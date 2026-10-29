@@ -1,8 +1,6 @@
 //! Material button presentation over GPUI Base activation and focus behavior.
 //! Reference: floor/material c910072f3fc5b660276731d8a935d7186f288364.
-//! Ripple, animated state layers/shadows, expanded touch targets and toggle/loading
-//! semantics are still pending. Color transitions currently inherit Base's reduced
-//! motion and repeated-reversal policies; this is not full reference conformance.
+//! Ripple, expanded touch targets and toggle/loading semantics are still pending.
 mod effects;
 mod focus_ring;
 mod shadow;
@@ -231,13 +229,14 @@ fn colors(variant: ButtonVariant, disabled: bool) -> (Rgba, Rgba, Rgba) {
     let (bg, fg, border) = color_targets(variant, disabled);
     (bg.resolve(), fg.resolve(), border.resolve())
 }
-fn elevation(level: u8) -> Vec<BoxShadow> {
-    shadow::ShadowPair::level(level).into_shadows()
-}
 
 /// Passive visual state. Base remains the only activation authority.
 struct PressState {
     pointer: bool,
+    hovered: bool,
+    caller_hovered: bool,
+    native_hovered: bool,
+    outside_window: bool,
     keyboard: bool,
     focus: FocusHandle,
     focus_out: Option<Subscription>,
@@ -245,6 +244,8 @@ struct PressState {
 }
 fn clear_press(state: &mut PressState) {
     state.pointer = false;
+    state.hovered = false;
+    state.outside_window = true;
     state.keyboard = false;
 }
 fn press_state(
@@ -263,6 +264,10 @@ fn press_state(
             });
         PressState {
             pointer: false,
+            hovered: false,
+            caller_hovered: false,
+            native_hovered: false,
+            outside_window: false,
             keyboard: false,
             focus: focus.clone(),
             focus_out: None,
@@ -299,7 +304,9 @@ fn observe_press(
     base = base.on_mouse_down(MouseButton::Left, move |_, window, cx| {
         if !window.default_prevented() {
             down.update(cx, |state, cx| {
+                state.outside_window = false;
                 state.pointer = true;
+                state.hovered = !window.last_input_was_touch();
                 cx.notify();
             });
         }
@@ -307,14 +314,16 @@ fn observe_press(
     let up = state.clone();
     let out = state.clone();
     base = base
-        .on_mouse_up(MouseButton::Left, move |_, _, cx| {
+        .on_mouse_up(MouseButton::Left, move |_, window, cx| {
             up.update(cx, |state, cx| {
                 state.pointer = false;
+                state.hovered = !window.last_input_was_touch();
                 cx.notify();
             });
         })
         .on_mouse_up_out(MouseButton::Left, move |_, _, cx| {
             out.update(cx, |state, cx| {
+                state.hovered = false;
                 state.pointer = false;
                 cx.notify();
             });
@@ -347,6 +356,8 @@ fn observe_press(
     base
 }
 
+type HoverCallback = std::rc::Rc<dyn Fn(&bool, &mut Window, &mut App)>;
+
 /// Sized, shaped Material presentation; activation, keyboard and focus stay in Base.
 #[derive(IntoElement)]
 pub struct MaterialButton {
@@ -354,6 +365,10 @@ pub struct MaterialButton {
     radius_observer: Option<std::rc::Rc<std::cell::Cell<f32>>>,
     #[cfg(test)]
     colors_observer: Option<std::rc::Rc<std::cell::Cell<(Rgba, Rgba, Rgba)>>>,
+    hover_callback: Option<HoverCallback>,
+    caller_hover_mode: HoverListenerMode,
+    #[cfg(test)]
+    effects_observer: Option<std::rc::Rc<std::cell::RefCell<(f32, shadow::ShadowPair)>>>,
     id: ElementId,
     focus_handle: Option<FocusHandle>,
     focusable: bool,
@@ -376,6 +391,10 @@ impl MaterialButton {
             radius_observer: None,
             #[cfg(test)]
             colors_observer: None,
+            hover_callback: None,
+            caller_hover_mode: HoverListenerMode::InputModalityAware,
+            #[cfg(test)]
+            effects_observer: None,
             id: id.clone(),
             focus_handle: None,
             focusable: true,
@@ -466,7 +485,16 @@ impl InteractiveElement for MaterialButton {
         self.base.interactivity()
     }
 }
-impl StatefulInteractiveElement for MaterialButton {}
+impl StatefulInteractiveElement for MaterialButton {
+    fn hover_listener_mode(mut self, mode: HoverListenerMode) -> Self {
+        self.caller_hover_mode = mode;
+        self
+    }
+    fn on_hover(mut self, listener: impl Fn(&bool, &mut Window, &mut App) + 'static) -> Self {
+        self.hover_callback = Some(std::rc::Rc::new(listener));
+        self
+    }
+}
 impl RenderOnce for MaterialButton {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         use gpui_base::StyledExt;
@@ -525,6 +553,53 @@ impl RenderOnce for MaterialButton {
                 state.keyboard = false;
             });
         }
+        let active = pressed.read(cx).pointer || pressed.read(cx).keyboard;
+        let hovered = pressed.read(cx).hovered && !window.last_input_was_touch();
+        let focused =
+            self.focusable && focus.is_focused(window) && window.last_input_was_keyboard();
+        let opacity = gpui_base::transition(
+            (self.id.clone(), "state-opacity"),
+            if self.disabled {
+                0.
+            } else if active || focused {
+                0.10
+            } else if hovered {
+                0.08
+            } else {
+                0.
+            },
+            gpui_base::Transition::new(std::time::Duration::from_millis(100))
+                .reduced_motion(gpui_base::ReducedMotion::Continue)
+                .easing(
+                    gpui_base::Easing::cubic_bezier(0.2, 0., 0., 1.)
+                        .expect("valid Material easing"),
+                ),
+            window,
+            cx,
+        );
+        let level = if self.disabled {
+            0
+        } else if self.variant == ButtonVariant::Elevated {
+            if hovered && !active { 2 } else { 1 }
+        } else if hovered
+            && !active
+            && matches!(self.variant, ButtonVariant::Filled | ButtonVariant::Tonal)
+        {
+            1
+        } else {
+            0
+        };
+        let shadows = motion::token_transition(
+            (self.id.clone(), "box-shadow"),
+            shadow::ShadowPair::level(level),
+            MotionToken::DefaultEffects,
+            window,
+            cx,
+        );
+        #[cfg(test)]
+        if let Some(observer) = &self.effects_observer {
+            *observer.borrow_mut() = (opacity, shadows.clone());
+        }
         let radius = motion::token_value(
             (self.id.clone(), "pressed-radius"),
             if pressed.read(cx).pointer || pressed.read(cx).keyboard {
@@ -564,26 +639,37 @@ impl RenderOnce for MaterialButton {
             ButtonIconPosition::Leading => (slot, None),
             ButtonIconPosition::Trailing => (None, slot),
         };
-        let level = if self.variant == ButtonVariant::Elevated {
-            1
-        } else {
-            0
-        };
-        let hover_level = match self.variant {
-            ButtonVariant::Elevated => 2,
-            ButtonVariant::Filled | ButtonVariant::Tonal => 1,
-            _ => 0,
-        };
         let weak = pressed.downgrade();
         // A window exit must clear a held press even after the pointer has left
         // the button. This canvas creates no hitbox and never handles activation.
         let exit_observer = canvas(
             |_, _, _| (),
-            move |_, _, window, _| {
+            move |bounds, _, window, _| {
+                let moving = weak.clone();
+                window.on_mouse_event(move |event: &MouseMoveEvent, phase, window, cx| {
+                    if phase == DispatchPhase::Capture {
+                        let _ = moving.update(cx, |state, cx| {
+                            if state.pointer || state.outside_window {
+                                state.outside_window = false;
+                                let hovered = bounds.contains(&event.position)
+                                    && !window.last_input_was_touch();
+                                if state.hovered != hovered {
+                                    state.hovered = hovered;
+                                    cx.notify();
+                                }
+                            }
+                        });
+                    }
+                });
                 window.on_mouse_event(move |_: &MouseExitEvent, phase, _, cx| {
                     if phase == DispatchPhase::Capture {
                         let _ = weak.update(cx, |state, cx| {
-                            if state.pointer {
+                            // A deferred native hover check can still see the last
+                            // in-window mouse position after exit. Keep it suppressed
+                            // until an actual pointer event enters the window again.
+                            state.outside_window = true;
+                            if state.pointer || state.hovered {
+                                state.hovered = false;
                                 state.pointer = false;
                                 cx.notify();
                             }
@@ -602,6 +688,55 @@ impl RenderOnce for MaterialButton {
             .children(trailing)
             .child(exit_observer);
         let base = observe_press(base, &pressed, &focus, self.disabled, self.focusable);
+        let hover_state = pressed.clone();
+        let callback = self.hover_callback;
+        let caller_mode = self.caller_hover_mode;
+        // CSS :hover is independent of keyboard modality. Preserve the caller's
+        // GPUI modality preference separately, sharing the one native listener.
+        if let Some(callback) = callback.clone() {
+            let caller_hovered = pressed.read(cx).native_hovered
+                && !pressed.read(cx).outside_window
+                && (!window.last_input_was_keyboard()
+                    || matches!(caller_mode, HoverListenerMode::InputModalityIndependent));
+            if caller_hovered != pressed.read(cx).caller_hovered {
+                pressed.update(cx, |state, _| state.caller_hovered = caller_hovered);
+                let weak = pressed.downgrade();
+                window.defer(cx, move |window, cx| {
+                    if let Some(state) = weak.upgrade()
+                        && state.read(cx).caller_hovered == caller_hovered
+                    {
+                        callback(&caller_hovered, window, cx);
+                    }
+                });
+            }
+        }
+        let base = base
+            .hover_listener_mode(HoverListenerMode::InputModalityIndependent)
+            .on_hover(move |hovered, window, cx| {
+                let caller_hovered = *hovered
+                    && !hover_state.read(cx).outside_window
+                    && (!window.last_input_was_keyboard()
+                        || matches!(caller_mode, HoverListenerMode::InputModalityIndependent));
+                let changed = hover_state.update(cx, |state, cx| {
+                    // GPUI reports hover=false during a held mouse down; the passive
+                    // move observer maintains pointer location for that interval.
+                    if !state.pointer {
+                        let hovered =
+                            *hovered && !state.outside_window && !window.last_input_was_touch();
+                        if state.hovered != hovered {
+                            state.hovered = hovered;
+                            cx.notify();
+                        }
+                    }
+                    state.native_hovered = *hovered;
+                    let changed = state.caller_hovered != caller_hovered;
+                    state.caller_hovered = caller_hovered;
+                    changed
+                });
+                if changed && let Some(callback) = &callback {
+                    callback(&caller_hovered, window, cx);
+                }
+            });
         let base = base
             .flex()
             .flex_row()
@@ -617,7 +752,7 @@ impl RenderOnce for MaterialButton {
             .pr(rem(right_padding))
             .gap(rem(g.gap))
             .rounded(rem(radius))
-            .bg(bg)
+            .bg(layer(bg, fg, opacity))
             .text_color(fg)
             .text_size(ty.font_size)
             .line_height(ty.line_height)
@@ -625,13 +760,8 @@ impl RenderOnce for MaterialButton {
             .when(self.variant == ButtonVariant::Outlined, |b| {
                 b.border(rem(g.outline)).border_color(border)
             })
-            .shadow(elevation(if self.disabled { 0 } else { level }))
-            .when(!self.disabled, |b| {
-                b.cursor_pointer()
-                    .hover(move |s| s.bg(layer(bg, fg, 0.08)).shadow(elevation(hover_level)))
-                    .focus_visible(move |s| s.bg(layer(bg, fg, 0.10)))
-                    .active(move |s| s.bg(layer(bg, fg, 0.10)).shadow(elevation(level)))
-            })
+            .shadow(shadows.into_shadows())
+            .when(!self.disabled, |b| b.cursor_pointer())
             .refine_style(&self.style);
         focus_ring::ButtonFocusRing::new(base, focus, !self.disabled && self.focusable, rem(radius))
     }
@@ -651,6 +781,313 @@ mod tests {
     };
 
     type PaintedColors = (gpui::Rgba, gpui::Rgba, gpui::Rgba);
+
+    struct EffectsHarness {
+        disabled: bool,
+        sample: std::rc::Rc<std::cell::RefCell<(f32, super::shadow::ShadowPair)>>,
+        focus: gpui::FocusHandle,
+        hovers: Vec<bool>,
+        hover_mode: gpui::HoverListenerMode,
+        activations: usize,
+    }
+    impl Render for EffectsHarness {
+        fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+            window.set_rem_size(px(14.));
+            crate::motion::apply_scheme(crate::motion::MotionScheme::Expressive);
+            let mut button = MaterialButton::new("effects")
+                .disabled(self.disabled)
+                .track_focus(&self.focus)
+                .debug_selector(|| "effects".into())
+                .child("Effects")
+                .on_click(cx.listener(|this, _, _, _| this.activations += 1));
+            button = StatefulInteractiveElement::on_hover(
+                button,
+                cx.listener(|this, hovered, _, _| this.hovers.push(*hovered)),
+            );
+            button = StatefulInteractiveElement::hover_listener_mode(button, self.hover_mode);
+            button.effects_observer = Some(self.sample.clone());
+            div().p(px(30.)).child(button)
+        }
+    }
+    #[gpui::test]
+    fn state_opacity_and_shadow_have_independent_event_clocks(cx: &mut TestAppContext) {
+        use super::shadow::ShadowPair;
+        use gpui::{MouseButton, MouseMoveEvent, point};
+        use gpui_base::Interpolate;
+        use std::{cell::RefCell, rc::Rc, time::Duration};
+        cx.update(gpui_base::init);
+        let sample = Rc::new(RefCell::new((0., ShadowPair::level(0))));
+        let (view, cx) = cx.add_window_view({
+            let sample = sample.clone();
+            move |_, cx| EffectsHarness {
+                disabled: false,
+                sample,
+                focus: cx.focus_handle(),
+                hovers: vec![],
+                hover_mode: gpui::HoverListenerMode::InputModalityAware,
+                activations: 0,
+            }
+        });
+        draw(cx);
+        let center = cx.debug_bounds("effects").unwrap().center();
+        cx.simulate_event(MouseMoveEvent {
+            position: center,
+            pressed_button: None,
+            modifiers: Modifiers::default(),
+        });
+        draw(cx);
+        cx.run_until_parked();
+        draw(cx);
+        assert_eq!(sample.borrow().0, 0.);
+        cx.executor().advance_clock(Duration::from_millis(50));
+        draw(cx);
+        // Independently sampled from the CSS reference in Chromium.
+        assert!((sample.borrow().0 - 0.0702267).abs() < 0.00001);
+        cx.executor().advance_clock(Duration::from_millis(50));
+        draw(cx);
+        assert_eq!(sample.borrow().0, 0.08);
+        let expected = ShadowPair::level(0).interpolate(
+            &ShadowPair::level(1),
+            crate::motion::MotionScheme::Expressive
+                .resolve(crate::motion::MotionToken::DefaultEffects)
+                .ease()(0.4),
+        );
+        assert_eq!(sample.borrow().1, expected);
+        assert_ne!(sample.borrow().1, ShadowPair::level(1));
+        cx.executor().advance_clock(Duration::from_millis(150));
+        draw(cx);
+        assert_eq!(sample.borrow().1, ShadowPair::level(1));
+        // A stationary pointer stays hovered across disable/re-enable, even
+        // though the native hover listener need not emit another true event.
+        view.update(cx, |view, cx| {
+            view.disabled = true;
+            cx.notify();
+        });
+        draw(cx);
+        cx.executor().advance_clock(Duration::from_millis(250));
+        draw(cx);
+        assert_eq!(*sample.borrow(), (0., ShadowPair::level(0)));
+        view.update(cx, |view, cx| {
+            view.disabled = false;
+            cx.notify();
+        });
+        draw(cx);
+        cx.executor().advance_clock(Duration::from_millis(250));
+        draw(cx);
+        assert_eq!(*sample.borrow(), (0.08, ShadowPair::level(1)));
+        cx.update(|_, cx| cx.set_reduce_motion(true));
+        cx.simulate_mouse_down(center, MouseButton::Left, Modifiers::default());
+        draw(cx);
+        cx.simulate_mouse_move(center, MouseButton::Left, Modifiers::default());
+        draw(cx);
+        cx.executor().advance_clock(Duration::from_millis(50));
+        draw(cx);
+        assert!(
+            (sample.borrow().0 - 0.0975567).abs() < 0.00001,
+            "reduced motion preserves CSS state fade"
+        );
+        assert_ne!(
+            sample.borrow().1,
+            ShadowPair::level(0),
+            "reduced motion preserves CSS shadow transition"
+        );
+        cx.executor().advance_clock(Duration::from_millis(50));
+        draw(cx);
+        assert_eq!(sample.borrow().0, 0.10);
+        cx.simulate_mouse_up(center, MouseButton::Left, Modifiers::default());
+        draw(cx);
+        cx.executor().advance_clock(Duration::from_millis(250));
+        draw(cx);
+        assert_eq!(
+            sample.borrow().0,
+            0.08,
+            "held move's GPUI hover=false must not lose hover on release"
+        );
+        assert_eq!(sample.borrow().1, ShadowPair::level(1));
+        cx.update(|_, cx| {
+            assert!(!view.read(cx).hovers.is_empty());
+            assert_eq!(view.read(cx).activations, 1);
+        });
+        cx.simulate_mouse_down(center, MouseButton::Left, Modifiers::default());
+        draw(cx);
+        cx.simulate_mouse_up(
+            point(px(900.), px(800.)),
+            MouseButton::Left,
+            Modifiers::default(),
+        );
+        draw(cx);
+        cx.executor().advance_clock(Duration::from_millis(250));
+        draw(cx);
+        assert_eq!(*sample.borrow(), (0., ShadowPair::level(0)));
+        // Pointer focus becomes visible only when keyboard modality takes over.
+        key(cx, "a", true);
+        draw(cx);
+        cx.executor().advance_clock(Duration::from_millis(100));
+        draw(cx);
+        assert_eq!(sample.borrow().0, 0.10);
+        view.update(cx, |view, cx| {
+            view.disabled = true;
+            cx.notify();
+        });
+        draw(cx);
+        cx.executor().advance_clock(Duration::from_millis(250));
+        draw(cx);
+        assert_eq!(*sample.borrow(), (0., ShadowPair::level(0)));
+        view.update(cx, |view, cx| {
+            view.disabled = false;
+            cx.notify();
+        });
+        cx.update(|window, cx| {
+            window.blur(cx);
+            window.activate_window();
+        });
+        cx.run_until_parked();
+        cx.simulate_event(MouseMoveEvent {
+            position: center,
+            pressed_button: None,
+            modifiers: Modifiers::default(),
+        });
+        draw(cx);
+        cx.run_until_parked();
+        draw(cx);
+        cx.executor().advance_clock(Duration::from_millis(250));
+        draw(cx);
+        assert_eq!(*sample.borrow(), (0.08, ShadowPair::level(1)));
+        cx.simulate_mouse_down(center, MouseButton::Left, Modifiers::default());
+        draw(cx);
+        cx.executor().advance_clock(Duration::from_millis(100));
+        draw(cx);
+        assert_eq!(sample.borrow().0, 0.10);
+        cx.deactivate_window();
+        draw(cx);
+        cx.executor().advance_clock(Duration::from_millis(250));
+        for _ in 0..3 {
+            cx.run_until_parked();
+            draw(cx);
+            assert_eq!(
+                *sample.borrow(),
+                (0., ShadowPair::level(0)),
+                "deactivation must not revive hover from the cached pointer position"
+            );
+            cx.update(|_, cx| assert_eq!(view.read(cx).hovers.last(), Some(&false)));
+        }
+        cx.simulate_mouse_up(
+            point(px(900.), px(800.)),
+            MouseButton::Left,
+            Modifiers::default(),
+        );
+        cx.update(|window, _| window.activate_window());
+        cx.run_until_parked();
+        cx.simulate_event(MouseMoveEvent {
+            position: center,
+            pressed_button: None,
+            modifiers: Modifiers::default(),
+        });
+        draw(cx);
+        cx.run_until_parked();
+        draw(cx);
+        cx.executor().advance_clock(Duration::from_millis(250));
+        draw(cx);
+        assert_eq!(
+            *sample.borrow(),
+            (0.08, ShadowPair::level(1)),
+            "a real pointer move after activation restores hover"
+        );
+        cx.update(|_, cx| assert_eq!(view.read(cx).hovers.last(), Some(&true)));
+    }
+
+    #[gpui::test]
+    fn keyboard_hover_modes_preserve_caller_events_and_material_elevation(cx: &mut TestAppContext) {
+        use super::shadow::ShadowPair;
+        use gpui::{HoverListenerMode, MouseMoveEvent, point};
+        use std::{cell::RefCell, rc::Rc, time::Duration};
+        cx.update(gpui_base::init);
+        let sample = Rc::new(RefCell::new((0., ShadowPair::level(0))));
+        let (view, cx) = cx.add_window_view({
+            let sample = sample.clone();
+            move |_, cx| EffectsHarness {
+                disabled: false,
+                sample,
+                focus: cx.focus_handle(),
+                hovers: vec![],
+                hover_mode: HoverListenerMode::InputModalityAware,
+                activations: 0,
+            }
+        });
+        draw(cx);
+        let center = cx.debug_bounds("effects").unwrap().center();
+        cx.simulate_event(MouseMoveEvent {
+            position: center,
+            pressed_button: None,
+            modifiers: Modifiers::default(),
+        });
+        draw(cx);
+        cx.run_until_parked();
+        draw(cx);
+        cx.executor().advance_clock(Duration::from_millis(250));
+        draw(cx);
+        assert_eq!(*sample.borrow(), (0.08, ShadowPair::level(1)));
+        cx.update(|window, cx| {
+            let focus = view.read(cx).focus.clone();
+            window.focus(&focus, cx);
+        });
+        key(cx, "a", true);
+        draw(cx);
+        cx.run_until_parked();
+        draw(cx);
+        cx.executor().advance_clock(Duration::from_millis(100));
+        draw(cx);
+        assert_eq!(*sample.borrow(), (0.10, ShadowPair::level(1)));
+        cx.update(|_, cx| assert_eq!(view.read(cx).hovers, [true, false]));
+        view.update(cx, |view, cx| {
+            view.hover_mode = HoverListenerMode::InputModalityIndependent;
+            cx.notify();
+        });
+        draw(cx);
+        cx.run_until_parked();
+        draw(cx);
+        cx.update(|_, cx| assert_eq!(view.read(cx).hovers, [true, false, true]));
+        key(cx, "b", true);
+        draw(cx);
+        cx.run_until_parked();
+        cx.update(|_, cx| assert_eq!(view.read(cx).hovers, [true, false, true]));
+        cx.simulate_event(gpui::TouchEvent {
+            id: gpui::TouchId(1),
+            phase: gpui::TouchPhase::Started,
+            position: center,
+            ..Default::default()
+        });
+        draw(cx);
+        cx.executor().advance_clock(Duration::from_millis(250));
+        draw(cx);
+        assert_eq!(
+            *sample.borrow(),
+            (0., ShadowPair::level(0)),
+            "touch must not retain hover or keyboard focus layers"
+        );
+        cx.simulate_event(gpui::TouchEvent {
+            id: gpui::TouchId(1),
+            phase: gpui::TouchPhase::Ended,
+            position: center,
+            ..Default::default()
+        });
+        cx.update(|window, cx| window.blur(cx));
+        cx.simulate_event(gpui::MouseExitEvent {
+            position: point(px(1200.), px(1000.)),
+            pressed_button: None,
+            modifiers: Modifiers::default(),
+        });
+        draw(cx);
+        cx.executor().advance_clock(Duration::from_millis(250));
+        draw(cx);
+        assert_eq!(*sample.borrow(), (0., ShadowPair::level(0)));
+        cx.run_until_parked();
+        draw(cx);
+        cx.run_until_parked();
+        draw(cx);
+        assert_eq!(*sample.borrow(), (0., ShadowPair::level(0)));
+        cx.update(|_, cx| assert_eq!(view.read(cx).hovers, [true, false, true, false]));
+    }
 
     struct ColorsHarness {
         variant: ButtonVariant,
@@ -766,6 +1203,9 @@ mod tests {
             view.update(cx, |view, _| view.disabled = true);
             window.draw(cx).clear(cx);
         });
+        assert_colors_close(sample.get(), colors(ButtonVariant::Tonal, false));
+        cx.executor().advance_clock(Duration::from_millis(250));
+        draw(cx);
         assert_colors_close(sample.get(), colors(ButtonVariant::Tonal, true));
     }
 
