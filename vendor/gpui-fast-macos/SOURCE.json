@@ -2,6 +2,7 @@
   "package": "gpui-fast-macos",
   "version": "0.1.12",
   "source": "crates.io published archive",
+  "archive_url": "https://static.crates.io/crates/gpui-fast-macos/gpui-fast-macos-0.1.12.crate",
   "archive_sha256": "d8e8b377d6dcbc0007e68098cb3f40bc2591a1d29526301e9572a70bb674f171",
   "upstream_files": {
     "Cargo.lock": "d91ed48ed2d416e9b3bd19eb03124fcaa2474cf42c5f23e121396edac5b6f2a8",
@@ -24,9 +25,34 @@
     "src/window_appearance.rs": "c1ea31769bfd6b324339525b8ffec3be0f59a24495a7e491c1df66bd43db5b75"
   },
   "local_patches": [
-    "src/window.rs",
     "src/display_link.rs",
-    "src/fast/composition.rs"
+    "src/fast/composition.rs",
+    "src/window.rs"
   ],
+  "modified_files": {
+    "src/display_link.rs": {
+      "upstream_sha256": "088f3e0b8dd9b242a1f6c090a2c79ef081857cc917564673d61d84a48c6cf1cc",
+      "local_sha256": "0254d01fe67a54f8d23b53f2dc649cc99e94629bcd310262c4f81d27f42a376e",
+      "reason": "WindowFrameSource::is_running and wake: one coalesced demand request on the existing main-thread source (MATERIAL-PATCHES.md)."
+    },
+    "src/fast/composition.rs": {
+      "upstream_sha256": "565d2e92ca930f921aef6513719442d2900b7a416b18404b13cfe31d272d4434",
+      "local_sha256": "f4d978c0649cbce39f6ad48abab4820f988829990618bc43c70c384d40a99aad",
+      "reason": "Composed-surface vsync status/control, inheritance by new surfaces, and all-surfaces-submitted frame counting (MATERIAL-PATCHES.md)."
+    },
+    "src/window.rs": {
+      "upstream_sha256": "d559ef3d21486e7e20fade38d917105ff4924d883143f5ef3aaca48faab5d1d8",
+      "local_sha256": "7f2c6a387c4996b82bb710eaee3f871920de8e48308d9ec72cecf11e6c54b1df",
+      "reason": "vsync_status/set_vsync, successful_frame_submissions via draw_with_status, has_periodic_frame_source, weak-owner demand frame_waker, unconditional anyhow::Result import (MATERIAL-PATCHES.md)."
+    }
+  },
+  "added_files": {},
+  "removed_files": {},
+  "unchanged_file_count": 15,
+  "provenance_files": [
+    "MATERIAL-PATCHES.md",
+    "SOURCE.json"
+  ],
+  "verification": "Archive downloaded from archive_url; its SHA-256 equals the crates.io index cksum and ~/.cargo/registry/cache. upstream_files are hashes of the extracted archive (excluding Cargo's .cargo-ok marker).",
   "validation": "source archive identity verified; runtime checks pending"
 }
