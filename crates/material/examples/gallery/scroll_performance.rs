@@ -197,7 +197,8 @@ impl Session {
         window: &mut Window,
         cx: &mut App,
         target: ScrollTarget,
-        finish_cpu: impl FnOnce(Vec<FrameEvent>, WindowId, Duration, Vec<String>) -> Value + 'static,
+        finish_cpu: impl FnOnce(Vec<FrameEvent>, WindowId, Duration, Vec<String>, Vec<usize>) -> Value
+        + 'static,
     ) {
         let quit_output = self.output.clone();
         cx.on_app_quit(move |_| {
@@ -245,15 +246,17 @@ impl Session {
             state.borrow_mut().stopped = true;
         }
         // Record the initial count/position; no startup sample is discarded.
-        state.borrow_mut().observe(window);
+        state.borrow_mut().observe(window, cx);
         schedule(state.clone(), window);
         let executor = cx.background_executor().clone();
         cx.spawn(async move |cx| {
             let mut events = Vec::new();
             let mut cpu_errors = Vec::new();
+            let mut batch_sizes = Vec::new();
             loop {
                 executor.timer(Duration::from_millis(100)).await;
                 let batch = self.collector.collect_unseen();
+                batch_sizes.push(batch.len());
                 if batch.len() >= (16 * 1024 * 1024) / std::mem::size_of::<FrameEvent>() {
                     cpu_errors.push("profiler ring full; event loss cannot be excluded".into());
                 }
@@ -263,9 +266,9 @@ impl Session {
                 }
             }
             if handle
-                .update(cx, |_, window, _| {
+                .update(cx, |_, window, cx| {
                     let mut state = state.borrow_mut();
-                    state.observe(window);
+                    state.observe(window, cx);
                     state.engine_final = engine_snapshot(window);
                     state.stopped = true;
                 })
@@ -277,12 +280,19 @@ impl Session {
                     .push("window closed before final sample".into());
             }
             let final_batch = self.collector.collect_unseen();
+            batch_sizes.push(final_batch.len());
             if final_batch.len() >= (16 * 1024 * 1024) / std::mem::size_of::<FrameEvent>() {
                 cpu_errors.push("final profiler batch full; event loss cannot be excluded".into());
             }
             events.extend(final_batch);
             profiler::set_trace_enabled(false);
-            let cpu = finish_cpu(events, window_id, started.elapsed(), cpu_errors);
+            let cpu = finish_cpu(
+                events,
+                window_id,
+                started.elapsed(),
+                cpu_errors,
+                batch_sizes,
+            );
             let report = state.borrow().report(cpu);
             let code = report["exit_code"].as_i64().unwrap_or(2) as i32;
             if let Some(parent) = self.output.parent() {
@@ -307,6 +317,8 @@ struct Observation {
     down: bool,
     moved: bool,
     vsync: &'static str,
+    thermal_state: &'static str,
+    window_active: bool,
 }
 struct Drive {
     started: Instant,
@@ -327,7 +339,7 @@ struct Drive {
     stopped: bool,
 }
 impl Drive {
-    fn observe(&mut self, window: &Window) -> bool {
+    fn observe(&mut self, window: &Window, cx: &App) -> bool {
         let position = self.target.position();
         if let Some(previous) = self.previous
             && let (Some(a), Some(b)) = (previous.item, position.item)
@@ -350,6 +362,16 @@ impl Drive {
             position,
             down: self.down,
             moved,
+            // App forwards this to the platform getter. On macOS this reads
+            // NSProcessInfo.thermalState; no observer, timer, or extra render is
+            // installed. This is one sampled state, not a transition history.
+            thermal_state: match cx.thermal_state() {
+                gpui::ThermalState::Nominal => "nominal",
+                gpui::ThermalState::Fair => "fair",
+                gpui::ThermalState::Serious => "serious",
+                gpui::ThermalState::Critical => "critical",
+            },
+            window_active: window.is_window_active(),
             vsync: match window.vsync_status() {
                 VsyncStatus::Disabled => "disabled",
                 VsyncStatus::Enabled => "enabled",
@@ -384,7 +406,7 @@ impl Drive {
         let raw: Vec<_> = self.raw.iter().enumerate().map(|(index,o)| {
             let previous = index.checked_sub(1).map(|i| &self.raw[i]);
             json!({"timestamp_ns":o.ns,"successful_new_frames":o.count,"position":o.position.json(),
-                "direction":if o.down {"down"} else {"up"},"position_changed":o.moved,"actual_vsync":o.vsync,
+                "direction":if o.down {"down"} else {"up"},"position_changed":o.moved,"actual_vsync":o.vsync,"thermal_state":o.thermal_state,"window_active":o.window_active,
                 "observed_interval_ns":previous.map(|p|o.ns-p.ns),
                 "counter_increment":previous.and_then(|p|p.count.zip(o.count)).map(|(a,b)|b.saturating_sub(a))})
         }).collect();
@@ -396,11 +418,7 @@ impl Drive {
             ScrollTarget::Pixels(handle) => Some(f32::from(handle.max_offset().y)),
             _ => None,
         };
-        let known_cpu_failure = cpu["summary"]["over_budget_frames"].as_u64().unwrap_or(0) > 0
-            || cpu["diagnostic_stage_summary"]["over_budget_frames"]
-                .as_u64()
-                .unwrap_or(0)
-                > 0;
+        let known_cpu_failure = super::performance::known_cpu_failure(&cpu);
         let partial_minimum = windows
             .iter()
             .filter(|w| w["partial"] == true)
@@ -422,6 +440,7 @@ impl Drive {
             "errors":errors,"cpu":cpu,"fps_overlay":true,
             "actual_vsync_initial":self.raw.first().map(|o|o.vsync),
             "actual_vsync_final":self.raw.last().map(|o|o.vsync),
+            "sampled_state_limit":"thermal_state and window_active are read during each observation; they do not prove state remained unchanged between observations; thermal getter calls the platform and its cost is included in driver work",
             "timing_domains":"CPU collector includes synchronous InitialDraw before open returns; FPS observations start when driver installs after open, not at CPU startup",
             "coverage":{"visited_logical_items":visited_items,"observed_offset_min":offset_min,"observed_offset_max":offset_max,
                 "total_scrollable_pixels":total_scrollable_pixels,"visited_sections":null,"complete_gallery_traversal":false,
@@ -440,7 +459,7 @@ fn schedule(state: Rc<RefCell<Drive>>, window: &mut Window) {
         if drive.stopped || drive.started.elapsed() >= drive.duration {
             return;
         }
-        let moved = drive.observe(window);
+        let moved = drive.observe(window, cx);
         if window.vsync_status() != VsyncStatus::Disabled {
             drive.errors.push("VSync changed during scrolling".into());
             drive.stopped = true;
@@ -554,6 +573,8 @@ mod tests {
                     down: true,
                     moved: false,
                     vsync: "disabled",
+                    thermal_state: "nominal",
+                    window_active: true,
                 },
                 Observation {
                     ns: 250_000_000,
@@ -565,6 +586,8 @@ mod tests {
                     down: false,
                     moved: true,
                     vsync: "disabled",
+                    thermal_state: "nominal",
+                    window_active: true,
                 },
             ],
         }
@@ -575,6 +598,8 @@ mod tests {
             .report(json!({"acceptance_eligible":true,"summary":{"over_budget_frames":0}}));
         assert_eq!(report["minimum_observed_window_fps"], 500.);
         assert_eq!(report["raw_observations"][1]["counter_increment"], 125);
+        assert_eq!(report["raw_observations"][1]["thermal_state"], "nominal");
+        assert_eq!(report["raw_observations"][1]["window_active"], true);
         assert_eq!(report["acceptance_eligible"], false);
         assert_eq!(report["exit_code"], 2);
     }
@@ -599,6 +624,8 @@ mod tests {
             down: false,
             moved: true,
             vsync: "disabled",
+            thermal_state: "nominal",
+            window_active: true,
         });
         let report = drive.report(json!({}));
         assert_eq!(report["minimum_observed_window_fps"], 500.);

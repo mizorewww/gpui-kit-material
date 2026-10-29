@@ -138,18 +138,23 @@ impl Session {
             eprintln!("Invalid scroll profile: {error}");
             std::process::exit(2)
         });
-        session.install(window, cx, target, move |events, id, elapsed, errors| {
-            report(
-                Recording {
-                    events,
-                    errors,
-                    batch_sizes: Vec::new(),
-                },
-                id,
-                self.metadata,
-                elapsed,
-            )
-        });
+        session.install(
+            window,
+            cx,
+            target,
+            move |events, id, elapsed, errors, batch_sizes| {
+                report(
+                    Recording {
+                        events,
+                        errors,
+                        batch_sizes,
+                    },
+                    id,
+                    self.metadata,
+                    elapsed,
+                )
+            },
+        );
     }
     pub fn install(mut self, window: &Window, cx: &mut App) {
         let window_id = window.window_handle().window_id();
@@ -206,13 +211,20 @@ impl Session {
         .detach();
     }
 }
+/// Known over-budget CPU work in any measured view fails, even when the
+/// evidence is otherwise incomplete. A split-scope sum excludes idle time, so
+/// it is CPU work for one frame and cannot be hidden as diagnostic-only.
+pub(super) fn known_cpu_failure(report: &Value) -> bool {
+    [
+        "summary",
+        "diagnostic_stage_summary",
+        "split_scope_frames_summary",
+    ]
+    .iter()
+    .any(|key| report[key]["over_budget_frames"].as_u64().unwrap_or(0) > 0)
+}
 fn exit_code(report: &Value) -> i32 {
-    if report["summary"]["over_budget_frames"].as_u64().unwrap() > 0
-        || report["diagnostic_stage_summary"]["over_budget_frames"]
-            .as_u64()
-            .unwrap()
-            > 0
-    {
+    if known_cpu_failure(report) {
         1
     } else if !report["acceptance_eligible"].as_bool().unwrap() {
         2
@@ -368,6 +380,7 @@ fn report(mut recording: Recording, target: WindowId, metadata: Value, elapsed: 
     let mut present_scopes = HashMap::new();
     let mut scope_costs = Vec::new();
     let mut scope_rows = Vec::new();
+    let mut split_sums = Vec::new();
     let mut saw_initial = false;
     for (index, scope) in scopes.iter().enumerate() {
         if scope.end < scope.start
@@ -483,10 +496,11 @@ fn report(mut recording: Recording, target: WindowId, metadata: Value, elapsed: 
                     frames[index]["over_budget"] =
                         json!(scopes[d].duration().as_nanos() > BUDGET_NS);
                 } else {
+                    let sum = scopes[d].duration().as_nanos() + scopes[p].duration().as_nanos();
+                    split_sums.push(sum);
                     frames[index]["cpu_frame_ns"] = Value::Null;
-                    frames[index]["over_budget"] = Value::Null;
-                    frames[index]["diagnostic_split_scope_cpu_sum_ns"] =
-                        json!(scopes[d].duration().as_nanos() + scopes[p].duration().as_nanos());
+                    frames[index]["over_budget"] = json!(sum > BUDGET_NS);
+                    frames[index]["diagnostic_split_scope_cpu_sum_ns"] = json!(sum);
                     reasons.push(format!("frame {index} draw and submit belong to separate scopes; split CPU sum is diagnostic, not a complete-frame measurement"));
                 }
             }
@@ -497,7 +511,7 @@ fn report(mut recording: Recording, target: WindowId, metadata: Value, elapsed: 
             }
         }
     }
-    json!({"schema":"material-gallery-cpu-frames-v2","statistics_definition":"nearest-rank quantiles; median is p50 (lower middle for even sample counts)","budget_ns":BUDGET_NS,"budget_comparison":"every complete CPU scope must be at or below budget; known over-budget work fails even when acceptance is incomplete","acceptance_eligible":recording.errors.is_empty() && reasons.is_empty(),"eligibility_reasons":reasons,"scope":"whole synchronous CPU frame scopes plus exact draw/present associations","cpu_work_definition":"Complete event end-start includes callbacks, draw, submission and cleanup; split initial draw and submission remain separately measured, idle gaps are not CPU work","complete":recording.errors.is_empty(),"errors":recording.errors,"metadata":metadata,"capture_elapsed_ns":elapsed.as_nanos(),"summary":summary(&scope_costs),"first_scope_summary":summary(&scope_costs[..scope_costs.len().min(1)]),"subsequent_scopes_summary":summary(&scope_costs[scope_costs.len().min(1)..]),"diagnostic_stage_summary":summary(&costs),"first_frame_stage_summary":summary(&costs[..costs.len().min(1)]),"subsequent_frames_stage_summary":summary(&costs[costs.len().min(1)..]),"collector_batch_sizes":recording.batch_sizes,"raw_events":raw,"cpu_scopes":scope_rows,"draw_lifecycle":draw_rows,"submissions":submission_rows,"frames":frames})
+    json!({"schema":"material-gallery-cpu-frames-v2","statistics_definition":"nearest-rank quantiles; median is p50 (lower middle for even sample counts)","budget_ns":BUDGET_NS,"budget_comparison":"every complete CPU scope must be at or below budget; known over-budget work fails even when acceptance is incomplete","acceptance_eligible":recording.errors.is_empty() && reasons.is_empty(),"eligibility_reasons":reasons,"scope":"whole synchronous CPU frame scopes plus exact draw/present associations","cpu_work_definition":"Complete event end-start includes callbacks, draw, submission and cleanup; split initial draw and submission remain separately measured, idle gaps are not CPU work","complete":recording.errors.is_empty(),"errors":recording.errors,"metadata":metadata,"capture_elapsed_ns":elapsed.as_nanos(),"summary":summary(&scope_costs),"split_scope_frames_summary":summary(&split_sums),"first_scope_summary":summary(&scope_costs[..scope_costs.len().min(1)]),"subsequent_scopes_summary":summary(&scope_costs[scope_costs.len().min(1)..]),"diagnostic_stage_summary":summary(&costs),"first_frame_stage_summary":summary(&costs[..costs.len().min(1)]),"subsequent_frames_stage_summary":summary(&costs[costs.len().min(1)..]),"collector_batch_sizes":recording.batch_sizes,"raw_events":raw,"cpu_scopes":scope_rows,"draw_lifecycle":draw_rows,"submissions":submission_rows,"frames":frames})
 }
 
 #[cfg(test)]
@@ -632,7 +646,13 @@ mod tests {
             2_100_000
         );
         assert_eq!(evidence["summary"]["max_ns"], 1_100_000);
-        assert_eq!(exit_code(&evidence), 2);
+        // Each scope fits, but the frame's CPU work (idle excluded) does not.
+        assert_eq!(evidence["frames"][0]["over_budget"], true);
+        assert_eq!(
+            evidence["split_scope_frames_summary"]["over_budget_frames"],
+            1
+        );
+        assert_eq!(exit_code(&evidence), 1);
     }
     #[test]
     fn callback_only_over_budget_scope_fails_even_without_complete_frame_pairs() {
