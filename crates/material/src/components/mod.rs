@@ -16,6 +16,7 @@ pub use divider::{
 };
 pub use switch::{MaterialSwitch, SwitchIcons};
 mod caption;
+mod checkbox;
 mod choice;
 mod feedback;
 mod focus;
@@ -29,6 +30,7 @@ mod title_bar;
 
 pub use button_group::ConnectedButtonGroup;
 pub use caption::{Caption, CaptionButton, CaptionButtons, CaptionLabels, title_bar_control};
+pub use checkbox::{CheckboxState, MaterialCheckbox};
 pub use choice::{ChoiceGroup, ChoiceTile, Tint, choice_radio, tinted_icon};
 pub use feedback::{
     AssistChip, BADGE_CONTAINER, BADGE_LABEL, BadgeKind, CARD_PADDING, CHIP_HEIGHT, CardSurface,
