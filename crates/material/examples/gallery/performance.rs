@@ -178,6 +178,12 @@ fn summary(values: &[u128]) -> Value {
 }
 fn report(mut recording: Recording, target: WindowId, metadata: Value, elapsed: Duration) -> Value {
     let mut pending: HashMap<WindowId, FrameTiming> = HashMap::new();
+    let mut last_submitted: HashMap<WindowId, FrameTiming> = HashMap::new();
+    let mut draws = HashMap::new();
+    let mut presentations = HashMap::new();
+    let mut draw_rows: Vec<Value> = Vec::new();
+    let mut draw_indices: HashMap<Instant, usize> = HashMap::new();
+    let mut submission_rows = Vec::new();
     let mut raw = Vec::new();
     let mut frames = Vec::new();
     let mut costs = Vec::new();
@@ -216,20 +222,62 @@ fn report(mut recording: Recording, target: WindowId, metadata: Value, elapsed: 
             FrameEvent::Draw(d) => {
                 let phases = json!({"request_layout_ns":d.phases.request_layout.as_nanos(),"prepaint_ns":d.phases.prepaint.as_nanos(),"paint_ns":d.phases.paint.as_nanos()});
                 raw.push(json!({"event":"draw","window":format!("{:?}",d.window_id),"start_ns":timestamp(d.draw_start),"end_ns":timestamp(d.draw_end),"dirty_ns":d.dirty_at.map(timestamp),"invalidations":d.invalidations,"refresh_interval_ns":d.refresh_interval.map(|v|v.as_nanos()),"signal_ns":d.signal_at.map(timestamp),"phases":phases}));
-                if pending.insert(d.window_id, d).is_some() {
+                if d.window_id != target {
+                    continue;
+                }
+                if draws.insert(d.draw_start, d).is_some() {
+                    recording.errors.push("duplicate raw draw timestamp".into());
+                }
+                if d.draw_end < d.draw_start {
                     recording
                         .errors
-                        .push(format!("draw superseded before present: {:?}", d.window_id));
+                        .push("invalid draw timestamp ordering".into());
                 }
+                if let Some(previous) = pending.insert(d.window_id, d)
+                    && let Some(&index) = draw_indices.get(&previous.draw_start)
+                {
+                    draw_rows[index]["disposition"] = json!("superseded_before_submit");
+                    draw_rows[index]["superseded_by_draw_start_ns"] =
+                        json!(timestamp(d.draw_start));
+                }
+                draw_indices.insert(d.draw_start, draw_rows.len());
+                draw_rows.push(json!({"draw_start_ns":timestamp(d.draw_start),"draw_end_ns":timestamp(d.draw_end),"disposition":"pending_at_capture_end"}));
             }
             FrameEvent::Present(p) => {
                 raw.push(json!({"event":"present","window":format!("{:?}",p.window_id),"start_ns":timestamp(p.present_start),"end_ns":timestamp(p.present_end),"animation_interval_ns":p.animation_interval.map(|v|v.as_nanos())}));
-                let Some(d) = pending.remove(&p.window_id) else {
+                if p.window_id != target {
+                    continue;
+                }
+                if presentations.insert(p.present_start, p).is_some() {
                     recording
                         .errors
-                        .push(format!("present without draw: {:?}", p.window_id));
+                        .push("duplicate raw present timestamp".into());
+                }
+                if p.present_end < p.present_start {
+                    recording
+                        .errors
+                        .push("invalid present timestamp ordering".into());
+                }
+                let fresh = pending.remove(&p.window_id);
+                let d = fresh.or_else(|| last_submitted.get(&p.window_id).copied());
+                submission_rows.push(json!({"present_start_ns":timestamp(p.present_start),"present_end_ns":timestamp(p.present_end),"disposition":if fresh.is_some() { "new_draw" } else if d.is_some() { "re_present" } else { "unknown_scene" },"draw_start_ns":d.map(|draw| timestamp(draw.draw_start))}));
+                let Some(d) = d else {
+                    recording.errors.push(format!(
+                        "present references an unobserved scene: {:?}",
+                        p.window_id
+                    ));
                     continue;
                 };
+                if fresh.is_none() {
+                    if p.present_start < d.draw_end {
+                        recording.errors.push("re-present precedes its draw".into());
+                    }
+                    continue;
+                }
+                last_submitted.insert(p.window_id, d);
+                if let Some(&index) = draw_indices.get(&d.draw_start) {
+                    draw_rows[index]["disposition"] = json!("submitted");
+                }
                 if d.draw_end < d.draw_start
                     || p.present_end < p.present_start
                     || p.present_start < d.draw_end
@@ -306,22 +354,43 @@ fn report(mut recording: Recording, target: WindowId, metadata: Value, elapsed: 
                     .errors
                     .push("duplicate complete scope for draw".into());
             }
-            if !pairs.iter().any(|(d, _)| d.draw_start == at) {
-                recording.errors.push(format!(
-                    "complete scope {index} draw has no matched Draw/Present events"
-                ));
+            match draws.get(&at) {
+                Some(draw) if draw.draw_end <= scope.end => {}
+                _ => recording.errors.push(format!(
+                    "complete scope {index} draw has no contained raw Draw event"
+                )),
             }
         }
-        if let Some(at) = scope.present_start
-            && present_scopes.insert(at, index).is_some()
-        {
-            recording
-                .errors
-                .push("duplicate complete scope for present".into());
+        if let Some(at) = scope.present_start {
+            if present_scopes.insert(at, index).is_some() {
+                recording
+                    .errors
+                    .push("duplicate complete scope for present".into());
+            }
+            match presentations.get(&at) {
+                Some(present) if present.present_end <= scope.end => {}
+                _ => recording.errors.push(format!(
+                    "complete scope {index} present has no contained raw Present event"
+                )),
+            }
         }
         let cost = scope.duration().as_nanos();
         scope_costs.push(cost);
         scope_rows.push(json!({"index":index,"source":format!("{:?}",scope.source),"cpu_elapsed_ns":cost,"draw_count":scope.draw_count,"present_count":scope.present_count,"next_frame_callbacks":scope.next_frame_callbacks,"over_budget":cost>BUDGET_NS,"gpu_time_ns":Value::Null}));
+    }
+    for at in draws.keys() {
+        if !draw_scopes.contains_key(at) {
+            recording
+                .errors
+                .push("raw draw has no owning complete scope".into());
+        }
+    }
+    for at in presentations.keys() {
+        if !present_scopes.contains_key(at) {
+            recording
+                .errors
+                .push("raw present has no owning complete scope".into());
+        }
     }
     if scopes.is_empty() {
         recording
@@ -330,6 +399,17 @@ fn report(mut recording: Recording, target: WindowId, metadata: Value, elapsed: 
     }
     if !saw_initial {
         reasons.push("first synchronous window draw scope was not observed".into());
+    }
+    // Superseding an initial draw is normal event flow, but it does not
+    // establish a single measured startup frame through the first submission.
+    // Preserve the distinction between complete events and acceptance evidence.
+    if let Some(first_present) = presentations.keys().min()
+        && let Some(&submit_scope) = present_scopes.get(first_present)
+        && scopes.iter().enumerate().any(|(index, scope)| {
+            scope.source == CpuFrameSource::InitialDraw && index != submit_scope
+        })
+    {
+        reasons.push("initial window drawing and first submission span separate CPU scopes; startup work is diagnostic, not a complete first-frame measurement".into());
     }
     for (index, (draw, present)) in pairs.iter().enumerate() {
         match (
@@ -363,7 +443,7 @@ fn report(mut recording: Recording, target: WindowId, metadata: Value, elapsed: 
             }
         }
     }
-    json!({"schema":"material-gallery-cpu-frames-v2","statistics_definition":"nearest-rank quantiles; median is p50 (lower middle for even sample counts)","budget_ns":BUDGET_NS,"budget_comparison":"every complete CPU scope must be at or below budget; known over-budget work fails even when acceptance is incomplete","acceptance_eligible":recording.errors.is_empty() && reasons.is_empty(),"eligibility_reasons":reasons,"scope":"whole synchronous CPU frame scopes plus exact draw/present associations","cpu_work_definition":"Complete event end-start includes callbacks, draw, submission and cleanup; split initial draw and submission remain separately measured, idle gaps are not CPU work","complete":recording.errors.is_empty(),"errors":recording.errors,"metadata":metadata,"capture_elapsed_ns":elapsed.as_nanos(),"summary":summary(&scope_costs),"first_scope_summary":summary(&scope_costs[..scope_costs.len().min(1)]),"subsequent_scopes_summary":summary(&scope_costs[scope_costs.len().min(1)..]),"diagnostic_stage_summary":summary(&costs),"first_frame_stage_summary":summary(&costs[..costs.len().min(1)]),"subsequent_frames_stage_summary":summary(&costs[costs.len().min(1)..]),"collector_batch_sizes":recording.batch_sizes,"raw_events":raw,"cpu_scopes":scope_rows,"frames":frames})
+    json!({"schema":"material-gallery-cpu-frames-v2","statistics_definition":"nearest-rank quantiles; median is p50 (lower middle for even sample counts)","budget_ns":BUDGET_NS,"budget_comparison":"every complete CPU scope must be at or below budget; known over-budget work fails even when acceptance is incomplete","acceptance_eligible":recording.errors.is_empty() && reasons.is_empty(),"eligibility_reasons":reasons,"scope":"whole synchronous CPU frame scopes plus exact draw/present associations","cpu_work_definition":"Complete event end-start includes callbacks, draw, submission and cleanup; split initial draw and submission remain separately measured, idle gaps are not CPU work","complete":recording.errors.is_empty(),"errors":recording.errors,"metadata":metadata,"capture_elapsed_ns":elapsed.as_nanos(),"summary":summary(&scope_costs),"first_scope_summary":summary(&scope_costs[..scope_costs.len().min(1)]),"subsequent_scopes_summary":summary(&scope_costs[scope_costs.len().min(1)..]),"diagnostic_stage_summary":summary(&costs),"first_frame_stage_summary":summary(&costs[..costs.len().min(1)]),"subsequent_frames_stage_summary":summary(&costs[costs.len().min(1)..]),"collector_batch_sizes":recording.batch_sizes,"raw_events":raw,"cpu_scopes":scope_rows,"draw_lifecycle":draw_rows,"submissions":submission_rows,"frames":frames})
 }
 
 #[cfg(test)]
@@ -529,5 +609,150 @@ mod tests {
         assert_eq!(evidence["acceptance_eligible"], false);
         assert_eq!(evidence["summary"]["over_budget_frames"], 1);
         assert_eq!(exit_code(&evidence), 1);
+    }
+
+    // Startup draw is replaced, then a platform frame is submitted and its
+    // scene is submitted again without new drawing work.
+    fn coalesced_startup(first_cost: Duration) -> Vec<FrameEvent> {
+        let first = draw();
+        let mut next = first;
+        next.draw_start = first.draw_start + Duration::from_millis(10);
+        next.draw_end = next.draw_start + Duration::from_micros(100);
+        let present = PresentTiming {
+            window_id: first.window_id,
+            present_start: next.draw_end,
+            present_end: next.draw_end + Duration::from_micros(100),
+            animation_interval: None,
+        };
+        let repeated = PresentTiming {
+            present_start: present.present_end + Duration::from_millis(20),
+            present_end: present.present_end
+                + Duration::from_millis(20)
+                + Duration::from_micros(100),
+            ..present
+        };
+        let initial = CpuFrameTiming {
+            window_id: first.window_id,
+            source: CpuFrameSource::InitialDraw,
+            start: first.draw_start,
+            end: first.draw_start + first_cost,
+            draw_start: Some(first.draw_start),
+            present_start: None,
+            draw_count: 1,
+            present_count: 0,
+            next_frame_callbacks: 0,
+            power_interrupted: false,
+        };
+        let submitted = CpuFrameTiming {
+            source: CpuFrameSource::Platform,
+            start: next.draw_start,
+            end: present.present_end,
+            draw_start: Some(next.draw_start),
+            present_start: Some(present.present_start),
+            present_count: 1,
+            ..initial
+        };
+        let resubmitted = CpuFrameTiming {
+            start: repeated.present_start,
+            end: repeated.present_end,
+            draw_start: None,
+            present_start: Some(repeated.present_start),
+            draw_count: 0,
+            ..submitted
+        };
+        vec![
+            FrameEvent::Draw(first),
+            FrameEvent::Complete(initial),
+            FrameEvent::Draw(next),
+            FrameEvent::Present(present),
+            FrameEvent::Complete(submitted),
+            FrameEvent::Present(repeated),
+            FrameEvent::Complete(resubmitted),
+        ]
+    }
+
+    fn report_events(events: Vec<FrameEvent>) -> serde_json::Value {
+        report(
+            Recording {
+                batch_sizes: vec![events.len()],
+                events,
+                errors: vec![],
+            },
+            WindowId::from(1),
+            json!({}),
+            Duration::ZERO,
+        )
+    }
+
+    #[test]
+    fn superseded_startup_and_represent_keep_all_cpu_scopes_without_idle() {
+        let evidence = report_events(coalesced_startup(Duration::from_millis(1)));
+        assert_eq!(evidence["complete"], true);
+        assert_eq!(evidence["acceptance_eligible"], false);
+        assert!(
+            evidence["eligibility_reasons"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|reason| reason
+                    .as_str()
+                    .unwrap()
+                    .contains("initial window drawing and first submission"))
+        );
+        assert_eq!(
+            evidence["draw_lifecycle"][0]["disposition"],
+            "superseded_before_submit"
+        );
+        assert_eq!(evidence["draw_lifecycle"][1]["disposition"], "submitted");
+        assert_eq!(evidence["submissions"][1]["disposition"], "re_present");
+        assert_eq!(evidence["summary"]["frames"], 3);
+        assert_eq!(evidence["summary"]["max_ns"], 1_000_000);
+        assert_eq!(evidence["cpu_scopes"][2]["cpu_elapsed_ns"], 100_000);
+        assert_eq!(exit_code(&evidence), 2);
+    }
+
+    #[test]
+    fn scope_declared_present_cannot_hide_a_filtered_raw_present() {
+        let mut events = coalesced_startup(Duration::from_millis(1));
+        events.remove(3); // Keep the complete scope declaring this submission.
+        let evidence = report_events(events);
+        assert_eq!(evidence["complete"], false);
+        assert_eq!(evidence["acceptance_eligible"], false);
+        assert!(evidence["errors"].as_array().unwrap().iter().any(|error| {
+            error
+                .as_str()
+                .unwrap()
+                .contains("present has no contained raw Present")
+        }));
+        assert_eq!(evidence["summary"]["frames"], 3);
+        assert_eq!(exit_code(&evidence), 2);
+    }
+
+    #[test]
+    fn pending_draw_at_capture_boundary_remains_incomplete_and_budgeted() {
+        let events = coalesced_startup(Duration::from_millis(1));
+        let evidence = report_events(events[..2].to_vec());
+        assert_eq!(
+            evidence["draw_lifecycle"][0]["disposition"],
+            "pending_at_capture_end"
+        );
+        assert_eq!(evidence["summary"]["frames"], 1);
+        assert_eq!(evidence["complete"], false);
+        assert_eq!(exit_code(&evidence), 2);
+    }
+
+    #[test]
+    fn superseded_over_budget_work_fails_even_when_submission_evidence_is_missing() {
+        let mut events = coalesced_startup(Duration::from_nanos(2_000_001));
+        events.remove(3);
+        let evidence = report_events(events);
+        assert_eq!(evidence["summary"]["over_budget_frames"], 1);
+        assert_eq!(evidence["complete"], false);
+        assert_eq!(exit_code(&evidence), 1);
+        let boundary = report_events(coalesced_startup(Duration::from_millis(2)));
+        assert_eq!(boundary["summary"]["over_budget_frames"], 0);
+        assert_eq!(boundary["complete"], true);
+        assert_eq!(boundary["acceptance_eligible"], false);
+        assert_eq!(exit_code(&boundary), 2);
     }
 }

@@ -1675,6 +1675,9 @@ impl WindowProfiler {
             animation_interval,
         };
         journal::record_present(present_timing, frame);
+        // Raw submissions describe actual CPU work, including re-presentations
+        // and draws excluded from latency statistics by visibility/power changes.
+        record_frame_event(FrameEvent::Present(present_timing));
 
         let Some(frame) = frame else {
             return;
@@ -1695,8 +1698,6 @@ impl WindowProfiler {
                 .record(animation_interval.as_nanos() as u64)
                 .ok();
         }
-        record_frame_event(FrameEvent::Present(present_timing));
-
         self.last_present_at = Some(present_end);
         self.animating_at_last_present = next_frame_scheduled && window_active;
     }
@@ -2068,7 +2069,7 @@ mod tests {
     }
 
     #[test]
-    fn records_present_events_for_newly_drawn_frames() {
+    fn records_present_events_including_represented_frames() {
         let _trace_test_guard = TraceTestGuard::new();
         set_trace_enabled(true);
         let window_id = WindowId::from(0xA11E);
@@ -2096,11 +2097,13 @@ mod tests {
                 _ => None,
             })
             .collect::<Vec<_>>();
-        let [first_present, second_present] = present_timings.as_slice() else {
-            panic!("expected exactly two present events, got {present_timings:?}");
+        let [first_present, second_present, repeated_present] = present_timings.as_slice() else {
+            panic!("expected exactly three present events, got {present_timings:?}");
         };
         assert_eq!(first_present.animation_interval, None);
         assert_eq!(second_present.animation_interval, Some(FRAME));
+        assert_eq!(repeated_present.animation_interval, None);
+        assert_eq!(repeated_present.present_start, start + FRAME + FRAME / 2);
 
         #[cfg(feature = "profiler")]
         {
@@ -2113,6 +2116,45 @@ mod tests {
                         .as_nanos() as u64
             );
         }
+    }
+
+    #[test]
+    fn records_raw_present_when_visibility_invalidates_latency_sample() {
+        let _trace_test_guard = TraceTestGuard::new();
+        let (_journal, _guard) = journal::install_test_foreground_journal(64, 4);
+        set_trace_enabled(true);
+        let id = WindowId::from(0xA11F);
+        let mut profiler = WindowProfiler::new(id).expect("valid histograms");
+        let old = Instant::now() - Duration::from_secs(1);
+        record_test_draw(&mut profiler, old);
+        profiler.first_input_at = Some(old);
+        profiler.pending_input_count = 1;
+        journal::record_window_visibility(id, crate::WindowVisibility::Hidden);
+        journal::record_window_visibility(id, crate::WindowVisibility::Visible);
+        assert!(profiler.pending_frame.is_some());
+        assert!(!journal::frame_sample_is_valid(id, old));
+
+        let mut collector = FrameTimingCollector::new();
+        let start = Instant::now();
+        let end = start + Duration::from_micros(100);
+        profiler.record_present_at(start, end, true, true);
+        let presentations = collector
+            .collect_unseen()
+            .into_iter()
+            .filter_map(|event| match event {
+                FrameEvent::Present(timing) if timing.window_id == id => Some(timing),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(presentations.len(), 1);
+        assert_eq!(presentations[0].present_start, start);
+        assert_eq!(presentations[0].present_end, end);
+        assert_eq!(presentations[0].animation_interval, None);
+        assert_eq!(profiler.input_latency_histogram.len(), 0);
+        assert_eq!(profiler.dirty_to_present_histogram.len(), 0);
+        assert_eq!(profiler.present_interval_histogram.len(), 0);
+        assert_eq!(profiler.last_present_at, None);
+        assert!(profiler.pending_frame.is_none());
     }
 
     #[test]
