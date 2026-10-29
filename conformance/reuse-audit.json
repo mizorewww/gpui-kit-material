@@ -1,0 +1,310 @@
+{
+  "schema": "material-kit-reuse-audit-v1",
+  "scope": "read-only source audit; deletion candidates are conditional, not executed replacements or visual/performance PASS",
+  "implementation_commit": "43b0a484bd7a91092e824413b122ba02fd7b6f51",
+  "upstream": {
+    "repository": "https://github.com/longbridge/gpui-kit",
+    "commit": "bb85882e1faab845d9e7be33b69a152879a90f69",
+    "local_checkout": "/tmp/gpui-material-kit-reference"
+  },
+  "symbols": {
+    "repository": "https://github.com/mizorewww/gpui-material-symbols",
+    "local_path": "../gpui-material-symbols",
+    "inspected_commit": "8055339faa9e75d1457da4936755bcebaf9d84fd"
+  },
+  "reviewers": [
+    "button_loading_audit: components",
+    "button_toggle_impl: facade, theme, icons, gallery",
+    "button_touch_target_audit: runtime patches, motion, performance"
+  ],
+  "items": [
+    {
+      "id": "kit-bootstrap",
+      "disposition": "replace-after-integration",
+      "priority": "P0",
+      "local_paths": [
+        "crates/material/examples/gallery.rs",
+        "crates/material/examples/gallery/mod.rs",
+        "crates/gallery-web/src/lib.rs"
+      ],
+      "upstream_paths": [
+        "crates/kit/src/lib.rs"
+      ],
+      "action": "Use gpui_kit::application/init/open_window; remove direct Base initialization and manual Root construction.",
+      "conditions": "Keep capture/profiler setup and one Root; verify overlay initialization and native/Web entry points."
+    },
+    {
+      "id": "material-icons",
+      "disposition": "replace-after-integration",
+      "priority": "P0",
+      "local_paths": [
+        "crates/material/src/icons.rs",
+        "crates/material/assets/icons"
+      ],
+      "upstream_paths": [
+        "crates/component/src/icon.rs"
+      ],
+      "action": "Reuse Symbols MaterialSymbols/WithMaterialSymbols/IconNamed and Component Icon; remove duplicated SVG wrapper and Lucide table after mappings land.",
+      "conditions": "Unify Kit source/revision. Cover component internal icons, data-backed icons, dimensions, rotation and variation axes; resolver must not regenerate SVG per draw."
+    },
+    {
+      "id": "theme-runtime",
+      "disposition": "consolidate",
+      "priority": "P1",
+      "local_paths": [
+        "crates/material/src/theme.rs"
+      ],
+      "upstream_paths": [
+        "crates/component/src/theme/mod.rs",
+        "crates/component/src/root.rs"
+      ],
+      "action": "Use one Component Theme projection and rem-size authority; remove competing runtime theme/scale writes.",
+      "conditions": "Retain full M3 roles, reference interpolation and token data; update theme only when it changes, preserving overlays and multi-window behavior."
+    },
+    {
+      "id": "symbols-consumer-dependency",
+      "disposition": "restructure",
+      "priority": "P0",
+      "local_paths": [
+        "../gpui-material-symbols/Cargo.toml"
+      ],
+      "upstream_paths": [],
+      "action": "Move the Material browser consumer into a separate workspace package in the Symbols repository.",
+      "conditions": "Keep Symbols core acyclic when Material depends on it; preserve Kit integration and consumer capabilities."
+    },
+    {
+      "id": "story-gallery",
+      "disposition": "reuse-parts",
+      "priority": "P1",
+      "local_paths": [
+        "crates/material/examples/gallery/mod.rs"
+      ],
+      "upstream_paths": [
+        "crates/story/src/gallery.rs"
+      ],
+      "action": "Reuse Component navigation/search/layout and Story patterns; do not depend on an assumed external catalog registry.",
+      "conditions": "Story has hardcoded registration; retain Material state matrices, capture and performance evidence."
+    },
+    {
+      "id": "base-compatibility",
+      "disposition": "retain-pending-equivalence",
+      "priority": "P0",
+      "local_paths": [
+        "vendor/gpui-base/src/button.rs",
+        "vendor/gpui-base/src/toggle.rs",
+        "vendor/gpui-base/src/a11y_disabled.rs",
+        "vendor/gpui-base/src/motion.rs"
+      ],
+      "upstream_paths": [
+        "crates/base/src/button.rs",
+        "crates/base/src/toggle.rs",
+        "crates/base/src/motion.rs"
+      ],
+      "action": "Keep narrow busy/focus/transition fixes while aligning the Git Base dependency.",
+      "conditions": "Same 0.8.1 version is not equivalence; upstream lacks the patched busy, focusable/disabled focus and reversal/reduced-motion behavior."
+    },
+    {
+      "id": "material-motion",
+      "disposition": "retain-design-data",
+      "priority": "P1",
+      "local_paths": [
+        "crates/material/src/motion.rs",
+        "crates/material/src/motion/expressive.rs"
+      ],
+      "upstream_paths": [
+        "crates/base/src/motion.rs",
+        "crates/component/src/theme/motion.rs"
+      ],
+      "action": "Keep Material tokens and curves; reuse the playback engine instead of creating a new scheduler.",
+      "conditions": "Base Spring and Material Spring have different parameterization/retargeting; verify conversion before removing math. Re-audit against primary reference."
+    },
+    {
+      "id": "material-color",
+      "disposition": "retain-design-data",
+      "priority": "P1",
+      "local_paths": [
+        "crates/color/src",
+        "crates/material/src/theme.rs"
+      ],
+      "upstream_paths": [
+        "crates/component/src/theme/mod.rs"
+      ],
+      "action": "Keep full Material roles and schemes; reuse generic utilities only after numerical equivalence.",
+      "conditions": "HSL, Oklab and RGBA blends are not interchangeable; Component semantic tokens do not retain all M3 roles."
+    },
+    {
+      "id": "gpui-text-hitbox-dpr",
+      "disposition": "retain-pending-equivalence",
+      "priority": "P0",
+      "local_paths": [
+        "vendor/gpui-pre",
+        "vendor/gpui-pre-apple",
+        "vendor/gpui-pre-web"
+      ],
+      "upstream_paths": [
+        "Cargo.toml"
+      ],
+      "action": "Keep required detailed text, original-hitbox extension, passive touch and DPR fixes until the selected runtime supplies equivalent behavior.",
+      "conditions": "Kit still depends on unpatched gpui-pre 0.3.10. Inspect actual runtime source and repeat regressions; do not remove entire vendor trees based on package names."
+    },
+    {
+      "id": "performance-evidence",
+      "disposition": "retain",
+      "priority": "P0",
+      "local_paths": [
+        "vendor/gpui-pre/src/profiler.rs",
+        "crates/material/examples/gallery/performance.rs",
+        "scripts/profile-gallery.py"
+      ],
+      "upstream_paths": [
+        "crates/fps/src/sampler.rs"
+      ],
+      "action": "Keep complete CPU scope and raw first-frame evidence; upstream FPS HUD is supplementary.",
+      "conditions": "Upstream sampler excludes warmup/backlog and uses draw timing; it cannot prove whole-gallery <=2ms including first frame."
+    },
+    {
+      "id": "web-reduced-motion",
+      "disposition": "retain-pending-equivalence",
+      "priority": "P1",
+      "local_paths": [
+        "crates/gallery-web/src/motion_preference.rs"
+      ],
+      "upstream_paths": [
+        "crates/story-web/src/lib.rs"
+      ],
+      "action": "Keep dynamic browser reduced-motion integration.",
+      "conditions": "No equivalent Story API was established in this audit; verify live preference changes before removal."
+    },
+    {
+      "id": "search-field",
+      "disposition": "thin-adapter",
+      "priority": "P0",
+      "local_paths": [
+        "crates/material/src/components/controls.rs"
+      ],
+      "upstream_paths": [
+        "crates/component/src/input/input.rs"
+      ],
+      "action": "Replace manual input slot composition with Component Input prefix/suffix/appearance(false), retaining Material container styling.",
+      "conditions": "Use the same InputState; validate internal padding, prefix/suffix spacing, focus and accessibility. Existing code does not duplicate IME/editing."
+    },
+    {
+      "id": "status-labels",
+      "disposition": "replace-after-hooks",
+      "priority": "P1",
+      "local_paths": [
+        "crates/material/src/components/feedback.rs"
+      ],
+      "upstream_paths": [
+        "crates/component/src/tag.rs"
+      ],
+      "action": "Use Tag::custom for ordinary metadata/status labels, not count Badge.",
+      "conditions": "Tag adds hover opacity(0.9) without an exposed hover override; precise static labels need a hook or a small renderer."
+    },
+    {
+      "id": "business-groups",
+      "disposition": "reuse-parts",
+      "priority": "P1",
+      "local_paths": [
+        "crates/material/src/components/feedback.rs",
+        "crates/material/src/components/tile.rs"
+      ],
+      "upstream_paths": [
+        "crates/component/src/group_box.rs",
+        "crates/component/src/setting/item.rs"
+      ],
+      "action": "Use GroupBox/Settings for ordinary titled groups and field organization; remove redundant factories after call sites migrate.",
+      "conditions": "Use content_style for body styling. Preserve connected corners, pair/details and Material-only surfaces; extra GroupBox nodes are not automatically faster."
+    },
+    {
+      "id": "notices",
+      "disposition": "conditional-replacement",
+      "priority": "P1",
+      "local_paths": [
+        "crates/material/src/components/feedback.rs"
+      ],
+      "upstream_paths": [
+        "crates/component/src/alert.rs"
+      ],
+      "action": "Use Component Alert for appropriate urgent/danger messages.",
+      "conditions": "Alert uses Role::Alert; do not silently upgrade informational Role::Status. Preserve action wrapping and reference appearance."
+    },
+    {
+      "id": "snackbar-lifecycle",
+      "disposition": "reuse-behavior",
+      "priority": "P1",
+      "local_paths": [
+        "crates/material/src/components/feedback.rs"
+      ],
+      "upstream_paths": [
+        "crates/component/src/notification.rs",
+        "crates/base/src/toast.rs"
+      ],
+      "action": "Reuse upstream queue, timeout, pause and dismissal when those are added; keep Material Snackbar as presentation.",
+      "conditions": "Current Snackbar is caller-positioned surface, not a duplicated notification engine. Notification.content does not replace its shell or animation."
+    },
+    {
+      "id": "button-switch-slider",
+      "disposition": "retain-material-parts",
+      "priority": "P1",
+      "local_paths": [
+        "crates/material/src/components/button.rs",
+        "crates/material/src/components/controls.rs"
+      ],
+      "upstream_paths": [
+        "crates/component/src/button/button.rs",
+        "crates/component/src/switch.rs",
+        "crates/component/src/slider.rs"
+      ],
+      "action": "Reuse Component where its hooks meet the contract; retain Material renderers over Base parts for uncovered shape/ripple/track/thumb motion.",
+      "conditions": "Component outer Styled does not expose every internal part. These current controls already reuse Base behavior; do not add extra wrappers merely to change imports."
+    },
+    {
+      "id": "standard-side-sheet",
+      "disposition": "retain-until-nonmodal-hook",
+      "priority": "P1",
+      "local_paths": [
+        "crates/material/src/components/controls.rs"
+      ],
+      "upstream_paths": [
+        "crates/component/src/sheet.rs",
+        "crates/base/src/sheet.rs"
+      ],
+      "action": "Use Component Sheet for modal sheets; keep nonmodal standard sheet layout until a proper capability exists.",
+      "conditions": "overlay(false) does not disable the Base focus trap; replacing a nonmodal side sheet would change keyboard access to main content."
+    },
+    {
+      "id": "titlebar-caption",
+      "disposition": "replace-after-hooks",
+      "priority": "P0",
+      "local_paths": [
+        "crates/material/src/components/title_bar.rs",
+        "crates/material/src/components/caption.rs"
+      ],
+      "upstream_paths": [
+        "crates/component/src/title_bar.rs"
+      ],
+      "action": "Consolidate duplicated drag, double-click and window-control execution into Component TitleBar.",
+      "conditions": "First provide caller labels/control slots, configurable height/traffic lights/leading geometry, overlay order and explicit close-veto adaptation; current private controls are not equivalent."
+    },
+    {
+      "id": "choice-tiles",
+      "disposition": "reuse-selection-behavior",
+      "priority": "P1",
+      "local_paths": [
+        "crates/material/src/components/choice.rs",
+        "crates/material/src/components/tile.rs"
+      ],
+      "upstream_paths": [
+        "crates/component/src/setting/item.rs",
+        "crates/component/src/radio.rs"
+      ],
+      "action": "Reuse Settings organization and real RadioGroup semantics for radio choices; keep only Material connected layout.",
+      "conditions": "ListItem selected/on_click is not a substitute for complete button/radio keyboard and accessibility behavior."
+    }
+  ],
+  "runtime_migration_status": "pending",
+  "component_conformance_status": "unreviewed",
+  "performance_status": "unverified",
+  "review_scope": "Three independent source audits cover components; facade/theme/icons/gallery; runtime patches/motion/performance. No runtime migration or deletion was executed in this audit."
+}
