@@ -26,8 +26,8 @@ pub use feedback::{
 };
 pub use focus::{FocusRing, RevealFocus, contain_scroll};
 pub use progress::{
-    CircularProgressFrame, circular_indeterminate_frame, circular_progress,
-    sample_circular_progress, icon_spinner, indeterminate_progress, linear_progress, progress, spinner,
+    CircularProgressFrame, circular_indeterminate_frame, circular_progress, icon_spinner,
+    indeterminate_progress, linear_progress, progress, sample_circular_progress, spinner,
 };
 pub use text::{
     accessible_text, error_text, info_callout, page_heading, section_heading, section_title,
