@@ -1,6 +1,10 @@
 # Presentation timing contract
 
-Source: the published Apache-2.0 `gpui-pre` 0.3.10 package.
+Source: the published Apache-2.0 `gpui-pre` 0.3.10 package (`SOURCE.json`).
+Files: `src/profiler.rs`, `src/profiler/journal.rs`, `src/window.rs`, and
+`src/profiler/hang.rs` (test fixtures only: `successful_new_frame: None`).
+The CPU frame scope these fields extend is described in
+`cpu-frame-scope-patch.md`.
 
 `profiler::CpuFrameTiming` carries `presentation_wait` and
 `presentation_waits`. Platform backends call

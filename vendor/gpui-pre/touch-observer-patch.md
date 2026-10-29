@@ -1,8 +1,10 @@
 # Passive touch observation
 
-Source: the published Apache-2.0 `gpui-pre` 0.3.10 package. The original revision
-is retained in `.cargo_vcs_info.json`; dependency versions use the normalized
-published manifest.
+Source: the published Apache-2.0 `gpui-pre` 0.3.10 crates.io archive. That
+archive ships no `.cargo_vcs_info.json`, so no upstream Git revision is claimed;
+`SOURCE.json` records the archive and per-file hashes. Dependency versions use
+the normalized published manifest. Files: `src/window.rs` (observer storage,
+paint-range reuse and dispatch before gesture recognition).
 
 `Window::observe_touch_event` registers a paint-scoped observer for raw touch
 input before gesture recognition. It follows frame clearing and cached paint

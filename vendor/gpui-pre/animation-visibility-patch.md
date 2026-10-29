@@ -1,7 +1,9 @@
 # Animation scheduling contract
 
-Source: the published Apache-2.0 `gpui-pre` 0.3.10 package, with the original
-revision retained in `.cargo_vcs_info.json`.
+Source: the published Apache-2.0 `gpui-pre` 0.3.10 crates.io archive. That
+archive ships no `.cargo_vcs_info.json`, so no upstream Git revision is claimed;
+`SOURCE.json` records the archive and per-file hashes. Files:
+`src/elements/animation.rs`.
 
 Animations sample `background_executor().now()`, including spring updates,
 ordinary repeat origins and synced phases. Production retains the platform's
