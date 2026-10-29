@@ -50,18 +50,20 @@ pub fn color(role: ColorRole) -> Rgba {
     rgba(PAINT.with(|paint| paint.borrow().current.get(role)))
 }
 
-/// Linear interpolation between two GPUI colors; see [`Color::blend`].
+/// Convert a GPUI color to the kit's.
+fn kit_color(color: Rgba) -> Color {
+    Color {
+        r: color.r,
+        g: color.g,
+        b: color.b,
+        a: color.a,
+    }
+}
+
+/// Linear interpolation between two GPUI colors: [`Color::blend`], the one
+/// implementation, applied to GPUI's color type.
 pub fn blend(from: Rgba, to: Rgba, t: f32) -> Rgba {
-    if t >= 1. {
-        return to;
-    }
-    let t = t.max(0.);
-    Rgba {
-        r: from.r + (to.r - from.r) * t,
-        g: from.g + (to.g - from.g) * t,
-        b: from.b + (to.b - from.b) * t,
-        a: from.a + (to.a - from.a) * t,
-    }
+    rgba(kit_color(from).blend(kit_color(to), t))
 }
 
 /// The current paint as a whole, e.g. to mirror it into another toolkit's theme.
@@ -327,6 +329,15 @@ mod tests {
         assert!(!component_projection_matches(&theme, painted, 1.5));
         write_component_projection(&mut theme, painted, 1.5);
         assert!(component_projection_matches(&theme, painted, 1.5));
+    }
+
+    #[test]
+    fn blend_matches_the_kit_color_blend() {
+        let from = Color::hex(0x204060);
+        let to = Color::hexa(0xffeeddcc);
+        for t in [-1., 0., 0.3, 1., 2., f32::NAN] {
+            assert_eq!(blend(rgba(from), rgba(to), t), rgba(from.blend(to, t)));
+        }
     }
 
     #[gpui::test]
