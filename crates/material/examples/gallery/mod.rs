@@ -401,19 +401,52 @@ impl Render for Gallery {
                                 MaterialSlider::new(&self.slider, "Classic slider")
                                     .appearance(SliderAppearance::Classic),
                             )
-                            .child(
-                                gpui_base::h_flex().gap(rem(8.)).children(
-                                    [
-                                        ("filled", ButtonVariant::Filled),
-                                        ("tonal", ButtonVariant::Tonal),
-                                        ("outlined", ButtonVariant::Outlined),
-                                        ("text", ButtonVariant::Text),
-                                    ]
-                                    .map(|(label, variant)| {
-                                        material_button(label, variant).child(label)
+                            .children(ButtonShape::ALL.into_iter().map(|shape| {
+                                gpui_base::v_flex().gap(rem(16.)).children(
+                                    ButtonSize::ALL.into_iter().map(move |size| {
+                                        gpui_base::v_flex()
+                                            .gap(rem(8.))
+                                            .child(accessible_text(
+                                                SharedString::from(format!(
+                                                    "button-label-{shape:?}-{size:?}"
+                                                )),
+                                                SharedString::from(format!(
+                                                    "{} / {}",
+                                                    shape.name(),
+                                                    size.name()
+                                                )),
+                                            ))
+                                            .child(
+                                                gpui_base::h_flex()
+                                                    .flex_wrap()
+                                                    .gap(rem(12.))
+                                                    .children(ButtonVariant::ALL.into_iter().map(
+                                                        move |variant| {
+                                                            MaterialButton::new(SharedString::from(
+                                                        format!(
+                                                            "button-{shape:?}-{size:?}-{variant:?}"
+                                                        ),
+                                                    ))
+                                                    .variant(variant)
+                                                    .button_size(size)
+                                                    .shape(shape)
+                                                    .child(variant.name())
+                                                        },
+                                                    )),
+                                            )
                                     }),
-                                ),
-                            ),
+                                )
+                            }))
+                            .child(gpui_base::h_flex().flex_wrap().gap(rem(12.)).children(
+                                ButtonVariant::ALL.into_iter().map(|variant| {
+                                    material_button(
+                                        SharedString::from(format!("disabled-{variant:?}")),
+                                        variant,
+                                    )
+                                    .disabled(true)
+                                    .child(variant.name())
+                                }),
+                            )),
                     )
                     .child(
                         div()

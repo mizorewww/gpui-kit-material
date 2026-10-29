@@ -1,5 +1,7 @@
 //! Material controls composed from GPUI Base behavior.
 //! Reference playgrounds: https://md3.io/components/{switch,slider,search,button}/.
+#[cfg(test)]
+use super::{ButtonVariant, material_button};
 use crate::{color::ColorRole, motion, theme::color, tokens::typography::rem};
 use gpui::{prelude::*, *};
 use gpui_base::{
@@ -229,49 +231,6 @@ impl RenderOnce for SearchField {
             .child(div().flex_1().min_w_0().child(Input::new(&self.state)))
             .children(self.trailing)
     }
-}
-
-/// M3 button tones, usable with icon, label or custom child content.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub enum ButtonVariant {
-    Filled,
-    Tonal,
-    Outlined,
-    #[default]
-    Text,
-}
-/// Return a headless Base button painted with Material roles and state layers.
-/// Content, accessible label and activation are supplied by the caller.
-pub fn material_button(id: impl Into<ElementId>, variant: ButtonVariant) -> gpui_base::Button {
-    let (bg, fg) = match variant {
-        ButtonVariant::Filled => (color(ColorRole::ACCENT), color(ColorRole::ON_PRIMARY)),
-        ButtonVariant::Tonal => (
-            color(ColorRole::SECONDARY_CONTAINER),
-            color(ColorRole::ON_SECONDARY_CONTAINER),
-        ),
-        _ => (gpui::rgba(0x00000000), color(ColorRole::INK)),
-    };
-    gpui_base::Button::new(id)
-        .flex()
-        .flex_row()
-        .items_center()
-        .justify_center()
-        .gap(rem(8.))
-        .h(rem(40.))
-        .px(rem(16.))
-        .rounded_full()
-        .bg(bg)
-        .text_color(fg)
-        .text_size(rem(14.))
-        .border_1()
-        .border_color(if variant == ButtonVariant::Outlined {
-            color(ColorRole::CONTROL)
-        } else {
-            gpui::rgba(0x00000000)
-        })
-        .styles(|s| s.disabled(|s| s.opacity(0.38)))
-        .hover(move |s| s.bg(crate::theme::blend(bg, fg, 0.08)))
-        .active(move |s| s.bg(crate::theme::blend(bg, fg, 0.12)))
 }
 
 /// A nonmodal M3 standard side sheet. It leaves the main content interactive;

@@ -101,6 +101,20 @@ including reversals, so changing schemes cannot jump an in-flight value. A mount
 entrance retains its initial scheme; a new palette target uses the current scheme.
 Reduced motion still paints the final state immediately.
 
+## Buttons
+
+`material_button(id, variant)` now returns `MaterialButton`, a presentation
+wrapper over GPUI Base's button. It supports Filled, Elevated, Tonal, Outlined,
+and Text variants, five `ButtonSize`s through `.button_size(...)`, and Round or
+Square through `.shape(...)`. The default variant is Filled. Existing callers
+with an explicit `gpui_base::Button` return annotation must update that type.
+Activation, focus binding, keyboard input and disabled behavior remain in Base.
+
+The gallery includes all 50 variant/size/shape combinations and disabled samples.
+This is an intermediate implementation: state transitions, ripple, the external
+focus ring, expanded touch targets, icon slots, toggle/loading and tracking still
+require implementation and independent visual/motion review.
+
 ## Reference themes
 
 The gallery starts with the Material baseline theme. Applications can select
