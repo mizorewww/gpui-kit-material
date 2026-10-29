@@ -198,6 +198,11 @@
           "kind": "browser-circular-geometry-and-cascade",
           "path": "conformance/reference/button-circular.json",
           "scope": "Pinned createButton and full stylesheet: 666 settled computed snapshots in light/ordinary motion, covering real pointer active states, circular modifier specificity, five sizes, two shapes, five variants, three content arrangements and loading. Independent recapture produced identical parsed JSON. Reference evidence only; circular implementation, raster and intermediate motion remain pending."
+        },
+        {
+          "kind": "browser-controlled-active-states",
+          "path": "conformance/reference/button-active.json",
+          "scope": "Actual pinned setActive API and full stylesheet: 300 combinations of variant, size, shape, ripple and plain/unselected/selected toggle, each at five settled active/disabled/restored states. Controlled active retains pressed shape while disabled and pressed opacity without ripple. No synthetic pointer, selection or wave is created. Excludes circular and intermediate browser motion."
         }
       ]
     },
