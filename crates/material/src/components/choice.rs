@@ -1,47 +1,20 @@
-//! Single choice among tiles: the M3 radio indicator, a choice tile with
-//! tonal selection, and category tints.
+//! Single choice among tiles: a choice tile with tonal selection and the
+//! shared M3 radio indicator, and category tints.
 use crate::color::ColorRole;
 use crate::icons::Icon;
 use crate::theme::{blend, color};
 use crate::tokens::{layout::*, shape::*, state, typography::*};
 use gpui::{prelude::*, *};
 
-/// The M3 radio's color: primary when selected, on-surface-variant when not,
-/// and on-surface at 38% when the choice is unavailable.
-fn radio_tone(selected: bool, enabled: bool) -> Rgba {
-    if !enabled {
-        state::disabled(color(ColorRole::ON_SURFACE))
-    } else if selected {
-        color(ColorRole::PRIMARY)
-    } else {
-        color(ColorRole::ON_SURFACE_VARIANT)
-    }
-}
-
-/// The M3 radio of a choice: an outlined ring, filled with a dot when
-/// selected.
-pub fn choice_radio(selected: bool, enabled: bool) -> Div {
-    let tone = radio_tone(selected, enabled);
-    div()
-        .flex()
-        .flex_shrink_0()
-        .items_center()
-        .justify_center()
-        .size(rem(20.))
-        .rounded_full()
-        .border_2()
-        .border_color(tone)
-        .when(selected, |ring| {
-            ring.child(div().size(rem(10.)).rounded_full().bg(tone))
-        })
-}
+pub use super::radio::choice_radio;
 
 pub use choice_tile::{ChoiceGroup, ChoiceTile};
 mod choice_tile {
     use super::*;
     use crate::components::InteractionPreview;
-    use crate::components::button_group::{FirstChoice, LastChoice, NextChoice, PreviousChoice};
     use crate::components::focus::{RingPlacement, RingedButton};
+    use crate::components::radio::animated_choice_radio;
+    use crate::components::roving::{RovingFocus, roving_handles};
     use crate::components::tile::outer_corner_radii;
     use gpui_base::v_flex;
     use std::rc::Rc;
@@ -267,7 +240,7 @@ mod choice_tile {
                             }),
                     )
                     .children(status)
-                    .child(choice_radio(selected, enabled))
+                    .child(animated_choice_radio(amount, selected, enabled))
                 })
                 .state_layers(paint.hover, paint.press)
                 .disabled(!enabled)
@@ -313,100 +286,22 @@ mod choice_tile {
         }
     }
 
-    #[derive(Clone, Copy, Debug)]
-    pub(super) enum Step {
-        Next,
-        Previous,
-        First,
-        Last,
-    }
-
-    /// The choice `step` lands on from `current`, among `enabled` choices;
-    /// arrows wrap.
-    pub(super) fn step_to(enabled: &[bool], current: Option<usize>, step: Step) -> Option<usize> {
-        let available: Vec<usize> = (0..enabled.len()).filter(|&i| enabled[i]).collect();
-        let (first, last) = (*available.first()?, *available.last()?);
-        Some(match (step, current) {
-            (Step::First, _) => first,
-            (Step::Last, _) => last,
-            (Step::Next, None) => first,
-            (Step::Previous, None) => last,
-            (Step::Next, Some(current)) => available
-                .iter()
-                .copied()
-                .find(|&i| i > current)
-                .unwrap_or(first),
-            (Step::Previous, Some(current)) => available
-                .iter()
-                .rev()
-                .copied()
-                .find(|&i| i < current)
-                .unwrap_or(last),
-        })
-    }
-
-    /// The single tab stop of the group: the selected choice when it is
-    /// available, otherwise the first available one.
-    pub(super) fn entry(enabled: &[bool], selected: Option<usize>) -> Option<usize> {
-        selected
-            .filter(|&i| enabled[i])
-            .or_else(|| enabled.iter().position(|&e| e))
-    }
-
-    #[derive(Clone)]
-    struct Navigation {
-        focus: Rc<[FocusHandle]>,
-        enabled: Rc<[bool]>,
-        selected: Option<usize>,
-        on_change: Option<GroupChange>,
-    }
-
-    impl Navigation {
-        fn go(&self, step: Step, window: &mut Window, cx: &mut App) {
-            let current = self
-                .focus
-                .iter()
-                .position(|focus| focus.is_focused(window))
-                .or(self.selected);
-            let Some(index) = step_to(&self.enabled, current, step) else {
-                return;
-            };
-            self.focus[index].focus(window, cx);
-            if self.selected != Some(index)
-                && let Some(on_change) = &self.on_change
-            {
-                on_change(&index, window, cx);
-            }
-        }
-    }
-
     impl RenderOnce for ChoiceGroup {
         fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
             let count = self.tiles.len();
-            let handles = window.use_keyed_state((self.id.clone(), "choice-focus"), cx, |_, _| {
-                Vec::<FocusHandle>::new()
-            });
-            let focus: Rc<[FocusHandle]> = handles.update(cx, |handles, cx| {
-                // One handle per position: extra ones go with removed tiles.
-                handles.truncate(count);
-                while handles.len() < count {
-                    handles.push(cx.focus_handle());
-                }
-                handles.as_slice().into()
-            });
+            let focus = roving_handles((self.id.clone(), "choice-focus"), count, window, cx);
             let enabled: Rc<[bool]> = self.tiles.iter().map(|tile| tile.enabled).collect();
             let selected = self.tiles.iter().position(|tile| tile.selected);
-            let entry = entry(&enabled, selected);
-            let navigation = Navigation {
-                focus: focus.clone(),
-                enabled,
-                selected,
-                on_change: self.on_change.clone(),
-            };
-            let mut group = super::super::TileGroup::new(
-                SharedString::from(format!("{:?}-title", self.id)),
-                self.title.clone(),
-            );
+            let on_select = self.on_change.clone().map(|on_change| {
+                Rc::new(move |index: usize, window: &mut Window, cx: &mut App| {
+                    on_change(&index, window, cx)
+                }) as Rc<dyn Fn(usize, &mut Window, &mut App)>
+            });
+            let roving = RovingFocus::new(focus.clone(), enabled, selected, on_select);
+            let entry = roving.entry();
+            // The title's id is scoped by the group's own id below, so a
+            // static name is unique without formatting one per frame.
+            let mut group = super::super::TileGroup::new("choice-group-title", self.title.clone());
             for (index, tile) in self.tiles.into_iter().enumerate() {
                 let chosen = tile.selected;
                 let tile = ChoiceTile {
@@ -429,41 +324,26 @@ mod choice_tile {
                     });
                 group = group.tile(move |_| button.into_any_element());
             }
-            let (next, previous, first, last) = (
-                navigation.clone(),
-                navigation.clone(),
-                navigation.clone(),
-                navigation,
-            );
-            div()
-                .id(self.id)
-                .role(Role::RadioGroup)
-                .aria_label(self.title)
-                .key_context("ChoiceGroup")
-                .w_full()
-                .min_w_0()
-                .on_action(move |_: &NextChoice, window, cx| next.go(Step::Next, window, cx))
-                .on_action(move |_: &PreviousChoice, window, cx| {
-                    previous.go(Step::Previous, window, cx)
-                })
-                .on_action(move |_: &FirstChoice, window, cx| first.go(Step::First, window, cx))
-                .on_action(move |_: &LastChoice, window, cx| last.go(Step::Last, window, cx))
+            roving
+                .install(
+                    div()
+                        .id(self.id)
+                        .role(Role::RadioGroup)
+                        .aria_label(self.title)
+                        .w_full()
+                        .min_w_0(),
+                    CHOICE_GROUP_CONTEXT,
+                )
                 .child(group)
         }
     }
 }
 
+const CHOICE_GROUP_CONTEXT: &str = "ChoiceGroup";
+
 /// Arrow keys, Home and End move within a [`ChoiceGroup`].
 pub(crate) fn init(cx: &mut App) {
-    use super::button_group::{FirstChoice, LastChoice, NextChoice, PreviousChoice};
-    cx.bind_keys([
-        KeyBinding::new("right", NextChoice, Some("ChoiceGroup")),
-        KeyBinding::new("down", NextChoice, Some("ChoiceGroup")),
-        KeyBinding::new("left", PreviousChoice, Some("ChoiceGroup")),
-        KeyBinding::new("up", PreviousChoice, Some("ChoiceGroup")),
-        KeyBinding::new("home", FirstChoice, Some("ChoiceGroup")),
-        KeyBinding::new("end", LastChoice, Some("ChoiceGroup")),
-    ]);
+    super::roving::bind_roving_keys(cx, CHOICE_GROUP_CONTEXT);
 }
 
 /// A distinct color family for a category icon: a tonal container role and
@@ -553,7 +433,7 @@ pub fn tinted_icon(icon: impl Into<Icon>, tint: Tint, size: impl Into<AbsoluteLe
 
 #[cfg(test)]
 mod tests {
-    use super::choice_tile::{Step, entry, step_to, tile_paint};
+    use super::choice_tile::tile_paint;
     use super::*;
     use crate::components::focus::test_rings;
     use core::prelude::v1::test;
@@ -574,37 +454,6 @@ mod tests {
         }
         let unavailable = tile_paint(0., false, false);
         assert_eq!(unavailable.label, state::disabled(unavailable.ink));
-    }
-
-    #[test]
-    fn radio_uses_m3_roles() {
-        assert_eq!(radio_tone(true, true), color(ColorRole::PRIMARY));
-        assert_eq!(
-            radio_tone(false, true),
-            color(ColorRole::ON_SURFACE_VARIANT)
-        );
-        let disabled = state::disabled(color(ColorRole::ON_SURFACE));
-        assert_eq!(radio_tone(true, false), disabled);
-        assert_eq!(radio_tone(false, false), disabled);
-    }
-
-    #[test]
-    fn arrows_skip_unavailable_choices_and_wrap() {
-        let enabled = [true, false, true, true];
-        assert_eq!(step_to(&enabled, Some(0), Step::Next), Some(2));
-        assert_eq!(step_to(&enabled, Some(3), Step::Next), Some(0));
-        assert_eq!(step_to(&enabled, Some(2), Step::Previous), Some(0));
-        assert_eq!(step_to(&enabled, Some(0), Step::Previous), Some(3));
-        assert_eq!(step_to(&enabled, None, Step::Next), Some(0));
-        assert_eq!(step_to(&enabled, None, Step::Last), Some(3));
-        assert_eq!(step_to(&[false, false], Some(0), Step::Next), None);
-    }
-
-    #[test]
-    fn tab_enters_at_the_selected_available_choice() {
-        assert_eq!(entry(&[true, true, true], Some(2)), Some(2));
-        assert_eq!(entry(&[true, true, false], Some(2)), Some(0));
-        assert_eq!(entry(&[false, true], None), Some(1));
     }
 
     struct GroupHarness {
