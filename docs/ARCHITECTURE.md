@@ -149,6 +149,17 @@ functions. GPUI renders on one UI thread; the paint is per thread.
 text is in rems (`typography::rem(px)`); platform geometry (caption buttons,
 hairlines, tile gaps) stays in px.
 
+**Virtualized animation state.** Kit/Base's keyed transitions live only while
+their elements remain mounted. Base's `TransitionPlayback` exposes the same
+transition sampler to callers that need to retain a channel across unmounts;
+it preserves interruption and reversal state without scheduling frames. The
+keyed API continues to own scheduling for its mounted elements. Owners forward
+actual target changes and reduced-motion observations, while visible elements
+request frames for active transitions. Material's `CircularProgressPlayback`
+similarly retains only the indicator clock and its reduced-motion stop state.
+These handles do not preserve transient pointer or focus state, nor rendered
+subtrees. A new handle explicitly starts a new logical playback.
+
 **No locale.** The kit ships no translated strings. Components that need
 accessible names (e.g. `CaptionLabels`) take them from the application.
 
