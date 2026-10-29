@@ -90,6 +90,18 @@ the font) for the web platform's default text measurements. Use
 `./scripts/build-gallery-web.sh --release` for an optimized build. Generated
 bindings stay out of Git.
 
+After building and serving the WASM gallery, its canvas allocation can be
+checked across 1×, 1.25×, 1.5×, and 2× device scales with `agent-browser`:
+
+```sh
+python3 scripts/check-gallery-dpr.py http://127.0.0.1:8080 /tmp/material-gallery-dpr
+```
+
+The check records screenshots and CSS/backing-store dimensions. It includes a
+real CSS resize with each emulated DPR change because Chromium's CDP emulation
+can omit resize and media-query events for a DPR-only change. It validates
+allocation after observer notification, not full component pixel conformance.
+
 Both gallery targets use the reference site's Roboto 400/500 font files, with
 pinned source hashes and the SIL OFL in
 `crates/material/examples/gallery/fonts/roboto`. Rebuild the static fonts with:

@@ -40,6 +40,12 @@ This leaves gesture recognition, scrolling and activation
 in GPUI while allowing Material to paint a ripple on touch-down and release it
 on cancellation. The same workspace-only patch limitation applies.
 
+The web backend is patched from the same `gpui-pre-web` 0.3.10 package to keep
+CSS viewport dimensions separate from backing-store device pixels. When a
+browser reports a device-pixel box inconsistent with its CSS size and DPR,
+allocation falls back to CSS size × DPR while preserving logical layout.
+The same workspace-only patch limitation applies.
+
 An application on a patched Zed checkout overrides `gpui-pre` for the whole
 graph, including this kit.
 

@@ -481,7 +481,13 @@
     {
       "id": "wasm-gallery",
       "status": "unreviewed",
-      "evidence": [],
+      "evidence": [
+        {
+          "kind": "browser-canvas-device-scale-regression",
+          "path": "scripts/check-gallery-dpr.py",
+          "scope": "Actual served WASM gallery canvas allocation at DPR 1, 2, 1.25, 1.5, then 1 with CSS resize observer notifications. Independent browser rerun matched backing dimensions and screenshots. CDP DPR-only changes can omit notifications; protocol includes a real 1px CSS resize. Not a complete component or gallery conformance verdict."
+        }
+      ],
       "reviews": []
     }
   ]
