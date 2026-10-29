@@ -31,7 +31,7 @@ trait GalleryReveal: IntoElement + Sized {
 }
 impl<T: IntoElement> GalleryReveal for T {}
 
-const GALLERY_SECTIONS: [(&str, &str); 14] = [
+const GALLERY_SECTIONS: [(&str, &str); 15] = [
     ("themes", "Themes"),
     ("motion", "Motion"),
     ("buttons", "Buttons"),
@@ -44,9 +44,20 @@ const GALLERY_SECTIONS: [(&str, &str); 14] = [
     ("typography", "Typography"),
     ("dividers", "Dividers"),
     ("chips", "Chips"),
+    ("cards", "Cards"),
     ("lists", "Lists"),
     ("window", "Window controls"),
 ];
+
+/// The Gallery's names for the caption buttons.
+fn caption_labels() -> CaptionLabels {
+    CaptionLabels {
+        minimize: "Minimize".into(),
+        maximize: "Maximize".into(),
+        restore: "Restore".into(),
+        close: "Close".into(),
+    }
+}
 
 /// Fixed height keeps the native traffic lights centered at every text scale.
 const TITLE_BAR: Pixels = px(56.);
@@ -446,29 +457,20 @@ impl Render for GalleryWindow {
             .text_color(color(ColorRole::INK))
             .font_family("Roboto")
             .child(
-                TitleBar::new(
-                    "title-bar",
-                    TITLE_BAR,
-                    CaptionLabels {
-                        minimize: "Minimize".into(),
-                        maximize: "Maximize".into(),
-                        restore: "Restore".into(),
-                        close: "Close".into(),
-                    },
-                )
-                .gap(rem(12.))
-                .child(section_title("window-title", "gpui-kit-material"))
-                .child(div().flex_1())
-                .when_some(self.fps.clone(), |bar, fps| bar.child(fps))
-                .child(title_bar_control(
-                    MaterialButton::new("gallery-settings-open")
-                        .variant(ButtonVariant::Text)
-                        .button_size(ButtonSize::ExtraSmall)
-                        .accessibility_label("Settings")
-                        .debug_selector(|| "gallery-settings-open".into())
-                        .child("Settings")
-                        .on_click(|_, window, cx| settings::open(window, cx)),
-                )),
+                TitleBar::new("title-bar", TITLE_BAR, caption_labels())
+                    .gap(rem(12.))
+                    .child(section_title("window-title", "gpui-kit-material"))
+                    .child(div().flex_1())
+                    .when_some(self.fps.clone(), |bar, fps| bar.child(fps))
+                    .child(title_bar_control(
+                        MaterialButton::new("gallery-settings-open")
+                            .variant(ButtonVariant::Text)
+                            .button_size(ButtonSize::ExtraSmall)
+                            .accessibility_label("Settings")
+                            .debug_selector(|| "gallery-settings-open".into())
+                            .child("Settings")
+                            .on_click(|_, window, cx| settings::open(window, cx)),
+                    )),
             )
             .child(
                 AnyView::from(self.gallery.clone())

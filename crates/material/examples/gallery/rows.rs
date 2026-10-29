@@ -484,7 +484,7 @@ pub(super) const ROWS: &[RowSpec] = &[
         gap: 28.0,
         section: None,
         interactive: true,
-        anchor: None,
+        anchor: Some("engine-choices"),
     },
     RowSpec {
         gap: 28.0,
@@ -717,6 +717,18 @@ pub(super) const ROWS: &[RowSpec] = &[
     RowSpec {
         gap: 12.0,
         section: None,
+        interactive: true,
+        anchor: None,
+    },
+    RowSpec {
+        gap: 28.0,
+        section: Some("cards"),
+        interactive: false,
+        anchor: None,
+    },
+    RowSpec {
+        gap: 12.0,
+        section: None,
         interactive: false,
         anchor: None,
     },
@@ -785,6 +797,8 @@ pub(super) const LOADING_SIZE_ROWS: usize = anchored_row("button-loading-sizes")
 const LOADING_SIZE_LAST: usize = LOADING_SIZE_ROWS + ButtonSize::ALL.len() - 1;
 /// The one source row that expands to as many physical rows as color columns need.
 const COLOR_SOURCE_ROW: usize = anchored_row("color-swatches");
+/// The engine choices, one radio group.
+const CHOICE_ROW: usize = anchored_row("engine-choices");
 /// The count of loading sample activations.
 const CLICK_COUNT_ROW: usize = anchored_row("loading-click-count");
 
@@ -1271,8 +1285,15 @@ impl Gallery {
                                         ),
                                     ),
                             )).into_any_element() },
-            63 => {  ({        let engines = ["Local engine", "Cloud service", "Unavailable"];
-        let mut choices = TileGroup::new("engines", "Choice tiles");
+            CHOICE_ROW => {  ({        let engines = ["Local engine", "Cloud service", "Unavailable"];
+        // A radio group: Tab enters at the selection, arrows, Home and End
+        // move and select among the available choices.
+        let mut choices = ChoiceGroup::new("engines", "Choice tiles").on_change(cx.listener(
+            |this, index: &usize, _, cx| {
+                this.engine = *index;
+                cx.notify();
+            },
+        ));
         for (index, title) in engines.into_iter().enumerate() {
             let tile = ChoiceTile::new(
                 ("engine", index),
@@ -1291,14 +1312,9 @@ impl Gallery {
                 1 => "Sends audio to the configured service",
                 _ => "Shown disabled, with its status at full strength",
             })
-            .status((index == 2).then(|| badge(BadgeKind::Warning).child("Missing")))
-            .enabled(index != 2)
-            .render(window, cx)
-            .on_click(cx.listener(move |this, _, _, cx| {
-                this.engine = index;
-                cx.notify();
-            }));
-            choices = choices.tile(move |_| tile.into_any_element());
+            .status((index == 2).then(|| status_chip(StatusKind::Warning).child("Missing")))
+            .enabled(index != 2);
+            choices = choices.tile(tile);
         }
 
 choices.reveal("reveal-choices", scroll)}).into_any_element() },
@@ -1338,16 +1354,60 @@ choices.reveal("reveal-choices", scroll)}).into_any_element() },
                     )),
             ); settings.reveal("reveal-settings", scroll) }).into_any_element() },
             65 => {  (section_title("feedback", "Feedback")).into_any_element() },
-            66 => {  (gpui_base::h_flex()
-                    .flex_wrap()
-                    .gap(rem(8.))
-                    .child(badge(BadgeKind::Success).child("Ready"))
-                    .child(badge(BadgeKind::Warning).child("Needs attention"))
-                    .child(badge(BadgeKind::Danger).child("Failed"))
-                    .child(badge(BadgeKind::Progress).child("Working"))
-                    .child(badge(BadgeKind::Neutral).child("Queued"))
-                    .child(badge(BadgeKind::Tonal).child("Default"))
-                    .child(outlined_badge("outlined", "Outlined"))).into_any_element() },
+            66 => {
+                // M3 badges sit on an icon's top-trailing corner: the small
+                // dot at the corner, the large badge 12dp across and 14dp down.
+                let badged = |id: &'static str, badge: AnyElement| {
+                    div()
+                        .id(id)
+                        .relative()
+                        .flex_shrink_0()
+                        .size(rem(24.))
+                        .child(IconName::Info.icon().size(rem(24.)).color(color(ColorRole::ON_SURFACE_VARIANT)))
+                        .child(badge)
+                };
+                gpui_base::v_flex()
+                    .gap(rem(16.))
+                    .child(
+                        gpui_base::h_flex()
+                            .flex_wrap()
+                            .gap(rem(8.))
+                            .child(status_chip(StatusKind::Success).child("Ready"))
+                            .child(status_chip(StatusKind::Warning).child("Needs attention"))
+                            .child(status_chip(StatusKind::Danger).child("Failed"))
+                            .child(status_chip(StatusKind::Progress).child("Working"))
+                            .child(status_chip(StatusKind::Neutral).child("Queued"))
+                            .child(status_chip(StatusKind::Tonal).child("Default"))
+                            .child(outlined_status_chip("outlined", "Outlined")),
+                    )
+                    .child(
+                        gpui_base::h_flex()
+                            .items_center()
+                            .gap(rem(24.))
+                            .child(accessible_text("badges-label", "Badges"))
+                            .child(badged(
+                                "small-badge-sample",
+                                small_badge().absolute().top_0().right_0().into_any_element(),
+                            ))
+                            .child(badged(
+                                "large-badge-sample",
+                                large_badge("large-badge", "3")
+                                    .absolute()
+                                    .top(rem(-2.))
+                                    .left(rem(12.))
+                                    .into_any_element(),
+                            ))
+                            .child(badged(
+                                "overflow-badge-sample",
+                                large_badge("overflow-badge", "999+")
+                                    .absolute()
+                                    .top(rem(-2.))
+                                    .left(rem(12.))
+                                    .into_any_element(),
+                            )),
+                    )
+                    .into_any_element()
+            }
             67 => {  (notice_banner(
                 "notice-info",
                 NoticeKind::Info,
@@ -1377,8 +1437,15 @@ choices.reveal("reveal-choices", scroll)}).into_any_element() },
                         "Linear progress",
                         icon_spinner_with_playback("label-spinner", ICON_SLOT, self.feedback_spinner_playback.clone(), cx),
                     ))
-                    .child(progress("measured", 0.62, window, cx))
-                    .child(indeterminate_progress_with_playback("indeterminate", self.feedback_linear_playback.clone(), cx))
+                    .child(linear_progress("measured", "Upload progress", Some(0.62), px(4.), false, window, cx))
+                    .child(indeterminate_linear_progress_with_playback(
+                        "indeterminate",
+                        "Loading content",
+                        px(4.),
+                        false,
+                        self.feedback_linear_playback.clone(),
+                        cx,
+                    ))
                     .child(accessible_text("circular-label", "Circular progress"))
                     .child(
                         gpui_base::h_flex()
@@ -1491,36 +1558,61 @@ choices.reveal("reveal-choices", scroll)}).into_any_element() },
                     .thickness(px(2.))
                     .color_role(ColorRole::PRIMARY)).into_any_element() },
             101 => section_title("chips", "Chips").into_any_element(),
-            102 => {
-                let label = TypeRole::LabelLarge.scale();
-                let assist = |leading: bool| {
-                    chip(leading)
-                        .border_1()
-                        .border_color(color(ColorRole::OUTLINE))
-                        .text_color(color(ColorRole::ON_SURFACE))
-                        .font_family(label.font_family)
-                        .text_size(label.font_size)
-                        .line_height(label.line_height)
-                        .font_weight(FontWeight(label.font_weight as f32))
-                };
-                gpui_base::h_flex()
-                    .flex_wrap()
-                    .gap(rem(8.))
-                    .child(assist(false).child("Assist chip"))
-                    .child(
-                        assist(true)
-                            .child(
-                                IconName::Info
-                                    .icon()
-                                    .size(rem(18.))
-                                    .color(color(ColorRole::PRIMARY)),
-                            )
-                            .child("With leading icon"),
-                    )
-                    .into_any_element()
-            }
-            103 => section_heading("lists", IconName::Info, "Lists").into_any_element(),
-            104 => {
+            102 => gpui_base::h_flex()
+                .flex_wrap()
+                .gap(rem(8.))
+                .child(
+                    AssistChip::new("assist-chip", "Assist chip")
+                        .on_click(cx.listener(|this, _, _, cx| {
+                            this.snackbar = true;
+                            cx.notify();
+                        }))
+                        .reveal("reveal-assist-chip", scroll),
+                )
+                .child(
+                    AssistChip::new("assist-chip-icon", "With leading icon")
+                        .icon(IconName::Info)
+                        .on_click(cx.listener(|this, _, _, cx| {
+                            this.snackbar = true;
+                            cx.notify();
+                        }))
+                        .reveal("reveal-assist-chip-icon", scroll),
+                )
+                .child(
+                    AssistChip::new("assist-chip-disabled", "Disabled")
+                        .icon(IconName::Info)
+                        .disabled(true),
+                )
+                .into_any_element(),
+            103 => section_title("cards", "Cards").into_any_element(),
+            104 => gpui_base::h_flex()
+                .flex_wrap()
+                .items_start()
+                .gap(rem(12.))
+                .children(
+                    [
+                        (CardVariant::Elevated, "Elevated card", "A low surface lifted by a shadow"),
+                        (CardVariant::Filled, "Filled card", "The highest surface container, flat"),
+                        (CardVariant::Outlined, "Outlined card", "The surface with an outline"),
+                    ]
+                    .into_iter()
+                    .enumerate()
+                    .map(|(index, (variant, title, support))| {
+                        card(variant)
+                            .flex_1()
+                            .flex_basis(rem(180.))
+                            .min_w_0()
+                            .gap(rem(4.))
+                            .child(TileScale::Regular.text(
+                                ("card", index),
+                                title,
+                                Some(support.into()),
+                            ))
+                    }),
+                )
+                .into_any_element(),
+            105 => section_heading("lists", IconName::Info, "Lists").into_any_element(),
+            106 => {
                 let items = [
                     ("Display", "Theme, contrast and text size"),
                     ("Notifications", "Alerts and sounds"),
@@ -1545,8 +1637,8 @@ choices.reveal("reveal-choices", scroll)}).into_any_element() },
                     }))
                     .into_any_element()
             }
-            105 => section_title("window", "Window controls").into_any_element(),
-            106 => {
+            107 => section_title("window", "Window controls").into_any_element(),
+            108 => {
                 let caption = match Caption::detect(window) {
                     Caption::System => "Caption buttons: drawn by the system",
                     Caption::Windows => "Caption buttons: Windows style, drawn by the app",
@@ -1555,6 +1647,38 @@ choices.reveal("reveal-choices", scroll)}).into_any_element() },
                 gpui_base::v_flex()
                     .gap(rem(12.))
                     .child(accessible_text("caption-style", caption))
+                    .child(
+                        // Inline previews of the app-drawn styles: inert and
+                        // in the page's flow, not over the real title bar.
+                        gpui_base::h_flex()
+                            .flex_wrap()
+                            .gap(rem(24.))
+                            .children(
+                                [
+                                    (Caption::Windows, "caption-preview-windows", "Windows"),
+                                    (Caption::Linux, "caption-preview-linux", "Linux"),
+                                ]
+                                .into_iter()
+                                .enumerate()
+                                .map(|(index, (caption, id, name))| {
+                                    gpui_base::v_flex()
+                                        .gap(rem(8.))
+                                        .child(accessible_text(("caption-preview-name", index), name))
+                                        .child(
+                                            div()
+                                                .debug_selector(move || id.to_string())
+                                                .flex()
+                                                .rounded(RADIUS_SMALL)
+                                                .bg(color(ColorRole::SURFACE_CONTAINER_HIGH))
+                                                .child(
+                                                    CaptionButtons::new(px(48.), super::caption_labels())
+                                                        .caption(caption)
+                                                        .preview(id),
+                                                ),
+                                        )
+                                }),
+                            ),
+                    )
                     .child(
                         // A sample bar: its control takes the press itself
                         // instead of starting a window drag.
@@ -1945,14 +2069,14 @@ mod keyboard_tests {
     }
 
     #[gpui::test]
-    fn chip_list_and_window_control_sections_render_their_samples(cx: &mut TestAppContext) {
+    fn chip_card_list_and_window_control_sections_render_their_samples(cx: &mut TestAppContext) {
         cx.update(|cx| {
             gpui_kit::init(cx);
             gpui_kit_material::init(cx);
         });
         let window = cx.open_window(size(px(700.), px(400.)), Gallery::new);
         draw(&window, cx);
-        for section in ["chips", "lists", "window"] {
+        for section in ["feedback", "chips", "cards", "lists", "window"] {
             let index = super::super::GALLERY_SECTIONS
                 .iter()
                 .position(|(id, _)| *id == section)
@@ -1974,6 +2098,62 @@ mod keyboard_tests {
                             "{section}: row {row} must render"
                         );
                     }
+                })
+                .unwrap();
+        }
+        // The caption previews lay out inside their row, not pinned over the
+        // window's title bar.
+        let controls = window
+            .update(cx, |gallery, _, _| {
+                let row = gallery.section_rows[gallery.section_rows.len() - 1] + 1;
+                gallery.list.bounds_for_item(row).unwrap()
+            })
+            .unwrap();
+        let mut visual = gpui::VisualTestContext::from_window(window.into(), cx);
+        for selector in ["caption-preview-windows", "caption-preview-linux"] {
+            let preview = visual
+                .debug_bounds(selector)
+                .unwrap_or_else(|| panic!("{selector} is not rendered"));
+            assert!(
+                controls.contains(&preview.origin) && preview.size.width > px(0.),
+                "{selector}: {preview:?} outside {controls:?}"
+            );
+        }
+    }
+
+    #[gpui::test]
+    fn choice_tiles_are_a_radio_group_driven_by_arrow_keys(cx: &mut TestAppContext) {
+        use super::CHOICE_ROW;
+        cx.update(|cx| {
+            gpui_kit::init(cx);
+            gpui_kit_material::init(cx);
+        });
+        let window = cx.open_window(size(px(960.), px(600.)), Gallery::new);
+        window
+            .update(cx, |gallery, _, cx| {
+                gallery.list.scroll_to(gpui::ListOffset {
+                    item_ix: CHOICE_ROW,
+                    offset_in_item: px(0.),
+                });
+                cx.notify();
+            })
+            .unwrap();
+        draw(&window, cx);
+        window
+            .update(cx, |gallery, window, cx| {
+                gallery.focus_row(CHOICE_ROW, false, window, cx);
+                assert!(gallery.row_focus[CHOICE_ROW].contains_focused(window, cx));
+            })
+            .unwrap();
+        let mut visual = gpui::VisualTestContext::from_window(window.into(), cx);
+        // Down selects the next choice; the unavailable third is skipped and
+        // the arrows wrap; End and Home land on the available ends.
+        for (key, engine) in [("down", 1), ("down", 0), ("up", 1), ("home", 0), ("end", 1)] {
+            visual.simulate_keystrokes(key);
+            draw(&window, cx);
+            window
+                .update(cx, |gallery, _, _| {
+                    assert_eq!(gallery.engine, engine, "after {key}")
                 })
                 .unwrap();
         }
