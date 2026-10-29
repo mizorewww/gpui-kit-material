@@ -9,11 +9,13 @@ pub use button::{
 mod button_group;
 mod controls;
 mod divider;
-pub use controls::{
-    MaterialSideSheet, MaterialSlider, MaterialSwitch, SearchField, SliderAppearance,
-};
+pub use controls::{MaterialSideSheet, MaterialSlider, MaterialSwitch, SliderAppearance};
 pub use divider::{
     DividerContext, DividerDirection, DividerOrientation, DividerVariant, MaterialDivider,
+};
+pub use search::{
+    SEARCH_BAR_HEIGHT, SEARCH_SUGGESTION_HEIGHT, SearchField, SearchSuggestion, SearchView,
+    SearchViewLayout,
 };
 mod caption;
 mod choice;
@@ -21,6 +23,7 @@ mod feedback;
 mod focus;
 mod preview;
 mod progress;
+mod search;
 mod text;
 mod text_field;
 mod tile;

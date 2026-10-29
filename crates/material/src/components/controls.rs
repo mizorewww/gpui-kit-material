@@ -1,5 +1,5 @@
 //! Material controls composed from GPUI Base behavior.
-//! Reference playgrounds: https://md3.io/components/{switch,slider,search,button}/.
+//! Reference playgrounds: https://md3.io/components/{switch,slider,button}/.
 use super::InteractionPreview;
 use super::button::ButtonFocusRing;
 #[cfg(test)]
@@ -8,16 +8,10 @@ use crate::{
     color::ColorRole,
     motion,
     theme::{blend, color},
-    tokens::{
-        state,
-        typography::{TypeRole, rem},
-    },
+    tokens::{state, typography::rem},
 };
 use gpui::{prelude::*, *};
-use gpui_base::{
-    input::{Input, InputState},
-    slider::{Slider, SliderIndicator, SliderState, SliderThumb, SliderTrack},
-};
+use gpui_base::slider::{Slider, SliderIndicator, SliderState, SliderThumb, SliderTrack};
 use std::rc::Rc;
 
 /// Controlled M3 switch: 52×32 track and an animated 16→24 handle that grows
@@ -437,53 +431,6 @@ impl RenderOnce for MaterialSlider {
     }
 }
 
-/// The M3 search bar container: surface-container-high (not the highest).
-const SEARCH_CONTAINER: ColorRole = ColorRole::SURFACE_CONTAINER_HIGH;
-
-/// M3 search field. Editing, selection, clipboard and IME are owned by GPUI Base.
-#[derive(gpui::IntoElement)]
-pub struct SearchField {
-    state: Entity<InputState>,
-    leading: Option<AnyElement>,
-    trailing: Option<AnyElement>,
-}
-impl SearchField {
-    pub fn new(state: &Entity<InputState>) -> Self {
-        Self {
-            state: state.clone(),
-            leading: None,
-            trailing: None,
-        }
-    }
-    pub fn leading(mut self, element: impl IntoElement) -> Self {
-        self.leading = Some(element.into_any_element());
-        self
-    }
-    pub fn trailing(mut self, element: impl IntoElement) -> Self {
-        self.trailing = Some(element.into_any_element());
-        self
-    }
-}
-impl RenderOnce for SearchField {
-    fn render(self, _: &mut Window, _: &mut App) -> impl IntoElement {
-        div()
-            .flex()
-            .items_center()
-            .w_full()
-            .min_w_0()
-            .h(rem(56.))
-            .px(rem(16.))
-            .gap(rem(16.))
-            .rounded_full()
-            .bg(color(SEARCH_CONTAINER))
-            .text_color(color(ColorRole::ON_SURFACE))
-            .text_size(TypeRole::BodyLarge.scale().font_size)
-            .children(self.leading)
-            .child(div().flex_1().min_w_0().child(Input::new(&self.state)))
-            .children(self.trailing)
-    }
-}
-
 /// A nonmodal M3 standard side sheet. It leaves the main content interactive;
 /// its controlled visibility retargets the spatial spring, including on close.
 #[derive(gpui::IntoElement)]
@@ -667,17 +614,10 @@ mod tests {
         assert!(window.debug_bounds("slider-stop").is_none());
     }
 
-    #[core::prelude::v1::test]
-    fn search_bar_sits_on_surface_container_high() {
-        assert_eq!(SEARCH_CONTAINER, ColorRole::SURFACE_CONTAINER_HIGH);
-        assert_ne!(SEARCH_CONTAINER, ColorRole::SURFACE_CONTAINER_HIGHEST);
-    }
-
     struct ControlsHarness {
         checked: bool,
         disabled: bool,
         changes: usize,
-        search: Entity<InputState>,
         slider: Entity<SliderState>,
     }
     impl Render for ControlsHarness {
@@ -702,11 +642,6 @@ mod tests {
                                     cx.notify();
                                 })),
                         ),
-                )
-                .child(
-                    div()
-                        .debug_selector(|| "test-search".into())
-                        .child(SearchField::new(&self.search)),
                 )
                 .child(
                     div()
@@ -736,11 +671,10 @@ mod tests {
             gpui_base::init(cx);
             cx.set_reduce_motion(true);
         });
-        let (view, cx) = cx.add_window_view(|w, cx| ControlsHarness {
+        let (view, cx) = cx.add_window_view(|_, cx| ControlsHarness {
             checked: false,
             disabled: false,
             changes: 0,
-            search: cx.new(|cx| InputState::new(w, cx).placeholder("Search")),
             slider: cx.new(|_| SliderState::new().max(100.).default_value(0.)),
         });
         draw(cx);
@@ -751,11 +685,6 @@ mod tests {
             assert!(view.read(cx).checked);
             assert_eq!(view.read(cx).changes, 1);
         });
-        let search = cx.debug_bounds("test-search").unwrap().center();
-        cx.simulate_click(search, Modifiers::default());
-        cx.simulate_input("home");
-        draw(cx);
-        cx.update(|_, cx| assert_eq!(view.read(cx).search.read(cx).value().as_ref(), "home"));
         let bounds = cx.debug_bounds("test-slider").unwrap();
         cx.simulate_click(
             point(bounds.left() + bounds.size.width * 0.75, bounds.center().y),
