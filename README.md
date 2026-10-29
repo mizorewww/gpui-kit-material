@@ -140,6 +140,12 @@ The callback receives `(next_selected, click_event, window, app)`; update the
 application's state and request a render. `.toggle_on_click(false)` suppresses
 selection requests while preserving `on_click` for container-owned selection.
 
+`.active_state(true)` keeps the pressed appearance while, for example, an
+associated menu stays open. It does not activate, select, focus or generate a
+ripple. This caller-owned visual state remains set when the button is disabled,
+as in the reference; clear it explicitly when the associated UI closes. GPUI’s
+`.active(style)` customization remains available.
+
 `.progress(visible, accessible_label)` shows a circular indicator while keeping
 activation available. `.loading(loading, accessible_label)` also marks the
 button busy and disables activation. Both are controlled: visible button text

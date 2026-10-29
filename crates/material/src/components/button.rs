@@ -1,6 +1,8 @@
 //! Material button presentation over GPUI Base activation and focus behavior.
 //! Reference: floor/material c910072f3fc5b660276731d8a935d7186f288364.
 //! Controlled toggle and loading presentation over Base behavior.
+#[cfg(test)]
+mod active_tests;
 mod control;
 mod effects;
 mod focus_ring;
@@ -443,6 +445,7 @@ pub struct MaterialButton {
     shape: ButtonShape,
     disabled: bool,
     ripple: bool,
+    active_state: bool,
     progress: Option<(bool, SharedString)>,
     loading: Option<(bool, SharedString)>,
     style: StyleRefinement,
@@ -474,6 +477,7 @@ impl MaterialButton {
             shape: ButtonShape::Round,
             disabled: false,
             ripple: true,
+            active_state: false,
             progress: None,
             loading: None,
             style: StyleRefinement::default(),
@@ -552,6 +556,14 @@ impl MaterialButton {
     /// names the indicator for assistive technology, not the button's visible text.
     pub fn loading(mut self, loading: bool, label: impl Into<SharedString>) -> Self {
         self.loading = Some((loading, label.into()));
+        self
+    }
+    /// Keep the reference active appearance, for example while a menu is open.
+    /// This only changes presentation: it does not focus, select, activate, or
+    /// create a ripple. The caller owns this state independently of `disabled`.
+    /// The name leaves GPUI's `active(style)` customization available.
+    pub fn active_state(mut self, active: bool) -> Self {
+        self.active_state = active;
         self
     }
     /// Enable the pointer ripple (enabled by default).
@@ -729,13 +741,15 @@ impl RenderOnce for MaterialButton {
                 state.keyboard = false;
             });
         }
-        let active = pressed.read(cx).pointer || pressed.read(cx).keyboard;
+        let active = self.active_state || pressed.read(cx).pointer || pressed.read(cx).keyboard;
         let hovered = pressed.read(cx).hovered && !window.last_input_was_touch();
         let focused =
             self.focusable && focus.is_focused(window) && window.last_input_was_keyboard();
         let opacity = gpui_base::transition(
             (self.id.clone(), "state-opacity"),
-            if self.disabled {
+            if self.active_state && !self.ripple {
+                0.10
+            } else if self.disabled {
                 0.
             } else if (active && !self.ripple) || focused {
                 0.10
@@ -779,11 +793,7 @@ impl RenderOnce for MaterialButton {
         }
         let radius = motion::token_value(
             (self.id.clone(), "pressed-radius"),
-            if pressed.read(cx).pointer || pressed.read(cx).keyboard {
-                g.pressed
-            } else {
-                radius
-            },
+            if active { g.pressed } else { radius },
             MotionToken::FastSpatial,
             window,
             cx,
