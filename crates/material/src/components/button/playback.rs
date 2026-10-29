@@ -113,26 +113,16 @@ impl ButtonTransitionPlayback {
             MotionToken::DefaultEffects,
             cx,
         );
-        self.opacity_target.set(state_opacity(
+        let opacity = state_opacity(
             inputs.active,
             inputs.disabled,
             inputs.ripple,
             inputs.active,
             false,
             false,
-        ));
-        self.opacity.sample(
-            state_opacity(
-                inputs.active,
-                inputs.disabled,
-                inputs.ripple,
-                inputs.active,
-                false,
-                false,
-            ),
-            opacity_policy(),
-            cx,
         );
+        self.opacity_target.set(opacity);
+        self.opacity.sample(opacity, opacity_policy(), cx);
     }
 }
 

@@ -106,6 +106,10 @@ impl StatefulInteractiveElement for BaseControl {}
 impl RenderOnce for BaseControl {
     fn render(mut self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         use gpui_base::StyledExt;
+        #[cfg(test)]
+        let a11y_observer = self.a11y_observer.take();
+        #[cfg(not(test))]
+        let a11y_observer = ();
         // Transfer caller and passive visual listeners onto the one Base root.
         // Both variants get identical layout, focus configuration and children.
         macro_rules! configure {
@@ -139,16 +143,7 @@ impl RenderOnce for BaseControl {
                     })
                 },
             );
-            {
-                let element = RenderOnce::render(base, window, cx).into_element();
-                #[cfg(test)]
-                if let Some(observer) = &self.a11y_observer {
-                    let mut node = accesskit::Node::new(Role::Button);
-                    element.write_a11y_info(&mut node);
-                    observer.borrow_mut().push(node);
-                }
-                element.into_any_element()
-            }
+            finish(base, a11y_observer, window, cx)
         } else {
             let on_click = self.on_click;
             let base = configure!(gpui_base::Button::new(self.id)).when_some(
@@ -157,16 +152,29 @@ impl RenderOnce for BaseControl {
                     base.on_click(move |event, window, cx| callback(event, window, cx))
                 },
             );
-            {
-                let element = RenderOnce::render(base, window, cx).into_element();
-                #[cfg(test)]
-                if let Some(observer) = &self.a11y_observer {
-                    let mut node = accesskit::Node::new(Role::Button);
-                    element.write_a11y_info(&mut node);
-                    observer.borrow_mut().push(node);
-                }
-                element.into_any_element()
-            }
+            finish(base, a11y_observer, window, cx)
         }
     }
+}
+
+#[cfg(test)]
+type A11yObserver = Option<Rc<std::cell::RefCell<Vec<accesskit::Node>>>>;
+#[cfg(not(test))]
+type A11yObserver = ();
+
+/// Render the configured Base root once; tests also record its a11y node.
+fn finish(
+    base: impl RenderOnce,
+    #[cfg_attr(not(test), allow(unused_variables))] observer: A11yObserver,
+    window: &mut Window,
+    cx: &mut App,
+) -> AnyElement {
+    let element = RenderOnce::render(base, window, cx).into_element();
+    #[cfg(test)]
+    if let Some(observer) = &observer {
+        let mut node = accesskit::Node::new(Role::Button);
+        element.write_a11y_info(&mut node);
+        observer.borrow_mut().push(node);
+    }
+    element.into_any_element()
 }

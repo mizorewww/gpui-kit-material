@@ -740,6 +740,7 @@ impl RenderOnce for MaterialButton {
                 cx,
             );
         }
+        // `disabled()` already set Base; loading additionally disables it.
         self.base = self.base.disabled(self.disabled).busy(loading);
         // One lifecycle implementation serves both caller-owned and keyed
         // playback. The keyed handle lives while the button renders each frame.
