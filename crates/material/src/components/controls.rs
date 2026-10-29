@@ -273,15 +273,20 @@ impl ParentElement for MaterialSideSheet {
         self.children.extend(children);
     }
 }
+/// Whether a sheet has finished closing: closed, with its reveal settled.
+fn sheet_hidden(open: bool, reveal: f32) -> bool {
+    !open && reveal == 0.
+}
+
 impl RenderOnce for MaterialSideSheet {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
-        let progress = motion::value(
+        let reveal = motion::value(
             (self.id.clone(), "reveal"),
             if self.open { 1. } else { 0. },
             window,
             cx,
-        )
-        .clamp(0., 1.);
+        );
+        let progress = reveal.clamp(0., 1.);
         let width = self.width.to_pixels(window.rem_size());
         div()
             .id(self.id)
@@ -292,7 +297,12 @@ impl RenderOnce for MaterialSideSheet {
             .w(width)
             .opacity(progress)
             .bg(color(ColorRole::SURFACE))
-            .children(self.children)
+            // Once the close has settled, the sheet's content leaves the tree,
+            // so it offers no tab stops or accessibility nodes off screen. The
+            // spring lands exactly on its target; an overshoot does not.
+            .when(!sheet_hidden(self.open, reveal), |sheet| {
+                sheet.children(self.children)
+            })
     }
 }
 
@@ -447,19 +457,77 @@ mod tests {
         cx.update(|cx| cx.set_reduce_motion(true));
         let (view, cx) = cx.add_window_view(|_, _| SheetHarness(false));
         draw(cx);
-        let closed = cx.debug_bounds("sheet-body").unwrap();
+        assert!(cx.debug_bounds("sheet-body").is_none());
         view.update(cx, |v, cx| {
             v.0 = true;
             cx.notify();
         });
         draw(cx);
         let open = cx.debug_bounds("sheet-body").unwrap();
-        assert_eq!(closed.left() - open.left(), open.size.width);
+        let viewport = cx.update(|window, _| window.viewport_size());
+        assert_eq!(open.right(), viewport.width, "an open sheet meets the edge");
         view.update(cx, |v, cx| {
             v.0 = false;
             cx.notify();
         });
         draw(cx);
-        assert_eq!(cx.debug_bounds("sheet-body").unwrap(), closed);
+        assert!(
+            cx.debug_bounds("sheet-body").is_none(),
+            "a settled closed sheet renders no content"
+        );
+    }
+
+    #[core::prelude::v1::test]
+    fn the_sheet_keeps_its_content_until_the_close_settles() {
+        assert!(
+            !sheet_hidden(true, 0.),
+            "opening starts from 0 with content"
+        );
+        assert!(
+            !sheet_hidden(false, 0.4),
+            "closing animates its content out"
+        );
+        assert!(!sheet_hidden(false, -0.01), "an overshoot is still moving");
+        assert!(sheet_hidden(false, 0.));
+    }
+
+    struct FocusSheetHarness {
+        open: bool,
+        focus: FocusHandle,
+    }
+    impl Render for FocusSheetHarness {
+        fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+            div().relative().size_full().child(
+                MaterialSideSheet::new("focus-sheet").open(self.open).child(
+                    div()
+                        .id("sheet-control")
+                        .track_focus(&self.focus)
+                        .debug_selector(|| "sheet-control".into())
+                        .size(px(20.)),
+                ),
+            )
+        }
+    }
+
+    #[gpui::test]
+    fn a_closed_sheet_offers_no_tab_stops(cx: &mut TestAppContext) {
+        cx.update(|cx| cx.set_reduce_motion(true));
+        let (view, cx) = cx.add_window_view(|_, cx| FocusSheetHarness {
+            open: true,
+            focus: cx.focus_handle(),
+        });
+        draw(cx);
+        assert!(cx.debug_bounds("sheet-control").is_some());
+        view.update(cx, |v, cx| {
+            v.open = false;
+            cx.notify();
+        });
+        draw(cx);
+        assert!(cx.debug_bounds("sheet-control").is_none());
+        cx.update(|window, cx| {
+            window.focus_next(cx);
+            let focus = view.read(cx).focus.clone();
+            assert!(!focus.is_focused(window));
+        });
     }
 }
