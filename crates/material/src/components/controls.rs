@@ -1,12 +1,16 @@
 //! Material controls composed from GPUI Base behavior.
 //! Reference playgrounds: https://md3.io/components/{switch,slider,search,button}/.
+use super::button::ButtonFocusRing;
 #[cfg(test)]
 use super::{ButtonVariant, material_button};
 use crate::{
     color::ColorRole,
     motion,
-    theme::color,
-    tokens::typography::{TypeRole, rem},
+    theme::{blend, color},
+    tokens::{
+        state,
+        typography::{TypeRole, rem},
+    },
 };
 use gpui::{prelude::*, *};
 use gpui_base::{
@@ -15,7 +19,8 @@ use gpui_base::{
 };
 use std::rc::Rc;
 
-/// Controlled M3 switch: 52×32 track and an animated 16→24 thumb.
+/// Controlled M3 switch: 52×32 track and an animated 16→24 handle that grows
+/// to 28 while pressed, with a 40dp state layer and M3 disabled colors.
 #[derive(gpui::IntoElement)]
 pub struct MaterialSwitch {
     id: ElementId,
@@ -48,10 +53,81 @@ impl MaterialSwitch {
         self
     }
 }
+/// The switch's track, in dp: 52×32 with a 2dp outline. The handle must
+/// stay inside the outline, so its travel is bounded by the track's inner
+/// edges.
+const TRACK_WIDTH: f32 = 52.;
+const TRACK_HEIGHT: f32 = 32.;
+const TRACK_OUTLINE: f32 = 2.;
+/// The handle: 16dp unselected, 24dp selected, 28dp while pressed, inside
+/// a 40dp state layer.
+const HANDLE_PRESSED: f32 = 28.;
+const STATE_LAYER: f32 = 40.;
+
+/// Handle size and leading offset (from the track's outer edge) for a
+/// selection amount `t`. The fast spatial spring may overshoot 0 and 1; that
+/// overshoot is kept, bounded only so the handle never crosses the outline.
 fn switch_geometry(t: f32) -> (f32, f32) {
-    let t = t.clamp(0., 1.);
-    (16. + 8. * t, 8. + 16. * t)
+    let t = if t.is_finite() { t } else { 0. };
+    let size = (16. + 8. * t).clamp(0., HANDLE_PRESSED);
+    let left = (8. + 16. * t)
+        .max(TRACK_OUTLINE)
+        .min(TRACK_WIDTH - TRACK_OUTLINE - size);
+    (size, left)
 }
+
+/// The paint of a switch in one state. Hover, focus and press do not change
+/// the handle's color; they show as the state layer.
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct SwitchPaint {
+    track: Rgba,
+    outline: Rgba,
+    handle: Rgba,
+    /// The state layer's content color.
+    layer: Rgba,
+}
+
+fn switch_paint(checked: bool, disabled: bool) -> SwitchPaint {
+    let role = |role| color(role);
+    // M3 disabled colors are mixed into the surface, so they stay opaque.
+    let over_surface = |content, amount| blend(role(ColorRole::SURFACE), role(content), amount);
+    match (checked, disabled) {
+        (true, false) => SwitchPaint {
+            track: role(ColorRole::PRIMARY),
+            outline: role(ColorRole::PRIMARY),
+            handle: role(ColorRole::ON_PRIMARY),
+            layer: role(ColorRole::PRIMARY),
+        },
+        (false, false) => SwitchPaint {
+            track: role(ColorRole::SURFACE_CONTAINER_HIGHEST),
+            outline: role(ColorRole::OUTLINE),
+            handle: role(ColorRole::OUTLINE),
+            layer: role(ColorRole::ON_SURFACE),
+        },
+        (true, true) => {
+            let track = over_surface(ColorRole::ON_SURFACE, state::DISABLED_CONTAINER);
+            SwitchPaint {
+                track,
+                outline: track,
+                handle: role(ColorRole::SURFACE),
+                layer: role(ColorRole::ON_SURFACE),
+            }
+        }
+        (false, true) => SwitchPaint {
+            track: over_surface(
+                ColorRole::SURFACE_CONTAINER_HIGHEST,
+                state::DISABLED_CONTAINER,
+            ),
+            outline: over_surface(ColorRole::ON_SURFACE, state::DISABLED_CONTAINER),
+            handle: over_surface(ColorRole::ON_SURFACE, state::DISABLED_CONTENT),
+            layer: role(ColorRole::ON_SURFACE),
+        },
+    }
+}
+
+/// Hover, press and pressed-handle styles resolve against this group.
+const SWITCH_GROUP: &str = "material-switch";
+
 impl RenderOnce for MaterialSwitch {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let t = motion::selection_value(
@@ -61,8 +137,33 @@ impl RenderOnce for MaterialSwitch {
             cx,
         );
         let (size, left) = switch_geometry(t);
+        let focus = window
+            .use_keyed_state((self.id.clone(), "focus"), cx, |_, cx| cx.focus_handle())
+            .read(cx)
+            .clone();
+        let enabled = !self.disabled;
+        let keyboard_focus =
+            enabled && focus.is_focused(window) && window.last_input_was_keyboard();
+        let paint = switch_paint(self.checked, self.disabled);
+        let clear = Rgba {
+            a: 0.,
+            ..paint.layer
+        };
+        let (hover, press, focused) = (
+            state::hovered(clear, paint.layer),
+            state::pressed(clear, paint.layer),
+            state::layer(clear, paint.layer, state::FOCUS),
+        );
+        // Positions inside the track's padding box, which starts inside the
+        // outline.
+        let center = left + size / 2.;
+        let layer_origin = (
+            center - STATE_LAYER / 2. - TRACK_OUTLINE,
+            TRACK_HEIGHT / 2. - STATE_LAYER / 2. - TRACK_OUTLINE,
+        );
         let action = self.on_change;
-        gpui_base::Switch::new(self.id)
+        let switch = gpui_base::Switch::new(self.id)
+            .track_focus(&focus)
             .accessibility_label(self.label)
             .checked(self.checked)
             .disabled(self.disabled)
@@ -71,35 +172,51 @@ impl RenderOnce for MaterialSwitch {
                     f(&value, window, cx);
                 }
             })
+            .group(SWITCH_GROUP)
             .relative()
-            .w(rem(52.))
-            .h(rem(32.))
+            .w(rem(TRACK_WIDTH))
+            .h(rem(TRACK_HEIGHT))
             .rounded_full()
-            .border_2()
-            .border_color(color(if self.checked {
-                ColorRole::ACCENT
-            } else {
-                ColorRole::CONTROL
-            }))
-            .bg(color(if self.checked {
-                ColorRole::ACCENT
-            } else {
-                ColorRole::SURFACE_HIGH
-            }))
-            .when(self.disabled, |e| e.opacity(0.38))
+            .border(rem(TRACK_OUTLINE))
+            .border_color(paint.outline)
+            .bg(paint.track)
             .child(
                 div()
+                    .id("state-layer")
                     .absolute()
-                    .left(rem(left - 2.))
-                    .top(rem((32. - size) / 2. - 2.))
-                    .size(rem(size))
+                    .left(rem(layer_origin.0))
+                    .top(rem(layer_origin.1))
+                    .size(rem(STATE_LAYER))
+                    .flex()
+                    .items_center()
+                    .justify_center()
                     .rounded_full()
-                    .bg(color(if self.checked {
-                        ColorRole::ON_PRIMARY
-                    } else {
-                        ColorRole::CONTROL
-                    })),
-            )
+                    .when(keyboard_focus, |layer| layer.bg(focused))
+                    .when(enabled, |layer| {
+                        layer
+                            .group_hover(SWITCH_GROUP, move |style| style.bg(hover))
+                            .group_active(SWITCH_GROUP, move |style| style.bg(press))
+                    })
+                    .child(
+                        div()
+                            .id("handle")
+                            .when(cfg!(test), |handle| {
+                                handle.debug_selector(|| "switch-handle".into())
+                            })
+                            .flex_shrink_0()
+                            .size(rem(size))
+                            .rounded_full()
+                            .bg(paint.handle)
+                            .when(enabled, |handle| {
+                                // A cursor gives the handle the hitbox its
+                                // group press needs.
+                                handle.cursor_pointer().group_active(SWITCH_GROUP, |style| {
+                                    style.size(rem(HANDLE_PRESSED))
+                                })
+                            }),
+                    ),
+            );
+        ButtonFocusRing::new(switch, focus, enabled, rem(TRACK_HEIGHT / 2.))
     }
 }
 
@@ -312,14 +429,56 @@ mod tests {
     use core::prelude::v1::test;
     #[core::prelude::v1::test]
     fn switch_motion_preserves_track_clearance() {
-        for t in [0., 0.25, 0.5, 0.75, 1.] {
+        for t in [-0.3, -0.05, 0., 0.25, 0.5, 0.75, 1., 1.05, 1.3] {
             let (size, left) = switch_geometry(t);
-            assert!(left >= 4.);
-            assert!(left + size <= 48.);
+            assert!(left >= TRACK_OUTLINE, "{t}: inside the leading outline");
+            assert!(
+                left + size <= TRACK_WIDTH - TRACK_OUTLINE,
+                "{t}: inside the trailing outline"
+            );
         }
         assert_eq!(switch_geometry(0.), (16., 8.));
         assert_eq!(switch_geometry(1.), (24., 24.));
     }
+
+    #[core::prelude::v1::test]
+    fn switch_keeps_spring_overshoot_within_the_track() {
+        let (rest_size, rest_left) = switch_geometry(1.);
+        let (size, left) = switch_geometry(1.05);
+        assert!(size > rest_size, "the overshoot still grows the handle");
+        assert!(
+            left + size > rest_left + rest_size,
+            "and moves it past rest"
+        );
+        let (size, left) = switch_geometry(-0.05);
+        assert!(size < 16. && left < 8., "overshoot past unselected is kept");
+    }
+
+    #[core::prelude::v1::test]
+    fn switch_uses_m3_roles_in_every_state() {
+        let c = color;
+        let on = switch_paint(true, false);
+        assert_eq!(on.track, c(ColorRole::PRIMARY));
+        assert_eq!(on.handle, c(ColorRole::ON_PRIMARY));
+        let off = switch_paint(false, false);
+        assert_eq!(off.track, c(ColorRole::SURFACE_CONTAINER_HIGHEST));
+        assert_eq!(off.outline, c(ColorRole::OUTLINE));
+        assert_eq!(off.handle, c(ColorRole::OUTLINE));
+        let surface = c(ColorRole::SURFACE);
+        let on_surface = c(ColorRole::ON_SURFACE);
+        let disabled_on = switch_paint(true, true);
+        assert_eq!(disabled_on.track, blend(surface, on_surface, 0.12));
+        assert_eq!(disabled_on.handle, surface);
+        let disabled_off = switch_paint(false, true);
+        assert_eq!(disabled_off.handle, blend(surface, on_surface, 0.38));
+        assert_eq!(disabled_off.outline, blend(surface, on_surface, 0.12));
+        for paint in [disabled_on, disabled_off] {
+            assert_eq!(paint.track.a, 1., "disabled colors are opaque mixes");
+        }
+        assert_eq!(HANDLE_PRESSED, 28.);
+        assert_eq!(STATE_LAYER, 40.);
+    }
+
     #[core::prelude::v1::test]
     fn slider_variants_have_distinct_handle_and_track() {
         assert_eq!(slider_geometry(SliderAppearance::Classic), (4., 20., 20.));
@@ -441,6 +600,35 @@ mod tests {
             assert!((view.read(cx).slider.read(cx).value().end() - 75.).abs() < 2.);
         });
     }
+    struct PressHarness;
+    impl Render for PressHarness {
+        fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+            window.set_rem_size(px(14.));
+            div()
+                .p(px(20.))
+                .child(MaterialSwitch::new("press-switch", "Wi-Fi").checked(true))
+        }
+    }
+
+    #[gpui::test]
+    fn pressing_grows_the_handle_to_28dp_around_its_center(cx: &mut TestAppContext) {
+        cx.update(|cx| {
+            gpui_base::init(cx);
+            cx.set_reduce_motion(true);
+        });
+        let (_, cx) = cx.add_window_view(|_, _| PressHarness);
+        draw(cx);
+        let rest = cx.debug_bounds("switch-handle").unwrap();
+        assert_eq!(rest.size, size(px(24.), px(24.)));
+        cx.simulate_mouse_move(rest.center(), None, Modifiers::default());
+        cx.simulate_mouse_down(rest.center(), MouseButton::Left, Modifiers::default());
+        draw(cx);
+        let pressed = cx.debug_bounds("switch-handle").unwrap();
+        assert_eq!(pressed.size, size(px(28.), px(28.)));
+        assert_eq!(pressed.center(), rest.center());
+        cx.simulate_mouse_up(rest.center(), MouseButton::Left, Modifiers::default());
+    }
+
     struct SheetHarness(bool);
     impl Render for SheetHarness {
         fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
