@@ -9,12 +9,12 @@ pub use button::{
 mod button_group;
 mod controls;
 mod divider;
-pub use controls::{
-    MaterialSideSheet, MaterialSlider, MaterialSwitch, SearchField, SliderAppearance,
-};
+mod switch;
+pub use controls::{MaterialSideSheet, MaterialSlider, SearchField, SliderAppearance};
 pub use divider::{
     DividerContext, DividerDirection, DividerOrientation, DividerVariant, MaterialDivider,
 };
+pub use switch::{MaterialSwitch, SwitchIcons};
 mod caption;
 mod choice;
 mod feedback;
