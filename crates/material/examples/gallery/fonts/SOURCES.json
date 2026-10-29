@@ -4,5 +4,32 @@
     "sha256": "975dcda37d80f038dcd143c22e33ca2d97a0cc5a929aace1c749153b0fe1afa5",
     "license": "OFL.txt",
     "purpose": "Default font required by GPUI Web before initial input measurement"
+  },
+  "roboto/Roboto-latin-wght.woff2": {
+    "source": "https://md3.io/fonts/Roboto-latin-wght.woff2",
+    "observed_on": "2026-10-29",
+    "version": "3.015; 2026",
+    "sha256": "1404ca348bd75ef836f4dd8b6f2cc719458642d1237c368296b2fc652dca47dc",
+    "license": "roboto/OFL.txt",
+    "purpose": "Reference component font; Latin subset",
+    "conversion": "Original reference download"
+  },
+  "roboto/Roboto-Regular.ttf": {
+    "source": "https://md3.io/fonts/Roboto-latin-wght.woff2",
+    "observed_on": "2026-10-29",
+    "version": "3.015; 2026",
+    "sha256": "bc225ce23152b77d02e9d0259ec181644028bd9c8cafaa885ca8799f12539018",
+    "license": "roboto/OFL.txt",
+    "purpose": "Reference component font; Latin subset",
+    "conversion": "fonttools 4.60.1 instantiateVariableFont wght=400 updateFontNames=True; WOFF2 to TTF; recalcTimestamp=False"
+  },
+  "roboto/Roboto-Medium.ttf": {
+    "source": "https://md3.io/fonts/Roboto-latin-wght.woff2",
+    "observed_on": "2026-10-29",
+    "version": "3.015; 2026",
+    "sha256": "30f3b37c18ef68aa67fac9a43553145e970a89257a8a3ba0b97224054ddf1255",
+    "license": "roboto/OFL.txt",
+    "purpose": "Reference component font; Latin subset",
+    "conversion": "fonttools 4.60.1 instantiateVariableFont wght=500 updateFontNames=True; WOFF2 to TTF; recalcTimestamp=False"
   }
 }

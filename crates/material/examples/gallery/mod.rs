@@ -309,7 +309,7 @@ impl Render for Gallery {
             .track_scroll(&self.scroll)
             .bg(color(ColorRole::CANVAS))
             .text_color(color(ColorRole::INK))
-            .font_family(".SystemUIFont")
+            .font_family("Roboto")
             .child(
                 gpui_base::v_flex()
                     .w_full()
@@ -442,6 +442,12 @@ pub fn run(application: gpui::Application) {
                 "fonts/IBMPlexSans-Regular.ttf"
             ))])
             .expect("Failed to load the gallery font");
+        cx.text_system()
+            .add_fonts(vec![
+                std::borrow::Cow::Borrowed(include_bytes!("fonts/roboto/Roboto-Regular.ttf")),
+                std::borrow::Cow::Borrowed(include_bytes!("fonts/roboto/Roboto-Medium.ttf")),
+            ])
+            .expect("Failed to load the reference Roboto fonts");
         gpui_base::init(cx);
         gpui_kit_material::init(cx);
         let bounds = Bounds::centered(None, size(px(960.), px(900.)), cx);

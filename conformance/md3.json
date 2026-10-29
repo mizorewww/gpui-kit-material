@@ -104,6 +104,11 @@
           "kind": "source-type-scale",
           "path": "crates/material/tests/fixtures/md3-typography.json",
           "scope": "15 reference type roles: default family, brand/plain typeface, size, line height, letter spacing and weight. Token data only; font loading, tracking rendering and component typography conformance remain pending."
+        },
+        {
+          "kind": "reference-font-assets",
+          "path": "crates/material/examples/gallery/fonts/SOURCES.json",
+          "scope": "Live md3.io typography samples load Roboto-latin-wght.woff2 (3.015); pinned source and reproducible 400/500 TTF instances registered in both gallery targets. Latin subset only; other scripts use platform fallback. Does not prove complete typography or tracking conformance."
         }
       ],
       "reference": "https://md3.io/styles/typography/",
