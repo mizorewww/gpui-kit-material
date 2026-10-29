@@ -8,9 +8,9 @@ mod motion_preference;
 #[cfg(target_family = "wasm")]
 #[wasm_bindgen::prelude::wasm_bindgen]
 pub fn run() {
-    gpui_platform::web_init();
+    gpui_kit::platform::web_init();
     gallery::run(
-        gpui_platform::single_threaded_web(),
+        gpui_kit::platform::single_threaded_web(),
         motion_preference::install,
     );
 }

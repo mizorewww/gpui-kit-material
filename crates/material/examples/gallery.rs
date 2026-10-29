@@ -10,7 +10,7 @@ fn main() -> anyhow::Result<()> {
     }
     let capture = gallery::capture::CaptureOptions::parse(args)?;
     let completed = capture.as_ref().map(|options| options.completed());
-    gallery::run(gpui_platform::application(), move |cx| {
+    gallery::run(gpui_kit::application(), move |cx| {
         if let Some(options) = capture {
             options.initialize(cx);
         }

@@ -8,10 +8,15 @@ publish = false
 [lib]
 crate-type = ["cdylib", "rlib"]
 
+# Shared Gallery source contains native-only profiling code. This acknowledges
+# that source's cfg without advertising a browser frame collector.
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(feature, values("frame-profiler"))'] }
+
 [target.'cfg(target_family = "wasm")'.dependencies]
+gpui-kit.workspace = true
 gpui.workspace = true
 gpui-base.workspace = true
-gpui_platform.workspace = true
 gpui-kit-material = { path = "../material" }
 wasm-bindgen = "=0.2.129"
 web-sys = { version = "=0.3.106", features = ["Window", "MediaQueryList", "MediaQueryListEvent", "EventTarget"] }

@@ -1,4 +1,4 @@
-//! Material 3 for GPUI.
+//! Material 3 adapters for Longbridge GPUI Kit.
 //!
 //! The kit is layered so each layer can be replaced without touching the
 //! ones above it:
@@ -10,14 +10,17 @@
 //! | Tokens | [`tokens`] | shape, type scale, layout metrics, elevation, state layers |
 //! | Motion | [`motion`] | M3 springs, entrances, retargetable values |
 //! | Icons | [`icons`] | the kit's own glyphs and their [`icons::Assets`] |
-//! | Components | [`components`] | Material components on GPUI Base behavior |
+//! | Components | [`components`] | Material presentation over Kit components and Base parts |
 //!
-//! Behavior (focus, keyboard, accessibility roles, transitions) comes from
-//! [`gpui_base`]; this kit only decides how Material looks and moves.
+//! Reuse [`gpui_kit::component`] controls where their presentation hooks meet the
+//! Material contract; [`gpui_base`] supplies behavior for uncovered parts. This
+//! kit owns the Material appearance and motion, not another generic UI runtime.
 //!
-//! Call `gpui_base::init` and then [`init`] once at startup, give the application [`icons::Assets`]
-//! (or chain it behind your own asset source), and call
-//! [`theme::apply`] at the start of each root render.
+//! Call `gpui_kit::init` and then [`init`] once at startup. Use Kit's
+//! `open_window` for the single Root, compose [`icons::Assets`] with the Kit asset
+//! source, and initialize [`theme::init_component_theme`] before Root's first
+//! render. Advance [`theme::advance_component_theme`] from input events and
+//! pre-frame callbacks. Base-only consumers can continue to use [`theme::apply`].
 pub use gpui_kit_material_color as color;
 
 pub mod components;

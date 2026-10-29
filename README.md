@@ -3,9 +3,10 @@
 Material 3 design tokens, motion and components for
 [Longbridge GPUI Kit](https://github.com/longbridge/gpui-kit). The target is a
 Material layer over its `gpui-component` controls and shared behavior, reusing
-Kit's facade, lifecycle and Material Symbols integration. The current code still
-uses GPUI/Base directly; that integration migration is pending, as described in
-[the architecture](docs/ARCHITECTURE.md).
+Kit's facade, lifecycle and Material Symbols integration. Both gallery targets
+use Kit initialization and window creation, with one shared GPUI/Base dependency
+graph and a Material-to-Component theme bridge. Individual control and Symbols
+migration remains in progress; see [the architecture](docs/ARCHITECTURE.md).
 
 The kit started as the shared design primitives of the
 [course2md](https://github.com/mizorewww/course2md) desktop app. It is being
@@ -22,16 +23,19 @@ grown into a complete **Material 3 Expressive** implementation; see
 ```rust
 use gpui_kit_material::{icons::Assets, prelude::*, theme};
 
-gpui_platform::application()
-    .with_assets(Assets::with(MyAssets)) // the kit's glyphs, then yours
+gpui_kit::application()
+    .with_assets(Assets::with(gpui_kit::assets::Assets))
     .run(|cx| {
-        gpui_base::init(cx);
+        gpui_kit::init(cx);
         gpui_kit_material::init(cx);
-        // open windows…
+        // Initialize the final Material scheme/scale before the first Root render:
+        // theme::init_component_theme(initial_scheme, 1.0, cx);
+        // Open content with gpui_kit::open_window; Kit supplies the Root.
     });
 
-// At the start of each root render:
-theme::apply(&preferences, window, cx);
+// In theme-change events and pre-frame callbacks, before Root rendering:
+// let running = theme::advance_component_theme(target_scheme, scale, window, cx);
+// Schedule one next-frame callback while running; do not update Theme in render.
 ```
 
 Components paint with semantic roles (`color(ColorRole::SURFACE)`), so a palette
@@ -120,7 +124,7 @@ selector supports 100%, 125%, 150%, and 200%. The page title uses headline-small
 (24px / 32px at 100%). Reference letter-spacing values are stored in the tokens;
 GPUI tracking support and full component typography alignment remain pending.
 
-The shared gallery mounts GPUI Base's `Root` for Tab/Shift+Tab traversal and
+The shared gallery uses Kit's window entry point to mount one `Root` for Tab/Shift+Tab traversal and
 focus containment. Focus reveal is attached to individual controls and button
 options, so keyboard navigation brings the next control into view without
 pinning the page during manual scrolling.

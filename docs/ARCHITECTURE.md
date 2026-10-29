@@ -9,10 +9,12 @@ Component behavior and presentation hooks, with thin Material adapters for the
 reference-specific appearance and motion. Use Base directly only for an
 identified Component presentation gap; do not build a parallel generic toolkit.
 
-The current implementation still imports the pinned GPUI/Base crates directly.
-Facade, theme, icon and component migration is pending; this document does not
-claim those runtime changes have landed. Existing compatibility fixes must remain
-until the same behavior is verified through the replacement dependency graph.
+The galleries use the Kit facade for application initialization and window
+creation. The Material-to-Component theme bridge runs before Root preparation.
+Existing Material controls and regression fixtures still import GPUI/Base
+directly, resolving to the same patched packages as Kit. Symbols and individual
+control migration remain pending. Existing compatibility fixes must remain until
+the same behavior is verified through the replacement dependency graph.
 The source-based reuse and removal conditions are recorded in
 [conformance/reuse-audit.json](../conformance/reuse-audit.json).
 
@@ -43,16 +45,21 @@ named Kit component is not sufficient evidence that Material behavior or visuals
 are preserved: inspect its rendering hooks and test the replacement before
 deleting a local implementation.
 
-**Application lifecycle.** Migrate galleries to `gpui_kit::application`, `init`
-and `open_window`; Kit owns the single Root and Component window extensions.
-Keep capture and complete-frame performance evidence around that lifecycle.
+**Application lifecycle.** Galleries use `gpui_kit::application`, `init` and
+`open_window`; Kit owns the single Root and Component window extensions.
+Capture settings are applied before the initial theme projection and Root
+creation. The frame collector starts before opening the window; its metadata
+snapshot is taken afterwards, once the actual viewport and rem are established.
 
-**Theme ownership.** Bridge Material roles to Component's semantic theme API and
-Base tokens when state changes. Component's window preparation owns rem size, so
-the bridge must also carry the Material text scale. Do not have competing rem
-setters or unconditionally update the global theme during each render. Material
-color derivation and reference-specific blending remain distinct from a generic
-theme lifecycle.
+**Theme ownership.** The explicit bridge projects 17 generic Material roles,
+the current Material body font and text scale into Component colors/render tokens
+and its Base projection. Initialize it before Root's first render. Palette and
+scale events advance it before drawing; a single pending callback continues an
+active theme animation. Gallery render consumes the prepared values and never
+updates Component Theme. Full M3 roles, reference-specific blending, motion,
+spacing and elevation remain Material-owned. Unmanaged fields retain Component
+mode-configuration behavior. This is currently a single-gallery-window policy,
+not independent per-window themes.
 
 **Icons.** Reuse the sibling Symbols repository's `MaterialSymbols` asset source,
 Kit `IconNamed` implementations and icon conversion. Retain only Material sizing,
@@ -63,12 +70,24 @@ acyclic and preserve all styles, axes and supplemental variants.
 **One GPUI.** During migration, align Kit and Symbols to the same source and
 resolved revision; a Git Base and registry Base with equal version numbers are
 still different package identities. Retarget necessary patches to the selected
-source rather than silently dropping them. The current workspace pins the `gpui-pre` snapshot that the published
-`gpui-base` requires (`=0.3.10` with `gpui-base =0.8.1`). Bump them together.
+source rather than silently dropping them. Component and assets are Git `main`
+dependencies pinned by Cargo.lock to the audited `bb85882` revision. The Kit
+facade is patched to the complete, unchanged implementation from that revision
+in `vendor/gpui-kit`. Its normalized manifest disables implicit WASM threading;
+`multithreaded-web` explicitly restores that capability and its toolchain/runtime
+requirements. Native platform defaults are preserved. Source hashes and the
+reproducible manifest normalization are recorded alongside the facade.
+The temporary Kit asset fallback embeds desktop icons but requests
+`/assets/icons/*.svg` on WASM. The Gallery web packaging does not yet supply
+that fallback catalog; existing Material icons remain embedded. Component icon
+coverage is unverified until the pending Symbols integration replaces it.
+The vendored Base contains that
+revision's source plus the compatibility patches; both crates.io and Git Base
+references resolve to this one path package. GPUI remains exactly `=0.3.10`.
 The workspace patches GPUI Base from `vendor/gpui-base` for CSS transition
 reversal, per-transition reduced-motion policy, toggle focus policy, and busy
 accessibility state on Button/Toggle. Its normalized manifest and
-license retain the published package provenance. This root Cargo patch applies
+license retain its source provenance in `vendor/gpui-base/SOURCE.json`. These root Cargo patches apply
 only to builds in this workspace; downstream consumers need the same patch or
 a Base release containing these fixes.
 GPUI itself is patched from `vendor/gpui-pre` to expose paint-scoped passive raw

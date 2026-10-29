@@ -1274,7 +1274,7 @@
     "entrypoint": "gpui-kit",
     "preferred_components": "gpui_kit::component (gpui-component)",
     "base": "use for source-verified presentation gaps, not as a blanket replacement for Component",
-    "status": "source reuse audit complete; runtime facade/component migration pending",
+    "status": "Kit startup and Component theme bridge integrated; control and Symbols migration pending; runtime visual/performance acceptance unverified",
     "icons": "reuse ../gpui-material-symbols Kit integration with the same dependency source/revision",
     "audit": "conformance/reuse-audit.json"
   }

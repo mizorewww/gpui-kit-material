@@ -1,7 +1,7 @@
 [workspace]
 resolver = "3"
 members = ["crates/color", "crates/material", "crates/gallery-web"]
-exclude = ["vendor/gpui-base", "vendor/gpui-pre", "vendor/gpui-pre-web", "vendor/gpui-pre-apple"]
+exclude = ["vendor/gpui-kit", "vendor/gpui-base", "vendor/gpui-pre", "vendor/gpui-pre-web", "vendor/gpui-pre-apple"]
 
 [workspace.package]
 version = "0.1.0"
@@ -13,11 +13,12 @@ authors = ["mizorewww"]
 [workspace.dependencies]
 gpui-kit-material-color = { path = "crates/color", version = "0.1.0" }
 
-# GPUI comes from the same `gpui-pre` snapshot that the published GPUI Kit
-# crates are built against, so `gpui-base` and this kit share one `gpui`.
-# Bump these together with gpui-base and the Cargo.lock entries.
+# Kit owns application initialization and the Component layer. Cargo.lock pins
+# this branch to the audited revision; GPUI and the patched Base must be shared.
+gpui-kit = { git = "https://github.com/longbridge/gpui-kit", branch = "main" }
+# Direct engine/Base imports remain for existing Material APIs and regression
+# fixtures during migration; both resolve to Kit's exact implementations.
 gpui = { package = "gpui-pre", version = "=0.3.10" }
-gpui_platform = { package = "gpui-pre-platform", version = "=0.3.10", default-features = false, features = ["font-kit", "x11", "wayland", "runtime_shaders"] }
 gpui-base = { version = "=0.8.1" }
 
 anyhow = "1"
@@ -35,3 +36,7 @@ gpui-base = { path = "vendor/gpui-base" }
 gpui-pre = { path = "vendor/gpui-pre" }
 gpui-pre-web = { path = "vendor/gpui-pre-web" }
 gpui-pre-apple = { path = "vendor/gpui-pre-apple" }
+
+[patch."https://github.com/longbridge/gpui-kit"]
+gpui-kit = { path = "vendor/gpui-kit" }
+gpui-base = { path = "vendor/gpui-base" }

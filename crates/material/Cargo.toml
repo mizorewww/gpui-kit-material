@@ -1,6 +1,6 @@
 [package]
 name = "gpui-kit-material"
-description = "Material 3 design tokens, motion and components for GPUI, built on GPUI Base"
+description = "Material 3 design tokens, motion and component adapters for Longbridge GPUI Kit"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -13,10 +13,11 @@ categories = ["gui"]
 [features]
 default = ["serde"]
 serde = ["gpui-kit-material-color/serde"]
-frame-profiler = ["gpui/profiler"]
+frame-profiler = ["gpui-kit/profiler"]
 
 [dependencies]
 gpui-kit-material-color.workspace = true
+gpui-kit.workspace = true
 gpui.workspace = true
 gpui-base.workspace = true
 anyhow.workspace = true
@@ -26,8 +27,8 @@ web-time = "1"
 
 [target.'cfg(not(target_family = "wasm"))'.dev-dependencies]
 serde_json.workspace = true
+gpui-kit = { workspace = true, features = ["test-support"] }
 gpui = { workspace = true, features = ["test-support"] }
-gpui_platform = { workspace = true, features = ["test-support"] }
 
 [[example]]
 name = "gallery"

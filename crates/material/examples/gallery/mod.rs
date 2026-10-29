@@ -59,6 +59,7 @@ struct Gallery {
     snackbar: bool,
     motion_scheme: motion::MotionScheme,
     motion_target: bool,
+    theme_frame_pending: bool,
     button_effects_disabled: bool,
     button_effects_tonal: bool,
     button_ripple: bool,
@@ -71,19 +72,40 @@ struct Gallery {
     button_loading_clicks: usize,
 }
 
+impl Gallery {
+    fn target_scheme(&self) -> gpui_kit_material::color::Scheme {
+        self.reference_theme.map_or_else(
+            || gpui_kit_material::color::Scheme::from_palette(self.palette),
+            |id| id.scheme(self.reference_mode, self.contrast),
+        )
+    }
+
+    // Run before Root prepares its styles, never while rendering the child view.
+    fn prepare_theme(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        motion::apply_scheme(self.motion_scheme);
+        let running = theme::advance_component_theme(
+            self.target_scheme(),
+            self.scale.parse().unwrap_or(1.),
+            window,
+            cx,
+        );
+        if running && !self.theme_frame_pending {
+            self.theme_frame_pending = true;
+            let view = cx.weak_entity();
+            window.on_next_frame(move |window, cx| {
+                let _ = view.update(cx, |this, cx| {
+                    this.theme_frame_pending = false;
+                    this.prepare_theme(window, cx);
+                    cx.notify();
+                });
+            });
+        }
+    }
+}
+
 impl Render for Gallery {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         motion::apply_scheme(self.motion_scheme);
-        if let Some(theme_id) = self.reference_theme {
-            theme::apply_scheme(
-                theme_id.scheme(self.reference_mode, self.contrast),
-                window,
-                cx,
-            );
-        } else {
-            theme::apply_palette(self.palette, window, cx);
-        }
-        theme::apply_scale(self.scale.parse().unwrap_or(1.), window);
         let compact = is_compact(window);
         let scroll = &self.scroll;
         let palettes = ConnectedButtonGroup::new("palette", "Palette")
@@ -95,10 +117,11 @@ impl Render for Gallery {
                 ""
             })
             .full_width()
-            .on_change(cx.listener(|this, name: &SharedString, _, cx| {
+            .on_change(cx.listener(|this, name: &SharedString, window, cx| {
                 if let Some(id) = PALETTES.into_iter().find(|id| id.name() == name.as_ref()) {
                     this.palette = id;
                     this.reference_theme = None;
+                    this.prepare_theme(window, cx);
                     cx.notify();
                 }
             }));
@@ -107,10 +130,11 @@ impl Render for Gallery {
             .options(themes::ALL.map(|id| (id.name(), id.name())))
             .selected(self.reference_theme.map(ThemeId::name).unwrap_or(""))
             .full_width()
-            .on_change(cx.listener(|this, name: &SharedString, _, cx| {
+            .on_change(cx.listener(|this, name: &SharedString, window, cx| {
                 this.reference_theme = themes::ALL
                     .into_iter()
                     .find(|id| id.name() == name.as_ref());
+                this.prepare_theme(window, cx);
                 cx.notify();
             }));
         let mode = ConnectedButtonGroup::new("reference-mode", "Material theme mode")
@@ -121,13 +145,14 @@ impl Render for Gallery {
             } else {
                 "light"
             })
-            .on_change(cx.listener(|this, name: &SharedString, _, cx| {
+            .on_change(cx.listener(|this, name: &SharedString, window, cx| {
                 this.reference_mode = if name == "dark" {
                     ThemeMode::Dark
                 } else {
                     ThemeMode::Light
                 };
                 this.reference_theme.get_or_insert(ThemeId::Baseline);
+                this.prepare_theme(window, cx);
                 cx.notify();
             }));
         let contrast = ConnectedButtonGroup::new("reference-contrast", "Material contrast")
@@ -142,13 +167,14 @@ impl Render for Gallery {
                 Contrast::Medium => "medium",
                 Contrast::High => "high",
             })
-            .on_change(cx.listener(|this, name: &SharedString, _, cx| {
+            .on_change(cx.listener(|this, name: &SharedString, window, cx| {
                 this.contrast = match name.as_ref() {
                     "high" => Contrast::High,
                     "medium" => Contrast::Medium,
                     _ => Contrast::Standard,
                 };
                 this.reference_theme.get_or_insert(ThemeId::Baseline);
+                this.prepare_theme(window, cx);
                 cx.notify();
             }));
         let color_swatches = themes::REFERENCE_ROLES
@@ -450,8 +476,9 @@ impl Render for Gallery {
                 ("2", "200%"),
             ])
             .selected(self.scale.clone())
-            .on_change(cx.listener(|this, value: &SharedString, _, cx| {
+            .on_change(cx.listener(|this, value: &SharedString, window, cx| {
                 this.scale = value.clone();
+                this.prepare_theme(window, cx);
                 cx.notify();
             }));
         let density = ConnectedButtonGroup::new("density", "Density")
@@ -509,12 +536,13 @@ impl Render for Gallery {
                 motion::MotionScheme::Expressive => "expressive",
                 motion::MotionScheme::Standard => "standard",
             })
-            .on_change(cx.listener(|this, value: &SharedString, _, cx| {
+            .on_change(cx.listener(|this, value: &SharedString, window, cx| {
                 this.motion_scheme = if value == "standard" {
                     motion::MotionScheme::Standard
                 } else {
                     motion::MotionScheme::Expressive
                 };
+                this.prepare_theme(window, cx);
                 cx.notify();
             }));
         let motion_rows = [
@@ -1013,9 +1041,12 @@ impl Render for Gallery {
 pub fn run(application: gpui::Application, initialize: impl FnOnce(&mut App) + 'static) {
     #[cfg(all(not(target_family = "wasm"), feature = "frame-profiler"))]
     let profiling = performance::prepare();
-    let application = application.with_assets(Assets::new());
+    #[cfg(not(target_family = "wasm"))]
+    let kit_assets = gpui_kit::assets::Assets;
+    #[cfg(target_family = "wasm")]
+    let kit_assets = gpui_kit::assets::Assets::default();
+    let application = application.with_assets(Assets::with(kit_assets));
     application.run(move |cx: &mut App| {
-        initialize(cx);
         #[cfg(target_family = "wasm")]
         cx.text_system()
             .add_fonts(vec![std::borrow::Cow::Borrowed(include_bytes!(
@@ -1028,18 +1059,16 @@ pub fn run(application: gpui::Application, initialize: impl FnOnce(&mut App) + '
                 std::borrow::Cow::Borrowed(include_bytes!("fonts/roboto/Roboto-Medium.ttf")),
             ])
             .expect("Failed to load the reference Roboto fonts");
-        gpui_base::init(cx);
+        gpui_kit::init(cx);
         gpui_kit_material::init(cx);
+        initialize(cx);
         let viewport = size(px(960.), px(900.));
         #[cfg(not(target_family = "wasm"))]
         let viewport = capture::window_size(cx).unwrap_or(viewport);
-        cx.open_window(
+        let (_window, _) = gpui_kit::open_window(
             title_bar_window_options("gpui-kit-material", TITLE_BAR, viewport, cx),
+            cx,
             move |window, cx| {
-                #[cfg(all(not(target_family = "wasm"), feature = "frame-profiler"))]
-                if let Some(profiling) = profiling {
-                    profiling.install(window, cx);
-                }
                 let gallery = cx.new(|cx| {
                     let search = cx.new(|cx| {
                         gpui_base::input::InputState::new(window, cx)
@@ -1063,6 +1092,7 @@ pub fn run(application: gpui::Application, initialize: impl FnOnce(&mut App) + '
                         snackbar: false,
                         motion_scheme: motion::MotionScheme::Expressive,
                         motion_target: false,
+                        theme_frame_pending: false,
                         button_effects_disabled: false,
                         button_effects_tonal: false,
                         button_ripple: true,
@@ -1089,10 +1119,20 @@ pub fn run(application: gpui::Application, initialize: impl FnOnce(&mut App) + '
                 });
                 #[cfg(not(target_family = "wasm"))]
                 capture::install(&gallery, window, cx);
-                cx.new(|cx| gpui_base::Root::new(gallery, window, cx))
+                let initial = gallery.read(cx);
+                let initial_scheme = initial.target_scheme();
+                let initial_scale = initial.scale.parse().unwrap_or(1.);
+                theme::init_component_theme(initial_scheme, initial_scale, cx);
+                gallery
             },
         )
         .unwrap();
+        #[cfg(all(not(target_family = "wasm"), feature = "frame-profiler"))]
+        if let Some(profiling) = profiling {
+            _window
+                .update(cx, |_, window, cx| profiling.install(window, cx))
+                .unwrap();
+        }
         cx.activate(true);
     });
 }

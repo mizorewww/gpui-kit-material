@@ -6,7 +6,8 @@
 //! target at once.
 use crate::color::{Color, ColorRole, PaletteId, Scheme, ThemePreferences};
 use crate::motion::{self, MotionToken};
-use gpui::{App, Rgba, Window, WindowAppearance};
+use gpui::{App, Global, Hsla, Pixels, Rgba, Window, WindowAppearance};
+use gpui_kit::component::{Theme as ComponentTheme, ThemeMode as ComponentThemeMode};
 use std::cell::RefCell;
 #[cfg(not(target_family = "wasm"))]
 use std::time::Instant;
@@ -97,9 +98,18 @@ pub fn apply_palette(id: PaletteId, window: &mut Window, cx: &mut App) -> bool {
 
 /// Apply a complete custom semantic scheme with the same animated transitions.
 pub fn apply_scheme(target: Scheme, window: &mut Window, cx: &mut App) -> bool {
+    let (changed, running) = advance_paint(target, cx);
+    if running {
+        window.request_animation_frame();
+    }
+    changed
+}
+
+// Both the Base-only renderer and the Component pre-frame driver use one sampler.
+fn advance_paint(target: Scheme, cx: &App) -> (bool, bool) {
     let reduce_motion = cx.reduce_motion();
     let effects = motion::curve(MotionToken::SlowEffects);
-    let (changed, running) = PAINT.with(|paint| {
+    PAINT.with(|paint| {
         let mut paint = paint.borrow_mut();
         let now = cx.background_executor().now();
         if paint.target.is_none() {
@@ -130,16 +140,161 @@ pub fn apply_scheme(target: Scheme, window: &mut Window, cx: &mut App) -> bool {
         let changed = next != paint.current;
         paint.current = next;
         (changed, paint.from != target && t < 1.)
-    });
-    if running {
-        window.request_animation_frame();
-    }
-    changed
+    })
 }
 
 /// Set the text scale: 14px is 1rem at 100%, and every rem token follows it.
 pub fn apply_scale(scale: f32, window: &mut Window) {
-    window.set_rem_size(gpui::px(crate::tokens::typography::BASE_PX * scale));
+    window.set_rem_size(scale_pixels(scale));
+}
+
+// Explicit opt-in: existing Base-only callers never require a Component global.
+struct ComponentThemeBridge;
+impl Global for ComponentThemeBridge {}
+
+fn scale_pixels(scale: f32) -> Pixels {
+    let scale = if scale.is_finite() && scale > 0. {
+        scale
+    } else {
+        1.
+    };
+    let pixels = crate::tokens::typography::BASE_PX * scale;
+    gpui::px(if pixels.is_finite() {
+        pixels
+    } else {
+        crate::tokens::typography::BASE_PX
+    })
+}
+
+fn component_font_family() -> &'static str {
+    // Follow the currently implemented Material type scale. A future reference
+    // font migration must update the scale and font assets together.
+    crate::tokens::typography::TypeRole::BodyMedium
+        .scale()
+        .font_family
+}
+
+fn component_color(painted: Scheme, role: ColorRole) -> Hsla {
+    rgba(painted.get(role)).into()
+}
+
+// Only generic semantic colors belong to this bridge. Full M3 role storage,
+// state-layer recipes, motion, spacing and elevation remain Material-owned.
+macro_rules! component_role_projection {
+    ($($field:ident => $role:ident),* $(,)?) => {
+        fn component_projection_matches(theme: &ComponentTheme, painted: Scheme, scale: f32) -> bool {
+            theme.font_size == scale_pixels(scale)
+                && theme.font_family.as_ref() == component_font_family()
+                $(&& theme.colors.$field == component_color(painted, ColorRole::$role)
+                  && theme.tokens.$field == component_color(painted, ColorRole::$role).into())*
+        }
+
+        fn write_component_projection(theme: &mut ComponentTheme, painted: Scheme, scale: f32) {
+            theme.font_size = scale_pixels(scale);
+            theme.font_family = component_font_family().into();
+            $(let color = component_color(painted, ColorRole::$role);
+              theme.colors.$field = color;
+              theme.tokens.$field = color.into();)*
+        }
+    };
+}
+
+component_role_projection! {
+    background => SURFACE,
+    foreground => ON_SURFACE,
+    popover => SURFACE_CONTAINER_HIGH,
+    popover_foreground => ON_SURFACE,
+    primary => PRIMARY,
+    primary_foreground => ON_PRIMARY,
+    secondary => SECONDARY_CONTAINER,
+    secondary_foreground => ON_SECONDARY_CONTAINER,
+    muted => SURFACE_CONTAINER,
+    muted_foreground => ON_SURFACE_VARIANT,
+    accent => TERTIARY_CONTAINER,
+    accent_foreground => ON_TERTIARY_CONTAINER,
+    danger => ERROR,
+    danger_foreground => ON_ERROR,
+    border => OUTLINE_VARIANT,
+    input => OUTLINE,
+    ring => PRIMARY,
+}
+
+fn sync_component_theme(painted: Scheme, scale: f32, cx: &mut App) -> bool {
+    if cx.try_global::<ComponentThemeBridge>().is_none()
+        || cx.try_global::<ComponentTheme>().is_none()
+    {
+        return false;
+    }
+    let mode = if painted.is_dark() {
+        ComponentThemeMode::Dark
+    } else {
+        ComponentThemeMode::Light
+    };
+    let mode_changed = ComponentTheme::global(cx).mode != mode;
+    if mode_changed {
+        // Component loads its registered mode config after an update that changes
+        // mode. Perform that step first so it cannot overwrite the M3 projection.
+        ComponentTheme::update(cx, |theme| theme.mode = mode);
+    }
+    let changed = !component_projection_matches(ComponentTheme::global(cx), painted, scale);
+    if changed {
+        ComponentTheme::update(cx, |theme| {
+            write_component_projection(theme, painted, scale)
+        });
+    }
+    mode_changed || changed
+}
+
+/// Enable the Component theme bridge after `gpui_kit::init`, before opening a
+/// window or returning its content builder. Initialize from the final startup
+/// palette and scale, including capture overrides, so the first Root preparation
+/// sees the correct colors and rem size. Returns false when Component is absent.
+/// No transition is started for this initial paint. The bridge owns the sans
+/// family from Material's current body type scale, its base size and projected
+/// colors. The projection does not own monospace fonts or unrelated geometry;
+/// Component mode configurations retain their normal behavior for those fields.
+pub fn init_component_theme(initial: Scheme, scale: f32, cx: &mut App) -> bool {
+    if cx.try_global::<ComponentTheme>().is_none() {
+        return false;
+    }
+    PAINT.with(|paint| {
+        let mut paint = paint.borrow_mut();
+        paint.target = Some(initial);
+        paint.from = initial;
+        paint.current = initial;
+        paint.started = cx.background_executor().now();
+        paint.motion = motion::curve(MotionToken::SlowEffects);
+    });
+    if cx.try_global::<ComponentThemeBridge>().is_none() {
+        cx.set_global(ComponentThemeBridge);
+    }
+    sync_component_theme(initial, scale, cx);
+    true
+}
+
+/// Advance Material paint and its enabled Component projection before Root
+/// rendering. Call from theme/scale events and next-frame callbacks, not from
+/// `Render`. Returns whether the animation needs another frame; the caller owns
+/// scheduling and should retain only one pending callback. This function never
+/// schedules an animation itself. Base-only callers remain supported.
+pub fn advance_component_theme(
+    target: Scheme,
+    scale: f32,
+    window: &mut Window,
+    cx: &mut App,
+) -> bool {
+    let (changed, running) = advance_paint(target, cx);
+    let projected = sync_component_theme(scheme(), scale, cx);
+    let font_size = scale_pixels(scale);
+    let scale_changed = window.rem_size() != font_size;
+    if scale_changed {
+        window.set_rem_size(font_size);
+    }
+    if (changed || scale_changed) && !projected {
+        // A changed M3-only role may have no Component counterpart.
+        window.refresh();
+    }
+    running
 }
 
 #[cfg(test)]
@@ -147,6 +302,52 @@ mod tests {
     use super::*;
     use gpui::{Context, IntoElement, Render, TestAppContext, div};
     use std::time::Duration;
+
+    #[test]
+    fn component_projection_keeps_unowned_tokens_and_uses_one_rem_baseline() {
+        let mut theme = ComponentTheme::default();
+        theme.font_family = "Caller Font".into();
+        theme.mono_font_family = "Caller Mono".into();
+        theme.radius = gpui::px(13.);
+        let unowned = theme.colors.chart_1;
+        let painted = Scheme::from_palette(PaletteId::Paper)
+            .with_role(ColorRole::PRIMARY_FIXED, Color::hex(0x123456));
+        write_component_projection(&mut theme, painted, 1.5);
+        assert!(component_projection_matches(&theme, painted, 1.5));
+        assert_eq!(theme.font_size, gpui::px(21.));
+        assert_eq!(theme.font_family.as_ref(), component_font_family());
+        assert_eq!(theme.mono_font_family.as_ref(), "Caller Mono");
+        assert_eq!(theme.radius, gpui::px(13.));
+        assert_eq!(theme.colors.chart_1, unowned);
+        assert_eq!(painted.get(ColorRole::PRIMARY_FIXED), Color::hex(0x123456));
+        // Both representations are managed, including a pre-existing mismatched token.
+        theme.tokens.primary = Hsla::default().into();
+        assert!(!component_projection_matches(&theme, painted, 1.5));
+        write_component_projection(&mut theme, painted, 1.5);
+        assert!(component_projection_matches(&theme, painted, 1.5));
+    }
+
+    #[gpui::test]
+    fn component_bridge_is_explicit_and_idempotent_across_modes(cx: &mut TestAppContext) {
+        cx.update(|cx| {
+            let initial = Scheme::from_palette(PaletteId::Paper);
+            assert!(!init_component_theme(initial, 1., cx));
+            assert!(cx.try_global::<ComponentTheme>().is_none());
+            gpui_kit::init(cx);
+            assert!(init_component_theme(initial, 1., cx));
+            assert_eq!(scheme(), initial);
+            assert!(!sync_component_theme(initial, 1., cx));
+            for palette in [PaletteId::Ink, PaletteId::Paper] {
+                let target = Scheme::from_palette(palette);
+                assert!(sync_component_theme(target, 1.25, cx));
+                let theme = ComponentTheme::global(cx);
+                assert_eq!(theme.mode.is_dark(), target.is_dark());
+                assert!(component_projection_matches(theme, target, 1.25));
+                assert_eq!(theme.font_family.as_ref(), component_font_family());
+                assert!(!sync_component_theme(target, 1.25, cx));
+            }
+        });
+    }
 
     struct PaletteHarness {
         palette: PaletteId,
