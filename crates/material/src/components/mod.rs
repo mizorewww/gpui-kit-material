@@ -20,9 +20,13 @@ mod button_group;
 mod controls;
 mod divider;
 mod switch;
-pub use controls::{MaterialSideSheet, MaterialSlider, SearchField, SliderAppearance};
+pub use controls::{MaterialSideSheet, MaterialSlider, SliderAppearance};
 pub use divider::{
     DividerContext, DividerDirection, DividerOrientation, DividerVariant, MaterialDivider,
+};
+pub use search::{
+    SEARCH_BAR_HEIGHT, SEARCH_SUGGESTION_HEIGHT, SearchField, SearchSuggestion, SearchView,
+    SearchViewLayout,
 };
 pub use switch::{MaterialSwitch, SwitchIcons};
 mod caption;
@@ -31,14 +35,17 @@ mod chips;
 mod choice;
 mod feedback;
 mod focus;
+mod menu;
 mod navigation;
 mod preview;
 mod progress;
 mod radio;
 mod roving;
 mod roving_list;
+mod search;
 mod tabs;
 mod text;
+mod text_field;
 mod tile;
 mod title_bar;
 
@@ -54,6 +61,9 @@ pub use feedback::{
     small_badge, status_chip,
 };
 pub use focus::{FocusRing, RevealFocus, RingedButton, contain_scroll};
+pub use menu::{
+    ExposedDropdown, MaterialMenu, MaterialMenuItem, MenuDensity, MenuGroup, MenuPopup, MenuStyle,
+};
 pub use navigation::{
     NavBadge, NavIcon, NavItem, NavItemLayout, NavigationBar, NavigationItem, NavigationRail,
     RAIL_COLLAPSED_WIDTH, RAIL_EXPANDED_WIDTH, RailAlignment, navigation_scrim,
@@ -72,6 +82,7 @@ pub use text::{
     accessible_text, error_text, info_callout, page_heading, section_heading, section_title,
     semantic_label, supporting_info,
 };
+pub use text_field::{TEXT_FIELD_HEIGHT, TEXT_FIELD_WIDTH, TextField, TextFieldVariant};
 pub use tile::{
     TileGroup, TileScale, disclosure_chevron, list_tile, tile, tile_chevron, tile_info,
 };
@@ -84,4 +95,5 @@ pub(crate) fn init(cx: &mut gpui::App) {
     roving_list::init(cx);
     choice::init(cx);
     radio::init(cx);
+    menu::init(cx);
 }
