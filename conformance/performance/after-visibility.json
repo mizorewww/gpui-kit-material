@@ -1,0 +1,335 @@
+{
+  "schema": "material-gallery-cpu-frames-v2",
+  "statistics_definition": "nearest-rank quantiles; median is p50 (lower middle for even sample counts)",
+  "budget_ns": 2000000,
+  "budget_comparison": "every complete CPU scope must be at or below budget; known over-budget work fails even when acceptance is incomplete",
+  "acceptance_eligible": false,
+  "eligibility_reasons": [],
+  "scope": "whole synchronous CPU frame scopes plus exact draw/present associations",
+  "cpu_work_definition": "Complete event end-start includes callbacks, draw, submission and cleanup; split initial draw and submission remain separately measured, idle gaps are not CPU work",
+  "complete": false,
+  "errors": [
+    "draw superseded before present: WindowId(1v1)",
+    "draw superseded before present: WindowId(1v1)",
+    "complete scope 0 draw has no matched Draw/Present events",
+    "complete scope 1 draw has no matched Draw/Present events"
+  ],
+  "metadata": {
+    "runtime_source_commit": "135fec0786faaab44fa510be8c8e5ba22ce927b0",
+    "runtime_source_dirty": false,
+    "runtime_source_status": "",
+    "binary_build_identity": null,
+    "build_identity_note": "runtime Git state is not binary provenance; build commit and binary hash must be recorded by the external build runner",
+    "release": true,
+    "debug_assertions": false,
+    "executable": "gallery",
+    "os": "macos",
+    "arch": "aarch64",
+    "hardware": {
+      "uname": null,
+      "model": "Mac14,7",
+      "cpu": "Apple M2",
+      "memory_bytes": "17179869184",
+      "available_parallelism": 8
+    },
+    "requested_seconds": 5.0,
+    "backend": "native GPUI; concrete renderer not exposed by FrameTimingCollector",
+    "build_flags": {
+      "rustflags_at_compile": null,
+      "encoded_rustflags_at_compile": null,
+      "feature": "frame-profiler",
+      "unavailable_flags_are_null": true
+    },
+    "initial_gallery_state": {
+      "theme": "baseline",
+      "mode": "light",
+      "contrast": "standard",
+      "text_scale": 1,
+      "density": "auto"
+    },
+    "scenario_coverage": "startup and naturally scheduled frames only; interaction matrix not automated",
+    "workload": "gallery startup and naturally requested frames; no synthetic refresh, no warm-up exclusion",
+    "gpu_time_ns": null,
+    "gpu_measurement": "unavailable: Present measures CPU platform submission, not GPU execution",
+    "ring_capacity_events": 116508,
+    "ring_overflow_policy": "full batch is incomplete, even if no loss can be proven",
+    "window": {
+      "id": "WindowId(1v1)",
+      "viewport_logical_px": [
+        960.0,
+        780.0
+      ],
+      "dpr": 2.0,
+      "rem_size_px": 14.0,
+      "snapshot": "initial window; viewport changes are not tracked"
+    }
+  },
+  "capture_elapsed_ns": 5002969291,
+  "summary": {
+    "frames": 3,
+    "max_ns": 36073417,
+    "median_ns": 16349625,
+    "p95_ns": 36073417,
+    "p99_ns": 36073417,
+    "over_budget_frames": 3
+  },
+  "first_scope_summary": {
+    "frames": 1,
+    "max_ns": 36073417,
+    "median_ns": 36073417,
+    "p95_ns": 36073417,
+    "p99_ns": 36073417,
+    "over_budget_frames": 1
+  },
+  "subsequent_scopes_summary": {
+    "frames": 2,
+    "max_ns": 16349625,
+    "median_ns": 12828292,
+    "p95_ns": 16349625,
+    "p99_ns": 16349625,
+    "over_budget_frames": 2
+  },
+  "diagnostic_stage_summary": {
+    "frames": 1,
+    "max_ns": 12568292,
+    "median_ns": 12568292,
+    "p95_ns": 12568292,
+    "p99_ns": 12568292,
+    "over_budget_frames": 1
+  },
+  "first_frame_stage_summary": {
+    "frames": 1,
+    "max_ns": 12568292,
+    "median_ns": 12568292,
+    "p95_ns": 12568292,
+    "p99_ns": 12568292,
+    "over_budget_frames": 1
+  },
+  "subsequent_frames_stage_summary": {
+    "frames": 0,
+    "max_ns": null,
+    "median_ns": null,
+    "p95_ns": null,
+    "p99_ns": null,
+    "over_budget_frames": 0
+  },
+  "collector_batch_sizes": [
+    7,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+  ],
+  "raw_events": [
+    {
+      "event": "draw",
+      "window": "WindowId(1v1)",
+      "start_ns": 17375,
+      "end_ns": 35755375,
+      "dirty_ns": null,
+      "invalidations": 0,
+      "refresh_interval_ns": 16666667,
+      "signal_ns": null,
+      "phases": {
+        "request_layout_ns": 7865459,
+        "prepaint_ns": 13006166,
+        "paint_ns": 14284250
+      }
+    },
+    {
+      "event": "complete",
+      "window": "WindowId(1v1)",
+      "source": "InitialDraw",
+      "start_ns": 0,
+      "end_ns": 36073417,
+      "duration_ns": 36073417,
+      "draw_start_ns": 17375,
+      "present_start_ns": null,
+      "draw_count": 1,
+      "present_count": 0,
+      "next_frame_callbacks": 0,
+      "power_interrupted": false
+    },
+    {
+      "event": "draw",
+      "window": "WindowId(1v1)",
+      "start_ns": 55012625,
+      "end_ns": 67544584,
+      "dirty_ns": null,
+      "invalidations": 24,
+      "refresh_interval_ns": 16666667,
+      "signal_ns": 54997250,
+      "phases": {
+        "request_layout_ns": 4900334,
+        "prepaint_ns": 4482916,
+        "paint_ns": 2395750
+      }
+    },
+    {
+      "event": "complete",
+      "window": "WindowId(1v1)",
+      "source": "Platform",
+      "start_ns": 55002417,
+      "end_ns": 71352042,
+      "duration_ns": 16349625,
+      "draw_start_ns": 55012625,
+      "present_start_ns": 67547084,
+      "draw_count": 1,
+      "present_count": 1,
+      "next_frame_callbacks": 0,
+      "power_interrupted": false
+    },
+    {
+      "event": "draw",
+      "window": "WindowId(1v1)",
+      "start_ns": 140943125,
+      "end_ns": 152815042,
+      "dirty_ns": 140931459,
+      "invalidations": 2,
+      "refresh_interval_ns": 16666667,
+      "signal_ns": 117755875,
+      "phases": {
+        "request_layout_ns": 4657250,
+        "prepaint_ns": 4243917,
+        "paint_ns": 2222958
+      }
+    },
+    {
+      "event": "present",
+      "window": "WindowId(1v1)",
+      "start_ns": 152818042,
+      "end_ns": 153514417,
+      "animation_interval_ns": null
+    },
+    {
+      "event": "complete",
+      "window": "WindowId(1v1)",
+      "source": "Platform",
+      "start_ns": 140939625,
+      "end_ns": 153767917,
+      "duration_ns": 12828292,
+      "draw_start_ns": 140943125,
+      "present_start_ns": 152818042,
+      "draw_count": 1,
+      "present_count": 1,
+      "next_frame_callbacks": 0,
+      "power_interrupted": false
+    }
+  ],
+  "cpu_scopes": [
+    {
+      "index": 0,
+      "source": "InitialDraw",
+      "cpu_elapsed_ns": 36073417,
+      "draw_count": 1,
+      "present_count": 0,
+      "next_frame_callbacks": 0,
+      "over_budget": true,
+      "gpu_time_ns": null
+    },
+    {
+      "index": 1,
+      "source": "Platform",
+      "cpu_elapsed_ns": 16349625,
+      "draw_count": 1,
+      "present_count": 1,
+      "next_frame_callbacks": 0,
+      "over_budget": true,
+      "gpu_time_ns": null
+    },
+    {
+      "index": 2,
+      "source": "Platform",
+      "cpu_elapsed_ns": 12828292,
+      "draw_count": 1,
+      "present_count": 1,
+      "next_frame_callbacks": 0,
+      "over_budget": true,
+      "gpu_time_ns": null
+    }
+  ],
+  "frames": [
+    {
+      "index": 0,
+      "first_frame": true,
+      "draw_start_ns": 140943125,
+      "present_end_ns": 153514417,
+      "draw_ns": 11871917,
+      "submit_ns": 696375,
+      "measured_cpu_stage_ns": 12568292,
+      "wall_span_ns": 12571292,
+      "request_layout_ns": 4657250,
+      "prepaint_ns": 4243917,
+      "paint_ns": 2222958,
+      "measured_stages_over_budget": true,
+      "gpu_time_ns": null,
+      "complete_scope_indices": [
+        2
+      ],
+      "cpu_frame_ns": 12828292,
+      "over_budget": true
+    }
+  ],
+  "publication": {
+    "original_frames_sha256": "21c67ae3d9d09bc5404b7fa2724d75250377616b88a98bb479f28e040d659e29",
+    "redactions": [
+      "metadata.executable absolute path",
+      "metadata.hardware.uname host name"
+    ],
+    "source_commit": "135fec0786faaab44fa510be8c8e5ba22ce927b0",
+    "source_status": "",
+    "source_files_sha256": "3be6789b33f3114b460679484a3b78842559716b92435b018ca8d8c3f9d3b275",
+    "binary_sha256": "61de0b78b338fe7bc1485da4d41815045686418838a273b42468b1816decb4e4",
+    "inputs_stable": true,
+    "external_sources": [
+      {
+        "commit": "d73f27c1b14d1a8330fb837945bb09b282257f1e",
+        "status": "",
+        "source_files_sha256": "2d6a276ba6aa156abe48ac37e135e8150eb1ff2d92f2d1e4a49a3c2ac514a046"
+      }
+    ]
+  }
+}

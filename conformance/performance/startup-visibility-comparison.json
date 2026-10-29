@@ -1,0 +1,37 @@
+{
+  "schema": "material-native-startup-comparison-v1",
+  "scenario": "5-second startup and naturally scheduled frames, no automated interaction",
+  "hardware": "Apple M2 / Mac14,7 / 16 GiB",
+  "viewport_logical_px": [
+    960,
+    780
+  ],
+  "dpr": 2,
+  "budget_ns": 2000000,
+  "verdict": "FAIL: every observed CPU scope exceeds budget in both runs",
+  "interpretation": "Offscreen recurring frame requests stop after startup; per-frame cost is not fixed. Three startup scopes are not a steady-state latency comparison. Draw/Present event completeness and GPU timing remain unverified.",
+  "runs": [
+    {
+      "evidence": "before-visibility.json",
+      "source_commit": "abbce11422af24ead2d56add991710c3ed810607",
+      "cpu_scopes": 301,
+      "total_scoped_cpu_ns": 3189706238,
+      "first_scope_ns": 36047083,
+      "max_scope_ns": 36047083,
+      "over_budget_scopes": 301,
+      "complete": false,
+      "acceptance_eligible": false
+    },
+    {
+      "evidence": "after-visibility.json",
+      "source_commit": "135fec0786faaab44fa510be8c8e5ba22ce927b0",
+      "cpu_scopes": 3,
+      "total_scoped_cpu_ns": 65251334,
+      "first_scope_ns": 36073417,
+      "max_scope_ns": 36073417,
+      "over_budget_scopes": 3,
+      "complete": false,
+      "acceptance_eligible": false
+    }
+  ]
+}

@@ -69,7 +69,7 @@
     "themes": "light and dark, every built-in palette, and reference baseline",
     "review_invalidation": "Any implementation change invalidates affected prior PASS verdicts until independently reviewed again.",
     "performance": {
-      "status": "unverified",
+      "status": "failed: measured native startup scopes exceed 2ms; other scenarios and WASM timing remain unverified",
       "scope": "entire gallery frame, on both desktop and wasm-browser; applies to acceptance of every component",
       "metric": "CPU frame elapsed time including view rendering, layout, prepaint, paint, scene finalization and graphics command submission",
       "threshold_ms": 2.0,
@@ -98,7 +98,8 @@
         "theme and text-scale changes",
         "reduced-motion transitions"
       ],
-      "completion": "No component or gallery can pass without whole-gallery evidence at or below the budget. Existing functional or visual reviews do not establish performance acceptance."
+      "completion": "No component or gallery can pass without whole-gallery evidence at or below the budget. Existing functional or visual reviews do not establish performance acceptance.",
+      "evidence": "conformance/performance/startup-visibility-comparison.json"
     },
     "reference_precedence": "Use reference_policy for all visual, motion, theme, typography and state assertions. A secondary-reference PASS cannot establish primary-reference conformance."
   },
