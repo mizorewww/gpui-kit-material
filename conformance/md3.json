@@ -99,7 +99,24 @@
         "reduced-motion transitions"
       ],
       "completion": "No component or gallery can pass without whole-gallery evidence at or below the budget. Existing functional or visual reviews do not establish performance acceptance.",
-      "evidence": "conformance/performance/startup-backend-comparison.json"
+      "evidence": "conformance/performance/startup-backend-comparison.json",
+      "scrolling_fps": {
+        "status": "unverified",
+        "minimum_fps": 500,
+        "scenario": "continuous upward and downward scrolling through the complete Gallery, including newly exposed component rows and direction reversals",
+        "metric": "actual rendered frame submissions during the declared active scrolling interval; not frame requests, monitor refresh rate, or skipped/no-drawable submission attempts",
+        "synchronization": "measure with vertical synchronization disabled where the backend exposes this capability; report actual synchronization state and request pacing; unsupported browser/platform control is not a PASS",
+        "evidence_required": [
+          "raw frame submission timestamps",
+          "frame intervals and minimum FPS, with the sampling definition stated",
+          "all slow intervals during the declared continuous scrolling scenario",
+          "CPU scope timings, GPU measurements separately",
+          "actual backend and synchronization state",
+          "independent subagent review"
+        ],
+        "cpu_budget": "the existing <= 2ms whole-gallery CPU frame gate remains required independently",
+        "interpretation": "rendering/submission throughput; physical monitor refresh is reported separately"
+      }
     },
     "reference_precedence": "Use reference_policy for all visual, motion, theme, typography and state assertions. A secondary-reference PASS cannot establish primary-reference conformance."
   },
@@ -1065,7 +1082,7 @@
       }
     }
   ],
-  "objective": "Reproduce the complete union of https://m3e.kyralabs.dev/ and https://md3.io/ components, styles and animations on desktop and WASM galleries, with m3e.kyralabs.dev authoritative for overlapping components; use https://gpui-kit.com/ for gallery organization. Exact visual and animation parity, independent subagent approval for every component, whole-gallery CPU frames <= 2 ms, atomic commits and frequent GitHub progress pushes are required. Material icons must come from the sibling ../gpui-material-symbols repository, which may be improved as needed. Build on Longbridge gpui-kit and its gpui-component layer, reusing existing controls and infrastructure before implementing Material-specific differences.",
+  "objective": "Reproduce the complete union of https://m3e.kyralabs.dev/ and https://md3.io/ components, styles and animations on desktop and WASM galleries, with m3e.kyralabs.dev authoritative for overlapping components; use https://gpui-kit.com/ for gallery organization. Exact visual and animation parity, independent subagent approval for every component, whole-gallery CPU frames <= 2 ms and continuous vertical-scrolling rendering throughput >= 500 FPS, atomic commits and frequent GitHub progress pushes are required. Material icons must come from the gpui-material-symbols repository, pinned by Git revision for default builds; its sibling checkout may be used explicitly for development and improved as needed. Build on Longbridge gpui-kit and its gpui-component layer, reusing existing controls and infrastructure before implementing Material-specific differences.",
   "reference_policy": {
     "primary": {
       "site": "https://m3e.kyralabs.dev/",
