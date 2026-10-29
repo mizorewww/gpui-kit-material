@@ -141,9 +141,10 @@ impl Session {
         let viewport = window.viewport_size();
         self.metadata["window"] = json!({"viewport_logical_px":[f32::from(viewport.width),f32::from(viewport.height)],
             "dpr":window.scale_factor(),"rem_size_px":f32::from(window.rem_size())});
-        self.metadata["scenario_coverage"] = json!("bounded bidirectional main-content scrolling");
+        self.metadata["scenario_coverage"] =
+            json!("full top-bottom-top main-content traversal, repeated until the bound");
         self.metadata["workload"] = json!(
-            "actual 8px scroll steps, all startup/turn observations retained, FPS overlay enabled"
+            "8px scroll inputs from a timer independent of frame callbacks (MATERIAL_SCROLL_INPUT_HZ, default 1000), all startup/turn observations retained, FPS overlay enabled"
         );
         self.metadata["display_refresh_interval_ns"] = json!(
             window
@@ -548,11 +549,16 @@ fn report(mut recording: Recording, target: WindowId, metadata: Value, elapsed: 
                     frames[index]["scope_elapsed_ns"] = json!(scope_elapsed[d]);
                     frames[index]["over_budget"] = json!(scope_costs[d] > BUDGET_NS);
                 } else {
-                    let sum = scope_costs[d] + scope_costs[p];
+                    // Split frames are never acceptance evidence, so judge them
+                    // conservatively on inclusive elapsed scope time (blocked
+                    // presentation waits included); the wait-free sum is kept too.
+                    let sum = scope_elapsed[d] + scope_elapsed[p];
                     split_sums.push(sum);
                     frames[index]["cpu_frame_ns"] = Value::Null;
                     frames[index]["over_budget"] = json!(sum > BUDGET_NS);
                     frames[index]["diagnostic_split_scope_cpu_sum_ns"] = json!(sum);
+                    frames[index]["diagnostic_split_scope_sum_excluding_wait_ns"] =
+                        json!(scope_costs[d] + scope_costs[p]);
                     reasons.push(format!("frame {index} draw and submit belong to separate scopes; split CPU sum is diagnostic, not a complete-frame measurement"));
                 }
             }
@@ -744,8 +750,10 @@ mod tests {
             present_count: 1,
             next_frame_callbacks: 0,
             power_interrupted: false,
-            presentation_wait: Duration::ZERO,
-            presentation_waits: 0,
+            // Even when most of submission is drawable acquisition, the
+            // inclusive split sum must still fail the complete frame budget.
+            presentation_wait: Duration::from_micros(800),
+            presentation_waits: 1,
         };
         let evidence = report(
             Recording {
