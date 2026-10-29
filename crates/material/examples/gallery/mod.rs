@@ -735,13 +735,13 @@ impl Render for Gallery {
                     .child(
                         gpui_base::h_flex()
                             .gap(rem(16.))
-                            .child(circular_progress(
+                            .child(indeterminate_circular_progress(
                                 "circular-animated",
                                 "Loading",
-                                sample_circular_progress("circular-animated-clock", window, cx),
-                                None,
                                 size(rem(24.), rem(24.)),
                                 1.,
+                                window,
+                                cx,
                             ))
                             .children([0., 0.62, 1.].into_iter().enumerate().map(
                                 |(index, fraction)| {

@@ -61,14 +61,23 @@ pub fn sample_circular_progress(
     window: &mut Window,
     cx: &mut App,
 ) -> CircularProgressFrame {
+    let (frame, running) = sample_clock(id.into(), window, cx);
+    if running {
+        window.request_animation_frame();
+    }
+    frame
+}
+
+// Sampling preserves the clock even when no frame is requested for offscreen paint.
+fn sample_clock(id: ElementId, window: &mut Window, cx: &mut App) -> (CircularProgressFrame, bool) {
     let now = cx.background_executor().now();
     let reduced = cx.reduce_motion();
-    let state = window.use_keyed_state((id.into(), "circular-progress-clock"), cx, |_, _| {
+    let state = window.use_keyed_state((id, "circular-progress-clock"), cx, |_, _| {
         (now, reduced, circular_indeterminate_frame(0.))
     });
     let (started, stopped, previous) = *state.read(cx);
     if stopped {
-        return previous;
+        return (previous, false);
     }
     let timing = Timing::new(Duration::from_millis(6000)).iterations(IterationCount::Infinite);
     let time = timing
@@ -80,10 +89,7 @@ pub fn sample_circular_progress(
         state.1 = reduced;
         state.2 = frame;
     });
-    if !reduced {
-        window.request_animation_frame();
-    }
-    frame
+    (frame, !reduced)
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -184,6 +190,50 @@ pub fn circular_progress(
     display_size: Size<Rems>,
     opacity: f32,
 ) -> AnyElement {
+    paint_progress(
+        id.into(),
+        label.into(),
+        frame,
+        fraction,
+        display_size,
+        opacity,
+        false,
+    )
+}
+
+/// Animate a bounded circular indicator while its box intersects the viewport
+/// and ancestor clip. Its original clock continues offscreen, so scrolling back
+/// does not restart playback. Reduced motion retains the sampler's stop policy.
+pub fn indeterminate_circular_progress(
+    id: impl Into<ElementId>,
+    label: impl Into<SharedString>,
+    display_size: Size<Rems>,
+    opacity: f32,
+    window: &mut Window,
+    cx: &mut App,
+) -> AnyElement {
+    let id = id.into();
+    let (frame, running) = sample_clock(id.clone(), window, cx);
+    paint_progress(
+        id,
+        label.into(),
+        frame,
+        None,
+        display_size,
+        opacity,
+        running,
+    )
+}
+
+fn paint_progress(
+    id: ElementId,
+    label: SharedString,
+    frame: CircularProgressFrame,
+    fraction: Option<f32>,
+    display_size: Size<Rems>,
+    opacity: f32,
+    request_frame: bool,
+) -> AnyElement {
     let (track, active) = geometry(frame);
     let track_color = color(ColorRole::SECONDARY_CONTAINER);
     let active_color = color(ColorRole::ACCENT);
@@ -197,12 +247,20 @@ pub fn circular_progress(
         .opacity(opacity.clamp(0., 1.))
         .child(
             canvas(
-                move |_, _, _| (),
-                move |bounds, (), window, _| {
+                move |bounds, window, _| {
+                    let visible = bounds
+                        .intersect(&window.content_mask().bounds)
+                        .intersect(&Bounds::new(point(px(0.), px(0.)), window.viewport_size()));
+                    request_frame && visible.size.width > px(0.) && visible.size.height > px(0.)
+                },
+                move |bounds, request_frame, window, _| {
                     for (arc, ink) in [(track, track_color), (active, active_color)] {
                         if let Some(path) = arc_path(bounds, arc) {
                             window.paint_path(path, ink);
                         }
+                    }
+                    if request_frame {
+                        window.request_animation_frame();
                     }
                 },
             )
@@ -283,6 +341,80 @@ mod tests {
             cx.set_reduce_motion(false);
             window.refresh();
             window.draw(cx).clear(cx);
+        });
+        assert_eq!(*samples.borrow().last().unwrap(), stopped);
+    }
+
+    struct VisibleClockHarness {
+        visible: bool,
+        samples: std::rc::Rc<std::cell::RefCell<Vec<CircularProgressFrame>>>,
+    }
+    impl Render for VisibleClockHarness {
+        fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+            use gpui::prelude::*;
+            let indicator = super::indeterminate_circular_progress(
+                "visible-clock",
+                "Loading",
+                size(gpui::rems(1.), gpui::rems(1.)),
+                1.,
+                window,
+                cx,
+            );
+            self.samples
+                .borrow_mut()
+                .push(super::sample_clock("visible-clock".into(), window, cx).0);
+            div().relative().size(px(100.)).overflow_hidden().child(
+                div()
+                    .absolute()
+                    .top(px(if self.visible { 10. } else { 150. }))
+                    .child(indicator),
+            )
+        }
+    }
+
+    #[gpui::test]
+    fn clipped_indicator_stops_requests_preserves_phase_and_reduced_stop(cx: &mut TestAppContext) {
+        let samples = std::rc::Rc::new(std::cell::RefCell::new(Vec::new()));
+        let (view, cx) = cx.add_window_view(|_, _| VisibleClockHarness {
+            visible: false,
+            samples: samples.clone(),
+        });
+        cx.update(|window, cx| {
+            window.draw(cx).clear(cx);
+            assert_eq!(window.simulate_next_frame(cx), 0);
+        });
+        cx.executor().advance_clock(Duration::from_millis(150));
+        cx.update(|window, cx| {
+            view.update(cx, |this, _| this.visible = true);
+            window.refresh();
+            window.draw(cx).clear(cx);
+            assert_eq!(window.simulate_next_frame(cx), 1);
+        });
+        let frame = *samples.borrow().last().unwrap();
+        assert!(
+            (frame.rotation_degrees - circular_indeterminate_frame(150.).rotation_degrees).abs()
+                < 0.002
+        );
+        cx.update(|window, cx| {
+            view.update(cx, |this, _| this.visible = false);
+            cx.set_reduce_motion(true);
+            window.refresh();
+            window.draw(cx).clear(cx);
+            // The prior visible frame already queued one callback. It may fire
+            // once after clipping; the stopped clock must not enqueue another.
+            assert_eq!(window.simulate_next_frame(cx), 1);
+            window.refresh();
+            window.draw(cx).clear(cx);
+            assert_eq!(window.simulate_next_frame(cx), 0);
+        });
+        let stopped = *samples.borrow().last().unwrap();
+        cx.executor().advance_clock(Duration::from_secs(2));
+        cx.update(|window, cx| {
+            view.update(cx, |this, _| this.visible = true);
+            cx.set_reduce_motion(false);
+            window.refresh();
+            window.draw(cx).clear(cx);
+            assert_eq!(window.simulate_next_frame(cx), 0);
         });
         assert_eq!(*samples.borrow().last().unwrap(), stopped);
     }

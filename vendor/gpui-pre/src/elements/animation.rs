@@ -95,6 +95,8 @@ pub trait AnimationExt {
             element: Some(self),
             animator: Box::new(move |this, _, value| animator(this, value)),
             animations: smallvec::smallvec![animation],
+            visible_repeat: false,
+            visible_frame: None,
         }
     }
 
@@ -113,6 +115,8 @@ pub trait AnimationExt {
             element: Some(self),
             animator: Box::new(animator),
             animations: animations.into(),
+            visible_repeat: false,
+            visible_frame: None,
         }
     }
 
@@ -162,6 +166,8 @@ pub struct AnimationElement<E> {
     id: ElementId,
     element: Option<E>,
     animations: SmallVec<[Animation; 1]>,
+    visible_repeat: bool,
+    visible_frame: Option<VisibleAnimationFrame>,
     animator: Box<dyn Fn(E, usize, f32) -> E + 'static>,
 }
 
@@ -215,6 +221,33 @@ impl<E: ParentElement> ParentElement for AnimationElement<E> {
 }
 
 impl<E> AnimationElement<E> {
+    /// Only request recurring frames while this repeating element's layout bounds
+    /// overlap both its ancestor content mask and the window viewport.
+    ///
+    /// Opt in only for decorative content whose drawing stays within its bounds
+    /// and whose animation cannot move or grow from outside the visible region
+    /// into it. Overflow, shadows outside the bounds, and entrance animations
+    /// require the default scheduling. Opacity is deliberately not considered.
+    ///
+    /// Sampling still uses the original clock: scrolling away does not pause or
+    /// restart the animation. Scrolling back (or another external invalidation)
+    /// samples the current phase. One already queued callback/timer may fire
+    /// after leaving the visible region, but it will not keep scheduling itself.
+    ///
+    /// # Panics
+    /// Panics unless this wraps exactly one repeating, nonzero-duration animation.
+    /// Animation chains and oneshots retain the default scheduling policy.
+    pub fn repeat_when_visible(mut self) -> Self {
+        assert!(
+            self.animations.len() == 1
+                && !self.animations[0].oneshot
+                && !self.animations[0].duration.is_zero(),
+            "repeat_when_visible requires one nonzero-duration repeating animation"
+        );
+        self.visible_repeat = true;
+        self
+    }
+
     /// Returns a new [`AnimationElement<E>`] after applying the given function
     /// to the element being animated.
     pub fn map_element(mut self, f: impl FnOnce(E) -> E) -> AnimationElement<E> {
@@ -237,6 +270,35 @@ struct AnimationState {
     /// Whether a throttled re-render (see [`Animation::with_max_fps`]) is
     /// already scheduled, so overlapping renders don't stack extra timers.
     delayed_frame_pending: Rc<Cell<bool>>,
+}
+
+// This intent is transient; the persistent animation clock remains untouched.
+struct VisibleAnimationFrame {
+    view: crate::EntityId,
+    max_fps: Option<f32>,
+    delayed_frame_pending: Rc<Cell<bool>>,
+}
+
+impl VisibleAnimationFrame {
+    fn request(self, window: &mut Window, cx: &mut App) {
+        let view = self.view;
+        match self.max_fps {
+            Some(fps) if fps.is_finite() && fps > 0.0 => {
+                if !self.delayed_frame_pending.replace(true) {
+                    let pending = self.delayed_frame_pending;
+                    let interval = Duration::from_secs_f32(1.0 / fps);
+                    window
+                        .spawn(cx, async move |cx| {
+                            cx.background_executor().timer(interval).await;
+                            pending.set(false);
+                            cx.update(move |_, cx| cx.notify(view)).ok();
+                        })
+                        .detach();
+                }
+            }
+            _ => window.on_next_frame(move |_, cx| cx.notify(view)),
+        }
+    }
 }
 
 struct SpringElementState {
@@ -381,7 +443,7 @@ impl<E: IntoElement + 'static> Element for SpringAnimationElement<E> {
 
 impl<E: IntoElement + 'static> Element for AnimationElement<E> {
     type RequestLayoutState = AnyElement;
-    type PrepaintState = ();
+    type PrepaintState = bool;
 
     fn id(&self) -> Option<ElementId> {
         Some(self.id.clone())
@@ -449,7 +511,13 @@ impl<E: IntoElement + 'static> Element for AnimationElement<E> {
             let element = self.element.take().expect("should only be called once");
             let mut element = (self.animator)(element, animation_ix, delta).into_any_element();
 
-            if !done {
+            if !done && self.visible_repeat {
+                self.visible_frame = Some(VisibleAnimationFrame {
+                    view: window.current_view(),
+                    max_fps: self.animations[animation_ix].max_fps,
+                    delayed_frame_pending: state.delayed_frame_pending.clone(),
+                });
+            } else if !done {
                 match self.animations[animation_ix].max_fps {
                     Some(max_fps) if max_fps.is_finite() && max_fps > 0.0 => {
                         if !state.delayed_frame_pending.get() {
@@ -478,12 +546,26 @@ impl<E: IntoElement + 'static> Element for AnimationElement<E> {
         &mut self,
         _id: Option<&GlobalElementId>,
         _inspector_id: Option<&InspectorElementId>,
-        _bounds: crate::Bounds<crate::Pixels>,
+        bounds: crate::Bounds<crate::Pixels>,
         element: &mut Self::RequestLayoutState,
         window: &mut Window,
         cx: &mut App,
     ) -> Self::PrepaintState {
+        if self.visible_frame.is_none() {
+            element.prepaint(window, cx);
+            return false;
+        }
+        // Use prepaint coordinates (which already include the scroll offset).
+        // Intersect all three rectangles, not just two pairwise overlap tests.
+        let mask = window.content_mask().bounds;
+        let viewport = window.viewport_size();
+        let left = bounds.left().max(mask.left()).max(crate::px(0.0));
+        let top = bounds.top().max(mask.top()).max(crate::px(0.0));
+        let right = bounds.right().min(mask.right()).min(viewport.width);
+        let bottom = bounds.bottom().min(mask.bottom()).min(viewport.height);
+        let visible = right > left && bottom > top;
         element.prepaint(window, cx);
+        visible
     }
 
     fn paint(
@@ -492,11 +574,18 @@ impl<E: IntoElement + 'static> Element for AnimationElement<E> {
         _inspector_id: Option<&InspectorElementId>,
         _bounds: crate::Bounds<crate::Pixels>,
         element: &mut Self::RequestLayoutState,
-        _: &mut Self::PrepaintState,
+        visible: &mut Self::PrepaintState,
         window: &mut Window,
         cx: &mut App,
     ) {
         element.paint(window, cx);
+        // Commit only after successful prepaint: retryable list/autoscroll
+        // prepaints do not roll back queued callbacks or detached timers.
+        if *visible {
+            if let Some(frame) = self.visible_frame.take() {
+                frame.request(window, cx);
+            }
+        }
     }
 }
 
@@ -1025,5 +1114,236 @@ mod tests {
 
         assert_eq!(simulate_next_frame(&window, cx), 0);
         assert_eq!(*rendered_deltas.borrow(), vec![0.0]);
+    }
+    struct VisibleRepeatTestView {
+        scroll: crate::ScrollHandle,
+        deltas: Rc<RefCell<Vec<f32>>>,
+        opt_in: bool,
+        opacity: f32,
+        max_fps: Option<f32>,
+    }
+
+    impl Render for VisibleRepeatTestView {
+        fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+            let deltas = self.deltas.clone();
+            let entrance_motion = !self.opt_in;
+            // Use the instance clock here: dedicated tests above cover synced
+            // repeats. Offscreen sampling must preserve both clock policies.
+            let mut animation = Animation::new(Duration::from_secs(1)).repeat();
+            if let Some(fps) = self.max_fps {
+                animation = animation.with_max_fps(fps);
+            }
+            let child = div()
+                .mt(px(150.))
+                .size(px(20.))
+                .opacity(self.opacity)
+                .with_animation("bounded-repeat", animation, move |this, delta| {
+                    deltas.borrow_mut().push(delta);
+                    if entrance_motion {
+                        this.relative().top(px(-200. * delta))
+                    } else {
+                        this
+                    }
+                });
+            let child = if self.opt_in {
+                child.repeat_when_visible()
+            } else {
+                child
+            };
+            div()
+                .id("viewport")
+                .size(px(100.))
+                .overflow_y_scroll()
+                .track_scroll(&self.scroll)
+                .child(div().h(px(400.)).w(px(100.)).child(child))
+        }
+    }
+
+    fn open_visible_repeat(
+        cx: &mut TestAppContext,
+        opt_in: bool,
+        max_fps: Option<f32>,
+    ) -> WindowHandle<VisibleRepeatTestView> {
+        let window = cx.open_window(size(px(100.), px(100.)), move |_, _| {
+            VisibleRepeatTestView {
+                scroll: crate::ScrollHandle::new(),
+                deltas: Rc::new(RefCell::new(Vec::new())),
+                opt_in,
+                opacity: 1.,
+                max_fps,
+            }
+        });
+        cx.run_until_parked();
+        window
+    }
+
+    #[gpui::test]
+    fn clipped_repeat_does_not_request_frames(cx: &mut TestAppContext) {
+        let window = open_visible_repeat(cx, true, None);
+        assert_eq!(simulate_next_frame(&window, cx), 0);
+        window
+            .update(cx, |view, _, _| assert_eq!(view.deltas.borrow().len(), 1))
+            .unwrap();
+    }
+
+    #[gpui::test]
+    fn scrolling_nonsynced_repeat_resumes_original_phase_even_at_zero_opacity(
+        cx: &mut TestAppContext,
+    ) {
+        let window = open_visible_repeat(cx, true, None);
+        cx.executor().advance_clock(Duration::from_millis(2350));
+        window
+            .update(cx, |view, _, cx| {
+                view.scroll.set_offset(crate::point(px(0.), px(-150.)));
+                view.opacity = 0.;
+                cx.notify();
+            })
+            .unwrap();
+        cx.run_until_parked();
+        window
+            .update(cx, |view, _, _| {
+                let delta = *view.deltas.borrow().last().unwrap();
+                assert!((delta - 0.35).abs() < 0.01, "phase restarted: {delta}");
+            })
+            .unwrap();
+        assert!(simulate_next_frame(&window, cx) > 0);
+        window
+            .update(cx, |view, _, cx| {
+                view.scroll.set_offset(crate::point(px(0.), px(0.)));
+                cx.notify();
+            })
+            .unwrap();
+        cx.run_until_parked();
+        // A callback queued while visible may still fire once.
+        simulate_next_frame(&window, cx);
+        assert_eq!(simulate_next_frame(&window, cx), 0);
+    }
+
+    #[gpui::test]
+    fn ordinary_offscreen_entrance_repeat_keeps_default_scheduling(cx: &mut TestAppContext) {
+        let window = open_visible_repeat(cx, false, None);
+        cx.executor().advance_clock(Duration::from_millis(750));
+        assert!(simulate_next_frame(&window, cx) > 0);
+        window
+            .update(cx, |view, _, _| {
+                // At phase .75 the ordinary animator moves its initial y=150 to 0.
+                // It must keep scheduling while outside in order to reach this state.
+                assert!((*view.deltas.borrow().last().unwrap() - 0.75).abs() < 0.01);
+            })
+            .unwrap();
+        assert!(simulate_next_frame(&window, cx) > 0);
+    }
+
+    #[gpui::test]
+    fn reduced_visible_repeat_remains_static(cx: &mut TestAppContext) {
+        cx.update(|cx| cx.set_reduce_motion(true));
+        let window = open_visible_repeat(cx, true, None);
+        window
+            .update(cx, |view, _, cx| {
+                view.scroll.set_offset(crate::point(px(0.), px(-150.)));
+                cx.notify();
+            })
+            .unwrap();
+        cx.run_until_parked();
+        assert_eq!(simulate_next_frame(&window, cx), 0);
+        window
+            .update(cx, |view, _, _| {
+                assert!(view.deltas.borrow().iter().all(|delta| *delta == 0.));
+            })
+            .unwrap();
+    }
+
+    #[gpui::test]
+    fn clipped_throttled_repeat_does_not_start_timer(cx: &mut TestAppContext) {
+        let window = open_visible_repeat(cx, true, Some(10.));
+        cx.executor().advance_clock(Duration::from_secs(1));
+        cx.run_until_parked();
+        window
+            .update(cx, |view, _, _| assert_eq!(view.deltas.borrow().len(), 1))
+            .unwrap();
+        assert_eq!(simulate_next_frame(&window, cx), 0);
+    }
+
+    #[gpui::test]
+    fn visible_throttled_repeat_deduplicates_and_stops_after_tail_timer(cx: &mut TestAppContext) {
+        let window = open_visible_repeat(cx, true, Some(10.));
+        window
+            .update(cx, |view, _, cx| {
+                view.scroll.set_offset(crate::point(px(0.), px(-150.)));
+                cx.notify();
+            })
+            .unwrap();
+        cx.run_until_parked();
+
+        // Three unrelated renders before the first 100 ms timer expires must
+        // not create timers due at 120, 140, and 160 ms.
+        for _ in 0..3 {
+            cx.executor().advance_clock(Duration::from_millis(20));
+            window.update(cx, |_, _, cx| cx.notify()).unwrap();
+            cx.run_until_parked();
+        }
+        let before_timer = window
+            .update(cx, |view, _, _| view.deltas.borrow().len())
+            .unwrap();
+        assert_eq!(simulate_next_frame(&window, cx), 0);
+        cx.executor().advance_clock(Duration::from_millis(45));
+        cx.run_until_parked();
+        let after_timer = window
+            .update(cx, |view, _, _| view.deltas.borrow().len())
+            .unwrap();
+        assert_eq!(after_timer, before_timer + 1);
+
+        // Separate deadlines make duplicate timers observable; merely counting
+        // renders at one shared deadline could hide coalesced notifications.
+        cx.executor().advance_clock(Duration::from_millis(60));
+        cx.run_until_parked();
+        window
+            .update(cx, |view, _, _| {
+                assert_eq!(view.deltas.borrow().len(), after_timer);
+            })
+            .unwrap();
+
+        window
+            .update(cx, |view, _, cx| {
+                view.scroll.set_offset(crate::point(px(0.), px(0.)));
+                cx.notify();
+            })
+            .unwrap();
+        cx.run_until_parked();
+        let after_scroll = window
+            .update(cx, |view, _, _| view.deltas.borrow().len())
+            .unwrap();
+        // The visible render at ~105 ms queued one timer at ~205 ms. It can
+        // notify once after clipping, but that draw must not renew the timer.
+        cx.executor().advance_clock(Duration::from_millis(45));
+        cx.run_until_parked();
+        window
+            .update(cx, |view, _, _| {
+                assert_eq!(view.deltas.borrow().len(), after_scroll + 1);
+            })
+            .unwrap();
+        cx.executor().advance_clock(Duration::from_secs(1));
+        cx.run_until_parked();
+        window
+            .update(cx, |view, _, _| {
+                assert_eq!(view.deltas.borrow().len(), after_scroll + 1);
+            })
+            .unwrap();
+        assert_eq!(simulate_next_frame(&window, cx), 0);
+    }
+
+    #[test]
+    #[should_panic(expected = "requires one nonzero-duration repeating animation")]
+    fn visible_repeat_rejects_animation_chains() {
+        div()
+            .with_animations(
+                "chain",
+                vec![
+                    Animation::new(Duration::from_secs(1)).repeat(),
+                    Animation::new(Duration::from_secs(1)).repeat(),
+                ],
+                |this, _, _| this,
+            )
+            .repeat_when_visible();
     }
 }

@@ -3,7 +3,7 @@
 mod circular;
 pub use circular::{
     CircularProgressFrame, circular_indeterminate_frame, circular_progress,
-    sample_circular_progress,
+    indeterminate_circular_progress, sample_circular_progress,
 };
 
 use crate::color::ColorRole;
@@ -40,6 +40,7 @@ fn spin(icon: Icon, id: impl Into<ElementId>, cx: &App) -> AnyElement {
             Animation::new(Duration::from_millis(SPINNER_TURN_MS)).repeat(),
             move |slot, t| slot.child(icon.clone().rotate(std::f32::consts::TAU * t)),
         )
+        .repeat_when_visible()
         .into_any_element()
 }
 
@@ -90,6 +91,7 @@ fn indeterminate_bar(
         Animation::new(Duration::from_millis(INDETERMINATE_SWEEP_MS)).repeat(),
         move |bar, t| pieces(bar, t * 1.3 - 0.3),
     )
+    .repeat_when_visible()
     .into_any_element()
 }
 
