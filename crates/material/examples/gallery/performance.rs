@@ -312,12 +312,12 @@ fn report(mut recording: Recording, target: WindowId, metadata: Value, elapsed: 
                 ));
             }
         }
-        if let Some(at) = scope.present_start {
-            if present_scopes.insert(at, index).is_some() {
-                recording
-                    .errors
-                    .push("duplicate complete scope for present".into());
-            }
+        if let Some(at) = scope.present_start
+            && present_scopes.insert(at, index).is_some()
+        {
+            recording
+                .errors
+                .push("duplicate complete scope for present".into());
         }
         let cost = scope.duration().as_nanos();
         scope_costs.push(cost);
