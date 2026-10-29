@@ -78,7 +78,7 @@ impl NavIcon {
         Self::new(icon.asset_path(), icon.filled(true).asset_path())
     }
 
-    fn path(&self, selected: bool) -> SharedString {
+    pub(crate) fn path(&self, selected: bool) -> SharedString {
         if selected {
             self.selected.clone()
         } else {

@@ -10,6 +10,7 @@ mod button_group;
 mod controls;
 mod divider;
 mod switch;
+mod toolbar;
 pub use controls::{MaterialSideSheet, MaterialSlider, SearchField, SliderAppearance};
 pub use divider::{
     DividerContext, DividerDirection, DividerOrientation, DividerVariant, MaterialDivider,
@@ -67,6 +68,10 @@ pub use tile::{
 };
 pub use title_bar::{
     TitleBar, title_bar_leading, title_bar_window_options, traffic_light_position,
+};
+pub use toolbar::{
+    TOOLBAR_FAB_GAP, TOOLBAR_MARGIN, TOOLBAR_SIZE, Toolbar, ToolbarButton, ToolbarColor,
+    ToolbarConfiguration, ToolbarOrientation,
 };
 
 pub(crate) fn init(cx: &mut gpui::App) {
