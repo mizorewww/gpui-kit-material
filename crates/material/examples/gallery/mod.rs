@@ -8,6 +8,10 @@ use gpui_kit_material::motion;
 use gpui_kit_material::prelude::*;
 use gpui_kit_material::theme;
 
+/// The window title bar, fixed so the macOS traffic lights stay centred in it
+/// at every text scale.
+const TITLE_BAR: Pixels = px(56.);
+
 struct Gallery {
     palette: PaletteId,
     scale: SharedString,
@@ -19,6 +23,7 @@ struct Gallery {
     slider: Entity<gpui_base::slider::SliderState>,
     switch: bool,
     sheet: bool,
+    snackbar: bool,
     motion_scheme: motion::MotionScheme,
     motion_target: bool,
 }
@@ -215,6 +220,14 @@ impl Render for Gallery {
             ))
             .child(error_text("error", "Error text is announced as an alert."))
             .child(
+                material_button("show-snackbar", ButtonVariant::Tonal)
+                    .child("Show snackbar")
+                    .on_click(cx.listener(|this, _, _, cx| {
+                        this.snackbar = true;
+                        cx.notify();
+                    })),
+            )
+            .child(
                 card_surface()
                     .gap(rem(12.))
                     .child(semantic_label(
@@ -226,9 +239,10 @@ impl Render for Gallery {
                     .child(indeterminate_progress("indeterminate", cx)),
             );
 
-        div()
+        let content = div()
             .id("gallery")
-            .size_full()
+            .flex_1()
+            .min_h_0()
             .overflow_y_scroll()
             .track_scroll(&self.scroll)
             .bg(color(ColorRole::CANVAS))
@@ -334,8 +348,40 @@ impl Render for Gallery {
                     .child(choices)
                     .child(settings)
                     .child(feedback),
+            );
+        gpui_base::v_flex()
+            .relative()
+            .size_full()
+            .bg(color(ColorRole::CANVAS))
+            .text_color(color(ColorRole::INK))
+            .font_family(".SystemUIFont")
+            .child(
+                TitleBar::new("title-bar", TITLE_BAR)
+                    .gap(rem(12.))
+                    .child(section_title("window-title", "gpui-kit-material")),
             )
-            .child(CaptionButtons::new(app_bar_height(window)))
+            .child(content)
+            .when(self.snackbar, |root| {
+                root.child(
+                    div().absolute().left(px(16.)).bottom(px(16.)).child(
+                        Snackbar::new("snackbar", "Settings saved")
+                            .action(
+                                "Undo",
+                                cx.listener(|this, _, _, cx| {
+                                    this.snackbar = false;
+                                    cx.notify();
+                                }),
+                            )
+                            .close(
+                                "Dismiss",
+                                cx.listener(|this, _, _, cx| {
+                                    this.snackbar = false;
+                                    cx.notify();
+                                }),
+                            ),
+                    ),
+                )
+            })
     }
 }
 
@@ -349,12 +395,8 @@ pub fn run(application: gpui::Application) {
             .expect("Failed to load the gallery font");
         gpui_base::init(cx);
         gpui_kit_material::init(cx);
-        let bounds = Bounds::centered(None, size(px(960.), px(900.)), cx);
         cx.open_window(
-            WindowOptions {
-                window_bounds: Some(WindowBounds::Windowed(bounds)),
-                ..Default::default()
-            },
+            title_bar_window_options("gpui-kit-material", TITLE_BAR, size(px(960.), px(900.)), cx),
             |window, cx| {
                 cx.new(|cx| {
                     let search = cx.new(|cx| {
@@ -373,6 +415,7 @@ pub fn run(application: gpui::Application) {
                         slider,
                         switch: false,
                         sheet: false,
+                        snackbar: false,
                         motion_scheme: motion::MotionScheme::Expressive,
                         motion_target: false,
                         palette: PaletteId::Paper,
