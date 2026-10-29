@@ -186,3 +186,32 @@ fn paint_resolves_live_theme_roles_and_caller_override(cx: &mut TestAppContext) 
         });
     }
 }
+
+#[test]
+fn separator_node_exposes_orientation_without_activation_actions() {
+    use gpui::{
+        Element, Role,
+        accesskit::{Action, Node, Orientation},
+    };
+    for (orientation, expected) in [
+        (DividerOrientation::Horizontal, None),
+        (DividerOrientation::Vertical, Some(Orientation::Vertical)),
+    ] {
+        let line = MaterialDivider::new("separator")
+            .orientation(orientation)
+            .into_line();
+        assert_eq!(line.a11y_role(), Some(Role::Splitter));
+        let mut node = Node::new(line.a11y_role().unwrap());
+        line.write_a11y_info(&mut node);
+        assert_eq!(node.orientation(), expected);
+        for action in [
+            Action::Click,
+            Action::Focus,
+            Action::Increment,
+            Action::Decrement,
+        ] {
+            assert!(!node.supports_action(action));
+        }
+        assert_eq!(node.label(), None);
+    }
+}
