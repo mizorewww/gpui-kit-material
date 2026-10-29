@@ -1,10 +1,10 @@
 //! Explicit native GPU capture for reproducible gallery evidence.
-use super::{GALLERY_SECTIONS, Gallery, ThemeMode};
+use super::{Gallery, page::CaptureState, pages::PAGES};
 use anyhow::{Context as _, Result, bail, ensure};
 use gpui::{App, Entity, Global, ListOffset, ListState, Pixels, Window, px, size};
 use std::{cell::Cell, path::PathBuf, process::Command, rc::Rc, time::Duration};
 
-pub const USAGE: &str = "gallery [--capture output.png --section themes|motion|buttons|toggles|loading|icons|labels|feedback|colors|typography|dividers|chips|cards|lists|window\n  --width 960 --height 900 --scale 1 --dark --reduced-motion --settle-ms 800\n  --active --disabled --selected --loading --no-ripple --offset-y 0 --settings --fps --vsync on|off]";
+pub const USAGE: &str = "gallery [--capture output.png --section <page id>\n  --width 960 --height 900 --scale 1 --dark --reduced-motion --settle-ms 800\n  --active --disabled --selected --loading --no-ripple --offset-y 0 --settings --fps --vsync on|off]\n\nPage ids, in gallery order:\n  color typography shape motion elevation app-bars badges buttons cards\n  carousel checkboxes chips date-time-pickers dialogs dividers lists\n  loading-progress menu navigation radio-button search sheets sliders\n  snackbar switch tabs text-fields toolbars tooltips";
 
 #[derive(Clone)]
 pub struct CaptureOptions {
@@ -64,9 +64,9 @@ impl CaptureOptions {
                 "--capture" => output = Some(PathBuf::from(value()?)),
                 "--section" => {
                     let name = value()?;
-                    options.section = GALLERY_SECTIONS
+                    options.section = PAGES
                         .iter()
-                        .position(|(id, _)| *id == name)
+                        .position(|page| page.info.id == name)
                         .with_context(|| format!("Unknown section: {name}"))?;
                 }
                 "--width" => options.width = value()?.parse()?,
@@ -151,19 +151,19 @@ pub(super) fn install(view: &Entity<Gallery>, window: &mut Window, cx: &mut App)
         std::process::exit(1);
     }
     view.update(cx, |gallery, cx| {
-        gallery.reference_mode = if options.dark {
-            ThemeMode::Dark
-        } else {
-            ThemeMode::Light
-        };
-        gallery.scale = options.scale.to_string().into();
-        gallery.selected_section = options.section;
-        gallery.button_active = options.active;
-        gallery.button_effects_disabled = options.disabled;
-        gallery.button_selections = [options.selected; 10];
-        gallery.button_loading = options.loading;
-        gallery.button_ripple = options.ripple;
-        cx.notify();
+        gallery.apply_capture(
+            options.section,
+            options.dark,
+            options.scale,
+            CaptureState {
+                active: options.active,
+                disabled: options.disabled,
+                selected: options.selected,
+                loading: options.loading,
+                ripple: options.ripple,
+            },
+            cx,
+        );
     });
     let view = view.clone();
     // Wait for initial layout, then position the logical section row.
@@ -207,7 +207,7 @@ pub(super) fn install(view: &Entity<Gallery>, window: &mut Window, cx: &mut App)
                     let metadata=serde_json::json!({
                         "renderer":"native GPUI render_to_image", "source_commit":git(&["rev-parse","HEAD"]),
                         "worktree_dirty":git(&["status","--porcelain"]).map(|status| !status.is_empty()),
-                        "section":GALLERY_SECTIONS[options.section].0,
+                        "section":PAGES[options.section].info.id,
                         "requested_viewport":{"width":options.width,"height":options.height},
                         "actual_viewport":{"width":f32::from(viewport.width),"height":f32::from(viewport.height)},
                         "image_pixels":{"width":image.width(),"height":image.height()},
@@ -297,9 +297,25 @@ fn scroll_measured_offset(
 
 #[cfg(test)]
 mod tests {
-    use super::CaptureOptions;
+    use super::{CaptureOptions, PAGES};
     fn parse(args: &[&str]) -> anyhow::Result<Option<CaptureOptions>> {
         CaptureOptions::parse(args.iter().map(|s| s.to_string()))
+    }
+    #[test]
+    fn every_page_is_a_capture_section_named_in_the_usage() {
+        for (index, page) in super::PAGES.iter().enumerate() {
+            let options = parse(&["--capture", "out.png", "--section", page.info.id])
+                .unwrap()
+                .unwrap();
+            assert_eq!(options.section, index);
+            assert!(
+                super::USAGE
+                    .split_whitespace()
+                    .any(|word| word == page.info.id),
+                "usage lists {}",
+                page.info.id
+            );
+        }
     }
     #[test]
     fn invalid_capture_requests_fail_instead_of_silently_launching() {
@@ -322,7 +338,7 @@ mod tests {
             "--capture",
             "out.png",
             "--section",
-            "toggles",
+            "buttons",
             "--width",
             "1280",
             "--height",
@@ -355,7 +371,16 @@ mod tests {
                 options.scale,
                 options.offset_y
             ),
-            (3, 1280., 1000., 1.5, -300.)
+            (
+                PAGES
+                    .iter()
+                    .position(|page| page.info.id == "buttons")
+                    .unwrap(),
+                1280.,
+                1000.,
+                1.5,
+                -300.
+            )
         );
         assert!(
             options.dark

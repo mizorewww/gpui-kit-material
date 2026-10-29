@@ -1,4 +1,6 @@
-//! Every extracted component on one page, in every built-in palette.
+//! The shared desktop/WASM gallery, organized like the component pages of
+//! Google's Figma "Material 3 Design Kit": one panel per page, listed in
+//! `pages::PAGES`. See `page` for how to add a page.
 //!
 //! `cargo run -p gpui-kit-material --example gallery`
 #[cfg(not(target_family = "wasm"))]
@@ -9,19 +11,22 @@ mod performance;
 mod scroll_performance;
 
 mod fps;
-mod rows;
+pub(crate) mod page;
+mod pages;
 mod settings;
+mod shell;
+#[cfg(test)]
+mod shell_tests;
+pub(crate) mod spec;
 
 use gpui::{prelude::*, *};
-use gpui_kit_material::color::palette::ALL as PALETTES;
-use gpui_kit_material::color::themes::{self, Contrast, ThemeId, ThemeMode};
-use gpui_kit_material::icons::{Assets, IconName};
-use gpui_kit_material::motion;
+use gpui_kit_material::icons::Assets;
 use gpui_kit_material::prelude::*;
 use gpui_kit_material::theme;
+use page::{AnyPage, CaptureState, GalleryShared, PageCx, PageRows};
 
 // Reveal only the newly focused control, not the entire long gallery page.
-trait GalleryReveal: IntoElement + Sized {
+pub(crate) trait GalleryReveal: IntoElement + Sized {
     fn reveal(self, id: impl Into<ElementId>, list: &ListState) -> RevealFocus {
         RevealFocus::in_list(id, self, list.clone()).inline()
     }
@@ -30,24 +35,6 @@ trait GalleryReveal: IntoElement + Sized {
     }
 }
 impl<T: IntoElement> GalleryReveal for T {}
-
-const GALLERY_SECTIONS: [(&str, &str); 15] = [
-    ("themes", "Themes"),
-    ("motion", "Motion"),
-    ("buttons", "Buttons"),
-    ("toggles", "Toggles"),
-    ("loading", "Loading"),
-    ("icons", "Icons"),
-    ("labels", "Labels"),
-    ("feedback", "Feedback"),
-    ("colors", "Colors"),
-    ("typography", "Typography"),
-    ("dividers", "Dividers"),
-    ("chips", "Chips"),
-    ("cards", "Cards"),
-    ("lists", "Lists"),
-    ("window", "Window controls"),
-];
 
 /// The Gallery's names for the caption buttons.
 fn caption_labels() -> CaptionLabels {
@@ -62,155 +49,121 @@ fn caption_labels() -> CaptionLabels {
 /// Fixed height keeps the native traffic lights centered at every text scale.
 const TITLE_BAR: Pixels = px(56.);
 
-struct Gallery {
-    palette: PaletteId,
-    reference_theme: Option<ThemeId>,
-    reference_mode: ThemeMode,
-    contrast: Contrast,
-    scale: SharedString,
-    density: SharedString,
-    engine: usize,
-    details: bool,
+/// The settings whose change starts a theme transition.
+type ThemeKey = (
+    PaletteId,
+    Option<ThemeId>,
+    ThemeMode,
+    Contrast,
+    SharedString,
+);
+fn theme_key(shared: &GalleryShared) -> ThemeKey {
+    (
+        shared.palette,
+        shared.reference_theme,
+        shared.reference_mode,
+        shared.contrast,
+        shared.scale.clone(),
+    )
+}
+
+pub(crate) struct Gallery {
+    shared: Entity<GalleryShared>,
+    applied_theme: ThemeKey,
+    pages: Vec<Box<dyn AnyPage>>,
+    page_rows: Vec<PageRows>,
+    /// The list row of each page's header.
+    headers: Vec<usize>,
+    /// Each page's body rows.
+    counts: Vec<usize>,
     list: ListState,
     row_focus: Vec<FocusHandle>,
     navigation_focus: FocusHandle,
+    navigation_scroll: ScrollHandle,
     pending_focus: Option<(usize, bool)>,
     last_rem: Pixels,
-    color_columns: usize,
-    feedback_spinner_playback: RepeatAnimationPlayback,
-    feedback_linear_playback: RepeatAnimationPlayback,
-    feedback_circular_playback: CircularProgressPlayback,
-    navigation_scroll: ScrollHandle,
-    section_rows: [usize; GALLERY_SECTIONS.len()],
     selected_section: usize,
-    search: Entity<gpui_base::input::InputState>,
-    slider: Entity<gpui_base::slider::SliderState>,
-    switch: bool,
-    sheet: bool,
-    snackbar: bool,
-    motion_scheme: motion::MotionScheme,
-    motion_target: bool,
-    motion_values: [f32; 6],
     theme_frame_pending: bool,
-    button_effects_disabled: bool,
-    button_effects_tonal: bool,
-    button_ripple: bool,
-    button_active: bool,
-    button_selections: [bool; 10],
-    button_toggle_size: ButtonSize,
-    button_loading: bool,
-    button_progress: bool,
-    button_loading_variant: usize,
-    button_loading_clicks: usize,
-    #[cfg(test)]
-    renders: std::cell::Cell<usize>,
-    #[cfg(test)]
-    button_sync_rows: std::cell::RefCell<std::collections::BTreeSet<usize>>,
-    button_loading_playbacks: [ButtonTransitionPlayback; 15],
-    button_effect_playbacks: [ButtonTransitionPlayback; 5],
-    button_toggle_playbacks: [ButtonTransitionPlayback; 10],
-    button_progress_playbacks: [ButtonProgressPlayback; 15],
-    button_progress_inputs: Option<(bool, bool, bool)>,
     /// The rows the list builder rendered in the current frame.
     rendered_rows: std::rc::Rc<std::cell::RefCell<Vec<usize>>>,
+    _subscriptions: Vec<Subscription>,
+    #[cfg(test)]
+    renders: std::cell::Cell<usize>,
 }
 
 impl Gallery {
     fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
-        let search = cx.new(|cx| {
-            gpui_base::input::InputState::new(window, cx).placeholder("Search components")
-        });
-        let slider = cx.new(|_| {
-            gpui_base::slider::SliderState::new()
-                .min(0.)
-                .max(100.)
-                .default_value(40.)
-        });
-        cx.observe(&slider, |_, _, cx| cx.notify()).detach();
-        let color_columns = rows::color_columns(window);
-        let row_focus: Vec<_> = (0..rows::row_count(color_columns))
-            .map(|_| cx.focus_handle())
-            .collect();
+        let shared = cx.new(|_| GalleryShared::default());
         let list = ListState::new(0, ListAlignment::Top, px(128.));
+        let mut pages = Vec::with_capacity(pages::PAGES.len());
+        let mut page_rows = Vec::with_capacity(pages::PAGES.len());
+        let mut headers = Vec::with_capacity(pages::PAGES.len());
+        let mut counts = Vec::with_capacity(pages::PAGES.len());
+        let mut next = 0;
+        for entry in pages::PAGES {
+            let rows = PageRows::new(list.clone(), next);
+            let page = (entry.build)(
+                PageCx {
+                    shared: shared.clone(),
+                    rows: rows.clone(),
+                },
+                window,
+                cx,
+            );
+            let count = page.row_count(window, cx);
+            headers.push(next);
+            counts.push(count);
+            page_rows.push(rows);
+            pages.push(page);
+            next += 1 + count;
+        }
+        let row_focus: Vec<_> = (0..next).map(|_| cx.focus_handle()).collect();
         list.splice_focusable(0..0, row_focus.iter().cloned().map(Some));
-        let section_rows = std::array::from_fn(|section| {
-            rows::physical_row(
-                rows::ROWS
-                    .iter()
-                    .position(|row| row.section == Some(GALLERY_SECTIONS[section].0))
-                    .expect("each Gallery section has a heading row"),
-                color_columns,
-            )
-        });
+        let mut subscriptions: Vec<_> = pages.iter().map(|page| page.observe(cx)).collect();
+        subscriptions.push(cx.observe_in(
+            &shared,
+            window,
+            |this: &mut Self, shared, window, cx| {
+                let key = theme_key(shared.read(cx));
+                if key != this.applied_theme {
+                    // The transition refreshes the window each step, which
+                    // renders the Gallery; a notify would invalidate it twice.
+                    this.applied_theme = key;
+                    this.prepare_theme(window, cx);
+                } else {
+                    cx.notify();
+                }
+            },
+        ));
+        let applied_theme = theme_key(shared.read(cx));
         Gallery {
-            search,
-            slider,
-            switch: false,
-            sheet: false,
-            snackbar: false,
-            motion_scheme: motion::MotionScheme::Expressive,
-            motion_target: false,
-            motion_values: [0.; 6],
-            theme_frame_pending: false,
-            button_effects_disabled: false,
-            button_effects_tonal: false,
-            button_ripple: true,
-            button_active: false,
-            button_selections: [false; 10],
-            button_toggle_size: ButtonSize::Small,
-            button_loading: false,
-            button_progress: false,
-            button_loading_variant: 0,
-            button_loading_clicks: 0,
-            #[cfg(test)]
-            renders: Default::default(),
-            #[cfg(test)]
-            button_sync_rows: Default::default(),
-            button_loading_playbacks: std::array::from_fn(|_| ButtonTransitionPlayback::default()),
-            button_effect_playbacks: std::array::from_fn(|_| ButtonTransitionPlayback::default()),
-            button_toggle_playbacks: std::array::from_fn(|_| ButtonTransitionPlayback::default()),
-            button_progress_playbacks: std::array::from_fn(|_| ButtonProgressPlayback::default()),
-            button_progress_inputs: None,
-            rendered_rows: Default::default(),
-            palette: PaletteId::Paper,
-            reference_theme: Some(ThemeId::Baseline),
-            reference_mode: ThemeMode::Light,
-            contrast: Contrast::Standard,
-            scale: "1".into(),
-            density: "auto".into(),
-            engine: 0,
-            details: false,
+            shared,
+            applied_theme,
+            pages,
+            page_rows,
+            headers,
+            counts,
             list,
             row_focus,
             navigation_focus: cx.focus_handle(),
+            navigation_scroll: ScrollHandle::new(),
             pending_focus: None,
             last_rem: window.rem_size(),
-            color_columns,
-            feedback_spinner_playback: RepeatAnimationPlayback::default(),
-            feedback_linear_playback: RepeatAnimationPlayback::default(),
-            feedback_circular_playback: CircularProgressPlayback::default(),
-            section_rows,
-            navigation_scroll: ScrollHandle::new(),
             selected_section: 0,
+            theme_frame_pending: false,
+            rendered_rows: Default::default(),
+            _subscriptions: subscriptions,
+            #[cfg(test)]
+            renders: Default::default(),
         }
-    }
-
-    fn target_scheme(&self) -> gpui_kit_material::color::Scheme {
-        self.reference_theme.map_or_else(
-            || gpui_kit_material::color::Scheme::from_palette(self.palette),
-            |id| id.scheme(self.reference_mode, self.contrast),
-        )
     }
 
     // Run before Root prepares its styles, never while rendering the child view.
     fn prepare_theme(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        motion::set_motion_scheme(self.motion_scheme);
-        let running = theme::advance_component_theme(
-            self.target_scheme(),
-            self.scale.parse().unwrap_or(1.),
-            window,
-            cx,
-        );
+        let shared = self.shared.read(cx);
+        gpui_kit_material::motion::set_motion_scheme(shared.motion_scheme);
+        let (scheme, scale) = (shared.target_scheme(), shared.text_scale());
+        let running = theme::advance_component_theme(scheme, scale, window, cx);
         if running && !self.theme_frame_pending {
             self.theme_frame_pending = true;
             let view = cx.weak_entity();
@@ -224,72 +177,50 @@ impl Gallery {
             });
         }
     }
+
+    /// Apply capture overrides to the settings and every page.
+    #[cfg_attr(target_family = "wasm", allow(dead_code))]
+    pub(crate) fn apply_capture(
+        &mut self,
+        section: usize,
+        dark: bool,
+        scale: f32,
+        state: CaptureState,
+        cx: &mut Context<Self>,
+    ) {
+        self.shared.update(cx, |shared, _| {
+            shared.reference_mode = if dark {
+                ThemeMode::Dark
+            } else {
+                ThemeMode::Light
+            };
+            shared.scale = scale.to_string().into();
+        });
+        // Capture applies the theme before the first frame (see `run`).
+        self.applied_theme = theme_key(self.shared.read(cx));
+        self.selected_section = section;
+        for page in &self.pages {
+            page.apply_capture(state, cx);
+        }
+        cx.notify();
+    }
 }
 
 impl Render for Gallery {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         #[cfg(test)]
         self.renders.set(self.renders.get() + 1);
-        self.feedback_circular_playback.observe_reduced_motion(cx);
-        let progress_inputs = (
-            self.button_progress,
-            self.button_loading,
-            self.button_effects_disabled,
-        );
-        for playback in &self.button_progress_playbacks {
-            if self.button_progress_inputs != Some(progress_inputs) {
-                playback.sync(progress_inputs.0, progress_inputs.1, progress_inputs.2, cx);
-            }
-            playback.observe_reduced_motion(cx);
+        let (motion_scheme, snackbar) = {
+            let shared = self.shared.read(cx);
+            (shared.motion_scheme, shared.snackbar)
+        };
+        gpui_kit_material::motion::set_motion_scheme(motion_scheme);
+        // Pages keep playbacks and keyed animations alive even while none of
+        // their rows is mounted.
+        for page in &self.pages {
+            page.prepare(window, cx);
         }
-        self.button_progress_inputs = Some(progress_inputs);
-        motion::set_motion_scheme(self.motion_scheme);
-        // Initialize all previews with the Gallery, even before their first visit.
-        // Keep Base's keyed retargeting and pinned curves alive independently of
-        // virtual rows. An offscreen target change still runs its finite transition
-        // (and requests frames until settled); remounting never restarts it.
-        self.motion_values = std::array::from_fn(|index| {
-            motion::token_value(
-                ("motion-preview", index),
-                if self.motion_target { 1. } else { 0. },
-                [
-                    motion::MotionToken::FastSpatial,
-                    motion::MotionToken::DefaultSpatial,
-                    motion::MotionToken::SlowSpatial,
-                    motion::MotionToken::FastEffects,
-                    motion::MotionToken::DefaultEffects,
-                    motion::MotionToken::SlowEffects,
-                ][index],
-                window,
-                cx,
-            )
-        });
-        let compact = is_compact(window);
-        let columns = rows::color_columns(window);
-        if columns != self.color_columns {
-            let previous = self.list.logical_scroll_top();
-            let source = rows::source_row(previous.item_ix, self.color_columns);
-            self.color_columns = columns;
-            self.row_focus
-                .resize_with(rows::row_count(columns), || cx.focus_handle());
-            self.list.splice_focusable(
-                0..self.list.item_count(),
-                self.row_focus.iter().cloned().map(Some),
-            );
-            self.section_rows = std::array::from_fn(|section| {
-                rows::physical_row(
-                    rows::ROWS
-                        .iter()
-                        .position(|row| row.section == Some(GALLERY_SECTIONS[section].0))
-                        .unwrap(),
-                    columns,
-                )
-            });
-            self.list.scroll_to(ListOffset {
-                item_ix: rows::physical_row(source, columns),
-                offset_in_item: previous.offset_in_item,
-            });
-        }
+        self.sync_row_counts(window, cx);
         if self.last_rem != window.rem_size() {
             self.last_rem = window.rem_size();
             self.list.remeasure();
@@ -304,57 +235,8 @@ impl Render for Gallery {
                 });
             });
         }
-        let navigation = div()
-            .id("gallery-navigation")
-            .role(Role::Navigation)
-            .aria_label("Gallery sections")
-            .track_focus(&self.navigation_focus)
-            .tab_stop(false)
-            .flex_shrink_0()
-            .min_h_0()
-            .overflow_y_scroll()
-            .track_scroll(&self.navigation_scroll)
-            .bg(color(ColorRole::SURFACE_CONTAINER_LOW))
-            .when(compact, |nav| nav.w_full().max_h(rem(160.)).border_b_1())
-            .when(!compact, |nav| nav.w(rem(176.)).h_full().border_r_1())
-            .border_color(color(ColorRole::OUTLINE_VARIANT))
-            .child(
-                gpui_base::v_flex()
-                    .p(rem(12.))
-                    .pt(rem(32.))
-                    .gap(rem(12.))
-                    .child(
-                        accessible_text("gallery-navigation-title", "Browse components")
-                            .text_size(TEXT_AUX),
-                    )
-                    .child(
-                        gpui_base::v_flex()
-                            .gap(rem(8.))
-                            .when(compact, |items| items.flex_row().flex_wrap())
-                            .children(GALLERY_SECTIONS.into_iter().enumerate().map(
-                                |(index, (_, label))| {
-                                    MaterialButton::new(("navigate", index))
-                                        .variant(ButtonVariant::Tonal)
-                                        .button_size(ButtonSize::ExtraSmall)
-                                        .toggle(true)
-                                        .selected(self.selected_section == index)
-                                        .toggle_on_click(false)
-                                        .child(label)
-                                        .when(!compact, |button| button.w_full().justify_start())
-                                        .on_click(cx.listener(move |this, _, window, cx| {
-                                            this.selected_section = index;
-                                            this.scroll_to_section(index);
-                                            let _ = window;
-                                            cx.notify();
-                                        }))
-                                        .reveal_handle(
-                                            ("reveal-navigation", index),
-                                            &self.navigation_scroll,
-                                        )
-                                },
-                            )),
-                    ),
-            );
+        let compact = is_compact(window);
+        let navigation = self.render_navigation(compact, cx);
         let view = cx.weak_entity();
         let sync_view = view.clone();
         // Reused across frames: the builder records this frame's rows.
@@ -367,7 +249,7 @@ impl Render for Gallery {
             .min_w_0()
             .min_h_0()
             .h_full()
-            .bg(color(ColorRole::SURFACE_CONTAINER))
+            .bg(spec::page_background())
             .text_color(color(ColorRole::ON_SURFACE))
             .font_family("Roboto")
             .child(
@@ -382,7 +264,7 @@ impl Render for Gallery {
                 gpui::canvas(
                     move |_, _, cx| {
                         let _ = sync_view.update(cx, |this, cx| {
-                            this.sync_button_transitions(&rendered_rows.borrow(), cx);
+                            this.after_layout(&rendered_rows.borrow(), cx);
                         });
                     },
                     |_, _, _, _| {},
@@ -402,7 +284,7 @@ impl Render for Gallery {
             .relative()
             .size_full()
             .min_h_0()
-            .bg(color(ColorRole::SURFACE_CONTAINER))
+            .bg(spec::page_background())
             .text_color(color(ColorRole::ON_SURFACE))
             .font_family("Roboto")
             .child(
@@ -416,24 +298,20 @@ impl Render for Gallery {
                     .child(navigation)
                     .child(content),
             )
-            .when(self.snackbar, |root| {
+            .when(snackbar, |root| {
+                let dismiss = |shared: Entity<GalleryShared>| {
+                    move |_: &ClickEvent, _: &mut Window, cx: &mut App| {
+                        shared.update(cx, |shared, cx| {
+                            shared.snackbar = false;
+                            cx.notify();
+                        })
+                    }
+                };
                 root.child(
                     div().absolute().left(px(16.)).bottom(px(16.)).child(
                         Snackbar::new("snackbar", "Settings saved")
-                            .action(
-                                "Undo",
-                                cx.listener(|this, _, _, cx| {
-                                    this.snackbar = false;
-                                    cx.notify();
-                                }),
-                            )
-                            .close(
-                                "Dismiss",
-                                cx.listener(|this, _, _, cx| {
-                                    this.snackbar = false;
-                                    cx.notify();
-                                }),
-                            ),
+                            .action("Undo", dismiss(self.shared.clone()))
+                            .close("Dismiss", dismiss(self.shared.clone())),
                     ),
                 )
             })
@@ -453,7 +331,7 @@ impl Render for GalleryWindow {
     fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
         gpui_base::v_flex()
             .size_full()
-            .bg(color(ColorRole::SURFACE_CONTAINER))
+            .bg(spec::page_background())
             .text_color(color(ColorRole::ON_SURFACE))
             .font_family("Roboto")
             .child(
@@ -516,9 +394,8 @@ pub fn run(application: gpui::Application, initialize: impl FnOnce(&mut App) + '
                 let fps = show_fps.then(|| cx.new(|cx| fps::FpsDisplay::new(window, cx)));
                 #[cfg(not(target_family = "wasm"))]
                 capture::install(&gallery, window, cx);
-                let initial = gallery.read(cx);
-                let initial_scheme = initial.target_scheme();
-                let initial_scale = initial.scale.parse().unwrap_or(1.);
+                let shared = gallery.read(cx).shared.read(cx);
+                let (initial_scheme, initial_scale) = (shared.target_scheme(), shared.text_scale());
                 theme::init_component_theme(initial_scheme, initial_scale, cx);
                 cx.new(|_| GalleryWindow { gallery, fps })
             },
