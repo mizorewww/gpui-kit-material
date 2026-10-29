@@ -211,7 +211,14 @@
       "reference": "https://md3.io/components/icon-button/",
       "status": "unreviewed",
       "cases": [],
-      "reviews": []
+      "reviews": [],
+      "evidence": [
+        {
+          "kind": "browser-icon-button-states-and-motion",
+          "path": "conformance/reference/icon-button.json",
+          "scope": "Pinned createIconButton and full stylesheet. 120 variant/size/width/shape configurations, 1800 plain/toggle-off/selected states; 80 normal/reduced motion configurations at default width; API, change-event, ripple, baseline-dark endpoints and disabled-focus lifecycle samples. Independent replay matched two full configurations (30 states) and all eight disabled-focus lifecycles. Mouse left-edge hit tests do not establish raw touch, all edges or clipping. DOM/CSS reference evidence only; no implementation, raster or full accessibility-tree conformance."
+        }
+      ]
     },
     {
       "id": "button-group",
