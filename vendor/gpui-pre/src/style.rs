@@ -1334,9 +1334,9 @@ mod tests {
 
     use super::*;
 
-    use util_macros::perf;
-
-    #[perf]
+    // The published snapshot omits the upstream-only performance macro.
+    // Keep all correctness assertions executable in the vendored test harness.
+    #[test]
     fn test_basic_highlight_style_combination() {
         let style_a = HighlightStyle::default();
         let style_b = HighlightStyle::default();
@@ -1421,7 +1421,7 @@ mod tests {
         );
     }
 
-    #[perf]
+    #[test]
     fn test_combine_highlights() {
         assert_eq!(
             combine_highlights(
@@ -1510,7 +1510,7 @@ mod tests {
         );
     }
 
-    #[perf]
+    #[test]
     fn test_text_style_refinement() {
         let mut style = Style::default();
         style.refine(&StyleRefinement::default().text_size(px(20.0)));
