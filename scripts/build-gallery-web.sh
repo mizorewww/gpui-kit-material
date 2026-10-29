@@ -5,13 +5,13 @@ workspace_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$workspace_dir"
 profile=debug
 args=(build --locked -p gpui-kit-material-gallery-web --target wasm32-unknown-unknown)
-if [[ "${1:-}" == "--release" ]]; then
-  profile=release
-  args+=(--release)
-elif [[ $# -gt 0 ]]; then
-  echo "Usage: $0 [--release]" >&2
-  exit 2
-fi
+for option in "$@"; do
+  case "$option" in
+    --release) profile=release; args+=(--release) ;;
+    --fast) args+=(--features gpui-fast) ;;
+    *) echo "Usage: $0 [--release] [--fast]" >&2; exit 2 ;;
+  esac
+done
 if ! command -v wasm-bindgen >/dev/null; then
   echo "Install the matching CLI: cargo install wasm-bindgen-cli --version 0.2.129 --locked" >&2
   exit 1

@@ -71,7 +71,7 @@ Select Kit's GPUI Fast backend for retained rendering and layout:
 
 ```sh
 cargo run -p gpui-kit-material --example gallery --features gpui-fast
-cargo build -p gpui-kit-material-gallery-web --target wasm32-unknown-unknown --features gpui-fast
+./scripts/build-gallery-web.sh --fast
 ```
 
 Both targets use the same Kit facade and Material components. The workspace
