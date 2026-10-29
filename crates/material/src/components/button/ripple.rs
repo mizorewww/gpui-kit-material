@@ -268,8 +268,11 @@ impl Element for ButtonRipple {
         });
         let hitbox = hitbox.clone();
         window.on_mouse_event(move |event: &MouseDownEvent, phase, window, cx| {
+            // Every pointer button starts a wave, matching the reference's
+            // captured right pointerdown; a handled (prevented) press does not.
             if enabled
                 && phase == DispatchPhase::Bubble
+                && !window.default_prevented()
                 && hitbox.is_hovered_at(event.position, window)
                 && !window.last_input_was_touch()
             {
@@ -525,6 +528,59 @@ mod tests {
             draw(cx);
         }
         cx.update(|_, cx| assert_eq!(view.read(cx).clicks, 3));
+    }
+    struct PreventingHarness {
+        inner: gpui::Entity<Harness>,
+    }
+    impl Render for PreventingHarness {
+        fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+            // An ancestor that handles the press during capture prevents the
+            // default, as GPUI focus transfer and nested controls do.
+            div().child(self.inner.clone()).child(
+                gpui::canvas(
+                    |_, _, _| {},
+                    |_, _, window, _| {
+                        window.on_mouse_event(|_: &gpui::MouseDownEvent, phase, window, _| {
+                            if phase == gpui::DispatchPhase::Capture {
+                                window.prevent_default();
+                            }
+                        });
+                    },
+                )
+                .size_0(),
+            )
+        }
+    }
+    #[gpui::test]
+    fn default_prevented_press_starts_no_wave(cx: &mut TestAppContext) {
+        cx.update(|cx| {
+            gpui_base::init(cx);
+            cx.set_reduce_motion(true);
+        });
+        let samples = Rc::new(RefCell::new(vec![]));
+        let (_, cx) = cx.add_window_view({
+            let samples = samples.clone();
+            move |_, cx| PreventingHarness {
+                inner: cx.new(|_| Harness {
+                    samples,
+                    clicks: 0,
+                    disabled: false,
+                    mounted: true,
+                }),
+            }
+        });
+        draw(cx);
+        let center = cx.debug_bounds("ripple-button").unwrap().center();
+        for button in [MouseButton::Left, MouseButton::Right, MouseButton::Middle] {
+            cx.simulate_mouse_down(center, button, Modifiers::default());
+            draw(cx);
+            assert!(
+                samples.borrow().is_empty(),
+                "{button:?}: a prevented press must not start a wave"
+            );
+            cx.simulate_mouse_up(center, button, Modifiers::default());
+            draw(cx);
+        }
     }
     #[gpui::test]
     fn reduced_motion_disable_and_unpainted_release_preserve_wave_lifecycle(
