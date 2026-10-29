@@ -844,6 +844,9 @@ pub struct Hitbox {
     /// The bounds of the hitbox.
     #[deref]
     pub bounds: Bounds<Pixels>,
+    /// An optional additional pointer target, sharing this hitbox identity and content mask.
+    /// This does not change visual bounds, layout, or event anchor geometry.
+    pub additional_bounds: Option<Bounds<Pixels>>,
     /// The content mask when the hitbox was inserted.
     pub content_mask: ContentMask<Pixels>,
     /// Flags that specify hitbox behavior.
@@ -851,6 +854,15 @@ pub struct Hitbox {
 }
 
 impl Hitbox {
+    /// Tests the pointer target geometry, including the extension and content mask.
+    /// Unlike `is_hovered_at`, this does not test occlusion by other elements.
+    pub fn contains_pointer(&self, position: &Point<Pixels>) -> bool {
+        self.bounds.intersect(&self.content_mask.bounds).contains(position)
+            || self.additional_bounds.is_some_and(|additional| {
+                additional.intersect(&self.content_mask.bounds).contains(position)
+            })
+    }
+
     /// Checks if the hitbox is currently hovered. Returns `false` during keyboard input modality
     /// so that keyboard navigation suppresses hover highlights. Except when handling
     /// `ScrollEvent`, this is typically what you want when determining whether to handle mouse
@@ -1180,8 +1192,7 @@ impl Frame {
         let mut set_hover_hitbox_count = false;
         let mut hit_test = HitTest::default();
         for hitbox in self.hitboxes.iter().rev() {
-            let bounds = hitbox.bounds.intersect(&hitbox.content_mask.bounds);
-            if bounds.contains(&position) {
+            if hitbox.contains_pointer(&position) {
                 hit_test.ids.push(hitbox.id);
                 if !set_hover_hitbox_count
                     && hitbox.behavior == HitboxBehavior::BlockMouseExceptScroll
@@ -5324,6 +5335,19 @@ impl Window {
     ///
     /// This method should only be called as part of the prepaint phase of element drawing.
     pub fn insert_hitbox(&mut self, bounds: Bounds<Pixels>, behavior: HitboxBehavior) -> Hitbox {
+        self.insert_hitbox_with_extension(bounds, None, behavior)
+    }
+
+    /// Inserts one hitbox whose pointer target includes an additional rectangle.
+    /// Both rectangles obey the current content mask. The returned visual bounds
+    /// remain unchanged, and both targets share one identity and event handlers.
+    /// This method must only be called during prepaint.
+    pub fn insert_hitbox_with_extension(
+        &mut self,
+        bounds: Bounds<Pixels>,
+        additional_bounds: Option<Bounds<Pixels>>,
+        behavior: HitboxBehavior,
+    ) -> Hitbox {
         self.invalidator.debug_assert_prepaint();
 
         let content_mask = self.content_mask();
@@ -5332,6 +5356,7 @@ impl Window {
         let hitbox = Hitbox {
             id,
             bounds,
+            additional_bounds,
             content_mask,
             behavior,
         };

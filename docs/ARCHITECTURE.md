@@ -33,7 +33,9 @@ license retain the published package provenance. This root Cargo patch applies
 only to builds in this workspace; downstream consumers need the same patch or
 a Base release containing these fixes.
 GPUI itself is patched from `vendor/gpui-pre` to expose paint-scoped passive raw
-touch observation. This leaves gesture recognition, scrolling and activation
+touch observation and hitbox extensions independent of layout geometry.
+Extensions retain the original hitbox identity, clipping and occlusion rules.
+This leaves gesture recognition, scrolling and activation
 in GPUI while allowing Material to paint a ripple on touch-down and release it
 on cancellation. The same workspace-only patch limitation applies.
 
