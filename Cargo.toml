@@ -1,7 +1,7 @@
 [workspace]
 resolver = "3"
 members = ["crates/color", "crates/material", "crates/gallery-web"]
-exclude = ["vendor/gpui-base", "vendor/gpui-pre", "vendor/gpui-pre-web"]
+exclude = ["vendor/gpui-base", "vendor/gpui-pre", "vendor/gpui-pre-web", "vendor/gpui-pre-apple"]
 
 [workspace.package]
 version = "0.1.0"
@@ -34,3 +34,4 @@ opt-level = 3
 gpui-base = { path = "vendor/gpui-base" }
 gpui-pre = { path = "vendor/gpui-pre" }
 gpui-pre-web = { path = "vendor/gpui-pre-web" }
+gpui-pre-apple = { path = "vendor/gpui-pre-apple" }
