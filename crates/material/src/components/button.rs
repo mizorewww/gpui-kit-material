@@ -12,12 +12,15 @@ pub(crate) use focus_ring::ButtonFocusRing;
 mod hit_target;
 #[cfg(test)]
 mod loading_tests;
+#[cfg(test)]
+mod preview_tests;
 mod ripple;
 mod ripple_clip;
 mod shadow;
 #[cfg(test)]
 mod toggle_tests;
 
+use super::InteractionPreview;
 use control::BaseControl;
 use effects::CssColor;
 
@@ -523,6 +526,7 @@ pub struct MaterialButton {
     loading: Option<(bool, SharedString)>,
     progress_playback: Option<ButtonProgressPlayback>,
     transition_playback: Option<ButtonTransitionPlayback>,
+    preview: Option<InteractionPreview>,
     style: StyleRefinement,
 }
 impl MaterialButton {
@@ -557,6 +561,7 @@ impl MaterialButton {
             loading: None,
             progress_playback: None,
             transition_playback: None,
+            preview: None,
             style: StyleRefinement::default(),
         }
     }
@@ -656,6 +661,16 @@ impl MaterialButton {
     /// The name leaves GPUI's `active(style)` customization available.
     pub fn active_state(mut self, active: bool) -> Self {
         self.active_state = active;
+        self
+    }
+    /// Render a static specimen in one forced interaction state, painting
+    /// exactly what the live state paints: its state-layer opacity, elevation,
+    /// pressed shape (with the press layer at rest instead of a pointer
+    /// ripple) and focus ring. The specimen leaves the tab order and ignores
+    /// live hover and press. Combine with `toggle`/`selected` for toggle
+    /// specimens. See [`InteractionPreview`].
+    pub fn preview_state(mut self, state: InteractionPreview) -> Self {
+        self.preview = Some(state);
         self
     }
     /// Enable the pointer ripple (enabled by default).
@@ -864,6 +879,15 @@ impl MaterialButton {
                 state.keyboard = false;
             });
         }
+        if let Some(preview) = self.preview {
+            return Interaction {
+                focus,
+                pressed,
+                active: self.active_state || preview.is_pressed(),
+                hovered: preview.is_hovered(),
+                focused: preview.is_focused(),
+            };
+        }
         let press = pressed.read(cx);
         let active = self.active_state || press.pointer || press.keyboard;
         let hovered = press.hovered && !window.last_input_was_touch();
@@ -897,7 +921,9 @@ impl MaterialButton {
             playback::state_opacity(
                 self.active_state,
                 self.disabled,
-                self.ripple,
+                // A forced press shows the ripple at rest: the press layer
+                // covering the whole container.
+                self.ripple && self.preview.is_none(),
                 active,
                 focused,
                 hovered,
@@ -1164,6 +1190,10 @@ impl RenderOnce for MaterialButton {
         let loading = self.loading.as_ref().is_some_and(|(visible, _)| *visible);
         let show_progress = loading || self.progress_visible();
         self.disabled |= loading;
+        if let Some(preview) = self.preview {
+            self.disabled |= preview.is_disabled();
+            self.base = self.base.tab_stop(false);
+        }
         self.record_transition_inputs(cx);
         // `disabled()` already set Base; loading additionally disables it.
         self.base = self.base.disabled(self.disabled).busy(loading);
@@ -1250,7 +1280,9 @@ impl RenderOnce for MaterialButton {
                 b.border(rem(g.outline)).border_color(border)
             })
             .shadow(effects.shadows.into_shadows())
-            .when(!self.disabled, |b| b.cursor_pointer())
+            .when(!self.disabled && self.preview.is_none(), |b| {
+                b.cursor_pointer()
+            })
             .refine_style(&self.style);
         let mut painted_style = Style::default();
         painted_style.refine(base.style());
@@ -1258,7 +1290,7 @@ impl RenderOnce for MaterialButton {
         let base = ripple::ButtonRipple::new(
             base,
             self.id,
-            self.ripple,
+            self.ripple && self.preview.is_none(),
             !self.disabled && ripple_visible,
             painted_style.corner_radii,
             painted_style.border_widths,
@@ -1267,12 +1299,14 @@ impl RenderOnce for MaterialButton {
             cx,
         )
         .hit_target(target_geometry);
+        let forced_focus = self.preview == Some(InteractionPreview::Focused);
         ButtonFocusRing::new(
             base,
             focus,
-            !self.disabled && self.focusable,
+            !self.disabled && (self.focusable || forced_focus),
             rem(effects.radius),
         )
+        .forced(forced_focus)
     }
 }
 /// Convenience constructor with caller-supplied content and activation.

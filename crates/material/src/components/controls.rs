@@ -1,5 +1,6 @@
 //! Material controls composed from GPUI Base behavior.
 //! Reference playgrounds: https://md3.io/components/{switch,slider,search,button}/.
+use super::InteractionPreview;
 use super::button::ButtonFocusRing;
 #[cfg(test)]
 use super::{ButtonVariant, material_button};
@@ -27,6 +28,7 @@ pub struct MaterialSwitch {
     label: SharedString,
     checked: bool,
     disabled: bool,
+    preview: Option<InteractionPreview>,
     on_change: Option<SwitchChange>,
 }
 type SwitchChange = Rc<dyn Fn(&bool, &mut Window, &mut App)>;
@@ -37,8 +39,17 @@ impl MaterialSwitch {
             label: label.into(),
             checked: false,
             disabled: false,
+            preview: None,
             on_change: None,
         }
+    }
+    /// Render a static specimen in one forced interaction state, painting
+    /// what the live state paints: the hover, focus or press state layer, the
+    /// pressed handle and the focus ring. The specimen leaves the tab order
+    /// and ignores live hover and press. See [`InteractionPreview`].
+    pub fn preview_state(mut self, state: InteractionPreview) -> Self {
+        self.preview = Some(state);
+        self
     }
     pub fn checked(mut self, checked: bool) -> Self {
         self.checked = checked;
@@ -141,10 +152,14 @@ impl RenderOnce for MaterialSwitch {
             .use_keyed_state((self.id.clone(), "focus"), cx, |_, cx| cx.focus_handle())
             .read(cx)
             .clone();
-        let enabled = !self.disabled;
-        let keyboard_focus =
-            enabled && focus.is_focused(window) && window.last_input_was_keyboard();
-        let paint = switch_paint(self.checked, self.disabled);
+        let preview = self.preview;
+        let disabled = self.disabled || preview.is_some_and(|p| p.is_disabled());
+        let enabled = !disabled;
+        let live = enabled && preview.is_none();
+        let forced = |state| enabled && preview == Some(state);
+        let keyboard_focus = forced(InteractionPreview::Focused)
+            || (live && focus.is_focused(window) && window.last_input_was_keyboard());
+        let paint = switch_paint(self.checked, disabled);
         let clear = Rgba {
             a: 0.,
             ..paint.layer
@@ -166,7 +181,8 @@ impl RenderOnce for MaterialSwitch {
             .track_focus(&focus)
             .accessibility_label(self.label)
             .checked(self.checked)
-            .disabled(self.disabled)
+            .disabled(disabled)
+            .tab_stop(preview.is_none())
             .on_change(move |value, _, window, cx| {
                 if let Some(f) = &action {
                     f(&value, window, cx);
@@ -192,7 +208,9 @@ impl RenderOnce for MaterialSwitch {
                     .justify_center()
                     .rounded_full()
                     .when(keyboard_focus, |layer| layer.bg(focused))
-                    .when(enabled, |layer| {
+                    .when(forced(InteractionPreview::Hovered), |layer| layer.bg(hover))
+                    .when(forced(InteractionPreview::Pressed), |layer| layer.bg(press))
+                    .when(live, |layer| {
                         layer
                             .group_hover(SWITCH_GROUP, move |style| style.bg(hover))
                             .group_active(SWITCH_GROUP, move |style| style.bg(press))
@@ -204,10 +222,14 @@ impl RenderOnce for MaterialSwitch {
                                 handle.debug_selector(|| "switch-handle".into())
                             })
                             .flex_shrink_0()
-                            .size(rem(size))
+                            .size(rem(if forced(InteractionPreview::Pressed) {
+                                HANDLE_PRESSED
+                            } else {
+                                size
+                            }))
                             .rounded_full()
                             .bg(paint.handle)
-                            .when(enabled, |handle| {
+                            .when(live, |handle| {
                                 // A cursor gives the handle the hitbox its
                                 // group press needs.
                                 handle.cursor_pointer().group_active(SWITCH_GROUP, |style| {
@@ -217,6 +239,7 @@ impl RenderOnce for MaterialSwitch {
                     ),
             );
         ButtonFocusRing::new(switch, focus, enabled, rem(TRACK_HEIGHT / 2.))
+            .forced(forced(InteractionPreview::Focused))
     }
 }
 

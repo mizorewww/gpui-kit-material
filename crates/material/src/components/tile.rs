@@ -133,30 +133,30 @@ impl TileScale {
         let scale = self;
         // Connected tiles sit 2dp apart, so the focus ring uses the M3 inner
         // offset: an outer ring would be covered by the next tile.
-        RingedButton::new(id, RingPlacement::Inner(outer_corner_radii(outer))).map(move |button| {
-            let button = button
-                .w_full()
-                .min_w_0()
-                .flex()
-                .items_center()
-                .justify_start()
-                .text_left()
-                .whitespace_normal()
-                .bg(bg)
-                .text_color(ink)
-                .cursor_pointer()
-                .hover(move |style| style.bg(state::hovered(bg, ink)))
-                .active(move |style| style.bg(state::pressed(bg, ink)));
-            let button = match scale {
-                TileScale::Regular => button.min_h(rem(64.)).px(ITEM_INSET).py(rem(16.)),
-                TileScale::Compact => button
-                    .min_h(rem(68.))
-                    .pl(ITEM_INSET)
-                    .pr(rem(16.))
-                    .py(rem(12.)),
-            };
-            tile_corners(button, outer)
-        })
+        RingedButton::new(id, RingPlacement::Inner(outer_corner_radii(outer)))
+            .map(move |button| {
+                let button = button
+                    .w_full()
+                    .min_w_0()
+                    .flex()
+                    .items_center()
+                    .justify_start()
+                    .text_left()
+                    .whitespace_normal()
+                    .bg(bg)
+                    .text_color(ink)
+                    .cursor_pointer();
+                let button = match scale {
+                    TileScale::Regular => button.min_h(rem(64.)).px(ITEM_INSET).py(rem(16.)),
+                    TileScale::Compact => button
+                        .min_h(rem(68.))
+                        .pl(ITEM_INSET)
+                        .pr(rem(16.))
+                        .py(rem(12.)),
+                };
+                tile_corners(button, outer)
+            })
+            .state_layers(state::hovered(bg, ink), state::pressed(bg, ink))
     }
 
     /// The gap between a tile's leading slot, text column and trailing items.

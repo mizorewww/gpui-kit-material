@@ -4,6 +4,7 @@
 //! Each option is its own button 2px from its neighbours; the selected one
 //! morphs to a full pill on the accent while its inner corners open, on the
 //! fast spatial spring.
+use super::InteractionPreview;
 use crate::color::ColorRole;
 use crate::icons::Icon;
 use crate::theme::{blend, color};
@@ -67,6 +68,7 @@ pub struct ConnectedButtonGroup {
     disabled: bool,
     on_change: Option<Change>,
     reveal_in: Option<ScrollHandle>,
+    previews: BTreeMap<SharedString, InteractionPreview>,
 }
 impl ConnectedButtonGroup {
     pub fn new(id: impl Into<ElementId>, label: impl Into<SharedString>) -> Self {
@@ -85,6 +87,7 @@ impl ConnectedButtonGroup {
             disabled: false,
             on_change: None,
             reveal_in: None,
+            previews: BTreeMap::new(),
         }
     }
     /// The options as `(value, label)` pairs. Values identify an option's
@@ -152,6 +155,19 @@ impl ConnectedButtonGroup {
     }
     pub fn disabled(mut self, disabled: bool) -> Self {
         self.disabled = disabled;
+        self
+    }
+    /// Render the option with `value` as a static specimen in one forced
+    /// interaction state, painting what that live state paints (its hover or
+    /// press layer, focus ring or disabled colors). A group with any preview
+    /// is a specimen: it leaves the tab order, and its other options ignore
+    /// live hover and press. See [`InteractionPreview`].
+    pub fn preview_state(
+        mut self,
+        value: impl Into<SharedString>,
+        state: InteractionPreview,
+    ) -> Self {
+        self.previews.insert(value.into(), state);
         self
     }
     pub fn on_change(
@@ -286,6 +302,7 @@ fn item_style<T: Styled + StatefulInteractiveElement + gpui::prelude::FluentBuil
     height: Pixels,
     fill: bool,
     disabled: bool,
+    preview: Option<InteractionPreview>,
 ) -> T {
     item.relative()
         .flex()
@@ -318,9 +335,14 @@ fn item_style<T: Styled + StatefulInteractiveElement + gpui::prelude::FluentBuil
         // width: a long label ("Speech recognition") takes what it needs and
         // never truncates, and the others split the rest equally.
         .when(fill, |item| item.flex_1())
-        .when(!disabled, |item| {
-            item.hover(move |style| style.bg(paint.hover))
-                .active(move |style| style.bg(paint.press))
+        .map(|item| match preview {
+            _ if disabled => item,
+            None => item
+                .hover(move |style| style.bg(paint.hover))
+                .active(move |style| style.bg(paint.press)),
+            Some(InteractionPreview::Hovered) => item.bg(paint.hover),
+            Some(InteractionPreview::Pressed) => item.bg(paint.press),
+            Some(_) => item,
         })
 }
 /// The shared M3 keyboard focus ring around one option. Options sit 2dp
@@ -330,6 +352,7 @@ fn focus_ring(
     option: impl IntoElement,
     focus: &FocusHandle,
     disabled: bool,
+    forced: bool,
     paint: OptionPaint,
 ) -> super::button::ButtonFocusRing {
     super::button::ButtonFocusRing::with_corners(
@@ -344,6 +367,7 @@ fn focus_ring(
         },
     )
     .inward()
+    .forced(forced)
 }
 
 /// The focus handle of each option, created on first sight. Handles of
@@ -387,7 +411,8 @@ impl RenderOnce for ConnectedButtonGroup {
             .options
             .iter()
             .position(|option| Some(&option.value) == self.value.as_ref());
-        let entry = (!disabled).then(|| selected.unwrap_or(0));
+        let specimen = !self.previews.is_empty();
+        let entry = (!disabled && !specimen).then(|| selected.unwrap_or(0));
         let navigation = Navigation {
             values: if disabled {
                 Vec::new()
@@ -440,7 +465,14 @@ impl RenderOnce for ConnectedButtonGroup {
                 window,
                 cx,
             );
-            let paint = option_paint(selection, index, count, item_height, disabled);
+            let forced = self.previews.get(&value).copied();
+            // A group-level disabled state wins; a forced one disables only
+            // its own option.
+            let option_disabled = disabled || forced.is_some_and(|p| p.is_disabled());
+            // Every option of a specimen ignores live hover and press.
+            let preview = forced.or(specimen.then_some(InteractionPreview::Enabled));
+            let forced_focus = forced == Some(InteractionPreview::Focused);
+            let paint = option_paint(selection, index, count, item_height, option_disabled);
             #[cfg(test)]
             PAINTED.with(|painted| {
                 painted
@@ -487,11 +519,12 @@ impl RenderOnce for ConnectedButtonGroup {
                     paint,
                     item_height,
                     fill,
-                    disabled,
+                    option_disabled,
+                    preview,
                 )
                 .when_some(self.label_text_size, |item, size| item.text_size(size))
                 .selected(checked)
-                .disabled(disabled)
+                .disabled(option_disabled)
                 .accessibility_label(label)
                 .set_position(index + 1, count)
                 .track_focus(&focus)
@@ -505,7 +538,13 @@ impl RenderOnce for ConnectedButtonGroup {
                         callback(&value, window, cx);
                     }
                 });
-                lane = lane.child(focus_ring(tab, &focus, disabled, paint));
+                lane = lane.child(focus_ring(
+                    tab,
+                    &focus,
+                    option_disabled,
+                    forced_focus,
+                    paint,
+                ));
             } else {
                 let click_focus = focus.clone();
                 let radio = item_style(
@@ -513,12 +552,13 @@ impl RenderOnce for ConnectedButtonGroup {
                     paint,
                     item_height,
                     fill,
-                    disabled,
+                    option_disabled,
+                    preview,
                 )
                 .when_some(self.label_text_size, |item, size| item.text_size(size))
                 .checked(checked)
                 .tab_stop(entry == Some(index))
-                .disabled(disabled)
+                .disabled(option_disabled)
                 .accessibility_label(label)
                 .set_position(index + 1, count)
                 .track_focus(&focus)
@@ -532,7 +572,13 @@ impl RenderOnce for ConnectedButtonGroup {
                         callback(&value, window, cx);
                     }
                 });
-                lane = lane.child(focus_ring(radio, &focus, disabled, paint));
+                lane = lane.child(focus_ring(
+                    radio,
+                    &focus,
+                    option_disabled,
+                    forced_focus,
+                    paint,
+                ));
             }
         }
         let group = div()

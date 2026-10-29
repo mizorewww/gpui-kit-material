@@ -7,6 +7,7 @@ use crate::tokens::{elevation, layout::*, shape::*, state, typography::*};
 use gpui::{prelude::*, *};
 use std::rc::Rc;
 
+use super::InteractionPreview;
 use super::focus::{RingPlacement, RingedButton};
 use super::text::accessible_text;
 
@@ -252,6 +253,7 @@ pub struct AssistChip {
     label: SharedString,
     icon: Option<IconName>,
     disabled: bool,
+    preview: Option<InteractionPreview>,
     on_click: Option<ChipHandler>,
 }
 
@@ -262,8 +264,16 @@ impl AssistChip {
             label: label.into(),
             icon: None,
             disabled: false,
+            preview: None,
             on_click: None,
         }
+    }
+
+    /// Render a static specimen in one forced interaction state, painting
+    /// what the live state paints. See [`InteractionPreview`].
+    pub fn preview_state(mut self, state: InteractionPreview) -> Self {
+        self.preview = Some(state);
+        self
     }
 
     pub fn icon(mut self, icon: IconName) -> Self {
@@ -287,11 +297,13 @@ impl AssistChip {
 
 impl RenderOnce for AssistChip {
     fn render(self, _: &mut Window, _: &mut App) -> impl IntoElement {
-        let paint = chip_paint(self.disabled);
+        let disabled = self.disabled || self.preview.is_some_and(|p| p.is_disabled());
+        let paint = chip_paint(disabled);
         let ink = color(ON_SURFACE);
         let clear = Rgba { a: 0., ..ink };
         let (hover, press) = (state::hovered(clear, ink), state::pressed(clear, ink));
-        let enabled = !self.disabled;
+        let enabled = !disabled;
+        let preview = self.preview;
         let scale = TypeRole::LabelLarge.scale();
         let leading = self.icon.is_some();
         let label = self.label;
@@ -318,11 +330,8 @@ impl RenderOnce for AssistChip {
                     .font_weight(FontWeight(scale.font_weight as f32))
                     .whitespace_nowrap()
                     .accessibility_label(label.clone())
-                    .when(enabled, |button| {
-                        button
-                            .cursor_pointer()
-                            .hover(move |style| style.bg(hover))
-                            .active(move |style| style.bg(press))
+                    .when(enabled && preview.is_none(), |button| {
+                        button.cursor_pointer()
                     })
                     .when_some(icon, |button, icon| {
                         button.child(icon.icon().size(CHIP_ICON).color(paint.icon))
@@ -332,7 +341,9 @@ impl RenderOnce for AssistChip {
                         button.on_click(move |event, window, cx| handler(event, window, cx))
                     })
             })
-            .disabled(self.disabled)
+            .state_layers(hover, press)
+            .disabled(disabled)
+            .when_some(preview, |button, preview| button.preview_state(preview))
     }
 }
 

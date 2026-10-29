@@ -35,6 +35,8 @@ pub(crate) struct ButtonFocusRing {
     enabled: bool,
     radius: Radius,
     inward: bool,
+    /// A specimen's forced focus: shown regardless of input modality.
+    forced: bool,
     #[cfg(test)]
     observed: Option<std::rc::Rc<std::cell::Cell<Option<Bounds<Pixels>>>>>,
 }
@@ -51,6 +53,7 @@ impl ButtonFocusRing {
             enabled,
             radius: Radius::Rems(radius),
             inward: false,
+            forced: false,
             #[cfg(test)]
             observed: None,
         }
@@ -78,9 +81,16 @@ impl ButtonFocusRing {
             enabled: true,
             radius: Radius::Rems(radius),
             inward: false,
+            forced: false,
             #[cfg(test)]
             observed: None,
         }
+    }
+
+    /// Always draw the ring (while enabled), for a static focused specimen.
+    pub(crate) fn forced(mut self, forced: bool) -> Self {
+        self.forced = forced;
+        self
     }
 
     /// Draw the ring at the M3 inner offset instead of the outer one.
@@ -178,7 +188,8 @@ impl Element for ButtonFocusRing {
             Visibility::Focus(focus) => focus.is_focused(window),
             Visibility::Resolved(active) => *active,
         };
-        let visible = self.enabled && focused && window.last_input_was_keyboard();
+        let visible =
+            self.enabled && (self.forced || (focused && window.last_input_was_keyboard()));
         let corners = match self.radius {
             Radius::Rems(radius) => Corners::all(radius.to_pixels(window.rem_size())),
             Radius::Corners(corners) => corners,
@@ -211,6 +222,7 @@ mod tests {
         focus: FocusHandle,
         border: f32,
         disabled: bool,
+        forced: bool,
         observed: Rc<Cell<Option<Bounds<Pixels>>>>,
     }
     impl Render for Harness {
@@ -225,7 +237,8 @@ mod tests {
                 .debug_selector(|| "focus-ring-button".into())
                 .child("Label");
             let mut ring =
-                ButtonFocusRing::new(button, self.focus.clone(), !self.disabled, rem(20.));
+                ButtonFocusRing::new(button, self.focus.clone(), !self.disabled, rem(20.))
+                    .forced(self.forced);
             ring.observed = Some(self.observed.clone());
             div().p(px(20.)).flex().child(ring)
         }
@@ -248,6 +261,7 @@ mod tests {
                 focus: cx.focus_handle(),
                 border: 1.,
                 disabled: false,
+                forced: false,
                 observed,
             }
         });
@@ -302,6 +316,31 @@ mod tests {
         draw(cx);
         assert!(observed.get().is_some());
         cx.simulate_click(original.center(), Modifiers::default());
+        draw(cx);
+        assert!(observed.get().is_none());
+    }
+
+    #[gpui::test]
+    fn forced_ring_paints_without_focus_but_not_while_disabled(cx: &mut TestAppContext) {
+        cx.update(gpui_base::init);
+        let observed = Rc::new(Cell::new(None));
+        let (view, cx) = cx.add_window_view({
+            let observed = observed.clone();
+            move |_, cx| Harness {
+                focus: cx.focus_handle(),
+                border: 0.,
+                disabled: false,
+                forced: true,
+                observed,
+            }
+        });
+        draw(cx);
+        let root = cx.debug_bounds("focus-ring-button").unwrap();
+        assert_eq!(observed.get(), Some(root.dilate(px(5.))));
+        view.update(cx, |this, cx| {
+            this.disabled = true;
+            cx.notify();
+        });
         draw(cx);
         assert!(observed.get().is_none());
     }

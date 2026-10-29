@@ -1,5 +1,6 @@
 //! Focus presentation for composed controls, and scrolling that reveals
 //! newly focused rows without pinning them during manual scrolling.
+use super::InteractionPreview;
 use super::button::ButtonFocusRing;
 use crate::tokens::{shape::RADIUS_FULL, typography::rem};
 use gpui::{prelude::*, *};
@@ -85,6 +86,10 @@ pub struct RingedButton {
     focus: Option<FocusHandle>,
     placement: RingPlacement,
     disabled: bool,
+    /// Hover and press state-layer backgrounds, installed as live styles or
+    /// painted directly for a forced preview.
+    layers: Option<(Rgba, Rgba)>,
+    preview: Option<InteractionPreview>,
 }
 
 impl RingedButton {
@@ -96,12 +101,33 @@ impl RingedButton {
             focus: None,
             placement,
             disabled: false,
+            layers: None,
+            preview: None,
         }
     }
 
     /// Restyle the inner button.
     pub(crate) fn map(mut self, f: impl FnOnce(gpui_base::Button) -> gpui_base::Button) -> Self {
         self.button = f(self.button);
+        self
+    }
+
+    /// The container under its hover and press state layers. Live, they are
+    /// the pointer hover and active styles; a preview paints the one it forces.
+    pub(crate) fn state_layers(mut self, hover: Rgba, press: Rgba) -> Self {
+        self.layers = Some((hover, press));
+        self
+    }
+
+    /// Render a static specimen in one forced interaction state: the hover or
+    /// press layer, the focus ring, or the disabled control. The specimen
+    /// leaves the tab order and ignores live hover and press. See
+    /// [`InteractionPreview`].
+    pub fn preview_state(mut self, state: InteractionPreview) -> Self {
+        self.preview = Some(state);
+        if state.is_disabled() {
+            self = self.disabled(true);
+        }
         self
     }
 
@@ -164,8 +190,22 @@ impl RenderOnce for RingedButton {
         });
         #[cfg(test)]
         let key = format!("{:?}", self.id);
-        let button = self.button.track_focus(&focus);
+        let mut button = self.button.track_focus(&focus);
         let enabled = !self.disabled;
+        if let Some((hover, press)) = self.layers.filter(|_| enabled) {
+            button = match self.preview {
+                None => button
+                    .hover(move |style| style.bg(hover))
+                    .active(move |style| style.bg(press)),
+                Some(InteractionPreview::Hovered) => button.bg(hover),
+                Some(InteractionPreview::Pressed) => button.bg(press),
+                Some(_) => button,
+            };
+        }
+        if self.preview.is_some() {
+            button = button.tab_stop(false);
+        }
+        let forced = self.preview == Some(InteractionPreview::Focused);
         let ring = match self.placement {
             RingPlacement::Outer(corners) => {
                 ButtonFocusRing::with_corners(button, focus, enabled, corners)
@@ -173,7 +213,8 @@ impl RenderOnce for RingedButton {
             RingPlacement::Inner(corners) => {
                 ButtonFocusRing::with_corners(button, focus, enabled, corners).inward()
             }
-        };
+        }
+        .forced(forced);
         #[cfg(test)]
         let ring = ring.observe(test_rings::cell(key));
         ring

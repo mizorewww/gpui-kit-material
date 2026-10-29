@@ -19,6 +19,7 @@ mod caption;
 mod choice;
 mod feedback;
 mod focus;
+mod preview;
 mod progress;
 mod text;
 mod tile;
@@ -34,6 +35,7 @@ pub use feedback::{
     outlined_status_chip, small_badge, status_chip,
 };
 pub use focus::{FocusRing, RevealFocus, RingedButton, contain_scroll};
+pub use preview::InteractionPreview;
 pub use progress::{
     CircularProgressFrame, CircularProgressPlayback, circular_indeterminate_frame,
     circular_progress, icon_spinner, icon_spinner_with_playback, indeterminate_circular_progress,

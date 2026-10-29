@@ -39,6 +39,7 @@ pub fn choice_radio(selected: bool, enabled: bool) -> Div {
 pub use choice_tile::{ChoiceGroup, ChoiceTile};
 mod choice_tile {
     use super::*;
+    use crate::components::InteractionPreview;
     use crate::components::button_group::{FirstChoice, LastChoice, NextChoice, PreviousChoice};
     use crate::components::focus::{RingPlacement, RingedButton};
     use crate::components::tile::outer_corner_radii;
@@ -98,6 +99,7 @@ mod choice_tile {
         status: Option<AnyElement>,
         selected: bool,
         enabled: bool,
+        preview: Option<InteractionPreview>,
     }
 
     impl ChoiceTile {
@@ -121,6 +123,7 @@ mod choice_tile {
                 status: None,
                 selected,
                 enabled: true,
+                preview: None,
             }
         }
 
@@ -155,6 +158,13 @@ mod choice_tile {
             self
         }
 
+        /// Render a static specimen in one forced interaction state, painting
+        /// what the live state paints. See [`InteractionPreview`].
+        pub fn preview_state(mut self, state: InteractionPreview) -> Self {
+            self.preview = Some(state);
+            self
+        }
+
         pub fn enabled(mut self, enabled: bool) -> Self {
             self.enabled = enabled;
             self
@@ -167,7 +177,8 @@ mod choice_tile {
         pub fn render(self, window: &mut Window, cx: &mut App) -> RingedButton {
             let id = self.id.clone();
             let selected = self.selected;
-            let enabled = self.enabled;
+            let preview = self.preview;
+            let enabled = self.enabled && !preview.is_some_and(|p| p.is_disabled());
             let amount = crate::motion::selection_value(
                 (id.clone(), "selection"),
                 if selected { 1. } else { 0. },
@@ -216,11 +227,8 @@ mod choice_tile {
                     )
                     .bg(paint.background)
                     .text_color(paint.label)
-                    .when(enabled, |button| {
-                        button
-                            .cursor_pointer()
-                            .hover(move |style| style.bg(paint.hover))
-                            .active(move |style| style.bg(paint.press))
+                    .when(enabled && preview.is_none(), |button| {
+                        button.cursor_pointer()
                     })
                     .children(icon)
                     .child(
@@ -261,7 +269,9 @@ mod choice_tile {
                     .children(status)
                     .child(choice_radio(selected, enabled))
                 })
+                .state_layers(paint.hover, paint.press)
                 .disabled(!enabled)
+                .when_some(preview, |tile, preview| tile.preview_state(preview))
         }
     }
 
