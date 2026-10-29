@@ -1,0 +1,405 @@
+{
+  "reference": {
+    "site": "https://md3.io/",
+    "repository": "https://github.com/floor/material",
+    "source_commit": "c910072f3fc5b660276731d8a935d7186f288364",
+    "package_version": "3.2.4",
+    "site_observed_on": "2026-10-29",
+    "deployed_commit_verified": false,
+    "source_observed_on": "2026-10-29",
+    "source_ref": "HEAD",
+    "package_version_origin": "source package.json; not a verified deployed version"
+  },
+  "gallery_reference": "https://gpui-kit.com/",
+  "acceptance": {
+    "platforms": [
+      "desktop",
+      "wasm-browser"
+    ],
+    "axes": [
+      "variant",
+      "size",
+      "shape",
+      "interaction-state",
+      "theme",
+      "text-scale"
+    ],
+    "text_scales": [
+      1,
+      1.25,
+      1.5,
+      2
+    ],
+    "visual": [
+      "color",
+      "font-metrics",
+      "geometry",
+      "spacing",
+      "border",
+      "shape",
+      "icon",
+      "elevation",
+      "state-layer"
+    ],
+    "motion": [
+      "duration",
+      "easing-or-spring",
+      "delay",
+      "overshoot",
+      "shape-morph",
+      "interruption",
+      "retargeting",
+      "reduced-motion"
+    ],
+    "review_required": [
+      "implementation-commit",
+      "reference-version",
+      "reference-and-implementation-viewport",
+      "font-and-scale",
+      "coverage-cases",
+      "desktop-and-browser-screenshots",
+      "timed-frames-or-video",
+      "test-results",
+      "independent-subagent-verdict",
+      "os-and-browser-version",
+      "device-pixel-ratio",
+      "zoom"
+    ],
+    "completion": "Every applicable case has evidence and an independent PASS tied to the delivered implementation. Unspecified, untested, and unreviewed cases remain incomplete.",
+    "themes": "light and dark, every built-in palette, and reference baseline",
+    "review_invalidation": "Any implementation change invalidates affected prior PASS verdicts until independently reviewed again."
+  },
+  "foundations": [
+    {
+      "id": "themes",
+      "status": "unreviewed",
+      "evidence": [],
+      "reference": "https://md3.io/styles/themes/",
+      "reference_status": "available"
+    },
+    {
+      "id": "color",
+      "status": "unreviewed",
+      "evidence": [],
+      "reference": "https://md3.io/styles/color/",
+      "reference_status": "available"
+    },
+    {
+      "id": "typography",
+      "status": "unreviewed",
+      "evidence": [],
+      "reference": "https://md3.io/styles/typography/",
+      "reference_status": "available"
+    },
+    {
+      "id": "shape",
+      "status": "unreviewed",
+      "evidence": [],
+      "reference": "https://md3.io/styles/shape/",
+      "reference_status": "available"
+    },
+    {
+      "id": "elevation",
+      "status": "unreviewed",
+      "evidence": [],
+      "reference": "https://md3.io/styles/",
+      "reference_status": "Coming on website; verify source and runtime"
+    },
+    {
+      "id": "motion",
+      "status": "unreviewed",
+      "evidence": [],
+      "reference": "https://md3.io/styles/",
+      "reference_status": "Coming on website; verify source and runtime"
+    },
+    {
+      "id": "states",
+      "status": "unreviewed",
+      "evidence": [],
+      "reference": "https://md3.io/styles/",
+      "reference_status": "Coming on website; verify source and runtime"
+    },
+    {
+      "id": "icons",
+      "status": "unreviewed",
+      "evidence": [],
+      "reference": "https://md3.io/styles/",
+      "reference_status": "Coming on website; verify source and runtime"
+    }
+  ],
+  "components": [
+    {
+      "id": "button",
+      "reference": "https://md3.io/components/button/",
+      "status": "unreviewed",
+      "cases": [],
+      "reviews": []
+    },
+    {
+      "id": "icon-button",
+      "reference": "https://md3.io/components/icon-button/",
+      "status": "unreviewed",
+      "cases": [],
+      "reviews": []
+    },
+    {
+      "id": "button-group",
+      "reference": "https://md3.io/components/button-group/",
+      "status": "unreviewed",
+      "cases": [],
+      "reviews": []
+    },
+    {
+      "id": "split-button",
+      "reference": "https://md3.io/components/split-button/",
+      "status": "unreviewed",
+      "cases": [],
+      "reviews": []
+    },
+    {
+      "id": "fab",
+      "reference": "https://md3.io/components/fab/",
+      "status": "unreviewed",
+      "cases": [],
+      "reviews": []
+    },
+    {
+      "id": "fab-menu",
+      "reference": "https://md3.io/components/fab-menu/",
+      "status": "unreviewed",
+      "cases": [],
+      "reviews": []
+    },
+    {
+      "id": "extended-fab",
+      "reference": "https://md3.io/components/extended-fab/",
+      "status": "unreviewed",
+      "cases": [],
+      "reviews": []
+    },
+    {
+      "id": "checkbox",
+      "reference": "https://md3.io/components/checkbox/",
+      "status": "unreviewed",
+      "cases": [],
+      "reviews": []
+    },
+    {
+      "id": "switch",
+      "reference": "https://md3.io/components/switch/",
+      "status": "unreviewed",
+      "cases": [],
+      "reviews": []
+    },
+    {
+      "id": "radios",
+      "reference": "https://md3.io/components/radios/",
+      "status": "unreviewed",
+      "cases": [],
+      "reviews": []
+    },
+    {
+      "id": "chips",
+      "reference": "https://md3.io/components/chips/",
+      "status": "unreviewed",
+      "cases": [],
+      "reviews": []
+    },
+    {
+      "id": "slider",
+      "reference": "https://md3.io/components/slider/",
+      "status": "unreviewed",
+      "cases": [],
+      "reviews": []
+    },
+    {
+      "id": "text-field",
+      "reference": "https://md3.io/components/text-field/",
+      "status": "unreviewed",
+      "cases": [],
+      "reviews": []
+    },
+    {
+      "id": "select",
+      "reference": "https://md3.io/components/select/",
+      "status": "unreviewed",
+      "cases": [],
+      "reviews": []
+    },
+    {
+      "id": "search",
+      "reference": "https://md3.io/components/search/",
+      "status": "unreviewed",
+      "cases": [],
+      "reviews": []
+    },
+    {
+      "id": "datepicker",
+      "reference": "https://md3.io/components/datepicker/",
+      "status": "unreviewed",
+      "cases": [],
+      "reviews": []
+    },
+    {
+      "id": "timepicker",
+      "reference": "https://md3.io/components/timepicker/",
+      "status": "unreviewed",
+      "cases": [],
+      "reviews": []
+    },
+    {
+      "id": "navigation-rail",
+      "reference": "https://md3.io/components/navigation-rail/",
+      "status": "unreviewed",
+      "cases": [],
+      "reviews": []
+    },
+    {
+      "id": "navigation-bar",
+      "reference": "https://md3.io/components/navigation-bar/",
+      "status": "unreviewed",
+      "cases": [],
+      "reviews": []
+    },
+    {
+      "id": "drawer",
+      "reference": "https://md3.io/components/drawer/",
+      "status": "unreviewed",
+      "cases": [],
+      "reviews": []
+    },
+    {
+      "id": "tabs",
+      "reference": "https://md3.io/components/tabs/",
+      "status": "unreviewed",
+      "cases": [],
+      "reviews": []
+    },
+    {
+      "id": "menu",
+      "reference": "https://md3.io/components/menu/",
+      "status": "unreviewed",
+      "cases": [],
+      "reviews": []
+    },
+    {
+      "id": "top-app-bar",
+      "reference": "https://md3.io/components/top-app-bar/",
+      "status": "unreviewed",
+      "cases": [],
+      "reviews": []
+    },
+    {
+      "id": "bottom-app-bar",
+      "reference": "https://md3.io/components/bottom-app-bar/",
+      "status": "unreviewed",
+      "cases": [],
+      "reviews": []
+    },
+    {
+      "id": "toolbar",
+      "reference": "https://md3.io/components/toolbar/",
+      "status": "unreviewed",
+      "cases": [],
+      "reviews": []
+    },
+    {
+      "id": "card",
+      "reference": "https://md3.io/components/card/",
+      "status": "unreviewed",
+      "cases": [],
+      "reviews": []
+    },
+    {
+      "id": "list",
+      "reference": "https://md3.io/components/list/",
+      "status": "unreviewed",
+      "cases": [],
+      "reviews": []
+    },
+    {
+      "id": "carousel",
+      "reference": "https://md3.io/components/carousel/",
+      "status": "unreviewed",
+      "cases": [],
+      "reviews": []
+    },
+    {
+      "id": "divider",
+      "reference": "https://md3.io/components/divider/",
+      "status": "unreviewed",
+      "cases": [],
+      "reviews": []
+    },
+    {
+      "id": "dialog",
+      "reference": "https://md3.io/components/dialog/",
+      "status": "unreviewed",
+      "cases": [],
+      "reviews": []
+    },
+    {
+      "id": "bottom-sheet",
+      "reference": "https://md3.io/components/bottom-sheet/",
+      "status": "unreviewed",
+      "cases": [],
+      "reviews": []
+    },
+    {
+      "id": "side-sheet",
+      "reference": "https://md3.io/components/side-sheet/",
+      "status": "unreviewed",
+      "cases": [],
+      "reviews": []
+    },
+    {
+      "id": "badge",
+      "reference": "https://md3.io/components/badge/",
+      "status": "unreviewed",
+      "cases": [],
+      "reviews": []
+    },
+    {
+      "id": "progress",
+      "reference": "https://md3.io/components/progress/",
+      "status": "unreviewed",
+      "cases": [],
+      "reviews": []
+    },
+    {
+      "id": "loading-indicator",
+      "reference": "https://md3.io/components/loading-indicator/",
+      "status": "unreviewed",
+      "cases": [],
+      "reviews": []
+    },
+    {
+      "id": "snackbar",
+      "reference": "https://md3.io/components/snackbar/",
+      "status": "unreviewed",
+      "cases": [],
+      "reviews": []
+    },
+    {
+      "id": "tooltip",
+      "reference": "https://md3.io/components/tooltip/",
+      "status": "unreviewed",
+      "cases": [],
+      "reviews": []
+    }
+  ],
+  "deliverables": [
+    {
+      "id": "desktop-gallery",
+      "status": "unreviewed",
+      "evidence": [],
+      "reviews": []
+    },
+    {
+      "id": "wasm-gallery",
+      "status": "unreviewed",
+      "evidence": [],
+      "reviews": []
+    }
+  ]
+}
