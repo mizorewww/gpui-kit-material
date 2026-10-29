@@ -219,49 +219,67 @@ mod choice_tile {
     }
 }
 
-/// A distinct color family for a category icon: a tonal container and its
-/// content color, blended from the current surface so every palette keeps
+/// A distinct color family for a category icon: a tonal container role and
+/// the content role that pairs with it. The names are the families' usual
+/// hues; the exact colors follow the current scheme, so every palette keeps
 /// its own ground and contrast.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Tint {
+    /// Error container.
     Orange,
+    /// Primary container.
     Blue,
+    /// Secondary container.
     Teal,
+    /// Warning container.
     Amber,
+    /// Success container.
     Green,
+    /// Tertiary fixed.
     Pink,
+    /// Tertiary container.
     Purple,
 }
 
 impl Tint {
-    fn hue(self) -> Rgba {
-        rgb(match self {
-            Tint::Orange => 0xd9692b,
-            Tint::Blue => 0x2f6fe0,
-            Tint::Teal => 0x1b8ea6,
-            Tint::Amber => 0xc79a12,
-            Tint::Green => 0x2f9a52,
-            Tint::Pink => 0xc7428a,
-            Tint::Purple => 0x7a5cc7,
-        })
+    pub const ALL: [Tint; 7] = [
+        Tint::Orange,
+        Tint::Blue,
+        Tint::Teal,
+        Tint::Amber,
+        Tint::Green,
+        Tint::Pink,
+        Tint::Purple,
+    ];
+
+    /// The container role and the content role on it.
+    pub const fn roles(self) -> (ColorRole, ColorRole) {
+        match self {
+            Tint::Orange => (ColorRole::ERROR_CONTAINER, ColorRole::ON_ERROR_CONTAINER),
+            Tint::Blue => (
+                ColorRole::PRIMARY_CONTAINER,
+                ColorRole::ON_PRIMARY_CONTAINER,
+            ),
+            Tint::Teal => (
+                ColorRole::SECONDARY_CONTAINER,
+                ColorRole::ON_SECONDARY_CONTAINER,
+            ),
+            Tint::Amber => (ColorRole::WARNING_BG, ColorRole::WARNING),
+            Tint::Green => (ColorRole::SUCCESS_BG, ColorRole::SUCCESS),
+            Tint::Pink => (ColorRole::TERTIARY_FIXED, ColorRole::ON_TERTIARY_FIXED),
+            Tint::Purple => (
+                ColorRole::TERTIARY_CONTAINER,
+                ColorRole::ON_TERTIARY_CONTAINER,
+            ),
+        }
     }
 
     pub fn container(self) -> Rgba {
-        let dark = crate::theme::is_dark();
-        blend(
-            color(ColorRole::SURFACE),
-            self.hue(),
-            if dark { 0.30 } else { 0.24 },
-        )
+        color(self.roles().0)
     }
 
     pub fn content(self) -> Rgba {
-        let dark = crate::theme::is_dark();
-        blend(
-            self.hue(),
-            color(ColorRole::INK),
-            if dark { 0.35 } else { 0.45 },
-        )
+        color(self.roles().1)
     }
 }
 
@@ -284,4 +302,24 @@ pub fn tinted_icon(icon: impl Into<Icon>, tint: Tint, size: impl Into<AbsoluteLe
         .bg(tint.container())
         .text_color(tint.content())
         .child(icon.into().size(glyph))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use core::prelude::v1::test;
+
+    #[test]
+    fn tints_are_distinct_semantic_role_pairs() {
+        let mut containers = Tint::ALL.map(|tint| tint.roles().0 as usize).to_vec();
+        containers.sort_unstable();
+        containers.dedup();
+        assert_eq!(containers.len(), Tint::ALL.len(), "one container per tint");
+        for tint in Tint::ALL {
+            let (container, content) = tint.roles();
+            assert_ne!(container, content);
+            assert_eq!(tint.container(), color(container));
+            assert_eq!(tint.content(), color(content));
+        }
+    }
 }
