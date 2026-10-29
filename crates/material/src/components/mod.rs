@@ -19,7 +19,7 @@ pub use button_group::ConnectedButtonGroup;
 pub use caption::{Caption, CaptionButton, CaptionButtons, CaptionLabels, title_bar_control};
 pub use choice::{ChoiceTile, Tint, choice_radio, tinted_icon};
 pub use feedback::{
-    BadgeKind, NoticeKind, badge, card_surface, chip, notice_banner, outlined_badge,
+    BadgeKind, NoticeKind, Snackbar, badge, card_surface, chip, notice_banner, outlined_badge,
 };
 pub use focus::{FocusRing, RevealFocus, contain_scroll};
 pub use progress::{icon_spinner, indeterminate_progress, linear_progress, progress, spinner};
