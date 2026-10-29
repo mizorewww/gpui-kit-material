@@ -223,7 +223,7 @@ mod tests {
         cx.update(|cx| {
             gpui_base::init(cx);
             cx.set_reduce_motion(false);
-            motion::apply_scheme(motion::MotionScheme::Expressive);
+            motion::set_motion_scheme(motion::MotionScheme::Expressive);
             let playback = ButtonTransitionPlayback::default();
             let inputs = ButtonTransitionInputs::default();
             playback.sync(inputs, cx);
@@ -241,7 +241,7 @@ mod tests {
             playback.opacity_target.set(0.08);
             playback.opacity.sample(0.08, opacity_policy(), cx);
             cx.set_reduce_motion(true);
-            motion::apply_scheme(motion::MotionScheme::Standard);
+            motion::set_motion_scheme(motion::MotionScheme::Standard);
             playback.sync(inputs, cx);
             assert_eq!(
                 playback

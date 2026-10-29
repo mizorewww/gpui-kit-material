@@ -95,7 +95,7 @@ struct ToggleHarness {
 impl Render for ToggleHarness {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         window.set_rem_size(px(14.));
-        crate::motion::apply_scheme(crate::motion::MotionScheme::Expressive);
+        crate::motion::set_motion_scheme(crate::motion::MotionScheme::Expressive);
         let entity = cx.entity().downgrade();
         let mut button = MaterialButton::new("toggle-test")
             .toggle(true)
@@ -415,7 +415,7 @@ struct ToggleUnmountHarness {
 impl Render for ToggleUnmountHarness {
     fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
         window.set_rem_size(px(14.));
-        crate::motion::apply_scheme(self.scheme);
+        crate::motion::set_motion_scheme(self.scheme);
         let mut root = div().flex().items_start();
         for (index, id) in ["always-mounted-toggle", "remounted-toggle"]
             .into_iter()

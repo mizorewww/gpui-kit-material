@@ -1304,7 +1304,7 @@ mod tests {
     impl Render for EffectsHarness {
         fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
             window.set_rem_size(px(14.));
-            crate::motion::apply_scheme(crate::motion::MotionScheme::Expressive);
+            crate::motion::set_motion_scheme(crate::motion::MotionScheme::Expressive);
             let mut button = MaterialButton::new("effects")
                 .ripple(self.ripple)
                 .disabled(self.disabled)
@@ -1668,7 +1668,7 @@ mod tests {
 
     impl Render for ColorsHarness {
         fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-            crate::motion::apply_scheme(crate::motion::MotionScheme::Expressive);
+            crate::motion::set_motion_scheme(crate::motion::MotionScheme::Expressive);
             crate::theme::apply_palette(self.palette, window, cx);
             let mut button = MaterialButton::new("colors-button")
                 .variant(self.variant)
@@ -1935,7 +1935,7 @@ mod tests {
     impl Render for MotionHarness {
         fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
             window.set_rem_size(px(14.));
-            crate::motion::apply_scheme(crate::motion::MotionScheme::Expressive);
+            crate::motion::set_motion_scheme(crate::motion::MotionScheme::Expressive);
             let mut button = MaterialButton::new("motion-button")
                 .track_focus(&self.focus)
                 .button_size(ButtonSize::Large)

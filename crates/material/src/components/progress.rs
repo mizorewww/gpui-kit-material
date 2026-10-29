@@ -447,7 +447,7 @@ mod tests {
     }
     impl Render for ProgressHarness {
         fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-            crate::motion::apply_scheme(crate::motion::MotionScheme::Expressive);
+            crate::motion::set_motion_scheme(crate::motion::MotionScheme::Expressive);
             div()
                 .w(px(100.))
                 .child(progress("bounded-progress", self.target, window, cx))

@@ -82,8 +82,15 @@ thread_local! {
 }
 
 /// Set the motion scheme for this root's render. Defaults to Expressive.
-pub fn apply_scheme(scheme: MotionScheme) {
+pub fn set_motion_scheme(scheme: MotionScheme) {
     SCHEME.set(scheme);
+}
+
+/// Former name of [`set_motion_scheme`]; it read like `theme::apply_scheme`,
+/// which applies a color scheme.
+#[deprecated(note = "renamed to `motion::set_motion_scheme`")]
+pub fn apply_scheme(scheme: MotionScheme) {
+    set_motion_scheme(scheme);
 }
 
 pub fn curve(token: MotionToken) -> MotionCurve {
@@ -787,7 +794,7 @@ mod tests {
 
     impl Render for SchemeHarness {
         fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-            super::apply_scheme(self.scheme);
+            super::set_motion_scheme(self.scheme);
             self.sample
                 .set(super::value("scheme-transition", self.target, window, cx));
             div().size(px(40.))
@@ -882,7 +889,7 @@ mod tests {
             window.draw(cx).clear(cx);
         });
         assert_eq!(sample.get(), 0.);
-        super::apply_scheme(MotionScheme::Expressive);
+        super::set_motion_scheme(MotionScheme::Expressive);
     }
 
     #[test]
@@ -926,7 +933,7 @@ mod tests {
 
     impl Render for CompoundEffectsHarness {
         fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-            super::apply_scheme(super::MotionScheme::Expressive);
+            super::set_motion_scheme(super::MotionScheme::Expressive);
             *self.sample.borrow_mut() = super::token_transition(
                 "compound-effects-transition",
                 self.target.clone(),

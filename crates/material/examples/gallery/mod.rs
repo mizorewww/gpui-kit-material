@@ -204,7 +204,7 @@ impl Gallery {
 
     // Run before Root prepares its styles, never while rendering the child view.
     fn prepare_theme(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        motion::apply_scheme(self.motion_scheme);
+        motion::set_motion_scheme(self.motion_scheme);
         let running = theme::advance_component_theme(
             self.target_scheme(),
             self.scale.parse().unwrap_or(1.),
@@ -243,7 +243,7 @@ impl Render for Gallery {
             playback.observe_reduced_motion(cx);
         }
         self.button_progress_inputs = Some(progress_inputs);
-        motion::apply_scheme(self.motion_scheme);
+        motion::set_motion_scheme(self.motion_scheme);
         // Initialize all previews with the Gallery, even before their first visit.
         // Keep Base's keyed retargeting and pinned curves alive independently of
         // virtual rows. An offscreen target change still runs its finite transition

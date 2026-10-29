@@ -72,7 +72,7 @@ Switch theme (animated on the slow effects spring) or motion scheme:
 
 ```rust
 theme::apply_scheme(ThemeId::Ocean.scheme(ThemeMode::Dark, Contrast::High), window, cx);
-gpui_kit_material::motion::apply_scheme(gpui_kit_material::motion::MotionScheme::Standard);
+gpui_kit_material::motion::set_motion_scheme(gpui_kit_material::motion::MotionScheme::Standard);
 ```
 
 Advance theme animation from input events and pre-frame callbacks with

@@ -404,7 +404,7 @@ mod tests {
     }
     impl Render for PaletteHarness {
         fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-            motion::apply_scheme(self.motion);
+            motion::set_motion_scheme(self.motion);
             apply_palette(self.palette, window, cx);
             div()
         }
@@ -479,6 +479,6 @@ mod tests {
             window.draw(cx).clear(cx);
         });
         assert_eq!(scheme(), Scheme::from_palette(PaletteId::Paper));
-        motion::apply_scheme(motion::MotionScheme::Expressive);
+        motion::set_motion_scheme(motion::MotionScheme::Expressive);
     }
 }
