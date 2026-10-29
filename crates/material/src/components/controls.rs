@@ -259,42 +259,145 @@ fn slider_geometry(appearance: SliderAppearance) -> (f32, f32, f32) {
         SliderAppearance::Expressive => (16., 4., 44.),
     }
 }
+
+/// M3 Expressive slider details, in dp: the gap between the handle and the
+/// track on either side, the track's outer corners and the corners where it
+/// meets the gap, and the stop indicator at the track's end.
+const HANDLE_GAP: f32 = 6.;
+const TRACK_CORNER: f32 = 8.;
+const TRACK_INNER_CORNER: f32 = 2.;
+const STOP_INDICATOR: f32 = 4.;
+
+/// The colors of a slider in one state.
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct SliderPaint {
+    active: Rgba,
+    inactive: Rgba,
+    handle: Rgba,
+    /// The stop indicator on the inactive track.
+    stop: Rgba,
+}
+
+fn slider_paint(disabled: bool) -> SliderPaint {
+    if disabled {
+        let on_surface = color(ColorRole::ON_SURFACE);
+        SliderPaint {
+            active: state::disabled(on_surface),
+            inactive: on_surface.opacity(state::DISABLED_CONTAINER),
+            // The handle is an opaque mix, so the track does not show
+            // through it.
+            handle: blend(
+                color(ColorRole::SURFACE),
+                on_surface,
+                state::DISABLED_CONTENT,
+            ),
+            stop: state::disabled(on_surface),
+        }
+    } else {
+        SliderPaint {
+            active: color(ColorRole::PRIMARY),
+            inactive: color(ColorRole::SECONDARY_CONTAINER),
+            handle: color(ColorRole::PRIMARY),
+            stop: color(ColorRole::PRIMARY),
+        }
+    }
+}
+
 impl RenderOnce for MaterialSlider {
     fn render(self, _: &mut Window, cx: &mut App) -> impl IntoElement {
         let p = self.state.read(cx).percentage().end;
         let (track, width, height) = slider_geometry(self.appearance);
+        let paint = slider_paint(self.disabled);
+        let track_top = rem((48. - track) / 2.);
+        let indicator = SliderIndicator::new(&self.state)
+            .absolute()
+            .left_0()
+            .top(track_top)
+            .w_full()
+            .h(rem(track));
+        let indicator = match self.appearance {
+            SliderAppearance::Classic => indicator.rounded_full().bg(paint.inactive).child(
+                div()
+                    .absolute()
+                    .left_0()
+                    .top_0()
+                    .h_full()
+                    .w(relative(p))
+                    .rounded_full()
+                    .bg(paint.active),
+            ),
+            SliderAppearance::Expressive => {
+                // Each side of the handle stops HANDLE_GAP short of it; the
+                // segment collapses rather than crossing the handle.
+                let clearance = rem(width / 2. + HANDLE_GAP);
+                let (outer, inner) = (rem(TRACK_CORNER), rem(TRACK_INNER_CORNER));
+                indicator
+                    .child(
+                        div()
+                            .absolute()
+                            .left_0()
+                            .top_0()
+                            .h_full()
+                            .w(relative(p))
+                            .pr(clearance)
+                            .child(
+                                div()
+                                    .when(cfg!(test), |segment| {
+                                        segment.debug_selector(|| "slider-active".into())
+                                    })
+                                    .size_full()
+                                    .rounded_l(outer)
+                                    .rounded_r(inner)
+                                    .bg(paint.active),
+                            ),
+                    )
+                    .child(
+                        div()
+                            .absolute()
+                            .right_0()
+                            .top_0()
+                            .h_full()
+                            .w(relative(1. - p))
+                            .pl(clearance)
+                            .child(
+                                div()
+                                    .when(cfg!(test), |segment| {
+                                        segment.debug_selector(|| "slider-inactive".into())
+                                    })
+                                    .size_full()
+                                    .rounded_l(inner)
+                                    .rounded_r(outer)
+                                    .bg(paint.inactive),
+                            ),
+                    )
+                    .when(p < 1., |track_view| {
+                        track_view.child(
+                            div()
+                                .when(cfg!(test), |stop| {
+                                    stop.debug_selector(|| "slider-stop".into())
+                                })
+                                .absolute()
+                                .right(rem((track - STOP_INDICATOR) / 2.))
+                                .top(rem((track - STOP_INDICATOR) / 2.))
+                                .size(rem(STOP_INDICATOR))
+                                .rounded_full()
+                                .bg(paint.stop),
+                        )
+                    })
+            }
+        };
         Slider::new(&self.state)
             .accessibility_label(self.label)
             .disabled(self.disabled)
             .w_full()
             .h(rem(48.))
-            .when(self.disabled, |e| e.opacity(0.38))
             .child(
                 SliderTrack::new(&self.state)
                     .disabled(self.disabled)
                     .relative()
                     .w_full()
                     .h_full()
-                    .child(
-                        SliderIndicator::new(&self.state)
-                            .absolute()
-                            .left_0()
-                            .top(rem((48. - track) / 2.))
-                            .w_full()
-                            .h(rem(track))
-                            .rounded_full()
-                            .bg(color(ColorRole::SECONDARY_CONTAINER))
-                            .child(
-                                div()
-                                    .absolute()
-                                    .left_0()
-                                    .top_0()
-                                    .h_full()
-                                    .w(relative(p))
-                                    .rounded_full()
-                                    .bg(color(ColorRole::ACCENT)),
-                            ),
-                    )
+                    .child(indicator)
                     .child(
                         SliderThumb::new(&self.state)
                             .disabled(self.disabled)
@@ -305,7 +408,7 @@ impl RenderOnce for MaterialSlider {
                             .w(rem(width))
                             .h(rem(height))
                             .rounded_full()
-                            .bg(color(ColorRole::ACCENT)),
+                            .bg(paint.handle),
                     ),
             )
     }
@@ -486,6 +589,59 @@ mod tests {
             slider_geometry(SliderAppearance::Expressive),
             (16., 4., 44.)
         );
+    }
+
+    #[core::prelude::v1::test]
+    fn slider_uses_m3_expressive_details_and_disabled_roles() {
+        assert_eq!(
+            (HANDLE_GAP, TRACK_CORNER, TRACK_INNER_CORNER, STOP_INDICATOR),
+            (6., 8., 2., 4.)
+        );
+        let enabled = slider_paint(false);
+        assert_eq!(enabled.active, color(ColorRole::PRIMARY));
+        assert_eq!(enabled.inactive, color(ColorRole::SECONDARY_CONTAINER));
+        assert_eq!(enabled.stop, color(ColorRole::PRIMARY));
+        let disabled = slider_paint(true);
+        let on_surface = color(ColorRole::ON_SURFACE);
+        assert_eq!(disabled.active, state::disabled(on_surface));
+        assert_eq!(disabled.inactive.a, on_surface.a * 0.12);
+        assert_eq!(disabled.handle.a, 1., "the disabled handle is opaque");
+    }
+
+    struct SliderHarness(Entity<SliderState>);
+    impl Render for SliderHarness {
+        fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+            window.set_rem_size(px(14.));
+            div()
+                .w(px(200.))
+                .child(MaterialSlider::new(&self.0, "Level"))
+        }
+    }
+
+    #[gpui::test]
+    fn the_stop_indicator_sits_at_the_track_end_until_the_value_reaches_it(
+        cx: &mut TestAppContext,
+    ) {
+        cx.update(gpui_base::init);
+        let (_, window) = cx.add_window_view(|_, cx| {
+            SliderHarness(cx.new(|_| SliderState::new().max(100.).default_value(30.)))
+        });
+        draw(window);
+        let stop = window
+            .debug_bounds("slider-stop")
+            .expect("a stop indicator");
+        assert_eq!(stop.size, size(px(4.), px(4.)));
+        assert_eq!(stop.right(), px(200. - 6.));
+        // The 4dp handle is centered at 60px; each side stops 6dp short.
+        let active = window.debug_bounds("slider-active").unwrap();
+        let inactive = window.debug_bounds("slider-inactive").unwrap();
+        assert_eq!(active.right(), px(60. - 2. - 6.));
+        assert_eq!(inactive.left(), px(60. + 2. + 6.));
+        let (_, window) = cx.add_window_view(|_, cx| {
+            SliderHarness(cx.new(|_| SliderState::new().max(100.).default_value(100.)))
+        });
+        draw(window);
+        assert!(window.debug_bounds("slider-stop").is_none());
     }
 
     #[core::prelude::v1::test]
