@@ -6,19 +6,22 @@ use crate::theme::{blend, color};
 use crate::tokens::{layout::*, shape::*, state, typography::*};
 use gpui::{prelude::*, *};
 
-/// The M3 radio of a choice: an outlined ring, filled with a dot when
-/// selected; 38% ink when the choice is unavailable.
-pub fn choice_radio(selected: bool, enabled: bool) -> Div {
-    let tone = if !enabled {
-        Rgba {
-            a: 0.38,
-            ..color(ColorRole::INK)
-        }
+/// The M3 radio's color: primary when selected, on-surface-variant when not,
+/// and on-surface at 38% when the choice is unavailable.
+fn radio_tone(selected: bool, enabled: bool) -> Rgba {
+    if !enabled {
+        state::disabled(color(ColorRole::ON_SURFACE))
     } else if selected {
-        color(ColorRole::ACCENT)
+        color(ColorRole::PRIMARY)
     } else {
-        color(ColorRole::CONTROL)
-    };
+        color(ColorRole::ON_SURFACE_VARIANT)
+    }
+}
+
+/// The M3 radio of a choice: an outlined ring, filled with a dot when
+/// selected.
+pub fn choice_radio(selected: bool, enabled: bool) -> Div {
+    let tone = radio_tone(selected, enabled);
     div()
         .flex()
         .flex_shrink_0()
@@ -561,6 +564,18 @@ mod tests {
         }
         let unavailable = tile_paint(0., false, false);
         assert_eq!(unavailable.label, state::disabled(unavailable.ink));
+    }
+
+    #[test]
+    fn radio_uses_m3_roles() {
+        assert_eq!(radio_tone(true, true), color(ColorRole::PRIMARY));
+        assert_eq!(
+            radio_tone(false, true),
+            color(ColorRole::ON_SURFACE_VARIANT)
+        );
+        let disabled = state::disabled(color(ColorRole::ON_SURFACE));
+        assert_eq!(radio_tone(true, false), disabled);
+        assert_eq!(radio_tone(false, false), disabled);
     }
 
     #[test]

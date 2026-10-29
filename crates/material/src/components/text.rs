@@ -10,13 +10,7 @@ use gpui::{prelude::*, *};
 /// ancestor from replacing its controls' accessibility.
 pub fn accessible_text(id: impl Into<ElementId>, value: impl Into<SharedString>) -> Stateful<Div> {
     let value = value.into();
-    // Word joiners only steer line wrapping; a screen reader gets the plain
-    // words so its pacing matches the text's meaning.
-    let label = if value.contains('\u{2060}') {
-        SharedString::from(value.replace('\u{2060}', ""))
-    } else {
-        value.clone()
-    };
+    let label = spoken(&value);
     div()
         .id(id)
         .role(Role::Label)
@@ -24,12 +18,23 @@ pub fn accessible_text(id: impl Into<ElementId>, value: impl Into<SharedString>)
         .child(value)
 }
 
+/// The accessible name of displayed text. Word joiners only steer line
+/// wrapping; a screen reader gets the plain words so its pacing matches the
+/// text's meaning.
+fn spoken(value: &SharedString) -> SharedString {
+    if value.contains('\u{2060}') {
+        SharedString::from(value.replace('\u{2060}', ""))
+    } else {
+        value.clone()
+    }
+}
+
 /// Failure feedback as one accessible alert form. Callers chain their own
 /// size and wrapping.
 pub fn error_text(id: impl Into<ElementId>, message: impl Into<SharedString>) -> Stateful<Div> {
     accessible_text(id, message)
         .role(Role::Alert)
-        .text_color(color(ColorRole::DANGER))
+        .text_color(color(ColorRole::ERROR))
 }
 
 /// An icon column and a medium-weight text column. The slot also takes a
@@ -84,7 +89,7 @@ pub fn supporting_info(id: impl Into<ElementId>, text: impl Into<SharedString>) 
                     IconName::Info
                         .icon()
                         .size(rem(16.))
-                        .color(color(ColorRole::GRAY)),
+                        .color(color(ColorRole::ON_SURFACE_VARIANT)),
                 ),
         )
         .child(
@@ -94,7 +99,7 @@ pub fn supporting_info(id: impl Into<ElementId>, text: impl Into<SharedString>) 
                 .whitespace_normal()
                 .text_size(TEXT_AUX)
                 .line_height(rem(18.))
-                .text_color(color(ColorRole::GRAY)),
+                .text_color(color(ColorRole::ON_SURFACE_VARIANT)),
         )
 }
 
@@ -110,13 +115,13 @@ pub fn info_callout(id: impl Into<ElementId>, text: impl Into<SharedString>) -> 
         .px(rem(16.))
         .py(rem(12.))
         .rounded(RADIUS_CARD)
-        .bg(color(ColorRole::SURFACE_HIGH))
+        .bg(color(ColorRole::SURFACE_CONTAINER_HIGHEST))
         .child(
             div().mt(rem(1.)).child(
                 IconName::Info
                     .icon()
                     .size(rem(18.))
-                    .color(color(ColorRole::GRAY)),
+                    .color(color(ColorRole::ON_SURFACE_VARIANT)),
             ),
         )
         .child(
@@ -126,7 +131,7 @@ pub fn info_callout(id: impl Into<ElementId>, text: impl Into<SharedString>) -> 
                 .whitespace_normal()
                 .text_size(TEXT_AUX)
                 .line_height(rem(18.))
-                .text_color(color(ColorRole::GRAY)),
+                .text_color(color(ColorRole::ON_SURFACE_VARIANT)),
         )
 }
 
@@ -152,7 +157,7 @@ pub fn section_title(id: impl Into<ElementId>, title: impl Into<SharedString>) -
         .text_size(TEXT_BODY)
         .line_height(rem(20.))
         .font_weight(FontWeight::MEDIUM)
-        .text_color(color(ColorRole::GRAY))
+        .text_color(color(ColorRole::ON_SURFACE_VARIANT))
 }
 
 /// A section title with a leading icon.
@@ -166,7 +171,21 @@ pub fn section_heading(
         .min_w_0()
         .items_center()
         .gap(ICON_GAP)
-        .text_color(color(ColorRole::GRAY))
+        .text_color(color(ColorRole::ON_SURFACE_VARIANT))
         .child(icon.into().size(rem(18.)))
         .child(section_title(id, title))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use core::prelude::v1::test;
+
+    #[test]
+    fn spoken_text_drops_word_joiners_only() {
+        let joined = SharedString::from("Text\u{2060}to\u{2060}speech");
+        assert_eq!(spoken(&joined).as_ref(), "Texttospeech");
+        let plain = SharedString::from("Plain words");
+        assert_eq!(spoken(&plain), plain);
+    }
 }

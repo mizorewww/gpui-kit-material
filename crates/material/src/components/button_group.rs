@@ -240,7 +240,7 @@ fn option_paint(
     if disabled {
         // M3 disabled: on-surface at 12% container and 38% content. The pill
         // shape still tells which option is current.
-        let ink = color(ColorRole::INK);
+        let ink = color(ColorRole::ON_SURFACE);
         return OptionPaint {
             background: ink.opacity(state::DISABLED_CONTAINER),
             foreground: state::disabled(ink),
@@ -250,8 +250,16 @@ fn option_paint(
             right_radius,
         };
     }
-    let background = blend(color(ColorRole::SURFACE_HIGH), color(ColorRole::ACCENT), t);
-    let foreground = blend(color(ColorRole::INK), color(ColorRole::ON_PRIMARY), t);
+    let background = blend(
+        color(ColorRole::SURFACE_CONTAINER_HIGHEST),
+        color(ColorRole::PRIMARY),
+        t,
+    );
+    let foreground = blend(
+        color(ColorRole::ON_SURFACE),
+        color(ColorRole::ON_PRIMARY),
+        t,
+    );
     OptionPaint {
         background,
         foreground,
@@ -905,7 +913,7 @@ mod tests {
     fn assert_selected(name: &str, height: Pixels) {
         let paint = painted(name);
         assert!(
-            same(paint.background, token(ColorRole::ACCENT)),
+            same(paint.background, token(ColorRole::PRIMARY)),
             "{name}: {:?}",
             paint
         );
@@ -917,16 +925,23 @@ mod tests {
         assert_eq!(paint.left_radius, height / 2., "{name}");
         assert_eq!(paint.right_radius, height / 2., "{name}");
         // A state layer resolves over the selected container, never replaces it.
-        assert!(!same(paint.hover, token(ColorRole::SURFACE_HIGH)));
+        assert!(!same(
+            paint.hover,
+            token(ColorRole::SURFACE_CONTAINER_HIGHEST)
+        ));
         assert!(!same(paint.hover, paint.background));
     }
 
     /// Unselected: neutral container, ink content; only outer ends are round.
     fn assert_unselected(name: &str, index: usize, count: usize, height: Pixels) {
         let paint = painted(name);
-        assert_eq!(paint.background, token(ColorRole::SURFACE_HIGH), "{name}");
+        assert_eq!(
+            paint.background,
+            token(ColorRole::SURFACE_CONTAINER_HIGHEST),
+            "{name}"
+        );
         assert!(
-            same(paint.foreground, token(ColorRole::INK)),
+            same(paint.foreground, token(ColorRole::ON_SURFACE)),
             "{name}: {:?}",
             paint
         );
@@ -1231,7 +1246,7 @@ mod tests {
         // The click frame starts from the current presentation, not the endpoint.
         assert_eq!(
             painted("content-2").background,
-            token(ColorRole::SURFACE_HIGH)
+            token(ColorRole::SURFACE_CONTAINER_HIGHEST)
         );
         cx.executor().advance_clock(Duration::from_millis(60));
         draw_choice(cx);
@@ -1243,7 +1258,7 @@ mod tests {
             "an intermediate shape is drawn"
         );
         assert!(leaving.right_radius > px(8.) && leaving.right_radius < px(20.));
-        assert!(!same(entering.background, token(ColorRole::ACCENT)));
+        assert!(!same(entering.background, token(ColorRole::PRIMARY)));
         for index in 0..3 {
             assert_eq!(choice_bounds(cx, selectors[index]), before[index]);
             assert_eq!(choice_bounds(cx, labels[index]), label_before[index]);
@@ -1315,8 +1330,11 @@ mod tests {
         draw_choice(cx);
         let middle = painted(&last);
         assert!(middle.left_radius > px(8.) && middle.left_radius < px(20.));
-        assert!(!same(middle.background, token(ColorRole::SURFACE_HIGH)));
-        assert!(!same(middle.background, token(ColorRole::ACCENT)));
+        assert!(!same(
+            middle.background,
+            token(ColorRole::SURFACE_CONTAINER_HIGHEST)
+        ));
+        assert!(!same(middle.background, token(ColorRole::PRIMARY)));
         for (index, before) in options.iter().enumerate() {
             assert_eq!(choice_bounds(cx, OPTION_SELECTORS[index]), *before);
         }
@@ -1455,7 +1473,7 @@ mod tests {
         cx.simulate_click(third, Modifiers::default());
         draw_choice(cx);
         cx.update(|_, cx| assert_eq!(view.read(cx).changes, 0));
-        let ink = token(ColorRole::INK);
+        let ink = token(ColorRole::ON_SURFACE);
         for index in 0..3 {
             let paint = painted(&format!("full-{index}"));
             assert_eq!(paint.background, ink.opacity(0.12));
