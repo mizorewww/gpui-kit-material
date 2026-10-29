@@ -12,6 +12,9 @@ impl FpsDisplay {
     pub(super) fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
         let mut count = window.submission_stats().successful_new_frames;
         let mut sampled_at = cx.background_executor().now();
+        // A label change redraws this display: one frame the counter itself
+        // caused, which must not keep an idle window reporting 2 FPS.
+        let mut own_frames = 0;
         let task = cx.spawn_in(window, async move |view, cx| {
             loop {
                 cx.background_executor()
@@ -24,7 +27,7 @@ impl FpsDisplay {
                         let label: SharedString = match (count, current) {
                             (Some(previous), Some(current)) => {
                                 let fps = sample_rate(
-                                    previous,
+                                    previous + own_frames,
                                     current,
                                     now.saturating_duration_since(sampled_at),
                                 );
@@ -35,8 +38,10 @@ impl FpsDisplay {
                         };
                         count = current;
                         sampled_at = now;
+                        own_frames = 0;
                         if this.label != label {
                             this.label = label;
+                            own_frames = 1;
                             cx.notify();
                         }
                     })
@@ -70,7 +75,7 @@ impl Render for FpsDisplay {
         div()
             .id("gallery-fps")
             .text_size(TEXT_AUX)
-            .aria_label("FPS: successful newly drawn frame submissions per second, including this display; not display refresh rate")
+            .aria_label("FPS: successful newly drawn frame submissions per second, excluding redraws of this counter; not display refresh rate")
             .child(self.label.clone())
     }
 }
@@ -85,6 +90,8 @@ mod tests {
         assert_eq!(sample_rate(25, 25, Duration::from_millis(500)), 0.);
         assert_eq!(sample_rate(25, 26, Duration::from_millis(500)), 2.);
         assert_eq!(sample_rate(25, 25, Duration::ZERO), 0.);
+        // Excluding the display's own redraw leaves an idle window at zero.
+        assert_eq!(sample_rate(25 + 1, 26, Duration::from_millis(500)), 0.);
     }
 
     #[gpui::test]
