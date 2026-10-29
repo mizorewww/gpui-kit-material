@@ -54,6 +54,27 @@ change animates the whole window on the slow effects spring.
 cargo run -p gpui-kit-material --example gallery
 ```
 
+The native gallery can save its GPU-rendered frame with reproducible state:
+
+```sh
+cargo run -p gpui-kit-material --example gallery -- \
+  --capture /tmp/material-toggles.png --section toggles \
+  --width 1280 --height 720 --selected --reduced-motion --settle-ms 0
+```
+
+Run with `--help` for theme, text scale, state, and scroll options. State flags
+configure their existing demonstrations: `--active`, `--disabled`, and
+`--no-ripple` affect the button effects samples; `--selected` affects toggles;
+`--loading` affects loading samples. The adjacent
+JSON records the source revision, dirty-worktree status, requested and actual
+viewport, device scale, theme, motion preference, and selected state. The OS
+may constrain the window size; compare using the actual viewport and image
+pixel dimensions. Capture waits for chapter scrolling before the settle timer
+and returns a nonzero status if rendering, saving, or completion fails. An
+existing output file alone is not evidence that the current command succeeded.
+These frames support visual review; they are not timed animation samples or
+an automatic conformance verdict.
+
 The browser entrypoint uses the same Rust gallery module and components:
 
 ```sh

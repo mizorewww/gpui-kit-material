@@ -1,6 +1,9 @@
 //! Every extracted component on one page, in every built-in palette.
 //!
 //! `cargo run -p gpui-kit-material --example gallery`
+#[cfg(not(target_family = "wasm"))]
+pub mod capture;
+
 use gpui::{prelude::*, *};
 use gpui_kit_material::color::palette::ALL as PALETTES;
 use gpui_kit_material::color::themes::{self, Contrast, ThemeId, ThemeMode};
@@ -919,7 +922,10 @@ pub fn run(application: gpui::Application, initialize: impl FnOnce(&mut App) + '
             .expect("Failed to load the reference Roboto fonts");
         gpui_base::init(cx);
         gpui_kit_material::init(cx);
-        let bounds = Bounds::centered(None, size(px(960.), px(900.)), cx);
+        let viewport = size(px(960.), px(900.));
+        #[cfg(not(target_family = "wasm"))]
+        let viewport = capture::window_size(cx).unwrap_or(viewport);
+        let bounds = Bounds::centered(None, viewport, cx);
         cx.open_window(
             WindowOptions {
                 window_bounds: Some(WindowBounds::Windowed(bounds)),
@@ -972,6 +978,8 @@ pub fn run(application: gpui::Application, initialize: impl FnOnce(&mut App) + '
                         selected_section: 0,
                     }
                 });
+                #[cfg(not(target_family = "wasm"))]
+                capture::install(&gallery, window, cx);
                 cx.new(|cx| gpui_base::Root::new(gallery, window, cx))
             },
         )
