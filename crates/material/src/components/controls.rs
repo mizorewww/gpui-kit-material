@@ -5,7 +5,6 @@
 use super::{ButtonVariant, MaterialSwitch, material_button};
 use crate::{
     color::ColorRole,
-    motion,
     theme::{blend, color},
     tokens::{
         state,
@@ -258,71 +257,6 @@ impl RenderOnce for SearchField {
     }
 }
 
-/// A nonmodal M3 standard side sheet. It leaves the main content interactive;
-/// its controlled visibility retargets the spatial spring, including on close.
-#[derive(gpui::IntoElement)]
-pub struct MaterialSideSheet {
-    id: ElementId,
-    open: bool,
-    width: Rems,
-    children: Vec<AnyElement>,
-}
-impl MaterialSideSheet {
-    pub fn new(id: impl Into<ElementId>) -> Self {
-        Self {
-            id: id.into(),
-            open: false,
-            width: rem(320.),
-            children: vec![],
-        }
-    }
-    pub fn open(mut self, open: bool) -> Self {
-        self.open = open;
-        self
-    }
-    pub fn width(mut self, width: Rems) -> Self {
-        self.width = width;
-        self
-    }
-}
-impl ParentElement for MaterialSideSheet {
-    fn extend(&mut self, children: impl IntoIterator<Item = AnyElement>) {
-        self.children.extend(children);
-    }
-}
-/// Whether a sheet has finished closing: closed, with its reveal settled.
-fn sheet_hidden(open: bool, reveal: f32) -> bool {
-    !open && reveal == 0.
-}
-
-impl RenderOnce for MaterialSideSheet {
-    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
-        let reveal = motion::value(
-            (self.id.clone(), "reveal"),
-            if self.open { 1. } else { 0. },
-            window,
-            cx,
-        );
-        let progress = reveal.clamp(0., 1.);
-        let width = self.width.to_pixels(window.rem_size());
-        div()
-            .id(self.id)
-            .absolute()
-            .top_0()
-            .bottom_0()
-            .right(width * (progress - 1.))
-            .w(width)
-            .opacity(progress)
-            .bg(color(ColorRole::SURFACE))
-            // Once the close has settled, the sheet's content leaves the tree,
-            // so it offers no tab stops or accessibility nodes off screen. The
-            // spring lands exactly on its target; an overshoot does not.
-            .when(!sheet_hidden(self.open, reveal), |sheet| {
-                sheet.children(self.children)
-            })
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -500,96 +434,6 @@ mod tests {
         cx.update(|_, cx| {
             assert_eq!(view.read(cx).changes, 1);
             assert!((view.read(cx).slider.read(cx).value().end() - 75.).abs() < 2.);
-        });
-    }
-
-    struct SheetHarness(bool);
-    impl Render for SheetHarness {
-        fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
-            div().relative().size_full().overflow_hidden().child(
-                MaterialSideSheet::new("sheet")
-                    .open(self.0)
-                    .width(rem(100.))
-                    .child(div().debug_selector(|| "sheet-body".into()).size_full()),
-            )
-        }
-    }
-    #[gpui::test]
-    fn reduced_motion_sheet_opens_and_closes_outside_viewport(cx: &mut TestAppContext) {
-        cx.update(|cx| cx.set_reduce_motion(true));
-        let (view, cx) = cx.add_window_view(|_, _| SheetHarness(false));
-        draw(cx);
-        assert!(cx.debug_bounds("sheet-body").is_none());
-        view.update(cx, |v, cx| {
-            v.0 = true;
-            cx.notify();
-        });
-        draw(cx);
-        let open = cx.debug_bounds("sheet-body").unwrap();
-        let viewport = cx.update(|window, _| window.viewport_size());
-        assert_eq!(open.right(), viewport.width, "an open sheet meets the edge");
-        view.update(cx, |v, cx| {
-            v.0 = false;
-            cx.notify();
-        });
-        draw(cx);
-        assert!(
-            cx.debug_bounds("sheet-body").is_none(),
-            "a settled closed sheet renders no content"
-        );
-    }
-
-    #[core::prelude::v1::test]
-    fn the_sheet_keeps_its_content_until_the_close_settles() {
-        assert!(
-            !sheet_hidden(true, 0.),
-            "opening starts from 0 with content"
-        );
-        assert!(
-            !sheet_hidden(false, 0.4),
-            "closing animates its content out"
-        );
-        assert!(!sheet_hidden(false, -0.01), "an overshoot is still moving");
-        assert!(sheet_hidden(false, 0.));
-    }
-
-    struct FocusSheetHarness {
-        open: bool,
-        focus: FocusHandle,
-    }
-    impl Render for FocusSheetHarness {
-        fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
-            div().relative().size_full().child(
-                MaterialSideSheet::new("focus-sheet").open(self.open).child(
-                    div()
-                        .id("sheet-control")
-                        .track_focus(&self.focus)
-                        .debug_selector(|| "sheet-control".into())
-                        .size(px(20.)),
-                ),
-            )
-        }
-    }
-
-    #[gpui::test]
-    fn a_closed_sheet_offers_no_tab_stops(cx: &mut TestAppContext) {
-        cx.update(|cx| cx.set_reduce_motion(true));
-        let (view, cx) = cx.add_window_view(|_, cx| FocusSheetHarness {
-            open: true,
-            focus: cx.focus_handle(),
-        });
-        draw(cx);
-        assert!(cx.debug_bounds("sheet-control").is_some());
-        view.update(cx, |v, cx| {
-            v.open = false;
-            cx.notify();
-        });
-        draw(cx);
-        assert!(cx.debug_bounds("sheet-control").is_none());
-        cx.update(|window, cx| {
-            window.focus_next(cx);
-            let focus = view.read(cx).focus.clone();
-            assert!(!focus.is_focused(window));
         });
     }
 }

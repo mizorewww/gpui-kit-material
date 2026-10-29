@@ -10,7 +10,7 @@ mod button_group;
 mod controls;
 mod divider;
 mod switch;
-pub use controls::{MaterialSideSheet, MaterialSlider, SearchField, SliderAppearance};
+pub use controls::{MaterialSlider, SearchField, SliderAppearance};
 pub use divider::{
     DividerContext, DividerDirection, DividerOrientation, DividerVariant, MaterialDivider,
 };
@@ -29,6 +29,7 @@ mod progress;
 mod radio;
 mod roving;
 mod roving_list;
+mod sheets;
 mod tabs;
 mod text;
 mod tile;
@@ -64,6 +65,7 @@ pub use progress::{
     sample_circular_progress, spinner, spinner_with_playback,
 };
 pub use radio::{MaterialRadio, MaterialRadioGroup};
+pub use sheets::{MaterialBottomSheet, MaterialSideSheet};
 pub use tabs::{MaterialTabs, TabItem, TabsVariant};
 pub use text::{
     accessible_text, error_text, info_callout, page_heading, section_heading, section_title,
