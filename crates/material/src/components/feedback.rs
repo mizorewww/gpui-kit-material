@@ -187,18 +187,153 @@ pub fn large_badge(id: impl Into<ElementId>, label: impl Into<SharedString>) -> 
         .whitespace_nowrap()
 }
 
-/// M3 assist chip geometry: 32px tall with 8px corners, 8px before a leading
-/// icon and 12px otherwise. Callers give it their tone and label size.
+/// M3 assist chip geometry, in dp: 32 tall, 8 before a leading icon and 16
+/// otherwise, 16 after the label, 8 between icon and label.
+pub const CHIP_HEIGHT: Rems = rem(32.);
+const CHIP_ICON_LEADING: f32 = 8.;
+const CHIP_TEXT_EDGE: f32 = 16.;
+const CHIP_GAP: Rems = rem(8.);
+const CHIP_ICON: Rems = rem(18.);
+
+/// The container of an M3 assist chip: its geometry, small corners and
+/// outline-variant edge. Callers give it their label color and size; prefer
+/// [`AssistChip`], which adds the label role, state layers and focus.
 pub fn chip(leading_icon: bool) -> Div {
     gpui_base::h_flex()
         .flex_shrink_0()
-        .h(rem(32.))
-        .pl(rems(if leading_icon { 8. } else { 12. } / 14.))
-        .pr(rem(12.))
-        .gap(px(6.))
+        .h(CHIP_HEIGHT)
+        .pl(rem(if leading_icon {
+            CHIP_ICON_LEADING
+        } else {
+            CHIP_TEXT_EDGE
+        }))
+        .pr(rem(CHIP_TEXT_EDGE))
+        .gap(CHIP_GAP)
         .items_center()
         .rounded(RADIUS_SMALL)
+        .border_1()
+        .border_color(color(OUTLINE_VARIANT))
         .whitespace_nowrap()
+}
+
+/// The colors of an assist chip.
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct ChipPaint {
+    label: Rgba,
+    icon: Rgba,
+    outline: Rgba,
+}
+
+fn chip_paint(disabled: bool) -> ChipPaint {
+    let on_surface = color(ON_SURFACE);
+    if disabled {
+        ChipPaint {
+            label: state::disabled(on_surface),
+            icon: state::disabled(on_surface),
+            outline: on_surface.opacity(state::DISABLED_CONTAINER),
+        }
+    } else {
+        ChipPaint {
+            label: on_surface,
+            icon: color(PRIMARY),
+            outline: color(OUTLINE_VARIANT),
+        }
+    }
+}
+
+type ChipHandler = Rc<dyn Fn(&ClickEvent, &mut Window, &mut App)>;
+
+/// M3 assist chip: an outlined, label-large action with an optional
+/// primary leading icon, on-surface state layers and the shared keyboard
+/// focus ring.
+#[derive(gpui::IntoElement)]
+pub struct AssistChip {
+    id: ElementId,
+    label: SharedString,
+    icon: Option<IconName>,
+    disabled: bool,
+    on_click: Option<ChipHandler>,
+}
+
+impl AssistChip {
+    pub fn new(id: impl Into<ElementId>, label: impl Into<SharedString>) -> Self {
+        Self {
+            id: id.into(),
+            label: label.into(),
+            icon: None,
+            disabled: false,
+            on_click: None,
+        }
+    }
+
+    pub fn icon(mut self, icon: IconName) -> Self {
+        self.icon = Some(icon);
+        self
+    }
+
+    pub fn disabled(mut self, disabled: bool) -> Self {
+        self.disabled = disabled;
+        self
+    }
+
+    pub fn on_click(
+        mut self,
+        handler: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_click = Some(Rc::new(handler));
+        self
+    }
+}
+
+impl RenderOnce for AssistChip {
+    fn render(self, _: &mut Window, _: &mut App) -> impl IntoElement {
+        let paint = chip_paint(self.disabled);
+        let ink = color(ON_SURFACE);
+        let clear = Rgba { a: 0., ..ink };
+        let (hover, press) = (state::hovered(clear, ink), state::pressed(clear, ink));
+        let enabled = !self.disabled;
+        let scale = TypeRole::LabelLarge.scale();
+        let leading = self.icon.is_some();
+        let label = self.label;
+        let icon = self.icon;
+        let on_click = self.on_click;
+        RingedButton::new(self.id, RingPlacement::Outer(Corners::all(RADIUS_SMALL)))
+            .map(move |button| {
+                button
+                    .flex_shrink_0()
+                    .h(CHIP_HEIGHT)
+                    .pl(rem(if leading {
+                        CHIP_ICON_LEADING
+                    } else {
+                        CHIP_TEXT_EDGE
+                    }))
+                    .pr(rem(CHIP_TEXT_EDGE))
+                    .gap(CHIP_GAP)
+                    .rounded(RADIUS_SMALL)
+                    .border_1()
+                    .border_color(paint.outline)
+                    .text_color(paint.label)
+                    .text_size(scale.font_size)
+                    .line_height(scale.line_height)
+                    .font_weight(FontWeight(scale.font_weight as f32))
+                    .whitespace_nowrap()
+                    .accessibility_label(label.clone())
+                    .when(enabled, |button| {
+                        button
+                            .cursor_pointer()
+                            .hover(move |style| style.bg(hover))
+                            .active(move |style| style.bg(press))
+                    })
+                    .when_some(icon, |button, icon| {
+                        button.child(icon.icon().size(CHIP_ICON).color(paint.icon))
+                    })
+                    .child(label)
+                    .when_some(on_click, |button, handler| {
+                        button.on_click(move |event, window, cx| handler(event, window, cx))
+                    })
+            })
+            .disabled(self.disabled)
+    }
 }
 
 /// The three M3 card variants.
@@ -501,6 +636,52 @@ mod tests {
         assert_eq!(long.size.height, px(16.));
         assert!(long.size.width > px(16.));
         assert_eq!(dot.size, gpui::size(px(6.), px(6.)));
+    }
+
+    #[test]
+    fn assist_chips_use_m3_padding_outline_and_disabled_roles() {
+        assert_eq!(CHIP_HEIGHT, rem(32.));
+        assert_eq!((CHIP_ICON_LEADING, CHIP_TEXT_EDGE), (8., 16.));
+        assert_eq!(CHIP_GAP, rem(8.));
+        let enabled = chip_paint(false);
+        assert_eq!(enabled.outline, color(OUTLINE_VARIANT));
+        assert_eq!(enabled.icon, color(PRIMARY));
+        assert_eq!(enabled.label, color(ON_SURFACE));
+        let disabled = chip_paint(true);
+        assert_eq!(disabled.label, state::disabled(color(ON_SURFACE)));
+        assert_eq!(disabled.outline.a, color(ON_SURFACE).a * 0.12);
+    }
+
+    struct ChipHarness;
+    impl Render for ChipHarness {
+        fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+            window.set_rem_size(px(14.));
+            div()
+                .flex()
+                .items_start()
+                .child(
+                    div()
+                        .debug_selector(|| "plain-chip".into())
+                        .child(AssistChip::new("plain-chip", "Plain")),
+                )
+                .child(
+                    div()
+                        .debug_selector(|| "icon-chip".into())
+                        .child(AssistChip::new("icon-chip", "Plain").icon(IconName::Info)),
+                )
+        }
+    }
+
+    #[gpui::test]
+    fn a_leading_icon_takes_the_chip_padding_it_replaces(cx: &mut TestAppContext) {
+        cx.update(gpui_base::init);
+        let (_, cx) = cx.add_window_view(|_, _| ChipHarness);
+        redraw(cx);
+        let plain = cx.debug_bounds("plain-chip").unwrap();
+        let icon = cx.debug_bounds("icon-chip").unwrap();
+        assert_eq!(plain.size.height, px(32.));
+        // 18dp icon + 8dp gap replace 8dp of the 16dp leading padding.
+        assert_eq!(icon.size.width - plain.size.width, px(18. + 8. - 8.));
     }
 
     #[test]
