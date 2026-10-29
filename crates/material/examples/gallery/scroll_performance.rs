@@ -172,10 +172,13 @@ fn sample_capacity(duration: Duration) -> usize {
 struct Position {
     item: Option<usize>,
     offset: f32,
+    /// Absolute content offset from the top in pixels (list: sum of known row
+    /// heights above the top row plus the in-row offset).
+    px: f32,
 }
 impl Position {
     fn json(self) -> Value {
-        json!({"item":self.item,"offset":self.offset})
+        json!({"item":self.item,"offset":self.offset,"content_px":self.px})
     }
 }
 impl ScrollTarget {
@@ -184,12 +187,14 @@ impl ScrollTarget {
             Self::Pixels(handle) => Position {
                 item: None,
                 offset: -f32::from(handle.offset().y),
+                px: -f32::from(handle.offset().y),
             },
             Self::List(list) => {
                 let top = list.logical_scroll_top();
                 Position {
                     item: Some(top.item_ix),
                     offset: f32::from(top.offset_in_item),
+                    px: -f32::from(list.scroll_px_offset_for_scrollbar().y),
                 }
             }
         }
@@ -347,6 +352,7 @@ impl Session {
             refresh_interval: window.refresh_interval(cx),
             traversal: Traversal::default(),
             new_draw_presents_ns: Vec::new(),
+            successful_submission_diagnostic: Value::Null,
             moved_up: false,
             moved_down: false,
             stopped: false,
@@ -378,7 +384,8 @@ impl Session {
                 let interval = state.borrow().input_interval;
                 let mut next = Instant::now();
                 loop {
-                    next += interval;
+                    // Skip missed deadlines rather than burst catch-up inputs.
+                    next = (next + interval).max(Instant::now());
                     executor
                         .timer(next.saturating_duration_since(Instant::now()))
                         .await;
@@ -437,6 +444,8 @@ impl Session {
             profiler::set_trace_enabled(false);
             let presents = new_draw_presents(&events, window_id, started);
             state.borrow_mut().new_draw_presents_ns = presents;
+            state.borrow_mut().successful_submission_diagnostic =
+                successful_submissions(&events, window_id, started);
             let cpu = finish_cpu(
                 events,
                 window_id,
@@ -491,6 +500,7 @@ struct Drive {
     /// First Present-attempt end after Draw, ns since driver start. These
     /// profiler events do not establish backend success or retry identity.
     new_draw_presents_ns: Vec<i128>,
+    successful_submission_diagnostic: Value,
     moved_up: bool,
     moved_down: bool,
     stopped: bool,
@@ -498,11 +508,15 @@ struct Drive {
 impl Drive {
     fn observe(&mut self, window: &Window, cx: &App) -> bool {
         let position = self.target.position();
+        // Continuity in content pixels: one 8px input separates observations.
+        // Row indices may legitimately jump across rows shorter than a step.
         if let Some(previous) = self.previous
-            && let (Some(a), Some(b)) = (previous.item, position.item)
-            && a.abs_diff(b) > 1
+            && (position.px - previous.px).abs() > CONTINUITY_PX
         {
-            self.errors.push("small list scroll skipped more than one logical row; measurement cannot prove continuous movement".into());
+            self.errors.push(format!(
+                "content offset jumped {:.1}px between observations (limit {CONTINUITY_PX}px); measurement cannot prove continuous movement",
+                position.px - previous.px
+            ));
             self.stopped = true;
         }
         let moved = self.previous.is_some_and(|previous| previous != position);
@@ -648,7 +662,7 @@ impl Drive {
                 "fewer than two draw-associated submission attempts inside the driver span".into(),
             );
         }
-        errors.push("per-successful-draw-generation timestamps and scroll-position association are unavailable; aggregate counter coverage cannot prove individual attempt success or rendered traversal".into());
+        errors.push("successful-new-frame timestamps are diagnostic only; complete start/end intervals and per-frame scroll-position association remain unverified; aggregate counts cannot prove rendered traversal".into());
         json!({"schema":"gallery-scroll-observations-v1","input_mode":self.input_mode.name(),"raw_inputs":self.inputs.iter().map(|i| json!({"timestamp_ns":i.ns,"position_px":i.position,"delta_y_px":i.delta_y})).collect::<Vec<_>>(),
             "engine_counters":{"initial":self.engine_initial,"final":self.engine_final,
                 "environment_overrides":self.engine_environment,
@@ -669,6 +683,7 @@ impl Drive {
             "input_driver":{"source":"foreground timer, independent of frame callbacks","interval_ns":self.input_interval.as_nanos(),"step_px":8,"pacing_limit":"foreground work can delay timers; overdue deadlines are caught up with immediate ticks, so requested cadence is not measured constant input frequency"},
             "display_refresh_interval_ns":self.refresh_interval.map(|interval| interval.as_nanos()),
             "median_full_window_fps":median_rate,"observed_rate_near_or_below_refresh":observed_rate_near_or_below_refresh,"refresh_comparison_limit":"rate comparison is diagnostic correlation, not proof of compositor pacing or an excuse to ignore measured FPS failure",
+            "successful_submission_diagnostic":self.successful_submission_diagnostic,
             "submission_attempt_diagnostic":{"raw_attempt_end_ns":self.new_draw_presents_ns,"draw_associated_attempts_in_span":in_span.len(),"counted_successful_new_frames":counted_new_frames,
                 "all_submissions_successful":Value::Null,"aggregate_counter_covers_attempt_count":aggregate_counter_covers_attempt_count,"longest_interior_attempt_gap_ns":longest_gap_ns,
                 "inverse_longest_interior_attempt_gap_hz":inverse_interior_attempt_gap_hz,
@@ -679,6 +694,35 @@ impl Drive {
             "scope":"attempted logical top-bottom-top main-content traversal; programmatic mode refreshes on offset change, wheel mode dispatches through platform input without explicit refresh; startup and turns retained; GPU time is in cpu.gpu"})
     }
 }
+/// Consume the engine's tri-state success marker directly, including retries
+/// with no intervening Draw. Never infer success from event order or totals.
+fn successful_submissions(events: &[FrameEvent], window: WindowId, origin: Instant) -> Value {
+    let mut successful = Vec::new();
+    let mut markers = Vec::new();
+    let mut false_count = 0usize;
+    let mut unknown_count = 0usize;
+    for event in events {
+        let FrameEvent::Present(present) = event else {
+            continue;
+        };
+        if present.window_id != window {
+            continue;
+        }
+        let at = journal_offset(present.present_end, origin);
+        markers
+            .push(json!({"present_end_ns":at,"successful_new_frame":present.successful_new_frame}));
+        match present.successful_new_frame {
+            Some(true) => successful.push(at),
+            Some(false) => false_count += 1,
+            None => unknown_count += 1,
+        }
+    }
+    json!({"raw_markers":markers,"successful_new_frame_end_ns":successful,
+        "successful_new_frame_count":successful.len(),"false_count":false_count,"unknown_count":unknown_count,
+        "scope":"all captured target-window Present markers, including negative offsets before driver installation; Some(true) comes from backend success and new-draw identity, not Draw/Present pairing; false includes failed attempts or already-counted scenes",
+        "limit":"diagnostic only; start/end interval coverage and association with changed scroll content remain unverified; timestamps are CPU submission completion, not GPU completion"})
+}
+
 /// First Present-attempt end after each Draw, relative to origin. This does
 /// not identify success: a failed attempt consumes pending and a successful
 /// retry is omitted. Retained only as a diagnostic, never an acceptance metric.
@@ -700,6 +744,9 @@ fn new_draw_presents(events: &[FrameEvent], window: WindowId, origin: Instant) -
     }
     presents
 }
+
+/// One 8px input plus half a pixel of rounding between observations.
+const CONTINUITY_PX: f32 = 8.5;
 
 /// Full-Gallery traversal state: top -> bottom -> top is one lap.
 #[derive(Default, Clone, Copy)]
@@ -782,6 +829,33 @@ fn tick(drive: &mut Drive, window: &mut Window, cx: &mut App) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[gpui::test]
+    fn short_rows_skip_indices_but_stay_pixel_continuous(cx: &mut gpui::TestAppContext) {
+        use gpui::{Context, IntoElement, ListAlignment, ParentElement, Render, Styled, div, list};
+        let list_state = ListState::new(200, ListAlignment::Top, px(128.));
+        struct View(ListState);
+        impl Render for View {
+            fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+                div().w(px(300.)).h(px(200.)).child(
+                    list(self.0.clone(), |_, _, _| {
+                        div().h(px(3.)).w_full().into_any_element()
+                    })
+                    .size_full(),
+                )
+            }
+        }
+        let (_view, cx) = cx.add_window_view(|_, _| View(list_state.clone()));
+        cx.update(|window, cx| window.draw(cx).clear(cx));
+        let target = ScrollTarget::List(list_state);
+        let before = target.position();
+        cx.update(|window, cx| assert!(target.wheel(true, window, cx).is_some()));
+        let after = target.position();
+        // 8px over 3px rows crosses more than one row index...
+        assert!(after.item.unwrap() > before.item.unwrap() + 1);
+        // ...yet content moved exactly one step, within the continuity limit.
+        assert!(((after.px - before.px) - 8.).abs() < 0.01);
+        assert!((after.px - before.px).abs() <= CONTINUITY_PX);
+    }
     #[gpui::test]
     fn wheel_dispatch_moves_list_through_scroll_handler(cx: &mut gpui::TestAppContext) {
         use gpui::{Context, IntoElement, ListAlignment, ParentElement, Render, Styled, div, list};
@@ -900,6 +974,7 @@ mod tests {
                 last_progress_ns: 0,
             },
             new_draw_presents_ns: Vec::new(),
+            successful_submission_diagnostic: Value::Null,
             moved_up: true,
             moved_down: true,
             stopped: true,
@@ -910,6 +985,7 @@ mod tests {
                     position: Position {
                         item: None,
                         offset: 0.,
+                        px: 0.,
                     },
                     down: true,
                     moved: false,
@@ -923,6 +999,7 @@ mod tests {
                     position: Position {
                         item: None,
                         offset: 8.,
+                        px: 8.,
                     },
                     down: false,
                     moved: true,
@@ -983,6 +1060,35 @@ mod tests {
         assert_eq!(report["exit_code"], 2);
     }
     #[test]
+    fn successful_retry_without_new_draw_uses_marker_and_preserves_unknown() {
+        let origin = Instant::now();
+        let id = WindowId::from(1);
+        let present = |at, marker| {
+            FrameEvent::Present(gpui::profiler::PresentTiming {
+                window_id: id,
+                present_start: origin + Duration::from_nanos(at),
+                present_end: origin + Duration::from_nanos(at + 1),
+                animation_interval: None,
+                successful_new_frame: marker,
+            })
+        };
+        // A failed attempt, successful retry with no new Draw, re-present,
+        // and unsupported success reporting must remain distinct.
+        let events = [
+            present(10, Some(false)),
+            present(20, Some(true)),
+            present(30, Some(false)),
+            present(40, None),
+        ];
+        let report = successful_submissions(&events, id, origin);
+        assert_eq!(report["successful_new_frame_end_ns"], json!([21]));
+        assert_eq!(report["successful_new_frame_count"], 1);
+        assert_eq!(report["false_count"], 2);
+        assert_eq!(report["unknown_count"], 1);
+        assert!(report["raw_markers"][3]["successful_new_frame"].is_null());
+    }
+
+    #[test]
     fn re_presents_are_not_new_draw_submissions() {
         use gpui::profiler::{DrawPhases, FrameTiming, PresentTiming};
         let origin = Instant::now();
@@ -1002,6 +1108,7 @@ mod tests {
             present_start: origin + Duration::from_micros(at),
             present_end: origin + Duration::from_micros(at + 10),
             animation_interval: None,
+            successful_new_frame: None,
         };
         let events = [
             FrameEvent::Draw(draw),
@@ -1038,6 +1145,7 @@ mod tests {
             position: Position {
                 item: None,
                 offset: 0.,
+                px: 0.,
             },
             down: false,
             moved: true,
