@@ -162,7 +162,19 @@
       "reference": "https://md3.io/components/button/",
       "status": "unreviewed",
       "cases": [],
-      "reviews": []
+      "reviews": [],
+      "evidence": [
+        {
+          "kind": "browser-color-transitions",
+          "path": "conformance/reference/button-effects.json",
+          "scope": "Pinned source CSS in recorded Chromium: Filled to Tonal and enabled to disabled at 125ms, first disabled reversal at 25ms. Color samples only; no state-layer, shadow, ripple, repeated-reversal or reduced-motion conformance."
+        },
+        {
+          "kind": "native-render-tests",
+          "path": "crates/material/src/components/button.rs",
+          "scope": "GPUI fake-clock color transitions and concurrent theme changes, press radius, icon slot geometry, focus and activation regressions. Does not establish desktop/browser pixel equality or full component conformance."
+        }
+      ]
     },
     {
       "id": "icon-button",
