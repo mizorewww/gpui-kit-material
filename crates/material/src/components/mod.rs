@@ -31,11 +31,11 @@ pub use feedback::{
 };
 pub use focus::{FocusRing, RevealFocus, contain_scroll};
 pub use progress::{
-    CircularProgressFrame, circular_indeterminate_frame, circular_progress, icon_spinner,
-    icon_spinner_with_playback, indeterminate_circular_progress,
-    indeterminate_linear_progress_with_playback, indeterminate_progress,
-    indeterminate_progress_with_playback, linear_progress, progress, sample_circular_progress,
-    spinner, spinner_with_playback,
+    CircularProgressFrame, CircularProgressPlayback, circular_indeterminate_frame,
+    circular_progress, icon_spinner, icon_spinner_with_playback, indeterminate_circular_progress,
+    indeterminate_circular_progress_with_playback, indeterminate_linear_progress_with_playback,
+    indeterminate_progress, indeterminate_progress_with_playback, linear_progress, progress,
+    sample_circular_progress, spinner, spinner_with_playback,
 };
 pub use text::{
     accessible_text, error_text, info_callout, page_heading, section_heading, section_title,

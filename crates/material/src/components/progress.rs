@@ -2,8 +2,9 @@
 //! spinner. The M3 Expressive wavy and contained variants are planned.
 mod circular;
 pub use circular::{
-    CircularProgressFrame, circular_indeterminate_frame, circular_progress,
-    indeterminate_circular_progress, sample_circular_progress,
+    CircularProgressFrame, CircularProgressPlayback, circular_indeterminate_frame,
+    circular_progress, indeterminate_circular_progress,
+    indeterminate_circular_progress_with_playback, sample_circular_progress,
 };
 
 use crate::color::ColorRole;

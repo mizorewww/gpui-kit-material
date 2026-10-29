@@ -2,7 +2,11 @@
 use crate::{color::ColorRole, theme::color};
 use gpui::{prelude::*, *};
 use gpui_base::{Easing, IterationCount, Progress, Timing};
-use std::{f32::consts::TAU, time::Duration};
+#[cfg(not(target_family = "wasm"))]
+use std::time::Instant;
+use std::{cell::RefCell, f32::consts::TAU, rc::Rc, time::Duration};
+#[cfg(target_family = "wasm")]
+use web_time::Instant;
 
 /// A circular arc's start in clockwise degrees from three o'clock and its fraction.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -68,28 +72,72 @@ pub fn sample_circular_progress(
     frame
 }
 
-// Sampling preserves the clock even when no frame is requested for offscreen paint.
-fn sample_clock(id: ElementId, window: &mut Window, cx: &mut App) -> (CircularProgressFrame, bool) {
-    let now = cx.background_executor().now();
-    let reduced = cx.reduce_motion();
-    let state = window.use_keyed_state((id, "circular-progress-clock"), cx, |_, _| {
-        (now, reduced, circular_indeterminate_frame(0.))
-    });
-    let (started, stopped, previous) = *state.read(cx);
-    if stopped {
-        return (previous, false);
+/// Caller-owned circular playback that survives virtual unmounting.
+///
+/// A new handle starts on its first sample (normally the first mounted render).
+/// Clones share one logical indicator's start time, stopped flag and last frame;
+/// no window, pointer state or scheduled callbacks are retained. Use within one
+/// app, and create a new handle to restart a stopped playback.
+///
+/// Reduced motion stops an existing playback permanently after one final sample.
+/// An owner whose indicator is unmounted must call [`Self::observe_reduced_motion`]
+/// when the preference changes, so an offscreen enable/disable is not missed.
+#[derive(Clone, Default)]
+pub struct CircularProgressPlayback {
+    state: Rc<RefCell<Option<CircularClock>>>,
+}
+
+struct CircularClock {
+    started: Instant,
+    stopped: bool,
+    last_frame: CircularProgressFrame,
+}
+
+impl CircularProgressPlayback {
+    /// Sample the reference clock without requesting a frame. Calling this for
+    /// the first time starts playback, even when no drawing element is mounted.
+    pub fn sample(&self, cx: &App) -> CircularProgressFrame {
+        self.sample_running(cx).0
     }
-    let timing = Timing::new(Duration::from_millis(6000)).iterations(IterationCount::Infinite);
-    let time = timing
-        .sample(now.saturating_duration_since(started))
-        .directed_progress
-        * 6000.;
-    let frame = circular_indeterminate_frame(time);
-    state.update(cx, |state, _| {
-        state.1 = reduced;
-        state.2 = frame;
+
+    /// Observe a reduced-motion preference change without starting an unused
+    /// indicator or requesting frames. Call after updating the app preference,
+    /// including while unmounted. Disabling reduced motion never restarts it.
+    pub fn observe_reduced_motion(&self, cx: &App) {
+        if cx.reduce_motion() && self.state.borrow().is_some() {
+            self.sample_running(cx);
+        }
+    }
+
+    fn sample_running(&self, cx: &App) -> (CircularProgressFrame, bool) {
+        let now = cx.background_executor().now();
+        let reduced = cx.reduce_motion();
+        let mut state = self.state.borrow_mut();
+        let state = state.get_or_insert_with(|| CircularClock {
+            started: now,
+            stopped: reduced,
+            last_frame: circular_indeterminate_frame(0.),
+        });
+        if state.stopped {
+            return (state.last_frame, false);
+        }
+        let timing = Timing::new(Duration::from_millis(6000)).iterations(IterationCount::Infinite);
+        let time = timing
+            .sample(now.saturating_duration_since(state.started))
+            .directed_progress
+            * 6000.;
+        state.last_frame = circular_indeterminate_frame(time);
+        state.stopped = reduced;
+        (state.last_frame, !reduced)
+    }
+}
+
+// The default API keeps its existing consecutive-frame keyed lifetime.
+fn sample_clock(id: ElementId, window: &mut Window, cx: &mut App) -> (CircularProgressFrame, bool) {
+    let state = window.use_keyed_state((id, "circular-progress-clock"), cx, |_, _| {
+        CircularProgressPlayback::default()
     });
-    (frame, !reduced)
+    state.read(cx).clone().sample_running(cx)
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -225,6 +273,29 @@ pub fn indeterminate_circular_progress(
     )
 }
 
+/// Draw with a caller-owned clock, retaining phase across virtual unmounts.
+/// Frame requests remain limited to visible paint. The owner must forward
+/// offscreen reduced-motion changes to [`CircularProgressPlayback::observe_reduced_motion`].
+pub fn indeterminate_circular_progress_with_playback(
+    id: impl Into<ElementId>,
+    label: impl Into<SharedString>,
+    display_size: Size<Rems>,
+    opacity: f32,
+    playback: &CircularProgressPlayback,
+    cx: &App,
+) -> AnyElement {
+    let (frame, running) = playback.sample_running(cx);
+    paint_progress(
+        id.into(),
+        label.into(),
+        frame,
+        None,
+        display_size,
+        opacity,
+        running,
+    )
+}
+
 fn paint_progress(
     id: ElementId,
     label: SharedString,
@@ -295,6 +366,167 @@ mod tests {
             );
             assert!((f64::from(frame.sweep) - item["sweep"].as_f64().unwrap()).abs() < 0.00002);
         }
+    }
+
+    struct RetainedClockHarness {
+        mounted: bool,
+        playback: super::CircularProgressPlayback,
+    }
+    impl Render for RetainedClockHarness {
+        fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+            use gpui::prelude::*;
+            div().size(px(100.)).when(self.mounted, |root| {
+                root.child(super::indeterminate_circular_progress_with_playback(
+                    "retained-circular",
+                    "Loading",
+                    size(gpui::rems(1.), gpui::rems(1.)),
+                    1.,
+                    &self.playback,
+                    cx,
+                ))
+            })
+        }
+    }
+
+    #[gpui::test]
+    fn caller_clock_survives_unmount_and_observes_offscreen_reduced_motion(
+        cx: &mut TestAppContext,
+    ) {
+        let playback = super::CircularProgressPlayback::default();
+        let (view, cx) = cx.add_window_view(|_, _| RetainedClockHarness {
+            mounted: false,
+            playback: playback.clone(),
+        });
+        cx.executor().advance_clock(Duration::from_millis(200));
+        cx.update(|window, cx| {
+            cx.set_reduce_motion(true);
+            playback.observe_reduced_motion(cx);
+            assert!(
+                playback.state.borrow().is_none(),
+                "preference events must not start an unused clock"
+            );
+            cx.set_reduce_motion(false);
+            view.update(cx, |view, _| view.mounted = true);
+            window.refresh();
+            window.draw(cx).clear(cx);
+        });
+        assert_eq!(
+            playback.state.borrow().as_ref().unwrap().last_frame,
+            circular_indeterminate_frame(0.)
+        );
+        cx.executor().advance_clock(Duration::from_millis(150));
+        cx.update(|window, cx| {
+            view.update(cx, |view, _| view.mounted = false);
+            window.refresh();
+            window.draw(cx).clear(cx);
+            // Drain the one previously scheduled visible-frame callback.
+            window.simulate_next_frame(cx);
+            window.refresh();
+            window.draw(cx).clear(cx);
+            assert_eq!(window.simulate_next_frame(cx), 0);
+        });
+        cx.executor().advance_clock(Duration::from_millis(350));
+        cx.update(|window, cx| {
+            window.refresh();
+            window.draw(cx).clear(cx);
+            assert_eq!(window.simulate_next_frame(cx), 0);
+            view.update(cx, |view, _| view.mounted = true);
+            window.refresh();
+            window.draw(cx).clear(cx);
+        });
+        let frame = playback.state.borrow().as_ref().unwrap().last_frame;
+        let expected = circular_indeterminate_frame(500.);
+        assert!((frame.rotation_degrees - expected.rotation_degrees).abs() < 0.002);
+        assert!((frame.sweep - expected.sweep).abs() < 0.00002);
+        cx.update(|window, cx| {
+            view.update(cx, |view, _| view.mounted = false);
+            window.refresh();
+            window.draw(cx).clear(cx);
+            window.simulate_next_frame(cx);
+            window.refresh();
+            window.draw(cx).clear(cx);
+        });
+        cx.executor().advance_clock(Duration::from_millis(200));
+        cx.update(|window, cx| {
+            cx.set_reduce_motion(true);
+            playback.observe_reduced_motion(cx);
+            assert_eq!(
+                window.simulate_next_frame(cx),
+                0,
+                "preference observation does not schedule"
+            );
+            cx.set_reduce_motion(false);
+            playback.observe_reduced_motion(cx);
+        });
+        let stopped = playback.state.borrow().as_ref().unwrap().last_frame;
+        assert!(
+            (stopped.rotation_degrees - circular_indeterminate_frame(700.).rotation_degrees).abs()
+                < 0.002
+        );
+        assert!(playback.state.borrow().as_ref().unwrap().stopped);
+        cx.executor().advance_clock(Duration::from_secs(2));
+        cx.update(|window, cx| {
+            view.update(cx, |view, _| view.mounted = true);
+            window.refresh();
+            window.draw(cx).clear(cx);
+            assert_eq!(window.simulate_next_frame(cx), 0);
+        });
+        assert_eq!(
+            playback.state.borrow().as_ref().unwrap().last_frame,
+            stopped
+        );
+    }
+
+    #[gpui::test]
+    fn caller_clock_initial_reduced_mount_stays_stopped_and_new_handle_restarts(
+        cx: &mut TestAppContext,
+    ) {
+        cx.update(|cx| cx.set_reduce_motion(true));
+        let playback = super::CircularProgressPlayback::default();
+        let (view, cx) = cx.add_window_view(|_, _| RetainedClockHarness {
+            mounted: true,
+            playback: playback.clone(),
+        });
+        cx.update(|window, cx| {
+            window.refresh();
+            window.draw(cx).clear(cx);
+        });
+        cx.executor().advance_clock(Duration::from_secs(1));
+        cx.update(|window, cx| {
+            cx.set_reduce_motion(false);
+            window.refresh();
+            window.draw(cx).clear(cx);
+            assert_eq!(window.simulate_next_frame(cx), 0);
+        });
+        assert_eq!(
+            playback.state.borrow().as_ref().unwrap().last_frame,
+            circular_indeterminate_frame(0.)
+        );
+        let fresh = super::CircularProgressPlayback::default();
+        cx.update(|window, cx| {
+            view.update(cx, |view, _| view.playback = fresh.clone());
+            window.refresh();
+            window.draw(cx).clear(cx);
+        });
+        cx.executor().advance_clock(Duration::from_millis(150));
+        cx.update(|window, cx| {
+            window.refresh();
+            window.draw(cx).clear(cx);
+        });
+        assert!(!fresh.state.borrow().as_ref().unwrap().stopped);
+        assert!(
+            (fresh
+                .state
+                .borrow()
+                .as_ref()
+                .unwrap()
+                .last_frame
+                .rotation_degrees
+                - circular_indeterminate_frame(150.).rotation_degrees)
+                .abs()
+                < 0.002
+        );
+        assert!(playback.state.borrow().as_ref().unwrap().stopped);
     }
 
     struct ClockHarness {
