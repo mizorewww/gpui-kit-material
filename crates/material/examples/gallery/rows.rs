@@ -708,6 +708,42 @@ pub(super) const ROWS: &[RowSpec] = &[
         interactive: false,
         anchor: None,
     },
+    RowSpec {
+        gap: 28.0,
+        section: Some("chips"),
+        interactive: false,
+        anchor: None,
+    },
+    RowSpec {
+        gap: 12.0,
+        section: None,
+        interactive: false,
+        anchor: None,
+    },
+    RowSpec {
+        gap: 28.0,
+        section: Some("lists"),
+        interactive: false,
+        anchor: None,
+    },
+    RowSpec {
+        gap: 12.0,
+        section: None,
+        interactive: false,
+        anchor: None,
+    },
+    RowSpec {
+        gap: 28.0,
+        section: Some("window"),
+        interactive: false,
+        anchor: None,
+    },
+    RowSpec {
+        gap: 12.0,
+        section: None,
+        interactive: true,
+        anchor: None,
+    },
 ];
 
 const fn same(a: &str, b: &str) -> bool {
@@ -1454,6 +1490,95 @@ choices.reveal("reveal-choices", scroll)}).into_any_element() },
                     .inset_end(px(8.))
                     .thickness(px(2.))
                     .color_role(ColorRole::PRIMARY)).into_any_element() },
+            101 => section_title("chips", "Chips").into_any_element(),
+            102 => {
+                let label = TypeRole::LabelLarge.scale();
+                let assist = |leading: bool| {
+                    chip(leading)
+                        .border_1()
+                        .border_color(color(ColorRole::OUTLINE))
+                        .text_color(color(ColorRole::ON_SURFACE))
+                        .font_family(label.font_family)
+                        .text_size(label.font_size)
+                        .line_height(label.line_height)
+                        .font_weight(FontWeight(label.font_weight as f32))
+                };
+                gpui_base::h_flex()
+                    .flex_wrap()
+                    .gap(rem(8.))
+                    .child(assist(false).child("Assist chip"))
+                    .child(
+                        assist(true)
+                            .child(
+                                IconName::Info
+                                    .icon()
+                                    .size(rem(18.))
+                                    .color(color(ColorRole::PRIMARY)),
+                            )
+                            .child("With leading icon"),
+                    )
+                    .into_any_element()
+            }
+            103 => section_heading("lists", IconName::Info, "Lists").into_any_element(),
+            104 => {
+                let items = [
+                    ("Display", "Theme, contrast and text size"),
+                    ("Notifications", "Alerts and sounds"),
+                    ("About", "Version and licenses"),
+                ];
+                gpui_base::v_flex()
+                    .gap(TILE_GAP)
+                    .children(items.into_iter().enumerate().map(|(index, (title, support))| {
+                        list_tile(index, items.len())
+                            .px(ITEM_INSET)
+                            .py(rem(12.))
+                            .child(
+                                TileScale::Regular
+                                    .row()
+                                    .child(TileScale::Regular.text(
+                                        ("list-tile", index),
+                                        title,
+                                        Some(support.into()),
+                                    ))
+                                    .child(tile_chevron()),
+                            )
+                    }))
+                    .into_any_element()
+            }
+            105 => section_title("window", "Window controls").into_any_element(),
+            106 => {
+                let caption = match Caption::detect(window) {
+                    Caption::System => "Caption buttons: drawn by the system",
+                    Caption::Windows => "Caption buttons: Windows style, drawn by the app",
+                    Caption::Linux => "Caption buttons: Linux style, drawn by the app",
+                };
+                gpui_base::v_flex()
+                    .gap(rem(12.))
+                    .child(accessible_text("caption-style", caption))
+                    .child(
+                        // A sample bar: its control takes the press itself
+                        // instead of starting a window drag.
+                        gpui_base::h_flex()
+                            .h(rem(56.))
+                            .px(rem(16.))
+                            .gap(rem(12.))
+                            .items_center()
+                            .rounded(RADIUS_SMALL)
+                            .bg(color(ColorRole::SURFACE_CONTAINER_HIGH))
+                            .child(accessible_text("sample-title", "Sample title bar"))
+                            .child(div().flex_1())
+                            .child(
+                                title_bar_control(
+                                    material_button("sample-bar-settings", ButtonVariant::Text)
+                                        .button_size(ButtonSize::ExtraSmall)
+                                        .child("Settings")
+                                        .on_click(|_, window, cx| super::settings::open(window, cx)),
+                                )
+                                .reveal("reveal-sample-bar-settings", scroll),
+                            ),
+                    )
+                    .into_any_element()
+            }
             _ => unreachable!("Gallery row index comes from the static directory"),
         }
     }
@@ -1816,6 +1941,41 @@ mod keyboard_tests {
                 row_bounds.contains(&content.origin),
                 "{selector} must render in row {physical}: {content:?} outside {row_bounds:?}"
             );
+        }
+    }
+
+    #[gpui::test]
+    fn chip_list_and_window_control_sections_render_their_samples(cx: &mut TestAppContext) {
+        cx.update(|cx| {
+            gpui_kit::init(cx);
+            gpui_kit_material::init(cx);
+        });
+        let window = cx.open_window(size(px(700.), px(400.)), Gallery::new);
+        draw(&window, cx);
+        for section in ["chips", "lists", "window"] {
+            let index = super::super::GALLERY_SECTIONS
+                .iter()
+                .position(|(id, _)| *id == section)
+                .unwrap();
+            window
+                .update(cx, |gallery, _, cx| {
+                    gallery.scroll_to_section(index);
+                    cx.notify();
+                })
+                .unwrap();
+            draw(&window, cx);
+            window
+                .update(cx, |gallery, _, _| {
+                    let heading = gallery.section_rows[index];
+                    for row in [heading, heading + 1] {
+                        let bounds = gallery.list.bounds_for_item(row);
+                        assert!(
+                            bounds.is_some_and(|bounds| bounds.size.height > px(0.)),
+                            "{section}: row {row} must render"
+                        );
+                    }
+                })
+                .unwrap();
         }
     }
 

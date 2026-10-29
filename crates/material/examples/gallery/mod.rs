@@ -31,7 +31,7 @@ trait GalleryReveal: IntoElement + Sized {
 }
 impl<T: IntoElement> GalleryReveal for T {}
 
-const GALLERY_SECTIONS: [(&str, &str); 11] = [
+const GALLERY_SECTIONS: [(&str, &str); 14] = [
     ("themes", "Themes"),
     ("motion", "Motion"),
     ("buttons", "Buttons"),
@@ -43,6 +43,9 @@ const GALLERY_SECTIONS: [(&str, &str); 11] = [
     ("colors", "Colors"),
     ("typography", "Typography"),
     ("dividers", "Dividers"),
+    ("chips", "Chips"),
+    ("lists", "Lists"),
+    ("window", "Window controls"),
 ];
 
 /// Fixed height keeps the native traffic lights centered at every text scale.
@@ -454,7 +457,7 @@ impl Render for GalleryWindow {
                     .child(section_title("window-title", "gpui-kit-material"))
                     .child(div().flex_1())
                     .when_some(self.fps.clone(), |bar, fps| bar.child(fps))
-                    .child(
+                    .child(title_bar_control(
                         MaterialButton::new("gallery-settings-open")
                             .variant(ButtonVariant::Text)
                             .button_size(ButtonSize::ExtraSmall)
@@ -462,7 +465,7 @@ impl Render for GalleryWindow {
                             .debug_selector(|| "gallery-settings-open".into())
                             .child("Settings")
                             .on_click(|_, window, cx| settings::open(window, cx)),
-                    ),
+                    )),
             )
             .child(
                 AnyView::from(self.gallery.clone())
