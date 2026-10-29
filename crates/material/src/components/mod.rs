@@ -19,6 +19,7 @@ mod caption;
 mod choice;
 mod feedback;
 mod focus;
+mod navigation;
 mod preview;
 mod progress;
 mod roving;
@@ -36,6 +37,10 @@ pub use feedback::{
     outlined_status_chip, small_badge, status_chip,
 };
 pub use focus::{FocusRing, RevealFocus, RingedButton, contain_scroll};
+pub use navigation::{
+    NavBadge, NavIcon, NavItem, NavItemLayout, NavigationBar, NavigationItem, NavigationRail,
+    RAIL_COLLAPSED_WIDTH, RAIL_EXPANDED_WIDTH, RailAlignment, navigation_scrim,
+};
 pub use preview::InteractionPreview;
 pub use progress::{
     CircularProgressFrame, CircularProgressPlayback, circular_indeterminate_frame,
