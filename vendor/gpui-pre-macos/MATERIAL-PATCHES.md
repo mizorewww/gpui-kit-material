@@ -14,3 +14,6 @@ and does not re-arm itself. Disabling synchronization permits demand-driven
 requests between display ticks; it does not guarantee any target FPS.
 
 Platform/UI acceptance and performance remain separately verified.
+
+Build fix: `window.rs` imports `anyhow::Result` unconditionally because the
+synchronization control patch (`set_vsync`) uses it outside test support.
