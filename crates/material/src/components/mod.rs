@@ -21,6 +21,7 @@ mod chips;
 mod choice;
 mod feedback;
 mod focus;
+mod list;
 mod navigation;
 mod preview;
 mod progress;
@@ -44,6 +45,10 @@ pub use feedback::{
     small_badge, status_chip,
 };
 pub use focus::{FocusRing, RevealFocus, RingedButton, contain_scroll};
+pub use list::{
+    LIST_SEGMENT_GAP, LIST_SEGMENT_INNER_RADIUS, LIST_SEGMENT_RADIUS, ListDensity, ListItem,
+    ListLeading, ListLines, ListTrailing, segmented_list,
+};
 pub use navigation::{
     NavBadge, NavIcon, NavItem, NavItemLayout, NavigationBar, NavigationItem, NavigationRail,
     RAIL_COLLAPSED_WIDTH, RAIL_EXPANDED_WIDTH, RailAlignment, navigation_scrim,
