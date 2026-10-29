@@ -31,15 +31,14 @@ pub mod motion;
 pub mod theme;
 pub mod tokens;
 
-pub use theme::color;
-
 /// Register the kit's key bindings. Call once, before opening windows.
 pub fn init(cx: &mut gpui::App) {
     icons::init(cx);
     components::init(cx);
 }
 
-/// The roles, tokens and components most pages need.
+/// The roles, tokens and components most pages need, including the
+/// [`theme::color`] lookup. The crate root's `color` is the color module.
 pub mod prelude {
     pub use crate::color::themes::{Contrast, ThemeId, ThemeMode};
     pub use crate::color::{Appearance, ColorRole, PaletteId, ThemePreferences};
