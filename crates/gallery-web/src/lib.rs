@@ -3,10 +3,10 @@
 extern crate gpui_kit as gpui;
 
 #[cfg(target_family = "wasm")]
+mod frame_counters;
+#[cfg(target_family = "wasm")]
 #[path = "../../material/examples/gallery/mod.rs"]
 mod gallery;
-#[cfg(target_family = "wasm")]
-mod frame_counters;
 #[cfg(target_family = "wasm")]
 mod motion_preference;
 
