@@ -14,3 +14,7 @@ time and decide whether blocked waiting counts as CPU work.
 a bounded (65536 entries, overflow counted), thread-safe store of driver GPU
 timestamps reported by platform completion handlers while tracing is enabled.
 GPU time is evidence separate from CPU frame scopes.
+
+`try_update` replaces the deprecated `fetch_update` on the profiler trace
+state and journal runnable counter (pinned toolchain deprecation; identical
+semantics), so deny-warnings builds cover this backend.

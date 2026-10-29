@@ -218,6 +218,10 @@
     {
       "path": "src/profiler.rs",
       "scope": "GpuExecution, record_gpu_execution and take_gpu_executions: a bounded (65536, overflow counted) thread-safe store of driver GPU timestamps recorded only while tracing; not cleared by trace toggles so late completions survive until taken."
+    },
+    {
+      "path": "src/profiler.rs, src/profiler/journal.rs",
+      "scope": "Atomic fetch_update renamed to try_update for the pinned toolchain's deprecation; identical semantics."
     }
   ]
 }
