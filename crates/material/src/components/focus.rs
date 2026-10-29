@@ -87,7 +87,9 @@ impl RevealScroll {
             RevealScroll::Handle(scroll) => {
                 scroll.set_offset(scroll.offset() + point(px(0.), delta));
             }
-            RevealScroll::List(state) => state.scroll_by(delta),
+            // Reveal deltas move the content; ListState distances move the
+            // viewport through the content, so their signs are opposite.
+            RevealScroll::List(state) => state.scroll_by(-delta),
         }
     }
 }
@@ -224,7 +226,83 @@ fn reveal_delta(top: f32, bottom: f32, visible_top: f32, visible_bottom: f32) ->
 
 #[cfg(test)]
 mod tests {
-    use super::reveal_delta;
+    use super::{RevealFocus, reveal_delta};
+    use gpui::{
+        Context, FocusHandle, IntoElement, ListAlignment, ListOffset, ListState, Render,
+        TestAppContext, Window, div, list, prelude::*, px, size,
+    };
+
+    struct ListRevealHarness {
+        list: ListState,
+        focus: FocusHandle,
+        inline: bool,
+    }
+
+    impl Render for ListRevealHarness {
+        fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+            let state = self.list.clone();
+            let focus = self.focus.clone();
+            let inline = self.inline;
+            list(self.list.clone(), move |_, _, _| {
+                let control = div()
+                    .id("focused-control")
+                    .debug_selector(|| "list-reveal-control".into())
+                    .track_focus(&focus)
+                    .w(px(40.))
+                    .h(px(30.));
+                let reveal = RevealFocus::in_list("list-reveal", control, state.clone());
+                let reveal = if inline { reveal.inline() } else { reveal };
+                div()
+                    .relative()
+                    .w_full()
+                    .h(px(400.))
+                    .child(div().absolute().top(px(150.)).w_full().child(reveal))
+                    .into_any_element()
+            })
+            .w(px(100.))
+            .h(px(100.))
+        }
+    }
+
+    #[gpui::test]
+    fn list_focus_reveal_scrolls_both_edges_in_content_coordinates(cx: &mut TestAppContext) {
+        for inline in [false, true] {
+            for initial_offset in [0., 170.] {
+                let (view, cx) = cx.add_window_view(|_, cx| {
+                    let state = ListState::new(1, ListAlignment::Top, px(0.));
+                    state.scroll_to(ListOffset {
+                        item_ix: 0,
+                        offset_in_item: px(initial_offset),
+                    });
+                    ListRevealHarness {
+                        list: state,
+                        focus: cx.focus_handle(),
+                        inline,
+                    }
+                });
+                cx.run_until_parked();
+                let before = cx.debug_bounds("list-reveal-control").unwrap();
+                cx.update(|window, cx| {
+                    let focus = view.read(cx).focus.clone();
+                    window.focus(&focus, cx);
+                    window.refresh();
+                });
+                cx.run_until_parked();
+                let after = cx.debug_bounds("list-reveal-control").unwrap();
+                let viewport = cx.update(|_, cx| view.read(cx).list.viewport_bounds());
+                if initial_offset == 0. {
+                    assert!(before.bottom() > viewport.bottom());
+                    assert!(after.top() < before.top(), "bottom reveal must scroll down");
+                } else {
+                    assert!(before.top() < viewport.top());
+                    assert!(after.top() > before.top(), "top reveal must scroll up");
+                }
+                assert!(after.top() >= viewport.top() + px(8.));
+                assert!(after.bottom() <= viewport.bottom() - px(8.));
+                assert_eq!(after.size, size(px(40.), px(30.)));
+            }
+        }
+    }
 
     #[test]
     fn reveals_clipped_controls_and_the_start_of_oversized_rows() {
