@@ -1,9 +1,8 @@
 //! Semantic color roles and their derivation from a source palette.
 //!
-//! The role names are the ones course2md's desktop shipped with. Each role
-//! documents the Material 3 role it stands for; the full M3 role set
-//! (surface containers, outline variants, tertiary, fixed roles) replaces
-//! them in the M3 Expressive migration (see `docs/ROADMAP.md`).
+//! Reference themes use the complete md3.io color role set. Compatibility
+//! constants map older names onto the same role storage; application-specific
+//! status containers and selection colors remain explicit extensions.
 use crate::{Color, PaletteId};
 
 macro_rules! roles {
@@ -23,52 +22,83 @@ macro_rules! roles {
 }
 
 roles!(
-    /// Window ground: M3 surface container, the canvas with a trace of accent.
-    CANVAS,
-    /// Tiles, cards and lists: M3 surface (lifted in dark palettes).
-    SURFACE,
-    /// M3 surface container highest: unselected segments, filled search
-    /// bars, tonal icon buttons.
-    SURFACE_HIGH,
-    /// A recessed area: sidebars, table heads.
-    INSET,
-    /// M3 on surface.
-    INK,
-    /// M3 on surface variant: supporting text and quiet icons.
-    GRAY,
-    /// Tertiary text and hovered scrollbar thumbs.
-    FAINT,
-    /// M3 outline variant: dividers.
-    HAIRLINE,
-    /// A card's tonal edge, softer than the hairline.
-    CARD_LINE,
-    /// M3 outline: unselected radios, inputs, scrollbar thumbs.
-    CONTROL,
-    /// M3 primary.
-    ACCENT,
-    /// M3 on primary.
+    ERROR,
+    ERROR_CONTAINER,
+    INFO,
+    INVERSE_ON_SURFACE,
+    INVERSE_PRIMARY,
+    INVERSE_SURFACE,
+    ON_ERROR,
+    ON_ERROR_CONTAINER,
+    ON_INFO,
     ON_PRIMARY,
-    /// M3 secondary container: tonal selection.
-    SECONDARY_CONTAINER,
-    /// M3 on secondary container.
+    ON_PRIMARY_CONTAINER,
+    ON_PRIMARY_FIXED,
+    ON_PRIMARY_FIXED_VARIANT,
+    ON_SECONDARY,
     ON_SECONDARY_CONTAINER,
+    ON_SECONDARY_FIXED,
+    ON_SECONDARY_FIXED_VARIANT,
+    ON_SUCCESS,
+    ON_SURFACE,
+    ON_SURFACE_VARIANT,
+    ON_TERTIARY,
+    ON_TERTIARY_CONTAINER,
+    ON_TERTIARY_FIXED,
+    ON_TERTIARY_FIXED_VARIANT,
+    ON_WARNING,
+    OUTLINE,
+    OUTLINE_VARIANT,
+    PRIMARY,
+    PRIMARY_CONTAINER,
+    PRIMARY_FIXED,
+    PRIMARY_FIXED_DIM,
+    SCRIM,
+    SECONDARY,
+    SECONDARY_CONTAINER,
+    SECONDARY_FIXED,
+    SECONDARY_FIXED_DIM,
+    SHADOW,
     SUCCESS,
-    SUCCESS_BG,
+    SURFACE,
+    SURFACE_BRIGHT,
+    SURFACE_CONTAINER,
+    SURFACE_CONTAINER_HIGH,
+    SURFACE_CONTAINER_HIGHEST,
+    SURFACE_CONTAINER_LOW,
+    SURFACE_CONTAINER_LOWEST,
+    SURFACE_DIM,
+    SURFACE_VARIANT,
+    TERTIARY,
+    TERTIARY_CONTAINER,
+    TERTIARY_FIXED,
+    TERTIARY_FIXED_DIM,
     WARNING,
+    INSET,
+    FAINT,
+    CARD_LINE,
+    SUCCESS_BG,
     WARNING_BG,
-    /// M3 error.
-    DANGER,
-    /// M3 error container (a light tint).
-    DANGER_BG,
-    /// Find-in-page matches.
     FIND_HIGHLIGHT,
     FIND_CURRENT,
     FIND_CURRENT_LINE,
-    /// Text selection in inputs.
     SELECTION,
-    /// Selected long-form text: translucent accent over whatever holds it.
     READING_SELECTION,
 );
+
+// Compatibility names share storage with their semantic M3 role. Application
+// extensions above remain independent; they are not claimed as M3 scheme roles.
+impl ColorRole {
+    pub const CANVAS: Self = Self::SURFACE_CONTAINER;
+    pub const SURFACE_HIGH: Self = Self::SURFACE_CONTAINER_HIGHEST;
+    pub const INK: Self = Self::ON_SURFACE;
+    pub const GRAY: Self = Self::ON_SURFACE_VARIANT;
+    pub const HAIRLINE: Self = Self::OUTLINE_VARIANT;
+    pub const CONTROL: Self = Self::OUTLINE;
+    pub const ACCENT: Self = Self::PRIMARY;
+    pub const DANGER: Self = Self::ERROR;
+    pub const DANGER_BG: Self = Self::ERROR_CONTAINER;
+}
 
 /// The number of roles in a [`Scheme`].
 pub const ROLE_COUNT: usize = ColorRole::ALL.len();
@@ -147,8 +177,92 @@ impl Scheme {
             ColorRole::FIND_HIGHLIGHT => tint(p.warning, 0.16),
             ColorRole::FIND_CURRENT => tint(p.warning, 0.32),
             ColorRole::FIND_CURRENT_LINE => hex(p.warning),
+            // Legacy presets predate full M3 schemes. These are adapters from
+            // their existing colors, not seed-generated HCT schemes.
+            ColorRole::PRIMARY_CONTAINER | ColorRole::TERTIARY_CONTAINER => tint(p.accent, 0.24),
+            ColorRole::ON_PRIMARY_CONTAINER | ColorRole::ON_TERTIARY_CONTAINER => hex(p.text),
+            ColorRole::SECONDARY | ColorRole::TERTIARY => hex(p.accent),
+            ColorRole::ON_SECONDARY | ColorRole::ON_TERTIARY => hex(p.on_accent),
+            ColorRole::PRIMARY_FIXED | ColorRole::SECONDARY_FIXED | ColorRole::TERTIARY_FIXED => {
+                hex(p.accent).blend(hex(0xffffff), 0.8)
+            }
+            ColorRole::PRIMARY_FIXED_DIM
+            | ColorRole::SECONDARY_FIXED_DIM
+            | ColorRole::TERTIARY_FIXED_DIM => hex(p.accent).blend(hex(0xffffff), 0.6),
+            ColorRole::ON_PRIMARY_FIXED
+            | ColorRole::ON_SECONDARY_FIXED
+            | ColorRole::ON_TERTIARY_FIXED => hex(p.accent).blend(hex(0), 0.8),
+            ColorRole::ON_PRIMARY_FIXED_VARIANT
+            | ColorRole::ON_SECONDARY_FIXED_VARIANT
+            | ColorRole::ON_TERTIARY_FIXED_VARIANT => hex(p.accent).blend(hex(0), 0.4),
+            ColorRole::SURFACE_DIM => hex(p.canvas),
+            ColorRole::SURFACE_BRIGHT => {
+                if dark {
+                    hex(p.surface).blend(hex(p.text), 0.18)
+                } else {
+                    hex(p.surface)
+                }
+            }
+            ColorRole::SURFACE_VARIANT | ColorRole::SURFACE_CONTAINER_HIGH => {
+                tint(p.text, if dark { 0.10 } else { 0.06 })
+            }
+            ColorRole::SURFACE_CONTAINER_LOWEST => {
+                if dark {
+                    hex(p.canvas)
+                } else {
+                    hex(p.surface)
+                }
+            }
+            ColorRole::SURFACE_CONTAINER_LOW => tint(p.text, 0.025),
+            ColorRole::INVERSE_SURFACE => hex(p.text),
+            ColorRole::INVERSE_ON_SURFACE => hex(p.surface),
+            ColorRole::INVERSE_PRIMARY => hex(p.accent).blend(hex(p.surface), 0.4),
+            ColorRole::ON_ERROR => hex(p.on_accent),
+            ColorRole::ON_ERROR_CONTAINER => hex(p.danger),
+            ColorRole::ON_SUCCESS | ColorRole::ON_WARNING => hex(p.on_accent),
+            ColorRole::INFO => hex(p.accent),
+            ColorRole::ON_INFO => hex(p.on_accent),
+            ColorRole::SHADOW | ColorRole::SCRIM => hex(0),
         });
         Self { colors, dark }
+    }
+
+    /// Construct an exact reference scheme and derive only the kit-specific
+    /// extensions (selection, find highlights, and status containers).
+    pub(crate) fn from_reference(colors: &[u32; 52], dark: bool) -> Self {
+        let mut scheme = Self {
+            colors: [Color::hex(0); ROLE_COUNT],
+            dark,
+        };
+        for (role, value) in crate::themes::REFERENCE_ROLES.iter().zip(colors) {
+            scheme.colors[*role as usize] = Color::hex(*value);
+        }
+        let surface = scheme.get(ColorRole::SURFACE);
+        let accent = scheme.get(ColorRole::PRIMARY);
+        let warning = scheme.get(ColorRole::WARNING);
+        scheme
+            .with_role(
+                ColorRole::INSET,
+                scheme.get(ColorRole::SURFACE_CONTAINER_LOWEST),
+            )
+            .with_role(ColorRole::FAINT, scheme.get(ColorRole::OUTLINE))
+            .with_role(ColorRole::CARD_LINE, scheme.get(ColorRole::OUTLINE_VARIANT))
+            .with_role(
+                ColorRole::SUCCESS_BG,
+                surface.blend(scheme.get(ColorRole::SUCCESS), 0.12),
+            )
+            .with_role(ColorRole::WARNING_BG, surface.blend(warning, 0.12))
+            .with_role(ColorRole::FIND_HIGHLIGHT, surface.blend(warning, 0.16))
+            .with_role(ColorRole::FIND_CURRENT, surface.blend(warning, 0.32))
+            .with_role(ColorRole::FIND_CURRENT_LINE, warning)
+            .with_role(
+                ColorRole::SELECTION,
+                scheme.get(ColorRole::PRIMARY_CONTAINER),
+            )
+            .with_role(
+                ColorRole::READING_SELECTION,
+                accent.alpha(if dark { 0.42 } else { 0.30 }),
+            )
     }
 
     pub fn get(&self, role: ColorRole) -> Color {

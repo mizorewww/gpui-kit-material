@@ -263,7 +263,11 @@ impl RenderOnce for CaptionButtons {
         if buttons.is_empty() {
             return div().into_any_element();
         }
-        let glyph_color = color(if window.is_window_active() { INK } else { GRAY });
+        let glyph_color = color(if window.is_window_active() {
+            ON_SURFACE
+        } else {
+            ON_SURFACE_VARIANT
+        });
         let row = gpui_base::h_flex()
             .id("window-caption")
             .text_color(glyph_color);
@@ -311,7 +315,7 @@ fn caption_layer(row: impl IntoElement, window: &Window) -> AnyElement {
 /// it. It occludes the drag area behind it.
 fn windows_button(button: CaptionButton, labels: &CaptionLabels) -> gpui::Stateful<gpui::Div> {
     let close = button == CaptionButton::Close;
-    let ink = color(INK);
+    let ink = color(ON_SURFACE);
     let (hover, pressed) = if close {
         (close_hover(), close_pressed())
     } else {
@@ -358,10 +362,10 @@ fn linux_button(
     on_close: Option<CloseRequest>,
 ) -> gpui::Stateful<gpui::Div> {
     let group = button.id();
-    let shape: ColorRole = SURFACE_HIGH;
+    let shape: ColorRole = SURFACE_CONTAINER_HIGHEST;
     let (hover, pressed) = (
-        blend(color(shape), color(INK), 0.08),
-        blend(color(shape), color(INK), 0.10),
+        blend(color(shape), color(ON_SURFACE), 0.08),
+        blend(color(shape), color(ON_SURFACE), 0.10),
     );
     div()
         .id(button.id())

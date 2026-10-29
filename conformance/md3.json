@@ -73,14 +73,26 @@
     {
       "id": "themes",
       "status": "unreviewed",
-      "evidence": [],
+      "evidence": [
+        {
+          "kind": "browser-resolved-presets",
+          "path": "crates/color/tests/fixtures/md3-colors.json",
+          "scope": "20 reference themes, two modes and three contrast levels; 52 roles per configuration. Does not establish HCT/dynamic color or component visual conformance."
+        }
+      ],
       "reference": "https://md3.io/styles/themes/",
       "reference_status": "available"
     },
     {
       "id": "color",
       "status": "unreviewed",
-      "evidence": [],
+      "evidence": [
+        {
+          "kind": "browser-resolved-presets",
+          "path": "crates/color/tests/fixtures/md3-colors.json",
+          "scope": "20 reference themes, two modes and three contrast levels; 52 roles per configuration. Does not establish HCT/dynamic color or component visual conformance."
+        }
+      ],
       "reference": "https://md3.io/styles/color/",
       "reference_status": "available"
     },

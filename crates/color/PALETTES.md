@@ -27,3 +27,18 @@ unchanged.
 
 Original licenses are in `licenses/`. They cover the palette source material;
 upstream projects do not endorse this kit or course2md.
+
+## md3.io reference themes
+
+`src/themes/` contains the 20 presets from
+[floor/material at c910072](https://github.com/floor/material/tree/c910072f3fc5b660276731d8a935d7186f288364/src/styles/themes),
+including light/dark modes and standard/medium/high contrast. Values are resolved
+by Chromium after compiling the pinned source with Dart Sass 1.85.1. The source
+is MIT licensed; its notice is bundled as `src/themes/LICENSE-material`.
+
+`tests/fixtures/md3-colors.json` records the captured values and environment.
+These tables preserve the reference implementation, including its highcontrast
+preset's different fixed roles in light and dark. They do not generate colors
+from arbitrary seeds. The original palettes above remain separate legacy
+adapters, and application extensions (selection, find highlights, and status
+containers) are derived by the kit rather than copied reference roles.

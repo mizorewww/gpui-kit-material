@@ -35,6 +35,7 @@ pub fn init(cx: &mut gpui::App) {
 
 /// The roles, tokens and components most pages need.
 pub mod prelude {
+    pub use crate::color::themes::{Contrast, ThemeId, ThemeMode};
     pub use crate::color::{Appearance, ColorRole, PaletteId, ThemePreferences};
     pub use crate::components::*;
     pub use crate::theme::color;

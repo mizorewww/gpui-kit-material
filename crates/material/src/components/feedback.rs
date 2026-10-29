@@ -23,13 +23,13 @@ pub fn notice_banner(
     let (bg, tone, icon, role) = match kind {
         NoticeKind::Info => (
             ColorRole::SECONDARY_CONTAINER,
-            ColorRole::ACCENT,
+            ColorRole::PRIMARY,
             IconName::Info,
             Role::Status,
         ),
         NoticeKind::Danger => (
-            ColorRole::DANGER_BG,
-            ColorRole::DANGER,
+            ColorRole::ERROR_CONTAINER,
+            ColorRole::ERROR,
             IconName::Error,
             Role::Alert,
         ),
@@ -71,13 +71,13 @@ pub fn badge(kind: BadgeKind) -> Div {
     let (text, bg, icon) = match kind {
         BadgeKind::Success => (SUCCESS, SUCCESS_BG, Some(IconName::CheckCircle)),
         BadgeKind::Warning => (WARNING, WARNING_BG, Some(IconName::Warning)),
-        BadgeKind::Danger => (DANGER, DANGER_BG, Some(IconName::Error)),
+        BadgeKind::Danger => (ERROR, ERROR_CONTAINER, Some(IconName::Error)),
         // A clock would read as waiting; work in progress needs no icon.
-        BadgeKind::Progress => (ACCENT, SECONDARY_CONTAINER, None),
+        BadgeKind::Progress => (PRIMARY, SECONDARY_CONTAINER, None),
         // Neutral is a plain text chip without a status icon, on the
         // highest surface container: a step above the tile in light and dark
         // palettes alike (INSET sinks below the surface in dark ones).
-        BadgeKind::Neutral => (GRAY, SURFACE_HIGH, None),
+        BadgeKind::Neutral => (ON_SURFACE_VARIANT, SURFACE_CONTAINER_HIGHEST, None),
         BadgeKind::Tonal => (ON_SECONDARY_CONTAINER, SECONDARY_CONTAINER, None),
     };
     let mut view = div()
@@ -113,7 +113,7 @@ pub fn outlined_badge(id: impl Into<ElementId>, label: impl Into<SharedString>) 
         .text_size(TEXT_AUX)
         .line_height(rem(16.))
         .font_weight(FontWeight::MEDIUM)
-        .text_color(color(ColorRole::GRAY))
+        .text_color(color(ColorRole::ON_SURFACE_VARIANT))
         .whitespace_nowrap()
 }
 
