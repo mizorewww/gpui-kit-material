@@ -69,7 +69,7 @@ impl FabMenuColor {
 }
 
 type ClickHandler = Rc<dyn Fn(&ClickEvent, &mut Window, &mut App)>;
-type ToggleHandler = Rc<dyn Fn(bool, &mut Window, &mut App)>;
+type ToggleHandler = Rc<dyn Fn(&bool, &mut Window, &mut App)>;
 
 /// One action of a FAB menu.
 pub struct FabMenuItem {
@@ -172,7 +172,7 @@ impl FabMenu {
         self
     }
     /// The requested open state (toggle activation, Escape).
-    pub fn on_toggle(mut self, callback: impl Fn(bool, &mut Window, &mut App) + 'static) -> Self {
+    pub fn on_toggle(mut self, callback: impl Fn(&bool, &mut Window, &mut App) + 'static) -> Self {
         self.on_toggle = Some(Rc::new(callback));
         self
     }
@@ -253,7 +253,7 @@ impl RenderOnce for FabMenu {
         }
         let on_toggle = self.on_toggle;
         if let Some(callback) = on_toggle.clone() {
-            toggle = toggle.on_click(move |_, window, cx| callback(!open, window, cx));
+            toggle = toggle.on_click(move |_, window, cx| callback(&!open, window, cx));
         }
         div()
             .id(self.id)
@@ -265,7 +265,7 @@ impl RenderOnce for FabMenu {
                 menu.on_key_down(move |event, window, cx| {
                     if event.keystroke.key == "escape" {
                         cx.stop_propagation();
-                        callback(false, window, cx);
+                        callback(&false, window, cx);
                     }
                 })
             })

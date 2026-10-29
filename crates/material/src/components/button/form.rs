@@ -213,33 +213,35 @@ pub(crate) const fn icon_button_width(size: ButtonSize, width: IconButtonWidth) 
 /// Split-button segment tokens per size.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct SegmentMetrics {
-    /// Inner corners at rest, hovered/focused and pressed.
+    /// Inner corners at rest (and focused) and hovered or pressed.
     pub inner: f32,
-    pub inner_hovered: f32,
-    pub inner_pressed: f32,
-    /// The leading segment's padding next to the trailing one.
-    pub leading_inner_padding: f32,
-    /// The trailing segment's width and chevron size.
+    pub inner_active: f32,
+    /// The leading segment's outer and inner padding.
+    pub leading_padding: (f32, f32),
+    /// The trailing segment's width, chevron size and (outer-side first)
+    /// padding while closed; open, the chevron is centered.
     pub trailing_width: f32,
     pub trailing_icon: f32,
+    pub trailing_padding: (f32, f32),
 }
 
+/// Figma "Material 3 Design Kit" split button tokens.
 pub(crate) const fn segment_metrics(size: ButtonSize) -> SegmentMetrics {
-    let (inner, inner_hovered, inner_pressed, leading_inner_padding, trailing_width, trailing_icon) =
+    let (inner, inner_active, leading_padding, trailing_width, trailing_icon, trailing_padding) =
         match size {
-            ButtonSize::ExtraSmall => (4., 8., 8., 10., 34., 22.),
-            ButtonSize::Small => (4., 12., 8., 12., 44., 22.),
-            ButtonSize::Medium => (4., 12., 12., 24., 56., 26.),
-            ButtonSize::Large => (8., 20., 16., 48., 90., 38.),
-            ButtonSize::ExtraLarge => (12., 20., 20., 64., 124., 50.),
+            ButtonSize::ExtraSmall => (4., 8., (12., 10.), 48., 22., (14., 12.)),
+            ButtonSize::Small => (4., 12., (16., 12.), 48., 22., (14., 12.)),
+            ButtonSize::Medium => (4., 12., (24., 24.), 56., 26., (17., 13.)),
+            ButtonSize::Large => (8., 20., (48., 48.), 96., 38., (32., 26.)),
+            ButtonSize::ExtraLarge => (12., 20., (64., 64.), 136., 50., (49., 37.)),
         };
     SegmentMetrics {
         inner,
-        inner_hovered,
-        inner_pressed,
-        leading_inner_padding,
+        inner_active,
+        leading_padding,
         trailing_width,
         trailing_icon,
+        trailing_padding,
     }
 }
 
@@ -323,8 +325,7 @@ impl Form {
                 }
             }
             Form::Segment(Segment::Leading) => {
-                let inner = segment_metrics(size).leading_inner_padding;
-                let (start, _) = horizontal_padding(size, variant, icon, ButtonDirection::Ltr);
+                let (start, inner) = segment_metrics(size).leading_padding;
                 FormGeometry {
                     min_width: 0.,
                     padding: if direction == ButtonDirection::Rtl {
@@ -332,6 +333,7 @@ impl Form {
                     } else {
                         (start, inner)
                     },
+                    outline: 1.,
                     ..label
                 }
             }
@@ -356,10 +358,18 @@ impl Form {
             }
             Form::Segment(Segment::Trailing) => {
                 let metrics = segment_metrics(size);
+                let (outer, inner) = metrics.trailing_padding;
                 FormGeometry {
                     width: Some(metrics.trailing_width),
                     min_width: 0.,
-                    padding: (0., 0.),
+                    // The closed chevron sits slightly toward the leading
+                    // segment; `MaterialButton` centers it while open.
+                    padding: if direction == ButtonDirection::Rtl {
+                        (outer, inner)
+                    } else {
+                        (inner, outer)
+                    },
+                    outline: 1.,
                     gap: 0.,
                     icon: metrics.trailing_icon,
                     ..label
@@ -505,12 +515,15 @@ mod tests {
                 ButtonDirection::Ltr,
             );
             assert_eq!(leading.height, trailing.height);
-            assert_eq!(
-                leading.padding.1,
-                segment_metrics(size).leading_inner_padding
-            );
+            assert_eq!(leading.padding, segment_metrics(size).leading_padding);
+            assert_eq!((leading.outline, trailing.outline), (1., 1.));
             let m = segment_metrics(size);
-            assert!(m.inner < m.inner_pressed && m.inner_pressed <= m.inner_hovered);
+            assert!(m.inner < m.inner_active);
+            assert_eq!(
+                trailing.padding.0 + trailing.padding.1 + trailing.icon,
+                m.trailing_width,
+                "the chevron fills its token box"
+            );
         }
     }
 }

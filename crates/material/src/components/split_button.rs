@@ -26,7 +26,7 @@ pub enum SplitButtonPart {
 }
 
 type ClickHandler = Rc<dyn Fn(&ClickEvent, &mut Window, &mut App)>;
-type ToggleHandler = Rc<dyn Fn(bool, &mut Window, &mut App)>;
+type ToggleHandler = Rc<dyn Fn(&bool, &mut Window, &mut App)>;
 
 #[derive(gpui::IntoElement)]
 pub struct SplitButton {
@@ -102,7 +102,7 @@ impl SplitButton {
         self
     }
     /// The requested menu state when the trailing segment is activated.
-    pub fn on_toggle(mut self, callback: impl Fn(bool, &mut Window, &mut App) + 'static) -> Self {
+    pub fn on_toggle(mut self, callback: impl Fn(&bool, &mut Window, &mut App) + 'static) -> Self {
         self.on_toggle = Some(Rc::new(callback));
         self
     }
@@ -168,7 +168,7 @@ impl RenderOnce for SplitButton {
             trailing = trailing.preview_state(state);
         }
         if let Some(callback) = self.on_toggle {
-            trailing = trailing.on_click(move |_, window, cx| callback(!open, window, cx));
+            trailing = trailing.on_click(move |_, window, cx| callback(&!open, window, cx));
         }
         div()
             .id(self.id)

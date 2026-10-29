@@ -607,12 +607,22 @@ impl MaterialButton {
         self
     }
     fn form_geometry(&self) -> form::FormGeometry {
-        self.form.geometry(
+        let geometry = self.form.geometry(
             self.size,
             self.variant,
             self.icon.as_ref().map(|_| self.icon_position),
             self.direction,
-        )
+        );
+        if self.open && self.form == Form::Segment(Segment::Trailing) {
+            // The open, fully round trailing segment centers its chevron.
+            let side = (geometry.padding.0 + geometry.padding.1) / 2.;
+            form::FormGeometry {
+                padding: (side, side),
+                ..geometry
+            }
+        } else {
+            geometry
+        }
     }
     fn color_targets(&self) -> (CssColor, CssColor, CssColor) {
         match &self.palette {
@@ -989,6 +999,8 @@ impl MaterialButton {
         );
         let level = match &self.palette {
             Some(palette) => palette.shadow_level(self.disabled, hovered, active),
+            // Icon buttons never elevate.
+            None if matches!(self.form, Form::Icon(_)) => 0,
             None => playback::shadow_level(
                 self.variant,
                 self.disabled,
@@ -1015,10 +1027,8 @@ impl MaterialButton {
                 let metrics = segment_metrics(self.size);
                 if self.open && segment == Segment::Trailing {
                     self.size.geometry().height / 2.
-                } else if active {
-                    metrics.inner_pressed
-                } else if hovered || focused {
-                    metrics.inner_hovered
+                } else if active || hovered {
+                    metrics.inner_active
                 } else {
                     metrics.inner
                 }
