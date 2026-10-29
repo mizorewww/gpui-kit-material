@@ -106,6 +106,24 @@ pub fn token_value(
     window: &mut Window,
     cx: &mut App,
 ) -> f32 {
+    token_transition(id, target, token, window, cx)
+}
+
+/// Follow an interpolatable target using the selected Material motion token.
+///
+/// Each channel ID must retain the same value type. Interpolation is supplied
+/// by the value, so color spaces and compound geometry need not be flattened
+/// into independent scalar clocks. Timing and retargeting belong to GPUI Base.
+pub fn token_transition<T>(
+    id: impl Into<ElementId>,
+    target: T,
+    token: MotionToken,
+    window: &mut Window,
+    cx: &mut App,
+) -> T
+where
+    T: gpui_base::Interpolate + PartialEq + 'static,
+{
     let id = id.into();
     let requested = curve(token);
     let state = window.use_keyed_state((id.clone(), "material-motion-curve"), cx, |_, _| {
@@ -741,5 +759,115 @@ mod tests {
         assert!(effects.clone().all(|v| v <= 1.));
         assert!(effects.collect::<Vec<_>>().windows(2).all(|p| p[0] <= p[1]));
         assert!((0..=200).all(|i| FAST_SPATIAL.ease()(i as f32 / 200.) < 1.003));
+    }
+
+    // Heap ownership deliberately prevents Copy: callers can animate compound values.
+    #[derive(Clone, Debug, PartialEq)]
+    struct CompoundEffects(Vec<f32>);
+
+    impl gpui_base::Interpolate for CompoundEffects {
+        fn interpolate(&self, target: &Self, progress: f32) -> Self {
+            Self(
+                self.0
+                    .iter()
+                    .zip(&target.0)
+                    .map(|(from, to)| from + (to - from) * progress)
+                    .collect(),
+            )
+        }
+    }
+
+    struct CompoundEffectsHarness {
+        target: CompoundEffects,
+        sample: Rc<std::cell::RefCell<CompoundEffects>>,
+    }
+
+    impl Render for CompoundEffectsHarness {
+        fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+            super::apply_scheme(super::MotionScheme::Expressive);
+            *self.sample.borrow_mut() = super::token_transition(
+                "compound-effects-transition",
+                self.target.clone(),
+                super::MotionToken::DefaultEffects,
+                window,
+                cx,
+            );
+            div().size(px(40.))
+        }
+    }
+
+    #[gpui::test]
+    fn generic_effects_interpolate_reverse_and_respect_reduced_motion(cx: &mut TestAppContext) {
+        let start = CompoundEffects(vec![0., 10.]);
+        let target = CompoundEffects(vec![1., 30.]);
+        let sample = Rc::new(std::cell::RefCell::new(start.clone()));
+        let (view, cx) = cx.add_window_view({
+            let sample = sample.clone();
+            let start = start.clone();
+            move |_, _| CompoundEffectsHarness {
+                target: start,
+                sample,
+            }
+        });
+        cx.update(|window, cx| window.draw(cx).clear(cx));
+        assert_eq!(*sample.borrow(), start);
+        cx.update(|window, cx| {
+            view.update(cx, |view, _| view.target = target.clone());
+            window.draw(cx).clear(cx);
+        });
+        assert_eq!(*sample.borrow(), start);
+        cx.executor().advance_clock(Duration::from_millis(125));
+        cx.update(|window, cx| {
+            window.refresh();
+            window.draw(cx).clear(cx);
+        });
+        // The 250ms DefaultEffects curve has a documented midpoint sample of 0.96.
+        let midpoint = sample.borrow().clone();
+        assert!((midpoint.0[0] - 0.96).abs() < 0.00001);
+        assert!((midpoint.0[1] - 29.2).abs() < 0.00001);
+        cx.update(|window, cx| {
+            view.update(cx, |view, _| view.target = start.clone());
+            window.draw(cx).clear(cx);
+        });
+        assert_eq!(*sample.borrow(), midpoint, "reversal must not jump");
+        cx.executor().advance_clock(Duration::from_millis(50));
+        cx.update(|window, cx| {
+            window.refresh();
+            window.draw(cx).clear(cx);
+        });
+        let reversing = sample.borrow().clone();
+        assert!(reversing.0[0] > 0. && reversing.0[0] < midpoint.0[0]);
+        assert!(reversing.0[1] > 10. && reversing.0[1] < midpoint.0[1]);
+        cx.update(|window, cx| {
+            cx.set_reduce_motion(true);
+            window.refresh();
+            window.draw(cx).clear(cx);
+        });
+        assert_eq!(
+            *sample.borrow(),
+            start,
+            "reduced motion finishes immediately"
+        );
+        cx.update(|window, cx| {
+            view.update(cx, |view, _| view.target = target.clone());
+            window.draw(cx).clear(cx);
+        });
+        assert_eq!(*sample.borrow(), target);
+        cx.update(|window, cx| {
+            cx.set_reduce_motion(false);
+            view.update(cx, |view, _| view.target = start.clone());
+            window.draw(cx).clear(cx);
+        });
+        assert_eq!(
+            *sample.borrow(),
+            target,
+            "restoring motion retains presentation"
+        );
+        cx.executor().advance_clock(Duration::from_millis(250));
+        cx.update(|window, cx| {
+            window.refresh();
+            window.draw(cx).clear(cx);
+        });
+        assert_eq!(*sample.borrow(), start);
     }
 }
