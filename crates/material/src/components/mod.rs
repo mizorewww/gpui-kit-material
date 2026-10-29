@@ -28,9 +28,9 @@ pub use button_group::ConnectedButtonGroup;
 pub use caption::{Caption, CaptionButton, CaptionButtons, CaptionLabels, title_bar_control};
 pub use choice::{ChoiceGroup, ChoiceTile, Tint, choice_radio, tinted_icon};
 pub use feedback::{
-    AssistChip, BADGE_CONTAINER, BADGE_LABEL, BadgeKind, CARD_PADDING, CHIP_HEIGHT, CardVariant,
-    LARGE_BADGE_PADDING, LARGE_BADGE_SIZE, NoticeKind, SMALL_BADGE_SIZE, Snackbar, StatusKind,
-    badge, card, card_surface, chip, large_badge, notice_banner, outlined_badge,
+    AssistChip, BADGE_CONTAINER, BADGE_LABEL, BadgeKind, CARD_PADDING, CHIP_HEIGHT, CardSurface,
+    CardVariant, LARGE_BADGE_PADDING, LARGE_BADGE_SIZE, NoticeKind, SMALL_BADGE_SIZE, Snackbar,
+    StatusKind, badge, card, card_surface, chip, large_badge, notice_banner, outlined_badge,
     outlined_status_chip, small_badge, status_chip,
 };
 pub use focus::{FocusRing, RevealFocus, RingedButton, contain_scroll};

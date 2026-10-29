@@ -375,30 +375,156 @@ fn card_style(variant: CardVariant) -> CardStyle {
     }
 }
 
-/// The inner padding of an M3 card's content (16dp). It shares a ruler with
-/// the card's text, so it follows the text scale.
+/// Compatibility helper padding from the reference's 16px content examples.
+/// The reference card surface itself has no padding.
 pub const CARD_PADDING: Rems = rem(16.);
 
-/// An M3 card of `variant`: its container role, elevation, outline (outlined
-/// only), medium (12dp) corners and 16dp padding. Callers chain their own
-/// gap and contents.
-pub fn card(variant: CardVariant) -> Div {
-    let style = card_style(variant);
-    gpui_base::v_flex()
-        .w_full()
-        .p(CARD_PADDING)
-        .bg(color(style.container))
-        .when_some(style.outline, |card, outline| {
-            card.border_1().border_color(color(outline))
-        })
-        .rounded(RADIUS_CARD)
-        .shadow(elevation::level(style.elevation))
+/// Static Material card surface, without implicit padding or full width.
+///
+/// Fast's native overflow handling clips children to the rounded shape. The
+/// upstream backend currently provides rectangular overflow clipping only;
+/// rounded content clipping there remains unsupported. Interactive card states
+/// and their animations are outside this static surface's scope.
+///
+/// The outline paints above content without participating in layout.
+pub struct CardSurface {
+    inner: Div,
+    outline: Option<ColorRole>,
+}
+impl CardSurface {
+    pub fn new(variant: CardVariant) -> Self {
+        let style = card_style(variant);
+        Self {
+            inner: gpui_base::v_flex()
+                .bg(color(style.container))
+                .text_color(color(ON_SURFACE))
+                .overflow_hidden()
+                .rounded(RADIUS_CARD)
+                .shadow(elevation::level(style.elevation)),
+            outline: style.outline,
+        }
+    }
+}
+impl Styled for CardSurface {
+    fn style(&mut self) -> &mut StyleRefinement {
+        self.inner.style()
+    }
+}
+impl ParentElement for CardSurface {
+    fn extend(&mut self, elements: impl IntoIterator<Item = AnyElement>) {
+        self.inner.extend(elements);
+    }
+}
+impl InteractiveElement for CardSurface {
+    fn interactivity(&mut self) -> &mut Interactivity {
+        self.inner.interactivity()
+    }
+}
+impl IntoElement for CardSurface {
+    type Element = Self;
+    fn into_element(self) -> Self {
+        self
+    }
+}
+impl Element for CardSurface {
+    type RequestLayoutState = <Div as Element>::RequestLayoutState;
+    type PrepaintState = <Div as Element>::PrepaintState;
+    fn id(&self) -> Option<ElementId> {
+        Element::id(&self.inner)
+    }
+    fn source_location(&self) -> Option<&'static core::panic::Location<'static>> {
+        Element::source_location(&self.inner)
+    }
+    fn a11y_role(&self) -> Option<accesskit::Role> {
+        self.inner.a11y_role()
+    }
+    fn write_a11y_info(&self, node: &mut accesskit::Node) {
+        self.inner.write_a11y_info(node);
+    }
+    fn a11y_synthetic_children(
+        &mut self,
+        prepaint: &mut Self::PrepaintState,
+        builder: &mut A11ySubtreeBuilder,
+    ) {
+        self.inner.a11y_synthetic_children(prepaint, builder);
+    }
+    fn request_layout(
+        &mut self,
+        id: Option<&GlobalElementId>,
+        inspector: Option<&InspectorElementId>,
+        window: &mut Window,
+        cx: &mut App,
+    ) -> (LayoutId, Self::RequestLayoutState) {
+        self.inner.request_layout(id, inspector, window, cx)
+    }
+    fn prepaint(
+        &mut self,
+        id: Option<&GlobalElementId>,
+        inspector: Option<&InspectorElementId>,
+        bounds: Bounds<Pixels>,
+        state: &mut Self::RequestLayoutState,
+        window: &mut Window,
+        cx: &mut App,
+    ) -> Self::PrepaintState {
+        self.inner
+            .prepaint(id, inspector, bounds, state, window, cx)
+    }
+    fn paint(
+        &mut self,
+        id: Option<&GlobalElementId>,
+        inspector: Option<&InspectorElementId>,
+        bounds: Bounds<Pixels>,
+        state: &mut Self::RequestLayoutState,
+        prepaint: &mut Self::PrepaintState,
+        window: &mut Window,
+        cx: &mut App,
+    ) {
+        let style = self
+            .inner
+            .interactivity()
+            .compute_style(id, prepaint.as_ref(), window, cx);
+        self.inner
+            .paint(id, inspector, bounds, state, prepaint, window, cx);
+        if let Some(role) = self.outline
+            && style.visibility != Visibility::Hidden
+            && style.display != Display::None
+        {
+            let radii = style
+                .corner_radii
+                .to_pixels(window.rem_size())
+                .clamp_radii_for_quad_size(bounds.size);
+            // Match GPUI's local multiplication; paint_quad applies ancestor
+            // opacity. Neither path clamps the local opacity here.
+            let mut outline: Hsla = color(role).into();
+            outline.a *= style.opacity.unwrap_or(1.);
+            window.paint_quad(quad(
+                bounds,
+                radii,
+                rgba(0x00000000),
+                px(1.),
+                outline,
+                BorderStyle::default(),
+            ));
+        }
+    }
 }
 
-/// An elevated card; kept for callers of the earlier single card style.
-pub fn card_surface() -> Div {
+/// Compatibility appearance helper: full width and 16dp example padding.
+/// Returns [`CardSurface`] instead of the earlier `Div`; Styled and
+/// ParentElement chains remain supported. Use [`CardSurface::new`] for the
+/// reference's unpadded surface, then supply caller-owned content spacing.
+pub fn card(variant: CardVariant) -> CardSurface {
+    CardSurface::new(variant).w_full().p(CARD_PADDING)
+}
+
+/// Elevated compatibility helper, retaining full width and example padding.
+pub fn card_surface() -> CardSurface {
     card(CardVariant::Elevated)
 }
+
+#[cfg(test)]
+#[path = "card_tests.rs"]
+mod card_tests;
 
 /// M3 snackbars sit at elevation level 3.
 const SNACKBAR_ELEVATION: u8 = 3;
