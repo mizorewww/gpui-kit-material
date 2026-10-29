@@ -18,6 +18,67 @@ use std::{
     time::{Duration, Instant},
 };
 
+// Signed offsets preserve queued signals that predate driver installation.
+fn journal_offset(at: Instant, origin: Instant) -> i128 {
+    if let Some(elapsed) = at.checked_duration_since(origin) {
+        elapsed.as_nanos() as i128
+    } else {
+        -(origin.duration_since(at).as_nanos() as i128)
+    }
+}
+
+#[derive(Default)]
+struct JournalEvidence {
+    entries: Vec<Value>,
+    batches: Vec<Value>,
+    lost: u64,
+}
+impl JournalEvidence {
+    fn drain(&mut self, batch: profiler::journal::DrainedEntries, id: WindowId, origin: Instant) {
+        use profiler::journal::{
+            ForegroundJournalEntry as Entry, FrameSkipReason, IntervalBoundary,
+        };
+        self.lost = self.lost.saturating_add(batch.lost);
+        self.batches
+            .push(json!({"entries":batch.entries.len(),"lost":batch.lost}));
+        for entry in batch.entries {
+            let value = match entry {
+                Entry::PlatformSignal(signal) if signal.window_id == id => json!({
+                    "kind":"platform_signal",
+                    "signal_at_ns":signal.signal_at.map(|at|journal_offset(at, origin)),
+                    "handled_at_ns":journal_offset(signal.handled_at, origin),
+                    "source":match signal.source {
+                        gpui::FrameRequestSource::NativeCallback => "native_callback",
+                        gpui::FrameRequestSource::LocalSchedule => "local_schedule",
+                    }
+                }),
+                Entry::Boundary(IntervalBoundary::FrameSkipped(skip)) if skip.window_id == id => {
+                    json!({
+                        "kind":"frame_skipped","at_ns":journal_offset(skip.at, origin),
+                        "reason":match skip.reason {
+                            FrameSkipReason::NoRenderNeeded => "no_render_needed",
+                            FrameSkipReason::InactiveFrameRateLimit => "inactive_frame_rate_limit",
+                            FrameSkipReason::ThermalFrameRateLimit => "thermal_frame_rate_limit",
+                        }
+                    })
+                }
+                Entry::ReentrantFrameSkipped { window_id, at } if window_id == id => json!({
+                    "kind":"reentrant_frame_skipped","at_ns":journal_offset(at, origin)
+                }),
+                Entry::Discontinuity { lost } => json!({"kind":"discontinuity","lost":lost}),
+                _ => continue,
+            };
+            self.entries.push(value);
+        }
+    }
+    fn report(&self) -> Value {
+        json!({"entries":self.entries,"batches":self.batches,"lost":self.lost,
+            "scope":"existing foreground journal collected after driver installation; only target-window platform signals and published skips plus stream-wide discontinuities; skip reasons are not exhaustive; coalesced request sources are not wake counts; no new hot-path instrumentation",
+            "time_basis":"signed nanoseconds relative to driver started, same origin as raw observations; negative offsets preserve signals requested before installation; null signal_at means unavailable",
+            "loss_scope":"lost aggregates batch lost values once; discontinuity markers describe the same loss, not additional loss; shared foreground stream loss cannot be assigned to a window"})
+    }
+}
+
 /// Read cumulative counters only: never reset stats or enable per-node timing.
 fn engine_snapshot(window: &Window) -> Value {
     #[cfg(feature = "gpui-fast")]
@@ -94,6 +155,19 @@ impl From<ListState> for ScrollTarget {
         Self::List(list)
     }
 }
+/// Plain record of one dispatched wheel event; serialized only after capture.
+#[derive(Clone, Copy)]
+struct WheelInput {
+    ns: u128,
+    position: [f32; 2],
+    delta_y: f32,
+}
+/// Upper bound on per-second samples, so buffers are allocated once before
+/// measurement and never grow inside a measured frame.
+const MAX_SAMPLES_PER_SECOND: usize = 4_000;
+fn sample_capacity(duration: Duration) -> usize {
+    (duration.as_secs_f64().ceil() as usize + 1) * MAX_SAMPLES_PER_SECOND
+}
 #[derive(Clone, Copy, PartialEq)]
 struct Position {
     item: Option<usize>,
@@ -120,7 +194,7 @@ impl ScrollTarget {
             }
         }
     }
-    fn wheel(&self, down: bool, window: &mut Window, cx: &mut App) -> Option<Value> {
+    fn wheel(&self, down: bool, window: &mut Window, cx: &mut App) -> Option<WheelInput> {
         let bounds = match self {
             Self::Pixels(handle) => handle.bounds(),
             Self::List(list) => list.viewport_bounds(),
@@ -142,9 +216,30 @@ impl ScrollTarget {
             }),
             cx,
         );
-        Some(
-            json!({"position_px":[f32::from(position.x),f32::from(position.y)],"delta_y_px":delta}),
-        )
+        Some(WheelInput {
+            ns: 0,
+            position: [f32::from(position.x), f32::from(position.y)],
+            delta_y: delta,
+        })
+    }
+    fn at_end(&self) -> bool {
+        match self {
+            Self::Pixels(handle) => {
+                -f32::from(handle.offset().y) >= f32::from(handle.max_offset().y) - 0.5
+            }
+            // Unknown heights (None) are not the end: keep scrolling to measure.
+            Self::List(list) => list.is_scrolled_to_end() == Some(true),
+        }
+    }
+    fn at_top(&self) -> bool {
+        let position = self.position();
+        position.item.unwrap_or(0) == 0 && position.offset <= 0.
+    }
+    fn item_count(&self) -> Option<usize> {
+        match self {
+            Self::Pixels(_) => None,
+            Self::List(list) => Some(list.item_count()),
+        }
     }
     fn step(&self, down: bool) {
         let distance = if down { 8. } else { -8. };
@@ -161,11 +256,31 @@ impl ScrollTarget {
     }
 }
 
+/// Default input cadence. Input is driven by a timer, independent of frame
+/// callbacks, so the input rate never limits or follows the frame rate.
+const DEFAULT_INPUT_HZ: u32 = 1_000;
+fn input_interval_from_environment() -> anyhow::Result<Duration> {
+    let hz = match std::env::var("MATERIAL_SCROLL_INPUT_HZ") {
+        Ok(value) => value
+            .parse::<u32>()
+            .map_err(|_| anyhow::anyhow!("MATERIAL_SCROLL_INPUT_HZ must be an integer"))?,
+        Err(std::env::VarError::NotPresent) => DEFAULT_INPUT_HZ,
+        Err(_) => anyhow::bail!("MATERIAL_SCROLL_INPUT_HZ must be valid Unicode"),
+    };
+    anyhow::ensure!(
+        (100..=MAX_SAMPLES_PER_SECOND as u32 / 2).contains(&hz),
+        "MATERIAL_SCROLL_INPUT_HZ must be in 100..={}",
+        MAX_SAMPLES_PER_SECOND / 2
+    );
+    Ok(Duration::from_secs(1) / hz)
+}
+
 pub(super) struct Session {
     output: PathBuf,
     duration: Duration,
     collector: FrameTimingCollector,
     input_mode: InputMode,
+    input_interval: Duration,
 }
 impl Session {
     pub(super) fn from_prepared(
@@ -186,6 +301,7 @@ impl Session {
             duration,
             collector,
             input_mode: InputMode::from_environment()?,
+            input_interval: input_interval_from_environment()?,
         })
     }
 
@@ -213,6 +329,7 @@ impl Session {
         let window_id = window.window_handle().window_id();
         let handle = window.window_handle();
         let started = Instant::now();
+        let mut journal_collector = cx.foreground_journal().collector();
         let state = Rc::new(RefCell::new(Drive {
             started,
             duration: self.duration,
@@ -221,12 +338,15 @@ impl Session {
             engine_initial: engine_snapshot(window),
             engine_final: Value::Null,
             engine_environment: engine_environment(),
-            inputs: Vec::new(),
-            raw: Vec::new(),
+            inputs: Vec::with_capacity(sample_capacity(self.duration)),
+            raw: Vec::with_capacity(sample_capacity(self.duration)),
             errors: Vec::new(),
             previous: None,
             down: true,
-            leg_started: started,
+            input_interval: self.input_interval,
+            refresh_interval: window.refresh_interval(cx),
+            traversal: Traversal::default(),
+            new_draw_presents_ns: Vec::new(),
             moved_up: false,
             moved_down: false,
             stopped: false,
@@ -247,14 +367,42 @@ impl Session {
         }
         // Record the initial count/position; no startup sample is discarded.
         state.borrow_mut().observe(window, cx);
-        schedule(state.clone(), window);
         let executor = cx.background_executor().clone();
+        // Timer-driven input: each tick is one input event dispatched outside
+        // any frame callback. Frames are produced (or coalesced) by the engine
+        // on its own schedule, so the driver cannot pace frames to one input.
+        cx.spawn({
+            let state = state.clone();
+            let executor = executor.clone();
+            async move |cx| {
+                let interval = state.borrow().input_interval;
+                let mut next = Instant::now();
+                loop {
+                    next += interval;
+                    executor
+                        .timer(next.saturating_duration_since(Instant::now()))
+                        .await;
+                    if state.borrow().stopped {
+                        break;
+                    }
+                    let ticked = handle.update(cx, |_, window, cx| {
+                        tick(&mut state.borrow_mut(), window, cx);
+                    });
+                    if ticked.is_err() {
+                        break;
+                    }
+                }
+            }
+        })
+        .detach();
         cx.spawn(async move |cx| {
             let mut events = Vec::new();
             let mut cpu_errors = Vec::new();
             let mut batch_sizes = Vec::new();
+            let mut journal = JournalEvidence::default();
             loop {
                 executor.timer(Duration::from_millis(100)).await;
+                journal.drain(journal_collector.collect_unseen(), window_id, started);
                 let batch = self.collector.collect_unseen();
                 batch_sizes.push(batch.len());
                 if batch.len() >= (16 * 1024 * 1024) / std::mem::size_of::<FrameEvent>() {
@@ -285,7 +433,10 @@ impl Session {
                 cpu_errors.push("final profiler batch full; event loss cannot be excluded".into());
             }
             events.extend(final_batch);
+            journal.drain(journal_collector.collect_unseen(), window_id, started);
             profiler::set_trace_enabled(false);
+            let presents = new_draw_presents(&events, window_id, started);
+            state.borrow_mut().new_draw_presents_ns = presents;
             let cpu = finish_cpu(
                 events,
                 window_id,
@@ -293,7 +444,8 @@ impl Session {
                 cpu_errors,
                 batch_sizes,
             );
-            let report = state.borrow().report(cpu);
+            let mut report = state.borrow().report(cpu);
+            report["foreground_journal"] = journal.report();
             let code = report["exit_code"].as_i64().unwrap_or(2) as i32;
             if let Some(parent) = self.output.parent() {
                 let _ = std::fs::create_dir_all(parent);
@@ -325,7 +477,7 @@ struct Drive {
     duration: Duration,
     target: ScrollTarget,
     input_mode: InputMode,
-    inputs: Vec<Value>,
+    inputs: Vec<WheelInput>,
     engine_initial: Value,
     engine_final: Value,
     engine_environment: Value,
@@ -333,7 +485,12 @@ struct Drive {
     errors: Vec<String>,
     previous: Option<Position>,
     down: bool,
-    leg_started: Instant,
+    input_interval: Duration,
+    refresh_interval: Option<Duration>,
+    traversal: Traversal,
+    /// Exact CPU submission timestamps (present end, ns since driver start)
+    /// of newly drawn target-window frames, from the profiler's own events.
+    new_draw_presents_ns: Vec<i128>,
     moved_up: bool,
     moved_down: bool,
     stopped: bool,
@@ -355,6 +512,13 @@ impl Drive {
             } else {
                 self.moved_up = true;
             }
+        }
+        if self.raw.len() == self.raw.capacity() {
+            self.errors.push(
+                "observation buffer full; stopped rather than allocate while measuring".into(),
+            );
+            self.stopped = true;
+            return false;
         }
         self.raw.push(Observation {
             ns: self.started.elapsed().as_nanos(),
@@ -412,6 +576,52 @@ impl Drive {
         }).collect();
         let visited_items: std::collections::BTreeSet<_> =
             self.raw.iter().filter_map(|o| o.position.item).collect();
+        // Every top row from 0 to the deepest one must have been observed; the
+        // rows below the deepest top row were in the final viewport at the end.
+        let contiguous_top_rows = visited_items
+            .iter()
+            .enumerate()
+            .all(|(index, item)| index == *item);
+        let complete_traversal = self.traversal.laps >= 1
+            && (matches!(self.target, ScrollTarget::Pixels(_)) || contiguous_top_rows);
+        // Strict per-submission rate inside the measured driver span: the
+        // longest gap between consecutive newly drawn submissions bounds the
+        // minimum instantaneous FPS. Valid only when every one of those
+        // submissions is also counted as successful by the platform.
+        let span_end = self.raw.last().map_or(0, |o| o.ns as i128);
+        let in_span: Vec<i128> = self
+            .new_draw_presents_ns
+            .iter()
+            .copied()
+            .filter(|ns| (0..=span_end).contains(ns))
+            .collect();
+        let longest_gap_ns = in_span.windows(2).map(|w| w[1] - w[0]).max();
+        let strict_minimum_fps = longest_gap_ns.map(|gap| 1e9 / gap.max(1) as f64);
+        let counted_new_frames = self
+            .raw
+            .first()
+            .zip(self.raw.last())
+            .and_then(|(a, b)| a.count.zip(b.count))
+            .map(|(a, b)| b.saturating_sub(a));
+        let submissions_all_successful =
+            counted_new_frames.is_some_and(|count| count as usize >= in_span.len());
+        // VSync can read disabled while the compositor still paces drawable
+        // release at the display rate. Such a run cannot test the 500 FPS gate.
+        let mut full_rates: Vec<f64> = windows
+            .iter()
+            .filter(|w| w["partial"] == false)
+            .filter_map(|w| w["fps"].as_f64())
+            .collect();
+        full_rates.sort_by(f64::total_cmp);
+        let median_rate = full_rates.get(full_rates.len() / 2).copied();
+        let refresh_hz = self
+            .refresh_interval
+            .filter(|interval| !interval.is_zero())
+            .map(|interval| 1e9 / interval.as_nanos() as f64);
+        let display_paced = median_rate
+            .zip(refresh_hz)
+            .is_some_and(|(rate, hz)| rate <= hz * 1.1)
+            && self.raw.iter().all(|o| o.vsync == "disabled");
         let offset_min = self.raw.iter().map(|o| o.position.offset).reduce(f32::min);
         let offset_max = self.raw.iter().map(|o| o.position.offset).reduce(f32::max);
         let total_scrollable_pixels = match &self.target {
@@ -432,7 +642,25 @@ impl Drive {
         if minimum.is_none() {
             errors.push("no complete >=250ms observation window".into());
         }
-        json!({"schema":"gallery-scroll-observations-v1","input_mode":self.input_mode.name(),"raw_inputs":self.inputs,
+        if !complete_traversal {
+            errors.push("did not complete a full top-to-bottom-to-top Gallery traversal".into());
+        }
+        if display_paced {
+            errors.push(format!(
+                "invalid run: median new-frame rate {:.1} FPS is at or below the {:.1} Hz display refresh while VSync reads disabled; presentation is still display-paced",
+                median_rate.unwrap_or_default(),
+                refresh_hz.unwrap_or_default()
+            ));
+        }
+        if strict_minimum_fps.is_none() {
+            errors.push("fewer than two newly drawn submissions inside the driver span".into());
+        } else if !submissions_all_successful {
+            errors.push("platform counted fewer successful frames than newly drawn submissions; strict rate unproven".into());
+        }
+        let strict_fps_failure = strict_minimum_fps.is_some_and(|fps| fps < 500.);
+        let cpu_eligible = cpu["acceptance_eligible"].as_bool().unwrap_or(false);
+        let eligible = errors.is_empty() && cpu_eligible;
+        json!({"schema":"gallery-scroll-observations-v1","input_mode":self.input_mode.name(),"raw_inputs":self.inputs.iter().map(|i| json!({"timestamp_ns":i.ns,"position_px":i.position,"delta_y_px":i.delta_y})).collect::<Vec<_>>(),
             "engine_counters":{"initial":self.engine_initial,"final":self.engine_final,
                 "environment_overrides":self.engine_environment,
                 "scope":"cumulative window counters at driver install (after initial draw) and final observation; not per-frame metrics; counters are never reset and extra timing is not enabled; unavailable backend or missing final window is null"},"raw_observations":raw,"windows":windows,
@@ -442,57 +670,124 @@ impl Drive {
             "actual_vsync_final":self.raw.last().map(|o|o.vsync),
             "sampled_state_limit":"thermal_state and window_active are read during each observation; they do not prove state remained unchanged between observations; thermal getter calls the platform and its cost is included in driver work",
             "timing_domains":"CPU collector includes synchronous InitialDraw before open returns; FPS observations start when driver installs after open, not at CPU startup",
-            "coverage":{"visited_logical_items":visited_items,"observed_offset_min":offset_min,"observed_offset_max":offset_max,
-                "total_scrollable_pixels":total_scrollable_pixels,"visited_sections":null,"complete_gallery_traversal":false,
-                "limitation":"one-second alternating local legs; logical items listed only for ListState; section identity not instrumented, full Gallery coverage unverified"},
-            "acceptance_eligible":false,"exit_code":if known_cpu_failure||known_fps_failure {1}else{2},
-            "strict_fps_limit":"callback observation timestamps are not per-successful-submission timestamps; coalesced increments cannot prove individual frame intervals; the full-window counter also includes FPS overlay and animations, and cannot attribute every counted frame to scrolling",
-            "scope":"bidirectional main-content scrolling; programmatic mode refreshes on offset change, wheel mode dispatches through platform input without explicit refresh; startup and turns retained; GPU completion unmeasured"})
+            "coverage":{"visited_logical_items":visited_items,"item_count":self.target.item_count(),
+                "contiguous_top_rows_from_zero":contiguous_top_rows,"laps":self.traversal.laps,
+                "observed_offset_min":offset_min,"observed_offset_max":offset_max,
+                "total_scrollable_pixels":total_scrollable_pixels,"visited_sections":null,
+                "visited_sections_reason":"section identity is not exposed to the driver; row coverage is recorded instead",
+                "complete_gallery_traversal":complete_traversal,
+                "definition":"a lap scrolls from the top until the list reports it is at the end, then back to the top; turns happen only at real ends; rows below the deepest top row are in the final viewport"},
+            "input_driver":{"source":"foreground timer, independent of frame callbacks","interval_ns":self.input_interval.as_nanos(),"step_px":8},
+            "display_refresh_interval_ns":self.refresh_interval.map(|interval| interval.as_nanos()),
+            "median_full_window_fps":median_rate,"display_paced_while_vsync_disabled":display_paced,
+            "strict":{"newly_drawn_submissions_in_span":in_span.len(),"counted_successful_new_frames":counted_new_frames,
+                "all_submissions_successful":submissions_all_successful,"longest_submission_gap_ns":longest_gap_ns,
+                "minimum_instantaneous_fps":strict_minimum_fps,
+                "definition":"1e9 / longest gap between consecutive newly drawn submission end times (profiler Present events) inside the driver span; requires the platform success counter to cover every such submission"},
+            "acceptance_eligible":eligible,
+            "exit_code":if known_cpu_failure||known_fps_failure||strict_fps_failure {1} else if eligible {0} else {2},
+            "counter_limit":"the full-window counter also includes FPS overlay and animation frames; with input every interval, each frame still carries new scroll content",
+            "scope":"full top-bottom-top main-content traversal; programmatic mode refreshes on offset change, wheel mode dispatches through platform input without explicit refresh; startup and turns retained; GPU time is in cpu.gpu"})
     }
 }
-fn schedule(state: Rc<RefCell<Drive>>, window: &mut Window) {
-    if state.borrow().stopped {
+/// Present-end times of submissions that carry a new draw (not re-presents),
+/// relative to `origin`. Mirrors the CPU report's pairing: a Present is new
+/// when a Draw for that window arrived since the previous Present.
+fn new_draw_presents(events: &[FrameEvent], window: WindowId, origin: Instant) -> Vec<i128> {
+    let mut pending = false;
+    let mut presents = Vec::new();
+    for event in events {
+        match event {
+            FrameEvent::Draw(draw) if draw.window_id == window => pending = true,
+            FrameEvent::Present(present) if present.window_id == window && pending => {
+                pending = false;
+                presents.push(match present.present_end.checked_duration_since(origin) {
+                    Some(after) => after.as_nanos() as i128,
+                    None => -(origin.duration_since(present.present_end).as_nanos() as i128),
+                });
+            }
+            _ => {}
+        }
+    }
+    presents
+}
+
+/// Full-Gallery traversal state: top -> bottom -> top is one lap.
+#[derive(Default, Clone, Copy)]
+struct Traversal {
+    reached_end: bool,
+    laps: u32,
+    /// Last time the position changed, to detect a stalled traversal.
+    last_progress_ns: u128,
+}
+/// A leg that makes no progress for this long cannot prove continuous scrolling.
+const STALL_NS: u128 = 1_000_000_000;
+
+fn tick(drive: &mut Drive, window: &mut Window, cx: &mut App) {
+    if drive.stopped || drive.started.elapsed() >= drive.duration {
+        drive.stopped = true;
         return;
     }
-    window.on_next_frame(move |window, cx| {
-        let mut drive = state.borrow_mut();
-        if drive.stopped || drive.started.elapsed() >= drive.duration {
-            return;
+    let moved = drive.observe(window, cx);
+    if drive.stopped {
+        return;
+    }
+    if window.vsync_status() != VsyncStatus::Disabled {
+        drive.errors.push("VSync changed during scrolling".into());
+        drive.stopped = true;
+        return;
+    }
+    let now = drive.started.elapsed().as_nanos();
+    if moved {
+        drive.traversal.last_progress_ns = now;
+    }
+    // Turn only at the real ends of the Gallery, never on a timer.
+    if drive.down && drive.target.at_end() {
+        drive.traversal.reached_end = true;
+        drive.down = false;
+        drive.traversal.last_progress_ns = now;
+    } else if !drive.down && drive.target.at_top() {
+        if drive.traversal.reached_end {
+            drive.traversal.laps += 1;
+            drive.traversal.reached_end = false;
         }
-        let moved = drive.observe(window, cx);
-        if window.vsync_status() != VsyncStatus::Disabled {
-            drive.errors.push("VSync changed during scrolling".into());
-            drive.stopped = true;
-            return;
-        }
-        if drive.leg_started.elapsed() >= Duration::from_secs(1) || (!moved && drive.raw.len() > 2)
-        {
-            drive.down = !drive.down;
-            drive.leg_started = Instant::now();
-        }
-        match drive.input_mode {
-            InputMode::Programmatic => {
-                let before = drive.target.position();
-                drive.target.step(drive.down);
-                if drive.target.position() != before {
-                    window.refresh();
-                }
+        drive.down = true;
+        drive.traversal.last_progress_ns = now;
+    } else if now.saturating_sub(drive.traversal.last_progress_ns) > STALL_NS {
+        drive.errors.push(
+            "scrolling made no progress for 1 s before reaching a Gallery end; traversal unverified"
+                .into(),
+        );
+        drive.stopped = true;
+        return;
+    }
+    match drive.input_mode {
+        InputMode::Programmatic => {
+            let before = drive.target.position();
+            drive.target.step(drive.down);
+            if drive.target.position() != before {
+                window.refresh();
             }
-            InputMode::Wheel => {
-                if let Some(mut input) = drive.target.wheel(drive.down, window, cx) {
-                    input["timestamp_ns"] = json!(drive.started.elapsed().as_nanos());
-                    drive.inputs.push(input);
-                } else {
-                    drive
-                        .errors
-                        .push("main scroll viewport has no visible area for wheel input".into());
+        }
+        InputMode::Wheel => {
+            if let Some(mut input) = drive.target.wheel(drive.down, window, cx) {
+                input.ns = drive.started.elapsed().as_nanos();
+                if drive.inputs.len() == drive.inputs.capacity() {
+                    drive.errors.push(
+                        "input buffer full; stopped rather than allocate while measuring".into(),
+                    );
                     drive.stopped = true;
+                    return;
                 }
+                drive.inputs.push(input);
+            } else {
+                drive
+                    .errors
+                    .push("main scroll viewport has no visible area for wheel input".into());
+                drive.stopped = true;
             }
         }
-        drop(drive);
-        schedule(state, window);
-    });
+    }
 }
 
 #[cfg(test)]
@@ -544,6 +839,56 @@ mod tests {
         assert_eq!(events.get(), 2);
     }
 
+    #[test]
+    fn journal_offsets_preserve_negative_times_and_stream_loss() {
+        let origin = Instant::now();
+        assert_eq!(journal_offset(origin - Duration::from_nanos(7), origin), -7);
+        assert_eq!(journal_offset(origin + Duration::from_nanos(9), origin), 9);
+        assert_eq!(journal_offset(origin, origin), 0);
+        use profiler::journal::{
+            DrainedEntries, ForegroundJournalEntry as Entry, FrameSkipReason, FrameSkipped,
+            IntervalBoundary, PlatformSignal,
+        };
+        let id = WindowId::from(1);
+        let mut evidence = JournalEvidence::default();
+        evidence.drain(
+            DrainedEntries {
+                lost: 3,
+                entries: vec![
+                    Entry::PlatformSignal(PlatformSignal {
+                        window_id: id,
+                        signal_at: Some(origin - Duration::from_nanos(7)),
+                        handled_at: origin,
+                        source: gpui::FrameRequestSource::LocalSchedule,
+                    }),
+                    Entry::PlatformSignal(PlatformSignal {
+                        window_id: WindowId::from(2),
+                        signal_at: None,
+                        handled_at: origin,
+                        source: gpui::FrameRequestSource::NativeCallback,
+                    }),
+                    Entry::Boundary(IntervalBoundary::FrameSkipped(FrameSkipped {
+                        window_id: id,
+                        at: origin + Duration::from_nanos(9),
+                        reason: FrameSkipReason::ThermalFrameRateLimit,
+                    })),
+                    Entry::Discontinuity { lost: 3 },
+                ],
+            },
+            id,
+            origin,
+        );
+        let report = evidence.report();
+        assert_eq!(report["lost"], 3);
+        assert_eq!(report["entries"].as_array().unwrap().len(), 3);
+        assert_eq!(report["entries"][0]["signal_at_ns"], -7);
+        assert_eq!(report["entries"][0]["source"], "local_schedule");
+        assert_eq!(report["entries"][1]["at_ns"], 9);
+        assert_eq!(report["entries"][1]["reason"], "thermal_frame_rate_limit");
+        assert_eq!(report["entries"][2]["lost"], 3);
+        assert_eq!(report["batches"][0]["entries"], 4);
+    }
+
     fn drive(count: u64) -> Drive {
         let now = Instant::now();
         Drive {
@@ -558,7 +903,14 @@ mod tests {
             errors: Vec::new(),
             previous: None,
             down: false,
-            leg_started: now,
+            input_interval: Duration::from_millis(1),
+            refresh_interval: None,
+            traversal: Traversal {
+                reached_end: false,
+                laps: 1,
+                last_progress_ns: 0,
+            },
+            new_draw_presents_ns: Vec::new(),
             moved_up: true,
             moved_down: true,
             stopped: true,
@@ -591,6 +943,87 @@ mod tests {
                 },
             ],
         }
+    }
+    #[test]
+    fn display_paced_vsync_off_run_is_invalid() {
+        let mut paced = drive(15); // 60 FPS over the 250 ms window
+        paced.refresh_interval = Some(Duration::from_nanos(16_666_667));
+        let report = paced.report(json!({"acceptance_eligible":true}));
+        assert_eq!(report["display_paced_while_vsync_disabled"], true);
+        assert_eq!(report["acceptance_eligible"], false);
+        assert_eq!(report["exit_code"], 1);
+        let mut fast = drive(250);
+        fast.refresh_interval = Some(Duration::from_nanos(16_666_667));
+        assert_eq!(
+            fast.report(json!({}))["display_paced_while_vsync_disabled"],
+            false
+        );
+    }
+    #[test]
+    fn strict_rate_uses_longest_submission_gap_and_can_pass() {
+        let mut passing = drive(126);
+        // 126 submissions every 1.98 ms inside the 250 ms span.
+        passing.new_draw_presents_ns = (0..126).map(|i| i * 1_980_000).collect();
+        let report = passing.report(json!({"acceptance_eligible":true}));
+        assert_eq!(report["strict"]["longest_submission_gap_ns"], 1_980_000);
+        assert_eq!(report["errors"], json!([]));
+        assert_eq!(report["acceptance_eligible"], true);
+        assert_eq!(report["exit_code"], 0);
+        // One 2.1 ms gap is a failure even when the window average is 500+.
+        let mut gap = drive(126);
+        gap.new_draw_presents_ns = (0..126).map(|i| i * 1_900_000).collect();
+        gap.new_draw_presents_ns[60] += 200_000;
+        gap.new_draw_presents_ns[61] += 2_300_000;
+        let report = gap.report(json!({"acceptance_eligible":true}));
+        assert!(
+            report["strict"]["minimum_instantaneous_fps"]
+                .as_f64()
+                .unwrap()
+                < 500.
+        );
+        assert_eq!(report["exit_code"], 1);
+        // Uncounted submissions cannot prove success.
+        let mut uncounted = drive(10);
+        uncounted.new_draw_presents_ns = (0..126).map(|i| i * 1_980_000).collect();
+        assert_eq!(uncounted.report(json!({}))["acceptance_eligible"], false);
+    }
+    #[test]
+    fn incomplete_traversal_is_not_eligible() {
+        let mut partial = drive(126);
+        partial.traversal.laps = 0;
+        partial.new_draw_presents_ns = (0..126).map(|i| i * 1_980_000).collect();
+        let report = partial.report(json!({"acceptance_eligible":true}));
+        assert_eq!(report["coverage"]["complete_gallery_traversal"], false);
+        assert_eq!(report["acceptance_eligible"], false);
+        assert_eq!(report["exit_code"], 2);
+    }
+    #[test]
+    fn re_presents_are_not_new_draw_submissions() {
+        use gpui::profiler::{DrawPhases, FrameTiming, PresentTiming};
+        let origin = Instant::now();
+        let id = WindowId::from(1);
+        let draw = FrameTiming {
+            window_id: id,
+            dirty_at: None,
+            invalidations: 1,
+            draw_start: origin,
+            draw_end: origin + Duration::from_micros(100),
+            refresh_interval: None,
+            signal_at: None,
+            phases: DrawPhases::default(),
+        };
+        let present = |at: u64| PresentTiming {
+            window_id: id,
+            present_start: origin + Duration::from_micros(at),
+            present_end: origin + Duration::from_micros(at + 10),
+            animation_interval: None,
+        };
+        let events = [
+            FrameEvent::Draw(draw),
+            FrameEvent::Present(present(200)),
+            FrameEvent::Present(present(400)),
+        ];
+        assert_eq!(new_draw_presents(&events, id, origin), vec![210_000]);
     }
     #[test]
     fn window_rate_never_claims_strict_fps_acceptance_and_preserves_coalescing() {
