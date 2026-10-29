@@ -132,17 +132,68 @@ pub fn chip(leading_icon: bool) -> Div {
         .whitespace_nowrap()
 }
 
-/// A standard card: surface fill, tonal edge, 16px corners and level-1
-/// elevation. Callers chain their own gap and contents.
-pub fn card_surface() -> Div {
+/// The three M3 card variants.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CardVariant {
+    /// Surface-container-low with level-1 elevation and no outline.
+    Elevated,
+    /// Surface-container-highest, flat.
+    Filled,
+    /// Surface with a 1dp outline-variant edge, flat.
+    Outlined,
+}
+
+/// The resolved paint of a card variant.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct CardStyle {
+    container: ColorRole,
+    elevation: u8,
+    outline: Option<ColorRole>,
+}
+
+fn card_style(variant: CardVariant) -> CardStyle {
+    match variant {
+        CardVariant::Elevated => CardStyle {
+            container: SURFACE_CONTAINER_LOW,
+            elevation: 1,
+            outline: None,
+        },
+        CardVariant::Filled => CardStyle {
+            container: SURFACE_CONTAINER_HIGHEST,
+            elevation: 0,
+            outline: None,
+        },
+        CardVariant::Outlined => CardStyle {
+            container: SURFACE,
+            elevation: 0,
+            outline: Some(OUTLINE_VARIANT),
+        },
+    }
+}
+
+/// The inner padding of an M3 card's content (16dp). It shares a ruler with
+/// the card's text, so it follows the text scale.
+pub const CARD_PADDING: Rems = rem(16.);
+
+/// An M3 card of `variant`: its container role, elevation, outline (outlined
+/// only), medium (12dp) corners and 16dp padding. Callers chain their own
+/// gap and contents.
+pub fn card(variant: CardVariant) -> Div {
+    let style = card_style(variant);
     gpui_base::v_flex()
         .w_full()
-        .p_4()
-        .bg(color(ColorRole::SURFACE))
-        .border_1()
-        .border_color(color(ColorRole::CARD_LINE))
+        .p(CARD_PADDING)
+        .bg(color(style.container))
+        .when_some(style.outline, |card, outline| {
+            card.border_1().border_color(color(outline))
+        })
         .rounded(RADIUS_CARD)
-        .shadow(elevation::level1())
+        .shadow(elevation::level(style.elevation))
+}
+
+/// An elevated card; kept for callers of the earlier single card style.
+pub fn card_surface() -> Div {
+    card(CardVariant::Elevated)
 }
 
 /// M3 snackbars sit at elevation level 3.
@@ -313,6 +364,36 @@ mod tests {
             assert_eq!(h.actions, 1);
             assert_eq!(h.closes, 2);
         });
+    }
+
+    #[test]
+    fn card_variants_use_m3_container_roles_elevation_and_outline() {
+        assert_eq!(
+            card_style(CardVariant::Elevated),
+            CardStyle {
+                container: SURFACE_CONTAINER_LOW,
+                elevation: 1,
+                outline: None,
+            }
+        );
+        assert_eq!(
+            card_style(CardVariant::Filled),
+            CardStyle {
+                container: SURFACE_CONTAINER_HIGHEST,
+                elevation: 0,
+                outline: None,
+            }
+        );
+        assert_eq!(
+            card_style(CardVariant::Outlined),
+            CardStyle {
+                container: SURFACE,
+                elevation: 0,
+                outline: Some(OUTLINE_VARIANT),
+            }
+        );
+        assert_eq!(RADIUS_CARD, px(12.));
+        assert_eq!(CARD_PADDING, rem(16.));
     }
 
     #[test]
