@@ -35,6 +35,7 @@ struct Gallery {
     motion_target: bool,
     button_effects_disabled: bool,
     button_effects_tonal: bool,
+    button_ripple: bool,
 }
 
 impl Render for Gallery {
@@ -132,7 +133,7 @@ impl Render for Gallery {
             });
         let button_effects = gpui_base::v_flex()
             .gap(rem(12.))
-            .child(section_title("button-effects", "Button color transitions"))
+            .child(section_title("button-effects", "Button transitions"))
             .child(
                 gpui_base::h_flex()
                     .flex_wrap()
@@ -158,6 +159,19 @@ impl Render for Gallery {
                                 cx.notify();
                             }))
                             .reveal("reveal-toggle-button-variant", scroll),
+                    )
+                    .child(
+                        material_button("toggle-button-ripple", ButtonVariant::Outlined)
+                            .child(if self.button_ripple {
+                                "Turn ripple off"
+                            } else {
+                                "Turn ripple on"
+                            })
+                            .on_click(cx.listener(|this, _, _, cx| {
+                                this.button_ripple = !this.button_ripple;
+                                cx.notify();
+                            }))
+                            .reveal("reveal-toggle-button-ripple", scroll),
                     ),
             )
             .child(gpui_base::h_flex().flex_wrap().gap(rem(12.)).children(
@@ -171,6 +185,7 @@ impl Render for Gallery {
                         },
                     )
                     .disabled(self.button_effects_disabled)
+                    .ripple(self.button_ripple)
                     .icon(IconName::Check)
                     .child(variant.name())
                     .reveal(
@@ -667,6 +682,7 @@ pub fn run(application: gpui::Application) {
                         motion_target: false,
                         button_effects_disabled: false,
                         button_effects_tonal: false,
+                        button_ripple: true,
                         palette: PaletteId::Paper,
                         reference_theme: Some(ThemeId::Baseline),
                         reference_mode: ThemeMode::Light,
