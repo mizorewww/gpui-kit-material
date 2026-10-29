@@ -34,6 +34,7 @@ mod tabs;
 mod text;
 mod tile;
 mod title_bar;
+mod tooltip;
 
 pub use button_group::ConnectedButtonGroup;
 pub use caption::{Caption, CaptionButton, CaptionButtons, CaptionLabels, title_bar_control};
@@ -77,6 +78,7 @@ pub use tile::{
 pub use title_bar::{
     TitleBar, title_bar_leading, title_bar_window_options, traffic_light_position,
 };
+pub use tooltip::{MaterialTooltip, PLAIN_TOOLTIP_MAX_WIDTH, RICH_TOOLTIP_WIDTH};
 
 pub(crate) fn init(cx: &mut gpui::App) {
     button_group::init(cx);
