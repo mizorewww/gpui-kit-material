@@ -400,7 +400,14 @@
       "reference": "https://md3.io/components/divider/",
       "status": "unreviewed",
       "cases": [],
-      "reviews": []
+      "reviews": [],
+      "evidence": [
+        {
+          "kind": "browser-layout-and-setter-matrix",
+          "path": "conformance/reference/divider.json",
+          "scope": "Pinned createDivider and full stylesheet: horizontal/vertical, three variants, LTR/RTL, baseline light/dark, four root font scales, block/flex-row/flex-row-center/flex-column and plain/list/card ancestors; custom insets/thickness/color and setter round trips. Full matrix independently sampled with reduced motion and compared to normal. Reference behavior only; implementation, raster and accessibility-tree conformance remain pending."
+        }
+      ]
     },
     {
       "id": "dialog",
