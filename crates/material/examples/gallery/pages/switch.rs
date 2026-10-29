@@ -1,10 +1,20 @@
-//! Switch: every interaction state, selected and not, and a live switch.
+//! Switch: every interaction state, selected and not, with and without
+//! handle icons, and live switches.
 use super::prelude::*;
 
 pub struct Page {
     page: PageCx,
     checked: bool,
+    icons: bool,
 }
+
+/// The board's rows, in the kit's order: (selected, icons, row label).
+const TYPES: [(bool, SwitchIcons, &str); 4] = [
+    (true, SwitchIcons::None, "Selected"),
+    (true, SwitchIcons::Both, "Selected · icon"),
+    (false, SwitchIcons::None, "Unselected"),
+    (false, SwitchIcons::Both, "Unselected · icon"),
+];
 
 impl GalleryPage for Page {
     const INFO: PageInfo = PageInfo {
@@ -18,6 +28,7 @@ impl GalleryPage for Page {
         Self {
             page,
             checked: false,
+            icons: true,
         }
     }
 
@@ -36,39 +47,79 @@ impl GalleryPage for Page {
                 .columns(5)
                 .column_width(96.)
                 .column_labels(InteractionPreview::ALL.map(InteractionPreview::name))
-                .row_labels(["Selected", "Unselected"])
-                .cells([true, false].into_iter().flat_map(|checked| {
-                    InteractionPreview::ALL
+                .row_labels(TYPES.map(|(_, _, label)| label))
+                .cells(
+                    TYPES
                         .into_iter()
                         .enumerate()
-                        .map(move |(index, state)| {
-                            MaterialSwitch::new(
-                                ("switch-state", index + if checked { 0 } else { 5 }),
-                                state.name(),
+                        .flat_map(|(kind, (checked, icons, _))| {
+                            InteractionPreview::ALL.into_iter().enumerate().map(
+                                move |(index, state)| {
+                                    MaterialSwitch::new(
+                                        ("switch-state", kind * 5 + index),
+                                        state.name(),
+                                    )
+                                    .checked(checked)
+                                    .icons(icons)
+                                    .preview_state(state)
+                                },
                             )
-                            .checked(checked)
-                            .preview_state(state)
-                        })
-                }))
+                        }),
+                )
                 .into_any_element();
         }
-        spec::demo(
-            "live-switch",
-            "Switch in use",
+        let list = self.page.rows.list().clone();
+        let line = |id: &'static str, label: &'static str, switch: AnyElement| {
             div()
                 .flex()
                 .items_center()
                 .gap(rem(16.))
-                .child(accessible_text("switch-label", "Enable notifications"))
-                .child(
+                .child(accessible_text(id, label).text_color(color(ColorRole::ON_SURFACE)))
+                .child(switch)
+        };
+        spec::demo(
+            "live-switch",
+            "Switch in use",
+            spec::demo_row()
+                .gap(rem(48.))
+                .child(line(
+                    "switch-label",
+                    "Enable notifications",
                     MaterialSwitch::new("example-switch", "Enable notifications")
                         .checked(self.checked)
+                        .icons(if self.icons {
+                            SwitchIcons::Selected
+                        } else {
+                            SwitchIcons::None
+                        })
                         .on_change(cx.listener(|this, checked: &bool, _, cx| {
                             this.checked = *checked;
                             cx.notify();
                         }))
-                        .reveal("reveal-switch", self.page.rows.list()),
-                ),
+                        .reveal("reveal-switch", &list)
+                        .into_any_element(),
+                ))
+                .child(line(
+                    "icons-label",
+                    "Show icons",
+                    MaterialSwitch::new("icons-switch", "Show icons")
+                        .checked(self.icons)
+                        .icons(SwitchIcons::Both)
+                        .on_change(cx.listener(|this, checked: &bool, _, cx| {
+                            this.icons = *checked;
+                            cx.notify();
+                        }))
+                        .reveal("reveal-icons-switch", &list)
+                        .into_any_element(),
+                ))
+                .child(line(
+                    "disabled-switch-label",
+                    "Unavailable",
+                    MaterialSwitch::new("disabled-switch", "Unavailable")
+                        .checked(true)
+                        .disabled(true)
+                        .into_any_element(),
+                )),
         )
         .into_any_element()
     }
