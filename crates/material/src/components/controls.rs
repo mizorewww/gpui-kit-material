@@ -2,7 +2,12 @@
 //! Reference playgrounds: https://md3.io/components/{switch,slider,search,button}/.
 #[cfg(test)]
 use super::{ButtonVariant, material_button};
-use crate::{color::ColorRole, motion, theme::color, tokens::typography::rem};
+use crate::{
+    color::ColorRole,
+    motion,
+    theme::color,
+    tokens::typography::{TypeRole, rem},
+};
 use gpui::{prelude::*, *};
 use gpui_base::{
     input::{Input, InputState},
@@ -189,6 +194,9 @@ impl RenderOnce for MaterialSlider {
     }
 }
 
+/// The M3 search bar container: surface-container-high (not the highest).
+const SEARCH_CONTAINER: ColorRole = ColorRole::SURFACE_CONTAINER_HIGH;
+
 /// M3 search field. Editing, selection, clipboard and IME are owned by GPUI Base.
 #[derive(gpui::IntoElement)]
 pub struct SearchField {
@@ -224,9 +232,9 @@ impl RenderOnce for SearchField {
             .px(rem(16.))
             .gap(rem(16.))
             .rounded_full()
-            .bg(color(ColorRole::SURFACE_HIGH))
-            .text_color(color(ColorRole::INK))
-            .text_size(rem(16.))
+            .bg(color(SEARCH_CONTAINER))
+            .text_color(color(ColorRole::ON_SURFACE))
+            .text_size(TypeRole::BodyLarge.scale().font_size)
             .children(self.leading)
             .child(div().flex_1().min_w_0().child(Input::new(&self.state)))
             .children(self.trailing)
@@ -309,6 +317,12 @@ mod tests {
             slider_geometry(SliderAppearance::Expressive),
             (16., 4., 44.)
         );
+    }
+
+    #[core::prelude::v1::test]
+    fn search_bar_sits_on_surface_container_high() {
+        assert_eq!(SEARCH_CONTAINER, ColorRole::SURFACE_CONTAINER_HIGH);
+        assert_ne!(SEARCH_CONTAINER, ColorRole::SURFACE_CONTAINER_HIGHEST);
     }
 
     struct ControlsHarness {
