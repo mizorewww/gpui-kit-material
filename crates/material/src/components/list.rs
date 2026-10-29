@@ -322,19 +322,27 @@ fn control_preview(disabled: bool) -> InteractionPreview {
     }
 }
 
+/// The selection control embedded in a list item.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Control {
+    Checkbox,
+    Radio,
+    Switch,
+}
+
 fn control(
-    kind: &'static str,
+    id: &'static str,
+    kind: Control,
     label: &SharedString,
-    checked: Option<bool>,
-    switch: bool,
+    on: bool,
     disabled: bool,
 ) -> AnyElement {
     let preview = control_preview(disabled);
-    match (checked, switch) {
-        (Some(checked), false) if kind == "checkbox" => control_slot(
+    match kind {
+        Control::Checkbox => control_slot(
             24.,
-            MaterialCheckbox::new(kind, label.clone())
-                .state(if checked {
+            MaterialCheckbox::new(id, label.clone())
+                .state(if on {
                     CheckboxState::Checked
                 } else {
                     CheckboxState::Unchecked
@@ -342,22 +350,21 @@ fn control(
                 .preview_state(preview),
         )
         .into_any_element(),
-        (Some(selected), false) => control_slot(
+        Control::Radio => control_slot(
             24.,
-            MaterialRadio::new(kind, label.clone())
-                .selected(selected)
+            MaterialRadio::new(id, label.clone())
+                .selected(on)
                 .preview_state(preview),
         )
         .into_any_element(),
-        (Some(checked), true) => div()
+        Control::Switch => div()
             .flex_shrink_0()
             .child(
-                MaterialSwitch::new(kind, label.clone())
-                    .checked(checked)
+                MaterialSwitch::new(id, label.clone())
+                    .checked(on)
                     .preview_state(preview),
             )
             .into_any_element(),
-        _ => div().into_any_element(),
     }
 }
 
@@ -408,13 +415,13 @@ impl ListItem {
             ListLeading::Image(content) => thumbnail(56., 56., content).into_any_element(),
             ListLeading::Video(content) => thumbnail(114., 64., content).into_any_element(),
             ListLeading::Checkbox(checked) => {
-                control("checkbox", &label, Some(checked), false, disabled)
+                control("checkbox", Control::Checkbox, &label, checked, disabled)
             }
             ListLeading::Radio(selected) => {
-                control("radio", &label, Some(selected), false, disabled)
+                control("radio", Control::Radio, &label, selected, disabled)
             }
             ListLeading::Switch(checked) => {
-                control("switch", &label, Some(checked), true, disabled)
+                control("switch", Control::Switch, &label, checked, disabled)
             }
         })
     }
@@ -429,15 +436,23 @@ impl ListItem {
                 .size(rem(24.))
                 .child(icon.size(rem(24.)).color(ink))
                 .into_any_element(),
-            ListTrailing::Checkbox(checked) => {
-                control("trailing-checkbox", &label, Some(checked), false, disabled)
-            }
+            ListTrailing::Checkbox(checked) => control(
+                "trailing-checkbox",
+                Control::Checkbox,
+                &label,
+                checked,
+                disabled,
+            ),
             ListTrailing::Radio(selected) => {
-                control("trailing-radio", &label, Some(selected), false, disabled)
+                control("trailing-radio", Control::Radio, &label, selected, disabled)
             }
-            ListTrailing::Switch(checked) => {
-                control("trailing-switch", &label, Some(checked), true, disabled)
-            }
+            ListTrailing::Switch(checked) => control(
+                "trailing-switch",
+                Control::Switch,
+                &label,
+                checked,
+                disabled,
+            ),
         })
     }
 }
