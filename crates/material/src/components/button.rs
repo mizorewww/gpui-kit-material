@@ -1,10 +1,12 @@
 //! Material button presentation over GPUI Base activation and focus behavior.
 //! Reference: floor/material c910072f3fc5b660276731d8a935d7186f288364.
-//! Loading semantics are still pending.
+//! Controlled toggle and loading presentation over Base behavior.
 mod control;
 mod effects;
 mod focus_ring;
 mod hit_target;
+#[cfg(test)]
+mod loading_tests;
 mod ripple;
 mod ripple_clip;
 mod shadow;
@@ -419,6 +421,8 @@ type HoverCallback = std::rc::Rc<dyn Fn(&bool, &mut Window, &mut App)>;
 #[derive(IntoElement)]
 pub struct MaterialButton {
     #[cfg(test)]
+    progress_opacity_observer: Option<std::rc::Rc<std::cell::Cell<f32>>>,
+    #[cfg(test)]
     radius_observer: Option<std::rc::Rc<std::cell::Cell<f32>>>,
     #[cfg(test)]
     colors_observer: Option<std::rc::Rc<std::cell::Cell<(Rgba, Rgba, Rgba)>>>,
@@ -439,12 +443,16 @@ pub struct MaterialButton {
     shape: ButtonShape,
     disabled: bool,
     ripple: bool,
+    progress: Option<(bool, SharedString)>,
+    loading: Option<(bool, SharedString)>,
     style: StyleRefinement,
 }
 impl MaterialButton {
     pub fn new(id: impl Into<ElementId>) -> Self {
         let id = id.into();
         Self {
+            #[cfg(test)]
+            progress_opacity_observer: None,
             #[cfg(test)]
             radius_observer: None,
             #[cfg(test)]
@@ -466,6 +474,8 @@ impl MaterialButton {
             shape: ButtonShape::Round,
             disabled: false,
             ripple: true,
+            progress: None,
+            loading: None,
             style: StyleRefinement::default(),
         }
     }
@@ -522,6 +532,26 @@ impl MaterialButton {
     pub fn disabled(mut self, disabled: bool) -> Self {
         self.disabled = disabled;
         self.base = self.base.disabled(disabled);
+        self
+    }
+    /// Show an indeterminate indicator without changing activation or busy state.
+    /// The label names the progress indicator for assistive technology. Keep this
+    /// configuration present while hidden to retain its animation phase.
+    /// When combined with `loading`, either true flag shows the indicator.
+    pub fn progress(mut self, visible: bool, label: impl Into<SharedString>) -> Self {
+        self.progress = Some((visible, label.into()));
+        self
+    }
+    /// Show progress, expose busy, and suppress activation while `loading` is true.
+    ///
+    /// This is controlled presentation: the caller owns the loading flag, label
+    /// children, and independent `disabled` flag. Update children to show a loading
+    /// label; no previous label or disabled state is saved or restored internally.
+    /// `loading(false, label)` retains progress configuration and its clock. An
+    /// explicitly disabled button stays disabled when loading ends. The label
+    /// names the indicator for assistive technology, not the button's visible text.
+    pub fn loading(mut self, loading: bool, label: impl Into<SharedString>) -> Self {
+        self.loading = Some((loading, label.into()));
         self
     }
     /// Enable the pointer ripple (enabled by default).
@@ -585,8 +615,60 @@ impl StatefulInteractiveElement for MaterialButton {
     }
 }
 impl RenderOnce for MaterialButton {
-    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
+    fn render(mut self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         use gpui_base::StyledExt;
+        let loading = self.loading.as_ref().is_some_and(|(visible, _)| *visible);
+        let show_progress = loading || self.progress.as_ref().is_some_and(|(visible, _)| *visible);
+        self.disabled |= loading;
+        self.base = self.base.disabled(self.disabled).busy(loading);
+        let (progress_frame, progress_opacity) =
+            if self.loading.is_some() || self.progress.is_some() {
+                // The reference retains its canvas clock while display:none. Opacity
+                // transitions, unlike that clock, restart from the computed value on
+                // each new display, so a newly shown loading indicator starts at 0.7.
+                let mounted =
+                    window.use_keyed_state((self.id.clone(), "progress-mounted"), cx, |_, _| {
+                        (false, false, 0_u64)
+                    });
+                mounted.update(cx, |state, _| {
+                    if show_progress && !state.1 {
+                        state.2 += 1;
+                    }
+                    state.0 |= show_progress;
+                    state.1 = show_progress;
+                });
+                let (started, _, generation) = *mounted.read(cx);
+                let frame = started.then(|| {
+                    super::progress::sample_circular_progress(
+                        (self.id.clone(), "button-progress"),
+                        window,
+                        cx,
+                    )
+                });
+                let opacity = if show_progress {
+                    gpui_base::transition(
+                        ElementId::NamedChild(
+                            self.id.clone().into(),
+                            format!("progress-opacity-{generation}").into(),
+                        ),
+                        if self.disabled { 0.7_f32 } else { 1. },
+                        gpui_base::Transition::new(std::time::Duration::from_millis(100))
+                            .reduced_motion(gpui_base::ReducedMotion::Continue)
+                            .easing(gpui_base::Easing::cubic_bezier(0.2, 0., 0., 1.).unwrap()),
+                        window,
+                        cx,
+                    )
+                } else {
+                    1.
+                };
+                (frame, opacity)
+            } else {
+                (None, 1.)
+            };
+        #[cfg(test)]
+        if let Some(observer) = &self.progress_opacity_observer {
+            observer.set(progress_opacity);
+        }
         let g = self.size.geometry();
         let ty = g.typography.scale();
         let (bg_target, fg_target, border_target) = toggle_color_targets(
@@ -716,7 +798,7 @@ impl RenderOnce for MaterialButton {
             self.icon.as_ref().map(|_| self.icon_position),
             self.direction,
         );
-        let slot = self.icon.map(|icon| {
+        let slot = self.icon.filter(|_| !show_progress).map(|icon| {
             let icon = if self.disabled {
                 icon.color(disabled_icon_color)
             } else {
@@ -730,9 +812,41 @@ impl RenderOnce for MaterialButton {
                 .size(rem(self.size.icon_size()))
                 .child(icon.size(rem(self.size.icon_size())))
         });
-        let (leading, trailing) = match self.icon_position {
-            ButtonIconPosition::Leading => (slot, None),
-            ButtonIconPosition::Trailing => (None, slot),
+        let (leading, trailing) = if show_progress {
+            let label = if loading {
+                self.loading.as_ref()
+            } else {
+                self.progress.as_ref()
+            }
+            .expect("visible progress has caller configuration")
+            .1
+            .clone();
+            let indicator = super::progress::circular_progress(
+                (self.id.clone(), "button-progress-indicator"),
+                label,
+                progress_frame.expect("visible progress has a mounted clock"),
+                None,
+                size(rem(self.size.icon_size().min(24.)), rem(24.)),
+                progress_opacity,
+            );
+            (
+                Some(
+                    div()
+                        .flex()
+                        .items_center()
+                        .justify_center()
+                        .flex_shrink_0()
+                        .size(rem(self.size.icon_size()))
+                        .debug_selector(|| "material-button-progress-slot".into())
+                        .child(indicator),
+                ),
+                None,
+            )
+        } else {
+            match self.icon_position {
+                ButtonIconPosition::Leading => (slot, None),
+                ButtonIconPosition::Trailing => (None, slot),
+            }
         };
         let weak = pressed.downgrade();
         // A window exit must clear a held press even after the pointer has left

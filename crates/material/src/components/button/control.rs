@@ -15,6 +15,7 @@ pub(super) struct BaseControl {
     style: StyleRefinement,
     children: Vec<AnyElement>,
     disabled: bool,
+    busy: bool,
     label: Option<SharedString>,
     focus: Option<FocusHandle>,
     focusable: bool,
@@ -37,6 +38,7 @@ impl BaseControl {
             style: StyleRefinement::default(),
             children: vec![],
             disabled: false,
+            busy: false,
             label: None,
             focus: None,
             focusable: true,
@@ -51,6 +53,10 @@ impl BaseControl {
     }
     pub fn disabled(mut self, value: bool) -> Self {
         self.disabled = value;
+        self
+    }
+    pub fn busy(mut self, value: bool) -> Self {
+        self.busy = value;
         self
     }
     pub fn accessibility_label(mut self, value: impl Into<SharedString>) -> Self {
@@ -107,6 +113,7 @@ impl RenderOnce for BaseControl {
                 let mut base = $base;
                 std::mem::swap(base.interactivity(), self.interaction.interactivity());
                 base.disabled(self.disabled)
+                    .busy(self.busy)
                     .focusable(self.focusable)
                     .tab_index(self.tab_index)
                     .tab_stop(self.tab_stop)
