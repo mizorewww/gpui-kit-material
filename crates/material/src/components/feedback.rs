@@ -145,6 +145,9 @@ pub fn card_surface() -> Div {
         .shadow(elevation::level1())
 }
 
+/// M3 snackbars sit at elevation level 3.
+const SNACKBAR_ELEVATION: u8 = 3;
+
 type SnackbarHandler = Rc<dyn Fn(&ClickEvent, &mut Window, &mut App)>;
 
 /// M3 snackbar: a brief status message on the inverse surface, with an
@@ -225,7 +228,7 @@ impl RenderOnce for Snackbar {
             .bg(color(INVERSE_SURFACE))
             .text_color(color(INVERSE_ON_SURFACE))
             .text_size(TEXT_BODY)
-            .shadow(elevation::popover())
+            .shadow(elevation::level(SNACKBAR_ELEVATION))
             .child(
                 accessible_text(child("message"), self.message)
                     .role(Role::Status)
@@ -310,6 +313,12 @@ mod tests {
             assert_eq!(h.actions, 1);
             assert_eq!(h.closes, 2);
         });
+    }
+
+    #[test]
+    fn snackbar_uses_m3_elevation_level_3() {
+        assert_eq!(SNACKBAR_ELEVATION, 3);
+        assert_eq!(elevation::level(SNACKBAR_ELEVATION), elevation::level3());
     }
 
     #[gpui::test]
