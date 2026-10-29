@@ -1,14 +1,18 @@
 //! Material button presentation over GPUI Base activation and focus behavior.
 //! Reference: floor/material c910072f3fc5b660276731d8a935d7186f288364.
-//! Ripple, animated color/state layers, expanded touch targets and toggle/loading
-//! semantics are still pending; this module does not establish full conformance.
+//! Ripple, animated state layers/shadows, expanded touch targets and toggle/loading
+//! semantics are still pending. Color transitions currently inherit Base's reduced
+//! motion and repeated-reversal policies; this is not full reference conformance.
+mod effects;
 mod focus_ring;
+mod shadow;
+
+use effects::CssColor;
 
 use crate::{
     color::ColorRole,
     icons::Icon,
     motion::{self, MotionToken},
-    theme::color,
     tokens::typography::{TypeRole, rem},
 };
 use gpui::{prelude::*, *};
@@ -185,62 +189,50 @@ fn layer(container: Rgba, content: Rgba, opacity: f32) -> Rgba {
         a,
     }
 }
-fn colors(variant: ButtonVariant, disabled: bool) -> (Rgba, Rgba, Rgba) {
-    let transparent = gpui::rgba(0x00000000);
+fn color_targets(variant: ButtonVariant, disabled: bool) -> (CssColor, CssColor, CssColor) {
+    use ColorRole as C;
     if disabled {
         return (
             if matches!(variant, ButtonVariant::Text | ButtonVariant::Outlined) {
-                transparent
+                CssColor::transparent()
             } else {
-                alpha(color(ColorRole::ON_SURFACE), 0.10)
+                CssColor::alpha_role(C::ON_SURFACE, 0.10)
             },
-            alpha(color(ColorRole::ON_SURFACE_VARIANT), 0.38),
+            CssColor::alpha_role(C::ON_SURFACE_VARIANT, 0.38),
             if variant == ButtonVariant::Outlined {
-                alpha(color(ColorRole::OUTLINE_VARIANT), 0.10)
+                CssColor::alpha_role(C::OUTLINE_VARIANT, 0.10)
             } else {
-                transparent
+                CssColor::transparent()
             },
         );
     }
     let (bg, fg) = match variant {
-        ButtonVariant::Filled => (color(ColorRole::PRIMARY), color(ColorRole::ON_PRIMARY)),
-        ButtonVariant::Elevated => (
-            color(ColorRole::SURFACE_CONTAINER_LOW),
-            color(ColorRole::PRIMARY),
-        ),
+        ButtonVariant::Filled => (CssColor::role(C::PRIMARY), C::ON_PRIMARY),
+        ButtonVariant::Elevated => (CssColor::role(C::SURFACE_CONTAINER_LOW), C::PRIMARY),
         ButtonVariant::Tonal => (
-            color(ColorRole::SECONDARY_CONTAINER),
-            color(ColorRole::ON_SECONDARY_CONTAINER),
+            CssColor::role(C::SECONDARY_CONTAINER),
+            C::ON_SECONDARY_CONTAINER,
         ),
-        ButtonVariant::Outlined => (transparent, color(ColorRole::ON_SURFACE_VARIANT)),
-        ButtonVariant::Text => (transparent, color(ColorRole::PRIMARY)),
+        ButtonVariant::Outlined => (CssColor::transparent(), C::ON_SURFACE_VARIANT),
+        ButtonVariant::Text => (CssColor::transparent(), C::PRIMARY),
     };
     (
         bg,
-        fg,
+        CssColor::role(fg),
         if variant == ButtonVariant::Outlined {
-            color(ColorRole::OUTLINE_VARIANT)
+            CssColor::role(C::OUTLINE_VARIANT)
         } else {
-            transparent
+            CssColor::transparent()
         },
     )
 }
+#[cfg(test)]
+fn colors(variant: ButtonVariant, disabled: bool) -> (Rgba, Rgba, Rgba) {
+    let (bg, fg, border) = color_targets(variant, disabled);
+    (bg.resolve(), fg.resolve(), border.resolve())
+}
 fn elevation(level: u8) -> Vec<BoxShadow> {
-    match level {
-        1 => vec![
-            BoxShadow::new(px(0.), px(1.), gpui::black().opacity(0.3)).blur_radius(px(2.)),
-            BoxShadow::new(px(0.), px(1.), gpui::black().opacity(0.15))
-                .blur_radius(px(3.))
-                .spread_radius(px(1.)),
-        ],
-        2 => vec![
-            BoxShadow::new(px(0.), px(1.), gpui::black().opacity(0.3)).blur_radius(px(2.)),
-            BoxShadow::new(px(0.), px(2.), gpui::black().opacity(0.15))
-                .blur_radius(px(6.))
-                .spread_radius(px(2.)),
-        ],
-        _ => vec![],
-    }
+    shadow::ShadowPair::level(level).into_shadows()
 }
 
 /// Passive visual state. Base remains the only activation authority.
@@ -360,6 +352,8 @@ fn observe_press(
 pub struct MaterialButton {
     #[cfg(test)]
     radius_observer: Option<std::rc::Rc<std::cell::Cell<f32>>>,
+    #[cfg(test)]
+    colors_observer: Option<std::rc::Rc<std::cell::Cell<(Rgba, Rgba, Rgba)>>>,
     id: ElementId,
     focus_handle: Option<FocusHandle>,
     focusable: bool,
@@ -380,6 +374,8 @@ impl MaterialButton {
         Self {
             #[cfg(test)]
             radius_observer: None,
+            #[cfg(test)]
+            colors_observer: None,
             id: id.clone(),
             focus_handle: None,
             focusable: true,
@@ -476,12 +472,42 @@ impl RenderOnce for MaterialButton {
         use gpui_base::StyledExt;
         let g = self.size.geometry();
         let ty = g.typography.scale();
-        let (bg, fg, border) = colors(self.variant, self.disabled);
+        let (bg_target, fg_target, border_target) = color_targets(self.variant, self.disabled);
+        // Disabled icon CSS is an explicit child color without a transition.
+        let disabled_icon_color = fg_target.resolve();
+        let bg = motion::token_transition(
+            (self.id.clone(), "background-color"),
+            bg_target,
+            MotionToken::DefaultEffects,
+            window,
+            cx,
+        )
+        .resolve();
+        let fg = motion::token_transition(
+            (self.id.clone(), "foreground-color"),
+            fg_target,
+            MotionToken::DefaultEffects,
+            window,
+            cx,
+        )
+        .resolve();
+        let border = motion::token_transition(
+            (self.id.clone(), "border-color"),
+            border_target,
+            MotionToken::DefaultEffects,
+            window,
+            cx,
+        )
+        .resolve();
         let radius = if self.shape == ButtonShape::Round {
             g.height / 2.
         } else {
             g.square
         };
+        #[cfg(test)]
+        if let Some(observer) = &self.colors_observer {
+            observer.set((bg, fg, border));
+        }
         let focus = self.focus_handle.unwrap_or_else(|| {
             window
                 .use_keyed_state((self.id.clone(), "material-focus"), cx, |_, cx| {
@@ -521,7 +547,11 @@ impl RenderOnce for MaterialButton {
             self.direction,
         );
         let slot = self.icon.map(|icon| {
-            let icon = if self.disabled { icon.color(fg) } else { icon };
+            let icon = if self.disabled {
+                icon.color(disabled_icon_color)
+            } else {
+                icon
+            };
             div()
                 .flex()
                 .items_center()
@@ -619,6 +649,125 @@ mod tests {
         Context, IntoElement, Modifiers, Render, TestAppContext, VisualTestContext, Window, div,
         prelude::*, px, rgba,
     };
+
+    type PaintedColors = (gpui::Rgba, gpui::Rgba, gpui::Rgba);
+
+    struct ColorsHarness {
+        variant: ButtonVariant,
+        disabled: bool,
+        palette: crate::color::PaletteId,
+        sample: std::rc::Rc<std::cell::Cell<PaintedColors>>,
+    }
+
+    impl Render for ColorsHarness {
+        fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+            crate::motion::apply_scheme(crate::motion::MotionScheme::Expressive);
+            crate::theme::apply_palette(self.palette, window, cx);
+            let mut button = MaterialButton::new("colors-button")
+                .variant(self.variant)
+                .disabled(self.disabled)
+                .child("Colors");
+            button.colors_observer = Some(self.sample.clone());
+            button
+        }
+    }
+
+    fn assert_colors_close(actual: PaintedColors, expected: PaintedColors) {
+        for (actual, expected) in [
+            (actual.0, expected.0),
+            (actual.1, expected.1),
+            (actual.2, expected.2),
+        ] {
+            for (actual, expected) in [
+                (actual.r, expected.r),
+                (actual.g, expected.g),
+                (actual.b, expected.b),
+                (actual.a, expected.a),
+            ] {
+                assert!(
+                    (actual - expected).abs() < 0.00001,
+                    "{actual} != {expected}"
+                );
+            }
+        }
+    }
+
+    #[gpui::test]
+    fn rendered_button_colors_keep_state_timing_across_theme_changes(cx: &mut TestAppContext) {
+        use crate::color::PaletteId;
+        use std::{cell::Cell, rc::Rc, time::Duration};
+        cx.update(gpui_base::init);
+        let sample = Rc::new(Cell::new((rgba(0), rgba(0), rgba(0))));
+        let (view, cx) = cx.add_window_view({
+            let sample = sample.clone();
+            move |_, _| ColorsHarness {
+                variant: ButtonVariant::Filled,
+                disabled: false,
+                palette: PaletteId::Paper,
+                sample,
+            }
+        });
+        cx.update(|window, cx| {
+            cx.set_reduce_motion(true);
+            window.draw(cx).clear(cx);
+            cx.set_reduce_motion(false);
+        });
+        let initial = sample.get();
+        cx.update(|window, cx| {
+            view.update(cx, |view, _| view.variant = ButtonVariant::Tonal);
+            window.draw(cx).clear(cx);
+        });
+        assert_colors_close(sample.get(), initial);
+        cx.executor().advance_clock(Duration::from_millis(125));
+        draw(cx);
+        let filled = colors(ButtonVariant::Filled, false);
+        let tonal = colors(ButtonVariant::Tonal, false);
+        assert_colors_close(
+            sample.get(),
+            (
+                crate::theme::blend(filled.0, tonal.0, 0.96),
+                crate::theme::blend(filled.1, tonal.1, 0.96),
+                tonal.2,
+            ),
+        );
+        let midpoint = sample.get();
+        cx.update(|window, cx| {
+            view.update(cx, |view, _| view.palette = PaletteId::Ink);
+            window.draw(cx).clear(cx);
+        });
+        assert_colors_close(sample.get(), midpoint);
+        cx.executor().advance_clock(Duration::from_millis(125));
+        draw(cx);
+        assert_ne!(
+            crate::theme::scheme(),
+            crate::color::Scheme::from_palette(PaletteId::Paper)
+        );
+        assert_colors_close(sample.get(), colors(ButtonVariant::Tonal, false));
+
+        cx.update(|window, cx| {
+            view.update(cx, |view, _| view.disabled = true);
+            window.draw(cx).clear(cx);
+        });
+        cx.executor().advance_clock(Duration::from_millis(50));
+        draw(cx);
+        let disabling = sample.get();
+        assert!(disabling.0.a > 0.10 && disabling.0.a < 1.);
+        assert!(disabling.1.a > 0.38 && disabling.1.a < 1.);
+        cx.update(|window, cx| {
+            view.update(cx, |view, _| view.disabled = false);
+            window.draw(cx).clear(cx);
+        });
+        assert_colors_close(sample.get(), disabling);
+        cx.executor().advance_clock(Duration::from_millis(250));
+        draw(cx);
+        assert_colors_close(sample.get(), colors(ButtonVariant::Tonal, false));
+        cx.update(|window, cx| {
+            cx.set_reduce_motion(true);
+            view.update(cx, |view, _| view.disabled = true);
+            window.draw(cx).clear(cx);
+        });
+        assert_colors_close(sample.get(), colors(ButtonVariant::Tonal, true));
+    }
 
     #[test]
     fn transparent_state_layers_preserve_content_rgb_and_opacity() {
