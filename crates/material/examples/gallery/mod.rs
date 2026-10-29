@@ -33,6 +33,8 @@ struct Gallery {
     sheet: bool,
     motion_scheme: motion::MotionScheme,
     motion_target: bool,
+    button_effects_disabled: bool,
+    button_effects_tonal: bool,
 }
 
 impl Render for Gallery {
@@ -128,6 +130,55 @@ impl Render for Gallery {
                             .text_size(TEXT_AUX),
                     )
             });
+        let button_effects = gpui_base::v_flex()
+            .gap(rem(12.))
+            .child(section_title("button-effects", "Button color transitions"))
+            .child(
+                gpui_base::h_flex()
+                    .flex_wrap()
+                    .gap(rem(12.))
+                    .child(
+                        material_button("toggle-button-disabled", ButtonVariant::Outlined)
+                            .child(if self.button_effects_disabled {
+                                "Enable samples"
+                            } else {
+                                "Disable samples"
+                            })
+                            .on_click(cx.listener(|this, _, _, cx| {
+                                this.button_effects_disabled = !this.button_effects_disabled;
+                                cx.notify();
+                            }))
+                            .reveal("reveal-toggle-button-disabled", scroll),
+                    )
+                    .child(
+                        material_button("toggle-button-variant", ButtonVariant::Outlined)
+                            .child("Switch filled / tonal")
+                            .on_click(cx.listener(|this, _, _, cx| {
+                                this.button_effects_tonal = !this.button_effects_tonal;
+                                cx.notify();
+                            }))
+                            .reveal("reveal-toggle-button-variant", scroll),
+                    ),
+            )
+            .child(gpui_base::h_flex().flex_wrap().gap(rem(12.)).children(
+                ButtonVariant::ALL.into_iter().map(|variant| {
+                    material_button(
+                        SharedString::from(format!("effect-sample-{variant:?}")),
+                        if variant == ButtonVariant::Filled && self.button_effects_tonal {
+                            ButtonVariant::Tonal
+                        } else {
+                            variant
+                        },
+                    )
+                    .disabled(self.button_effects_disabled)
+                    .icon(IconName::Check)
+                    .child(variant.name())
+                    .reveal(
+                        SharedString::from(format!("reveal-effect-sample-{variant:?}")),
+                        scroll,
+                    )
+                }),
+            ));
         let button_icons = gpui_base::v_flex()
             .gap(rem(16.))
             .child(section_title("button-icons", "Button icons"))
@@ -503,6 +554,7 @@ impl Render for Gallery {
                                     }),
                                 )
                             }))
+                            .child(button_effects)
                             .child(button_icons)
                             .child(gpui_base::h_flex().flex_wrap().gap(rem(12.)).children(
                                 ButtonVariant::ALL.into_iter().map(|variant| {
@@ -613,6 +665,8 @@ pub fn run(application: gpui::Application) {
                         sheet: false,
                         motion_scheme: motion::MotionScheme::Expressive,
                         motion_target: false,
+                        button_effects_disabled: false,
+                        button_effects_tonal: false,
                         palette: PaletteId::Paper,
                         reference_theme: Some(ThemeId::Baseline),
                         reference_mode: ThemeMode::Light,
