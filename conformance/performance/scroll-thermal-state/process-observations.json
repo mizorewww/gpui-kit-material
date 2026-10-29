@@ -1,0 +1,1230 @@
+{
+  "scope": "sampled process presence only; not continuous workload accounting; compilation may overlap capture",
+  "observations": [
+    {
+      "unix_time_ns": 1793284513778806000,
+      "processes": [
+        {
+          "pid": 55716,
+          "cpu_percent": 0.0,
+          "executable": "cargo"
+        },
+        {
+          "pid": 55961,
+          "cpu_percent": 65.5,
+          "executable": "gallery"
+        },
+        {
+          "pid": 56019,
+          "cpu_percent": 0.0,
+          "executable": "cargo"
+        },
+        {
+          "pid": 56090,
+          "cpu_percent": 15.7,
+          "executable": "rustc"
+        },
+        {
+          "pid": 56091,
+          "cpu_percent": 22.5,
+          "executable": "rustc"
+        },
+        {
+          "pid": 56092,
+          "cpu_percent": 22.9,
+          "executable": "rustc"
+        },
+        {
+          "pid": 56100,
+          "cpu_percent": 22.9,
+          "executable": "rustc"
+        },
+        {
+          "pid": 56101,
+          "cpu_percent": 21.1,
+          "executable": "rustc"
+        },
+        {
+          "pid": 56126,
+          "cpu_percent": 17.4,
+          "executable": "cargo"
+        },
+        {
+          "pid": 56130,
+          "cpu_percent": 21.9,
+          "executable": "rustc"
+        }
+      ]
+    },
+    {
+      "unix_time_ns": 1793284514400567000,
+      "processes": [
+        {
+          "pid": 55716,
+          "cpu_percent": 0.0,
+          "executable": "cargo"
+        },
+        {
+          "pid": 55961,
+          "cpu_percent": 61.5,
+          "executable": "gallery"
+        },
+        {
+          "pid": 56019,
+          "cpu_percent": 0.0,
+          "executable": "cargo"
+        },
+        {
+          "pid": 56090,
+          "cpu_percent": 1.4,
+          "executable": "rustc"
+        },
+        {
+          "pid": 56091,
+          "cpu_percent": 7.9,
+          "executable": "rustc"
+        },
+        {
+          "pid": 56092,
+          "cpu_percent": 4.2,
+          "executable": "rustc"
+        },
+        {
+          "pid": 56100,
+          "cpu_percent": 13.8,
+          "executable": "rustc"
+        },
+        {
+          "pid": 56101,
+          "cpu_percent": 12.3,
+          "executable": "rustc"
+        },
+        {
+          "pid": 56126,
+          "cpu_percent": 9.3,
+          "executable": "cargo"
+        },
+        {
+          "pid": 56130,
+          "cpu_percent": 14.1,
+          "executable": "rustc"
+        }
+      ]
+    },
+    {
+      "unix_time_ns": 1793284515075952000,
+      "processes": [
+        {
+          "pid": 55716,
+          "cpu_percent": 0.0,
+          "executable": "cargo"
+        },
+        {
+          "pid": 55961,
+          "cpu_percent": 66.7,
+          "executable": "gallery"
+        },
+        {
+          "pid": 56019,
+          "cpu_percent": 0.0,
+          "executable": "cargo"
+        },
+        {
+          "pid": 56090,
+          "cpu_percent": 0.1,
+          "executable": "rustc"
+        },
+        {
+          "pid": 56091,
+          "cpu_percent": 9.7,
+          "executable": "rustc"
+        },
+        {
+          "pid": 56092,
+          "cpu_percent": 0.3,
+          "executable": "rustc"
+        },
+        {
+          "pid": 56100,
+          "cpu_percent": 8.4,
+          "executable": "rustc"
+        },
+        {
+          "pid": 56101,
+          "cpu_percent": 10.7,
+          "executable": "rustc"
+        },
+        {
+          "pid": 56126,
+          "cpu_percent": 11.1,
+          "executable": "cargo"
+        },
+        {
+          "pid": 56130,
+          "cpu_percent": 20.7,
+          "executable": "rustc"
+        }
+      ]
+    },
+    {
+      "unix_time_ns": 1793284515719576000,
+      "processes": [
+        {
+          "pid": 55716,
+          "cpu_percent": 0.0,
+          "executable": "cargo"
+        },
+        {
+          "pid": 55961,
+          "cpu_percent": 66.0,
+          "executable": "gallery"
+        },
+        {
+          "pid": 56019,
+          "cpu_percent": 0.0,
+          "executable": "cargo"
+        },
+        {
+          "pid": 56090,
+          "cpu_percent": 0.0,
+          "executable": "rustc"
+        },
+        {
+          "pid": 56091,
+          "cpu_percent": 0.6,
+          "executable": "rustc"
+        },
+        {
+          "pid": 56092,
+          "cpu_percent": 0.0,
+          "executable": "rustc"
+        },
+        {
+          "pid": 56100,
+          "cpu_percent": 13.3,
+          "executable": "rustc"
+        },
+        {
+          "pid": 56101,
+          "cpu_percent": 11.2,
+          "executable": "rustc"
+        },
+        {
+          "pid": 56126,
+          "cpu_percent": 14.1,
+          "executable": "cargo"
+        },
+        {
+          "pid": 56130,
+          "cpu_percent": 11.1,
+          "executable": "rustc"
+        }
+      ]
+    },
+    {
+      "unix_time_ns": 1793284516370378000,
+      "processes": [
+        {
+          "pid": 55716,
+          "cpu_percent": 0.0,
+          "executable": "cargo"
+        },
+        {
+          "pid": 55961,
+          "cpu_percent": 76.1,
+          "executable": "gallery"
+        },
+        {
+          "pid": 56019,
+          "cpu_percent": 0.0,
+          "executable": "cargo"
+        },
+        {
+          "pid": 56090,
+          "cpu_percent": 0.0,
+          "executable": "rustc"
+        },
+        {
+          "pid": 56091,
+          "cpu_percent": 0.0,
+          "executable": "rustc"
+        },
+        {
+          "pid": 56092,
+          "cpu_percent": 0.0,
+          "executable": "rustc"
+        },
+        {
+          "pid": 56100,
+          "cpu_percent": 13.3,
+          "executable": "rustc"
+        },
+        {
+          "pid": 56101,
+          "cpu_percent": 11.3,
+          "executable": "rustc"
+        },
+        {
+          "pid": 56126,
+          "cpu_percent": 17.3,
+          "executable": "cargo"
+        },
+        {
+          "pid": 56130,
+          "cpu_percent": 12.6,
+          "executable": "rustc"
+        }
+      ]
+    },
+    {
+      "unix_time_ns": 1793284516970572000,
+      "processes": [
+        {
+          "pid": 55716,
+          "cpu_percent": 0.0,
+          "executable": "cargo"
+        },
+        {
+          "pid": 56019,
+          "cpu_percent": 0.0,
+          "executable": "cargo"
+        },
+        {
+          "pid": 56090,
+          "cpu_percent": 0.0,
+          "executable": "rustc"
+        },
+        {
+          "pid": 56091,
+          "cpu_percent": 0.0,
+          "executable": "rustc"
+        },
+        {
+          "pid": 56092,
+          "cpu_percent": 0.0,
+          "executable": "rustc"
+        },
+        {
+          "pid": 56100,
+          "cpu_percent": 19.6,
+          "executable": "rustc"
+        },
+        {
+          "pid": 56101,
+          "cpu_percent": 15.9,
+          "executable": "rustc"
+        },
+        {
+          "pid": 56126,
+          "cpu_percent": 7.0,
+          "executable": "cargo"
+        },
+        {
+          "pid": 56130,
+          "cpu_percent": 20.7,
+          "executable": "rustc"
+        },
+        {
+          "pid": 56208,
+          "cpu_percent": 55.3,
+          "executable": "cargo"
+        }
+      ]
+    },
+    {
+      "unix_time_ns": 1793284517594257000,
+      "processes": [
+        {
+          "pid": 55716,
+          "cpu_percent": 0.0,
+          "executable": "cargo"
+        },
+        {
+          "pid": 56019,
+          "cpu_percent": 0.0,
+          "executable": "cargo"
+        },
+        {
+          "pid": 56090,
+          "cpu_percent": 0.0,
+          "executable": "rustc"
+        },
+        {
+          "pid": 56091,
+          "cpu_percent": 0.0,
+          "executable": "rustc"
+        },
+        {
+          "pid": 56092,
+          "cpu_percent": 0.0,
+          "executable": "rustc"
+        },
+        {
+          "pid": 56100,
+          "cpu_percent": 22.0,
+          "executable": "rustc"
+        },
+        {
+          "pid": 56101,
+          "cpu_percent": 24.1,
+          "executable": "rustc"
+        },
+        {
+          "pid": 56126,
+          "cpu_percent": 0.6,
+          "executable": "cargo"
+        },
+        {
+          "pid": 56130,
+          "cpu_percent": 22.1,
+          "executable": "rustc"
+        }
+      ]
+    },
+    {
+      "unix_time_ns": 1793284518239211000,
+      "processes": [
+        {
+          "pid": 55716,
+          "cpu_percent": 0.0,
+          "executable": "cargo"
+        },
+        {
+          "pid": 56019,
+          "cpu_percent": 0.0,
+          "executable": "cargo"
+        },
+        {
+          "pid": 56091,
+          "cpu_percent": 0.0,
+          "executable": "rustc"
+        },
+        {
+          "pid": 56100,
+          "cpu_percent": 33.4,
+          "executable": "rustc"
+        },
+        {
+          "pid": 56126,
+          "cpu_percent": 0.0,
+          "executable": "cargo"
+        },
+        {
+          "pid": 56130,
+          "cpu_percent": 33.9,
+          "executable": "rustc"
+        }
+      ]
+    },
+    {
+      "unix_time_ns": 1793284518860455000,
+      "processes": [
+        {
+          "pid": 55716,
+          "cpu_percent": 0.0,
+          "executable": "cargo"
+        },
+        {
+          "pid": 56019,
+          "cpu_percent": 7.0,
+          "executable": "cargo"
+        },
+        {
+          "pid": 56100,
+          "cpu_percent": 63.3,
+          "executable": "rustc"
+        },
+        {
+          "pid": 56126,
+          "cpu_percent": 3.0,
+          "executable": "cargo"
+        },
+        {
+          "pid": 56130,
+          "cpu_percent": 57.9,
+          "executable": "rustc"
+        },
+        {
+          "pid": 56243,
+          "cpu_percent": 0.0,
+          "executable": "cargo"
+        }
+      ]
+    },
+    {
+      "unix_time_ns": 1793284519459244000,
+      "processes": [
+        {
+          "pid": 55716,
+          "cpu_percent": 1.6,
+          "executable": "cargo"
+        },
+        {
+          "pid": 56019,
+          "cpu_percent": 1.6,
+          "executable": "cargo"
+        },
+        {
+          "pid": 56100,
+          "cpu_percent": 80.0,
+          "executable": "rustc"
+        },
+        {
+          "pid": 56126,
+          "cpu_percent": 13.2,
+          "executable": "cargo"
+        },
+        {
+          "pid": 56243,
+          "cpu_percent": 73.0,
+          "executable": "cargo"
+        },
+        {
+          "pid": 56250,
+          "cpu_percent": 39.5,
+          "executable": "rustc"
+        },
+        {
+          "pid": 56251,
+          "cpu_percent": 0.0,
+          "executable": "rustc"
+        }
+      ]
+    },
+    {
+      "unix_time_ns": 1793284520054583000,
+      "processes": [
+        {
+          "pid": 55716,
+          "cpu_percent": 0.0,
+          "executable": "cargo"
+        },
+        {
+          "pid": 56019,
+          "cpu_percent": 0.1,
+          "executable": "cargo"
+        },
+        {
+          "pid": 56100,
+          "cpu_percent": 70.2,
+          "executable": "rustc"
+        },
+        {
+          "pid": 56126,
+          "cpu_percent": 1.2,
+          "executable": "cargo"
+        },
+        {
+          "pid": 56243,
+          "cpu_percent": 13.6,
+          "executable": "cargo"
+        },
+        {
+          "pid": 56250,
+          "cpu_percent": 63.5,
+          "executable": "rustc"
+        }
+      ]
+    },
+    {
+      "unix_time_ns": 1793284520640284000,
+      "processes": [
+        {
+          "pid": 55716,
+          "cpu_percent": 0.0,
+          "executable": "cargo"
+        },
+        {
+          "pid": 56019,
+          "cpu_percent": 0.0,
+          "executable": "cargo"
+        },
+        {
+          "pid": 56100,
+          "cpu_percent": 90.2,
+          "executable": "rustc"
+        },
+        {
+          "pid": 56126,
+          "cpu_percent": 0.1,
+          "executable": "cargo"
+        },
+        {
+          "pid": 56243,
+          "cpu_percent": 2.1,
+          "executable": "cargo"
+        },
+        {
+          "pid": 56250,
+          "cpu_percent": 87.2,
+          "executable": "rustc"
+        }
+      ]
+    },
+    {
+      "unix_time_ns": 1793284521208008000,
+      "processes": [
+        {
+          "pid": 55716,
+          "cpu_percent": 0.0,
+          "executable": "cargo"
+        },
+        {
+          "pid": 56019,
+          "cpu_percent": 0.0,
+          "executable": "cargo"
+        },
+        {
+          "pid": 56100,
+          "cpu_percent": 98.3,
+          "executable": "rustc"
+        },
+        {
+          "pid": 56126,
+          "cpu_percent": 0.0,
+          "executable": "cargo"
+        },
+        {
+          "pid": 56243,
+          "cpu_percent": 0.1,
+          "executable": "cargo"
+        },
+        {
+          "pid": 56250,
+          "cpu_percent": 95.4,
+          "executable": "rustc"
+        }
+      ]
+    },
+    {
+      "unix_time_ns": 1793284521795264000,
+      "processes": [
+        {
+          "pid": 55716,
+          "cpu_percent": 0.0,
+          "executable": "cargo"
+        },
+        {
+          "pid": 56019,
+          "cpu_percent": 0.0,
+          "executable": "cargo"
+        },
+        {
+          "pid": 56100,
+          "cpu_percent": 90.4,
+          "executable": "rustc"
+        },
+        {
+          "pid": 56126,
+          "cpu_percent": 0.0,
+          "executable": "cargo"
+        },
+        {
+          "pid": 56243,
+          "cpu_percent": 0.0,
+          "executable": "cargo"
+        },
+        {
+          "pid": 56250,
+          "cpu_percent": 94.5,
+          "executable": "rustc"
+        }
+      ]
+    },
+    {
+      "unix_time_ns": 1793284522384151000,
+      "processes": [
+        {
+          "pid": 55716,
+          "cpu_percent": 0.0,
+          "executable": "cargo"
+        },
+        {
+          "pid": 56019,
+          "cpu_percent": 0.0,
+          "executable": "cargo"
+        },
+        {
+          "pid": 56100,
+          "cpu_percent": 93.7,
+          "executable": "rustc"
+        },
+        {
+          "pid": 56126,
+          "cpu_percent": 0.0,
+          "executable": "cargo"
+        },
+        {
+          "pid": 56243,
+          "cpu_percent": 0.0,
+          "executable": "cargo"
+        },
+        {
+          "pid": 56250,
+          "cpu_percent": 92.5,
+          "executable": "rustc"
+        }
+      ]
+    },
+    {
+      "unix_time_ns": 1793284522963673000,
+      "processes": [
+        {
+          "pid": 55716,
+          "cpu_percent": 0.0,
+          "executable": "cargo"
+        },
+        {
+          "pid": 56019,
+          "cpu_percent": 0.3,
+          "executable": "cargo"
+        },
+        {
+          "pid": 56100,
+          "cpu_percent": 95.2,
+          "executable": "rustc"
+        },
+        {
+          "pid": 56126,
+          "cpu_percent": 0.0,
+          "executable": "cargo"
+        },
+        {
+          "pid": 56243,
+          "cpu_percent": 0.0,
+          "executable": "cargo"
+        },
+        {
+          "pid": 56250,
+          "cpu_percent": 52.0,
+          "executable": "rustc"
+        }
+      ]
+    },
+    {
+      "unix_time_ns": 1793284523582544000,
+      "processes": [
+        {
+          "pid": 55716,
+          "cpu_percent": 0.0,
+          "executable": "cargo"
+        },
+        {
+          "pid": 56019,
+          "cpu_percent": 0.0,
+          "executable": "cargo"
+        },
+        {
+          "pid": 56100,
+          "cpu_percent": 35.8,
+          "executable": "rustc"
+        },
+        {
+          "pid": 56126,
+          "cpu_percent": 0.0,
+          "executable": "cargo"
+        },
+        {
+          "pid": 56243,
+          "cpu_percent": 0.0,
+          "executable": "cargo"
+        },
+        {
+          "pid": 56250,
+          "cpu_percent": 4.6,
+          "executable": "rustc"
+        }
+      ]
+    },
+    {
+      "unix_time_ns": 1793284524174970000,
+      "processes": [
+        {
+          "pid": 55716,
+          "cpu_percent": 0.0,
+          "executable": "cargo"
+        },
+        {
+          "pid": 56019,
+          "cpu_percent": 0.0,
+          "executable": "cargo"
+        },
+        {
+          "pid": 56100,
+          "cpu_percent": 72.9,
+          "executable": "rustc"
+        },
+        {
+          "pid": 56126,
+          "cpu_percent": 0.0,
+          "executable": "cargo"
+        },
+        {
+          "pid": 56243,
+          "cpu_percent": 0.0,
+          "executable": "cargo"
+        },
+        {
+          "pid": 56250,
+          "cpu_percent": 0.7,
+          "executable": "rustc"
+        }
+      ]
+    },
+    {
+      "unix_time_ns": 1793284524752344000,
+      "processes": [
+        {
+          "pid": 55716,
+          "cpu_percent": 0.0,
+          "executable": "cargo"
+        },
+        {
+          "pid": 56019,
+          "cpu_percent": 0.0,
+          "executable": "cargo"
+        },
+        {
+          "pid": 56100,
+          "cpu_percent": 86.7,
+          "executable": "rustc"
+        },
+        {
+          "pid": 56126,
+          "cpu_percent": 9.0,
+          "executable": "cargo"
+        },
+        {
+          "pid": 56243,
+          "cpu_percent": 23.1,
+          "executable": "cargo"
+        }
+      ]
+    },
+    {
+      "unix_time_ns": 1793284525333258000,
+      "processes": [
+        {
+          "pid": 55716,
+          "cpu_percent": 0.0,
+          "executable": "cargo"
+        },
+        {
+          "pid": 56019,
+          "cpu_percent": 0.0,
+          "executable": "cargo"
+        },
+        {
+          "pid": 56100,
+          "cpu_percent": 87.9,
+          "executable": "rustc"
+        },
+        {
+          "pid": 56126,
+          "cpu_percent": 0.8,
+          "executable": "cargo"
+        },
+        {
+          "pid": 56243,
+          "cpu_percent": 6.7,
+          "executable": "cargo"
+        },
+        {
+          "pid": 56328,
+          "cpu_percent": 33.5,
+          "executable": "rustc"
+        },
+        {
+          "pid": 56329,
+          "cpu_percent": 33.1,
+          "executable": "rustc"
+        }
+      ]
+    },
+    {
+      "unix_time_ns": 1793284525941226000,
+      "processes": [
+        {
+          "pid": 55716,
+          "cpu_percent": 0.0,
+          "executable": "cargo"
+        },
+        {
+          "pid": 56019,
+          "cpu_percent": 0.0,
+          "executable": "cargo"
+        },
+        {
+          "pid": 56100,
+          "cpu_percent": 90.6,
+          "executable": "rustc"
+        },
+        {
+          "pid": 56126,
+          "cpu_percent": 0.1,
+          "executable": "cargo"
+        },
+        {
+          "pid": 56243,
+          "cpu_percent": 0.9,
+          "executable": "cargo"
+        },
+        {
+          "pid": 56328,
+          "cpu_percent": 69.4,
+          "executable": "rustc"
+        },
+        {
+          "pid": 56329,
+          "cpu_percent": 65.8,
+          "executable": "rustc"
+        }
+      ]
+    },
+    {
+      "unix_time_ns": 1793284526547646000,
+      "processes": [
+        {
+          "pid": 55716,
+          "cpu_percent": 0.0,
+          "executable": "cargo"
+        },
+        {
+          "pid": 56019,
+          "cpu_percent": 0.4,
+          "executable": "cargo"
+        },
+        {
+          "pid": 56100,
+          "cpu_percent": 82.7,
+          "executable": "rustc"
+        },
+        {
+          "pid": 56126,
+          "cpu_percent": 0.0,
+          "executable": "cargo"
+        },
+        {
+          "pid": 56243,
+          "cpu_percent": 0.0,
+          "executable": "cargo"
+        },
+        {
+          "pid": 56328,
+          "cpu_percent": 50.1,
+          "executable": "rustc"
+        },
+        {
+          "pid": 56329,
+          "cpu_percent": 51.4,
+          "executable": "rustc"
+        }
+      ]
+    },
+    {
+      "unix_time_ns": 1793284527133269000,
+      "processes": [
+        {
+          "pid": 55716,
+          "cpu_percent": 0.0,
+          "executable": "cargo"
+        },
+        {
+          "pid": 56019,
+          "cpu_percent": 0.0,
+          "executable": "cargo"
+        },
+        {
+          "pid": 56100,
+          "cpu_percent": 88.1,
+          "executable": "rustc"
+        },
+        {
+          "pid": 56126,
+          "cpu_percent": 0.0,
+          "executable": "cargo"
+        },
+        {
+          "pid": 56243,
+          "cpu_percent": 0.0,
+          "executable": "cargo"
+        },
+        {
+          "pid": 56328,
+          "cpu_percent": 76.2,
+          "executable": "rustc"
+        },
+        {
+          "pid": 56329,
+          "cpu_percent": 71.1,
+          "executable": "rustc"
+        }
+      ]
+    },
+    {
+      "unix_time_ns": 1793284527735681000,
+      "processes": [
+        {
+          "pid": 55716,
+          "cpu_percent": 0.0,
+          "executable": "cargo"
+        },
+        {
+          "pid": 56019,
+          "cpu_percent": 0.0,
+          "executable": "cargo"
+        },
+        {
+          "pid": 56100,
+          "cpu_percent": 84.7,
+          "executable": "rustc"
+        },
+        {
+          "pid": 56126,
+          "cpu_percent": 0.0,
+          "executable": "cargo"
+        },
+        {
+          "pid": 56243,
+          "cpu_percent": 0.0,
+          "executable": "cargo"
+        },
+        {
+          "pid": 56328,
+          "cpu_percent": 81.1,
+          "executable": "rustc"
+        },
+        {
+          "pid": 56329,
+          "cpu_percent": 79.6,
+          "executable": "rustc"
+        }
+      ]
+    },
+    {
+      "unix_time_ns": 1793284528350076000,
+      "processes": [
+        {
+          "pid": 55716,
+          "cpu_percent": 0.0,
+          "executable": "cargo"
+        },
+        {
+          "pid": 56019,
+          "cpu_percent": 0.0,
+          "executable": "cargo"
+        },
+        {
+          "pid": 56100,
+          "cpu_percent": 78.5,
+          "executable": "rustc"
+        },
+        {
+          "pid": 56126,
+          "cpu_percent": 0.0,
+          "executable": "cargo"
+        },
+        {
+          "pid": 56243,
+          "cpu_percent": 0.0,
+          "executable": "cargo"
+        },
+        {
+          "pid": 56328,
+          "cpu_percent": 85.8,
+          "executable": "rustc"
+        },
+        {
+          "pid": 56329,
+          "cpu_percent": 82.5,
+          "executable": "rustc"
+        }
+      ]
+    },
+    {
+      "unix_time_ns": 1793284528946467000,
+      "processes": [
+        {
+          "pid": 55716,
+          "cpu_percent": 0.4,
+          "executable": "cargo"
+        },
+        {
+          "pid": 56019,
+          "cpu_percent": 0.1,
+          "executable": "cargo"
+        },
+        {
+          "pid": 56126,
+          "cpu_percent": 0.0,
+          "executable": "cargo"
+        },
+        {
+          "pid": 56243,
+          "cpu_percent": 0.0,
+          "executable": "cargo"
+        },
+        {
+          "pid": 56328,
+          "cpu_percent": 89.4,
+          "executable": "rustc"
+        },
+        {
+          "pid": 56329,
+          "cpu_percent": 88.3,
+          "executable": "rustc"
+        },
+        {
+          "pid": 56358,
+          "cpu_percent": 62.2,
+          "executable": "rustc"
+        }
+      ]
+    },
+    {
+      "unix_time_ns": 1793284529530190000,
+      "processes": [
+        {
+          "pid": 55716,
+          "cpu_percent": 0.0,
+          "executable": "cargo"
+        },
+        {
+          "pid": 56019,
+          "cpu_percent": 0.0,
+          "executable": "cargo"
+        },
+        {
+          "pid": 56126,
+          "cpu_percent": 0.0,
+          "executable": "cargo"
+        },
+        {
+          "pid": 56243,
+          "cpu_percent": 0.0,
+          "executable": "cargo"
+        },
+        {
+          "pid": 56328,
+          "cpu_percent": 90.7,
+          "executable": "rustc"
+        },
+        {
+          "pid": 56329,
+          "cpu_percent": 90.8,
+          "executable": "rustc"
+        },
+        {
+          "pid": 56358,
+          "cpu_percent": 37.6,
+          "executable": "rustc"
+        }
+      ]
+    },
+    {
+      "unix_time_ns": 1793284530143772000,
+      "processes": [
+        {
+          "pid": 55716,
+          "cpu_percent": 0.0,
+          "executable": "cargo"
+        },
+        {
+          "pid": 56019,
+          "cpu_percent": 0.0,
+          "executable": "cargo"
+        },
+        {
+          "pid": 56126,
+          "cpu_percent": 0.0,
+          "executable": "cargo"
+        },
+        {
+          "pid": 56243,
+          "cpu_percent": 0.0,
+          "executable": "cargo"
+        },
+        {
+          "pid": 56328,
+          "cpu_percent": 77.7,
+          "executable": "rustc"
+        },
+        {
+          "pid": 56329,
+          "cpu_percent": 72.1,
+          "executable": "rustc"
+        },
+        {
+          "pid": 56358,
+          "cpu_percent": 46.0,
+          "executable": "rustc"
+        }
+      ]
+    },
+    {
+      "unix_time_ns": 1793284530734894000,
+      "processes": [
+        {
+          "pid": 55716,
+          "cpu_percent": 0.0,
+          "executable": "cargo"
+        },
+        {
+          "pid": 56019,
+          "cpu_percent": 0.1,
+          "executable": "cargo"
+        },
+        {
+          "pid": 56243,
+          "cpu_percent": 0.0,
+          "executable": "cargo"
+        },
+        {
+          "pid": 56328,
+          "cpu_percent": 73.9,
+          "executable": "rustc"
+        },
+        {
+          "pid": 56329,
+          "cpu_percent": 73.4,
+          "executable": "rustc"
+        },
+        {
+          "pid": 56358,
+          "cpu_percent": 70.7,
+          "executable": "rustc"
+        }
+      ]
+    },
+    {
+      "unix_time_ns": 1793284531343737000,
+      "processes": [
+        {
+          "pid": 55716,
+          "cpu_percent": 0.0,
+          "executable": "cargo"
+        },
+        {
+          "pid": 56243,
+          "cpu_percent": 0.0,
+          "executable": "cargo"
+        },
+        {
+          "pid": 56328,
+          "cpu_percent": 75.9,
+          "executable": "rustc"
+        },
+        {
+          "pid": 56329,
+          "cpu_percent": 79.3,
+          "executable": "rustc"
+        },
+        {
+          "pid": 56358,
+          "cpu_percent": 70.2,
+          "executable": "rustc"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,67 @@
+{
+  "source_commit": "216122e9c314700073e2d02bbbb48e76a62bf285",
+  "inputs_stable": true,
+  "binary_sha256": "f3594b7cf47e18d9c128ee67f2ef7de677bf0abb848b117a6e95cc91ca77917a",
+  "acceptance_eligible": false,
+  "purpose": "Diagnostic sampled thermal/activity state; not a comparable unloaded performance baseline.",
+  "minimum_observed_window_fps": 31.214187937792886,
+  "cpu_summary": {
+    "frames": 602,
+    "max_ns": 33013167,
+    "median_ns": 16526084,
+    "p95_ns": 20171791,
+    "p99_ns": 24666709,
+    "over_budget_frames": 602
+  },
+  "states": [
+    {
+      "thermal_state": "nominal",
+      "window_active": false,
+      "actual_vsync": "disabled",
+      "observations": 2
+    },
+    {
+      "thermal_state": "nominal",
+      "window_active": true,
+      "actual_vsync": "disabled",
+      "observations": 595
+    }
+  ],
+  "limitations": [
+    "Concurrent compilation was present; process observations are sampled and cover only part of the capture. Do not compare the FPS change to prior unloaded runs as a regression or improvement.",
+    "All thermal observations are nominal, but discrete samples cannot exclude unsampled transitions. Two initial observations are inactive and are retained in the minimum FPS calculation.",
+    "Source and executable identities are stable; source 216122e is an isolated committed snapshot, not the later concurrently edited main worktree.",
+    "Local alternating legs visit only items 0 through 7; full traversal and strict per-submission intervals remain unverified.",
+    "This source uses inclusive synchronous CPU scope elapsed; no drawable acquisition time is subtracted. GPU timing is unmeasured."
+  ],
+  "coverage": {
+    "visited_logical_items": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
+    ],
+    "observed_offset_min": 0.0,
+    "observed_offset_max": 130.0,
+    "total_scrollable_pixels": null,
+    "visited_sections": null,
+    "complete_gallery_traversal": false,
+    "limitation": "one-second alternating local legs; logical items listed only for ListState; section identity not instrumented, full Gallery coverage unverified"
+  },
+  "raw_sha256": "970919e1ef521d82a309b19a82d41e1bb58da11235e9a878df3c282cc55771f8",
+  "independent_review": {
+    "verdict": "PASS for evidence authenticity and stated diagnostic limits only; performance gate FAILED",
+    "reviewer": "button_touch_target_audit",
+    "checked": [
+      "actual isolated commit and clean status",
+      "recomputed source fingerprint and binary SHA-256",
+      "raw copy identity and raw SHA-256",
+      "all state counts, CPU quantiles, and FPS window formulas",
+      "startup retained and concurrent compilation limitations"
+    ]
+  }
+}
