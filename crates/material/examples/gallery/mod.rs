@@ -459,7 +459,21 @@ impl Render for Gallery {
                         icon_spinner("label-spinner", ICON_SLOT, cx),
                     ))
                     .child(progress("measured", 0.62, window, cx))
-                    .child(indeterminate_progress("indeterminate", cx)),
+                    .child(indeterminate_progress("indeterminate", cx))
+                    .child(accessible_text("circular-label", "Circular progress"))
+                    .child(gpui_base::h_flex().gap(rem(16.))
+                        .child(circular_progress(
+                            "circular-animated", "Loading",
+                            sample_circular_progress("circular-animated-clock", window, cx),
+                            None, size(rem(24.), rem(24.)), 1.,
+                        ))
+                        .children([0., 0.62, 1.].into_iter().enumerate().map(|(index, fraction)| {
+                            circular_progress(
+                                SharedString::from(format!("circular-measured-{index}")), "Progress",
+                                CircularProgressFrame::determinate(fraction), Some(fraction),
+                                size(rem(24.), rem(24.)), 1.,
+                            )
+                        }))),
             );
 
         div()

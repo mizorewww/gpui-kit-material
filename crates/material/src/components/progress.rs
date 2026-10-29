@@ -1,5 +1,11 @@
 //! M3 progress indicators: linear (measured and indeterminate) and a
 //! spinner. The M3 Expressive wavy and contained variants are planned.
+mod circular;
+pub use circular::{
+    CircularProgressFrame, circular_indeterminate_frame, circular_progress,
+    sample_circular_progress,
+};
+
 use crate::color::ColorRole;
 use crate::icons::{Icon, IconName};
 use crate::theme::color;
