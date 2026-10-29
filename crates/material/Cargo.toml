@@ -1,0 +1,28 @@
+[package]
+name = "gpui-kit-material"
+description = "Material 3 design tokens, motion and components for GPUI, built on GPUI Base"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+readme = "../../README.md"
+keywords = ["material", "material-design", "gpui", "ui", "desktop"]
+categories = ["gui"]
+
+[features]
+default = ["serde"]
+serde = ["gpui-kit-material-color/serde"]
+
+[dependencies]
+gpui-kit-material-color.workspace = true
+gpui.workspace = true
+gpui-base.workspace = true
+anyhow.workspace = true
+
+[dev-dependencies]
+gpui = { workspace = true, features = ["test-support"] }
+gpui_platform.workspace = true
+
+[[example]]
+name = "gallery"
