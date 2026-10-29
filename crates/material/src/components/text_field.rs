@@ -48,6 +48,8 @@ const FILLED_FLOAT_TOP: f32 = 8.;
 const FILLED_INPUT_TOP: f32 = 24.;
 /// Space the outline notch keeps on each side of the floating label.
 const NOTCH_PADDING: f32 = 4.;
+/// The focused indicator and outline weight (the design kit's 3dp stroke).
+const FOCUS_INDICATOR: f32 = 3.;
 
 /// The two M3 text field styles.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
@@ -298,7 +300,7 @@ pub(crate) fn field_paint(variant: TextFieldVariant, s: FieldState) -> FieldPain
             alpha(on_surface, 0.)
         },
         indicator,
-        indicator_width: if s.focused { 2. } else { 1. },
+        indicator_width: if s.focused { FOCUS_INDICATOR } else { 1. },
         label,
         input: on_surface,
         placeholder: variant_ink,
@@ -503,7 +505,7 @@ impl RenderOnce for TextField {
                         this.group_hover(group.clone(), move |s| s.bg(layer))
                     }),
             );
-            // The resting 1dp indicator, and the 2dp focus indicator fading
+            // The resting 1dp indicator, and the 3dp focus indicator fading
             // in over it (material-web's two-layer active indicator).
             container = container
                 .child(

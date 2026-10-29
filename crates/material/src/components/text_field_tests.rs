@@ -31,7 +31,7 @@ fn filled_and_outlined_paint_m3_roles_in_every_state() {
         },
     );
     assert_eq!(focused.indicator, color(C::PRIMARY));
-    assert_eq!(focused.indicator_width, 2.);
+    assert_eq!(focused.indicator_width, 3.);
     assert_eq!(focused.label, color(C::PRIMARY));
     assert_eq!(focused.container.a, 0., "outlined fields have no container");
 
@@ -181,8 +181,8 @@ fn typing_floats_the_label_and_counts_characters(cx: &mut TestAppContext) {
     let indicator = cx.debug_bounds("text-field-focus-indicator").unwrap();
     assert_eq!(
         indicator.size.height,
-        px(2.),
-        "focus fades in a 2dp indicator"
+        px(3.),
+        "focus fades in a 3dp indicator"
     );
     assert_eq!(indicator.bottom(), field.top() + px(56.));
 }
