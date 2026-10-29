@@ -21,12 +21,15 @@ impl Gallery {
                     overlap.size.width > px(0.) && overlap.size.height > px(0.)
                 })
         };
+        let effect_row = physical_row(EFFECT_SAMPLE_ROW, self.color_columns);
+        let toggle_row = physical_row(TOGGLE_SHAPE_ROWS, self.color_columns);
+        let loading_row = physical_row(LOADING_SIZE_ROWS, self.color_columns);
         for (index, variant) in ButtonVariant::ALL.into_iter().enumerate() {
-            if participating(37) {
+            if participating(effect_row) {
                 continue;
             }
             #[cfg(test)]
-            self.button_sync_rows.borrow_mut().insert(37);
+            self.button_sync_rows.borrow_mut().insert(effect_row);
             self.button_effect_playbacks[index].sync(
                 ButtonTransitionInputs {
                     variant: if variant == ButtonVariant::Filled && self.button_effects_tonal {
@@ -43,12 +46,14 @@ impl Gallery {
             );
         }
         for (size_index, size) in ButtonSize::ALL.into_iter().enumerate() {
-            if participating(46 + size_index) {
+            if participating(loading_row + size_index) {
                 continue;
             }
             for icon_index in 0..3 {
                 #[cfg(test)]
-                self.button_sync_rows.borrow_mut().insert(46 + size_index);
+                self.button_sync_rows
+                    .borrow_mut()
+                    .insert(loading_row + size_index);
                 self.button_loading_playbacks[size_index * 3 + icon_index].sync(
                     ButtonTransitionInputs {
                         variant: ButtonVariant::ALL[self.button_loading_variant],
@@ -62,13 +67,15 @@ impl Gallery {
             }
         }
         for (shape_index, shape) in ButtonShape::ALL.into_iter().enumerate() {
-            if participating(40 + shape_index) {
+            if participating(toggle_row + shape_index) {
                 continue;
             }
             for (variant_index, variant) in ButtonVariant::ALL.into_iter().enumerate() {
                 let index = shape_index * 5 + variant_index;
                 #[cfg(test)]
-                self.button_sync_rows.borrow_mut().insert(40 + shape_index);
+                self.button_sync_rows
+                    .borrow_mut()
+                    .insert(toggle_row + shape_index);
                 self.button_toggle_playbacks[index].sync(
                     ButtonTransitionInputs {
                         variant,
@@ -91,514 +98,657 @@ pub(super) struct RowSpec {
     pub gap: f32,
     pub section: Option<&'static str>,
     pub interactive: bool,
+    /// Names a row other code addresses, so its index follows the table.
+    pub anchor: Option<&'static str>,
 }
 pub(super) const ROWS: &[RowSpec] = &[
     RowSpec {
         gap: 0.0,
         section: None,
         interactive: false,
+        anchor: None,
     },
     RowSpec {
         gap: 28.0,
         section: None,
         interactive: false,
+        anchor: None,
     },
     RowSpec {
         gap: 28.0,
         section: Some("themes"),
         interactive: false,
+        anchor: None,
     },
     RowSpec {
         gap: 12.0,
         section: None,
         interactive: true,
+        anchor: None,
     },
     RowSpec {
         gap: 12.0,
         section: None,
         interactive: true,
+        anchor: None,
     },
     RowSpec {
         gap: 12.0,
         section: None,
         interactive: true,
+        anchor: None,
     },
     RowSpec {
         gap: 28.0,
         section: Some("motion"),
         interactive: false,
+        anchor: None,
     },
     RowSpec {
         gap: 12.0,
         section: None,
         interactive: true,
+        anchor: None,
     },
     RowSpec {
         gap: 12.0,
         section: None,
         interactive: true,
+        anchor: None,
     },
     RowSpec {
         gap: 12.0,
         section: None,
         interactive: false,
+        anchor: None,
     },
     RowSpec {
         gap: 12.0,
         section: None,
         interactive: false,
+        anchor: None,
     },
     RowSpec {
         gap: 12.0,
         section: None,
         interactive: false,
+        anchor: None,
     },
     RowSpec {
         gap: 12.0,
         section: None,
         interactive: false,
+        anchor: None,
     },
     RowSpec {
         gap: 12.0,
         section: None,
         interactive: false,
+        anchor: None,
     },
     RowSpec {
         gap: 12.0,
         section: None,
         interactive: false,
+        anchor: None,
     },
     RowSpec {
         gap: 28.0,
         section: None,
         interactive: false,
+        anchor: None,
     },
     RowSpec {
         gap: 12.0,
         section: None,
         interactive: true,
+        anchor: None,
     },
     RowSpec {
         gap: 12.0,
         section: None,
         interactive: true,
+        anchor: None,
     },
     RowSpec {
         gap: 12.0,
         section: None,
         interactive: true,
+        anchor: None,
     },
     RowSpec {
         gap: 28.0,
         section: None,
         interactive: false,
+        anchor: None,
     },
     RowSpec {
         gap: 16.0,
         section: None,
         interactive: true,
+        anchor: None,
     },
     RowSpec {
         gap: 16.0,
         section: None,
         interactive: true,
+        anchor: None,
     },
     RowSpec {
         gap: 16.0,
         section: None,
         interactive: true,
+        anchor: None,
     },
     RowSpec {
         gap: 16.0,
         section: None,
         interactive: true,
+        anchor: None,
     },
     RowSpec {
         gap: 16.0,
         section: Some("buttons"),
         interactive: false,
+        anchor: None,
     },
     RowSpec {
         gap: 16.0,
         section: None,
         interactive: true,
+        anchor: None,
     },
     RowSpec {
         gap: 16.0,
         section: None,
         interactive: true,
+        anchor: None,
     },
     RowSpec {
         gap: 16.0,
         section: None,
         interactive: true,
+        anchor: None,
     },
     RowSpec {
         gap: 16.0,
         section: None,
         interactive: true,
+        anchor: None,
     },
     RowSpec {
         gap: 16.0,
         section: None,
         interactive: true,
+        anchor: None,
     },
     RowSpec {
         gap: 16.0,
         section: None,
         interactive: true,
+        anchor: None,
     },
     RowSpec {
         gap: 16.0,
         section: None,
         interactive: true,
+        anchor: None,
     },
     RowSpec {
         gap: 16.0,
         section: None,
         interactive: true,
+        anchor: None,
     },
     RowSpec {
         gap: 16.0,
         section: None,
         interactive: true,
+        anchor: None,
     },
     RowSpec {
         gap: 16.0,
         section: None,
         interactive: true,
+        anchor: None,
     },
     RowSpec {
         gap: 16.0,
         section: None,
         interactive: false,
+        anchor: None,
     },
     RowSpec {
         gap: 12.0,
         section: None,
         interactive: true,
+        anchor: None,
     },
     RowSpec {
         gap: 12.0,
         section: None,
         interactive: true,
+        anchor: Some("button-effect-samples"),
     },
     RowSpec {
         gap: 16.0,
         section: Some("toggles"),
         interactive: false,
+        anchor: None,
     },
     RowSpec {
         gap: 16.0,
         section: None,
         interactive: true,
+        anchor: None,
     },
     RowSpec {
         gap: 16.0,
         section: None,
         interactive: true,
+        anchor: Some("button-toggle-shapes"),
     },
     RowSpec {
         gap: 16.0,
         section: None,
         interactive: true,
+        anchor: None,
     },
     RowSpec {
         gap: 16.0,
         section: Some("loading"),
         interactive: false,
+        anchor: None,
     },
     RowSpec {
         gap: 16.0,
         section: None,
         interactive: true,
+        anchor: None,
     },
     RowSpec {
         gap: 16.0,
         section: None,
         interactive: false,
+        anchor: None,
     },
     RowSpec {
         gap: 16.0,
         section: None,
         interactive: false,
+        anchor: None,
     },
     RowSpec {
         gap: 16.0,
         section: None,
         interactive: true,
+        anchor: Some("button-loading-sizes"),
     },
     RowSpec {
         gap: 16.0,
         section: None,
         interactive: true,
+        anchor: None,
     },
     RowSpec {
         gap: 16.0,
         section: None,
         interactive: true,
+        anchor: None,
     },
     RowSpec {
         gap: 16.0,
         section: None,
         interactive: true,
+        anchor: None,
     },
     RowSpec {
         gap: 16.0,
         section: None,
         interactive: true,
+        anchor: None,
     },
     RowSpec {
         gap: 16.0,
         section: Some("icons"),
         interactive: false,
+        anchor: None,
     },
     RowSpec {
         gap: 16.0,
         section: None,
         interactive: true,
+        anchor: None,
     },
     RowSpec {
         gap: 16.0,
         section: None,
         interactive: true,
+        anchor: None,
     },
     RowSpec {
         gap: 16.0,
         section: None,
         interactive: true,
+        anchor: None,
     },
     RowSpec {
         gap: 16.0,
         section: None,
         interactive: true,
+        anchor: None,
     },
     RowSpec {
         gap: 16.0,
         section: None,
         interactive: true,
+        anchor: None,
     },
     RowSpec {
         gap: 16.0,
         section: Some("labels"),
         interactive: false,
+        anchor: None,
     },
     RowSpec {
         gap: 16.0,
         section: None,
         interactive: false,
+        anchor: None,
     },
     RowSpec {
         gap: 16.0,
         section: None,
         interactive: false,
+        anchor: None,
     },
     RowSpec {
         gap: 16.0,
         section: None,
         interactive: false,
+        anchor: None,
     },
     RowSpec {
         gap: 16.0,
         section: None,
         interactive: true,
+        anchor: None,
     },
     RowSpec {
         gap: 28.0,
         section: None,
         interactive: true,
+        anchor: None,
     },
     RowSpec {
         gap: 28.0,
         section: None,
         interactive: true,
+        anchor: None,
     },
     RowSpec {
         gap: 28.0,
         section: None,
         interactive: true,
+        anchor: None,
     },
     RowSpec {
         gap: 28.0,
         section: Some("feedback"),
         interactive: false,
+        anchor: None,
     },
     RowSpec {
         gap: 12.0,
         section: None,
         interactive: false,
+        anchor: None,
     },
     RowSpec {
         gap: 12.0,
         section: None,
         interactive: false,
+        anchor: None,
     },
     RowSpec {
         gap: 12.0,
         section: None,
         interactive: false,
+        anchor: None,
     },
     RowSpec {
         gap: 12.0,
         section: None,
         interactive: false,
+        anchor: None,
     },
     RowSpec {
         gap: 12.0,
         section: None,
         interactive: false,
+        anchor: None,
     },
     RowSpec {
         gap: 12.0,
         section: None,
         interactive: true,
+        anchor: None,
     },
     RowSpec {
         gap: 12.0,
         section: None,
         interactive: false,
+        anchor: None,
     },
     RowSpec {
         gap: 28.0,
         section: Some("colors"),
         interactive: false,
+        anchor: None,
     },
     RowSpec {
         gap: 12.0,
         section: None,
         interactive: false,
+        anchor: Some("color-swatches"),
     },
     RowSpec {
         gap: 28.0,
         section: Some("typography"),
         interactive: false,
+        anchor: None,
     },
     RowSpec {
         gap: 20.0,
         section: None,
         interactive: false,
+        anchor: None,
     },
     RowSpec {
         gap: 20.0,
         section: None,
         interactive: false,
+        anchor: None,
     },
     RowSpec {
         gap: 20.0,
         section: None,
         interactive: false,
+        anchor: None,
     },
     RowSpec {
         gap: 20.0,
         section: None,
         interactive: false,
+        anchor: None,
     },
     RowSpec {
         gap: 20.0,
         section: None,
         interactive: false,
+        anchor: None,
     },
     RowSpec {
         gap: 20.0,
         section: None,
         interactive: false,
+        anchor: None,
     },
     RowSpec {
         gap: 20.0,
         section: None,
         interactive: false,
+        anchor: None,
     },
     RowSpec {
         gap: 20.0,
         section: None,
         interactive: false,
+        anchor: None,
     },
     RowSpec {
         gap: 20.0,
         section: None,
         interactive: false,
+        anchor: None,
     },
     RowSpec {
         gap: 20.0,
         section: None,
         interactive: false,
+        anchor: None,
     },
     RowSpec {
         gap: 20.0,
         section: None,
         interactive: false,
+        anchor: None,
     },
     RowSpec {
         gap: 20.0,
         section: None,
         interactive: false,
+        anchor: None,
     },
     RowSpec {
         gap: 20.0,
         section: None,
         interactive: false,
+        anchor: None,
     },
     RowSpec {
         gap: 20.0,
         section: None,
         interactive: false,
+        anchor: None,
     },
     RowSpec {
         gap: 20.0,
         section: None,
         interactive: false,
+        anchor: None,
     },
     RowSpec {
         gap: 28.0,
         section: Some("dividers"),
         interactive: false,
+        anchor: None,
     },
     RowSpec {
         gap: 20.0,
         section: None,
         interactive: false,
+        anchor: None,
     },
     RowSpec {
         gap: 20.0,
         section: None,
         interactive: false,
+        anchor: None,
     },
     RowSpec {
         gap: 20.0,
         section: None,
         interactive: false,
+        anchor: None,
     },
     RowSpec {
         gap: 20.0,
         section: None,
         interactive: false,
+        anchor: None,
     },
     RowSpec {
         gap: 20.0,
         section: None,
         interactive: false,
+        anchor: None,
     },
     RowSpec {
         gap: 20.0,
         section: None,
         interactive: false,
+        anchor: None,
     },
     RowSpec {
         gap: 20.0,
         section: None,
         interactive: false,
+        anchor: None,
     },
     RowSpec {
         gap: 20.0,
         section: None,
         interactive: false,
+        anchor: None,
     },
     RowSpec {
         gap: 20.0,
         section: None,
         interactive: false,
+        anchor: None,
     },
 ];
+
+const fn same(a: &str, b: &str) -> bool {
+    let (a, b) = (a.as_bytes(), b.as_bytes());
+    if a.len() != b.len() {
+        return false;
+    }
+    let mut i = 0;
+    while i < a.len() {
+        if a[i] != b[i] {
+            return false;
+        }
+        i += 1;
+    }
+    true
+}
+
+/// The source row carrying `anchor`; a missing anchor fails compilation.
+const fn anchored_row(anchor: &str) -> usize {
+    let mut row = 0;
+    while row < ROWS.len() {
+        if let Some(name) = ROWS[row].anchor
+            && same(name, anchor)
+        {
+            return row;
+        }
+        row += 1;
+    }
+    panic!("Gallery row anchor is missing from ROWS")
+}
+
+/// The samples driven by `button_effect_playbacks`.
+pub(super) const EFFECT_SAMPLE_ROW: usize = anchored_row("button-effect-samples");
+/// One row per [`ButtonShape`], driven by `button_toggle_playbacks`.
+pub(super) const TOGGLE_SHAPE_ROWS: usize = anchored_row("button-toggle-shapes");
+const TOGGLE_SHAPE_LAST: usize = TOGGLE_SHAPE_ROWS + ButtonShape::ALL.len() - 1;
+/// One row per [`ButtonSize`], driven by `button_loading_playbacks`.
+pub(super) const LOADING_SIZE_ROWS: usize = anchored_row("button-loading-sizes");
+const LOADING_SIZE_LAST: usize = LOADING_SIZE_ROWS + ButtonSize::ALL.len() - 1;
+/// The one source row that expands to as many physical rows as color columns need.
+const COLOR_SOURCE_ROW: usize = anchored_row("color-swatches");
 
 impl Gallery {
     pub(super) fn render_row_content(
@@ -867,7 +1017,7 @@ impl Gallery {
                             }))
                             .reveal("reveal-toggle-button-ripple", scroll),
                     )).into_any_element() },
-            37 => {  (gpui_base::h_flex().flex_wrap().gap(rem(12.)).children(
+            EFFECT_SAMPLE_ROW => {  (gpui_base::h_flex().debug_selector(|| "button-effect-samples".into()).flex_wrap().gap(rem(12.)).children(
                 ButtonVariant::ALL.into_iter().enumerate().map(|(sample_index, variant)| {
                     material_button(
                         SharedString::from(format!("effect-sample-{variant:?}")),
@@ -903,11 +1053,12 @@ impl Gallery {
                             this.list.remeasure(); cx.notify();
                         }
                     })), self.list.clone())).into_any_element() },
-            40..=41 => { let sample_index = index - 40; ((ButtonShape::ALL
+            TOGGLE_SHAPE_ROWS..=TOGGLE_SHAPE_LAST => { let sample_index = index - TOGGLE_SHAPE_ROWS; ((ButtonShape::ALL
                     .into_iter()
                     .enumerate()
                     .nth(sample_index).map(|(shape_index, shape)| {
                         gpui_base::v_flex()
+                            .when(sample_index == 0, |row| row.debug_selector(|| "button-toggle-shapes".into()))
                             .gap(rem(12.))
                             .child(accessible_text(
                                 SharedString::from(format!("toggle-shape-{shape:?}")),
@@ -965,8 +1116,8 @@ impl Gallery {
                     .reveal("reveal-loading-variant", scroll))).into_any_element() },
             44 => {  (accessible_text("loading-help", "Progress stays interactive. Loading disables the samples and changes their labels.")).into_any_element() },
             45 => {  (accessible_text("loading-click-count", SharedString::from(format!("Sample activations: {}", self.button_loading_clicks)))).into_any_element() },
-            46..=50 => { let loading_variant = ButtonVariant::ALL[self.button_loading_variant];let sample_index = index - 46; ((ButtonSize::ALL.into_iter().nth(sample_index).map(|size| {
-                gpui_base::v_flex().gap(rem(12.))
+            LOADING_SIZE_ROWS..=LOADING_SIZE_LAST => { let loading_variant = ButtonVariant::ALL[self.button_loading_variant];let sample_index = index - LOADING_SIZE_ROWS; ((ButtonSize::ALL.into_iter().nth(sample_index).map(|size| {
+                gpui_base::v_flex().when(sample_index == 0, |row| row.debug_selector(|| "button-loading-sizes".into())).gap(rem(12.))
                     .child(accessible_text(SharedString::from(format!("loading-size-{size:?}")), size.name()))
                     .child(gpui_base::h_flex().flex_wrap().gap(rem(16.)).children((0..3).map(|icon_position| {
                         MaterialButton::new(SharedString::from(format!("loading-{size:?}-{icon_position}")))
@@ -1221,7 +1372,7 @@ choices.reveal("reveal-choices", scroll)}).into_any_element() },
                             )),
                     )).into_any_element() },
             73 => {  (section_title("reference-colors", "Material color roles")).into_any_element() },
-            74 => {  (gpui_base::h_flex().flex_wrap().gap(rem(12.)).children(themes::REFERENCE_ROLES
+            COLOR_SOURCE_ROW => {  (gpui_base::h_flex().when(color_start == 0, |row| row.debug_selector(|| "color-swatches".into())).flex_wrap().gap(rem(12.)).children(themes::REFERENCE_ROLES
             .into_iter()
             .zip(themes::REFERENCE_ROLE_NAMES).skip(color_start).take(self.color_columns)
             .map(|(role, name)| {
@@ -1491,7 +1642,6 @@ mod tests {
     }
 }
 
-const COLOR_SOURCE_ROW: usize = 74;
 fn color_row_count(columns: usize) -> usize {
     themes::REFERENCE_ROLES.len().div_ceil(columns)
 }
@@ -1525,6 +1675,7 @@ pub(super) fn color_columns(window: &Window) -> usize {
 #[cfg(test)]
 mod keyboard_tests {
     use super::super::Gallery;
+    use super::{COLOR_SOURCE_ROW, EFFECT_SAMPLE_ROW, LOADING_SIZE_ROWS, TOGGLE_SHAPE_ROWS};
     use gpui::{AppContext, TestAppContext, WindowHandle, px, size};
 
     fn draw(window: &WindowHandle<Gallery>, cx: &mut TestAppContext) {
@@ -1565,10 +1716,20 @@ mod keyboard_tests {
                     !gallery.button_sync_rows.borrow().contains(&999),
                     "zero-size canvas prepaint must run"
                 );
-                assert!(gallery.button_sync_rows.borrow().contains(&37));
-                assert!(gallery.button_sync_rows.borrow().contains(&46));
+                assert!(
+                    gallery
+                        .button_sync_rows
+                        .borrow()
+                        .contains(&EFFECT_SAMPLE_ROW)
+                );
+                assert!(
+                    gallery
+                        .button_sync_rows
+                        .borrow()
+                        .contains(&LOADING_SIZE_ROWS)
+                );
                 gallery.list.scroll_to(gpui::ListOffset {
-                    item_ix: 37,
+                    item_ix: EFFECT_SAMPLE_ROW,
                     offset_in_item: px(0.),
                 });
                 cx.notify();
@@ -1577,7 +1738,12 @@ mod keyboard_tests {
         draw(&window, cx);
         window
             .update(cx, |gallery, _, cx| {
-                assert!(!gallery.button_sync_rows.borrow().contains(&37));
+                assert!(
+                    !gallery
+                        .button_sync_rows
+                        .borrow()
+                        .contains(&EFFECT_SAMPLE_ROW)
+                );
                 gallery.button_active = true;
                 gallery.list.remeasure();
                 cx.notify();
@@ -1587,11 +1753,55 @@ mod keyboard_tests {
         window
             .update(cx, |gallery, _, _| {
                 assert!(
-                    !gallery.button_sync_rows.borrow().contains(&37),
+                    !gallery
+                        .button_sync_rows
+                        .borrow()
+                        .contains(&EFFECT_SAMPLE_ROW),
                     "remeasure must not inject rest targets into the visible row"
                 );
             })
             .unwrap();
+    }
+
+    #[gpui::test]
+    fn anchored_rows_render_the_content_their_playbacks_drive(cx: &mut TestAppContext) {
+        cx.update(|cx| {
+            gpui_kit::init(cx);
+            gpui_kit_material::init(cx);
+        });
+        let window = cx.open_window(size(px(960.), px(600.)), Gallery::new);
+        draw(&window, cx);
+        for (row, selector) in [
+            (EFFECT_SAMPLE_ROW, "button-effect-samples"),
+            (TOGGLE_SHAPE_ROWS, "button-toggle-shapes"),
+            (LOADING_SIZE_ROWS, "button-loading-sizes"),
+            (COLOR_SOURCE_ROW, "color-swatches"),
+        ] {
+            let physical = window
+                .update(cx, |gallery, _, cx| {
+                    let physical = super::physical_row(row, gallery.color_columns);
+                    gallery.list.scroll_to(gpui::ListOffset {
+                        item_ix: physical,
+                        offset_in_item: px(0.),
+                    });
+                    cx.notify();
+                    physical
+                })
+                .unwrap();
+            draw(&window, cx);
+            let row_bounds = window
+                .update(cx, |gallery, _, _| gallery.list.bounds_for_item(physical))
+                .unwrap()
+                .expect("anchored row is mounted");
+            let mut visual = gpui::VisualTestContext::from_window(window.into(), cx);
+            let content = visual
+                .debug_bounds(selector)
+                .unwrap_or_else(|| panic!("{selector} is not rendered"));
+            assert!(
+                row_bounds.contains(&content.origin),
+                "{selector} must render in row {physical}: {content:?} outside {row_bounds:?}"
+            );
+        }
     }
 
     #[gpui::test]
