@@ -89,14 +89,27 @@ roles!(
 // Compatibility names share storage with their semantic M3 role. Application
 // extensions above remain independent; they are not claimed as M3 scheme roles.
 impl ColorRole {
+    /// Legacy name for [`ColorRole::SURFACE_CONTAINER`], the window ground.
     pub const CANVAS: Self = Self::SURFACE_CONTAINER;
+    /// Legacy name for [`ColorRole::SURFACE_CONTAINER_HIGHEST`]. Despite the
+    /// name, this is the *highest* container, not
+    /// [`ColorRole::SURFACE_CONTAINER_HIGH`].
     pub const SURFACE_HIGH: Self = Self::SURFACE_CONTAINER_HIGHEST;
+    /// Legacy name for [`ColorRole::ON_SURFACE`], primary text and icons.
     pub const INK: Self = Self::ON_SURFACE;
+    /// Legacy name for [`ColorRole::ON_SURFACE_VARIANT`], secondary text
+    /// and icons.
     pub const GRAY: Self = Self::ON_SURFACE_VARIANT;
+    /// Legacy name for [`ColorRole::OUTLINE_VARIANT`], decorative dividers.
     pub const HAIRLINE: Self = Self::OUTLINE_VARIANT;
+    /// Legacy name for [`ColorRole::OUTLINE`], control boundaries such as
+    /// outlined fields and unselected checkboxes.
     pub const CONTROL: Self = Self::OUTLINE;
+    /// Legacy name for [`ColorRole::PRIMARY`].
     pub const ACCENT: Self = Self::PRIMARY;
+    /// Legacy name for [`ColorRole::ERROR`].
     pub const DANGER: Self = Self::ERROR;
+    /// Legacy name for [`ColorRole::ERROR_CONTAINER`].
     pub const DANGER_BG: Self = Self::ERROR_CONTAINER;
 }
 
