@@ -23,3 +23,8 @@ Profiler patch: while profiler tracing is enabled, `draw_with_status` times
 `CAMetalLayer nextDrawable` and reports it through
 `gpui::profiler::record_presentation_wait`, so frame evidence can separate
 blocked drawable waits from CPU work. Presentation policy is unchanged.
+
+GPU timing patch: while profiler tracing is enabled, `attach_gpu_timing` adds a
+command-buffer completion handler that reports `GPUStartTime`, `GPUEndTime`,
+status and the CPU commit time through `gpui::profiler::record_gpu_execution`.
+Rendering and presentation are unchanged.

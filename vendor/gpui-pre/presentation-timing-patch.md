@@ -9,3 +9,8 @@ example `CAMetalLayer nextDrawable`). The wait is attributed to the innermost
 open CPU frame scope on the calling thread and only while tracing is enabled.
 Scope boundaries and `duration()` are unchanged: consumers keep the raw elapsed
 time and decide whether blocked waiting counts as CPU work.
+
+`profiler::GpuExecution`, `record_gpu_execution` and `take_gpu_executions` keep
+a bounded (65536 entries, overflow counted), thread-safe store of driver GPU
+timestamps reported by platform completion handlers while tracing is enabled.
+GPU time is evidence separate from CPU frame scopes.

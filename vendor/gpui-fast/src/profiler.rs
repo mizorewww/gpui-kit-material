@@ -1097,6 +1097,51 @@ pub fn record_presentation_wait(waited: Duration) {
     let _ = waited;
 }
 
+/// GPU execution of one submitted command buffer, timed by the GPU driver.
+/// Material patch: whole-frame evidence reports GPU time separately from CPU.
+#[derive(Debug, Copy, Clone)]
+pub struct GpuExecution {
+    /// CPU time immediately before the command buffer was committed.
+    pub submitted_at: Instant,
+    /// Driver GPU start timestamp, in seconds of the platform host clock.
+    pub gpu_start_s: f64,
+    /// Driver GPU end timestamp, in seconds of the platform host clock.
+    pub gpu_end_s: f64,
+    /// Static label for the kind of work (for example `"frame"`).
+    pub kind: &'static str,
+    /// Whether the driver reported successful completion.
+    pub completed: bool,
+}
+
+/// Bounded so a forgotten capture cannot grow without limit; overflow is counted.
+const GPU_EXECUTION_CAPACITY: usize = 1 << 16;
+
+static GPU_EXECUTIONS: std::sync::Mutex<(Vec<GpuExecution>, u64)> =
+    std::sync::Mutex::new((Vec::new(), 0));
+
+/// Record a completed command buffer's GPU timestamps. Callable from any
+/// thread (Metal completion handlers run off the main thread). Ignored when
+/// profiler tracing is disabled.
+pub fn record_gpu_execution(execution: GpuExecution) {
+    if !cfg!(feature = "profiler") || !trace_enabled() {
+        return;
+    }
+    let mut executions = GPU_EXECUTIONS.lock().unwrap_or_else(|e| e.into_inner());
+    if executions.0.len() < GPU_EXECUTION_CAPACITY {
+        executions.0.push(execution);
+    } else {
+        executions.1 += 1;
+    }
+}
+
+/// Take all recorded GPU executions and the number dropped at capacity since
+/// the previous call.
+pub fn take_gpu_executions() -> (Vec<GpuExecution>, u64) {
+    let mut executions = GPU_EXECUTIONS.lock().unwrap_or_else(|e| e.into_inner());
+    let dropped = std::mem::take(&mut executions.1);
+    (std::mem::take(&mut executions.0), dropped)
+}
+
 #[cfg(feature = "profiler")]
 fn note_cpu_phase(window_id: WindowId, start: Instant, draw: bool) {
     if !trace_enabled() {

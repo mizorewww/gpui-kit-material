@@ -96,6 +96,10 @@
     {
       "path": "src/metal_renderer.rs",
       "scope": "draw_with_status times CAMetalLayer nextDrawable only while profiler tracing is enabled and reports it through gpui::profiler::record_presentation_wait. No synchronization, drawable count, timeout or presentation policy change."
+    },
+    {
+      "path": "src/metal_renderer.rs, src/fast/layers/raster.rs",
+      "scope": "attach_gpu_timing adds a completion handler (only while profiler tracing is enabled) that reports GPUStartTime/GPUEndTime, status and CPU commit time through gpui::profiler::record_gpu_execution for frame and raster-tile command buffers. Rendering and presentation are unchanged."
     }
   ]
 }

@@ -1,7 +1,10 @@
 //! Opt-in whole-window CPU frame evidence. Never enabled by the ordinary gallery.
 use gpui::{
     App, Window, WindowId,
-    profiler::{self, CpuFrameSource, FrameEvent, FrameTiming, FrameTimingCollector},
+    profiler::{
+        self, CpuFrameSource, FrameEvent, FrameTiming, FrameTimingCollector, GpuExecution,
+        PresentTiming,
+    },
 };
 use serde_json::{Value, json};
 use std::{
@@ -70,7 +73,7 @@ pub fn prepare() -> Option<Session> {
         "initial_gallery_state":{"theme":"baseline","mode":"light","contrast":"standard","text_scale":1,"density":"auto"},
         "scenario_coverage":"startup and naturally scheduled frames only; interaction matrix not automated",
         "workload":"gallery startup and naturally requested frames; no synthetic refresh, no warm-up exclusion",
-        "gpu_time_ns":Value::Null,"gpu_measurement":"unavailable: Present measures CPU platform submission, not GPU execution",
+        "gpu_measurement":match GPU_TIMING_SOURCE { Some(source) => json!({"source":source,"scope":"per-frame sum of command buffers committed inside that frame's submission; separate from and never part of the CPU budget"}), None => json!({"source":null,"reason":"this platform backend does not report GPU command timestamps"}) },
         "ring_capacity_events":RING_CAPACITY,"ring_overflow_policy":"full batch is incomplete, even if no loss can be proven"
     });
     profiler::set_trace_enabled(true);
@@ -86,7 +89,29 @@ struct Recording {
     events: Vec<FrameEvent>,
     errors: Vec<String>,
     batch_sizes: Vec<usize>,
+    gpu: GpuCapture,
 }
+/// Driver GPU timestamps, reported separately from the CPU budget.
+#[derive(Default)]
+struct GpuCapture {
+    executions: Vec<GpuExecution>,
+    dropped: u64,
+}
+impl GpuCapture {
+    fn take() -> Self {
+        let (executions, dropped) = profiler::take_gpu_executions();
+        Self {
+            executions,
+            dropped,
+        }
+    }
+}
+/// Only the Apple Metal backends report command-buffer GPU timestamps.
+const GPU_TIMING_SOURCE: Option<&str> = if cfg!(target_os = "macos") {
+    Some("Metal command-buffer GPUStartTime/GPUEndTime via the vendored Apple renderer")
+} else {
+    None
+};
 impl Recording {
     fn collect(&mut self, collector: &mut FrameTimingCollector) {
         let events = collector.collect_unseen();
@@ -148,6 +173,7 @@ impl Session {
                         events,
                         errors,
                         batch_sizes,
+                        gpu: GpuCapture::take(),
                     },
                     id,
                     self.metadata,
@@ -177,6 +203,7 @@ impl Session {
                 events: Vec::new(),
                 errors: Vec::new(),
                 batch_sizes: Vec::new(),
+                gpu: GpuCapture::default(),
             };
             loop {
                 executor
@@ -191,6 +218,7 @@ impl Session {
                     break;
                 }
             }
+            recording.gpu = GpuCapture::take();
             profiler::set_trace_enabled(false);
             let report = report(recording, window_id, self.metadata, started.elapsed());
             let code = exit_code(&report);
@@ -270,9 +298,9 @@ fn report(mut recording: Recording, target: WindowId, metadata: Value, elapsed: 
         .events
         .iter()
         .filter_map(|event| match event {
-            FrameEvent::Complete(scope) if scope.window_id == target => scope
-                .present_start
-                .map(|at| (at, scope.presentation_wait)),
+            FrameEvent::Complete(scope) if scope.window_id == target => {
+                scope.present_start.map(|at| (at, scope.presentation_wait))
+            }
             _ => None,
         })
         .collect();
@@ -373,10 +401,11 @@ fn report(mut recording: Recording, target: WindowId, metadata: Value, elapsed: 
                 let wait = present_waits
                     .get(&p.present_start)
                     .map_or(0, |wait| wait.as_nanos().min(submit));
-                let total = draw + submit - wait;
+                // API-call elapsed remains part of the complete submission budget.
+                let total = draw + submit;
                 costs.push(total);
                 pairs.push((d, p));
-                frames.push(json!({"index":frames.len(),"first_frame":frames.is_empty(),"draw_start_ns":timestamp(d.draw_start),"present_end_ns":timestamp(p.present_end),"draw_ns":draw,"submit_ns":submit,"submit_presentation_wait_ns":wait,"measured_cpu_stage_ns":total,"measured_stage_ns_including_wait":draw+submit,"wall_span_ns":(p.present_end-d.draw_start).as_nanos(),"request_layout_ns":d.phases.request_layout.as_nanos(),"prepaint_ns":d.phases.prepaint.as_nanos(),"paint_ns":d.phases.paint.as_nanos(),"measured_stages_over_budget":total>BUDGET_NS,"gpu_time_ns":Value::Null}));
+                frames.push(json!({"index":frames.len(),"first_frame":frames.is_empty(),"draw_start_ns":timestamp(d.draw_start),"present_end_ns":timestamp(p.present_end),"draw_ns":draw,"submit_ns":submit,"submit_presentation_wait_ns":wait,"measured_cpu_stage_ns":total,"measured_stage_ns_including_wait":draw+submit,"diagnostic_stage_ns_excluding_drawable_call":total-wait,"wall_span_ns":(p.present_end-d.draw_start).as_nanos(),"request_layout_ns":d.phases.request_layout.as_nanos(),"prepaint_ns":d.phases.prepaint.as_nanos(),"paint_ns":d.phases.paint.as_nanos(),"measured_stages_over_budget":total>BUDGET_NS,"gpu_time_ns":Value::Null}));
             }
         }
     }
@@ -460,11 +489,13 @@ fn report(mut recording: Recording, target: WindowId, metadata: Value, elapsed: 
         }
         let elapsed = scope.duration().as_nanos();
         let wait = scope.presentation_wait.as_nanos().min(elapsed);
-        let cost = elapsed - wait;
+        // Keep synchronous drawable acquisition, submission and cleanup in
+        // the original whole-frame budget. The API timer is diagnostic only.
+        let cost = elapsed;
         scope_costs.push(cost);
         scope_elapsed.push(elapsed);
         scope_waits.push(wait);
-        scope_rows.push(json!({"index":index,"source":format!("{:?}",scope.source),"cpu_elapsed_ns":cost,"scope_elapsed_ns":elapsed,"presentation_wait_ns":wait,"presentation_waits":scope.presentation_waits,"draw_count":scope.draw_count,"present_count":scope.present_count,"next_frame_callbacks":scope.next_frame_callbacks,"over_budget":cost>BUDGET_NS,"gpu_time_ns":Value::Null}));
+        scope_rows.push(json!({"index":index,"source":format!("{:?}",scope.source),"cpu_elapsed_ns":cost,"scope_elapsed_ns":elapsed,"diagnostic_scope_ns_excluding_drawable_call":elapsed-wait,"presentation_wait_ns":wait,"presentation_waits":scope.presentation_waits,"draw_count":scope.draw_count,"present_count":scope.present_count,"next_frame_callbacks":scope.next_frame_callbacks,"over_budget":cost>BUDGET_NS}));
     }
     for at in draws.keys() {
         if !draw_scopes.contains_key(at) {
@@ -532,7 +563,73 @@ fn report(mut recording: Recording, target: WindowId, metadata: Value, elapsed: 
             }
         }
     }
-    json!({"schema":"material-gallery-cpu-frames-v2","statistics_definition":"nearest-rank quantiles; median is p50 (lower middle for even sample counts)","budget_ns":BUDGET_NS,"budget_comparison":"every complete CPU scope must be at or below budget; known over-budget work fails even when acceptance is incomplete","acceptance_eligible":recording.errors.is_empty() && reasons.is_empty(),"eligibility_reasons":reasons,"scope":"whole synchronous CPU frame scopes plus exact draw/present associations","cpu_work_definition":"Complete event end-start includes callbacks, draw, submission and cleanup, minus blocked presentation waits (nextDrawable) reported by the platform; split initial draw and submission remain separately measured, idle gaps are not CPU work","presentation_wait_definition":"time blocked inside platform presentation waiting for a drawable; reported per scope and per frame, excluded from the 2 ms CPU judgement and retained in scope_elapsed_summary","complete":recording.errors.is_empty(),"errors":recording.errors,"metadata":metadata,"capture_elapsed_ns":elapsed.as_nanos(),"summary":summary(&scope_costs),"scope_elapsed_summary":summary(&scope_elapsed),"presentation_wait_summary":summary(&scope_waits),"split_scope_frames_summary":summary(&split_sums),"first_scope_summary":summary(&scope_costs[..scope_costs.len().min(1)]),"subsequent_scopes_summary":summary(&scope_costs[scope_costs.len().min(1)..]),"diagnostic_stage_summary":summary(&costs),"first_frame_stage_summary":summary(&costs[..costs.len().min(1)]),"subsequent_frames_stage_summary":summary(&costs[costs.len().min(1)..]),"collector_batch_sizes":recording.batch_sizes,"raw_events":raw,"cpu_scopes":scope_rows,"draw_lifecycle":draw_rows,"submissions":submission_rows,"frames":frames})
+    let gpu = gpu_report(&mut recording.gpu, &pairs, &mut frames, origin);
+    json!({"schema":"material-gallery-cpu-frames-v2","gpu":gpu,"statistics_definition":"nearest-rank quantiles; median is p50 (lower middle for even sample counts)","budget_ns":BUDGET_NS,"budget_comparison":"every complete CPU scope must be at or below budget; known over-budget work fails even when acceptance is incomplete","acceptance_eligible":recording.errors.is_empty() && reasons.is_empty(),"eligibility_reasons":reasons,"scope":"whole synchronous CPU frame scopes plus exact draw/present associations","cpu_work_definition":"Complete event end-start includes callbacks, draw, synchronous drawable acquisition, submission and cleanup without subtracting API-call elapsed time; split initial draw and submission remain separately measured, idle gaps are not CPU work","presentation_wait_definition":"Legacy presentation_wait fields report elapsed wall time of the whole nextDrawable API call, including any internal CPU work, scheduling and waiting; they do not measure pure blocking or GPU time. This time remains included in all 2 ms acceptance judgements. Fields named diagnostic_*_excluding_drawable_call are descriptive differences only, never acceptance metrics.","complete":recording.errors.is_empty(),"errors":recording.errors,"metadata":metadata,"capture_elapsed_ns":elapsed.as_nanos(),"summary":summary(&scope_costs),"scope_elapsed_summary":summary(&scope_elapsed),"presentation_wait_summary":summary(&scope_waits),"split_scope_frames_summary":summary(&split_sums),"first_scope_summary":summary(&scope_costs[..scope_costs.len().min(1)]),"subsequent_scopes_summary":summary(&scope_costs[scope_costs.len().min(1)..]),"diagnostic_stage_summary":summary(&costs),"first_frame_stage_summary":summary(&costs[..costs.len().min(1)]),"subsequent_frames_stage_summary":summary(&costs[costs.len().min(1)..]),"collector_batch_sizes":recording.batch_sizes,"raw_events":raw,"cpu_scopes":scope_rows,"draw_lifecycle":draw_rows,"submissions":submission_rows,"frames":frames})
+}
+
+/// Attach driver GPU time to each submitted frame and summarize it apart from
+/// the CPU budget. GPU time never affects CPU acceptance or the exit code.
+fn gpu_report(
+    capture: &mut GpuCapture,
+    pairs: &[(FrameTiming, PresentTiming)],
+    frames: &mut [Value],
+    origin: Option<Instant>,
+) -> Value {
+    let Some(source) = GPU_TIMING_SOURCE else {
+        for frame in frames.iter_mut() {
+            frame["gpu_time_null_reason"] = json!("backend reports no GPU timestamps");
+        }
+        return json!({"source":null,"reason":"this platform backend does not report GPU command timestamps","summary":summary(&[])});
+    };
+    let executions = &mut capture.executions;
+    executions.sort_by_key(|execution| execution.submitted_at);
+    let duration = |execution: &GpuExecution| {
+        ((execution.gpu_end_s - execution.gpu_start_s).max(0.) * 1e9).round() as u128
+    };
+    let mut per_frame = Vec::new();
+    for (index, (_, present)) in pairs.iter().enumerate() {
+        let first = executions.partition_point(|e| e.submitted_at < present.present_start);
+        let last = executions.partition_point(|e| e.submitted_at <= present.present_end);
+        let owned = &executions[first..last];
+        let reason = if owned.is_empty() {
+            Some("no command buffer completion recorded for this submission")
+        } else if owned
+            .iter()
+            .any(|e| !e.completed || e.gpu_end_s < e.gpu_start_s)
+        {
+            Some("a command buffer did not complete successfully")
+        } else {
+            None
+        };
+        if let Some(reason) = reason {
+            frames[index]["gpu_time_ns"] = Value::Null;
+            frames[index]["gpu_time_null_reason"] = json!(reason);
+        } else {
+            let total: u128 = owned.iter().map(duration).sum();
+            per_frame.push(total);
+            frames[index]["gpu_time_ns"] = json!(total);
+            frames[index]["gpu_command_buffers"] = json!(owned.len());
+        }
+    }
+    let relative = |at: Instant| {
+        origin.map(|origin| {
+            if at >= origin {
+                (at - origin).as_nanos() as i128
+            } else {
+                -((origin - at).as_nanos() as i128)
+            }
+        })
+    };
+    let raw: Vec<Value> = executions
+        .iter()
+        .map(|e| {
+            json!({"kind":e.kind,"completed":e.completed,"submitted_ns":relative(e.submitted_at),
+                "gpu_start_s":e.gpu_start_s,"gpu_end_s":e.gpu_end_s,"gpu_ns":duration(e)})
+        })
+        .collect();
+    json!({"source":source,"definition":"sum of GPUEndTime-GPUStartTime over command buffers committed during a frame's submission; overlap is not removed; never part of the CPU budget",
+        "summary":summary(&per_frame),"frames_without_gpu_time":pairs.len()-per_frame.len(),
+        "dropped_at_capacity":capture.dropped,"raw_command_buffers":raw})
 }
 
 #[cfg(test)]
@@ -568,6 +665,7 @@ mod tests {
                 events: vec![FrameEvent::Draw(draw)],
                 errors: vec![],
                 batch_sizes: vec![1],
+                gpu: Default::default(),
             },
             draw.window_id,
             json!({}),
@@ -590,6 +688,7 @@ mod tests {
                 events: vec![FrameEvent::Draw(draw), FrameEvent::Present(present)],
                 errors: vec![],
                 batch_sizes: vec![2],
+                gpu: Default::default(),
             },
             draw.window_id,
             json!({}),
@@ -658,6 +757,7 @@ mod tests {
                 ],
                 errors: vec![],
                 batch_sizes: vec![4],
+                gpu: Default::default(),
             },
             d.window_id,
             json!({}),
@@ -680,7 +780,7 @@ mod tests {
         assert_eq!(exit_code(&evidence), 1);
     }
     #[test]
-    fn blocked_presentation_wait_is_reported_but_not_judged_as_cpu_work() {
+    fn drawable_call_elapsed_remains_in_whole_frame_budget() {
         let d = draw();
         let p = PresentTiming {
             window_id: d.window_id,
@@ -710,17 +810,92 @@ mod tests {
             ]
         };
         let evidence = report_events(events(Duration::from_micros(14_500)));
-        assert_eq!(evidence["summary"]["max_ns"], 1_500_000);
+        assert_eq!(evidence["summary"]["max_ns"], 16_000_000);
         assert_eq!(evidence["scope_elapsed_summary"]["max_ns"], 16_000_000);
         assert_eq!(evidence["presentation_wait_summary"]["max_ns"], 14_500_000);
-        assert_eq!(evidence["frames"][0]["measured_cpu_stage_ns"], 1_500_000);
-        assert_eq!(evidence["frames"][0]["over_budget"], false);
-        // Not a failure; ineligible only because no initial draw was captured.
-        assert_eq!(exit_code(&evidence), 2);
-        // Unreported time remains CPU work and fails.
+        assert_eq!(evidence["frames"][0]["measured_cpu_stage_ns"], 16_000_000);
+        assert_eq!(
+            evidence["frames"][0]["diagnostic_stage_ns_excluding_drawable_call"],
+            1_500_000
+        );
+        assert_eq!(evidence["cpu_scopes"][0]["cpu_elapsed_ns"], 16_000_000);
+        assert_eq!(
+            evidence["cpu_scopes"][0]["diagnostic_scope_ns_excluding_drawable_call"],
+            1_500_000
+        );
+        assert_eq!(evidence["frames"][0]["over_budget"], true);
+        assert_eq!(evidence["summary"]["over_budget_frames"], 1);
+        assert_eq!(
+            evidence["diagnostic_stage_summary"]["over_budget_frames"],
+            1
+        );
+        // A known 16ms scope fails even though the subtracted diagnostic is
+        // below 2ms and missing startup also makes the evidence ineligible.
+        assert_eq!(exit_code(&evidence), 1);
+        // Changing the reported API-call elapsed cannot change acceptance.
         let unexplained = report_events(events(Duration::from_millis(13)));
         assert_eq!(unexplained["summary"]["over_budget_frames"], 1);
         assert_eq!(exit_code(&unexplained), 1);
+    }
+    #[test]
+    #[cfg(target_os = "macos")]
+    fn gpu_time_is_attached_per_submission_and_never_judged_as_cpu() {
+        use super::{GpuCapture, GpuExecution};
+        let d = draw();
+        let p = PresentTiming {
+            window_id: d.window_id,
+            present_start: d.draw_end,
+            present_end: d.draw_end + Duration::from_micros(500),
+            animation_interval: None,
+        };
+        let execution = |at, start: f64, end: f64, completed| GpuExecution {
+            submitted_at: at,
+            gpu_start_s: start,
+            gpu_end_s: end,
+            kind: "frame",
+            completed,
+        };
+        let evidence = |gpu| {
+            report(
+                Recording {
+                    events: vec![FrameEvent::Draw(d), FrameEvent::Present(p)],
+                    errors: vec![],
+                    batch_sizes: vec![2],
+                    gpu: GpuCapture {
+                        executions: gpu,
+                        dropped: 0,
+                    },
+                },
+                d.window_id,
+                json!({}),
+                Duration::ZERO,
+            )
+        };
+        let inside = p.present_start + Duration::from_micros(100);
+        let measured = evidence(vec![
+            execution(inside, 10.0, 10.005, true),
+            execution(inside, 10.005, 10.006, true),
+            // Committed after this submission ended: belongs to no frame here.
+            execution(p.present_end + Duration::from_millis(1), 11.0, 12.0, true),
+        ]);
+        assert_eq!(measured["frames"][0]["gpu_time_ns"], 6_000_000);
+        assert_eq!(measured["gpu"]["summary"]["max_ns"], 6_000_000);
+        assert_eq!(
+            measured["gpu"]["raw_command_buffers"]
+                .as_array()
+                .unwrap()
+                .len(),
+            3
+        );
+        // 6 ms of GPU time is reported but is not a CPU budget failure.
+        assert_eq!(
+            measured["diagnostic_stage_summary"]["over_budget_frames"],
+            0
+        );
+        let failed = evidence(vec![execution(inside, 1.0, 2.0, false)]);
+        assert!(failed["frames"][0]["gpu_time_ns"].is_null());
+        assert!(failed["frames"][0]["gpu_time_null_reason"].is_string());
+        assert_eq!(failed["gpu"]["frames_without_gpu_time"], 1);
     }
     #[test]
     fn callback_only_over_budget_scope_fails_even_without_complete_frame_pairs() {
@@ -745,6 +920,7 @@ mod tests {
                 events: vec![FrameEvent::Complete(scope)],
                 errors: vec![],
                 batch_sizes: vec![1],
+                gpu: Default::default(),
             },
             id,
             json!({}),
@@ -821,6 +997,7 @@ mod tests {
         report(
             Recording {
                 batch_sizes: vec![events.len()],
+                gpu: Default::default(),
                 events,
                 errors: vec![],
             },

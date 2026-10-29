@@ -568,6 +568,7 @@ impl MetalRenderer {
                 }
             };
 
+            attach_gpu_timing(&command_buffer, "frame");
             if self.presents_with_transaction {
                 command_buffer.commit();
                 command_buffer.wait_until_scheduled();
@@ -1742,6 +1743,40 @@ impl gpui::PlatformHeadlessRenderer for MetalHeadlessRenderer {
 
     fn sprite_atlas(&self) -> Arc<dyn gpui::PlatformAtlas> {
         self.renderer.sprite_atlas().clone()
+    }
+}
+
+
+/// Material patch: while profiler tracing is enabled, report the driver's
+/// GPUStartTime/GPUEndTime for a command buffer committed after this call.
+pub(crate) fn attach_gpu_timing(command_buffer: &metal::CommandBufferRef, kind: &'static str) {
+    if !gpui::profiler::trace_enabled() {
+        return;
+    }
+    let submitted_at = std::time::Instant::now();
+    let block = RcBlock::new(move |command_buffer: ptr::NonNull<AnyObject>| {
+        // SAFETY: Metal hands its completion handlers the command buffer that
+        // completed; these read-only properties are valid once it completes.
+        let command_buffer = unsafe { command_buffer.as_ref() };
+        let (gpu_start_s, gpu_end_s, status): (f64, f64, usize) = unsafe {
+            (
+                objc2::msg_send![command_buffer, GPUStartTime],
+                objc2::msg_send![command_buffer, GPUEndTime],
+                objc2::msg_send![command_buffer, status],
+            )
+        };
+        gpui::profiler::record_gpu_execution(gpui::profiler::GpuExecution {
+            submitted_at,
+            gpu_start_s,
+            gpu_end_s,
+            kind,
+            // MTLCommandBufferStatusCompleted
+            completed: status == 4,
+        });
+    });
+    // SAFETY: Both pointee types are opaque views of the same Objective-C block pointer ABI.
+    unsafe {
+        command_buffer.add_completed_handler(&*RcBlock::as_ptr(&block).cast());
     }
 }
 
