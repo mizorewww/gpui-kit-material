@@ -65,7 +65,7 @@
       "device-pixel-ratio",
       "zoom"
     ],
-    "completion": "Every applicable case has evidence and an independent PASS tied to the delivered implementation. Unspecified, untested, and unreviewed cases remain incomplete. The entire gallery CPU frame must additionally satisfy the strict performance gate for every component acceptance.",
+    "completion": "Every applicable case has evidence and an independent PASS tied to the delivered implementation. Unspecified, untested, and unreviewed cases remain incomplete. The entire gallery CPU frame must additionally satisfy the performance gate for every component acceptance.",
     "themes": "light and dark, every built-in palette, and reference baseline",
     "review_invalidation": "Any implementation change invalidates affected prior PASS verdicts until independently reviewed again.",
     "performance": {
@@ -73,7 +73,7 @@
       "scope": "entire gallery frame, on both desktop and wasm-browser; applies to acceptance of every component",
       "metric": "CPU frame elapsed time including view rendering, layout, prepaint, paint, scene finalization and graphics command submission",
       "threshold_ms": 2.0,
-      "comparison": "strictly less than; any measured frame >= 2.0 ms fails",
+      "comparison": "less than or equal to; any measured frame > 2.0 ms fails",
       "aggregation": "maximum per-frame duration; also report median, p95, p99 and over-budget count",
       "first_frame": "included; report cold-start and steady-state separately without excluding slow frames from acceptance",
       "gpu": "measure and report separately; never substitute GPU or average FPS for CPU frame time",
@@ -98,8 +98,9 @@
         "theme and text-scale changes",
         "reduced-motion transitions"
       ],
-      "completion": "No component or gallery can pass without whole-gallery evidence below the strict budget. Existing functional or visual reviews do not establish performance acceptance."
-    }
+      "completion": "No component or gallery can pass without whole-gallery evidence at or below the budget. Existing functional or visual reviews do not establish performance acceptance."
+    },
+    "reference_precedence": "Use reference_policy for all visual, motion, theme, typography and state assertions. A secondary-reference PASS cannot establish primary-reference conformance."
   },
   "foundations": [
     {
@@ -113,7 +114,8 @@
         }
       ],
       "reference": "https://md3.io/styles/themes/",
-      "reference_status": "available"
+      "reference_status": "available",
+      "primary_reference_review": "pending: reconcile with m3e.kyralabs.dev; existing md3.io evidence is not a primary-reference PASS"
     },
     {
       "id": "color",
@@ -126,7 +128,8 @@
         }
       ],
       "reference": "https://md3.io/styles/color/",
-      "reference_status": "available"
+      "reference_status": "available",
+      "primary_reference_review": "pending: reconcile with m3e.kyralabs.dev; existing md3.io evidence is not a primary-reference PASS"
     },
     {
       "id": "typography",
@@ -144,21 +147,24 @@
         }
       ],
       "reference": "https://md3.io/styles/typography/",
-      "reference_status": "available"
+      "reference_status": "available",
+      "primary_reference_review": "pending: reconcile with m3e.kyralabs.dev; existing md3.io evidence is not a primary-reference PASS"
     },
     {
       "id": "shape",
       "status": "unreviewed",
       "evidence": [],
       "reference": "https://md3.io/styles/shape/",
-      "reference_status": "available"
+      "reference_status": "available",
+      "primary_reference_review": "pending: reconcile with m3e.kyralabs.dev; existing md3.io evidence is not a primary-reference PASS"
     },
     {
       "id": "elevation",
       "status": "unreviewed",
       "evidence": [],
       "reference": "https://md3.io/styles/",
-      "reference_status": "Coming on website; verify source and runtime"
+      "reference_status": "Coming on website; verify source and runtime",
+      "primary_reference_review": "pending: reconcile with m3e.kyralabs.dev; existing md3.io evidence is not a primary-reference PASS"
     },
     {
       "id": "motion",
@@ -171,21 +177,24 @@
         }
       ],
       "reference": "https://md3.io/styles/",
-      "reference_status": "Coming on website; verify source and runtime"
+      "reference_status": "Coming on website; verify source and runtime",
+      "primary_reference_review": "pending: reconcile with m3e.kyralabs.dev; existing md3.io evidence is not a primary-reference PASS"
     },
     {
       "id": "states",
       "status": "unreviewed",
       "evidence": [],
       "reference": "https://md3.io/styles/",
-      "reference_status": "Coming on website; verify source and runtime"
+      "reference_status": "Coming on website; verify source and runtime",
+      "primary_reference_review": "pending: reconcile with m3e.kyralabs.dev; existing md3.io evidence is not a primary-reference PASS"
     },
     {
       "id": "icons",
       "status": "unreviewed",
       "evidence": [],
       "reference": "https://md3.io/styles/",
-      "reference_status": "Coming on website; verify source and runtime"
+      "reference_status": "Coming on website; verify source and runtime",
+      "primary_reference_review": "pending: reconcile with m3e.kyralabs.dev; existing md3.io evidence is not a primary-reference PASS"
     }
   ],
   "components": [
@@ -241,6 +250,12 @@
         "status": "unverified",
         "evidence": [],
         "reviews": []
+      },
+      "alignment_reference": {
+        "site": "https://m3e.kyralabs.dev/",
+        "url": "https://m3e.kyralabs.dev/components/button/",
+        "status": "unreviewed",
+        "variant_mapping": "requires complete variant audit"
       }
     },
     {
@@ -260,6 +275,12 @@
         "status": "unverified",
         "evidence": [],
         "reviews": []
+      },
+      "alignment_reference": {
+        "site": "https://m3e.kyralabs.dev/",
+        "url": "https://m3e.kyralabs.dev/components/icon-button/",
+        "status": "unreviewed",
+        "variant_mapping": "requires complete variant audit"
       }
     },
     {
@@ -272,6 +293,12 @@
         "status": "unverified",
         "evidence": [],
         "reviews": []
+      },
+      "alignment_reference": {
+        "site": "https://m3e.kyralabs.dev/",
+        "url": "https://m3e.kyralabs.dev/components/button-group/",
+        "status": "unreviewed",
+        "variant_mapping": "requires complete variant audit"
       }
     },
     {
@@ -284,6 +311,12 @@
         "status": "unverified",
         "evidence": [],
         "reviews": []
+      },
+      "alignment_reference": {
+        "site": "https://m3e.kyralabs.dev/",
+        "url": "https://m3e.kyralabs.dev/components/split-button/",
+        "status": "unreviewed",
+        "variant_mapping": "requires complete variant audit"
       }
     },
     {
@@ -296,6 +329,12 @@
         "status": "unverified",
         "evidence": [],
         "reviews": []
+      },
+      "alignment_reference": {
+        "site": "https://m3e.kyralabs.dev/",
+        "url": "https://m3e.kyralabs.dev/components/fab/",
+        "status": "unreviewed",
+        "variant_mapping": "requires complete variant audit"
       }
     },
     {
@@ -308,6 +347,12 @@
         "status": "unverified",
         "evidence": [],
         "reviews": []
+      },
+      "alignment_reference": {
+        "site": "https://m3e.kyralabs.dev/",
+        "url": "https://m3e.kyralabs.dev/components/fab-menu/",
+        "status": "unreviewed",
+        "variant_mapping": "requires complete variant audit"
       }
     },
     {
@@ -320,6 +365,12 @@
         "status": "unverified",
         "evidence": [],
         "reviews": []
+      },
+      "alignment_reference": {
+        "site": "https://m3e.kyralabs.dev/",
+        "url": "https://m3e.kyralabs.dev/components/fab/",
+        "status": "unreviewed",
+        "variant_mapping": "requires audit"
       }
     },
     {
@@ -332,6 +383,12 @@
         "status": "unverified",
         "evidence": [],
         "reviews": []
+      },
+      "alignment_reference": {
+        "site": "https://m3e.kyralabs.dev/",
+        "url": "https://m3e.kyralabs.dev/components/checkbox/",
+        "status": "unreviewed",
+        "variant_mapping": "requires complete variant audit"
       }
     },
     {
@@ -344,6 +401,12 @@
         "status": "unverified",
         "evidence": [],
         "reviews": []
+      },
+      "alignment_reference": {
+        "site": "https://m3e.kyralabs.dev/",
+        "url": "https://m3e.kyralabs.dev/components/switch/",
+        "status": "unreviewed",
+        "variant_mapping": "requires complete variant audit"
       }
     },
     {
@@ -356,6 +419,12 @@
         "status": "unverified",
         "evidence": [],
         "reviews": []
+      },
+      "alignment_reference": {
+        "site": "https://m3e.kyralabs.dev/",
+        "url": "https://m3e.kyralabs.dev/components/radio-button/",
+        "status": "unreviewed",
+        "variant_mapping": "requires audit"
       }
     },
     {
@@ -368,6 +437,12 @@
         "status": "unverified",
         "evidence": [],
         "reviews": []
+      },
+      "alignment_reference": {
+        "site": "https://m3e.kyralabs.dev/",
+        "url": "https://m3e.kyralabs.dev/components/chips/",
+        "status": "unreviewed",
+        "variant_mapping": "requires complete variant audit"
       }
     },
     {
@@ -380,6 +455,12 @@
         "status": "unverified",
         "evidence": [],
         "reviews": []
+      },
+      "alignment_reference": {
+        "site": "https://m3e.kyralabs.dev/",
+        "url": "https://m3e.kyralabs.dev/components/slider/",
+        "status": "unreviewed",
+        "variant_mapping": "requires complete variant audit"
       }
     },
     {
@@ -392,6 +473,12 @@
         "status": "unverified",
         "evidence": [],
         "reviews": []
+      },
+      "alignment_reference": {
+        "site": "https://m3e.kyralabs.dev/",
+        "url": "https://m3e.kyralabs.dev/components/text-field/",
+        "status": "unreviewed",
+        "variant_mapping": "requires complete variant audit"
       }
     },
     {
@@ -404,6 +491,12 @@
         "status": "unverified",
         "evidence": [],
         "reviews": []
+      },
+      "alignment_reference": {
+        "site": "https://md3.io/",
+        "url": "https://md3.io/components/select/",
+        "status": "unreviewed",
+        "primary_overlap_audit": "pending; if a primary-source equivalent exists it takes precedence"
       }
     },
     {
@@ -416,6 +509,12 @@
         "status": "unverified",
         "evidence": [],
         "reviews": []
+      },
+      "alignment_reference": {
+        "site": "https://m3e.kyralabs.dev/",
+        "url": "https://m3e.kyralabs.dev/components/search/",
+        "status": "unreviewed",
+        "variant_mapping": "requires complete variant audit"
       }
     },
     {
@@ -428,6 +527,12 @@
         "status": "unverified",
         "evidence": [],
         "reviews": []
+      },
+      "alignment_reference": {
+        "site": "https://m3e.kyralabs.dev/",
+        "url": "https://m3e.kyralabs.dev/components/date-picker/",
+        "status": "unreviewed",
+        "variant_mapping": "requires audit"
       }
     },
     {
@@ -440,6 +545,12 @@
         "status": "unverified",
         "evidence": [],
         "reviews": []
+      },
+      "alignment_reference": {
+        "site": "https://m3e.kyralabs.dev/",
+        "url": "https://m3e.kyralabs.dev/components/time-picker/",
+        "status": "unreviewed",
+        "variant_mapping": "requires audit"
       }
     },
     {
@@ -452,6 +563,12 @@
         "status": "unverified",
         "evidence": [],
         "reviews": []
+      },
+      "alignment_reference": {
+        "site": "https://m3e.kyralabs.dev/",
+        "url": "https://m3e.kyralabs.dev/components/navigation-rail/",
+        "status": "unreviewed",
+        "variant_mapping": "requires complete variant audit"
       }
     },
     {
@@ -464,6 +581,12 @@
         "status": "unverified",
         "evidence": [],
         "reviews": []
+      },
+      "alignment_reference": {
+        "site": "https://m3e.kyralabs.dev/",
+        "url": "https://m3e.kyralabs.dev/components/navigation-bar/",
+        "status": "unreviewed",
+        "variant_mapping": "requires complete variant audit"
       }
     },
     {
@@ -476,6 +599,12 @@
         "status": "unverified",
         "evidence": [],
         "reviews": []
+      },
+      "alignment_reference": {
+        "site": "https://m3e.kyralabs.dev/",
+        "url": "https://m3e.kyralabs.dev/components/navigation-drawer/",
+        "status": "unreviewed",
+        "variant_mapping": "requires audit"
       }
     },
     {
@@ -488,6 +617,12 @@
         "status": "unverified",
         "evidence": [],
         "reviews": []
+      },
+      "alignment_reference": {
+        "site": "https://m3e.kyralabs.dev/",
+        "url": "https://m3e.kyralabs.dev/components/tabs/",
+        "status": "unreviewed",
+        "variant_mapping": "requires complete variant audit"
       }
     },
     {
@@ -500,6 +635,12 @@
         "status": "unverified",
         "evidence": [],
         "reviews": []
+      },
+      "alignment_reference": {
+        "site": "https://m3e.kyralabs.dev/",
+        "url": "https://m3e.kyralabs.dev/components/menu/",
+        "status": "unreviewed",
+        "variant_mapping": "requires complete variant audit"
       }
     },
     {
@@ -512,6 +653,12 @@
         "status": "unverified",
         "evidence": [],
         "reviews": []
+      },
+      "alignment_reference": {
+        "site": "https://m3e.kyralabs.dev/",
+        "url": "https://m3e.kyralabs.dev/components/top-app-bar/",
+        "status": "unreviewed",
+        "variant_mapping": "requires complete variant audit"
       }
     },
     {
@@ -524,6 +671,12 @@
         "status": "unverified",
         "evidence": [],
         "reviews": []
+      },
+      "alignment_reference": {
+        "site": "https://md3.io/",
+        "url": "https://md3.io/components/bottom-app-bar/",
+        "status": "unreviewed",
+        "primary_overlap_audit": "pending; if a primary-source equivalent exists it takes precedence"
       }
     },
     {
@@ -536,6 +689,12 @@
         "status": "unverified",
         "evidence": [],
         "reviews": []
+      },
+      "alignment_reference": {
+        "site": "https://m3e.kyralabs.dev/",
+        "url": "https://m3e.kyralabs.dev/components/docked-toolbar/",
+        "status": "unreviewed",
+        "variant_mapping": "requires audit"
       }
     },
     {
@@ -548,6 +707,12 @@
         "status": "unverified",
         "evidence": [],
         "reviews": []
+      },
+      "alignment_reference": {
+        "site": "https://m3e.kyralabs.dev/",
+        "url": "https://m3e.kyralabs.dev/components/card/",
+        "status": "unreviewed",
+        "variant_mapping": "requires complete variant audit"
       }
     },
     {
@@ -560,6 +725,12 @@
         "status": "unverified",
         "evidence": [],
         "reviews": []
+      },
+      "alignment_reference": {
+        "site": "https://m3e.kyralabs.dev/",
+        "url": "https://m3e.kyralabs.dev/components/list/",
+        "status": "unreviewed",
+        "variant_mapping": "requires complete variant audit"
       }
     },
     {
@@ -572,6 +743,12 @@
         "status": "unverified",
         "evidence": [],
         "reviews": []
+      },
+      "alignment_reference": {
+        "site": "https://m3e.kyralabs.dev/",
+        "url": "https://m3e.kyralabs.dev/components/carousel/",
+        "status": "unreviewed",
+        "variant_mapping": "requires complete variant audit"
       }
     },
     {
@@ -596,6 +773,12 @@
         "status": "unverified",
         "evidence": [],
         "reviews": []
+      },
+      "alignment_reference": {
+        "site": "https://m3e.kyralabs.dev/",
+        "url": "https://m3e.kyralabs.dev/components/divider/",
+        "status": "unreviewed",
+        "variant_mapping": "requires complete variant audit"
       }
     },
     {
@@ -608,6 +791,12 @@
         "status": "unverified",
         "evidence": [],
         "reviews": []
+      },
+      "alignment_reference": {
+        "site": "https://m3e.kyralabs.dev/",
+        "url": "https://m3e.kyralabs.dev/components/dialog/",
+        "status": "unreviewed",
+        "variant_mapping": "requires complete variant audit"
       }
     },
     {
@@ -620,6 +809,12 @@
         "status": "unverified",
         "evidence": [],
         "reviews": []
+      },
+      "alignment_reference": {
+        "site": "https://m3e.kyralabs.dev/",
+        "url": "https://m3e.kyralabs.dev/components/bottom-sheet/",
+        "status": "unreviewed",
+        "variant_mapping": "requires complete variant audit"
       }
     },
     {
@@ -632,6 +827,12 @@
         "status": "unverified",
         "evidence": [],
         "reviews": []
+      },
+      "alignment_reference": {
+        "site": "https://m3e.kyralabs.dev/",
+        "url": "https://m3e.kyralabs.dev/components/side-sheet/",
+        "status": "unreviewed",
+        "variant_mapping": "requires complete variant audit"
       }
     },
     {
@@ -644,6 +845,12 @@
         "status": "unverified",
         "evidence": [],
         "reviews": []
+      },
+      "alignment_reference": {
+        "site": "https://m3e.kyralabs.dev/",
+        "url": "https://m3e.kyralabs.dev/components/badge/",
+        "status": "unreviewed",
+        "variant_mapping": "requires complete variant audit"
       }
     },
     {
@@ -656,6 +863,12 @@
         "status": "unverified",
         "evidence": [],
         "reviews": []
+      },
+      "alignment_reference": {
+        "site": "https://m3e.kyralabs.dev/",
+        "url": "https://m3e.kyralabs.dev/components/progress/",
+        "status": "unreviewed",
+        "variant_mapping": "requires complete variant audit"
       }
     },
     {
@@ -668,6 +881,12 @@
         "status": "unverified",
         "evidence": [],
         "reviews": []
+      },
+      "alignment_reference": {
+        "site": "https://m3e.kyralabs.dev/",
+        "url": "https://m3e.kyralabs.dev/components/loading-indicator/",
+        "status": "unreviewed",
+        "variant_mapping": "requires complete variant audit"
       }
     },
     {
@@ -680,6 +899,12 @@
         "status": "unverified",
         "evidence": [],
         "reviews": []
+      },
+      "alignment_reference": {
+        "site": "https://m3e.kyralabs.dev/",
+        "url": "https://m3e.kyralabs.dev/components/snackbar/",
+        "status": "unreviewed",
+        "variant_mapping": "requires complete variant audit"
       }
     },
     {
@@ -692,6 +917,120 @@
         "status": "unverified",
         "evidence": [],
         "reviews": []
+      },
+      "alignment_reference": {
+        "site": "https://m3e.kyralabs.dev/",
+        "url": "https://m3e.kyralabs.dev/components/tooltip/",
+        "status": "unreviewed",
+        "variant_mapping": "requires complete variant audit"
+      }
+    },
+    {
+      "id": "canonical-layouts",
+      "reference": "https://m3e.kyralabs.dev/components/canonical-layouts/",
+      "status": "unreviewed",
+      "cases": [],
+      "reviews": [],
+      "performance": {
+        "status": "unverified",
+        "evidence": [],
+        "reviews": []
+      },
+      "alignment_reference": {
+        "site": "https://m3e.kyralabs.dev/",
+        "url": "https://m3e.kyralabs.dev/components/canonical-layouts/",
+        "status": "unreviewed",
+        "variant_mapping": "requires complete variant audit"
+      }
+    },
+    {
+      "id": "floating-toolbar",
+      "reference": "https://m3e.kyralabs.dev/components/floating-toolbar/",
+      "status": "unreviewed",
+      "cases": [],
+      "reviews": [],
+      "performance": {
+        "status": "unverified",
+        "evidence": [],
+        "reviews": []
+      },
+      "alignment_reference": {
+        "site": "https://m3e.kyralabs.dev/",
+        "url": "https://m3e.kyralabs.dev/components/floating-toolbar/",
+        "status": "unreviewed",
+        "variant_mapping": "requires complete variant audit"
+      }
+    },
+    {
+      "id": "navigation-suite",
+      "reference": "https://m3e.kyralabs.dev/components/navigation-suite/",
+      "status": "unreviewed",
+      "cases": [],
+      "reviews": [],
+      "performance": {
+        "status": "unverified",
+        "evidence": [],
+        "reviews": []
+      },
+      "alignment_reference": {
+        "site": "https://m3e.kyralabs.dev/",
+        "url": "https://m3e.kyralabs.dev/components/navigation-suite/",
+        "status": "unreviewed",
+        "variant_mapping": "requires complete variant audit"
+      }
+    },
+    {
+      "id": "primitives",
+      "reference": "https://m3e.kyralabs.dev/components/primitives/",
+      "status": "unreviewed",
+      "cases": [],
+      "reviews": [],
+      "performance": {
+        "status": "unverified",
+        "evidence": [],
+        "reviews": []
+      },
+      "alignment_reference": {
+        "site": "https://m3e.kyralabs.dev/",
+        "url": "https://m3e.kyralabs.dev/components/primitives/",
+        "status": "unreviewed",
+        "variant_mapping": "requires complete variant audit"
+      }
+    },
+    {
+      "id": "pull-to-refresh",
+      "reference": "https://m3e.kyralabs.dev/components/pull-to-refresh/",
+      "status": "unreviewed",
+      "cases": [],
+      "reviews": [],
+      "performance": {
+        "status": "unverified",
+        "evidence": [],
+        "reviews": []
+      },
+      "alignment_reference": {
+        "site": "https://m3e.kyralabs.dev/",
+        "url": "https://m3e.kyralabs.dev/components/pull-to-refresh/",
+        "status": "unreviewed",
+        "variant_mapping": "requires complete variant audit"
+      }
+    },
+    {
+      "id": "segmented-button",
+      "reference": "https://m3e.kyralabs.dev/components/segmented-button/",
+      "status": "unreviewed",
+      "cases": [],
+      "reviews": [],
+      "performance": {
+        "status": "unverified",
+        "evidence": [],
+        "reviews": []
+      },
+      "alignment_reference": {
+        "site": "https://m3e.kyralabs.dev/",
+        "url": "https://m3e.kyralabs.dev/components/segmented-button/",
+        "status": "unreviewed",
+        "variant_mapping": "requires complete variant audit"
       }
     }
   ],
@@ -724,5 +1063,209 @@
         "reviews": []
       }
     }
-  ]
+  ],
+  "objective": "Reproduce the complete union of https://m3e.kyralabs.dev/ and https://md3.io/ components, styles and animations on desktop and WASM galleries, with m3e.kyralabs.dev authoritative for overlapping components; use https://gpui-kit.com/ for gallery organization. Exact visual and animation parity, independent subagent approval for every component, whole-gallery CPU frames <= 2 ms, atomic commits and frequent GitHub progress pushes are required. Material icons must come from the sibling ../gpui-material-symbols repository, which may be improved as needed.",
+  "reference_policy": {
+    "primary": {
+      "site": "https://m3e.kyralabs.dev/",
+      "repository": "https://github.com/kyra-labs/m3exp-web",
+      "source_commit": "3b1e0047c0021eab7b4c0128fa1bec95c76ca746",
+      "deployed_commit_verified": false,
+      "site_observed_on": "2026-10-29",
+      "source_observed_on": "2026-10-29",
+      "source_ref": "HEAD",
+      "package_versions": {
+        "@kyralabs/m3e-codegen": "0.0.0",
+        "@kyralabs/m3e-css": "1.8.0",
+        "@kyralabs/m3e-elements": "1.8.0",
+        "@kyralabs/m3e-icons": "1.8.0",
+        "@kyralabs/m3e-motion": "1.8.0",
+        "@kyralabs/m3e-react": "1.8.0",
+        "@kyralabs/m3e-shapes": "1.8.0",
+        "@kyralabs/m3e-tokens": "1.8.0",
+        "@kyralabs/m3exp-web": "1.8.0"
+      },
+      "package_version_origin": "cloned source package.json files; deployed versions not verified"
+    },
+    "secondary": "https://md3.io/",
+    "scope": "union of all components and their variants from both sites",
+    "overlap": "m3e.kyralabs.dev is authoritative for the entire overlapping component, including visual tokens, typography, interaction states and animation",
+    "existing_reference_field": "Pinned md3.io source provenance retained for existing evidence; not the primary authority for overlapping components.",
+    "existing_evidence": "Existing md3.io fixtures remain secondary-reference evidence. They do not establish conformance to the new primary source. Re-review against the selected source is required.",
+    "catalog_status": "top-level union enumerated; variant and alias coverage still requires source and rendered-site audit",
+    "primary_catalog": [
+      {
+        "id": "badge",
+        "url": "https://m3e.kyralabs.dev/components/badge/"
+      },
+      {
+        "id": "bottom-sheet",
+        "url": "https://m3e.kyralabs.dev/components/bottom-sheet/"
+      },
+      {
+        "id": "button",
+        "url": "https://m3e.kyralabs.dev/components/button/"
+      },
+      {
+        "id": "button-group",
+        "url": "https://m3e.kyralabs.dev/components/button-group/"
+      },
+      {
+        "id": "canonical-layouts",
+        "url": "https://m3e.kyralabs.dev/components/canonical-layouts/"
+      },
+      {
+        "id": "card",
+        "url": "https://m3e.kyralabs.dev/components/card/"
+      },
+      {
+        "id": "carousel",
+        "url": "https://m3e.kyralabs.dev/components/carousel/"
+      },
+      {
+        "id": "checkbox",
+        "url": "https://m3e.kyralabs.dev/components/checkbox/"
+      },
+      {
+        "id": "chips",
+        "url": "https://m3e.kyralabs.dev/components/chips/"
+      },
+      {
+        "id": "date-picker",
+        "url": "https://m3e.kyralabs.dev/components/date-picker/"
+      },
+      {
+        "id": "dialog",
+        "url": "https://m3e.kyralabs.dev/components/dialog/"
+      },
+      {
+        "id": "divider",
+        "url": "https://m3e.kyralabs.dev/components/divider/"
+      },
+      {
+        "id": "docked-toolbar",
+        "url": "https://m3e.kyralabs.dev/components/docked-toolbar/"
+      },
+      {
+        "id": "fab",
+        "url": "https://m3e.kyralabs.dev/components/fab/"
+      },
+      {
+        "id": "fab-menu",
+        "url": "https://m3e.kyralabs.dev/components/fab-menu/"
+      },
+      {
+        "id": "floating-toolbar",
+        "url": "https://m3e.kyralabs.dev/components/floating-toolbar/"
+      },
+      {
+        "id": "icon-button",
+        "url": "https://m3e.kyralabs.dev/components/icon-button/"
+      },
+      {
+        "id": "list",
+        "url": "https://m3e.kyralabs.dev/components/list/"
+      },
+      {
+        "id": "loading-indicator",
+        "url": "https://m3e.kyralabs.dev/components/loading-indicator/"
+      },
+      {
+        "id": "menu",
+        "url": "https://m3e.kyralabs.dev/components/menu/"
+      },
+      {
+        "id": "navigation-bar",
+        "url": "https://m3e.kyralabs.dev/components/navigation-bar/"
+      },
+      {
+        "id": "navigation-drawer",
+        "url": "https://m3e.kyralabs.dev/components/navigation-drawer/"
+      },
+      {
+        "id": "navigation-rail",
+        "url": "https://m3e.kyralabs.dev/components/navigation-rail/"
+      },
+      {
+        "id": "navigation-suite",
+        "url": "https://m3e.kyralabs.dev/components/navigation-suite/"
+      },
+      {
+        "id": "primitives",
+        "url": "https://m3e.kyralabs.dev/components/primitives/"
+      },
+      {
+        "id": "progress",
+        "url": "https://m3e.kyralabs.dev/components/progress/"
+      },
+      {
+        "id": "pull-to-refresh",
+        "url": "https://m3e.kyralabs.dev/components/pull-to-refresh/"
+      },
+      {
+        "id": "radio-button",
+        "url": "https://m3e.kyralabs.dev/components/radio-button/"
+      },
+      {
+        "id": "search",
+        "url": "https://m3e.kyralabs.dev/components/search/"
+      },
+      {
+        "id": "segmented-button",
+        "url": "https://m3e.kyralabs.dev/components/segmented-button/"
+      },
+      {
+        "id": "side-sheet",
+        "url": "https://m3e.kyralabs.dev/components/side-sheet/"
+      },
+      {
+        "id": "slider",
+        "url": "https://m3e.kyralabs.dev/components/slider/"
+      },
+      {
+        "id": "snackbar",
+        "url": "https://m3e.kyralabs.dev/components/snackbar/"
+      },
+      {
+        "id": "split-button",
+        "url": "https://m3e.kyralabs.dev/components/split-button/"
+      },
+      {
+        "id": "switch",
+        "url": "https://m3e.kyralabs.dev/components/switch/"
+      },
+      {
+        "id": "tabs",
+        "url": "https://m3e.kyralabs.dev/components/tabs/"
+      },
+      {
+        "id": "text-field",
+        "url": "https://m3e.kyralabs.dev/components/text-field/"
+      },
+      {
+        "id": "time-picker",
+        "url": "https://m3e.kyralabs.dev/components/time-picker/"
+      },
+      {
+        "id": "tooltip",
+        "url": "https://m3e.kyralabs.dev/components/tooltip/"
+      },
+      {
+        "id": "top-app-bar",
+        "url": "https://m3e.kyralabs.dev/components/top-app-bar/"
+      }
+    ]
+  },
+  "delivery": {
+    "commits": "atomic by concern",
+    "github": "push completed atomic milestones frequently without claiming unreviewed work is accepted",
+    "review": "every component requires independent subagent PASS for visual, motion and performance acceptance"
+  },
+  "icon_source": {
+    "repository": "https://github.com/mizorewww/gpui-material-symbols",
+    "local_path": "../gpui-material-symbols",
+    "policy": "Use this repository for Material icons; improve its coverage, rendering and performance as needed while preserving its GPUI Kit compatibility and separate optional Material adapter.",
+    "status": "integration pending",
+    "commits": "atomic by concern in each affected repository"
+  }
 }

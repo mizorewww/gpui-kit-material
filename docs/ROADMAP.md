@@ -7,6 +7,15 @@ course2md's shared primitives as a standalone, tested kit on GPUI Base. See
 
 ## Next — Material 3 Expressive
 
+The target is the union of all components at https://m3e.kyralabs.dev/ and
+https://md3.io/. For overlaps, https://m3e.kyralabs.dev/ is authoritative, including
+visuals, typography, interaction states and animations. Both desktop and WASM
+galleries must match the selected reference exactly, with independent subagent
+approval for every component and whole-gallery CPU frame time <= 2 ms (including
+the first frame). GPU timings are reported separately. Land atomic commits and
+push completed milestones to GitHub frequently. The source catalog and acceptance
+gates live in [conformance/md3.json](../conformance/md3.json).
+
 Work in this order; each step lands with gallery coverage and tests.
 
 1. **Color**
@@ -42,7 +51,9 @@ Work in this order; each step lands with gallery coverage and tests.
      indicator (morphing shapes), badges, snackbar.
 6. **Icons**: Material Symbols via
    [gpui-material-symbols](https://github.com/mizorewww/gpui-material-symbols),
-   replacing the Lucide glyphs.
+   using the sibling `../gpui-material-symbols` repository and replacing the
+   Lucide glyphs. Improve that repository as needed for parity and performance;
+   keep its compatibility requirements and commit changes atomically there.
 7. **course2md adoption**: switch course2md to the kit, removing its local
    copies and gpui-component wrappers as the replacements land.
 

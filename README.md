@@ -123,12 +123,18 @@ A persistent chapter navigator stays beside the content on wide windows and
 wraps above it on narrow windows. Its scroll area and keyboard focus reveal are
 independent of the examples; jumping between chapters preserves example state.
 
-Component alignment is tracked in [`conformance/md3.json`](conformance/md3.json).
+The alignment target is the complete component union of [M3 Expressive Web](https://m3e.kyralabs.dev/)
+and [md3.io](https://md3.io/). For overlapping components, M3 Expressive Web is
+authoritative for visuals, typography, states and animations. Exact visual and
+animation parity requires independent subagent review for every component on
+both targets. Existing md3.io evidence does not establish parity with the primary
+reference. Component alignment is tracked in [`conformance/md3.json`](conformance/md3.json).
+Work lands as atomic commits with frequent GitHub progress pushes.
 An available gallery example does not imply visual or motion conformance;
 each component needs independent review and desktop/browser evidence.
-The entire gallery must also stay strictly below **2 ms per CPU frame** on both
+The entire gallery must also stay at or below **2 ms per CPU frame** on both
 targets, including view rendering, layout, paint and graphics submission. Every
-component inherits this gate: a measured frame at or above 2 ms fails acceptance.
+component inherits this gate: a measured frame above 2 ms fails acceptance.
 Record individual frame timings, maximum and over-budget count, with first-frame
 and steady-state results reported separately; averages do not establish a pass.
 GPU timing is reported separately. Functional or visual reviews alone do not
