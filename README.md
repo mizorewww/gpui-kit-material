@@ -1,7 +1,11 @@
 # gpui-kit-material
 
-Material 3 design tokens, motion and components for [GPUI](https://www.gpui.rs),
-built on the headless behavior of [GPUI Base](https://crates.io/crates/gpui-base).
+Material 3 design tokens, motion and components for
+[Longbridge GPUI Kit](https://github.com/longbridge/gpui-kit). The target is a
+Material layer over its `gpui-component` controls and shared behavior, reusing
+Kit's facade, lifecycle and Material Symbols integration. The current code still
+uses GPUI/Base directly; that integration migration is pending, as described in
+[the architecture](docs/ARCHITECTURE.md).
 
 The kit started as the shared design primitives of the
 [course2md](https://github.com/mizorewww/course2md) desktop app. It is being

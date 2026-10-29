@@ -34,7 +34,8 @@ Work in this order; each step lands with gallery coverage and tests.
    library (35 shapes) and shape morphing for buttons and indicators.
 4. **Typography**: the baseline and emphasized type scale (display, headline,
    title, body, label × large/medium/small) as text roles.
-5. **Components** (Expressive variants first), on GPUI Base behavior:
+5. **Components** (Expressive variants first), adapting Longbridge GPUI Kit's
+   `gpui-component` controls and shared behavior; use Base for verified styling gaps:
    - Buttons: filled, tonal, elevated, outlined, text; sizes XS–XL; toggle
      buttons; shape morph on press; icon buttons; split buttons; FAB, extended
      FAB, FAB menu.
@@ -54,13 +55,15 @@ Work in this order; each step lands with gallery coverage and tests.
    using the sibling `../gpui-material-symbols` repository and replacing the
    Lucide glyphs. Improve that repository as needed for parity and performance;
    keep its compatibility requirements and commit changes atomically there.
-7. **course2md adoption**: switch course2md to the kit, removing its local
-   copies and gpui-component wrappers as the replacements land.
+7. **course2md adoption**: switch course2md to the Material adapters, removing
+   redundant local implementations while retaining shared GPUI Kit behavior.
 
 ## Principles
 
 - Official Material guidance is cited per component; project choices are
   labelled as such.
-- Components own looks and motion; behavior and accessibility stay in GPUI
-  Base. Fix a missing behavior upstream rather than forking it here.
+- Components own Material looks and motion; reuse Kit Component behavior and
+  its Base foundation. Use Base directly for source-verified presentation gaps.
+  Prefer upstream fixes and retain verified narrow compatibility patches until
+  replacements pass the corresponding regressions.
 - Every component works in every palette, light and dark, at 100–200% text.

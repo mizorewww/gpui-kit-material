@@ -1064,7 +1064,7 @@
       }
     }
   ],
-  "objective": "Reproduce the complete union of https://m3e.kyralabs.dev/ and https://md3.io/ components, styles and animations on desktop and WASM galleries, with m3e.kyralabs.dev authoritative for overlapping components; use https://gpui-kit.com/ for gallery organization. Exact visual and animation parity, independent subagent approval for every component, whole-gallery CPU frames <= 2 ms, atomic commits and frequent GitHub progress pushes are required. Material icons must come from the sibling ../gpui-material-symbols repository, which may be improved as needed.",
+  "objective": "Reproduce the complete union of https://m3e.kyralabs.dev/ and https://md3.io/ components, styles and animations on desktop and WASM galleries, with m3e.kyralabs.dev authoritative for overlapping components; use https://gpui-kit.com/ for gallery organization. Exact visual and animation parity, independent subagent approval for every component, whole-gallery CPU frames <= 2 ms, atomic commits and frequent GitHub progress pushes are required. Material icons must come from the sibling ../gpui-material-symbols repository, which may be improved as needed. Build on Longbridge gpui-kit and its gpui-component layer, reusing existing controls and infrastructure before implementing Material-specific differences.",
   "reference_policy": {
     "primary": {
       "site": "https://m3e.kyralabs.dev/",
@@ -1267,5 +1267,15 @@
     "policy": "Use this repository for Material icons; improve its coverage, rendering and performance as needed while preserving its GPUI Kit compatibility and separate optional Material adapter.",
     "status": "integration pending",
     "commits": "atomic by concern in each affected repository"
+  },
+  "implementation_foundation": {
+    "repository": "https://github.com/longbridge/gpui-kit",
+    "inspected_commit": "bb85882e1faab845d9e7be33b69a152879a90f69",
+    "entrypoint": "gpui-kit",
+    "preferred_components": "gpui_kit::component (gpui-component)",
+    "base": "use for source-verified presentation gaps, not as a blanket replacement for Component",
+    "status": "source reuse audit complete; runtime facade/component migration pending",
+    "icons": "reuse ../gpui-material-symbols Kit integration with the same dependency source/revision",
+    "audit": "conformance/reuse-audit.json"
   }
 }
