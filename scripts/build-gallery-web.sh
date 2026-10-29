@@ -4,14 +4,20 @@ set -euo pipefail
 workspace_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$workspace_dir"
 profile=debug
+backend=default
 args=(build --locked -p gpui-kit-material-gallery-web --target wasm32-unknown-unknown)
 for option in "$@"; do
   case "$option" in
     --release) profile=release; args+=(--release) ;;
-    --fast) args+=(--features gpui-fast) ;;
-    *) echo "Usage: $0 [--release] [--fast]" >&2; exit 2 ;;
+    --fast) backend=fast ;;
+    --upstream) backend=upstream ;;
+    *) echo "Usage: $0 [--release] [--fast | --upstream]" >&2; exit 2 ;;
   esac
 done
+case "$backend" in
+  fast) args+=(--features gpui-fast) ;;
+  upstream) args+=(--no-default-features) ;;
+esac
 if ! command -v wasm-bindgen >/dev/null; then
   echo "Install the matching CLI: cargo install wasm-bindgen-cli --version 0.2.129 --locked" >&2
   exit 1

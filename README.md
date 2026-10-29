@@ -67,12 +67,17 @@ change animates the whole window on the slow effects spring.
 cargo run -p gpui-kit-material --example gallery
 ```
 
-Select Kit's GPUI Fast backend for retained rendering and layout:
+The desktop and WASM galleries use Kit's GPUI Fast backend by default. It can
+also be selected explicitly:
 
 ```sh
 cargo run -p gpui-kit-material --example gallery --features gpui-fast
 ./scripts/build-gallery-web.sh --fast
 ```
+
+Use `--no-default-features --features serde,embedded-symbols` with the native
+Gallery command to run the upstream backend for comparison.
+For browser artifacts, use `./scripts/build-gallery-web.sh --upstream`.
 
 Both targets use the same Kit facade and Material components. The workspace
 patches GPUI Fast 0.1.12 to preserve the touch, animation, text and frame-timing

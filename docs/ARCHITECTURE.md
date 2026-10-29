@@ -111,8 +111,9 @@ official backend feature. Kit selects Fast for its public core, platform, Base,
 Component and assets types. Material's `gpui` crate alias points to Kit, so it
 cannot accidentally combine direct upstream types with the Fast facade.
 Cargo's additive dependencies still compile upstream packages; these do not
-define the selected facade's public types. The default upstream backend remains
-available for comparison.
+define the selected facade's public types. Fast is enabled by default for
+Material and both galleries; the upstream backend remains available with
+default features disabled for comparison.
 
 Fast 0.1.12 core, Apple and Web packages are patched in `vendor/gpui-fast*`.
 Their `MATERIAL-MIGRATION.json` files preserve published archive and source

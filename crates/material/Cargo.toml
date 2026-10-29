@@ -11,7 +11,7 @@ keywords = ["material", "material-design", "gpui", "ui", "desktop"]
 categories = ["gui"]
 
 [features]
-default = ["serde", "embedded-symbols"]
+default = ["serde", "embedded-symbols", "gpui-fast"]
 embedded-symbols = ["gpui-material-symbols/embed-assets"]
 serde = ["gpui-kit-material-color/serde"]
 frame-profiler = ["gpui-kit/profiler"]
