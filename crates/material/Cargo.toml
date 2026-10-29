@@ -22,10 +22,13 @@ gpui-kit-material-color.workspace = true
 gpui-kit.workspace = true
 gpui-material-symbols = { git = "https://github.com/mizorewww/gpui-material-symbols", rev = "593aa15a46076f3e2870c23c0e4fd79f94f105bd", default-features = false, features = ["gpui-kit"] }
 gpui-base.workspace = true
-anyhow.workspace = true
 
 [target.'cfg(target_family = "wasm")'.dependencies]
 web-time = "1"
+
+[dev-dependencies]
+# Only the icon asset-source test and the native gallery example use anyhow.
+anyhow.workspace = true
 
 [target.'cfg(not(target_family = "wasm"))'.dev-dependencies]
 serde_json.workspace = true
