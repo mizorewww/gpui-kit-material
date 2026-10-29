@@ -21,8 +21,17 @@ gpui-base.workspace = true
 anyhow.workspace = true
 
 [dev-dependencies]
+image = { version = "0.25", default-features = false }
+gpui-material-symbols = { path = "../../../gpui-material-symbols", default-features = false }
+resvg = { version = "0.46", default-features = false }
+tiny-skia = { version = "0.11", features = ["png-format"] }
 gpui = { workspace = true, features = ["test-support"] }
-gpui_platform.workspace = true
+gpui_platform = { workspace = true, features = ["test-support"] }
+gpui-base = { workspace = true, features = ["test-support"] }
 
 [[example]]
 name = "gallery"
+
+[[example]]
+name = "material_symbols"
+path = "examples/material_symbols/main.rs"
