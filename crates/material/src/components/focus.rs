@@ -190,8 +190,17 @@ impl RenderOnce for RingedButton {
         });
         #[cfg(test)]
         let key = format!("{:?}", self.id);
-        let mut button = self.button.track_focus(&focus);
         let enabled = !self.disabled;
+        // A disabled button is inert and a specimen is not operated: neither
+        // shows the pointer cursor (nor, below, live state layers).
+        let pointer = shows_pointer(enabled, self.preview);
+        let mut button = self.button.track_focus(&focus).map(|button| {
+            if pointer {
+                button.cursor_pointer()
+            } else {
+                button.cursor_default()
+            }
+        });
         if let Some((hover, press)) = self.layers.filter(|_| enabled) {
             button = match self.preview {
                 None => button
@@ -219,6 +228,12 @@ impl RenderOnce for RingedButton {
         let ring = ring.observe(test_rings::cell(key));
         ring
     }
+}
+
+/// Whether a [`RingedButton`] shows the pointer cursor and live hover and
+/// press layers: only when it is enabled and not a forced specimen.
+pub(crate) fn shows_pointer(enabled: bool, preview: Option<InteractionPreview>) -> bool {
+    enabled && preview.is_none()
 }
 
 /// Test hook: the focus ring each [`RingedButton`] last painted, by the
