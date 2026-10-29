@@ -291,9 +291,10 @@ const SIDE_GUTTER: f32 = 72.;
 
 /// A dashed specimen board, or one band of a board split across rows.
 ///
-/// Cells fill rows of `columns`, each centered in an equal share of the
-/// board's width, or in `column_width` (design px) when set, which sizes
-/// the board to its content. `caption` appears centered above the top band;
+/// Cells fill rows of `columns` in a grid whose columns are at least as
+/// wide as their widest specimen and share spare width equally (or are
+/// `column_width` design px when set). Specimens never overlap or wrap; a
+/// band wider than its row scrolls horizontally inside the row. `caption` appears centered above the top band;
 /// `column_labels` title the columns inside the top band; `row_labels` title
 /// each cell row at its leading edge (e.g. interaction states); `side_label`
 /// sits outside the band's leading edge, level with its first cell row (the
@@ -381,79 +382,79 @@ impl IntoElement for Board {
         let radius = rem(BOARD_RADIUS);
         let width = self.column_width;
         let labelled_rows = !self.row_labels.is_empty();
-        let share = relative(1. / self.columns as f32);
+        let columns = self.columns + usize::from(labelled_rows);
+        // One grid per band: every column is at least as wide as its widest
+        // specimen (min-content) and shares any spare width equally, so
+        // specimens never overlap or wrap; a band wider than the page
+        // scrolls horizontally instead.
         let cell = move |content: AnyElement| {
-            // Each cell takes an equal share of the board, but never less
-            // than its specimen: a row too wide for the board wraps instead
-            // of overlapping, keeping the cells' shares on the next line.
             div()
                 .flex()
                 .items_center()
                 .justify_center()
-                .flex_shrink_0()
-                .map(|cell| match width {
-                    Some(width) => cell.w(rem(width)),
-                    None => cell.flex_basis(share).px(rem(CELL_GAP / 2.)),
-                })
+                .when_some(width, |cell, width| cell.w(rem(width)))
                 .child(content)
         };
-        let row = |label: Option<AnyElement>, cells: Vec<AnyElement>| {
+        let row_label = |label: Option<AnyElement>| {
             div()
+                .w(rem(ROW_LABEL_WIDTH))
                 .flex()
                 .items_center()
-                .when(width.is_none(), |row| row.w_full())
-                .when(labelled_rows, |row| {
-                    row.child(
-                        div()
-                            .w(rem(ROW_LABEL_WIDTH))
-                            .flex_shrink_0()
-                            .children(label),
-                    )
-                })
-                .child(
-                    div()
-                        .flex()
-                        .flex_wrap()
-                        .items_center()
-                        .gap_y(rem(CELL_GAP))
-                        .when(width.is_some(), |cells| cells.gap_x(rem(CELL_GAP)))
-                        .when(width.is_none(), |cells| cells.flex_1().min_w_0())
-                        .children(cells.into_iter().map(cell)),
-                )
+                .children(label)
+                .into_any_element()
         };
-        let mut rows = Vec::new();
+        let mut items: Vec<AnyElement> = Vec::new();
         if band.has_top() && !self.column_labels.is_empty() {
-            rows.push(row(
-                None,
+            if labelled_rows {
+                items.push(row_label(None));
+            }
+            items.extend(
                 self.column_labels
                     .into_iter()
                     .enumerate()
                     .map(|(index, label)| {
-                        small_label(("column-label", index), label)
-                            .whitespace_normal()
-                            .text_center()
-                            .into_any_element()
-                    })
-                    .collect(),
-            ));
+                        cell(
+                            small_label(("column-label", index), label)
+                                .whitespace_normal()
+                                .text_center()
+                                .into_any_element(),
+                        )
+                        .into_any_element()
+                    }),
+            );
         }
         let mut row_labels = self.row_labels.into_iter();
         let mut cells = self.cells.into_iter().peekable();
         let mut index: usize = 0;
         while cells.peek().is_some() {
-            let chunk: Vec<_> = cells.by_ref().take(self.columns).collect();
-            let label = row_labels
-                .next()
-                .map(|label| small_label(("row-label", index), label).into_any_element());
-            rows.push(row(label, chunk));
+            if labelled_rows {
+                let label = row_labels
+                    .next()
+                    .map(|label| small_label(("row-label", index), label).into_any_element());
+                items.push(row_label(label));
+            }
+            let mut taken = 0;
+            for content in cells.by_ref().take(self.columns) {
+                items.push(cell(content).into_any_element());
+                taken += 1;
+            }
+            // Keep the next row's label in the first column.
+            items.extend((taken..self.columns).map(|_| div().into_any_element()));
             index += 1;
         }
+        let grid = div()
+            .w_full()
+            .grid()
+            .grid_cols_min_content(columns as u16)
+            .items_center()
+            .gap_x(rem(CELL_GAP))
+            .gap_y(rem(CELL_GAP))
+            .children(items);
         let frame = div()
-            .when(width.is_none(), |frame| frame.flex_1())
-            .min_w_0()
+            .flex_shrink_0()
+            .when(width.is_none(), |frame| frame.min_w(relative(1.)))
             .flex()
             .flex_col()
-            .gap(rem(CELL_GAP))
             .px(rem(BOARD_PADDING))
             .pt(rem(if band.has_top() {
                 BOARD_PADDING
@@ -473,7 +474,7 @@ impl IntoElement for Board {
             .when(band.has_bottom(), |frame| {
                 frame.border_b_1().rounded_b(radius)
             })
-            .children(rows);
+            .child(grid);
         let caption = self.caption.filter(|_| band.has_top());
         div()
             .id(self.id)
@@ -507,7 +508,17 @@ impl IntoElement for Board {
                                 .child(small_label("side-label", label)),
                         )
                     })
-                    .child(frame),
+                    .child(
+                        div()
+                            .id("board-scroll")
+                            .flex_1()
+                            .min_w_0()
+                            .flex()
+                            .flex_row()
+                            .overflow_x_scroll()
+                            .restrict_scroll_to_axis()
+                            .child(frame),
+                    ),
             )
             .into_any_element()
     }
