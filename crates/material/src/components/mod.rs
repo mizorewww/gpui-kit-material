@@ -6,6 +6,8 @@ pub use button::{
     ButtonTransitionInputs, ButtonTransitionPlayback, ButtonVariant, FabSize, IconButtonWidth,
     MaterialButton, material_button,
 };
+mod fab;
+pub use fab::{ExtendedFab, Fab, FabColor};
 mod icon_button;
 pub use icon_button::{IconButton, IconButtonVariant};
 mod button_group;
