@@ -6,6 +6,9 @@ pub mod capture;
 #[cfg(all(not(target_family = "wasm"), feature = "frame-profiler"))]
 mod performance;
 
+mod fps;
+mod settings;
+
 use gpui::{prelude::*, *};
 use gpui_kit_material::color::palette::ALL as PALETTES;
 use gpui_kit_material::color::themes::{self, Contrast, ThemeId, ThemeMode};
@@ -40,6 +43,7 @@ const GALLERY_SECTIONS: [(&str, &str); 11] = [
 const TITLE_BAR: Pixels = px(56.);
 
 struct Gallery {
+    fps_display: Option<Entity<fps::FpsDisplay>>,
     palette: PaletteId,
     reference_theme: Option<ThemeId>,
     reference_mode: ThemeMode,
@@ -1001,7 +1005,18 @@ impl Render for Gallery {
             .child(
                 TitleBar::new("title-bar", TITLE_BAR)
                     .gap(rem(12.))
-                    .child(section_title("window-title", "gpui-kit-material")),
+                    .child(section_title("window-title", "gpui-kit-material"))
+                    .child(div().flex_1())
+                    .when_some(self.fps_display.clone(), |bar, fps| bar.child(fps))
+                    .child(
+                        MaterialButton::new("gallery-settings-open")
+                            .variant(ButtonVariant::Text)
+                            .button_size(ButtonSize::ExtraSmall)
+                            .accessibility_label("Settings")
+                            .debug_selector(|| "gallery-settings-open".into())
+                            .child("Settings")
+                            .on_click(|_, window, cx| settings::open(window, cx)),
+                    ),
             )
             .child(
                 div()
@@ -1081,6 +1096,7 @@ pub fn run(application: gpui::Application, initialize: impl FnOnce(&mut App) + '
                     let section_anchors =
                         std::array::from_fn(|_| ScrollAnchor::for_handle(scroll.clone()));
                     Gallery {
+                        fps_display: None,
                         search,
                         slider,
                         switch: false,
@@ -1113,6 +1129,16 @@ pub fn run(application: gpui::Application, initialize: impl FnOnce(&mut App) + '
                         selected_section: 0,
                     }
                 });
+                // FPS is part of ordinary UI and profiler runs. Only deterministic
+                // screenshot captures omit the changing counter and its timer.
+                #[cfg(not(target_family = "wasm"))]
+                let show_fps = capture::show_fps(cx);
+                #[cfg(target_family = "wasm")]
+                let show_fps = true;
+                if show_fps {
+                    let fps = cx.new(|cx| fps::FpsDisplay::new(window, cx));
+                    gallery.update(cx, |gallery, _| gallery.fps_display = Some(fps));
+                }
                 #[cfg(not(target_family = "wasm"))]
                 capture::install(&gallery, window, cx);
                 let initial = gallery.read(cx);

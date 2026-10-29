@@ -4,7 +4,7 @@ use anyhow::{Context as _, Result, bail, ensure};
 use gpui::{App, Entity, Global, Window, px, size};
 use std::{cell::Cell, path::PathBuf, process::Command, rc::Rc, time::Duration};
 
-pub const USAGE: &str = "gallery [--capture output.png --section themes|motion|buttons|toggles|loading|icons|labels|feedback|colors|typography|dividers\n  --width 960 --height 900 --scale 1 --dark --reduced-motion --settle-ms 800\n  --active --disabled --selected --loading --no-ripple --offset-y 0]";
+pub const USAGE: &str = "gallery [--capture output.png --section themes|motion|buttons|toggles|loading|icons|labels|feedback|colors|typography|dividers\n  --width 960 --height 900 --scale 1 --dark --reduced-motion --settle-ms 800\n  --active --disabled --selected --loading --no-ripple --offset-y 0 --settings --fps --vsync on|off]";
 
 #[derive(Clone)]
 pub struct CaptureOptions {
@@ -22,6 +22,9 @@ pub struct CaptureOptions {
     loading: bool,
     ripple: bool,
     offset_y: f32,
+    settings: bool,
+    fps: bool,
+    vsync: Option<bool>,
     completed: Rc<Cell<bool>>,
 }
 impl Global for CaptureOptions {}
@@ -47,6 +50,9 @@ impl CaptureOptions {
             loading: false,
             ripple: true,
             offset_y: 0.,
+            settings: false,
+            fps: false,
+            vsync: None,
             completed: Rc::new(Cell::new(false)),
         };
         while let Some(flag) = args.next() {
@@ -68,6 +74,15 @@ impl CaptureOptions {
                 "--scale" => options.scale = value()?.parse()?,
                 "--offset-y" => options.offset_y = value()?.parse()?,
                 "--settle-ms" => options.settle_ms = value()?.parse()?,
+                "--fps" => options.fps = true,
+                "--settings" => options.settings = true,
+                "--vsync" => {
+                    options.vsync = Some(match value()?.as_str() {
+                        "on" => true,
+                        "off" => false,
+                        _ => bail!("--vsync must be on or off"),
+                    })
+                }
                 "--dark" => options.dark = true,
                 "--reduced-motion" => options.reduced_motion = true,
                 "--active" => options.active = true,
@@ -114,6 +129,11 @@ impl CaptureOptions {
     }
 }
 
+pub(super) fn show_fps(cx: &App) -> bool {
+    cx.try_global::<CaptureOptions>()
+        .is_none_or(|options| options.fps)
+}
+
 pub(super) fn window_size(cx: &App) -> Option<gpui::Size<gpui::Pixels>> {
     cx.try_global::<CaptureOptions>()
         .map(|options| size(px(options.width), px(options.height)))
@@ -124,6 +144,12 @@ pub(super) fn install(view: &Entity<Gallery>, window: &mut Window, cx: &mut App)
         return;
     };
     cx.set_reduce_motion(options.reduced_motion);
+    if let Some(enabled) = options.vsync
+        && let Err(error) = window.set_vsync(enabled)
+    {
+        eprintln!("Capture vertical sync setting failed: {error:#}");
+        std::process::exit(1);
+    }
     view.update(cx, |gallery, cx| {
         gallery.reference_mode = if options.dark {
             ThemeMode::Dark
@@ -143,6 +169,9 @@ pub(super) fn install(view: &Entity<Gallery>, window: &mut Window, cx: &mut App)
     // Wait for a real layout before asking the chapter anchor to scroll.
     window.on_next_frame(move |window, _| {
         window.on_next_frame(move |window, cx| {
+            if options.settings {
+                super::settings::open(window, cx);
+            }
             let anchor = view.read(cx).section_anchors[options.section].clone();
             anchor.scroll_to(window, cx);
             // Anchor scrolling is itself deferred; capture only after that frame.
@@ -174,6 +203,11 @@ pub(super) fn install(view: &Entity<Gallery>, window: &mut Window, cx: &mut App)
                         "image_pixels":{"width":image.width(),"height":image.height()},
                         "device_scale_factor":window.scale_factor(), "text_scale":options.scale,
                         "theme":"baseline", "mode":if options.dark {"dark"} else {"light"},
+                        "fps_overlay":options.fps,
+                        "window_submissions":window.submission_stats().count,
+                        "settings_open":options.settings,
+                        "requested_vsync":options.vsync,
+                        "vsync_status":format!("{:?}", window.vsync_status()),
                         "reduced_motion":cx.reduce_motion(),"settle_ms":options.settle_ms,
                         "scroll_offset":{"x":f32::from(scroll.offset().x),"y":f32::from(scroll.offset().y)},
                         "state":{"active":options.active,"disabled":options.disabled,"selected":options.selected,"loading":options.loading,"ripple":options.ripple},
@@ -212,6 +246,7 @@ mod tests {
             vec!["--capture", "out.png", "--scale", "NaN"],
             vec!["--capture", "out.png", "--width", "0"],
             vec!["--capture", "out.png", "--height"],
+            vec!["--capture", "out.png", "--vsync", "invalid"],
             vec!["--unknown"],
         ] {
             assert!(parse(&args).is_err(), "{args:?}");
@@ -239,9 +274,15 @@ mod tests {
             "--no-ripple",
             "--offset-y",
             "-300",
+            "--settings",
+            "--fps",
+            "--vsync",
+            "off",
         ])
         .unwrap()
         .unwrap();
+        assert!(options.settings && options.fps);
+        assert_eq!(options.vsync, Some(false));
         assert_eq!(
             (
                 options.section,

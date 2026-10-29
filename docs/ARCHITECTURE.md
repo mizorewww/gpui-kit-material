@@ -141,6 +141,20 @@ browser reports a device-pixel box inconsistent with its CSS size and DPR,
 allocation falls back to CSS size × DPR while preserving logical layout.
 The same workspace-only patch limitation applies.
 
+**Frame observation and presentation settings.** Window submission statistics
+retain attempts for diagnostics and separately count successfully submitted new
+draw generations. FPS uses only the latter: no-drawable failures and repeated
+presentation of the same draw do not inflate it. Backends without a success
+signal report unavailable. These counters do not claim GPU completion. The Gallery samples these counters in a separate view every
+500 ms; performance profiling includes this view, while explicit static captures
+disable it and record that choice. `VsyncStatus` reports backend capability and
+actual state. The vendored macOS backends forward settings to Metal's display
+synchronization property, including existing and newly created Fast composition
+surfaces. Unsupported backends return an error instead of storing a pretend
+setting. With synchronization disabled, macOS forwards real frame demand into
+the existing coalescing main-thread source. The display link remains a fallback
+for safety throttling; clean windows do not acquire an extra rendering loop.
+
 An application on a patched Zed checkout overrides `gpui-pre` for the whole
 graph, including this kit.
 

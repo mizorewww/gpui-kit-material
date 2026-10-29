@@ -68,6 +68,19 @@ change animates the whole window on the slow effects spring.
 cargo run -p gpui-kit-material --example gallery
 ```
 
+The title bar shows FPS, sampled every half second from the window's rendering
+successful new-frame submission count, including the counter's own updates.
+Skipped submissions and repeated presentation of the same drawn frame do not
+increase this FPS; it is not monitor refresh rate or GPU completion. Idle windows can
+show a low rate because GPUI renders on demand.
+
+Open **Settings → Vertical sync** to change presentation synchronization on
+macOS. The switch reads back the actual Metal setting; unsupported backends,
+including the browser, show a disabled control and an explanation. Turning it
+off enables demand-driven rendering on macOS without forcing an idle window to
+redraw. Platform safety throttles still apply. The setting applies to the current
+window.
+
 The desktop and WASM galleries use Kit's GPUI Fast backend by default. It can
 also be selected explicitly:
 

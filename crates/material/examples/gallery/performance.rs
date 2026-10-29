@@ -63,6 +63,7 @@ pub fn prepare() -> Option<Session> {
             "memory_bytes":command("sysctl", &["-n", "hw.memsize"]),
             "available_parallelism":std::thread::available_parallelism().ok().map(usize::from)},
         "requested_seconds":seconds,
+        "fps_overlay":true,
         "backend": if gpui_kit::GPUI_FAST { "native GPUI Fast" } else { "native GPUI upstream" },
         "renderer": "concrete renderer not exposed by FrameTimingCollector",
         "build_flags": {"rustflags_at_compile":option_env!("RUSTFLAGS"),"encoded_rustflags_at_compile":option_env!("CARGO_ENCODED_RUSTFLAGS"),"feature":"frame-profiler","unavailable_flags_are_null":true},
