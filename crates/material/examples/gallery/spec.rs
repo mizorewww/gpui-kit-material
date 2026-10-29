@@ -291,8 +291,8 @@ const SIDE_GUTTER: f32 = 72.;
 
 /// A dashed specimen board, or one band of a board split across rows.
 ///
-/// Cells fill rows of `columns` in a grid whose columns are at least as
-/// wide as their widest specimen and share spare width equally (or are
+/// Cells fill rows of `columns` in a grid whose columns are as wide as
+/// their widest specimen, with spare width spread around them (or are
 /// `column_width` design px when set). Specimens never overlap or wrap; a
 /// band wider than its row scrolls horizontally inside the row. `caption` appears centered above the top band;
 /// `column_labels` title the columns inside the top band; `row_labels` title
@@ -383,8 +383,8 @@ impl IntoElement for Board {
         let width = self.column_width;
         let labelled_rows = !self.row_labels.is_empty();
         let columns = self.columns + usize::from(labelled_rows);
-        // One grid per band: every column is at least as wide as its widest
-        // specimen (min-content) and shares any spare width equally, so
+        // One grid per band: every column is as wide as its widest specimen
+        // (max-content) with spare width spread around the columns, so
         // specimens never overlap or wrap; a band wider than the page
         // scrolls horizontally instead.
         let cell = move |content: AnyElement| {
@@ -445,7 +445,10 @@ impl IntoElement for Board {
         let grid = div()
             .w_full()
             .grid()
-            .grid_cols_min_content(columns as u16)
+            .grid_cols_max_content(columns as u16)
+            // Spare width goes around content-sized columns; it never
+            // widens one column to match the widest.
+            .justify_around()
             .items_center()
             .gap_x(rem(CELL_GAP))
             .gap_y(rem(CELL_GAP))
