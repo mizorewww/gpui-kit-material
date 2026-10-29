@@ -7,6 +7,7 @@
 use crate::color::ColorRole;
 use crate::icons::Icon;
 use crate::theme::{blend, color};
+use crate::tokens::state;
 use gpui::prelude::FluentBuilder as _;
 use gpui::*;
 use std::{collections::BTreeMap, rc::Rc};
@@ -221,10 +222,10 @@ fn option_paint(
         // shape still tells which option is current.
         let ink = color(ColorRole::INK);
         return OptionPaint {
-            background: ink.opacity(0.12),
-            foreground: ink.opacity(0.38),
-            hover: ink.opacity(0.12),
-            press: ink.opacity(0.12),
+            background: ink.opacity(state::DISABLED_CONTAINER),
+            foreground: state::disabled(ink),
+            hover: ink.opacity(state::DISABLED_CONTAINER),
+            press: ink.opacity(state::DISABLED_CONTAINER),
             left_radius,
             right_radius,
         };
@@ -237,8 +238,8 @@ fn option_paint(
         // One state layer in the content colour, resolved over the current
         // container instead of stacking translucent fills, so the selected
         // accent stays under hover and press.
-        hover: blend(background, foreground, 0.08),
-        press: blend(background, foreground, 0.10),
+        hover: state::hovered(background, foreground),
+        press: state::pressed(background, foreground),
         left_radius,
         right_radius,
     }
@@ -527,7 +528,32 @@ impl RenderOnce for ConnectedButtonGroup {
 
 #[cfg(test)]
 mod tests {
-    use super::{ConnectedButtonGroup, Direction, OptionPaint, PAINTED, destination};
+    use super::{
+        ConnectedButtonGroup, Direction, OptionPaint, PAINTED, destination, option_paint, state,
+    };
+
+    #[core::prelude::v1::test]
+    fn state_layers_come_from_the_shared_tokens() {
+        for selection in [0., 0.5, 1.] {
+            let paint = option_paint(selection, 1, 3, px(40.), false);
+            assert_eq!(
+                paint.hover,
+                state::hovered(paint.background, paint.foreground)
+            );
+            assert_eq!(
+                paint.press,
+                state::pressed(paint.background, paint.foreground)
+            );
+        }
+        let disabled = option_paint(1., 1, 3, px(40.), true);
+        let ink = crate::theme::color(ColorRole::ON_SURFACE);
+        assert_eq!(disabled.foreground, state::disabled(ink));
+        assert_eq!(disabled.background.a, ink.a * state::DISABLED_CONTAINER);
+        assert_eq!(
+            disabled.hover, disabled.background,
+            "no state layer when disabled"
+        );
+    }
     use crate::color::ColorRole;
     use crate::icons::IconName;
     use gpui::{

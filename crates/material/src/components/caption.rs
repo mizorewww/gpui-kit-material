@@ -20,7 +20,8 @@
 //! layouts flyout) and closes. On Linux the buttons act themselves.
 use crate::color::ColorRole::{self, *};
 use crate::icons::IconName;
-use crate::theme::{blend, color};
+use crate::theme::color;
+use crate::tokens::state;
 use gpui::{
     AnyElement, App, Decorations, InteractiveElement as _, IntoElement, MouseButton,
     ParentElement as _, Pixels, RenderOnce, Rgba, SharedString, StatefulInteractiveElement as _,
@@ -320,7 +321,8 @@ fn windows_button(button: CaptionButton, labels: &CaptionLabels) -> gpui::Statef
     let (hover, pressed) = if close {
         (close_hover(), close_pressed())
     } else {
-        (Rgba { a: 0.08, ..ink }, Rgba { a: 0.10, ..ink })
+        let clear = Rgba { a: 0., ..ink };
+        (state::hovered(clear, ink), state::pressed(clear, ink))
     };
     let on_close = rgb(0xffffff);
     div()
@@ -365,8 +367,8 @@ fn linux_button(
     let group = button.id();
     let shape: ColorRole = SURFACE_CONTAINER_HIGHEST;
     let (hover, pressed) = (
-        blend(color(shape), color(ON_SURFACE), 0.08),
-        blend(color(shape), color(ON_SURFACE), 0.10),
+        state::hovered(color(shape), color(ON_SURFACE)),
+        state::pressed(color(shape), color(ON_SURFACE)),
     );
     div()
         .id(button.id())

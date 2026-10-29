@@ -3,7 +3,7 @@
 use crate::color::ColorRole;
 use crate::icons::Icon;
 use crate::theme::{blend, color};
-use crate::tokens::{layout::*, shape::*, typography::*};
+use crate::tokens::{layout::*, shape::*, state, typography::*};
 use gpui::{prelude::*, *};
 
 /// The M3 radio of a choice: an outlined ring, filled with a dot when
@@ -178,8 +178,8 @@ mod choice_tile {
             .when(enabled, |button| {
                 button
                     .cursor_pointer()
-                    .hover(move |style| style.bg(blend(bg, ink, 0.08)))
-                    .active(move |style| style.bg(blend(bg, ink, 0.10)))
+                    .hover(move |style| style.bg(state::hovered(bg, ink)))
+                    .active(move |style| style.bg(state::pressed(bg, ink)))
             })
             .focus(|style| style.border_color(color(ColorRole::ACCENT)))
             .children(icon)
