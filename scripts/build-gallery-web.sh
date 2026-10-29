@@ -18,12 +18,18 @@ case "$backend" in
   fast) args+=(--features gpui-fast) ;;
   upstream) args+=(--no-default-features) ;;
 esac
-if ! command -v wasm-bindgen >/dev/null; then
-  echo "Install the matching CLI: cargo install wasm-bindgen-cli --version 0.2.129 --locked" >&2
+# The CLI must match the wasm-bindgen crate pinned in Cargo.lock exactly.
+bindgen_version="$(awk '/^name = "wasm-bindgen"$/ { getline; gsub(/"/, "", $3); print $3; exit }' Cargo.lock)"
+if [[ -z "$bindgen_version" ]]; then
+  echo "Could not read the wasm-bindgen version from Cargo.lock." >&2
   exit 1
 fi
-if [[ "$(wasm-bindgen --version)" != "wasm-bindgen 0.2.129" ]]; then
-  echo "This gallery requires wasm-bindgen-cli 0.2.129 (matching Cargo.lock)." >&2
+if ! command -v wasm-bindgen >/dev/null; then
+  echo "Install the matching CLI: cargo install wasm-bindgen-cli --version $bindgen_version --locked" >&2
+  exit 1
+fi
+if [[ "$(wasm-bindgen --version)" != "wasm-bindgen $bindgen_version" ]]; then
+  echo "This gallery requires wasm-bindgen-cli $bindgen_version (matching Cargo.lock)." >&2
   exit 1
 fi
 
