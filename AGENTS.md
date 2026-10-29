@@ -55,6 +55,11 @@
   frame. Any measured frame > 2 ms fails; averages cannot establish acceptance.
   Preserve raw frame timings, maxima, build/hardware context and independent
   review. Report GPU time separately; incomplete timing remains unverified.
+- Continuous upward and downward Gallery scrolling must sustain >= 500 FPS.
+  Measure successful newly drawn frame submissions with vertical sync disabled;
+  report display refresh separately. Failed submissions, repeated presentation
+  of the same draw and idle frames cannot establish this gate. Preserve raw
+  timings and verified scroll movement; an average alone is not a minimum FPS.
 - Notify the narrowest owning view, avoid render-time notification loops and
   virtualize long collections. Measure before introducing caches and identify
   each cache's invalidation owner. Do not simplify required animations to pass.
