@@ -4,11 +4,12 @@
 //! Each option is its own button 2px from its neighbours; the selected one
 //! morphs to a full pill on the accent while its inner corners open, on the
 //! fast spatial spring.
-use super::InteractionPreview;
+use super::{ButtonShape, ButtonSize, ButtonVariant, InteractionPreview};
 use crate::color::ColorRole;
 use crate::icons::Icon;
 use crate::theme::{blend, color};
 use crate::tokens::state;
+use crate::tokens::typography::{TypeRole, rem};
 use gpui::prelude::FluentBuilder as _;
 use gpui::*;
 use std::{collections::BTreeMap, rc::Rc};
@@ -69,6 +70,9 @@ pub struct ConnectedButtonGroup {
     on_change: Option<Change>,
     reveal_in: Option<ScrollHandle>,
     previews: BTreeMap<SharedString, InteractionPreview>,
+    variant: ButtonVariant,
+    size: Option<ButtonSize>,
+    shape: ButtonShape,
 }
 impl ConnectedButtonGroup {
     pub fn new(id: impl Into<ElementId>, label: impl Into<SharedString>) -> Self {
@@ -88,7 +92,29 @@ impl ConnectedButtonGroup {
             on_change: None,
             reveal_in: None,
             previews: BTreeMap::new(),
+            variant: ButtonVariant::Tonal,
+            size: None,
+            shape: ButtonShape::Round,
         }
+    }
+    /// The toggle-button colors the options use: tonal by default (the
+    /// kit's connected group), or filled, elevated or outlined.
+    pub fn variant(mut self, variant: ButtonVariant) -> Self {
+        self.variant = variant;
+        self
+    }
+    /// An M3 Expressive button size (XS–XL): the options take that button's
+    /// height, padding, label type and icon, and the size's inner corners.
+    /// Without it the group keeps its compact 40px default.
+    pub fn button_size(mut self, size: ButtonSize) -> Self {
+        self.size = Some(size);
+        self
+    }
+    /// Round (default) or square outer corners for unselected end options.
+    /// The selected option is always a full pill.
+    pub fn shape(mut self, shape: ButtonShape) -> Self {
+        self.shape = shape;
+        self
     }
     /// The options as `(value, label)` pairs. Values identify an option's
     /// focus and selection state, so they must be unique: a repeated value
@@ -234,13 +260,61 @@ struct OptionPaint {
     right_radius: Pixels,
 }
 
-/// Inner corners between neighbours; outer group ends are always fully round.
+/// Inner corners between neighbours of the compact default group.
 const INNER_RADIUS: f32 = 8.;
 const GAP: f32 = 2.;
+
+/// The size-dependent geometry of one group, in design px.
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct Metrics {
+    height: f32,
+    /// Corners between neighbours.
+    inner: f32,
+    /// Unselected outer ends: `None` is a full half-height round.
+    outer: Option<f32>,
+    /// Horizontal padding of filling options, inside the 2px border;
+    /// content-sized options add the border back.
+    padding: f32,
+    icon: f32,
+    text: Option<TypeRole>,
+}
+
+impl Metrics {
+    /// M3 Expressive connected group: each option is that size's button;
+    /// inner corners are XS 4, S 8, M 8, L 16, XL 20.
+    fn of(size: ButtonSize, shape: ButtonShape) -> Self {
+        let (height, inner, square, padding, icon, text) = match size {
+            ButtonSize::ExtraSmall => (32., 4., 12., 12., 20., TypeRole::LabelLarge),
+            ButtonSize::Small => (40., 8., 12., 16., 20., TypeRole::LabelLarge),
+            ButtonSize::Medium => (56., 8., 16., 24., 24., TypeRole::TitleMedium),
+            ButtonSize::Large => (96., 16., 28., 48., 32., TypeRole::HeadlineSmall),
+            ButtonSize::ExtraLarge => (136., 20., 28., 64., 40., TypeRole::HeadlineLarge),
+        };
+        Self {
+            height,
+            inner,
+            outer: (shape == ButtonShape::Square).then_some(square),
+            padding: padding - 2.,
+            icon,
+            text: Some(text),
+        }
+    }
+    fn compact(height: f32) -> Self {
+        Self {
+            height,
+            inner: INNER_RADIUS,
+            outer: None,
+            padding: 12.,
+            icon: 18.,
+            text: None,
+        }
+    }
+}
 
 /// M3 connected button group: each option is its own button. `selection` is the
 /// option's animated selection amount (0 unselected, 1 selected), which morphs
 /// both colour and the inner corners toward a full pill.
+#[cfg(test)]
 fn option_paint(
     selection: f32,
     index: usize,
@@ -248,11 +322,34 @@ fn option_paint(
     height: Pixels,
     disabled: bool,
 ) -> OptionPaint {
+    option_paint_with(
+        selection,
+        index,
+        count,
+        height,
+        disabled,
+        ButtonVariant::Tonal,
+        Metrics::compact(f32::from(height)),
+    )
+}
+
+fn option_paint_with(
+    selection: f32,
+    index: usize,
+    count: usize,
+    height: Pixels,
+    disabled: bool,
+    variant: ButtonVariant,
+    metrics: Metrics,
+) -> OptionPaint {
     let t = selection.clamp(0., 1.);
     let full = height / 2.;
-    let inner = px(INNER_RADIUS) + (full - px(INNER_RADIUS)) * t;
-    let left_radius = if index == 0 { full } else { inner };
-    let right_radius = if index + 1 == count { full } else { inner };
+    let scale = height / px(metrics.height);
+    let morph = |rest: Pixels| rest + (full - rest) * t;
+    let inner = morph(px(metrics.inner) * scale);
+    let outer = morph(metrics.outer.map_or(full, |outer| px(outer) * scale));
+    let left_radius = if index == 0 { outer } else { inner };
+    let right_radius = if index + 1 == count { outer } else { inner };
     if disabled {
         // M3 disabled: on-surface at 12% container and 38% content. The pill
         // shape still tells which option is current.
@@ -266,16 +363,11 @@ fn option_paint(
             right_radius,
         };
     }
-    let background = blend(
-        color(ColorRole::SURFACE_CONTAINER_HIGHEST),
-        color(ColorRole::PRIMARY),
-        t,
-    );
-    let foreground = blend(
-        color(ColorRole::ON_SURFACE),
-        color(ColorRole::ON_PRIMARY),
-        t,
-    );
+    // The toggle button's own unselected and selected colors.
+    let (rest_bg, rest_fg) = super::button::toggle_colors(variant, false);
+    let (on_bg, on_fg) = super::button::toggle_colors(variant, true);
+    let background = blend(rest_bg, on_bg, t);
+    let foreground = blend(rest_fg, on_fg, t);
     OptionPaint {
         background,
         foreground,
@@ -303,6 +395,7 @@ fn item_style<T: Styled + StatefulInteractiveElement + gpui::prelude::FluentBuil
     fill: bool,
     disabled: bool,
     preview: Option<InteractionPreview>,
+    metrics: Metrics,
 ) -> T {
     item.relative()
         .flex()
@@ -317,7 +410,11 @@ fn item_style<T: Styled + StatefulInteractiveElement + gpui::prelude::FluentBuil
         // option; 14px in equal shares. That is also the floor for a label
         // wider than its share, so a long label at a large text scale never
         // meets the pill's edge: the options wrap to another row first.
-        .px(if fill { rems(12. / 14.) } else { rems(1.) })
+        .px(rem(if fill {
+            metrics.padding
+        } else {
+            metrics.padding + 2.
+        }))
         .py_0()
         .rounded_l(paint.left_radius)
         .rounded_r(paint.right_radius)
@@ -327,8 +424,18 @@ fn item_style<T: Styled + StatefulInteractiveElement + gpui::prelude::FluentBuil
         .border_color(gpui::transparent_black())
         .bg(paint.background)
         .text_color(paint.foreground)
-        .text_size(crate::tokens::typography::TEXT_BODY)
-        .font_weight(FontWeight::MEDIUM)
+        .map(|item| match metrics.text {
+            Some(role) => {
+                let scale = role.scale();
+                item.font_family(scale.font_family)
+                    .text_size(scale.font_size)
+                    .line_height(scale.line_height)
+                    .font_weight(FontWeight(scale.font_weight as f32))
+            }
+            None => item
+                .text_size(crate::tokens::typography::TEXT_BODY)
+                .font_weight(FontWeight::MEDIUM),
+        })
         // Content-width options keep the default shrink so a narrow parent
         // ellipsizes labels instead of overflowing. Filling options are equal
         // shares of the row (a zero basis), floored at their label's own
@@ -432,12 +539,19 @@ impl RenderOnce for ConnectedButtonGroup {
         let last = navigation;
         let count = self.options.len();
         let scale = f32::from(window.rem_size()) / 14.;
+        let metrics = match self.size {
+            Some(size) => Metrics::of(size, self.shape),
+            None => Metrics::compact(if self.segmented { 48. } else { 40. }),
+        };
         let item_height = match self.height {
             Some(height) => height.to_pixels(window.rem_size()),
-            None => px(if self.segmented { 48. } else { 40. } * scale),
+            None => px(metrics.height * scale),
         };
         let fill = self.full_width;
-        let icon_size = rems(18. / 14.);
+        let icon_size = rem(metrics.icon);
+        let variant = self.variant;
+        let selection_root: std::sync::Arc<ElementId> =
+            std::sync::Arc::new((self.id.clone(), "selection").into());
         let debug_kind = if fill { "full" } else { "content" };
         let mut lane = gpui_base::h_flex()
             .w_full()
@@ -460,7 +574,7 @@ impl RenderOnce for ConnectedButtonGroup {
             // Each option animates its own selection amount; a rapid click
             // retargets from the current presentation value.
             let selection = crate::motion::selection_value(
-                ElementId::NamedChild(self.id.clone().into(), format!("selection-{value}").into()),
+                ElementId::NamedChild(selection_root.clone(), value.clone()),
                 if checked { 1. } else { 0. },
                 window,
                 cx,
@@ -472,7 +586,15 @@ impl RenderOnce for ConnectedButtonGroup {
             // Every option of a specimen ignores live hover and press.
             let preview = forced.or(specimen.then_some(InteractionPreview::Enabled));
             let forced_focus = forced == Some(InteractionPreview::Focused);
-            let paint = option_paint(selection, index, count, item_height, option_disabled);
+            let paint = option_paint_with(
+                selection,
+                index,
+                count,
+                item_height,
+                option_disabled,
+                variant,
+                metrics,
+            );
             #[cfg(test)]
             PAINTED.with(|painted| {
                 painted
@@ -521,8 +643,10 @@ impl RenderOnce for ConnectedButtonGroup {
                     fill,
                     option_disabled,
                     preview,
+                    metrics,
                 )
                 .when_some(self.label_text_size, |item, size| item.text_size(size))
+                .tab_stop(entry == Some(index))
                 .selected(checked)
                 .disabled(option_disabled)
                 .accessibility_label(label)
@@ -554,6 +678,7 @@ impl RenderOnce for ConnectedButtonGroup {
                     fill,
                     option_disabled,
                     preview,
+                    metrics,
                 )
                 .when_some(self.label_text_size, |item, size| item.text_size(size))
                 .checked(checked)
@@ -606,8 +731,8 @@ impl RenderOnce for ConnectedButtonGroup {
             })
             .on_action(move |_: &LastChoice, window, cx| last.navigate(Direction::Last, window, cx))
             .child(lane);
-        let reveal_id = SharedString::from(format!("choice-reveal-{:?}", self.id));
         if let Some(scroll) = self.reveal_in {
+            let reveal_id = ElementId::from((self.id.clone(), "choice-reveal"));
             let reveal = super::RevealFocus::new(reveal_id, group, scroll);
             if fill { reveal } else { reveal.inline() }.into_any_element()
         } else {
@@ -959,22 +1084,19 @@ mod tests {
     fn assert_selected(name: &str, height: Pixels) {
         let paint = painted(name);
         assert!(
-            same(paint.background, token(ColorRole::PRIMARY)),
+            same(paint.background, token(ColorRole::SECONDARY)),
             "{name}: {:?}",
             paint
         );
         assert!(
-            same(paint.foreground, token(ColorRole::ON_PRIMARY)),
+            same(paint.foreground, token(ColorRole::ON_SECONDARY)),
             "{name}: {:?}",
             paint
         );
         assert_eq!(paint.left_radius, height / 2., "{name}");
         assert_eq!(paint.right_radius, height / 2., "{name}");
         // A state layer resolves over the selected container, never replaces it.
-        assert!(!same(
-            paint.hover,
-            token(ColorRole::SURFACE_CONTAINER_HIGHEST)
-        ));
+        assert!(!same(paint.hover, token(ColorRole::SECONDARY_CONTAINER)));
         assert!(!same(paint.hover, paint.background));
     }
 
@@ -983,11 +1105,11 @@ mod tests {
         let paint = painted(name);
         assert_eq!(
             paint.background,
-            token(ColorRole::SURFACE_CONTAINER_HIGHEST),
+            token(ColorRole::SECONDARY_CONTAINER),
             "{name}"
         );
         assert!(
-            same(paint.foreground, token(ColorRole::ON_SURFACE)),
+            same(paint.foreground, token(ColorRole::ON_SECONDARY_CONTAINER)),
             "{name}: {:?}",
             paint
         );
@@ -1292,7 +1414,7 @@ mod tests {
         // The click frame starts from the current presentation, not the endpoint.
         assert_eq!(
             painted("content-2").background,
-            token(ColorRole::SURFACE_CONTAINER_HIGHEST)
+            token(ColorRole::SECONDARY_CONTAINER)
         );
         cx.executor().advance_clock(Duration::from_millis(60));
         draw_choice(cx);
@@ -1304,7 +1426,7 @@ mod tests {
             "an intermediate shape is drawn"
         );
         assert!(leaving.right_radius > px(8.) && leaving.right_radius < px(20.));
-        assert!(!same(entering.background, token(ColorRole::PRIMARY)));
+        assert!(!same(entering.background, token(ColorRole::SECONDARY)));
         for index in 0..3 {
             assert_eq!(choice_bounds(cx, selectors[index]), before[index]);
             assert_eq!(choice_bounds(cx, labels[index]), label_before[index]);
@@ -1378,9 +1500,9 @@ mod tests {
         assert!(middle.left_radius > px(8.) && middle.left_radius < px(20.));
         assert!(!same(
             middle.background,
-            token(ColorRole::SURFACE_CONTAINER_HIGHEST)
+            token(ColorRole::SECONDARY_CONTAINER)
         ));
-        assert!(!same(middle.background, token(ColorRole::PRIMARY)));
+        assert!(!same(middle.background, token(ColorRole::SECONDARY)));
         for (index, before) in options.iter().enumerate() {
             assert_eq!(choice_bounds(cx, OPTION_SELECTORS[index]), *before);
         }
