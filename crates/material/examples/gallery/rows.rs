@@ -4,11 +4,7 @@
 use super::*;
 
 impl Gallery {
-    pub(super) fn sync_button_transitions(
-        &self,
-        rendered: &std::collections::BTreeSet<usize>,
-        cx: &App,
-    ) {
+    pub(super) fn sync_button_transitions(&self, rendered: &[usize], cx: &App) {
         #[cfg(test)]
         self.button_sync_rows.borrow_mut().clear();
         // Run after list prepaint, when measurements are current. Fast can
@@ -99,6 +95,10 @@ pub(super) struct RowSpec {
     pub section: Option<&'static str>,
     pub interactive: bool,
     /// Names a row other code addresses, so its index follows the table.
+    #[allow(
+        dead_code,
+        reason = "read only during const evaluation by anchored_row"
+    )]
     pub anchor: Option<&'static str>,
 }
 pub(super) const ROWS: &[RowSpec] = &[
@@ -940,9 +940,7 @@ impl Gallery {
                                         gpui_base::v_flex()
                                             .gap(rem(8.))
                                             .child(accessible_text(
-                                                SharedString::from(format!(
-                                                    "button-label-{shape:?}-{size:?}"
-                                                )),
+                                                ("button-label", sample_index),
                                                 SharedString::from(format!(
                                                     "{} / {}",
                                                     shape.name(),
@@ -953,18 +951,15 @@ impl Gallery {
                                                 gpui_base::h_flex()
                                                     .flex_wrap()
                                                     .gap(rem(12.))
-                                                    .children(ButtonVariant::ALL.into_iter().map(
-                                                        move |variant| {
-                                                            MaterialButton::new(SharedString::from(
-                                                        format!(
-                                                            "button-{shape:?}-{size:?}-{variant:?}"
-                                                        ),
-                                                    ))
+                                                    .children(ButtonVariant::ALL.into_iter().enumerate().map(
+                                                        move |(variant_index, variant)| {
+                                                            let sample = sample_index * 5 + variant_index;
+                                                            MaterialButton::new(("button", sample))
                                                     .variant(variant)
                                                     .button_size(size)
                                                     .shape(shape)
                                                     .child(variant.name())
-                                                    .reveal(SharedString::from(format!("reveal-button-{shape:?}-{size:?}-{variant:?}")),scroll)
+                                                    .reveal(("reveal-button", sample),scroll)
                                                         },
                                                     )),
                                             )
@@ -1024,7 +1019,7 @@ impl Gallery {
             EFFECT_SAMPLE_ROW => {  (gpui_base::h_flex().debug_selector(|| "button-effect-samples".into()).flex_wrap().gap(rem(12.)).children(
                 ButtonVariant::ALL.into_iter().enumerate().map(|(sample_index, variant)| {
                     material_button(
-                        SharedString::from(format!("effect-sample-{variant:?}")),
+                        ("effect-sample", sample_index),
                         if variant == ButtonVariant::Filled && self.button_effects_tonal {
                             ButtonVariant::Tonal
                         } else {
@@ -1038,7 +1033,7 @@ impl Gallery {
                     .icon(IconName::Check)
                     .child(variant.name())
                     .reveal(
-                        SharedString::from(format!("reveal-effect-sample-{variant:?}")),
+                        ("reveal-effect-sample", sample_index),
                         scroll,
                     )
                 }),
@@ -1065,16 +1060,14 @@ impl Gallery {
                             .when(sample_index == 0, |row| row.debug_selector(|| "button-toggle-shapes".into()))
                             .gap(rem(12.))
                             .child(accessible_text(
-                                SharedString::from(format!("toggle-shape-{shape:?}")),
+                                ("toggle-shape", shape_index),
                                 shape.name(),
                             ))
                             .child(gpui_base::h_flex().flex_wrap().gap(rem(16.)).children(
                                 ButtonVariant::ALL.into_iter().enumerate().map(
                                     |(variant_index, variant)| {
                                         let index = shape_index * 5 + variant_index;
-                                        MaterialButton::new(SharedString::from(format!(
-                                            "toggle-{shape:?}-{variant:?}"
-                                        )))
+                                        MaterialButton::new(("toggle", index))
                                         .variant(variant)
                                         .shape(shape)
                                         .button_size(self.button_toggle_size)
@@ -1095,9 +1088,7 @@ impl Gallery {
                                             }
                                         })
                                         .reveal(
-                                            SharedString::from(format!(
-                                                "reveal-toggle-{shape:?}-{variant:?}"
-                                            )),
+                                            ("reveal-toggle", index),
                                             scroll,
                                         )
                                     },
@@ -1122,9 +1113,9 @@ impl Gallery {
             CLICK_COUNT_ROW => {  (accessible_text("loading-click-count", SharedString::from(format!("Sample activations: {}", self.button_loading_clicks))).debug_selector(|| "loading-click-count".into())).into_any_element() },
             LOADING_SIZE_ROWS..=LOADING_SIZE_LAST => { let loading_variant = ButtonVariant::ALL[self.button_loading_variant];let sample_index = index - LOADING_SIZE_ROWS; ((ButtonSize::ALL.into_iter().nth(sample_index).map(|size| {
                 gpui_base::v_flex().when(sample_index == 0, |row| row.debug_selector(|| "button-loading-sizes".into())).gap(rem(12.))
-                    .child(accessible_text(SharedString::from(format!("loading-size-{size:?}")), size.name()))
+                    .child(accessible_text(("loading-size", sample_index), size.name()))
                     .child(gpui_base::h_flex().flex_wrap().gap(rem(16.)).children((0..3).map(|icon_position| {
-                        MaterialButton::new(SharedString::from(format!("loading-{size:?}-{icon_position}")))
+                        MaterialButton::new(("loading", sample_index * 3 + icon_position))
                             .variant(loading_variant).button_size(size)
                             .when(icon_position > 0, |button| button.icon(IconName::Check))
                             .when(icon_position == 2, |button| button.icon_position(ButtonIconPosition::Trailing))
@@ -1135,7 +1126,7 @@ impl Gallery {
                             .progress_playback(self.button_progress_playbacks[sample_index * 3 + icon_position].clone())
                             .child(if self.button_loading { "Saving…" } else { "Save changes" })
                             .on_click(cx.listener(|this, _, _, cx| this.count_loading_activation(cx)))
-                            .reveal(SharedString::from(format!("reveal-loading-{size:?}-{icon_position}")), scroll)
+                            .reveal(("reveal-loading", sample_index * 3 + icon_position), scroll)
                     })))
             })).expect("gallery row")).into_any_element() },
             51 => {  (section_title("button-icons", "Button icons")).into_any_element() },
@@ -1168,9 +1159,11 @@ impl Gallery {
                         ),
                     ]
                     .into_iter()
-                    .map(move |(label, position, direction, variant)| {
+                    .enumerate()
+                    .map(move |(position_index, (label, position, direction, variant))| {
+                        let sample = sample_index * 4 + position_index;
                         material_button(
-                            SharedString::from(format!("icon-{size:?}-{label}")),
+                            ("icon", sample),
                             variant,
                         )
                         .button_size(size)
@@ -1179,7 +1172,7 @@ impl Gallery {
                         .direction(direction)
                         .child(label)
                         .reveal(
-                            SharedString::from(format!("reveal-icon-{size:?}-{label}")),
+                            ("reveal-icon", sample),
                             scroll,
                         )
                     }),
@@ -1195,7 +1188,7 @@ impl Gallery {
                 .nth(sample_index).map(|role| {
                     let spec = role.scale();
                     accessible_text(
-                        SharedString::from(format!("label-role-{}", role.name())),
+                        ("label-role", sample_index),
                         role.name(),
                     )
                     .font_family(spec.font_family)
@@ -1204,9 +1197,9 @@ impl Gallery {
                     .font_weight(FontWeight(spec.font_weight as f32))
                 })).expect("gallery row")).into_any_element() },
             61 => {  (gpui_base::h_flex().flex_wrap().gap(rem(12.)).children(
-                                ButtonVariant::ALL.into_iter().map(|variant| {
+                                ButtonVariant::ALL.into_iter().enumerate().map(|(variant_index, variant)| {
                                     material_button(
-                                        SharedString::from(format!("disabled-{variant:?}")),
+                                        ("disabled", variant_index),
                                         variant,
                                     )
                                     .disabled(true)
@@ -1246,7 +1239,7 @@ impl Gallery {
         let mut choices = TileGroup::new("engines", "Choice tiles");
         for (index, title) in engines.into_iter().enumerate() {
             let tile = ChoiceTile::new(
-                SharedString::from(format!("engine-{index}")),
+                ("engine", index),
                 index,
                 engines.len(),
                 title,
@@ -1365,7 +1358,7 @@ choices.reveal("reveal-choices", scroll)}).into_any_element() },
                             .children([0., 0.62, 1.].into_iter().enumerate().map(
                                 |(index, fraction)| {
                                     circular_progress(
-                                        SharedString::from(format!("circular-measured-{index}")),
+                                        ("circular-measured", index),
                                         "Progress",
                                         CircularProgressFrame::determinate(fraction),
                                         Some(fraction),
@@ -1378,14 +1371,14 @@ choices.reveal("reveal-choices", scroll)}).into_any_element() },
             73 => {  (section_title("reference-colors", "Material color roles")).into_any_element() },
             COLOR_SOURCE_ROW => {  (gpui_base::h_flex().when(color_start == 0, |row| row.debug_selector(|| "color-swatches".into())).flex_wrap().gap(rem(12.)).children(themes::REFERENCE_ROLES
             .into_iter()
-            .zip(themes::REFERENCE_ROLE_NAMES).skip(color_start).take(self.color_columns)
-            .map(|(role, name)| {
+            .zip(themes::REFERENCE_ROLE_NAMES).enumerate().skip(color_start).take(self.color_columns)
+            .map(|(role_index, (role, name))| {
                 gpui_base::v_flex()
                     .w(rem(166.))
                     .gap(rem(4.))
                     .child(div().h(rem(32.)).w_full().rounded(rem(8.)).bg(color(role)))
                     .child(
-                        accessible_text(SharedString::from(format!("color-{name}")), name)
+                        accessible_text(("color", role_index), name)
                             .text_size(TEXT_AUX),
                     )
             }))).into_any_element() },
@@ -1396,7 +1389,7 @@ choices.reveal("reveal-choices", scroll)}).into_any_element() },
                 .gap(rem(4.))
                 .child(
                     accessible_text(
-                        SharedString::from(format!("type-label-{}", role.name())),
+                        ("type-label", sample_index),
                         role.name(),
                     )
                     .text_size(TEXT_AUX)
@@ -1404,7 +1397,7 @@ choices.reveal("reveal-choices", scroll)}).into_any_element() },
                 )
                 .child(
                     accessible_text(
-                        SharedString::from(format!("type-sample-{}", role.name())),
+                        ("type-sample", sample_index),
                         "The quick brown fox jumps over the lazy dog",
                     )
                     .whitespace_normal()

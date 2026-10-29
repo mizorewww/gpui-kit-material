@@ -96,6 +96,8 @@ struct Gallery {
     button_toggle_playbacks: [ButtonTransitionPlayback; 10],
     button_progress_playbacks: [ButtonProgressPlayback; 15],
     button_progress_inputs: Option<(bool, bool, bool)>,
+    /// The rows the list builder rendered in the current frame.
+    rendered_rows: std::rc::Rc<std::cell::RefCell<Vec<usize>>>,
 }
 
 impl Gallery {
@@ -152,6 +154,7 @@ impl Gallery {
             button_toggle_playbacks: std::array::from_fn(|_| ButtonTransitionPlayback::default()),
             button_progress_playbacks: std::array::from_fn(|_| ButtonProgressPlayback::default()),
             button_progress_inputs: None,
+            rendered_rows: Default::default(),
             palette: PaletteId::Paper,
             reference_theme: Some(ThemeId::Baseline),
             reference_mode: ThemeMode::Light,
@@ -229,7 +232,7 @@ impl Render for Gallery {
         // (and requests frames until settled); remounting never restarts it.
         self.motion_values = std::array::from_fn(|index| {
             motion::token_value(
-                SharedString::from(format!("motion-preview-{index}")),
+                ("motion-preview", index),
                 if self.motion_target { 1. } else { 0. },
                 [
                     motion::MotionToken::FastSpatial,
@@ -311,35 +314,34 @@ impl Render for Gallery {
                             .gap(rem(8.))
                             .when(compact, |items| items.flex_row().flex_wrap())
                             .children(GALLERY_SECTIONS.into_iter().enumerate().map(
-                                |(index, (id, label))| {
-                                    MaterialButton::new(SharedString::from(format!(
-                                        "navigate-{id}"
-                                    )))
-                                    .variant(ButtonVariant::Tonal)
-                                    .button_size(ButtonSize::ExtraSmall)
-                                    .toggle(true)
-                                    .selected(self.selected_section == index)
-                                    .toggle_on_click(false)
-                                    .child(label)
-                                    .when(!compact, |button| button.w_full().justify_start())
-                                    .on_click(cx.listener(move |this, _, window, cx| {
-                                        this.selected_section = index;
-                                        this.scroll_to_section(index);
-                                        let _ = window;
-                                        cx.notify();
-                                    }))
-                                    .reveal_handle(
-                                        SharedString::from(format!("reveal-navigation-{id}")),
-                                        &self.navigation_scroll,
-                                    )
+                                |(index, (_, label))| {
+                                    MaterialButton::new(("navigate", index))
+                                        .variant(ButtonVariant::Tonal)
+                                        .button_size(ButtonSize::ExtraSmall)
+                                        .toggle(true)
+                                        .selected(self.selected_section == index)
+                                        .toggle_on_click(false)
+                                        .child(label)
+                                        .when(!compact, |button| button.w_full().justify_start())
+                                        .on_click(cx.listener(move |this, _, window, cx| {
+                                            this.selected_section = index;
+                                            this.scroll_to_section(index);
+                                            let _ = window;
+                                            cx.notify();
+                                        }))
+                                        .reveal_handle(
+                                            ("reveal-navigation", index),
+                                            &self.navigation_scroll,
+                                        )
                                 },
                             )),
                     ),
             );
         let view = cx.weak_entity();
         let sync_view = view.clone();
-        let rendered_rows =
-            std::rc::Rc::new(std::cell::RefCell::new(std::collections::BTreeSet::new()));
+        // Reused across frames: the builder records this frame's rows.
+        self.rendered_rows.borrow_mut().clear();
+        let rendered_rows = self.rendered_rows.clone();
         let list_rows = rendered_rows.clone();
         let content = div()
             .id("gallery-content")
@@ -352,7 +354,7 @@ impl Render for Gallery {
             .font_family("Roboto")
             .child(
                 gpui::list(self.list.clone(), move |index, window, cx| {
-                    list_rows.borrow_mut().insert(index);
+                    list_rows.borrow_mut().push(index);
                     view.update(cx, |this, cx| this.render_row(index, window, cx))
                         .unwrap_or_else(|_| div().into_any_element())
                 })
