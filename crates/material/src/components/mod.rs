@@ -21,6 +21,7 @@ mod caption;
 mod choice;
 mod feedback;
 mod focus;
+mod menu;
 mod preview;
 mod progress;
 mod search;
@@ -39,6 +40,9 @@ pub use feedback::{
     outlined_status_chip, small_badge, status_chip,
 };
 pub use focus::{FocusRing, RevealFocus, RingedButton, contain_scroll};
+pub use menu::{
+    ExposedDropdown, MaterialMenu, MaterialMenuItem, MenuDensity, MenuGroup, MenuPopup, MenuStyle,
+};
 pub use preview::InteractionPreview;
 pub use progress::{
     CircularProgressFrame, CircularProgressPlayback, circular_indeterminate_frame,
@@ -62,4 +66,5 @@ pub use title_bar::{
 pub(crate) fn init(cx: &mut gpui::App) {
     button_group::init(cx);
     choice::init(cx);
+    menu::init(cx);
 }
