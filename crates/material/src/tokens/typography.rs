@@ -26,17 +26,16 @@ pub const TEXT_SECTION: Rems = TypeRole::TitleLarge.scale().font_size;
 /// Page titles use the reference headline-small role (24px / 32px).
 pub const TEXT_HEADLINE: Rems = TypeRole::HeadlineSmall.scale().font_size;
 pub const HEADLINE_LINE_HEIGHT: Rems = TypeRole::HeadlineSmall.scale().line_height;
-/// Settings content reads one step larger than navigation: body-large (16px).
+/// Component token: the label of a regular tile and of a choice tile
+/// ([`crate::components::TileScale::Regular`], [`crate::components::ChoiceTile`]),
+/// one step larger than navigation: body-large (16px).
 pub const TEXT_SETTINGS_BODY: Rems = TypeRole::BodyLarge.scale().font_size;
-/// Settings supporting text: body-medium (14px).
+/// Component token: the supporting text of a regular tile and of a choice
+/// tile: body-medium (14px).
 pub const TEXT_SETTINGS_AUX: Rems = TEXT_BODY;
-/// The main label of a settings tile (17px). Off the M3 scale: it maps to
-/// [`TypeRole::BodyLarge`] (16px, the M3 list-item headline) and keeps its
-/// old size only until its caller migrates to that role.
-pub const TEXT_TILE_LABEL: Rems = rem(17.);
 
 /// The M3 role each legacy size constant maps to, by constant name.
-pub const LEGACY_ROLES: [(&str, TypeRole); 9] = [
+pub const LEGACY_ROLES: [(&str, TypeRole); 8] = [
     ("TEXT_AUX", TypeRole::BodySmall),
     ("TEXT_BODY", TypeRole::BodyMedium),
     ("TEXT_READER", TypeRole::BodyLarge),
@@ -45,7 +44,6 @@ pub const LEGACY_ROLES: [(&str, TypeRole); 9] = [
     ("TEXT_HEADLINE", TypeRole::HeadlineSmall),
     ("TEXT_SETTINGS_BODY", TypeRole::BodyLarge),
     ("TEXT_SETTINGS_AUX", TypeRole::BodyMedium),
-    ("TEXT_TILE_LABEL", TypeRole::BodyLarge),
 ];
 
 /// A role in the reference Material type scale.
@@ -191,7 +189,6 @@ mod tests {
         for (size, (name, role)) in sizes.into_iter().zip(LEGACY_ROLES) {
             assert_eq!(size, role.scale().font_size, "{name}");
         }
-        assert_eq!(LEGACY_ROLES[8], ("TEXT_TILE_LABEL", TypeRole::BodyLarge));
     }
 
     #[test]

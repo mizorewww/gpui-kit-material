@@ -19,8 +19,6 @@ pub const SECTION_TITLE_SPACE: Rems = rem(10.);
 pub const SECTION_TITLE_GAP: Pixels = px(10.);
 /// Above and below the control row of an app bar.
 pub const APP_BAR_BLOCK_PADDING: Rems = rem(8.);
-/// A select at the trailing end of a row keeps a readable width.
-pub const INLINE_SELECT_WIDTH: Rems = rem(280.);
 
 /// The window width, in 100%-scale px, below which pages use narrow
 /// gutters, compact navigation and stacked controls.
