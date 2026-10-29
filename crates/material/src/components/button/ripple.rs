@@ -75,6 +75,7 @@ pub(super) struct ButtonRipple {
     border: Edges<AbsoluteLength>,
     color: Rgba,
     waves: Vec<PaintedWave>,
+    target: Option<super::hit_target::SharedTarget>,
 }
 impl ButtonRipple {
     #[allow(clippy::too_many_arguments)]
@@ -155,7 +156,13 @@ impl ButtonRipple {
             border,
             color,
             waves,
+            target: None,
         }
+    }
+
+    pub(super) fn hit_target(mut self, target: super::hit_target::SharedTarget) -> Self {
+        self.target = Some(target);
+        self
     }
 }
 impl IntoElement for ButtonRipple {
@@ -191,9 +198,17 @@ impl Element for ButtonRipple {
         window: &mut Window,
         cx: &mut App,
     ) -> Hitbox {
-        let hitbox = window.insert_hitbox(bounds, HitboxBehavior::Normal);
+        // Base occludes earlier pointer targets. Register this passive observer
+        // above its own child, while later siblings still occlude both together.
         self.child.prepaint(window, cx);
-        hitbox
+        // Base has just resolved interaction styles and its complete content
+        // mask, including focus/hover border or overflow overrides. Reuse that
+        // result rather than reconstructing a second target from render styles.
+        self.target
+            .as_ref()
+            .and_then(|target| target.get())
+            .unwrap_or_else(|| super::hit_target::ResolvedTarget::new(bounds, None, window))
+            .insert(window)
     }
     fn paint(
         &mut self,
@@ -853,6 +868,333 @@ mod tests {
             samples.borrow()[0].opacity,
             0.,
             "an unpainted press must not flash later"
+        );
+    }
+}
+
+#[cfg(test)]
+mod target_tests {
+    use super::RippleState;
+    use crate::components::button::{ButtonSize, ButtonVariant, MaterialButton, PressState};
+    use gpui::prelude::*;
+    use gpui::{
+        Context, ElementId, Entity, InputEvent, IntoElement, Modifiers, MouseButton,
+        MouseMoveEvent, Render, TestAppContext, TouchEvent, TouchId, TouchPhase, VisualTestContext,
+        Window, div, point, px,
+    };
+
+    struct Harness {
+        size: ButtonSize,
+        outlined: bool,
+        own_clip: bool,
+        ancestor_clip: bool,
+        overlap: bool,
+        focus: gpui::FocusHandle,
+        focus_clip: bool,
+        focus_border: bool,
+        occlude: bool,
+        scrolls: usize,
+        clicks: [usize; 2],
+        ripple_states: [Option<Entity<RippleState>>; 2],
+        press_state: Option<Entity<PressState>>,
+    }
+    impl Render for Harness {
+        fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+            window.set_rem_size(px(14.));
+            let button = MaterialButton::new("target")
+                .button_size(self.size)
+                .track_focus(&self.focus)
+                .when(self.focus_clip, |button| {
+                    button.focus(|style| style.overflow_hidden())
+                })
+                .when(self.focus_border, |button| {
+                    button.focus(|style| style.border_l(px(10.)))
+                })
+                .when(self.occlude, |button| button.occlude())
+                .variant(if self.outlined {
+                    ButtonVariant::Outlined
+                } else {
+                    ButtonVariant::Filled
+                })
+                .w(px(80.))
+                .child("Target")
+                .debug_selector(|| "target".into())
+                .when(self.own_clip, |button| button.overflow_hidden())
+                .on_click(cx.listener(|this, _, _, _| this.clicks[0] += 1));
+            let button = gpui::RenderOnce::render(button, window, cx).into_any_element();
+            self.ripple_states[0] = Some(window.use_keyed_state(
+                (ElementId::from("target"), "ripple"),
+                cx,
+                |_, _| panic!("existing ripple"),
+            ));
+            self.press_state = Some(window.use_keyed_state(
+                (ElementId::from("target"), "material-press"),
+                cx,
+                |_, _| panic!("existing press"),
+            ));
+            let neighbor = if self.overlap {
+                let neighbor = MaterialButton::new("neighbor")
+                    .button_size(ButtonSize::ExtraSmall)
+                    .absolute()
+                    .top(px(40.))
+                    .w(px(80.))
+                    .child("Next")
+                    .on_click(cx.listener(|this, _, _, _| this.clicks[1] += 1));
+                let neighbor = gpui::RenderOnce::render(neighbor, window, cx).into_any_element();
+                self.ripple_states[1] = Some(window.use_keyed_state(
+                    (ElementId::from("neighbor"), "ripple"),
+                    cx,
+                    |_, _| panic!("existing neighbor ripple"),
+                ));
+                Some(neighbor)
+            } else {
+                None
+            };
+            div()
+                .size_full()
+                .p(px(20.))
+                .on_scroll(cx.listener(|this, _, _, _| this.scrolls += 1))
+                .child(
+                    div()
+                        .relative()
+                        .w(px(80.))
+                        .h(px(self.size.geometry().height))
+                        .when(self.ancestor_clip, |parent| parent.overflow_hidden())
+                        .child(button)
+                        .children(neighbor),
+                )
+        }
+    }
+    fn setup(cx: &mut TestAppContext) -> (Entity<Harness>, &mut VisualTestContext) {
+        cx.update(gpui_base::init);
+        let (view, cx) = cx.add_window_view(|_, cx| Harness {
+            size: ButtonSize::ExtraSmall,
+            outlined: false,
+            own_clip: false,
+            ancestor_clip: false,
+            overlap: false,
+            focus: cx.focus_handle(),
+            focus_clip: false,
+            focus_border: false,
+            occlude: false,
+            scrolls: 0,
+            clicks: [0; 2],
+            ripple_states: [None, None],
+            press_state: None,
+        });
+        draw(cx);
+        (view, cx)
+    }
+    fn draw(cx: &mut VisualTestContext) {
+        cx.update(|window, cx| window.draw(cx).clear(cx));
+    }
+    fn wave_count(view: &Entity<Harness>, cx: &mut VisualTestContext, id: &'static str) -> u64 {
+        view.read_with(cx, |view, cx| {
+            view.ripple_states[usize::from(id == "neighbor")]
+                .as_ref()
+                .unwrap()
+                .read(cx)
+                .next
+        })
+    }
+    fn press(view: &Entity<Harness>, cx: &mut VisualTestContext) -> (bool, bool) {
+        view.read_with(cx, |view, cx| {
+            let state = view.press_state.as_ref().unwrap().read(cx);
+            (state.pointer, state.hovered)
+        })
+    }
+
+    #[gpui::test]
+    fn compact_edges_share_activation_hover_press_and_ripple_without_layout_growth(
+        cx: &mut TestAppContext,
+    ) {
+        let (view, cx) = setup(cx);
+        for size in [ButtonSize::ExtraSmall, ButtonSize::Small] {
+            view.update(cx, |view, cx| {
+                view.size = size;
+                cx.notify();
+            });
+            draw(cx);
+            let bounds = cx.debug_bounds("target").unwrap();
+            assert_eq!(bounds.size.height, px(size.geometry().height));
+            let edge = point(bounds.center().x, bounds.origin.y - px(2.));
+            cx.simulate_event(MouseMoveEvent {
+                position: edge,
+                pressed_button: None,
+                modifiers: Modifiers::default(),
+            });
+            cx.run_until_parked();
+            assert!(press(&view, cx).1, "outer target must hover");
+            let before = wave_count(&view, cx, "target");
+            let clicks = view.read_with(cx, |view, _| view.clicks[0]);
+            cx.simulate_mouse_down(edge, MouseButton::Left, Modifiers::default());
+            assert!(press(&view, cx).0);
+            assert_eq!(wave_count(&view, cx, "target"), before + 1);
+            cx.simulate_mouse_move(edge, MouseButton::Left, Modifiers::default());
+            assert!(press(&view, cx).1, "held movement uses expanded target");
+            cx.simulate_mouse_up(edge, MouseButton::Left, Modifiers::default());
+            assert!(!press(&view, cx).0);
+            assert_eq!(view.read_with(cx, |view, _| view.clicks[0]), clicks + 1);
+            assert_eq!(
+                cx.debug_bounds("target").unwrap().size.height,
+                bounds.size.height
+            );
+        }
+        view.update(cx, |view, cx| {
+            view.size = ButtonSize::Medium;
+            cx.notify();
+        });
+        draw(cx);
+        let bounds = cx.debug_bounds("target").unwrap();
+        let before = wave_count(&view, cx, "target");
+        cx.simulate_click(
+            point(bounds.center().x, bounds.origin.y - px(2.)),
+            Modifiers::default(),
+        );
+        assert_eq!(
+            wave_count(&view, cx, "target"),
+            before,
+            "medium has no expanded target"
+        );
+    }
+
+    #[gpui::test]
+    fn target_and_ripple_obey_border_width_clipping_and_neighbor_occlusion(
+        cx: &mut TestAppContext,
+    ) {
+        let (view, cx) = setup(cx);
+        view.update(cx, |view, cx| {
+            view.outlined = true;
+            cx.notify();
+        });
+        draw(cx);
+        let bounds = cx.debug_bounds("target").unwrap();
+        let strip = point(bounds.origin.x + px(0.25), bounds.origin.y - px(2.));
+        cx.simulate_click(strip, Modifiers::default());
+        assert_eq!(
+            wave_count(&view, cx, "target"),
+            0,
+            "outlined extension excludes the border strip"
+        );
+        assert_eq!(view.read_with(cx, |view, _| view.clicks[0]), 0);
+        for own in [true, false] {
+            view.update(cx, |view, cx| {
+                view.own_clip = own;
+                view.ancestor_clip = !own;
+                cx.notify();
+            });
+            draw(cx);
+            cx.simulate_click(
+                point(bounds.center().x, bounds.origin.y - px(2.)),
+                Modifiers::default(),
+            );
+            assert_eq!(
+                wave_count(&view, cx, "target"),
+                0,
+                "passive ripple obeys the same clip as activation"
+            );
+            assert_eq!(view.read_with(cx, |view, _| view.clicks[0]), 0);
+        }
+        view.update(cx, |view, cx| {
+            view.own_clip = false;
+            view.ancestor_clip = false;
+            view.overlap = true;
+            cx.notify();
+        });
+        draw(cx);
+        cx.simulate_click(
+            point(bounds.center().x, bounds.origin.y + px(35.)),
+            Modifiers::default(),
+        );
+        assert_eq!(
+            wave_count(&view, cx, "target"),
+            0,
+            "later neighbor blocks earlier passive ripple"
+        );
+        assert_eq!(wave_count(&view, cx, "neighbor"), 1);
+        assert_eq!(view.read_with(cx, |view, _| view.clicks), [0, 1]);
+    }
+
+    #[gpui::test]
+    fn raw_touch_at_extended_edge_starts_one_wave_and_activates_once(cx: &mut TestAppContext) {
+        let (view, cx) = setup(cx);
+        let bounds = cx.debug_bounds("target").unwrap();
+        let edge = point(bounds.center().x, bounds.origin.y - px(2.));
+        for phase in [TouchPhase::Started, TouchPhase::Ended] {
+            cx.update(|window, cx| {
+                window.dispatch_event(
+                    TouchEvent {
+                        id: TouchId(1),
+                        phase,
+                        position: edge,
+                        ..Default::default()
+                    }
+                    .to_platform_input(),
+                    cx,
+                );
+            });
+            assert_eq!(press(&view, cx).0, phase == TouchPhase::Started);
+            assert_eq!(
+                wave_count(&view, cx, "target"),
+                1,
+                "synthesized mouse must not duplicate raw wave"
+            );
+        }
+        assert_eq!(view.read_with(cx, |view, _| view.clicks[0]), 1);
+    }
+    #[gpui::test]
+    fn passive_target_uses_base_resolved_focus_border_and_overflow(cx: &mut TestAppContext) {
+        let (view, cx) = setup(cx);
+        let focus = view.read_with(cx, |view, _| view.focus.clone());
+        cx.update(|window, cx| window.focus(&focus, cx));
+        for clip in [true, false] {
+            view.update(cx, |view, cx| {
+                view.focus_clip = clip;
+                view.focus_border = !clip;
+                cx.notify();
+            });
+            draw(cx);
+            let bounds = cx.debug_bounds("target").unwrap();
+            let edge = point(bounds.origin.x + px(5.), bounds.origin.y - px(2.));
+            cx.simulate_click(edge, Modifiers::default());
+            assert_eq!(view.read_with(cx, |view, _| view.clicks[0]), 0);
+            assert_eq!(
+                wave_count(&view, cx, "target"),
+                0,
+                "resolved focus style must constrain ripple identically to Base"
+            );
+            assert!(!press(&view, cx).0);
+        }
+    }
+
+    #[gpui::test]
+    fn caller_occlusion_can_block_scroll_beyond_material_default(cx: &mut TestAppContext) {
+        let (view, cx) = setup(cx);
+        let position = cx.debug_bounds("target").unwrap().center();
+        let scroll = |cx: &mut VisualTestContext| {
+            cx.simulate_event(gpui::ScrollEvent {
+                position,
+                delta: gpui::ScrollDelta::Pixels(point(px(0.), px(10.))),
+                touch_phase: TouchPhase::Moved,
+                ..Default::default()
+            });
+        };
+        scroll(cx);
+        assert_eq!(
+            view.read_with(cx, |view, _| view.scrolls),
+            1,
+            "default allows ancestor scrolling"
+        );
+        view.update(cx, |view, cx| {
+            view.occlude = true;
+            cx.notify();
+        });
+        draw(cx);
+        scroll(cx);
+        assert_eq!(
+            view.read_with(cx, |view, _| view.scrolls),
+            1,
+            "caller occlude must not be overwritten during render"
         );
     }
 }

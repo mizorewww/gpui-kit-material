@@ -1,9 +1,10 @@
 //! Material button presentation over GPUI Base activation and focus behavior.
 //! Reference: floor/material c910072f3fc5b660276731d8a935d7186f288364.
-//! Expanded touch targets and loading semantics are still pending.
+//! Loading semantics are still pending.
 mod control;
 mod effects;
 mod focus_ring;
+mod hit_target;
 mod ripple;
 mod ripple_clip;
 mod shadow;
@@ -455,7 +456,7 @@ impl MaterialButton {
             id: id.clone(),
             focus_handle: None,
             focusable: true,
-            base: BaseControl::new(id),
+            base: BaseControl::new(id).block_mouse_except_scroll(),
             children: vec![],
             icon: None,
             icon_position: ButtonIconPosition::Leading,
@@ -737,9 +738,21 @@ impl RenderOnce for MaterialButton {
         // A window exit must clear a held press even after the pointer has left
         // the button. Its non-occluding hitbox only locates passive touch presses.
         let touch_enabled = !self.disabled;
+        let expanded_target = matches!(self.size, ButtonSize::ExtraSmall | ButtonSize::Small);
+        // Capture the actual Base border box during its prepaint. A positioned
+        // child has padding-box geometry, so it cannot independently reconstruct
+        // the target when callers supply asymmetric borders.
+        let target_geometry = hit_target::SharedTarget::default();
+        let target_reader = target_geometry.clone();
         let exit_observer = canvas(
-            |bounds, window, _| window.insert_hitbox(bounds, HitboxBehavior::Normal),
-            move |bounds, hitbox, window, _| {
+            move |bounds, window, _| {
+                target_reader
+                    .get()
+                    .unwrap_or_else(|| hit_target::ResolvedTarget::new(bounds, None, window))
+                    .insert(window)
+            },
+            move |_, hitbox, window, _| {
+                let moving_hitbox = hitbox.clone();
                 let touch = weak.clone();
                 window.observe_touch_event(move |event, window, cx| match event.phase {
                     TouchPhase::Started
@@ -769,7 +782,7 @@ impl RenderOnce for MaterialButton {
                         let _ = moving.update(cx, |state, cx| {
                             if state.pointer || state.outside_window {
                                 state.outside_window = false;
-                                let hovered = bounds.contains(&event.position)
+                                let hovered = moving_hitbox.is_hovered_at(event.position, window)
                                     && !window.last_input_was_touch();
                                 if state.hovered != hovered {
                                     state.hovered = hovered;
@@ -798,9 +811,19 @@ impl RenderOnce for MaterialButton {
         )
         .absolute()
         .size_full();
+        let target_writer = target_geometry.clone();
         let base = self
             .base
             .track_focus(&focus)
+            .hitbox_extension(move |bounds, style, window| {
+                let extension = expanded_target
+                    .then(|| hit_target::extra_bounds(bounds, style, window))
+                    .flatten();
+                target_writer.set(Some(hit_target::ResolvedTarget::new(
+                    bounds, extension, window,
+                )));
+                extension
+            })
             .children(leading)
             .children(self.children)
             .children(trailing)
@@ -901,7 +924,8 @@ impl RenderOnce for MaterialButton {
             ripple_color,
             window,
             cx,
-        );
+        )
+        .hit_target(target_geometry);
         focus_ring::ButtonFocusRing::new(base, focus, !self.disabled && self.focusable, rem(radius))
     }
 }
