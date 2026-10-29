@@ -15,6 +15,10 @@ struct Gallery {
     engine: usize,
     details: bool,
     scroll: ScrollHandle,
+    search: Entity<gpui_base::input::InputState>,
+    slider: Entity<gpui_base::slider::SliderState>,
+    switch: bool,
+    sheet: bool,
 }
 
 impl Render for Gallery {
@@ -197,6 +201,67 @@ impl Render for Gallery {
                             .child(scale)
                             .child(density),
                     )
+                    .child(
+                        gpui_base::v_flex()
+                            .gap(rem(16.))
+                            .child(section_title("controls", "Material controls"))
+                            .child(SearchField::new(&self.search))
+                            .child(
+                                MaterialSwitch::new("example-switch", "Enable notifications")
+                                    .checked(self.switch)
+                                    .on_change(cx.listener(|this, checked: &bool, _, cx| {
+                                        this.switch = *checked;
+                                        cx.notify();
+                                    })),
+                            )
+                            .child(MaterialSlider::new(&self.slider, "Expressive slider"))
+                            .child(
+                                MaterialSlider::new(&self.slider, "Classic slider")
+                                    .appearance(SliderAppearance::Classic),
+                            )
+                            .child(
+                                gpui_base::h_flex().gap(rem(8.)).children(
+                                    [
+                                        ("filled", ButtonVariant::Filled),
+                                        ("tonal", ButtonVariant::Tonal),
+                                        ("outlined", ButtonVariant::Outlined),
+                                        ("text", ButtonVariant::Text),
+                                    ]
+                                    .map(|(label, variant)| {
+                                        material_button(label, variant).child(label)
+                                    }),
+                                ),
+                            ),
+                    )
+                    .child(
+                        div()
+                            .relative()
+                            .h(rem(220.))
+                            .overflow_hidden()
+                            .child(
+                                material_button("open-sheet", ButtonVariant::Tonal)
+                                    .child("Toggle side sheet")
+                                    .on_click(cx.listener(|this, _, _, cx| {
+                                        this.sheet = !this.sheet;
+                                        cx.notify();
+                                    })),
+                            )
+                            .child(
+                                MaterialSideSheet::new("gallery-sheet")
+                                    .open(self.sheet)
+                                    .width(rem(280.))
+                                    .child(
+                                        div().p(rem(20.)).child("Standard side sheet").child(
+                                            material_button("close-sheet", ButtonVariant::Text)
+                                                .child("Close")
+                                                .on_click(cx.listener(|this, _, _, cx| {
+                                                    this.sheet = false;
+                                                    cx.notify();
+                                                })),
+                                        ),
+                                    ),
+                            ),
+                    )
                     .child(choices)
                     .child(settings)
                     .child(feedback),
@@ -217,14 +282,31 @@ fn main() {
                     window_bounds: Some(WindowBounds::Windowed(bounds)),
                     ..Default::default()
                 },
-                |_, cx| {
-                    cx.new(|_| Gallery {
-                        palette: PaletteId::Paper,
-                        scale: "1".into(),
-                        density: "auto".into(),
-                        engine: 0,
-                        details: false,
-                        scroll: ScrollHandle::new(),
+                |window, cx| {
+                    cx.new(|cx| {
+                        let search = cx.new(|cx| {
+                            gpui_base::input::InputState::new(window, cx)
+                                .placeholder("Search components")
+                        });
+                        let slider = cx.new(|_| {
+                            gpui_base::slider::SliderState::new()
+                                .min(0.)
+                                .max(100.)
+                                .default_value(40.)
+                        });
+                        cx.observe(&slider, |_, _, cx| cx.notify()).detach();
+                        Gallery {
+                            search,
+                            slider,
+                            switch: false,
+                            sheet: false,
+                            palette: PaletteId::Paper,
+                            scale: "1".into(),
+                            density: "auto".into(),
+                            engine: 0,
+                            details: false,
+                            scroll: ScrollHandle::new(),
+                        }
                     })
                 },
             )

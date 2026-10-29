@@ -1,6 +1,11 @@
 //! Material components. Each module documents the M3 component it
 //! implements and what remains for M3 Expressive (`docs/ROADMAP.md`).
 mod button_group;
+mod controls;
+pub use controls::{
+    ButtonVariant, MaterialSideSheet, MaterialSlider, MaterialSwitch, SearchField,
+    SliderAppearance, material_button,
+};
 mod caption;
 mod choice;
 mod feedback;
