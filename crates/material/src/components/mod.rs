@@ -16,10 +16,12 @@ mod standard_button_group;
 pub use icon_button::{IconButton, IconButtonVariant};
 pub use split_button::{SplitButton, SplitButtonPart};
 pub use standard_button_group::{ButtonGroup, EXPANDED_RATIO, standard_group_gap};
+mod app_bar;
 mod button_group;
 mod controls;
 mod divider;
 mod switch;
+mod toolbar;
 pub use controls::{MaterialSideSheet, MaterialSlider, SliderAppearance};
 pub use divider::{
     DividerContext, DividerDirection, DividerOrientation, DividerVariant, MaterialDivider,
@@ -49,6 +51,10 @@ mod text_field;
 mod tile;
 mod title_bar;
 
+pub use app_bar::{
+    BOTTOM_APP_BAR_HEIGHT, BottomAppBar, TOP_APP_BAR_HEIGHT, TopAppBar, TopAppBarVariant,
+    collapsed_title_alpha,
+};
 pub use button_group::ConnectedButtonGroup;
 pub use caption::{Caption, CaptionButton, CaptionButtons, CaptionLabels, title_bar_control};
 pub use checkbox::{CheckboxState, MaterialCheckbox};
@@ -88,6 +94,10 @@ pub use tile::{
 };
 pub use title_bar::{
     TitleBar, title_bar_leading, title_bar_window_options, traffic_light_position,
+};
+pub use toolbar::{
+    TOOLBAR_FAB_GAP, TOOLBAR_MARGIN, TOOLBAR_SIZE, Toolbar, ToolbarButton, ToolbarColor,
+    ToolbarConfiguration, ToolbarOrientation,
 };
 
 pub(crate) fn init(cx: &mut gpui::App) {
