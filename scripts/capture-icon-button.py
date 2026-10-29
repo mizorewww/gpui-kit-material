@@ -6,24 +6,13 @@ Captures actual CSS pointer/keyboard states, API behavior, touch boundaries, and
 Uses original createIconButton and complete main.scss compiled with Sass 1.85.1; no reference source edits.
 """
 import argparse
-import functools
 import hashlib
-import http.server
 import json
 from pathlib import Path
-import subprocess
 import tempfile
-import threading
-import uuid
 
-REVISION = "c910072f3fc5b660276731d8a935d7186f288364"
-
-
-def run(*args, **kwargs):
-    result = subprocess.run(args, text=True, capture_output=True, **kwargs)
-    if result.returncode:
-        raise RuntimeError(f"{args[0]} failed ({result.returncode}): {result.stderr or result.stdout}")
-    return result.stdout
+import reference_capture as capture
+from reference_capture import REVISION
 
 
 def unpack_fixture(fixture):
@@ -130,41 +119,22 @@ def main():
         return
     if args.source is None or args.output is None: parser.error("source and output are required for capture")
     source = args.source.resolve()
-    if run("git", "-C", str(source), "rev-parse", "HEAD").strip() != REVISION:
-        parser.error("Reference HEAD must be " + REVISION)
     # All imports of the actual icon button must match the pinned revision.
-    if run("git", "-C", str(source), "status", "--porcelain", "--", "src"):
-        parser.error("Reference src (including shared features and styles) must be clean")
-    sampler = Path(__file__).with_suffix(".js").read_text()
-    data = {"reference": REVISION, "tools": {
-        "bun": run("bun", "--version").strip(),
-        "sass": run("npx", "--yes", "sass@1.85.1", "--version").strip(),
-        "agent_browser": run("agent-browser", "--version").strip(),
-    }}
+    capture.require_reference(parser, source, "src", "Reference HEAD must be ",
+                              "Reference src (including shared features and styles) must be clean")
+    sampler = capture.sampler(__file__)
+    data = {"reference": REVISION, "tools": capture.tool_versions()}
     with tempfile.TemporaryDirectory(prefix="material-icon-button-") as directory:
         work = Path(directory)
-        entry = ("import createIconButton from " + json.dumps(str(source / "src/components/icon-button/icon-button.ts")) + ";\n"
-                 "window.referenceCreateIconButton=createIconButton;\n")
-        (work / "entry.ts").write_text(entry)
-        run("bun", "build", str(work / "entry.ts"), "--outfile", str(work / "entry.js"))
-        run("npx", "--yes", "sass@1.85.1", "--no-source-map", "--style=expanded",
-            str(source / "src/styles/main.scss"), str(work / "buttons.css"))
+        capture.bundle(work, "import createIconButton from " + capture.module(source / "src/components/icon-button/icon-button.ts") + ";\n"
+                       "window.referenceCreateIconButton=createIconButton;\n")
+        capture.compile_sass(source / "src/styles/main.scss", work / "buttons.css")
         data["stylesheet_sha256"] = hashlib.sha256((work / "buttons.css").read_bytes()).hexdigest()
         (work / "index.html").write_text('<!doctype html><html data-theme="baseline" data-theme-mode="light"><meta charset="utf-8"><link rel="stylesheet" href="buttons.css"><script src="entry.js"></script><body></body>')
-        handler = functools.partial(http.server.SimpleHTTPRequestHandler, directory=directory)
-        server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), handler)
-        thread = threading.Thread(target=server.serve_forever, daemon=True)
-        thread.start()
-        try:
-            session = "material-icon-button-" + uuid.uuid4().hex[:12]
-            def browser(*commands):
-                return run("agent-browser", "--session", session, *commands)
-            def evaluate(code):
-                return json.loads(browser_input(code))
-            def browser_input(code):
-                return run("agent-browser", "--session", session, "eval", "--stdin", input=code)
-            try:
-                browser("open", f"http://127.0.0.1:{server.server_port}")
+        with capture.serve(directory) as port:
+            with capture.browser_session("material-icon-button-") as browser:
+                evaluate = browser.evaluate
+                browser("open", f"http://127.0.0.1:{port}")
                 browser("set", "media", "light")
                 evaluate(sampler)
                 data["media"] = evaluate("({dark:matchMedia('(prefers-color-scheme: dark)').matches,reduced_motion:matchMedia('(prefers-reduced-motion: reduce)').matches})")
@@ -202,7 +172,7 @@ def main():
                     args.output.parent.mkdir(parents=True, exist_ok=True)
                     args.output.write_text(json.dumps(pack_fixture(data), indent=2) + "\n")
                 def batch(commands):
-                    run("agent-browser", "--session", session, "batch", "--bail", "--json", input=json.dumps(commands))
+                    browser("batch", "--bail", "--json", input=json.dumps(commands))
                 completed=[row["config"] for row in data["states"]]
                 for variant in ("standard", "filled", "tonal", "outlined"):
                     for size in ("xs", "s", "m", "l", "xl"):
@@ -321,14 +291,7 @@ def main():
                 save()
                 validate(data)
                 assert unpack_fixture(pack_fixture(data)) == data, "style interning must be lossless"
-            finally:
-                browser("close")
-            args.output.parent.mkdir(parents=True, exist_ok=True)
-            args.output.write_text(json.dumps(pack_fixture(data), indent=2) + "\n")
-        finally:
-            server.shutdown()
-            server.server_close()
-            thread.join()
+            capture.write_json(args.output, pack_fixture(data))
 
 
 if __name__ == "__main__":

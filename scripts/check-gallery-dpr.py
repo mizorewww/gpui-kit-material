@@ -8,8 +8,8 @@ component pixel conformance. Each screenshot uses the recorded emulated DPR.
 import argparse
 import json
 from pathlib import Path
-import subprocess
-import uuid
+
+import reference_capture as capture
 
 
 def main():
@@ -18,20 +18,9 @@ def main():
     parser.add_argument("output", type=Path)
     args = parser.parse_args()
     args.output.mkdir(parents=True, exist_ok=True)
-    session = "gallery-dpr-" + uuid.uuid4().hex[:12]
-
-    def browser(*commands, **kwargs):
-        result = subprocess.run(["agent-browser", "--session", session, *commands],
-                                capture_output=True, text=True, **kwargs)
-        if result.returncode:
-            raise RuntimeError(result.stderr + result.stdout)
-        return result.stdout
-
-    def evaluate(code):
-        return json.loads(browser("eval", "--stdin", input=code))
-
     samples = []
-    try:
+    with capture.browser_session("gallery-dpr-") as browser:
+        evaluate = browser.evaluate
         browser("open", args.url)
         for index, (width, height, dpr) in enumerate([
             (960, 720, 1), (960, 720, 2), (960, 720, 1.25),
@@ -76,8 +65,6 @@ def main():
                   "protocol": "Each emulated DPR change includes a 1 CSS pixel viewport resize because CDP DPR-only changes may emit neither resize nor media-query events.",
                   "samples": samples}
         (args.output / "results.json").write_text(json.dumps(result, indent=2)+"\n")
-    finally:
-        browser("close")
 
 
 if __name__ == "__main__":

@@ -4,52 +4,28 @@
 Usage: python3 scripts/capture-button-states.py /path/to/floor-material output.json
 Requires npx, git, and agent-browser. Dart Sass is pinned to 1.85.1.
 """
-import argparse
-import functools
-import http.server
-import json
 from pathlib import Path
-import subprocess
 import tempfile
-import threading
-import uuid
 
-REVISION = "c910072f3fc5b660276731d8a935d7186f288364"
-
-
-def run(*args, **kwargs):
-    return subprocess.run(args, check=True, text=True, capture_output=True, **kwargs).stdout
+import reference_capture as capture
+from reference_capture import REVISION
 
 
 def main():
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("source", type=Path)
-    parser.add_argument("output", type=Path)
+    parser = capture.parser(__doc__)
     parser.add_argument("--reduced-motion", action="store_true")
     args = parser.parse_args()
     source = args.source.resolve()
-    if run("git", "-C", str(source), "rev-parse", "HEAD").strip() != REVISION:
-        parser.error("The reference checkout must be at " + REVISION)
-    if run("git", "-C", str(source), "status", "--porcelain", "--", "src/styles"):
-        parser.error("Reference styles must be clean before capture")
-    session = "material-button-states-" + uuid.uuid4().hex[:12]
-    sampler = Path(__file__).with_suffix(".js").read_text()
+    capture.require_reference(parser, source, "src/styles", "The reference checkout must be at ",
+                              "Reference styles must be clean before capture")
+    sampler = capture.sampler(__file__)
     with tempfile.TemporaryDirectory(prefix="material-button-states-") as directory:
         work = Path(directory)
-        run("npx", "--yes", "sass@1.85.1", "--no-source-map", "--style=expanded",
-            str(source / "src/styles/main.scss"), str(work / "buttons.css"))
+        capture.compile_sass(source / "src/styles/main.scss", work / "buttons.css")
         (work / "index.html").write_text('<!doctype html><html><head><meta charset="utf-8"></head><body></body></html>')
-        handler = functools.partial(http.server.SimpleHTTPRequestHandler, directory=directory)
-        server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), handler)
-        thread = threading.Thread(target=server.serve_forever, daemon=True)
-        thread.start()
-        try:
-            run("agent-browser", "--session", session, "open", f"http://127.0.0.1:{server.server_port}")
-            def browser(*commands):
-                return run("agent-browser", "--session", session, *commands)
-            def evaluate(code):
-                return json.loads(run(
-                    "agent-browser", "--session", session, "eval", "--stdin", input=code))
+        with capture.serve(directory) as port, capture.browser_session("material-button-states-") as browser:
+            browser("open", f"http://127.0.0.1:{port}")
+            evaluate = browser.evaluate
             if args.reduced_motion:
                 browser("set", "media", "light", "reduced-motion")
             evaluate(sampler)
@@ -94,15 +70,7 @@ def main():
                     and not data["keyboard_focus"]["hovered"] and data["disabled_exit"]["disabled"]
                     and not data["disabled_exit"]["hovered"]):
                 raise ValueError("Browser pseudo-class state did not match the requested events")
-            args.output.parent.mkdir(parents=True, exist_ok=True)
-            args.output.write_text(json.dumps(data, indent=2) + "\n")
-        finally:
-            try:
-                run("agent-browser", "--session", session, "close")
-            finally:
-                server.shutdown()
-                server.server_close()
-                thread.join()
+            capture.write_json(args.output, data)
 
 
 if __name__ == "__main__":

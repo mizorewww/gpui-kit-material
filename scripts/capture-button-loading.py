@@ -5,63 +5,34 @@ Usage: python3 scripts/capture-button-loading.py /path/to/material output.json
 Captures ordinary and reduced motion. Requires git, bun, npx, agent-browser.
 Uses original createButton/circularIndeterminateFrame and Sass 1.85.1; no reference source edits.
 """
-import argparse
-import functools
-import http.server
-import json
 from pathlib import Path
-import subprocess
 import tempfile
-import threading
-import uuid
 
-REVISION = "c910072f3fc5b660276731d8a935d7186f288364"
-
-
-def run(*args, **kwargs):
-    return subprocess.run(args, check=True, text=True, capture_output=True, **kwargs).stdout
+import reference_capture as capture
+from reference_capture import REVISION
 
 
 def main():
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("source", type=Path)
-    parser.add_argument("output", type=Path)
+    parser = capture.parser(__doc__)
     args = parser.parse_args()
     source = args.source.resolve()
-    if run("git", "-C", str(source), "rev-parse", "HEAD").strip() != REVISION:
-        parser.error("Reference HEAD must be " + REVISION)
     # All imports of the actual button and progress must match the pinned revision.
-    if run("git", "-C", str(source), "status", "--porcelain", "--", "src"):
-        parser.error("Reference src (including styles and progress) must be clean")
-    sampler = Path(__file__).with_suffix(".js").read_text()
-    data = {"reference": REVISION, "tools": {
-        "bun": run("bun", "--version").strip(),
-        "sass": run("npx", "--yes", "sass@1.85.1", "--version").strip(),
-        "agent_browser": run("agent-browser", "--version").strip(),
-    }, "modes": {}}
+    capture.require_reference(parser, source, "src", "Reference HEAD must be ",
+                              "Reference src (including styles and progress) must be clean")
+    sampler = capture.sampler(__file__)
+    data = {"reference": REVISION, "tools": capture.tool_versions(), "modes": {}}
     with tempfile.TemporaryDirectory(prefix="material-button-loading-") as directory:
         work = Path(directory)
-        entry = ("import createButton from " + json.dumps(str(source / "src/components/button/button.ts")) + ";\n"
-                 "import {circularIndeterminateFrame} from " + json.dumps(str(source / "src/components/progress/features/motion.ts")) + ";\n"
-                 "window.referenceCreateButton=createButton;window.referenceCircularFrame=circularIndeterminateFrame;\n")
-        (work / "entry.ts").write_text(entry)
-        run("bun", "build", str(work / "entry.ts"), "--outfile", str(work / "entry.js"))
-        run("npx", "--yes", "sass@1.85.1", "--no-source-map", "--style=expanded",
-            str(source / "src/styles/main.scss"), str(work / "buttons.css"))
+        capture.bundle(work, "import createButton from " + capture.module(source / "src/components/button/button.ts") + ";\n"
+                       "import {circularIndeterminateFrame} from " + capture.module(source / "src/components/progress/features/motion.ts") + ";\n"
+                       "window.referenceCreateButton=createButton;window.referenceCircularFrame=circularIndeterminateFrame;\n")
+        capture.compile_sass(source / "src/styles/main.scss", work / "buttons.css")
         (work / "index.html").write_text('<!doctype html><meta charset="utf-8"><link rel="stylesheet" href="buttons.css"><script src="entry.js"></script><body></body>')
-        handler = functools.partial(http.server.SimpleHTTPRequestHandler, directory=directory)
-        server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), handler)
-        thread = threading.Thread(target=server.serve_forever, daemon=True)
-        thread.start()
-        try:
+        with capture.serve(directory) as port:
             for mode in ("ordinary", "reduced"):
-                session = "material-button-loading-" + uuid.uuid4().hex[:12]
-                def browser(*commands):
-                    return run("agent-browser", "--session", session, *commands)
-                def evaluate(code):
-                    return json.loads(run("agent-browser", "--session", session, "eval", "--stdin", input=code))
-                try:
-                    browser("open", f"http://127.0.0.1:{server.server_port}")
+                with capture.browser_session("material-button-loading-") as browser:
+                    evaluate = browser.evaluate
+                    browser("open", f"http://127.0.0.1:{port}")
                     if mode == "reduced":
                         browser("set", "media", "light", "reduced-motion")
                     browser("mouse", "move", "900", "700")
@@ -90,14 +61,7 @@ def main():
                         if row["loading"]["progress_opacity"] != "0.7" or row["repeated"]["label"] != "Saving changes":
                             raise ValueError("Progress opacity or repeated loading semantics changed")
                     data["modes"][mode] = captured
-                finally:
-                    browser("close")
-            args.output.parent.mkdir(parents=True, exist_ok=True)
-            args.output.write_text(json.dumps(data, indent=2) + "\n")
-        finally:
-            server.shutdown()
-            server.server_close()
-            thread.join()
+            capture.write_json(args.output, data)
 
 
 if __name__ == "__main__":
