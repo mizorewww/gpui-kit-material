@@ -4,8 +4,9 @@ This directory contains `crates/base` from Longbridge GPUI Kit Git revision
 `bb85882e1faab845d9e7be33b69a152879a90f69`, licensed under Apache-2.0.
 The upstream package declares version `0.8.1`, but this checkout is **not** the
 published crates.io `0.8.1` source. `SOURCE.json` records every upstream file's
-SHA-256, the normalized manifests, and the five local patch files.
-`.cargo_vcs_info.json` identifies the Git checkout actually vendored here.
+SHA-256, the normalized manifests, and the original and patched SHA-256 of
+each of the six local patch files. `.cargo_vcs_info.json` is a locally written
+marker identifying the Git checkout actually vendored here.
 
 The root and example manifests expand workspace-inherited values from that
 same upstream revision. They do not inherit dependencies or lint settings from
@@ -27,7 +28,17 @@ The local compatibility surface is restricted to:
   negative-delay scaling, plus explicit per-transition reduced-motion policy.
   The default finishes transitions immediately under reduced motion; callers
   may continue non-spatial effects. Keyframe playback is unchanged.
-- `src/lib.rs`: the `ReducedMotion` public export.
+  `TransitionPlayback<T>` is a caller-owned handle that keeps one transition's
+  clock and interruption/reversal history across unmounts (for virtualized
+  rows) using the same sampler as `transition_with_status`; it retains no
+  view, window or scheduled callback.
+- `src/lib.rs`: public exports `ReducedMotion` and `TransitionPlayback`, and
+  `RootTab`/`RootTabPrev` aliases for the `root::Tab`/`TabPrev` actions (the
+  `root` module is private upstream), so an app can handle Root's focus-cycling
+  keys itself, as the virtualized Gallery does.
+- `src/text_selection.rs`: `Hitbox` literals add `additional_bounds: None`,
+  required by the GPUI `Hitbox` field patch
+  (`vendor/gpui-pre/hitbox-extension-patch.md`). No behavior change.
 
 These patches require source unification for both the Kit Git dependency and
 any registry Base dependency in the consuming workspace. Cargo patches are not

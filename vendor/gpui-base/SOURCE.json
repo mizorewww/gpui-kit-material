@@ -1,4 +1,10 @@
 {
+  "added_files": {
+    ".cargo_vcs_info.json": {
+      "reason": "Locally written marker naming the vendored Git revision bb85882 and crates/base; not an upstream file.",
+      "sha256": "1ef59237513d2538e17724e17d21e739823f9bc085031aea97a7f816c9b6e2a6"
+    }
+  },
   "development_examples_limit": "Upstream development examples are preserved, including references to sibling story-web font and repository example fixtures. Those external fixtures are not included in this Base-only vendor snapshot; standalone example execution is not asserted.",
   "license": "Apache-2.0",
   "local_patch_files": [
@@ -6,22 +12,73 @@
     "src/button.rs",
     "src/lib.rs",
     "src/motion.rs",
+    "src/text_selection.rs",
     "src/toggle.rs"
   ],
+  "local_patch_sha256": {
+    "src/a11y_disabled.rs": {
+      "local_sha256": "1568f7d301c66cd754ef37ea372edc474d0c760d20e159df56c1764155797a36",
+      "reason": "Transparent accessibility state for disabled and busy controls (motion-patch.md).",
+      "upstream_sha256": "979c0103db88f31fad9425ca6fc16351bdb07a5b5b0fe30a85d2aaec573bcceb"
+    },
+    "src/button.rs": {
+      "local_sha256": "c493baa980d6832c151cf439bb35023ba86dd7baf37aa5cb5ec03982e5449755",
+      "reason": "Caller-controlled busy(bool), independent of disabled (motion-patch.md).",
+      "upstream_sha256": "822d81a514355c92f41f4a13392f783b4307061ecc8be49a38f4bc1f41fdd55c"
+    },
+    "src/lib.rs": {
+      "local_sha256": "8f96ea188790fdf5e91939021eab1c1092167dea37067b79ad9e88bec29a5205",
+      "reason": "Public exports ReducedMotion and TransitionPlayback (motion), plus RootTab/RootTabPrev aliases for the otherwise private root::Tab/TabPrev actions (motion-patch.md).",
+      "upstream_sha256": "7692fadcb738947c529f338208facea785a5172298064eef8fb34365e452e876"
+    },
+    "src/motion.rs": {
+      "local_sha256": "d55dad6487967b7196bbf2217b9e31a5afbdfa4f6e1f6f2cb8eeb151dc1fbc10",
+      "reason": "CSS reversal, negative-delay scaling, per-transition reduced motion, and TransitionPlayback (motion-patch.md).",
+      "upstream_sha256": "cfbcc4cbe63aeb5bb6ffc27af0505b59c5fec3054310beaf29e947e14cf6424e"
+    },
+    "src/text_selection.rs": {
+      "local_sha256": "be2bc711ab2f1b109c73b1c45411b5b58029c46d852ae6962164ec7bd9cd75f4",
+      "reason": "Hitbox literals set additional_bounds: None after the GPUI Hitbox field patch (vendor/gpui-pre/hitbox-extension-patch.md); no behavior change.",
+      "upstream_sha256": "4d45f303915294b0e1984bc6a83a00f8752751c96bf78d6f24dcd057b17b742c"
+    },
+    "src/toggle.rs": {
+      "local_sha256": "ba62b028b21e4210cfe780a5abb8825a468a379b37a73c9d106a5252c6934163",
+      "reason": "Busy state and nonfocusable activation/focus corrections (motion-patch.md).",
+      "upstream_sha256": "f534cdf953b1ed7d61e98f787e108d1698bfe482ad6ac28ebc314afea98ad802"
+    }
+  },
   "lockfile_policy": "No stale package-level lockfile. The consuming workspace Cargo.lock owns resolution.",
   "normalized_manifests": [
     "Cargo.toml",
     "examples/native/Cargo.toml",
     "examples/wasm/Cargo.toml"
   ],
+  "normalized_manifests_sha256": {
+    "Cargo.toml": {
+      "local_sha256": "5e7e4fbe949070998ab196093434292efeaec0a95d97007c37612880fb2dc8da",
+      "upstream_sha256": "02738156dcc3e7e3204895d131ef1b1f70c37901e84c1ef0b5961b72f8eddbcb"
+    },
+    "examples/native/Cargo.toml": {
+      "local_sha256": "da50188239d8d66401ab08de619466e9cf325f209764394e9f218321d9b8928d",
+      "upstream_sha256": "63e0f84687f2b9daf51e1c4b417b80efcb2dfc384bf07b0df3ba275b487f856d"
+    },
+    "examples/wasm/Cargo.toml": {
+      "local_sha256": "e710c1d7a9ee0470b00bd0340bf25fef3d64f3a6154d8fd2a3b3dbb084762930",
+      "upstream_sha256": "50bec9a1923a184900e97d2311715df98396e45fad861a9b0d4aa0dd302665f3"
+    }
+  },
   "package_version": "0.8.1",
-  "patch_application": "Three-way merge of upstream Git / published registry base / local patched registry files; all five merged without conflicts.",
+  "patch_application": "The original five patch files were three-way merged (upstream Git / published registry 0.8.1 base / local patched registry files) without conflicts. src/text_selection.rs (Hitbox follow-up) and the TransitionPlayback, RootTab and RootTabPrev additions were made directly on this checkout afterwards.",
   "patch_base": {
     "package": "gpui-base",
     "registry_source_revision": "99576db58ec8103417c41a092e891b4022d24e7e",
     "version": "0.8.1"
   },
   "path_in_repository": "crates/base",
+  "provenance_files": [
+    "SOURCE.json",
+    "motion-patch.md"
+  ],
   "repository": "https://github.com/longbridge/gpui-kit",
   "revision": "bb85882e1faab845d9e7be33b69a152879a90f69",
   "source_kind": "Git checkout, not the crates.io 0.8.1 archive",
@@ -307,5 +364,6 @@
     "src/virtual_list.rs": "5082b8fc5c7e340e0eadbfa61079638524345558407f3f60e8b1b49d6f826d68",
     "tests/element_ext.rs": "1c0fbd0bb0b422b0537322163395eec312ccbe4e65e11874246dd1c4c5ca4c5f",
     "tests/text_host.rs": "7f5853edc1383ce5980b2d97af3df11fcf10eedeb60f3a56197ce2f6cb556776"
-  }
+  },
+  "verification": "upstream_files_sha256 are hashes of crates/base in the longbridge/gpui-kit checkout at revision; every vendor file outside local_patch_files, normalized_manifests, added_files and provenance_files matches them."
 }
