@@ -1,0 +1,213 @@
+{
+  "reduced_motion": true,
+  "reference": "c910072f3fc5b660276731d8a935d7186f288364",
+  "ua": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/155.0.0.0 Safari/537.36",
+  "hover": {
+    "animations": [
+      {
+        "duration": 250,
+        "easing": "linear(0 0%, 0.066 4.166666666666667%, 0.203 8.333333333333332%, 0.355 12.5%, 0.496 16.666666666666668%, 0.616 20.833333333333336%, 0.713 25%, 0.788 29.166666666666668%, 0.845 33.333333333333336%, 0.888 37.5%, 0.92 41.666666666666664%, 0.943 45.83333333333333%, 0.96 49.99999999999999%, 0.971 54.16666666666666%, 0.98 58.33333333333333%, 0.986 62.49999999999999%, 0.99 66.66666666666666%, 0.993 70.83333333333333%, 0.995 75%, 0.997 79.16666666666667%, 0.998 83.33333333333334%, 0.998 87.5%, 0.999 91.66666666666667%, 0.999 95.83333333333334%, 1 100%)",
+        "frames": [
+          {
+            "boxShadow": "none",
+            "composite": "auto",
+            "computedOffset": 0,
+            "easing": "linear",
+            "offset": 0
+          },
+          {
+            "boxShadow": "rgba(0, 0, 0, 0.3) 0px 1px 2px 0px, rgba(0, 0, 0, 0.15) 0px 1px 3px 1px",
+            "composite": "auto",
+            "computedOffset": 1,
+            "easing": "linear",
+            "offset": 1
+          }
+        ],
+        "property": "box-shadow",
+        "pseudo": null,
+        "time": 125,
+        "value": "rgba(0, 0, 0, 0.29) 0px 0.96px 1.92px 0px, rgba(0, 0, 0, 0.14) 0px 0.96px 2.88px 0.96px"
+      },
+      {
+        "duration": 100,
+        "easing": "cubic-bezier(0.2, 0, 0, 1)",
+        "frames": [
+          {
+            "composite": "auto",
+            "computedOffset": 0,
+            "easing": "linear",
+            "offset": 0,
+            "opacity": "0"
+          },
+          {
+            "composite": "auto",
+            "computedOffset": 1,
+            "easing": "linear",
+            "offset": 1,
+            "opacity": "0.08"
+          }
+        ],
+        "property": "opacity",
+        "pseudo": "::before",
+        "time": 50,
+        "value": "0.0702267"
+      }
+    ],
+    "disabled": false,
+    "focused": false,
+    "hovered": true,
+    "opacity": "0.0702267",
+    "pressed": false,
+    "shadow": "rgba(0, 0, 0, 0.29) 0px 0.96px 1.92px 0px, rgba(0, 0, 0, 0.14) 0px 0.96px 2.88px 0.96px"
+  },
+  "pressed_over_hover": {
+    "animations": [
+      {
+        "duration": 250,
+        "easing": "linear(0 0%, 0.066 4.166666666666667%, 0.203 8.333333333333332%, 0.355 12.5%, 0.496 16.666666666666668%, 0.616 20.833333333333336%, 0.713 25%, 0.788 29.166666666666668%, 0.845 33.333333333333336%, 0.888 37.5%, 0.92 41.666666666666664%, 0.943 45.83333333333333%, 0.96 49.99999999999999%, 0.971 54.16666666666666%, 0.98 58.33333333333333%, 0.986 62.49999999999999%, 0.99 66.66666666666666%, 0.993 70.83333333333333%, 0.995 75%, 0.997 79.16666666666667%, 0.998 83.33333333333334%, 0.998 87.5%, 0.999 91.66666666666667%, 0.999 95.83333333333334%, 1 100%)",
+        "frames": [
+          {
+            "boxShadow": "rgba(0, 0, 0, 0.3) 0px 1px 2px 0px, rgba(0, 0, 0, 0.15) 0px 1px 3px 1px",
+            "composite": "auto",
+            "computedOffset": 0,
+            "easing": "linear",
+            "offset": 0
+          },
+          {
+            "boxShadow": "none",
+            "composite": "auto",
+            "computedOffset": 1,
+            "easing": "linear",
+            "offset": 1
+          }
+        ],
+        "property": "box-shadow",
+        "pseudo": null,
+        "time": 125,
+        "value": "rgba(0, 0, 0, 0.01) 0px 0.04px 0.08px 0px, rgba(0, 0, 0, 0.008) 0px 0.04px 0.12px 0.04px"
+      },
+      {
+        "duration": 100,
+        "easing": "cubic-bezier(0.2, 0, 0, 1)",
+        "frames": [
+          {
+            "composite": "auto",
+            "computedOffset": 0,
+            "easing": "linear",
+            "offset": 0,
+            "opacity": "0.08"
+          },
+          {
+            "composite": "auto",
+            "computedOffset": 1,
+            "easing": "linear",
+            "offset": 1,
+            "opacity": "0.1"
+          }
+        ],
+        "property": "opacity",
+        "pseudo": "::before",
+        "time": 50,
+        "value": "0.0975567"
+      }
+    ],
+    "disabled": false,
+    "focused": false,
+    "hovered": true,
+    "opacity": "0.0975567",
+    "pressed": true,
+    "shadow": "rgba(0, 0, 0, 0.01) 0px 0.04px 0.08px 0px, rgba(0, 0, 0, 0.008) 0px 0.04px 0.12px 0.04px"
+  },
+  "keyboard_focus": {
+    "animations": [
+      {
+        "duration": 100,
+        "easing": "cubic-bezier(0.2, 0, 0, 1)",
+        "frames": [
+          {
+            "composite": "auto",
+            "computedOffset": 0,
+            "easing": "linear",
+            "offset": 0,
+            "opacity": "0"
+          },
+          {
+            "composite": "auto",
+            "computedOffset": 1,
+            "easing": "linear",
+            "offset": 1,
+            "opacity": "0.1"
+          }
+        ],
+        "property": "opacity",
+        "pseudo": "::before",
+        "time": 50,
+        "value": "0.0877834"
+      }
+    ],
+    "disabled": false,
+    "focused": true,
+    "hovered": false,
+    "opacity": "0.0877834",
+    "pressed": false,
+    "shadow": "none"
+  },
+  "disabled_exit": {
+    "animations": [
+      {
+        "duration": 250,
+        "easing": "linear(0 0%, 0.066 4.166666666666667%, 0.203 8.333333333333332%, 0.355 12.5%, 0.496 16.666666666666668%, 0.616 20.833333333333336%, 0.713 25%, 0.788 29.166666666666668%, 0.845 33.333333333333336%, 0.888 37.5%, 0.92 41.666666666666664%, 0.943 45.83333333333333%, 0.96 49.99999999999999%, 0.971 54.16666666666666%, 0.98 58.33333333333333%, 0.986 62.49999999999999%, 0.99 66.66666666666666%, 0.993 70.83333333333333%, 0.995 75%, 0.997 79.16666666666667%, 0.998 83.33333333333334%, 0.998 87.5%, 0.999 91.66666666666667%, 0.999 95.83333333333334%, 1 100%)",
+        "frames": [
+          {
+            "boxShadow": "rgba(0, 0, 0, 0.3) 0px 1px 2px 0px, rgba(0, 0, 0, 0.15) 0px 1px 3px 1px",
+            "composite": "auto",
+            "computedOffset": 0,
+            "easing": "linear",
+            "offset": 0
+          },
+          {
+            "boxShadow": "none",
+            "composite": "auto",
+            "computedOffset": 1,
+            "easing": "linear",
+            "offset": 1
+          }
+        ],
+        "property": "box-shadow",
+        "pseudo": null,
+        "time": 125,
+        "value": "rgba(0, 0, 0, 0.01) 0px 0.04px 0.08px 0px, rgba(0, 0, 0, 0.008) 0px 0.04px 0.12px 0.04px"
+      },
+      {
+        "duration": 100,
+        "easing": "cubic-bezier(0.2, 0, 0, 1)",
+        "frames": [
+          {
+            "composite": "auto",
+            "computedOffset": 0,
+            "easing": "linear",
+            "offset": 0,
+            "opacity": "0.08"
+          },
+          {
+            "composite": "auto",
+            "computedOffset": 1,
+            "easing": "linear",
+            "offset": 1,
+            "opacity": "0"
+          }
+        ],
+        "property": "opacity",
+        "pseudo": "::before",
+        "time": 50,
+        "value": "0.00977331"
+      }
+    ],
+    "disabled": true,
+    "focused": false,
+    "hovered": false,
+    "opacity": "0.00977331",
+    "pressed": false,
+    "shadow": "rgba(0, 0, 0, 0.01) 0px 0.04px 0.08px 0px, rgba(0, 0, 0, 0.008) 0px 0.04px 0.12px 0.04px"
+  }
+}

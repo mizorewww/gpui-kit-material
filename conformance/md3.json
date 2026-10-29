@@ -173,6 +173,16 @@
           "kind": "native-render-tests",
           "path": "crates/material/src/components/button.rs",
           "scope": "GPUI fake-clock color transitions and concurrent theme changes, press radius, icon slot geometry, focus and activation regressions. Does not establish desktop/browser pixel equality or full component conformance."
+        },
+        {
+          "kind": "browser-state-transitions",
+          "path": "conformance/reference/button-states.json",
+          "scope": "Real pointer hover/press, keyboard focus and disabled exit. State-layer opacity sampled at 50ms of 100ms; shadows separately sampled at 125ms of 250ms. Independent channel samples, not simultaneous screenshot frames or ripple evidence."
+        },
+        {
+          "kind": "browser-reduced-motion-transitions",
+          "path": "conformance/reference/button-states-reduced-motion.json",
+          "scope": "Same state cases with prefers-reduced-motion verified active. Confirms retained opacity and shadow transitions; does not establish spatial, ripple or whole-component reduced-motion conformance."
         }
       ]
     },
