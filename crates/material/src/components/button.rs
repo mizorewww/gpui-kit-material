@@ -15,6 +15,7 @@ mod loading_tests;
 #[cfg(test)]
 mod preview_tests;
 mod ripple;
+pub(crate) use ripple::ButtonRipple;
 mod ripple_clip;
 mod shadow;
 #[cfg(test)]

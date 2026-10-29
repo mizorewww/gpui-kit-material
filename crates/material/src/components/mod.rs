@@ -21,10 +21,13 @@ mod chips;
 mod choice;
 mod feedback;
 mod focus;
+mod navigation;
 mod preview;
 mod progress;
 mod radio;
 mod roving;
+mod roving_list;
+mod tabs;
 mod text;
 mod tile;
 mod title_bar;
@@ -41,6 +44,10 @@ pub use feedback::{
     small_badge, status_chip,
 };
 pub use focus::{FocusRing, RevealFocus, RingedButton, contain_scroll};
+pub use navigation::{
+    NavBadge, NavIcon, NavItem, NavItemLayout, NavigationBar, NavigationItem, NavigationRail,
+    RAIL_COLLAPSED_WIDTH, RAIL_EXPANDED_WIDTH, RailAlignment, navigation_scrim,
+};
 pub use preview::InteractionPreview;
 pub use progress::{
     CircularProgressFrame, CircularProgressPlayback, circular_indeterminate_frame,
@@ -50,6 +57,7 @@ pub use progress::{
     sample_circular_progress, spinner, spinner_with_playback,
 };
 pub use radio::{MaterialRadio, MaterialRadioGroup};
+pub use tabs::{MaterialTabs, TabItem, TabsVariant};
 pub use text::{
     accessible_text, error_text, info_callout, page_heading, section_heading, section_title,
     semantic_label, supporting_info,
@@ -63,6 +71,7 @@ pub use title_bar::{
 
 pub(crate) fn init(cx: &mut gpui::App) {
     button_group::init(cx);
+    roving_list::init(cx);
     choice::init(cx);
     radio::init(cx);
 }
