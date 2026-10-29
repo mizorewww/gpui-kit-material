@@ -1,0 +1,81 @@
+{
+  "before_report": "../scroll-baseline/report.json",
+  "after_report": "frames.json",
+  "before": {
+    "minimum_observed_window_fps": 47.14148288444984,
+    "coverage": {
+      "visited_logical_items": [],
+      "observed_offset_min": -0.0,
+      "observed_offset_max": 504.0,
+      "total_scrollable_pixels": 8716.5,
+      "visited_sections": null,
+      "complete_gallery_traversal": false,
+      "limitation": "one-second alternating local legs; logical items listed only for ListState; section identity not instrumented, full Gallery coverage unverified"
+    },
+    "actual_vsync_initial": "disabled",
+    "actual_vsync_final": "disabled",
+    "exit_code": 1,
+    "acceptance_eligible": false,
+    "cpu_summary": {
+      "frames": 600,
+      "max_ns": 34271584,
+      "median_ns": 16636417,
+      "p95_ns": 16955000,
+      "p99_ns": 17153375,
+      "over_budget_frames": 598
+    },
+    "phase_median_ns": {
+      "draw_ns": 7201000,
+      "submit_ns": 9288625,
+      "request_layout_ns": 3737000,
+      "prepaint_ns": 941834,
+      "paint_ns": 2155458
+    }
+  },
+  "after": {
+    "minimum_observed_window_fps": 54.85433066144288,
+    "coverage": {
+      "visited_logical_items": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "observed_offset_min": 0.0,
+      "observed_offset_max": 130.0,
+      "total_scrollable_pixels": null,
+      "visited_sections": null,
+      "complete_gallery_traversal": false,
+      "limitation": "one-second alternating local legs; logical items listed only for ListState; section identity not instrumented, full Gallery coverage unverified"
+    },
+    "actual_vsync_initial": "disabled",
+    "actual_vsync_final": "disabled",
+    "exit_code": 1,
+    "acceptance_eligible": false,
+    "cpu_summary": {
+      "frames": 603,
+      "max_ns": 33312209,
+      "median_ns": 16534292,
+      "p95_ns": 17019458,
+      "p99_ns": 19533083,
+      "over_budget_frames": 599
+    },
+    "phase_median_ns": {
+      "draw_ns": 6504875,
+      "submit_ns": 9746917,
+      "request_layout_ns": 1454000,
+      "prepaint_ns": 2653583,
+      "paint_ns": 1961666
+    }
+  },
+  "independent_review": "Raw observations, scope timings, source identities and binary hashes independently checked; both observations fail the required gates.",
+  "limits": [
+    "Single local run of each implementation; no full Gallery traversal or general speedup claim.",
+    "Phase medians are separate statistics and cannot be added to obtain a complete-frame median.",
+    "FPS callback windows do not establish exact per-scroll-submission intervals."
+  ]
+}

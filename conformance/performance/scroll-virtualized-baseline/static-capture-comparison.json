@@ -1,0 +1,8 @@
+{
+  "before": "settings-before.json",
+  "after": "settings-after.json",
+  "image": "settings-off.png",
+  "sha256": "e6fe5a71b0ef94432da34c0626633aa5eac0bb2127d5183d6e85e4b66911f085",
+  "identical_bytes": true,
+  "scope": "Single native Themes view with Settings open, reduced motion, VSync off, FPS visible, 960x780 logical pixels at DPR2. Does not establish other sections or animation conformance."
+}

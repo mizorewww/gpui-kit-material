@@ -1,0 +1,13 @@
+{
+  "tool": "/usr/bin/sample",
+  "duration_seconds": 3,
+  "sample_interval_ms": 1,
+  "scenario": "Separate 10-second scroll diagnostic, sampled after two seconds; not acceptance timing evidence.",
+  "source_commit": "502a6dfd8bda35c68f4baf1144242f5db996e5ce",
+  "binary_sha256": "02e58c97a2ee17d02f5034656a3dc7f4057ab21dc477466452abef404ee2c2fc",
+  "stack_sha256": "e26866830d07c9d1164a084a4ccb0596f09490d784671fe7121fee3889829146",
+  "main_thread_samples": 1569,
+  "next_drawable_samples": 1304,
+  "nested_semaphore_wait_samples": 1284,
+  "conclusion": "Main thread frequently waited for a drawable during this instrumented capture. This is neither baseline time attribution nor GPU execution timing."
+}

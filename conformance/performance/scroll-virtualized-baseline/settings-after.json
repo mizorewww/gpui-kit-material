@@ -1,0 +1,44 @@
+{
+  "renderer": "native GPUI render_to_image",
+  "source_commit": "502a6dfd8bda35c68f4baf1144242f5db996e5ce",
+  "worktree_dirty": false,
+  "section": "themes",
+  "requested_viewport": {
+    "width": 960.0,
+    "height": 780.0
+  },
+  "actual_viewport": {
+    "width": 960.0,
+    "height": 780.0
+  },
+  "image_pixels": {
+    "width": 1920,
+    "height": 1560
+  },
+  "device_scale_factor": 2.0,
+  "text_scale": 1.0,
+  "theme": "baseline",
+  "mode": "light",
+  "fps_overlay": true,
+  "window_submissions": 5,
+  "settings_open": true,
+  "requested_vsync": false,
+  "vsync_status": "Disabled",
+  "reduced_motion": true,
+  "settle_ms": 1600,
+  "logical_scroll_top": {
+    "item_ix": 2,
+    "offset_in_item": 28.0
+  },
+  "state": {
+    "active": false,
+    "disabled": false,
+    "selected": false,
+    "loading": false,
+    "ripple": true
+  },
+  "os": "macos",
+  "architecture": "aarch64",
+  "fonts": "gallery/fonts/roboto (registered 400/500)",
+  "scope": "Rendered gallery evidence; not a pixel-conformance verdict or timed animation sample"
+}
