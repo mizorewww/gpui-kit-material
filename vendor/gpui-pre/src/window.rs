@@ -857,9 +857,13 @@ impl Hitbox {
     /// Tests the pointer target geometry, including the extension and content mask.
     /// Unlike `is_hovered_at`, this does not test occlusion by other elements.
     pub fn contains_pointer(&self, position: &Point<Pixels>) -> bool {
-        self.bounds.intersect(&self.content_mask.bounds).contains(position)
+        self.bounds
+            .intersect(&self.content_mask.bounds)
+            .contains(position)
             || self.additional_bounds.is_some_and(|additional| {
-                additional.intersect(&self.content_mask.bounds).contains(position)
+                additional
+                    .intersect(&self.content_mask.bounds)
+                    .contains(position)
             })
     }
 
@@ -1796,6 +1800,11 @@ impl Window {
             let mut deferred_force_render = false;
             move |request_frame_options| {
                 #[cfg(feature = "profiler")]
+                let mut cpu_frame = profiler::CpuFrameScope::new(
+                    handle.window_id(),
+                    profiler::CpuFrameSource::Platform,
+                );
+                #[cfg(feature = "profiler")]
                 let (_foreground_turn, window_id) = {
                     let foreground_turn = profiler::journal::foreground_turn();
                     let window_id = handle.window_id();
@@ -1896,6 +1905,8 @@ impl Window {
                 if !pending_next_frame_callbacks.is_empty() {
                     handle
                         .update(&mut cx, |_, window, cx| {
+                            #[cfg(feature = "profiler")]
+                            cpu_frame.callbacks(pending_next_frame_callbacks.len());
                             for callback in pending_next_frame_callbacks {
                                 callback(window, cx);
                             }
@@ -1962,6 +1973,8 @@ impl Window {
                         profiler::journal::FrameSkipReason::NoRenderNeeded,
                     );
                 }
+                #[cfg(feature = "profiler")]
+                cpu_frame.complete();
             }
         }));
         invalidator.set_platform_waker(platform_window.frame_waker());
