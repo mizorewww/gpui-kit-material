@@ -336,7 +336,7 @@ fn caller_progress_preserves_visible_opacity_and_distinguishes_real_hide(cx: &mu
         window.draw(cx).clear(cx);
         playback.sync(true, false, false, cx);
     });
-    let reversed = cx.update(|_, cx| playback.sample_inputs(true, false, false, cx).1.value);
+    let reversed = cx.update(|_, cx| playback.sample_inputs(true, false, false, cx).value);
     assert!((reversed - expected).abs() < 0.00001);
     cx.executor().advance_clock(Duration::from_millis(10));
     cx.update(|window, cx| {
@@ -430,5 +430,59 @@ fn caller_progress_retains_started_gate_and_offscreen_reduced_stop(cx: &mut Test
         window.draw(cx).clear(cx);
         assert_eq!(window.simulate_next_frame(cx), 0);
         assert_eq!(playback.state.borrow().circular.sample(cx), stopped);
+    });
+}
+
+#[gpui::test]
+fn keyed_progress_stops_requesting_frames_once_hidden(cx: &mut TestAppContext) {
+    use std::time::Duration;
+    cx.update(|cx| {
+        gpui_base::init(cx);
+        cx.set_reduce_motion(false);
+    });
+    let (view, cx) = cx.add_window_view(|_, _| Probe {
+        size: ButtonSize::Small,
+        variant: ButtonVariant::Filled,
+        icon: None,
+        progress: false,
+        loading: true,
+        disabled: false,
+        toggle: false,
+        clicks: 0,
+        a11y: Rc::new(RefCell::new(Vec::new())),
+        opacity: Rc::new(Cell::new(0.)),
+    });
+    let draw = |cx: &mut gpui::VisualTestContext| {
+        cx.update(|window, cx| {
+            window.refresh();
+            window.draw(cx).clear(cx);
+        })
+    };
+    draw(cx);
+    cx.update(|window, cx| {
+        assert!(
+            window.simulate_next_frame(cx) > 0,
+            "a painted indeterminate indicator animates"
+        );
+    });
+    view.update(cx, |state, cx| {
+        state.loading = false;
+        cx.notify();
+    });
+    draw(cx);
+    // Let the independent enable color/shadow transitions finish.
+    for _ in 0..4 {
+        cx.executor().advance_clock(Duration::from_secs(1));
+        cx.update(|window, cx| {
+            window.simulate_next_frame(cx);
+        });
+        draw(cx);
+    }
+    cx.update(|window, cx| {
+        assert_eq!(
+            window.simulate_next_frame(cx),
+            0,
+            "a hidden, previously shown indicator must let the window idle"
+        );
     });
 }

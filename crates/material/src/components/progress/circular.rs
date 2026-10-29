@@ -54,19 +54,24 @@ pub fn circular_indeterminate_frame(elapsed_ms: f32) -> CircularProgressFrame {
     }
 }
 
-/// Sample independently of painting so a hidden button indicator keeps its phase.
+/// Sample independently of painting so a hidden indicator keeps its phase.
 ///
 /// Keep calling this after first showing the indicator, including while hidden.
 /// The reference polls reduced motion in its frame callback: a running loop draws
 /// one last frame then stops. Changing back does not restart it. A new ID starts
 /// a fresh playback, as explicitly restarting the reference's indicator does.
+///
+/// `visible` states whether the caller paints the returned frame. Only a visible,
+/// running sample requests the next animation frame; a hidden sample advances
+/// and observes reduced motion without keeping the window out of idle.
 pub fn sample_circular_progress(
     id: impl Into<ElementId>,
+    visible: bool,
     window: &mut Window,
     cx: &mut App,
 ) -> CircularProgressFrame {
     let (frame, running) = sample_clock(id.into(), window, cx);
-    if running {
+    if visible && running {
         window.request_animation_frame();
     }
     frame
@@ -530,16 +535,52 @@ mod tests {
     }
 
     struct ClockHarness {
+        visible: bool,
         samples: std::rc::Rc<std::cell::RefCell<Vec<CircularProgressFrame>>>,
     }
 
     impl Render for ClockHarness {
         fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-            self.samples
-                .borrow_mut()
-                .push(sample_circular_progress("clock", window, cx));
+            self.samples.borrow_mut().push(sample_circular_progress(
+                "clock",
+                self.visible,
+                window,
+                cx,
+            ));
             div()
         }
+    }
+
+    #[gpui::test]
+    fn hidden_samples_advance_without_requesting_frames(cx: &mut TestAppContext) {
+        let samples = std::rc::Rc::new(std::cell::RefCell::new(Vec::new()));
+        let (view, cx) = cx.add_window_view(|_, _| ClockHarness {
+            visible: true,
+            samples: samples.clone(),
+        });
+        cx.update(|window, cx| {
+            window.draw(cx).clear(cx);
+            assert_eq!(window.simulate_next_frame(cx), 1);
+            view.update(cx, |view, _| view.visible = false);
+            window.refresh();
+            window.draw(cx).clear(cx);
+            // Drain the request queued by the last visible sample.
+            window.simulate_next_frame(cx);
+            window.refresh();
+            window.draw(cx).clear(cx);
+            assert_eq!(window.simulate_next_frame(cx), 0);
+        });
+        cx.executor().advance_clock(Duration::from_millis(150));
+        cx.update(|window, cx| {
+            window.refresh();
+            window.draw(cx).clear(cx);
+            assert_eq!(window.simulate_next_frame(cx), 0);
+        });
+        let sampled = *samples.borrow().last().unwrap();
+        assert!(
+            (sampled.rotation_degrees - circular_indeterminate_frame(150.).rotation_degrees).abs()
+                < 0.002
+        );
     }
 
     #[gpui::test]
@@ -548,6 +589,7 @@ mod tests {
     ) {
         let samples = std::rc::Rc::new(std::cell::RefCell::new(Vec::new()));
         let (_, cx) = cx.add_window_view(|_, _| ClockHarness {
+            visible: false,
             samples: samples.clone(),
         });
         cx.update(|window, cx| window.draw(cx).clear(cx));
