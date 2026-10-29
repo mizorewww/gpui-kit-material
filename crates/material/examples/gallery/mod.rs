@@ -36,6 +36,12 @@ struct Gallery {
     button_effects_disabled: bool,
     button_effects_tonal: bool,
     button_ripple: bool,
+    button_selections: [bool; 10],
+    button_toggle_size: ButtonSize,
+    button_loading: bool,
+    button_progress: bool,
+    button_loading_variant: usize,
+    button_loading_clicks: usize,
 }
 
 impl Render for Gallery {
@@ -194,6 +200,105 @@ impl Render for Gallery {
                     )
                 }),
             ));
+        let button_toggles = gpui_base::v_flex()
+            .gap(rem(16.))
+            .child(section_title("button-toggles", "Toggle buttons"))
+            .child(
+                ConnectedButtonGroup::new("toggle-size", "Toggle button size")
+                    .reveal_in(scroll.clone())
+                    .options(ButtonSize::ALL.map(|size| (size.name(), size.name())))
+                    .selected(self.button_toggle_size.name())
+                    .on_change(cx.listener(|this, name: &SharedString, _, cx| {
+                        if let Some(size) = ButtonSize::ALL
+                            .into_iter()
+                            .find(|size| size.name() == name.as_ref())
+                        {
+                            this.button_toggle_size = size;
+                            cx.notify();
+                        }
+                    })),
+            )
+            .children(
+                ButtonShape::ALL
+                    .into_iter()
+                    .enumerate()
+                    .map(|(shape_index, shape)| {
+                        gpui_base::v_flex()
+                            .gap(rem(12.))
+                            .child(accessible_text(
+                                SharedString::from(format!("toggle-shape-{shape:?}")),
+                                shape.name(),
+                            ))
+                            .child(gpui_base::h_flex().flex_wrap().gap(rem(16.)).children(
+                                ButtonVariant::ALL.into_iter().enumerate().map(
+                                    |(variant_index, variant)| {
+                                        let index = shape_index * 5 + variant_index;
+                                        MaterialButton::new(SharedString::from(format!(
+                                            "toggle-{shape:?}-{variant:?}"
+                                        )))
+                                        .variant(variant)
+                                        .shape(shape)
+                                        .button_size(self.button_toggle_size)
+                                        .toggle(true)
+                                        .selected(self.button_selections[index])
+                                        .disabled(self.button_effects_disabled)
+                                        .ripple(self.button_ripple)
+                                        .icon(IconName::Check)
+                                        .child(variant.name())
+                                        .on_change({
+                                            let entity = cx.entity().downgrade();
+                                            move |selected, _, _, cx| {
+                                                let _ = entity.update(cx, |this, cx| {
+                                                    this.button_selections[index] = selected;
+                                                    cx.notify();
+                                                });
+                                            }
+                                        })
+                                        .reveal(
+                                            SharedString::from(format!(
+                                                "reveal-toggle-{shape:?}-{variant:?}"
+                                            )),
+                                            scroll,
+                                        )
+                                    },
+                                ),
+                            ))
+                    }),
+            );
+        let loading_variant = ButtonVariant::ALL[self.button_loading_variant];
+        let button_loading = gpui_base::v_flex().gap(rem(16.))
+            .child(section_title("button-loading", "Button progress and loading"))
+            .child(gpui_base::h_flex().flex_wrap().gap(rem(12.))
+                .child(material_button("toggle-loading", ButtonVariant::Outlined)
+                    .child(if self.button_loading { "Stop loading" } else { "Start loading" })
+                    .on_click(cx.listener(|this, _, _, cx| { this.button_loading = !this.button_loading; cx.notify(); }))
+                    .reveal("reveal-toggle-loading", scroll))
+                .child(material_button("toggle-progress", ButtonVariant::Outlined)
+                    .child(if self.button_progress { "Hide progress" } else { "Show progress" })
+                    .on_click(cx.listener(|this, _, _, cx| { this.button_progress = !this.button_progress; cx.notify(); }))
+                    .reveal("reveal-toggle-progress", scroll))
+                .child(material_button("loading-variant", ButtonVariant::Outlined)
+                    .child(SharedString::from(format!("Variant: {}", loading_variant.name())))
+                    .on_click(cx.listener(|this, _, _, cx| { this.button_loading_variant = (this.button_loading_variant + 1) % ButtonVariant::ALL.len(); cx.notify(); }))
+                    .reveal("reveal-loading-variant", scroll)))
+            .child(accessible_text("loading-help", "Progress stays interactive. Loading disables the samples and changes their labels."))
+            .child(accessible_text("loading-click-count", SharedString::from(format!("Sample activations: {}", self.button_loading_clicks))))
+            .children(ButtonSize::ALL.into_iter().map(|size| {
+                gpui_base::v_flex().gap(rem(12.))
+                    .child(accessible_text(SharedString::from(format!("loading-size-{size:?}")), size.name()))
+                    .child(gpui_base::h_flex().flex_wrap().gap(rem(16.)).children((0..3).map(|icon_position| {
+                        MaterialButton::new(SharedString::from(format!("loading-{size:?}-{icon_position}")))
+                            .variant(loading_variant).button_size(size)
+                            .when(icon_position > 0, |button| button.icon(IconName::Check))
+                            .when(icon_position == 2, |button| button.icon_position(ButtonIconPosition::Trailing))
+                            .disabled(self.button_effects_disabled).ripple(self.button_ripple)
+                            .progress(self.button_progress, "Operation progress")
+                            .loading(self.button_loading, "Operation loading")
+                            .child(if self.button_loading { "Saving…" } else { "Save changes" })
+                            .on_click(cx.listener(|this, _, _, cx| { this.button_loading_clicks += 1; cx.notify(); }))
+                            .reveal(SharedString::from(format!("reveal-loading-{size:?}-{icon_position}")), scroll)
+                    })))
+            }));
         let button_icons = gpui_base::v_flex()
             .gap(rem(16.))
             .child(section_title("button-icons", "Button icons"))
@@ -461,19 +566,30 @@ impl Render for Gallery {
                     .child(progress("measured", 0.62, window, cx))
                     .child(indeterminate_progress("indeterminate", cx))
                     .child(accessible_text("circular-label", "Circular progress"))
-                    .child(gpui_base::h_flex().gap(rem(16.))
-                        .child(circular_progress(
-                            "circular-animated", "Loading",
-                            sample_circular_progress("circular-animated-clock", window, cx),
-                            None, size(rem(24.), rem(24.)), 1.,
-                        ))
-                        .children([0., 0.62, 1.].into_iter().enumerate().map(|(index, fraction)| {
-                            circular_progress(
-                                SharedString::from(format!("circular-measured-{index}")), "Progress",
-                                CircularProgressFrame::determinate(fraction), Some(fraction),
-                                size(rem(24.), rem(24.)), 1.,
-                            )
-                        }))),
+                    .child(
+                        gpui_base::h_flex()
+                            .gap(rem(16.))
+                            .child(circular_progress(
+                                "circular-animated",
+                                "Loading",
+                                sample_circular_progress("circular-animated-clock", window, cx),
+                                None,
+                                size(rem(24.), rem(24.)),
+                                1.,
+                            ))
+                            .children([0., 0.62, 1.].into_iter().enumerate().map(
+                                |(index, fraction)| {
+                                    circular_progress(
+                                        SharedString::from(format!("circular-measured-{index}")),
+                                        "Progress",
+                                        CircularProgressFrame::determinate(fraction),
+                                        Some(fraction),
+                                        size(rem(24.), rem(24.)),
+                                        1.,
+                                    )
+                                },
+                            )),
+                    ),
             );
 
         div()
@@ -584,6 +700,8 @@ impl Render for Gallery {
                                 )
                             }))
                             .child(button_effects)
+                            .child(button_toggles)
+                            .child(button_loading)
                             .child(button_icons)
                             .child(gpui_base::h_flex().flex_wrap().gap(rem(12.)).children(
                                 ButtonVariant::ALL.into_iter().map(|variant| {
@@ -699,6 +817,12 @@ pub fn run(application: gpui::Application, initialize: impl FnOnce(&mut App) + '
                         button_effects_disabled: false,
                         button_effects_tonal: false,
                         button_ripple: true,
+                        button_selections: [false; 10],
+                        button_toggle_size: ButtonSize::Small,
+                        button_loading: false,
+                        button_progress: false,
+                        button_loading_variant: 0,
+                        button_loading_clicks: 0,
                         palette: PaletteId::Paper,
                         reference_theme: Some(ThemeId::Baseline),
                         reference_mode: ThemeMode::Light,
