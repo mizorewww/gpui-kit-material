@@ -541,6 +541,7 @@ pub struct MaterialButton {
     form: Form,
     palette: Option<Palette>,
     open: bool,
+    press_probe: Option<std::rc::Rc<std::cell::Cell<bool>>>,
     style: StyleRefinement,
 }
 impl MaterialButton {
@@ -579,6 +580,7 @@ impl MaterialButton {
             form: Form::Label,
             palette: None,
             open: false,
+            press_probe: None,
             style: StyleRefinement::default(),
         }
     }
@@ -593,6 +595,13 @@ impl MaterialButton {
         self
     }
     /// A trailing split segment whose menu is open: fully round.
+    /// Report whether this button is pressed (pointer, key or forced
+    /// preview) to a composite such as a button group. A change requests
+    /// one more frame so the composite reads it.
+    pub(crate) fn press_probe(mut self, probe: std::rc::Rc<std::cell::Cell<bool>>) -> Self {
+        self.press_probe = Some(probe);
+        self
+    }
     pub(crate) fn open(mut self, open: bool) -> Self {
         self.open = open;
         self
@@ -1268,6 +1277,12 @@ impl RenderOnce for MaterialButton {
         let ty = g.typography.scale();
         let colors = self.sample_colors(window, cx);
         let interaction = self.resolve_interaction(window, cx);
+        if let Some(probe) = &self.press_probe
+            && probe.get() != interaction.active
+        {
+            probe.set(interaction.active);
+            window.request_animation_frame();
+        }
         let effects = self.sample_effects(&interaction, window, cx);
         let (left_padding, right_padding) = g.padding;
         let progress = progress_playback

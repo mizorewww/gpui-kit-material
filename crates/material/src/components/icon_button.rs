@@ -174,7 +174,7 @@ impl IconButton {
         self
     }
 
-    fn button(self) -> MaterialButton {
+    pub(crate) fn into_button(self) -> MaterialButton {
         let selected = self.toggle && self.selected;
         let icon = match self.selected_icon {
             Some(icon) if selected => icon,
@@ -213,6 +213,12 @@ impl IconButton {
     }
 }
 
+impl From<IconButton> for MaterialButton {
+    fn from(button: IconButton) -> Self {
+        button.into_button()
+    }
+}
+
 impl Styled for IconButton {
     fn style(&mut self) -> &mut StyleRefinement {
         &mut self.style
@@ -221,7 +227,7 @@ impl Styled for IconButton {
 
 impl RenderOnce for IconButton {
     fn render(self, _: &mut Window, _: &mut App) -> impl IntoElement {
-        self.button()
+        self.into_button()
     }
 }
 
