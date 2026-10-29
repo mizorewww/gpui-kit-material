@@ -99,7 +99,13 @@
     {
       "id": "typography",
       "status": "unreviewed",
-      "evidence": [],
+      "evidence": [
+        {
+          "kind": "source-type-scale",
+          "path": "crates/material/tests/fixtures/md3-typography.json",
+          "scope": "15 reference type roles: default family, brand/plain typeface, size, line height, letter spacing and weight. Token data only; font loading, tracking rendering and component typography conformance remain pending."
+        }
+      ],
       "reference": "https://md3.io/styles/typography/",
       "reference_status": "available"
     },

@@ -1,0 +1,142 @@
+{
+  "source_commit": "c910072f3fc5b660276731d8a935d7186f288364",
+  "source_path": "src/styles/abstract/_variables.scss",
+  "roles": [
+    {
+      "name": "display-large",
+      "font_family": "Roboto",
+      "font_size": 57.0,
+      "line_height": 64.0,
+      "letter_spacing": -0.25,
+      "font_weight": 400,
+      "typeface": "brand"
+    },
+    {
+      "name": "display-medium",
+      "font_family": "Roboto",
+      "font_size": 45.0,
+      "line_height": 52.0,
+      "letter_spacing": 0.0,
+      "font_weight": 400,
+      "typeface": "brand"
+    },
+    {
+      "name": "display-small",
+      "font_family": "Roboto",
+      "font_size": 36.0,
+      "line_height": 44.0,
+      "letter_spacing": 0.0,
+      "font_weight": 400,
+      "typeface": "brand"
+    },
+    {
+      "name": "headline-large",
+      "font_family": "Roboto",
+      "font_size": 32.0,
+      "line_height": 40.0,
+      "letter_spacing": 0.0,
+      "font_weight": 400,
+      "typeface": "brand"
+    },
+    {
+      "name": "headline-medium",
+      "font_family": "Roboto",
+      "font_size": 28.0,
+      "line_height": 36.0,
+      "letter_spacing": 0.0,
+      "font_weight": 400,
+      "typeface": "brand"
+    },
+    {
+      "name": "headline-small",
+      "font_family": "Roboto",
+      "font_size": 24.0,
+      "line_height": 32.0,
+      "letter_spacing": 0.0,
+      "font_weight": 400,
+      "typeface": "brand"
+    },
+    {
+      "name": "title-large",
+      "font_family": "Roboto",
+      "font_size": 22.0,
+      "line_height": 28.0,
+      "letter_spacing": 0.0,
+      "font_weight": 400,
+      "typeface": "brand"
+    },
+    {
+      "name": "title-medium",
+      "font_family": "Roboto",
+      "font_size": 16.0,
+      "line_height": 24.0,
+      "letter_spacing": 0.15,
+      "font_weight": 500,
+      "typeface": "brand"
+    },
+    {
+      "name": "title-small",
+      "font_family": "Roboto",
+      "font_size": 14.0,
+      "line_height": 20.0,
+      "letter_spacing": 0.1,
+      "font_weight": 500,
+      "typeface": "brand"
+    },
+    {
+      "name": "body-large",
+      "font_family": "Roboto",
+      "font_size": 16.0,
+      "line_height": 24.0,
+      "letter_spacing": 0.5,
+      "font_weight": 400,
+      "typeface": "plain"
+    },
+    {
+      "name": "body-medium",
+      "font_family": "Roboto",
+      "font_size": 14.0,
+      "line_height": 20.0,
+      "letter_spacing": 0.25,
+      "font_weight": 400,
+      "typeface": "plain"
+    },
+    {
+      "name": "body-small",
+      "font_family": "Roboto",
+      "font_size": 12.0,
+      "line_height": 16.0,
+      "letter_spacing": 0.4,
+      "font_weight": 400,
+      "typeface": "plain"
+    },
+    {
+      "name": "label-large",
+      "font_family": "Roboto",
+      "font_size": 14.0,
+      "line_height": 20.0,
+      "letter_spacing": 0.1,
+      "font_weight": 500,
+      "typeface": "plain"
+    },
+    {
+      "name": "label-medium",
+      "font_family": "Roboto",
+      "font_size": 12.0,
+      "line_height": 16.0,
+      "letter_spacing": 0.5,
+      "font_weight": 500,
+      "typeface": "plain"
+    },
+    {
+      "name": "label-small",
+      "font_family": "Roboto",
+      "font_size": 11.0,
+      "line_height": 16.0,
+      "letter_spacing": 0.5,
+      "font_weight": 500,
+      "typeface": "plain"
+    }
+  ],
+  "typeface_source_path": "src/styles/abstract/_functions.scss"
+}
