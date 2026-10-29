@@ -124,24 +124,17 @@ impl CaptionButton {
 }
 
 /// Accessible names of the caption buttons. The kit has no locale of its
-/// own; applications pass their translations.
+/// own, so there is no default: applications pass their translations.
+///
+/// ```compile_fail
+/// let _ = gpui_kit_material::components::CaptionLabels::default();
+/// ```
 #[derive(Clone, Debug)]
 pub struct CaptionLabels {
     pub minimize: SharedString,
     pub maximize: SharedString,
     pub restore: SharedString,
     pub close: SharedString,
-}
-
-impl Default for CaptionLabels {
-    fn default() -> Self {
-        Self {
-            minimize: "Minimize".into(),
-            maximize: "Maximize".into(),
-            restore: "Restore".into(),
-            close: "Close".into(),
-        }
-    }
 }
 
 impl CaptionLabels {
@@ -216,11 +209,11 @@ pub struct CaptionButtons {
 }
 
 impl CaptionButtons {
-    /// Buttons for a title bar `height` tall.
-    pub fn new(height: Pixels) -> Self {
+    /// Buttons for a title bar `height` tall, announced with `labels`.
+    pub fn new(height: Pixels, labels: CaptionLabels) -> Self {
         Self {
             height,
-            labels: CaptionLabels::default(),
+            labels,
             caption: None,
             on_close: None,
         }
@@ -413,9 +406,18 @@ fn linux_button(
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
     use gpui::{Context, Modifiers, Render, TestAppContext};
+
+    pub(crate) fn test_labels() -> CaptionLabels {
+        CaptionLabels {
+            minimize: "Minimize".into(),
+            maximize: "Maximize".into(),
+            restore: "Restore".into(),
+            close: "Close".into(),
+        }
+    }
 
     /// A modal dialog as gpui-component lays it out: a deferred layer at
     /// priority 10 whose full-window backdrop takes every press.
@@ -452,7 +454,7 @@ mod tests {
                     MouseButton::Left,
                     cx.listener(|this, _, _, _| this.menu_presses += 1),
                 );
-            let labels = CaptionLabels::default();
+            let labels = test_labels();
             let row = gpui_base::h_flex().h(px(WINDOWS_BUTTON_HEIGHT)).children(
                 [
                     CaptionButton::Minimize,

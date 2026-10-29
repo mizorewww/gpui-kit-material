@@ -94,19 +94,21 @@ pub struct TitleBar {
 }
 
 impl TitleBar {
-    /// A bar `height` tall at the top of the window.
-    pub fn new(id: impl Into<gpui::ElementId>, height: Pixels) -> Self {
+    /// A bar `height` tall at the top of the window. `labels` are the
+    /// accessible names of the Windows and Linux caption buttons, in the
+    /// application's language.
+    pub fn new(id: impl Into<gpui::ElementId>, height: Pixels, labels: CaptionLabels) -> Self {
         let id = id.into();
         Self {
             base: div().id(id.clone()),
             id,
             height,
-            labels: CaptionLabels::default(),
+            labels,
             on_close: None,
         }
     }
 
-    /// Accessible names of the Windows and Linux caption buttons.
+    /// Replace the accessible names of the Windows and Linux caption buttons.
     pub fn labels(mut self, labels: CaptionLabels) -> Self {
         self.labels = labels;
         self
@@ -157,7 +159,7 @@ impl RenderOnce for TitleBar {
         );
         let press = intent.clone();
         let release = intent.clone();
-        let mut caption = CaptionButtons::new(self.height).labels(self.labels);
+        let mut caption = CaptionButtons::new(self.height, self.labels);
         if let Some(request) = self.on_close {
             caption = caption.on_close(move |window, cx| request(window, cx));
         }
@@ -208,6 +210,7 @@ impl RenderOnce for TitleBar {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::components::caption::tests::test_labels;
     use crate::components::{ButtonVariant, material_button, title_bar_control};
     use gpui::{Context, Modifiers, Render, TestAppContext, size};
     use std::cell::Cell;
@@ -251,7 +254,7 @@ mod tests {
     impl Render for Harness {
         fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
             div().size_full().child(
-                TitleBar::new("bar", px(48.))
+                TitleBar::new("bar", px(48.), test_labels())
                     .w_full()
                     .gap(px(16.))
                     .child(title_bar_control(
