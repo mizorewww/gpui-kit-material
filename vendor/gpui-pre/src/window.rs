@@ -1241,6 +1241,21 @@ enum InputModality {
     Touch,
 }
 
+/// Returned CPU submission attempts for this window, not GPU presentation timestamps.
+/// A composed frame counts once even when its platform submission has multiple surfaces.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct WindowSubmissionStats {
+    /// Monotonic count of returned platform draw/draw_composed calls.
+    /// A platform may skip work (for example, no drawable); such attempts count too.
+    pub count: u64,
+    /// Monotonic wall-clock timestamp after the last submission returned.
+    pub last_submit: Option<Instant>,
+    /// Successful submissions of distinct completed Window::draw generations.
+    /// Re-presenting the same scene does not increment this. None means unsupported.
+    /// Success means backend submission, not GPU completion or physical scanout.
+    pub successful_new_frames: Option<u64>,
+}
+
 /// Holds the state for a specific window.
 pub struct Window {
     pub(crate) handle: AnyWindowHandle,
@@ -1302,6 +1317,9 @@ pub struct Window {
         SubscriberSet<(), Box<dyn FnMut(WindowVisibility, &mut Window, &mut App) -> bool>>,
     hovered: Rc<Cell<bool>>,
     pub(crate) needs_present: Rc<Cell<bool>>,
+    submission_stats: WindowSubmissionStats,
+    draw_generation: u64,
+    last_successful_draw: Option<u64>,
     /// Tracks recent input event timestamps to determine if input is arriving at a high rate.
     /// Used to selectively enable VRR optimization only when input rate exceeds 60fps.
     pub(crate) input_rate_tracker: Rc<RefCell<InputRateTracker>>,
@@ -1872,17 +1890,17 @@ impl Window {
                     {
                         // Don't lose a pending forced render to throttling.
                         deferred_force_render |= force_render;
-                        // Deferred by throttling: ask demand-driven platforms to retry.
+                        // A periodic source will retry after the deadline. An
+                        // immediate wake here would busy-loop on platforms with
+                        // both a display link and an unpaced demand waker.
                         handle
                             .update(&mut cx, |_, window, _| {
-                                window.platform_window.schedule_frame();
+                                if !window.platform_window.has_periodic_frame_source() {
+                                    window.platform_window.schedule_frame();
+                                    invalidator.wake_platform();
+                                }
                             })
                             .log_err();
-                        // The demand that entered this branch (a deferred forced
-                        // render or pending next-frame callbacks) is still
-                        // unserved; platforms that stop requesting frames for
-                        // idle windows need a wakeup to deliver the retry.
-                        invalidator.wake_platform();
                         #[cfg(feature = "profiler")]
                         profiler::journal::record_frame_skipped(
                             window_id,
@@ -2214,6 +2232,9 @@ impl Window {
             visibility_observers: SubscriberSet::new(),
             hovered,
             needs_present,
+            submission_stats: WindowSubmissionStats::default(),
+            draw_generation: 0,
+            last_successful_draw: None,
             input_rate_tracker,
             #[cfg(feature = "profiler")]
             window_profiler: profiler::WindowProfiler::new(handle.window_id())?,
@@ -2872,6 +2893,19 @@ impl Window {
         self.display_observers
             .clone()
             .retain(&(), |callback| callback(self, cx));
+    }
+
+    /// Read the backend's actual presentation synchronization setting.
+    /// Browser-controlled and unsupported backends return Unsupported.
+    pub fn vsync_status(&self) -> crate::VsyncStatus {
+        self.platform_window.vsync_status()
+    }
+
+    /// Set presentation synchronization. An error leaves support or application
+    /// failure visible to the caller; query the actual status before updating UI.
+    /// This does not change display-link/rAF pacing or promise unlimited FPS.
+    pub fn set_vsync(&mut self, enabled: bool) -> Result<()> {
+        self.platform_window.set_vsync(enabled)
     }
 
     /// The time between refreshes of the display the window is on, as of the
@@ -3609,6 +3643,7 @@ impl Window {
         if self.focus != focus_before_listeners {
             self.refresh();
         }
+        self.draw_generation = self.draw_generation.saturating_add(1);
         self.needs_present.set(true);
 
         #[cfg(feature = "profiler")]
@@ -3648,13 +3683,45 @@ impl Window {
         self.invalidator.replace_views(views);
     }
 
+    /// Observe platform submission attempts without scheduling a frame.
+    /// This is CPU submission activity, not display refresh or GPU completion FPS.
+    pub fn submission_stats(&self) -> WindowSubmissionStats {
+        let mut stats = self.submission_stats;
+        stats.successful_new_frames = self
+            .platform_window
+            .successful_frame_submissions()
+            .map(|_| stats.successful_new_frames.unwrap_or(0));
+        stats
+    }
+
+    fn record_successful_submission(&mut self, before: Option<u64>, after: Option<u64>) {
+        if let (Some(before), Some(after)) = (before, after)
+            && after > before
+            && self.draw_generation != 0
+            && self.last_successful_draw != Some(self.draw_generation)
+        {
+            self.submission_stats.successful_new_frames = Some(
+                self.submission_stats
+                    .successful_new_frames
+                    .unwrap_or(0)
+                    .saturating_add(1),
+            );
+            self.last_successful_draw = Some(self.draw_generation);
+        }
+    }
+
     #[profiling::function]
     fn present(&mut self) {
         #[cfg(feature = "profiler")]
         let _foreground_turn = profiler::journal::foreground_turn();
         #[cfg(feature = "profiler")]
         let present_start = Instant::now();
+        let successful_before = self.platform_window.successful_frame_submissions();
         self.platform_window.draw(&self.rendered_frame.scene);
+        let successful_after = self.platform_window.successful_frame_submissions();
+        self.record_successful_submission(successful_before, successful_after);
+        self.submission_stats.count = self.submission_stats.count.saturating_add(1);
+        self.submission_stats.last_submit = Some(Instant::now());
         #[cfg(feature = "profiler")]
         self.window_profiler.record_present(
             present_start,
@@ -8014,6 +8081,77 @@ mod tests {
     };
 
     #[gpui::test]
+    fn unsupported_vsync_does_not_report_a_successful_setting(cx: &mut TestAppContext) {
+        let window = cx.add_window(|_, _| EmptyView);
+        cx.update_window(window.into(), |_, window, _| {
+            assert_eq!(window.vsync_status(), crate::VsyncStatus::Unsupported);
+            assert!(window.set_vsync(false).is_err());
+            assert_eq!(window.vsync_status(), crate::VsyncStatus::Unsupported);
+            assert!(window.set_vsync(true).is_err());
+            assert_eq!(window.vsync_status(), crate::VsyncStatus::Unsupported);
+        })
+        .unwrap();
+    }
+
+    #[gpui::test]
+    fn successful_submission_counts_new_draws_and_allows_retry_after_failure(
+        cx: &mut TestAppContext,
+    ) {
+        let window = cx.add_window(|_, _| EmptyView);
+        cx.update_window(window.into(), |_, window, cx| {
+            window.draw(cx).clear(cx);
+            window.record_successful_submission(None, None);
+            window.record_successful_submission(Some(0), Some(0));
+            assert_eq!(window.submission_stats.successful_new_frames, None);
+            window.record_successful_submission(Some(0), Some(1));
+            assert_eq!(window.submission_stats.successful_new_frames, Some(1));
+            window.record_successful_submission(Some(1), Some(2));
+            assert_eq!(
+                window.submission_stats.successful_new_frames,
+                Some(1),
+                "same scene re-present"
+            );
+            window.draw(cx).clear(cx);
+            window.record_successful_submission(Some(2), Some(2));
+            assert_eq!(window.submission_stats.successful_new_frames, Some(1));
+            window.record_successful_submission(Some(2), Some(3));
+            assert_eq!(
+                window.submission_stats.successful_new_frames,
+                Some(2),
+                "retry succeeds for new draw"
+            );
+            window.record_successful_submission(Some(3), Some(0));
+            assert_eq!(
+                window.submission_stats.successful_new_frames,
+                Some(2),
+                "counter reset is not success"
+            );
+        })
+        .unwrap();
+    }
+
+    #[gpui::test]
+    fn submission_stats_count_present_not_layout_or_frame_requests(cx: &mut TestAppContext) {
+        let window = cx.add_window(|_, _| EmptyView);
+        cx.update_window(window.into(), |_, window, cx| {
+            let initial = window.submission_stats();
+            window.refresh();
+            window.draw(cx).clear(cx);
+            window.on_next_frame(|_, _| {});
+            assert_eq!(window.submission_stats(), initial);
+            window.present();
+            let submitted = window.submission_stats();
+            assert_eq!(submitted.count, initial.count + 1);
+            assert!(submitted.last_submit.is_some());
+            window.present();
+            let repeated = window.submission_stats();
+            assert_eq!(repeated.count, submitted.count + 1);
+            assert!(repeated.last_submit >= submitted.last_submit);
+        })
+        .unwrap();
+    }
+
+    #[gpui::test]
     async fn test_focus_handle_release(cx: &mut TestAppContext) {
         let (handle, survivor) = cx.update(|cx| (cx.focus_handle(), cx.focus_handle()));
         let handle_id = handle.id;
@@ -8658,6 +8796,68 @@ mod tests {
             test_window.frame_wake_count() > baseline,
             "scheduling a next-frame callback in an idle window must wake the frame source"
         );
+    }
+
+    /// Periodic backends wait for a future tick instead of re-queuing an
+    /// immediate request while the inactive-window deadline is closed.
+    #[gpui::test]
+    fn test_periodic_source_throttle_waits_and_resumes(cx: &mut TestAppContext) {
+        cx.app.borrow_mut().mode = crate::app::GpuiMode::Production;
+        for periodic in [true, false] {
+            let interval = Duration::from_millis(250);
+            let window = cx
+                .app
+                .borrow_mut()
+                .open_window(
+                    WindowOptions {
+                        inactive_frame_interval: Some(interval),
+                        ..Default::default()
+                    },
+                    |_, cx| cx.new(|_| EmptyView),
+                )
+                .unwrap();
+            let platform = cx.test_window(window.into());
+            platform.0.lock().periodic_frame_source = periodic;
+            platform.simulate_active_status_change(false);
+            platform.simulate_frame_request(RequestFrameOptions::default());
+            let ran = Rc::new(Cell::new(0));
+            window
+                .update(cx, |_, window, _| {
+                    let ran = ran.clone();
+                    window.on_next_frame(move |_, _| ran.set(ran.get() + 1));
+                })
+                .unwrap();
+            let wakes = platform.frame_wake_count();
+            for _ in 0..8 {
+                platform.simulate_frame_request(RequestFrameOptions::default());
+            }
+            assert_eq!(ran.get(), 0, "callback must remain pending during throttle");
+            if periodic {
+                assert_eq!(
+                    platform.frame_wake_count(),
+                    wakes,
+                    "periodic retry must not self-wake"
+                );
+            } else {
+                assert_eq!(
+                    platform.frame_wake_count(),
+                    wakes + 8,
+                    "demand-only retry remains armed"
+                );
+            }
+            // The platform throttle uses wall-clock Instant::now, not the
+            // executor's synthetic clock. Deliver a genuine later periodic
+            // tick without force_render or require_presentation bypasses.
+            std::thread::sleep(interval);
+            platform.simulate_frame_request(RequestFrameOptions::default());
+            assert_eq!(
+                ran.get(),
+                1,
+                "the first tick after the deadline consumes pending work"
+            );
+            platform.simulate_frame_request(RequestFrameOptions::default());
+            assert_eq!(ran.get(), 1, "completed demand is not repeated");
+        }
     }
 
     /// A frame request that arrives while next-frame callbacks are pending

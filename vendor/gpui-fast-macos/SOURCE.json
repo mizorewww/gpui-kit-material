@@ -1,0 +1,32 @@
+{
+  "package": "gpui-fast-macos",
+  "version": "0.1.12",
+  "source": "crates.io published archive",
+  "archive_sha256": "d8e8b377d6dcbc0007e68098cb3f40bc2591a1d29526301e9572a70bb674f171",
+  "upstream_files": {
+    "Cargo.lock": "d91ed48ed2d416e9b3bd19eb03124fcaa2474cf42c5f23e121396edac5b6f2a8",
+    "Cargo.toml": "dd418ecd00552bbbb6a2e9ca52ef8fe32ade58ab939c4b09a358a3f7e9e6cd4a",
+    "Cargo.toml.orig": "cbc13793fa371521ef203300e99f691fb3004d3222dea877e5509e923a8506b4",
+    "LICENSE": "5f78a733701db49b73da93addad8cb74f816f3789ef30c3c0e959e943ecd99b4",
+    "README.md": "f83c981868967f08fbd4ec28f94263f03318dddf8cf63e17e51cce7a27ee5565",
+    "src/display.rs": "eb232a1ab75d8199741e2cc800b21acc725eeddcf8883ff05baf2fcc5ce2d260",
+    "src/display_link.rs": "088f3e0b8dd9b242a1f6c090a2c79ef081857cc917564673d61d84a48c6cf1cc",
+    "src/events.rs": "73ef912d8ef63a7282c5a7d1b93e0b12e11cba5075b5a4bf4f09541783f5d619",
+    "src/fast/composition.rs": "565d2e92ca930f921aef6513719442d2900b7a416b18404b13cfe31d272d4434",
+    "src/fast/mod.rs": "de36fcd4b81798f3ce2f7e523b12409536dcdeee899b087865262dfc85da2b02",
+    "src/gpui_macos.rs": "c1a048ce4016ea5fcff4aafffdcaf4270b2e2647a9856e05e316dbbd250e7877",
+    "src/keyboard.rs": "9f70aa07612b9eaee7ff91817ab436138b9e63f9f68f55ab9b5fae498f008970",
+    "src/pasteboard.rs": "05d01ac0c7e532a16eb0a962ebd1299b0cacaf64616d3d0d11a1495b5feac994",
+    "src/platform.rs": "c790996c4ce334fe43446b8af8fe2c6a2dcc8f908fb2fb0a0e187c81ab013146",
+    "src/screen_capture.rs": "996c4308d93aea1c809e27baa2ac42b18d038a677cfdd599e481abf5ad200d4b",
+    "src/system_notifications.rs": "df8374f075932996d58b99c043d97a82e1cefebab79e5b0f4648c8a3776ea5fe",
+    "src/window.rs": "d559ef3d21486e7e20fade38d917105ff4924d883143f5ef3aaca48faab5d1d8",
+    "src/window_appearance.rs": "c1ea31769bfd6b324339525b8ffec3be0f59a24495a7e491c1df66bd43db5b75"
+  },
+  "local_patches": [
+    "src/window.rs",
+    "src/display_link.rs",
+    "src/fast/composition.rs"
+  ],
+  "validation": "source archive identity verified; runtime checks pending"
+}

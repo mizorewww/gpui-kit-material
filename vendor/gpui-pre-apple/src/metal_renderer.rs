@@ -518,13 +518,19 @@ impl MetalRenderer {
     }
 
     pub fn draw(&mut self, scene: &Scene) {
+        self.draw_with_status(scene);
+    }
+
+    /// Submit a drawable and report whether a real command buffer/presentation
+    /// was issued. This is not GPU completion or display presentation timing.
+    pub fn draw_with_status(&mut self, scene: &Scene) -> bool {
         let layer = match &self.layer {
             Some(l) => l.clone(),
             None => {
                 log::error!(
                     "draw() called on headless renderer - use render_scene_to_image() instead"
                 );
-                return;
+                return false;
             }
         };
         let viewport_size = layer.drawable_size();
@@ -539,14 +545,14 @@ impl MetalRenderer {
                 "failed to retrieve next drawable, drawable size: {:?}",
                 viewport_size
             );
-            return;
+            return false;
         };
 
         let command_buffer = match self.render_frame(scene, drawable.texture(), viewport_size) {
             Ok(command_buffer) => command_buffer,
             Err(error) => {
                 log::error!("failed to render: {error:#}");
-                return;
+                return false;
             }
         };
 
@@ -558,6 +564,7 @@ impl MetalRenderer {
             command_buffer.present_drawable(drawable);
             command_buffer.commit();
         }
+        true
     }
 
     fn render_frame(
