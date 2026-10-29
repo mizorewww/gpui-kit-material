@@ -36,7 +36,8 @@ change animates the whole window on the slow effects spring.
 ## What's included
 
 - **Theme**: 10 built-in palettes (Paper/Ink, Nord, Tokyo Night, Catppuccin),
-  separate light/dark choices, animated palette transitions, a text scale.
+  plus all 20 md3.io reference themes in light/dark and standard/medium/high
+  contrast, animated palette transitions, and a text scale.
 - **Tokens**: shape (connected tile corners), type scale, layout metrics,
   elevation, state layers.
 - **Motion**: md3.io Expressive sampled curves (spatial and effects, fast/default/slow),
@@ -86,6 +87,43 @@ Expressive is the default. A value transition retains its curve until it settles
 including reversals, so changing schemes cannot jump an in-flight value. A mounted
 entrance retains its initial scheme; a new palette target uses the current scheme.
 Reduced motion still paints the final state immediately.
+
+## Reference themes
+
+The gallery starts with the Material baseline theme. Applications can select
+one of the 20 reference presets through the same animated theme runtime:
+
+```rust
+use gpui_kit_material::{prelude::*, theme};
+
+theme::apply_scheme(
+    ThemeId::Ocean.scheme(ThemeMode::Dark, Contrast::High),
+    window,
+    cx,
+);
+```
+
+The 120 preset configurations preserve the reference CSS's 52 colors, including
+fixed, inverse, surface-container, error, and status roles. The kit's selection,
+find-highlight, and status-container extensions are derived separately. Existing
+Paper/Nord/etc. palettes remain adapters from their original source colors.
+Dynamic seed/HCT generation is still pending.
+
+Qualified legacy names such as `ColorRole::ACCENT` remain aliases of canonical
+roles such as `ColorRole::PRIMARY`, sharing the same override storage. Code that
+imported the old enum variants with `use ColorRole::{ACCENT}` or `use ColorRole::*`
+must use qualified names or import the canonical variants instead.
+
+To recapture the preset fixtures from a clean checkout of the pinned reference:
+
+```sh
+python3 scripts/capture-reference-colors.py /path/to/floor-material /tmp/md3-colors.json
+```
+
+This requires `npx`, `git`, and `agent-browser`. The script checks the reference
+revision, compiles its Sass, and reads the browser's resolved CSS properties.
+The source revision and capture environment are recorded in the fixture; the
+reference implementation's MIT notice ships with the tables.
 
 ## Material Symbols consumer example
 

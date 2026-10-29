@@ -3,6 +3,7 @@
 //! `cargo run -p gpui-kit-material --example gallery`
 use gpui::{prelude::*, *};
 use gpui_kit_material::color::palette::ALL as PALETTES;
+use gpui_kit_material::color::themes::{self, Contrast, ThemeId, ThemeMode};
 use gpui_kit_material::icons::{Assets, IconName};
 use gpui_kit_material::motion;
 use gpui_kit_material::prelude::*;
@@ -10,6 +11,9 @@ use gpui_kit_material::theme;
 
 struct Gallery {
     palette: PaletteId,
+    reference_theme: Option<ThemeId>,
+    reference_mode: ThemeMode,
+    contrast: Contrast,
     scale: SharedString,
     density: SharedString,
     engine: usize,
@@ -26,19 +30,91 @@ struct Gallery {
 impl Render for Gallery {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         motion::apply_scheme(self.motion_scheme);
-        theme::apply_palette(self.palette, window, cx);
+        if let Some(theme_id) = self.reference_theme {
+            theme::apply_scheme(
+                theme_id.scheme(self.reference_mode, self.contrast),
+                window,
+                cx,
+            );
+        } else {
+            theme::apply_palette(self.palette, window, cx);
+        }
         theme::apply_scale(self.scale.parse().unwrap_or(1.), window);
         let compact = is_compact(window);
         let palettes = ConnectedButtonGroup::new("palette", "Palette")
             .options(PALETTES.map(|id| (id.name(), id.name())))
-            .selected(self.palette.name())
+            .selected(if self.reference_theme.is_none() {
+                self.palette.name()
+            } else {
+                ""
+            })
             .full_width()
             .on_change(cx.listener(|this, name: &SharedString, _, cx| {
                 if let Some(id) = PALETTES.into_iter().find(|id| id.name() == name.as_ref()) {
                     this.palette = id;
+                    this.reference_theme = None;
                     cx.notify();
                 }
             }));
+        let reference_themes = ConnectedButtonGroup::new("reference-themes", "Material themes")
+            .options(themes::ALL.map(|id| (id.name(), id.name())))
+            .selected(self.reference_theme.map(ThemeId::name).unwrap_or(""))
+            .full_width()
+            .on_change(cx.listener(|this, name: &SharedString, _, cx| {
+                this.reference_theme = themes::ALL
+                    .into_iter()
+                    .find(|id| id.name() == name.as_ref());
+                cx.notify();
+            }));
+        let mode = ConnectedButtonGroup::new("reference-mode", "Material theme mode")
+            .options([("light", "Light"), ("dark", "Dark")])
+            .selected(if self.reference_mode == ThemeMode::Dark {
+                "dark"
+            } else {
+                "light"
+            })
+            .on_change(cx.listener(|this, name: &SharedString, _, cx| {
+                this.reference_mode = if name == "dark" {
+                    ThemeMode::Dark
+                } else {
+                    ThemeMode::Light
+                };
+                this.reference_theme.get_or_insert(ThemeId::Baseline);
+                cx.notify();
+            }));
+        let contrast = ConnectedButtonGroup::new("reference-contrast", "Material contrast")
+            .options([
+                ("standard", "Standard contrast"),
+                ("medium", "Medium contrast"),
+                ("high", "High contrast"),
+            ])
+            .selected(match self.contrast {
+                Contrast::Standard => "standard",
+                Contrast::Medium => "medium",
+                Contrast::High => "high",
+            })
+            .on_change(cx.listener(|this, name: &SharedString, _, cx| {
+                this.contrast = match name.as_ref() {
+                    "high" => Contrast::High,
+                    "medium" => Contrast::Medium,
+                    _ => Contrast::Standard,
+                };
+                this.reference_theme.get_or_insert(ThemeId::Baseline);
+                cx.notify();
+            }));
+        let color_swatches = themes::REFERENCE_ROLES
+            .into_iter()
+            .zip(themes::REFERENCE_ROLE_NAMES)
+            .map(|(role, name)| {
+                gpui_base::v_flex()
+                    .w(rem(166.))
+                    .gap(rem(4.))
+                    .child(div().h(rem(32.)).w_full().rounded(rem(8.)).bg(color(role)))
+                    .child(
+                        accessible_text(SharedString::from(format!("color-{name}")), name)
+                            .text_size(TEXT_AUX),
+                    )
+            });
         let scale = ConnectedButtonGroup::new("scale", "Text size")
             .options([("1", "100%"), ("1.25", "125%"), ("1.5", "150%")])
             .selected(self.scale.clone())
@@ -245,8 +321,16 @@ impl Render for Gallery {
                     .child(page_heading("title", "gpui-kit-material"))
                     .child(supporting_info(
                         "intro",
-                        "Components extracted from course2md; M3 Expressive arrives next.",
+                        "Explore Material themes, motion and components.",
                     ))
+                    .child(
+                        gpui_base::v_flex()
+                            .gap(rem(12.))
+                            .child(section_title("reference-theme", "Material themes"))
+                            .child(reference_themes)
+                            .child(mode)
+                            .child(contrast),
+                    )
                     .child(
                         gpui_base::v_flex()
                             .gap(rem(12.))
@@ -333,7 +417,18 @@ impl Render for Gallery {
                     )
                     .child(choices)
                     .child(settings)
-                    .child(feedback),
+                    .child(feedback)
+                    .child(
+                        gpui_base::v_flex()
+                            .gap(rem(12.))
+                            .child(section_title("reference-colors", "Material color roles"))
+                            .child(
+                                gpui_base::h_flex()
+                                    .flex_wrap()
+                                    .gap(rem(12.))
+                                    .children(color_swatches),
+                            ),
+                    ),
             )
             .child(CaptionButtons::new(app_bar_height(window)))
     }
@@ -376,6 +471,9 @@ pub fn run(application: gpui::Application) {
                         motion_scheme: motion::MotionScheme::Expressive,
                         motion_target: false,
                         palette: PaletteId::Paper,
+                        reference_theme: Some(ThemeId::Baseline),
+                        reference_mode: ThemeMode::Light,
+                        contrast: Contrast::Standard,
                         scale: "1".into(),
                         density: "auto".into(),
                         engine: 0,
