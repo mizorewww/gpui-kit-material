@@ -121,7 +121,7 @@ def main():
         parser.error("use an output directory outside the repository to keep source fingerprints stable")
     destination.mkdir(parents=True, exist_ok=False)
     command = ["cargo", "build", "--locked", "--release", "-p", "gpui-kit-material",
-               "--example", "gallery", "--features", "frame-profiler", "--jobs", "2",
+               "--example", "gallery", "--features", "frame-profiler",
                "--message-format=json-render-diagnostics"]
     provenance = {
         "source_before_build": source_identity(),

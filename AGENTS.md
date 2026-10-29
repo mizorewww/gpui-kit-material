@@ -58,8 +58,7 @@
 - Notify the narrowest owning view, avoid render-time notification loops and
   virtualize long collections. Measure before introducing caches and identify
   each cache's invalidation owner. Do not simplify required animations to pass.
-- Coordinate one build or benchmark at a time; default to `CARGO_BUILD_JOBS=2`.
-  Use bounded captures and stop owned test processes when sampling completes.
+- Use bounded captures and stop owned test processes when sampling completes.
 - Before merging: `cargo fmt --all --check`,
   `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace`,
   plus relevant WASM, profiler and compatibility checks for the change.

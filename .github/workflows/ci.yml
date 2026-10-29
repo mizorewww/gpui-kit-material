@@ -7,8 +7,6 @@ on:
 defaults:
   run:
     working-directory: gpui-kit-material
-env:
-  CARGO_BUILD_JOBS: 2
 
 jobs:
   check:
