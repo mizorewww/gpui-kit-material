@@ -4,9 +4,10 @@
 //
 // Each GPUI frame on the web runs inside one requestAnimationFrame callback
 // (layout, prepaint, paint and WebGPU submission). Wrapping that callback with
-// performance.now() measures the whole synchronous CPU frame scope; the
-// synchronous first draw happens inside `run()`, which is timed as its own
-// scope. Buffers are preallocated so recording never allocates per frame.
+// performance.now() measures the whole synchronous CPU frame scope from page
+// start, so the window's first (asynchronously opened) draw is included;
+// `run()` is timed as its own startup scope. Buffers are preallocated so
+// recording never allocates per frame.
 // The finished report is published as `window.__galleryProfile`.
 
 const BUDGET_MS = 2;
@@ -68,10 +69,24 @@ export function installProfiler(params) {
     start(module) {
       counters = module;
       if (errors.length) return finish();
-      const vsync = module.gallery_vsync_status() ?? null;
-      const startedAt = performance.now();
-      const inputs = mode === "scroll" ? startScrollDriver(state, startedAt) : null;
-      setTimeout(() => finish(vsync, startedAt, inputs), seconds * 1000);
+      // Browser graphics initialize asynchronously: wait (bounded) for the
+      // canvas and the Gallery window before starting the measured run.
+      const waitStarted = performance.now();
+      const ready = () => {
+        const vsync = module.gallery_vsync_status() ?? null;
+        if (vsync === null || !document.querySelector("canvas")) {
+          if (performance.now() - waitStarted > 20000) {
+            errors.push("Gallery window or canvas did not appear within 20 s");
+            return finish();
+          }
+          return setTimeout(ready, 50);
+        }
+        state.window_ready_ms = performance.now();
+        const startedAt = performance.now();
+        const inputs = mode === "scroll" ? startScrollDriver(state, startedAt) : null;
+        setTimeout(() => finish(vsync, startedAt, inputs), seconds * 1000);
+      };
+      ready();
     },
   };
 
@@ -102,6 +117,9 @@ export function installProfiler(params) {
       errors.push("successful new-frame counter unavailable");
     }
     if (minimumFps === null) errors.push("no complete >=250ms observation window");
+    if (mode === "scroll" && !(inputs?.summary().dispatched > 0)) {
+      errors.push("no wheel input was dispatched");
+    }
     const vsyncFinal = counters?.gallery_vsync_status() ?? null;
     const cpuFailure = scopes.some((ms) => ms > BUDGET_MS);
     const fpsFailure = mode === "scroll" && minimumFps !== null && minimumFps < 500;
@@ -110,7 +128,7 @@ export function installProfiler(params) {
       mode,
       budget_ms: BUDGET_MS,
       scope:
-        "performance.now() around each requestAnimationFrame callback (all synchronous GPUI frame work including WebGPU command submission); the first scope is the synchronous run() startup including the first window draw",
+        "performance.now() around each requestAnimationFrame callback (all synchronous GPUI frame work including WebGPU command submission) from page start, plus the synchronous run() startup; browser graphics open the window asynchronously, so its first draw is captured as an rAF scope",
       timer_resolution_note: `crossOriginIsolated=${self.crossOriginIsolated}; browsers coarsen performance.now() (about 5 us isolated, 100 us otherwise)`,
       user_agent: navigator.userAgent,
       device_pixel_ratio: devicePixelRatio,

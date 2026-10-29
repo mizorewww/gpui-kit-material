@@ -1,0 +1,36 @@
+{
+  "build_command": [
+    "./scripts/build-gallery-web.sh",
+    "--release",
+    "--fast"
+  ],
+  "requested_backend": "fast",
+  "requested_scenario": "web-scroll",
+  "source_before_build": {
+    "commit": "50e83040c82e95f86d8d1a56d13a827e3c97c392",
+    "status": " M crates/gallery-web/www/profile.js\n M crates/material/src/components/controls.rs\n",
+    "source_files_sha256": "618fb0076c07f1978dee71d22521d5f7ea5147717c6ab7526af1c72a1404dc58"
+  },
+  "acceptance_eligible": false,
+  "build_exit_code": 0,
+  "source_after_build": {
+    "commit": "50e83040c82e95f86d8d1a56d13a827e3c97c392",
+    "status": " M crates/gallery-web/www/profile.js\n M crates/material/src/components/controls.rs\n",
+    "source_files_sha256": "9e09ba802f683517c0ee6ddd4f4865f26be95046eeaa017af72428c0c4b95f88"
+  },
+  "wasm_sha256": "fe72cfd4edd4ed749942ebe396e9cd4e3ed8f9bd452c255fce6c01aa061c8aaf",
+  "url": "http://127.0.0.1:51598/?profile=scroll&seconds=15.0",
+  "browser_args": "--disable-gpu-vsync,--disable-frame-rate-limit,--enable-unsafe-webgpu",
+  "viewport": [
+    1280,
+    800
+  ],
+  "capture_exit_code": 1,
+  "source_after_capture": {
+    "commit": "8b6fdb309208c06a4ce10c88020486456ede6b3e",
+    "status": " M crates/gallery-web/www/profile.js\n",
+    "source_files_sha256": "9e09ba802f683517c0ee6ddd4f4865f26be95046eeaa017af72428c0c4b95f88"
+  },
+  "inputs_stable": false,
+  "note": "URL port is ephemeral; inputs_stable false means concurrent agents changed sources during the run"
+}

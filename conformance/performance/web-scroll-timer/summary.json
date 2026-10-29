@@ -1,0 +1,44 @@
+{
+  "schema": "gallery-web-evidence-summary-v1",
+  "acceptance_eligible": false,
+  "gates": {
+    "cpu_2ms": "FAIL (measured)",
+    "scroll_500fps": "FAIL (measured)"
+  },
+  "browser": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/155.0.0.0 Safari/537.36",
+  "browser_args": "--disable-gpu-vsync,--disable-frame-rate-limit,--enable-unsafe-webgpu",
+  "backend": "GPUI Fast WebGPU, release WASM",
+  "report_exit_code": 1,
+  "runner_exit_code": 2,
+  "inputs_stable": false,
+  "cpu_summary_ms": {
+    "frames": 4268,
+    "max_ms": 22.985000014305115,
+    "median_ms": 2.799999952316284,
+    "p95_ms": 5.319999933242798,
+    "p99_ms": 7.934999942779541,
+    "over_budget_frames": 3591
+  },
+  "initial_scope_ms": 11.475000023841858,
+  "minimum_window_fps": 94.42313364117766,
+  "vsync_readback": "unsupported",
+  "inputs": {
+    "source": "MessageChannel loop independent of requestAnimationFrame; untrusted DOM WheelEvent on the canvas",
+    "canvas_found": true,
+    "dispatched": 8619,
+    "requested_interval_ms": 1,
+    "longest_input_gap_ms": 24.179999947547913,
+    "turns": 1,
+    "step_px": 8
+  },
+  "coverage": {
+    "complete_gallery_traversal": false,
+    "reason": "the browser driver cannot read the Gallery list position; legs scroll a fixed distance and rely on clamping at the ends"
+  },
+  "gpu": "null: WebGPU timestamp queries are not wired into the web renderer",
+  "limits": [
+    "Gallery traversal coverage is not verifiable from the browser driver",
+    "window FPS is an average per 250 ms window, not a per-frame minimum",
+    "headless Chromium on the development Mac; untrusted DOM wheel events"
+  ]
+}
