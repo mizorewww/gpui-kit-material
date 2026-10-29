@@ -101,7 +101,10 @@
       "completion": "No component or gallery can pass without whole-gallery evidence at or below the budget. Existing functional or visual reviews do not establish performance acceptance.",
       "evidence": "conformance/performance/startup-backend-comparison.json",
       "scrolling_fps": {
-        "status": "unverified",
+        "status": "failed: native release local scrolling measured a minimum full-window 47.1415 FPS; complete Gallery traversal and strict per-submission timing remain unverified",
+        "diagnostic_evidence": "conformance/performance/scroll-baseline/report.json",
+        "diagnostic_provenance": "conformance/performance/scroll-baseline/provenance.json",
+        "diagnostic_review": "independent subagent verified raw counters, bidirectional position changes, Disabled VSync, 598 of 600 CPU scopes over 2ms, and incomplete full-Gallery coverage; this is a reviewed failure, not conformance PASS",
         "minimum_fps": 500,
         "scenario": "continuous upward and downward scrolling through the complete Gallery, including newly exposed component rows and direction reversals",
         "metric": "actual rendered frame submissions during the declared active scrolling interval; not frame requests, monitor refresh rate, or skipped/no-drawable submission attempts",

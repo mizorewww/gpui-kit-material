@@ -1,0 +1,19 @@
+{
+  "candidate": "/var/folders/1l/06myrrdn1x92w3znzt73djlw0000gn/T/material-fps-vsync-xmel9zqg/gpui-kit-material",
+  "source_manifest_sha256": "8b0cfeab3af2ec38e3320af40ceb98c4727fe305e345d9c345c50d374adec505",
+  "source_head_not_build_identity": "3d9e46d0e7f6b17d01fbfc2c57972e8cb5c8353d",
+  "source_dirty": true,
+  "build_command": "CARGO_TARGET_DIR=/Users/aac6fef/Developer/gpui-kit-material/target cargo build --release -p gpui-kit-material --example gallery --features gpui-fast,frame-profiler --locked",
+  "priority": "normal",
+  "jobs": "Cargo default",
+  "binary_sha256": "8ce1c9a835d1d11bad825fcf01518b3dd90ae70790f4e0db4b251e3a454c7229",
+  "binary": "/Users/aac6fef/Developer/gpui-kit-material/target/release/examples/gallery",
+  "run_environment": {
+    "MATERIAL_PROFILE_OUTPUT": "/tmp/material-scroll-baseline/report.json",
+    "MATERIAL_PROFILE_SECONDS": "10",
+    "MATERIAL_SCROLL_PROFILE": "1"
+  },
+  "source_manifest_hash_encoding": "Python json.dumps(parsed manifest, sort_keys=True, separators=(comma, colon)), UTF-8, no trailing newline",
+  "source_manifest_file_sha256": "ea9d3fa6340d48ec5bf22c4b72c4756d32f94bb890bd5fb2b11ee4a1ced42519",
+  "provenance_limit": "Candidate files and binary independently matched after capture; this single manifest is not a complete before/after build attestation."
+}
