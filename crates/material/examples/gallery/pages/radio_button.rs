@@ -1,14 +1,17 @@
-//! Radio button: the radio indicator, choice tiles in every state, and a
-//! live radio group of choice tiles.
+//! Radio button: radio buttons in every state and in a live group, choice
+//! tiles in every state, and a live radio group of choice tiles.
 use super::prelude::*;
 
 pub struct Page {
     page: PageCx,
+    ringtone: usize,
     pub(crate) engine: usize,
 }
 
+/// The live radio group's row.
+const RADIO_ROW: usize = 1;
 /// The live choice group's row.
-pub(crate) const CHOICE_ROW: usize = 2;
+pub(crate) const CHOICE_ROW: usize = 3;
 
 impl GalleryPage for Page {
     const INFO: PageInfo = PageInfo {
@@ -19,15 +22,19 @@ impl GalleryPage for Page {
     };
 
     fn new(page: PageCx, _: &mut Window, _: &mut Context<Self>) -> Self {
-        Self { page, engine: 0 }
+        Self {
+            page,
+            ringtone: 0,
+            engine: 0,
+        }
     }
 
     fn row_count(&self, _: &Window) -> usize {
-        3
+        4
     }
 
     fn interactive(&self, row: usize) -> bool {
-        row == CHOICE_ROW
+        row == RADIO_ROW || row == CHOICE_ROW
     }
 
     fn render_row(
@@ -37,20 +44,50 @@ impl GalleryPage for Page {
         cx: &mut Context<Self>,
     ) -> AnyElement {
         match row {
-            0 => board("radio-indicators")
-                .caption("Radio indicator")
-                .columns(2)
-                .column_width(120.)
-                .column_labels(["Selected", "Unselected"])
-                .row_labels(["Enabled", "Disabled"])
+            0 => board("radio-states")
+                .caption("Radio buttons")
+                .columns(5)
+                .column_width(72.)
+                .column_labels(InteractionPreview::ALL.map(InteractionPreview::name))
+                .row_labels(["Selected", "Unselected"])
                 .cells(
-                    [(true, true), (false, true), (true, false), (false, false)]
-                        .map(|(selected, enabled)| choice_radio(selected, enabled)),
+                    [true, false]
+                        .into_iter()
+                        .enumerate()
+                        .flat_map(|(kind, selected)| {
+                            InteractionPreview::ALL.into_iter().enumerate().map(
+                                move |(index, state)| {
+                                    MaterialRadio::new(
+                                        ("radio-state", kind * 5 + index),
+                                        state.name(),
+                                    )
+                                    .selected(selected)
+                                    .preview_state(state)
+                                },
+                            )
+                        }),
                 )
                 .into_any_element(),
-            1 => board("choice-tile-states")
+            RADIO_ROW => spec::demo(
+                "radio-group",
+                "Radio buttons in a group",
+                MaterialRadioGroup::new("ringtones", "Ringtone")
+                    .option("Chime", true)
+                    .option("Bell", true)
+                    .option("Marimba", true)
+                    .option("Unavailable", false)
+                    .selected(Some(self.ringtone))
+                    .on_change(cx.listener(|this, index: &usize, _, cx| {
+                        this.ringtone = *index;
+                        cx.notify();
+                    }))
+                    .reveal("reveal-radio-group", self.page.rows.list()),
+            )
+            .into_any_element(),
+            2 => board("choice-tile-states")
                 .caption("Choice tile")
                 .columns(5)
+                .column_width(148.)
                 .column_labels(InteractionPreview::ALL.map(InteractionPreview::name))
                 .row_labels(["Unselected", "Selected"])
                 .cells(
