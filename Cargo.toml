@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/color", "crates/material"]
+members = ["crates/color", "crates/material", "crates/gallery-web"]
 
 [workspace.package]
 version = "0.1.0"
@@ -16,7 +16,7 @@ gpui-kit-material-color = { path = "crates/color", version = "0.1.0" }
 # crates are built against, so `gpui-base` and this kit share one `gpui`.
 # Bump these together with gpui-base and the Cargo.lock entries.
 gpui = { package = "gpui-pre", version = "=0.3.10" }
-gpui_platform = { package = "gpui-pre-platform", version = "=0.3.10", features = ["font-kit", "x11", "wayland", "runtime_shaders"] }
+gpui_platform = { package = "gpui-pre-platform", version = "=0.3.10", default-features = false, features = ["font-kit", "x11", "wayland", "runtime_shaders"] }
 gpui-base = { version = "=0.8.1" }
 
 anyhow = "1"

@@ -52,6 +52,25 @@ change animates the whole window on the slow effects spring.
 cargo run -p gpui-kit-material --example gallery
 ```
 
+The browser entrypoint uses the same Rust gallery module and components:
+
+```sh
+rustup target add wasm32-unknown-unknown
+cargo install wasm-bindgen-cli --version 0.2.129 --locked
+./scripts/build-gallery-web.sh
+python3 -m http.server 8080 --bind 127.0.0.1 --directory crates/gallery-web/www
+```
+
+Open `http://localhost:8080`. The single-threaded browser build runs without
+cross-origin isolation headers. It embeds IBM Plex Sans (SIL OFL, bundled beside
+the font) for the web platform's default text measurements. Use
+`./scripts/build-gallery-web.sh --release` for an optimized build. Generated
+bindings stay out of Git.
+
+Component alignment is tracked in [`conformance/md3.json`](conformance/md3.json).
+An available gallery example does not imply visual or motion conformance;
+each component needs independent review and desktop/browser evidence.
+
 ## Material Symbols consumer example
 
 The Google Fonts icon browser belongs to

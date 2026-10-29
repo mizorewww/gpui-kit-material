@@ -7,7 +7,11 @@
 use crate::color::{Color, ColorRole, PaletteId, Scheme, ThemePreferences};
 use crate::motion::SLOW_EFFECTS;
 use gpui::{App, Rgba, Window, WindowAppearance};
-use std::{cell::RefCell, time::Instant};
+use std::cell::RefCell;
+#[cfg(not(target_family = "wasm"))]
+use std::time::Instant;
+#[cfg(target_family = "wasm")]
+use web_time::Instant;
 
 struct Paint {
     target: Option<Scheme>,

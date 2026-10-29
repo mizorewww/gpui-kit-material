@@ -20,7 +20,10 @@ gpui.workspace = true
 gpui-base.workspace = true
 anyhow.workspace = true
 
-[dev-dependencies]
+[target.'cfg(target_family = "wasm")'.dependencies]
+web-time = "1"
+
+[target.'cfg(not(target_family = "wasm"))'.dev-dependencies]
 gpui = { workspace = true, features = ["test-support"] }
 gpui_platform.workspace = true
 

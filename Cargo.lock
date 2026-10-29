@@ -1935,6 +1935,7 @@ dependencies = [
  "gpui-kit-material-color",
  "gpui-pre",
  "gpui-pre-platform",
+ "web-time",
 ]
 
 [[package]]
@@ -1943,6 +1944,17 @@ version = "0.1.0"
 dependencies = [
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "gpui-kit-material-gallery-web"
+version = "0.1.0"
+dependencies = [
+ "gpui-base",
+ "gpui-kit-material",
+ "gpui-pre",
+ "gpui-pre-platform",
+ "wasm-bindgen",
 ]
 
 [[package]]
@@ -2254,7 +2266,6 @@ dependencies = [
  "futures",
  "parking_lot",
  "rand 0.9.5",
- "wasm_thread",
  "web-time",
 ]
 
@@ -2317,7 +2328,6 @@ dependencies = [
  "uuid",
  "wasm-bindgen",
  "wasm-bindgen-futures",
- "wasm_thread",
  "web-sys",
  "web-time",
 ]
@@ -5928,18 +5938,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "23f0c9c52aa7cd7d77769a4cfe2a9adb1b331f489a41d912ce14513d5ab995c6"
 dependencies = [
  "unicode-ident",
-]
-
-[[package]]
-name = "wasm_thread"
-version = "0.3.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b7516db7f32decdadb1c3b8deb1b7d78b9df7606c5cc2f6241737c2ab3a0258e"
-dependencies = [
- "futures",
- "js-sys",
- "wasm-bindgen",
- "web-sys",
 ]
 
 [[package]]
