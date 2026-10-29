@@ -24,7 +24,10 @@ use crate::{
     color::ColorRole,
     icons::Icon,
     motion::{self, MotionToken},
-    tokens::typography::{TypeRole, rem},
+    tokens::{
+        state,
+        typography::{TypeRole, rem},
+    },
 };
 use gpui::{prelude::*, *};
 
@@ -254,24 +257,10 @@ fn horizontal_padding(
     }
 }
 
+#[cfg(test)]
 fn alpha(mut color: Rgba, opacity: f32) -> Rgba {
     color.a *= opacity;
     color
-}
-/// Composite a state layer without darkening its RGB on transparent buttons.
-fn layer(container: Rgba, content: Rgba, opacity: f32) -> Rgba {
-    let top = alpha(content, opacity);
-    let a = top.a + container.a * (1. - top.a);
-    if a == 0. {
-        return gpui::rgba(0x00000000);
-    }
-    let c = |x: f32, y: f32| (x * top.a + y * container.a * (1. - top.a)) / a;
-    Rgba {
-        r: c(top.r, container.r),
-        g: c(top.g, container.g),
-        b: c(top.b, container.b),
-        a,
-    }
 }
 fn color_targets(variant: ButtonVariant, disabled: bool) -> (CssColor, CssColor, CssColor) {
     use ColorRole as C;
@@ -1118,7 +1107,7 @@ impl RenderOnce for MaterialButton {
             .pr(rem(right_padding))
             .gap(rem(g.gap))
             .rounded(rem(radius))
-            .bg(layer(bg, fg, opacity))
+            .bg(state::layer(bg, fg, opacity))
             .text_color(fg)
             .font_family(ty.font_family)
             .text_size(ty.font_size)
@@ -1162,7 +1151,8 @@ pub fn material_button(id: impl Into<ElementId>, variant: ButtonVariant) -> Mate
 
 #[cfg(test)]
 mod tests {
-    use super::{ButtonSize, ButtonVariant, MaterialButton, alpha, colors, layer};
+    use super::{ButtonSize, ButtonVariant, MaterialButton, alpha, colors};
+    use crate::tokens::state::layer;
     use crate::{color::ColorRole, theme::color};
     use gpui::{
         Context, IntoElement, Modifiers, Render, TestAppContext, VisualTestContext, Window, div,
