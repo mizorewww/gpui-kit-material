@@ -203,6 +203,7 @@ pub struct TopAppBar {
     navigation: Option<AnyElement>,
     actions: Vec<AnyElement>,
     scroll_offset: f32,
+    scrolled_under: Option<bool>,
     search_placeholder: SharedString,
     on_search: Option<ClickHandler>,
     preview: Option<InteractionPreview>,
@@ -220,6 +221,7 @@ impl TopAppBar {
             navigation: None,
             actions: Vec::new(),
             scroll_offset: 0.,
+            scrolled_under: None,
             search_placeholder: SharedString::default(),
             on_search: None,
             preview: None,
@@ -261,6 +263,16 @@ impl TopAppBar {
         self
     }
     /// How far the content under the bar has scrolled, in design px.
+    /// Override the scrolled-under state the offset implies, e.g. for a bar
+    /// over content the caller knows is scrolled, or a static specimen. A
+    /// flexible bar still collapses with the offset alone.
+    pub fn scrolled_under(mut self, scrolled: bool) -> Self {
+        self.scrolled_under = Some(scrolled);
+        self
+    }
+    fn is_scrolled_under(&self) -> bool {
+        self.scrolled_under.unwrap_or(self.scroll_offset > 0.)
+    }
     pub fn scroll_offset(mut self, offset: f32) -> Self {
         self.scroll_offset = offset.max(0.);
         self
@@ -330,7 +342,7 @@ impl RenderOnce for TopAppBar {
         let subtitle = self.subtitle.is_some();
         let scrolled = motion::token_value(
             (self.id.clone(), "app-bar-scrolled"),
-            if self.scroll_offset > 0. { 1. } else { 0. },
+            if self.is_scrolled_under() { 1. } else { 0. },
             MotionToken::DefaultEffects,
             window,
             cx,
@@ -400,6 +412,7 @@ impl RenderOnce for TopAppBar {
                                 .px(rem(SEARCH_PADDING))
                                 .flex()
                                 .items_center()
+                                .justify_start()
                                 .rounded_full()
                                 .bg(paint.search)
                                 .text_color(ink)
