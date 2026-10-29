@@ -1,8 +1,10 @@
 //! Material button presentation over GPUI Base activation and focus behavior.
 //! Reference: floor/material c910072f3fc5b660276731d8a935d7186f288364.
-//! Ripple, expanded touch targets and toggle/loading semantics are still pending.
+//! Expanded touch targets and toggle/loading semantics are still pending.
 mod effects;
 mod focus_ring;
+mod ripple;
+mod ripple_clip;
 mod shadow;
 
 use effects::CssColor;
@@ -381,6 +383,7 @@ pub struct MaterialButton {
     size: ButtonSize,
     shape: ButtonShape,
     disabled: bool,
+    ripple: bool,
     style: StyleRefinement,
 }
 impl MaterialButton {
@@ -407,6 +410,7 @@ impl MaterialButton {
             size: ButtonSize::Small,
             shape: ButtonShape::Round,
             disabled: false,
+            ripple: true,
             style: StyleRefinement::default(),
         }
     }
@@ -438,6 +442,11 @@ impl MaterialButton {
     pub fn disabled(mut self, disabled: bool) -> Self {
         self.disabled = disabled;
         self.base = self.base.disabled(disabled);
+        self
+    }
+    /// Enable the pointer ripple (enabled by default).
+    pub fn ripple(mut self, enabled: bool) -> Self {
+        self.ripple = enabled;
         self
     }
     pub fn accessibility_label(mut self, label: impl Into<SharedString>) -> Self {
@@ -561,7 +570,7 @@ impl RenderOnce for MaterialButton {
             (self.id.clone(), "state-opacity"),
             if self.disabled {
                 0.
-            } else if active || focused {
+            } else if (active && !self.ripple) || focused {
                 0.10
             } else if hovered {
                 0.08
@@ -641,10 +650,34 @@ impl RenderOnce for MaterialButton {
         };
         let weak = pressed.downgrade();
         // A window exit must clear a held press even after the pointer has left
-        // the button. This canvas creates no hitbox and never handles activation.
+        // the button. Its non-occluding hitbox only locates passive touch presses.
+        let touch_enabled = !self.disabled;
         let exit_observer = canvas(
-            |_, _, _| (),
-            move |bounds, _, window, _| {
+            |bounds, window, _| window.insert_hitbox(bounds, HitboxBehavior::Normal),
+            move |bounds, hitbox, window, _| {
+                let touch = weak.clone();
+                window.observe_touch_event(move |event, window, cx| match event.phase {
+                    TouchPhase::Started
+                        if touch_enabled && hitbox.is_hovered_at(event.position, window) =>
+                    {
+                        let _ = touch.update(cx, |state, cx| {
+                            state.pointer = true;
+                            state.hovered = false;
+                            state.outside_window = false;
+                            cx.notify();
+                        });
+                    }
+                    TouchPhase::Ended | TouchPhase::Cancelled => {
+                        let _ = touch.update(cx, |state, cx| {
+                            if state.pointer {
+                                state.pointer = false;
+                                state.hovered = false;
+                                cx.notify();
+                            }
+                        });
+                    }
+                    _ => {}
+                });
                 let moving = weak.clone();
                 window.on_mouse_event(move |event: &MouseMoveEvent, phase, window, cx| {
                     if phase == DispatchPhase::Capture {
@@ -737,7 +770,7 @@ impl RenderOnce for MaterialButton {
                     callback(&caller_hovered, window, cx);
                 }
             });
-        let base = base
+        let mut base = base
             .flex()
             .flex_row()
             .when(self.direction == ButtonDirection::Rtl, |b| {
@@ -763,6 +796,27 @@ impl RenderOnce for MaterialButton {
             .shadow(shadows.into_shadows())
             .when(!self.disabled, |b| b.cursor_pointer())
             .refine_style(&self.style);
+        let mut painted_style = Style::default();
+        painted_style.refine(base.style());
+        let mut ripple_color = painted_style.text.color.map(Rgba::from).unwrap_or(fg);
+        // Base's opacity scope ends after child.paint; apply the same local
+        // multiplier to the overlay (ancestor opacity remains in Window).
+        ripple_color.a *= painted_style.opacity.unwrap_or(1.);
+        let ripple_visible = painted_style.visibility == Visibility::Visible;
+        if !ripple_visible {
+            ripple_color.a = 0.;
+        }
+        let base = ripple::ButtonRipple::new(
+            base,
+            self.id,
+            self.ripple,
+            !self.disabled && ripple_visible,
+            painted_style.corner_radii,
+            painted_style.border_widths,
+            ripple_color,
+            window,
+            cx,
+        );
         focus_ring::ButtonFocusRing::new(base, focus, !self.disabled && self.focusable, rem(radius))
     }
 }
@@ -784,6 +838,7 @@ mod tests {
 
     struct EffectsHarness {
         disabled: bool,
+        ripple: bool,
         sample: std::rc::Rc<std::cell::RefCell<(f32, super::shadow::ShadowPair)>>,
         focus: gpui::FocusHandle,
         hovers: Vec<bool>,
@@ -795,6 +850,7 @@ mod tests {
             window.set_rem_size(px(14.));
             crate::motion::apply_scheme(crate::motion::MotionScheme::Expressive);
             let mut button = MaterialButton::new("effects")
+                .ripple(self.ripple)
                 .disabled(self.disabled)
                 .track_focus(&self.focus)
                 .debug_selector(|| "effects".into())
@@ -810,6 +866,62 @@ mod tests {
         }
     }
     #[gpui::test]
+    fn default_ripple_suppresses_pressed_layer_but_retains_hover_and_keyboard_focus(
+        cx: &mut TestAppContext,
+    ) {
+        use super::shadow::ShadowPair;
+        use gpui::{MouseButton, MouseMoveEvent};
+        use std::{cell::RefCell, rc::Rc, time::Duration};
+        cx.update(gpui_base::init);
+        assert!(MaterialButton::new("default").ripple);
+        let sample = Rc::new(RefCell::new((0., ShadowPair::level(0))));
+        let (_, cx) = cx.add_window_view({
+            let sample = sample.clone();
+            move |_, cx| EffectsHarness {
+                disabled: false,
+                ripple: true,
+                sample,
+                focus: cx.focus_handle(),
+                hovers: vec![],
+                hover_mode: gpui::HoverListenerMode::InputModalityAware,
+                activations: 0,
+            }
+        });
+        draw(cx);
+        let center = cx.debug_bounds("effects").unwrap().center();
+        cx.simulate_event(MouseMoveEvent {
+            position: center,
+            pressed_button: None,
+            modifiers: Modifiers::default(),
+        });
+        cx.run_until_parked();
+        draw(cx);
+        cx.executor().advance_clock(Duration::from_millis(100));
+        draw(cx);
+        assert_eq!(sample.borrow().0, 0.08);
+        cx.simulate_mouse_down(center, MouseButton::Left, Modifiers::default());
+        draw(cx);
+        cx.executor().advance_clock(Duration::from_millis(100));
+        draw(cx);
+        assert_eq!(
+            sample.borrow().0,
+            0.08,
+            "a pointer wave coexists with hover, without adding the pressed state layer"
+        );
+        cx.simulate_mouse_up(center, MouseButton::Left, Modifiers::default());
+        draw(cx);
+        key(cx, "space", true);
+        draw(cx);
+        cx.executor().advance_clock(Duration::from_millis(100));
+        draw(cx);
+        assert_eq!(
+            sample.borrow().0,
+            0.1,
+            "keyboard focus keeps its separate state layer"
+        );
+        key(cx, "space", false);
+    }
+    #[gpui::test]
     fn state_opacity_and_shadow_have_independent_event_clocks(cx: &mut TestAppContext) {
         use super::shadow::ShadowPair;
         use gpui::{MouseButton, MouseMoveEvent, point};
@@ -820,6 +932,7 @@ mod tests {
         let (view, cx) = cx.add_window_view({
             let sample = sample.clone();
             move |_, cx| EffectsHarness {
+                ripple: false,
                 disabled: false,
                 sample,
                 focus: cx.focus_handle(),
@@ -1006,6 +1119,7 @@ mod tests {
         let (view, cx) = cx.add_window_view({
             let sample = sample.clone();
             move |_, cx| EffectsHarness {
+                ripple: false,
                 disabled: false,
                 sample,
                 focus: cx.focus_handle(),
@@ -1062,8 +1176,8 @@ mod tests {
         draw(cx);
         assert_eq!(
             *sample.borrow(),
-            (0., ShadowPair::level(0)),
-            "touch must not retain hover or keyboard focus layers"
+            (0.1, ShadowPair::level(0)),
+            "without ripple, held touch uses its pressed layer and drops hover elevation"
         );
         cx.simulate_event(gpui::TouchEvent {
             id: gpui::TouchId(1),
@@ -1391,6 +1505,76 @@ mod tests {
         } else {
             cx.simulate_event(gpui::KeyUpEvent { keystroke });
         }
+    }
+    #[gpui::test]
+    fn raw_touch_animates_held_shape_and_cancellation_preserves_base_activation(
+        cx: &mut TestAppContext,
+    ) {
+        use gpui::{TouchEvent, TouchId, TouchPhase};
+        use std::{cell::Cell, rc::Rc, time::Duration};
+        cx.update(gpui_base::init);
+        let sample = Rc::new(Cell::new(0.));
+        let (view, cx) = cx.add_window_view({
+            let sample = sample.clone();
+            move |_, cx| MotionHarness {
+                disabled: false,
+                shown: true,
+                sample,
+                focus: cx.focus_handle(),
+                other: cx.focus_handle(),
+                activations: 0,
+            }
+        });
+        draw(cx);
+        let center = cx.debug_bounds("motion-button").unwrap().center();
+        cx.simulate_event(TouchEvent {
+            id: TouchId(1),
+            phase: TouchPhase::Started,
+            position: center,
+            ..Default::default()
+        });
+        draw(cx);
+        assert_eq!(sample.get(), 48.);
+        cx.executor().advance_clock(Duration::from_millis(100));
+        draw(cx);
+        let expected = 48.
+            + (16. - 48.)
+                * crate::motion::MotionScheme::Expressive
+                    .resolve(crate::motion::MotionToken::FastSpatial)
+                    .ease()(0.1 / 0.425);
+        assert!((sample.get() - expected).abs() < 0.001);
+        cx.update(|_, cx| assert_eq!(view.read(cx).activations, 0));
+        cx.simulate_event(TouchEvent {
+            id: TouchId(1),
+            phase: TouchPhase::Cancelled,
+            position: center,
+            ..Default::default()
+        });
+        draw(cx);
+        cx.executor().advance_clock(Duration::from_millis(500));
+        draw(cx);
+        assert_eq!(sample.get(), 48.);
+        cx.update(|_, cx| {
+            assert_eq!(view.read(cx).activations, 0);
+            cx.set_reduce_motion(true);
+        });
+        cx.simulate_event(TouchEvent {
+            id: TouchId(2),
+            phase: TouchPhase::Started,
+            position: center,
+            ..Default::default()
+        });
+        draw(cx);
+        assert_eq!(sample.get(), 16.);
+        cx.simulate_event(TouchEvent {
+            id: TouchId(2),
+            phase: TouchPhase::Ended,
+            position: center,
+            ..Default::default()
+        });
+        draw(cx);
+        assert_eq!(sample.get(), 48.);
+        cx.update(|_, cx| assert_eq!(view.read(cx).activations, 1));
     }
     #[gpui::test]
     fn press_radius_matches_reference_and_retargets_without_jumps(cx: &mut TestAppContext) {
