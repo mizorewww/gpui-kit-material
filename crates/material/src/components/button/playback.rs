@@ -140,13 +140,15 @@ pub(super) fn state_opacity(
     hovered: bool,
 ) -> f32 {
     if controlled_active && !ripple {
-        0.10
+        state::PRESS
     } else if disabled {
         0.
-    } else if (active && !ripple) || focused {
-        0.10
+    } else if active && !ripple {
+        state::PRESS
+    } else if focused {
+        state::FOCUS
     } else if hovered {
-        0.08
+        state::HOVER
     } else {
         0.
     }
@@ -238,8 +240,10 @@ mod tests {
                 MotionToken::DefaultEffects,
                 cx,
             );
-            playback.opacity_target.set(0.08);
-            playback.opacity.sample(0.08, opacity_policy(), cx);
+            playback.opacity_target.set(crate::tokens::state::HOVER);
+            playback
+                .opacity
+                .sample(crate::tokens::state::HOVER, opacity_policy(), cx);
             cx.set_reduce_motion(true);
             motion::set_motion_scheme(motion::MotionScheme::Standard);
             playback.sync(inputs, cx);
@@ -251,7 +255,7 @@ mod tests {
                     .value,
                 pressed
             );
-            assert_eq!(playback.opacity_target.get(), 0.08);
+            assert_eq!(playback.opacity_target.get(), crate::tokens::state::HOVER);
             // Same target remains a continuation, not a rest-target reversal.
             assert_eq!(
                 playback

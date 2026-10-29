@@ -3,9 +3,19 @@
 mod button;
 pub use button::{
     ButtonDirection, ButtonIconPosition, ButtonProgressPlayback, ButtonShape, ButtonSize,
-    ButtonTransitionInputs, ButtonTransitionPlayback, ButtonVariant, MaterialButton,
-    material_button,
+    ButtonTransitionInputs, ButtonTransitionPlayback, ButtonVariant, FabSize, IconButtonWidth,
+    MaterialButton, material_button,
 };
+mod fab;
+pub use fab::{ExtendedFab, Fab, FabColor};
+mod fab_menu;
+pub use fab_menu::{FabMenu, FabMenuColor, FabMenuItem};
+mod icon_button;
+mod split_button;
+mod standard_button_group;
+pub use icon_button::{IconButton, IconButtonVariant};
+pub use split_button::{SplitButton, SplitButtonPart};
+pub use standard_button_group::{ButtonGroup, EXPANDED_RATIO, standard_group_gap};
 mod button_group;
 mod controls;
 mod divider;
