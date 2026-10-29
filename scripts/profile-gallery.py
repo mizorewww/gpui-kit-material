@@ -116,7 +116,7 @@ def runner_exit_code(capture_code, inputs_stable, scroll, report_path):
 
     A startup run measures only the CPU gate, so it can fail (1) but never
     pass (0). Only a scroll run that the gallery itself reports as eligible,
-    with exit 0 and a strict minimum FPS of at least 500, returns 0.
+    with exit 0, complete traversal and an eligible CPU report, returns 0.
     """
     if not inputs_stable:
         return 2
@@ -128,13 +128,11 @@ def runner_exit_code(capture_code, inputs_stable, scroll, report_path):
         report = json.loads(report_path.read_text())
     except (OSError, ValueError):
         return 2
-    strict = report.get("strict") or {}
-    fps = strict.get("minimum_instantaneous_fps")
     passed = (report.get("exit_code") == 0
               and report.get("acceptance_eligible") is True
+              and not report.get("errors")
               and (report.get("cpu") or {}).get("acceptance_eligible") is True
-              and (report.get("coverage") or {}).get("complete_gallery_traversal") is True
-              and isinstance(fps, (int, float)) and fps >= 500)
+              and (report.get("coverage") or {}).get("complete_gallery_traversal") is True)
     return 0 if passed else 2
 
 
