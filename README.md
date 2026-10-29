@@ -119,6 +119,9 @@ Use `.icon(...)` for a decorative SVG icon, `.icon_position(...)` for logical
 Leading/Trailing placement, and `.direction(ButtonDirection::Rtl)` for mirrored
 layout. Slot dimensions follow button size, and disabled icons use the disabled
 content role even when the supplied icon has a custom color.
+Button text defaults to its type role’s font family (Roboto); caller
+`.font_family(...)` overrides remain supported. Applications must register the
+font to obtain reference glyph metrics; otherwise GPUI uses its font fallback.
 
 The gallery includes all 50 variant/size/shape combinations, disabled samples,
 controlled toggles, and loading examples with no icon or either icon placement.

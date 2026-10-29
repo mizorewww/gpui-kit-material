@@ -1009,6 +1009,7 @@ impl RenderOnce for MaterialButton {
             .rounded(rem(radius))
             .bg(layer(bg, fg, opacity))
             .text_color(fg)
+            .font_family(ty.font_family)
             .text_size(ty.font_size)
             .line_height(ty.line_height)
             .font_weight(FontWeight(ty.font_weight as f32))
