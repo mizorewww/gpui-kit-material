@@ -1,0 +1,23 @@
+[
+  {
+    "dy": 600,
+    "mode": 0,
+    "target": "TEXTAREA",
+    "x": 0,
+    "y": 0
+  },
+  {
+    "dy": 600,
+    "mode": 0,
+    "target": "CANVAS",
+    "x": 700,
+    "y": 350
+  },
+  {
+    "dy": -400,
+    "mode": 0,
+    "target": "CANVAS",
+    "x": 700,
+    "y": 350
+  }
+]

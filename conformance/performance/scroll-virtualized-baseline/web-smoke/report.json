@@ -1,0 +1,32 @@
+{
+  "source_commit_at_build": "502a6dfd8bda35c68f4baf1144242f5db996e5ce",
+  "build_command": "./scripts/build-gallery-web.sh",
+  "backend": "Fast default / BrowserWebGpu",
+  "viewport": [
+    1280,
+    577
+  ],
+  "fps_samples": [
+    3.9,
+    37.5,
+    37.6,
+    32.5,
+    21.3
+  ],
+  "settings": "Unsupported Vertical sync switch disabled, browser-controlled explanation; close button removes dialog",
+  "navigation": "Themes to Buttons changes visible contents; screenshot05",
+  "real_wheel": "Browser CDP Input.dispatchMouseEvent mouseWheel at(700,350), target CANVAS; +600 reveals xl buttons screenshot08; -400 returns xs/s/m/l screenshot09",
+  "tool_issue": "agent-browser mouse wheel emitted wheel at(0,0) target TEXTAREA despite preceding mouse move; fallback uses same ownedbrowser CDP real input, no DOM-dispatched wheel or direct state mutation",
+  "console_errors": "",
+  "result": "runtime smoke PASS only",
+  "not_claimed": [
+    "500FPS acceptance",
+    "CPU <=2ms",
+    "full pixel conformance",
+    "full Gallery traversal"
+  ],
+  "cleanup": {
+    "browser_closed": true,
+    "server_8094_stopped": true
+  }
+}
