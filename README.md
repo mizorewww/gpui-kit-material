@@ -253,6 +253,17 @@ cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace
 ```
 
+The vendored paragraph-layout regressions run separately from workspace tests:
+
+```sh
+cargo test -p gpui-pre --test line_layout_options
+cargo test -p gpui-pre --lib text_system
+```
+
+CI runs these on macOS and separately checks and builds the WASM gallery with
+the matching wasm-bindgen CLI. Browser rendering and component conformance
+review remain separate from build checks.
+
 ## License
 
 MIT. Palette sources and their licenses are listed in
