@@ -12,3 +12,9 @@ build definitions.
 The local detailed-layout extension preserves CoreText's glyph positions,
 paragraph direction, shaping clusters, and visual caret intervals. Existing
 layout calls continue using the upstream path.
+
+The presentation path adds `draw_with_status` for actual command-buffer
+submission reporting. Its per-call autorelease pool drains temporary Metal
+references before returning to the presentation timer, including early returns;
+demand frames need not wait for the enclosing Cocoa event-loop pool.
+Synchronization, drawable timeout, buffering, and counting policy are unchanged.

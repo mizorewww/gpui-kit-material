@@ -524,47 +524,53 @@ impl MetalRenderer {
     /// Submit a drawable and report whether a real command buffer/presentation
     /// was issued. This is not GPU completion or display presentation timing.
     pub fn draw_with_status(&mut self, scene: &Scene) -> bool {
-        let layer = match &self.layer {
-            Some(l) => l.clone(),
-            None => {
+        // Dispatch-source demand frames can run without returning to the
+        // enclosing Cocoa event-loop pool. Release per-draw autoreleased Metal
+        // objects here, before returning to the measured presentation caller.
+        // Only a bool escapes; drawable/encoder borrows remain inside the pool.
+        objc2::rc::autoreleasepool(|_| {
+            let layer = match &self.layer {
+                Some(l) => l.clone(),
+                None => {
+                    log::error!(
+                        "draw() called on headless renderer - use render_scene_to_image() instead"
+                    );
+                    return false;
+                }
+            };
+            let viewport_size = layer.drawable_size();
+            let viewport_size: Size<DevicePixels> = size(
+                (viewport_size.width.ceil() as i32).into(),
+                (viewport_size.height.ceil() as i32).into(),
+            );
+            let drawable = if let Some(drawable) = layer.next_drawable() {
+                drawable
+            } else {
                 log::error!(
-                    "draw() called on headless renderer - use render_scene_to_image() instead"
+                    "failed to retrieve next drawable, drawable size: {:?}",
+                    viewport_size
                 );
                 return false;
-            }
-        };
-        let viewport_size = layer.drawable_size();
-        let viewport_size: Size<DevicePixels> = size(
-            (viewport_size.width.ceil() as i32).into(),
-            (viewport_size.height.ceil() as i32).into(),
-        );
-        let drawable = if let Some(drawable) = layer.next_drawable() {
-            drawable
-        } else {
-            log::error!(
-                "failed to retrieve next drawable, drawable size: {:?}",
-                viewport_size
-            );
-            return false;
-        };
+            };
 
-        let command_buffer = match self.render_frame(scene, drawable.texture(), viewport_size) {
-            Ok(command_buffer) => command_buffer,
-            Err(error) => {
-                log::error!("failed to render: {error:#}");
-                return false;
-            }
-        };
+            let command_buffer = match self.render_frame(scene, drawable.texture(), viewport_size) {
+                Ok(command_buffer) => command_buffer,
+                Err(error) => {
+                    log::error!("failed to render: {error:#}");
+                    return false;
+                }
+            };
 
-        if self.presents_with_transaction {
-            command_buffer.commit();
-            command_buffer.wait_until_scheduled();
-            drawable.present();
-        } else {
-            command_buffer.present_drawable(drawable);
-            command_buffer.commit();
-        }
-        true
+            if self.presents_with_transaction {
+                command_buffer.commit();
+                command_buffer.wait_until_scheduled();
+                drawable.present();
+            } else {
+                command_buffer.present_drawable(drawable);
+                command_buffer.commit();
+            }
+            true
+        })
     }
 
     fn render_frame(

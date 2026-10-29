@@ -81,5 +81,9 @@
   "archive_verification": {
     "files": 48,
     "mismatches": []
+  },
+  "presentation_patch": {
+    "path": "src/metal_renderer.rs",
+    "scope": "draw_with_status reports real command-buffer submission; a per-call autoreleasepool drains temporary Metal references before returning to the presentation timer, including early returns. No synchronization, drawable timeout, buffering, or counting policy changes."
   }
 }
