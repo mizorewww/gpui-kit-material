@@ -201,7 +201,7 @@
     },
     "examples/image/exif-orientation-rotate-180.jpg": {
       "sha256": "cb6c28e3e6065d62790ba38662d14f3f1510180375cacba18547720e8b48d9d5",
-      "source": "matching fixture in vendor/gpui-pre; font licenses retained alongside the files"
+      "source": "identical to the file in the published gpui-pre 0.3.10 archive (and vendor/gpui-pre); used by a src/platform.rs test"
     }
   },
   "warning_patches": [
@@ -227,5 +227,181 @@
       "path": "src/window.rs, src/profiler.rs",
       "scope": "PresentTiming.successful_new_frame carries the existing distinct-draw successful-submission decision: true for a confirmed new generation, false for known failed or repeated submission, unknown when counters are unavailable or reset. Raw events preserve failed-attempt/retry outcomes independently of latency filtering and pending-draw consumption; present_end is CPU observation of submission, not GPU completion or scanout. Complete CPU scope timing and submission behavior are unchanged."
     }
-  ]
+  ],
+  "local_changes": {
+    "scope": "Every file that differs from the extracted published archive (Cargo's .cargo-ok extraction marker excluded); MATERIAL-MIGRATION.json itself is provenance.",
+    "modified": {
+      "Cargo.toml": {
+        "upstream_sha256": "1f8d49e1f08e320cf393fcacb2ac402044ddb7aaf8dffc4572e31aa3d5a9e7ea",
+        "local_sha256": "79f414781c446fda6edb8ba461ef303e4a8d27074d8e9441d52baab63ced140b",
+        "reason": "unicode-segmentation =1.13.3 and the line_layout_options [[test]], as vendor/gpui-pre/line-layout-options-patch.md."
+      },
+      "src/app.rs": {
+        "upstream_sha256": "2d698e066335022335d3b3f4611f66e55e192fedeee56b1960ebea3f0a62eb23",
+        "local_sha256": "56ac979976d49c802d6630b7fb9fbb0878079967bbefa1d81f41309bf0c7d0ac",
+        "reason": "CpuFrameScope around initial and test-app draws (vendor/gpui-pre/cpu-frame-scope-patch.md)."
+      },
+      "src/app/bench_context.rs": {
+        "upstream_sha256": "6bef320831a933502651903f85b849b6ea371b84c6822b7b88d3e064dc8c9818",
+        "local_sha256": "30293a50e5b164b738f59a438387dd103d67ba83dbe8c2018a1ce92d6c232f4a",
+        "reason": "Ignore FrameEvent::Complete in legacy phase metrics (vendor/gpui-pre/cpu-frame-scope-patch.md)."
+      },
+      "src/elements/animation.rs": {
+        "upstream_sha256": "117a4b1a580382b21accce30308f0480853c1e9372220566748dcb5f74d5793e",
+        "local_sha256": "da466d2d926998f334aac8b4871d807a4eda8b972f8df8c9ea05abc0fe382a2d",
+        "reason": "Executor-clock sampling, repeat_when_visible and RepeatAnimationPlayback (vendor/gpui-pre/animation-visibility-patch.md)."
+      },
+      "src/elements/div.rs": {
+        "upstream_sha256": "fa6378a65d066a46670dea1b65d305c25e2e7f06c1ced9f7a4175e1adb1aa8dc",
+        "local_sha256": "f3f5d129b649d91191b494942e58e25bd687815dfaa6518622f3e3b004dbfb7a",
+        "reason": "hitbox_extension builder and contains_pointer hit testing (vendor/gpui-pre/hitbox-extension-patch.md)."
+      },
+      "src/fast/composition.rs": {
+        "upstream_sha256": "0d60427202a86fdfde3bc75ee90cae144d0822363deb4f7d879b4523c528a880",
+        "local_sha256": "9e486eaedcf5e0e629486051b05a687e317763f16f157600eb8052480f8ee515",
+        "reason": "Composition input regions clip the visual and extension rectangles independently and hit-test both (composition_hitbox_contains), so an extension-only target neither disappears nor fills the gap (hitbox extension)."
+      },
+      "src/fast/layers/input.rs": {
+        "upstream_sha256": "e54dce67c2eee996a785b181ea478330467780c3149c73647f23582b965ccb23",
+        "local_sha256": "85e39dacf74cda812467fa467822fe3675ee96b5b0f442c0acb5a447ff660c29",
+        "reason": "Scrolled layer replay translates Hitbox.additional_bounds with the visual bounds, keeping identity and viewport clip (hitbox extension)."
+      },
+      "src/fast/layers/lists.rs": {
+        "upstream_sha256": "d167ae8af3ae59a8c3eaa0ee20c8f933521200b6b882775f3e4120e9180a538f",
+        "local_sha256": "7f191273a738c0ec408e93f433322c2780f96788198939d2850cd5c561235fa8",
+        "reason": "List hit testing uses Hitbox::contains_pointer (hitbox extension)."
+      },
+      "src/fast/layers/mod.rs": {
+        "upstream_sha256": "0e3437497f6eb5ba8d4df09464302a3ed616a9bfc037cda88c4d1d5ee968381c",
+        "local_sha256": "439713d9bf140643873311f8cb4a82084a4621719c6cf78ef1389789fd4a0270",
+        "reason": "Layer reuse is disallowed after a font-generation change (font registration invalidation)."
+      },
+      "src/fast/layers/reuse.rs": {
+        "upstream_sha256": "8259c4c5b53a8d9818786dbdedc377b8da4a8b1c84baafa65dd89cfb562b3f3f",
+        "local_sha256": "3ea103c11235d4ed749428098f5e0f264b5dc979b306ea600d38a8592694fcb1",
+        "reason": "Carried paint records move touch observers and check their index range (touch observers through retained replay); debug-bounds borrows moved inside the test-support cfg to avoid unused-variable warnings (warning_patches)."
+      },
+      "src/fast/layout_key.rs": {
+        "upstream_sha256": "07732d58977e847f9200f3fbdd36efd26d660e8c929aa74ffed12d45b9802471",
+        "local_sha256": "8c6f9252b1bae7b88ee562855fbe8534998459805c3854f479ca243f5181f50a",
+        "reason": "Scene description includes additional_bounds so layout/oracle comparisons see extension changes (hitbox extension)."
+      },
+      "src/fast/retained.rs": {
+        "upstream_sha256": "e6885ba63fccd9375a0afc80b657463790cc9a39f639676997f8fa293b1beb6b",
+        "local_sha256": "a246a92c3c92f83645324ecad5a465108d2463627e0fc84f6f0aaf71b47ed24e",
+        "reason": "Font-generation change forces a refreshing frame and blocks view/layout retention; PaintIndex gains touch_observers_index (equality and shifting); touch-replay tests."
+      },
+      "src/fast/splice.rs": {
+        "upstream_sha256": "4436ab4f8934aec0e95e73edf69fb3ea36c1b01cb6fe494037cb9923ea221efd",
+        "local_sha256": "12d873c49c9d60155ead908d183083911ab16816deee3072287eee7f347b6aba",
+        "reason": "Layout splicing is refused or invalidated after a font-generation change (font registration invalidation)."
+      },
+      "src/fast/tests/layers_oracle.rs": {
+        "upstream_sha256": "ff28ee326fccca43f6d3a04bf7f3d76693ee0d09e6096c3101fabdc1177f35e6",
+        "local_sha256": "33764049ae7efa57ecb1ce74af890eff91a4e0f3001555171e765035db21906f",
+        "reason": "Oracle hitbox description includes the clipped extension rectangle (hitbox extension, test only)."
+      },
+      "src/fast/tests/retained.rs": {
+        "upstream_sha256": "95fbb8389daf15e227312b07d2794ba109406071a780d3f4d9224e61f722173b",
+        "local_sha256": "54c5fcb2b860bc00a2c96b0688b2de2c35616ff280d9746c54736c487ec481d0",
+        "reason": "Test: font registration rebuilds cached views without an entity notification."
+      },
+      "src/fast/text.rs": {
+        "upstream_sha256": "e386a393269aee9189cb87c2a1f40f40fb4716b2cd98e6a394e052b318177814",
+        "local_sha256": "bf9df6e2acfc6666f947841b28cc1e0d8b6ef0c05228835502e60588d0f9a519",
+        "reason": "Text measurement inputs carry the font generation and drop stale held layouts; frame carry-over of the detailed-line cache (font invalidation and line-layout options)."
+      },
+      "src/platform.rs": {
+        "upstream_sha256": "7f95c2fe68fc225cb45451888355c4df2589632d7bde0d61fce554972f4825ca",
+        "local_sha256": "8f61a3b5496db874994fbf7b7556be0dc413165ce4e453a71c8b6db68988bc6a",
+        "reason": "VsyncStatus, vsync_status/set_vsync, has_periodic_frame_source, successful_frame_submissions (vendor/gpui-pre/frame-submission-patch.md); layout_line_with_options (line-layout-options-patch.md)."
+      },
+      "src/platform/test/window.rs": {
+        "upstream_sha256": "3b359c9e7943ccb065096c718756b32400dac3394bfd9ab6f361dda8163e97bd",
+        "local_sha256": "bdbe9eb2e46f4f8204db9a8a6b0d7012957fc92adaa1bfa96d9afa7e59a31b15",
+        "reason": "periodic_frame_source switch for the throttle-retry test (vendor/gpui-pre/frame-submission-patch.md)."
+      },
+      "src/profiler.rs": {
+        "upstream_sha256": "65e9553a9d6c6606e0425ee075a6b482ffce39656672ee6fc4ca2b46812e4fcb",
+        "local_sha256": "2d21fd1c7c986c73cd1c8aa66f6881d8379747313107966e5d3b028f5e08f174",
+        "reason": "CPU frame scopes (cpu-frame-scope-patch.md); presentation wait, GpuExecution store, successful_new_frame, raw Present recording, try_update (presentation-timing-patch.md); see profiler_patches."
+      },
+      "src/profiler/hang.rs": {
+        "upstream_sha256": "c174ede51b6cc4da1345553d32323b063f1ae727f89c266affca42a04b2e3759",
+        "local_sha256": "081a02c645c6bc1a5207addb7a003abaf7eca3975f45a2afb8d379dca3e0429d",
+        "reason": "Test fixtures set successful_new_frame; the slow-view journal test matches samples to the Draw event that contains them, because Fast can retain views in later frames without re-rendering (test only)."
+      },
+      "src/profiler/journal.rs": {
+        "upstream_sha256": "78240995b3727fb3cdcf4f8c06f38f81c49f9a3a0793b414450e19bb7da00c3e",
+        "local_sha256": "61b815bdb44b5812b1ce377c1660ac9ee4e3c9ba6f34faa7a457332e347b4e6b",
+        "reason": "try_update instead of deprecated fetch_update; test fixtures set successful_new_frame (presentation-timing-patch.md)."
+      },
+      "src/style.rs": {
+        "upstream_sha256": "d2c9e53fb00271f2dde4afc5a65837b4e1ae83b8849b92b17afe0799b6ed69ce",
+        "local_sha256": "eb805acedbd5ed4afb5d7ed8f6d73ca5a949fd16d5985bc8206364a4ca1cee80",
+        "reason": "Replace unpublished util_macros #[perf] with #[test] (vendor/gpui-pre/test-harness-patch.md)."
+      },
+      "src/svg_renderer.rs": {
+        "upstream_sha256": "fb12dae87c0cd4c5f5a1fbbd2f9548d52fde9440c21e3d576dfeb0233eda88a6",
+        "local_sha256": "d9a399c9021fddbc1afb13f168bc4ecd8e67a0034098bfabcc63e74b323a0dfb",
+        "reason": "SVG tests load fonts from tests/fonts (vendor/gpui-pre/test-harness-patch.md)."
+      },
+      "src/text_system.rs": {
+        "upstream_sha256": "e07554d460982d07546b4d67d9cd02162853b27a9cab7f53a9266626fff27346",
+        "local_sha256": "bf1ba1916bbc8ee9fe32df256009da273ed725f3c5784dded292e8ac419d2739",
+        "reason": "Detailed layout entry points and em_width/em_advance fallback (line-layout-options-patch.md); add_fonts invalidates Fast text caches after the platform installs the fonts instead of before, and exposes font_generation() to the Fast retention checks."
+      },
+      "src/text_system/line_layout.rs": {
+        "upstream_sha256": "757c2672c0831f9f848845c6ac74dece3c6e0401613b1e00325129cbf1548c08",
+        "local_sha256": "a6dacb5437ee9e3cc63c0e3f62d38ecb57c3d9b42971862749b501a2d91d0c39",
+        "reason": "Separate detailed-layout frame cache with index, reuse and truncation; fields pub(crate) for Fast's text-cache carry-over (line-layout-options-patch.md)."
+      },
+      "src/window.rs": {
+        "upstream_sha256": "d3f00c28cc47446f6c73be67d00830446e0e3a9a7fadefdf54fff9e5ccadee0b",
+        "local_sha256": "70ce7305427ed2923b2cf3cb7b02761b5f7fa353fe69283981a4dfd7bbd9d62e",
+        "reason": "Same GPUI window patches as vendor/gpui-pre (hitbox extension, touch observers, CPU frame scope, submission stats/vsync/throttle retry, present outcome); touch-observer storage and FrameDirtyAccumulator made pub(crate) for Fast layer reuse."
+      }
+    },
+    "added": {
+      "examples/image/exif-orientation-rotate-180.jpg": {
+        "sha256": "cb6c28e3e6065d62790ba38662d14f3f1510180375cacba18547720e8b48d9d5",
+        "reason": "Added: fixture included by a src/platform.rs test; identical to the published gpui-pre 0.3.10 archive file, absent from the gpui-fast archive."
+      },
+      "src/text_system/line_layout_options.rs": {
+        "sha256": "c6c61dd6adc811245cfaeba129034910b53955c50f5eda40ccd25b8b37a8a57f",
+        "reason": "Added: identical to vendor/gpui-pre (line-layout-options-patch.md)."
+      },
+      "tests/fonts/README.md": {
+        "sha256": "675824dd97a1d09a1a105d186a7b96a05016009d5d14621d6f5298612b3fbc6d",
+        "reason": "Added: test-font provenance, identical to vendor/gpui-pre (additional_test_fixtures)."
+      },
+      "tests/fonts/ibm-plex-sans/IBMPlexSans-Regular.ttf": {
+        "sha256": "975dcda37d80f038dcd143c22e33ca2d97a0cc5a929aace1c749153b0fe1afa5",
+        "reason": "Added: SVG test font, identical to vendor/gpui-pre."
+      },
+      "tests/fonts/ibm-plex-sans/license.txt": {
+        "sha256": "91c25c350d3cac39da2736d74f7ba37ef648f5237a4e330a240615bc8d8c4360",
+        "reason": "Added: font license, identical to vendor/gpui-pre."
+      },
+      "tests/fonts/lilex/Lilex-Regular.ttf": {
+        "sha256": "8a467ad5a1941dc7c9cebaee34e3ed9364a73b48393034e363e4b528bd711d04",
+        "reason": "Added: SVG test font, identical to vendor/gpui-pre."
+      },
+      "tests/fonts/lilex/OFL.txt": {
+        "sha256": "a356708a399e3f54b937ec7d9b722c26dabba21365b60f95c56eb7ebca0dee40",
+        "reason": "Added: font license, identical to vendor/gpui-pre."
+      },
+      "tests/line_layout_options.rs": {
+        "sha256": "e5a6ffc9852b81db571127695b6f11bb7de66adc9655e374bdf6dbcef19701b2",
+        "reason": "Added: identical to vendor/gpui-pre (line-layout-options-patch.md)."
+      }
+    },
+    "removed": {
+      "Cargo.lock": {
+        "upstream_sha256": "39784e46afaf0cfafe455a7dc5973a8ae88df1243c8dc37ed47324dfa193b0e0",
+        "reason": "Package-level lockfile not retained; the workspace Cargo.lock owns resolution."
+      }
+    },
+    "unchanged_file_count": 144
+  }
 }
