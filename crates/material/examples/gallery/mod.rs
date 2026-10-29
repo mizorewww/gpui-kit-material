@@ -196,10 +196,11 @@ impl Gallery {
             self.theme_frame_pending = true;
             let view = cx.weak_entity();
             window.on_next_frame(move |window, cx| {
+                // advance_component_theme refreshes the window for each step;
+                // notifying the Gallery as well would invalidate it twice.
                 let _ = view.update(cx, |this, cx| {
                     this.theme_frame_pending = false;
                     this.prepare_theme(window, cx);
-                    cx.notify();
                 });
             });
         }
