@@ -3,9 +3,11 @@
 mod button;
 pub use button::{
     ButtonDirection, ButtonIconPosition, ButtonProgressPlayback, ButtonShape, ButtonSize,
-    ButtonTransitionInputs, ButtonTransitionPlayback, ButtonVariant, MaterialButton,
-    material_button,
+    ButtonTransitionInputs, ButtonTransitionPlayback, ButtonVariant, FabSize, IconButtonWidth,
+    MaterialButton, material_button,
 };
+mod icon_button;
+pub use icon_button::{IconButton, IconButtonVariant};
 mod button_group;
 mod controls;
 mod divider;

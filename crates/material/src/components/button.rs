@@ -8,7 +8,10 @@ mod playback;
 pub use playback::{ButtonTransitionInputs, ButtonTransitionPlayback};
 mod effects;
 mod focus_ring;
+mod form;
 pub(crate) use focus_ring::ButtonFocusRing;
+pub use form::{FabSize, IconButtonWidth};
+pub(crate) use form::{Form, Palette, Roles, Segment, segment_metrics};
 mod hit_target;
 #[cfg(test)]
 mod loading_tests;
@@ -353,6 +356,14 @@ fn toggle_color_targets(
     }
 }
 
+/// The resolved container and content of an enabled toggle button of
+/// `variant`, for composites (connected groups) that paint toggle colors
+/// on their own options.
+pub(crate) fn toggle_colors(variant: ButtonVariant, selected: bool) -> (Rgba, Rgba) {
+    let (bg, fg, _) = toggle_color_targets(variant, false, true, selected);
+    (bg.resolve(), fg.resolve())
+}
+
 #[cfg(test)]
 fn colors(variant: ButtonVariant, disabled: bool) -> (Rgba, Rgba, Rgba) {
     let (bg, fg, border) = color_targets(variant, disabled);
@@ -527,6 +538,9 @@ pub struct MaterialButton {
     progress_playback: Option<ButtonProgressPlayback>,
     transition_playback: Option<ButtonTransitionPlayback>,
     preview: Option<InteractionPreview>,
+    form: Form,
+    palette: Option<Palette>,
+    open: bool,
     style: StyleRefinement,
 }
 impl MaterialButton {
@@ -562,7 +576,44 @@ impl MaterialButton {
             progress_playback: None,
             transition_playback: None,
             preview: None,
+            form: Form::Label,
+            palette: None,
+            open: false,
             style: StyleRefinement::default(),
+        }
+    }
+    /// Use a non-label form's geometry (icon button, FAB, split segment).
+    pub(crate) fn form(mut self, form: Form) -> Self {
+        self.form = form;
+        self
+    }
+    /// Paint with these roles instead of the variant's.
+    pub(crate) fn palette(mut self, palette: Palette) -> Self {
+        self.palette = Some(palette);
+        self
+    }
+    /// A trailing split segment whose menu is open: fully round.
+    pub(crate) fn open(mut self, open: bool) -> Self {
+        self.open = open;
+        self
+    }
+    fn form_geometry(&self) -> form::FormGeometry {
+        self.form.geometry(
+            self.size,
+            self.variant,
+            self.icon.as_ref().map(|_| self.icon_position),
+            self.direction,
+        )
+    }
+    fn color_targets(&self) -> (CssColor, CssColor, CssColor) {
+        match &self.palette {
+            Some(palette) => palette.targets(self.disabled, self.base.toggle, self.base.selected),
+            None => toggle_color_targets(
+                self.variant,
+                self.disabled,
+                self.base.toggle,
+                self.base.selected,
+            ),
         }
     }
     /// Enable controlled toggle semantics and Material selected presentation.
@@ -814,12 +865,7 @@ impl MaterialButton {
     }
 
     fn sample_colors(&self, window: &mut Window, cx: &mut App) -> SampledColors {
-        let (bg_target, fg_target, border_target) = toggle_color_targets(
-            self.variant,
-            self.disabled,
-            self.base.toggle,
-            self.base.selected,
-        );
+        let (bg_target, fg_target, border_target) = self.color_targets();
         let disabled_icon = fg_target.resolve();
         let transitions = self.transition_playback.as_ref();
         let bg = playback::token_sample(
@@ -932,13 +978,16 @@ impl MaterialButton {
             window,
             cx,
         );
-        let level = playback::shadow_level(
-            self.variant,
-            self.disabled,
-            self.base.toggle,
-            hovered,
-            active,
-        );
+        let level = match &self.palette {
+            Some(palette) => palette.shadow_level(self.disabled, hovered, active),
+            None => playback::shadow_level(
+                self.variant,
+                self.disabled,
+                self.base.toggle,
+                hovered,
+                active,
+            ),
+        };
         let shadows = playback::token_sample(
             transitions.map(|p| &p.shadow),
             (self.id.clone(), "box-shadow"),
@@ -951,19 +1000,32 @@ impl MaterialButton {
         if let Some(observer) = &self.effects_observer {
             *observer.borrow_mut() = (opacity, shadows.clone());
         }
-        let resting = resting_radius(
-            self.size,
-            self.shape,
-            self.base.toggle && self.base.selected,
-        );
+        let target = match self.form {
+            // Split segments morph their inner corners; outer ends stay round.
+            Form::Segment(segment) => {
+                let metrics = segment_metrics(self.size);
+                if self.open && segment == Segment::Trailing {
+                    self.size.geometry().height / 2.
+                } else if active {
+                    metrics.inner_pressed
+                } else if hovered || focused {
+                    metrics.inner_hovered
+                } else {
+                    metrics.inner
+                }
+            }
+            form if !form.sized_shape() => form.fixed_radius().unwrap_or(0.),
+            _ if active => self.size.geometry().pressed,
+            _ => resting_radius(
+                self.size,
+                self.shape,
+                self.base.toggle && self.base.selected,
+            ),
+        };
         let radius = playback::token_sample(
             transitions.map(|p| &p.radius),
             (self.id.clone(), "pressed-radius"),
-            if active {
-                self.size.geometry().pressed
-            } else {
-                resting
-            },
+            target,
             MotionToken::FastSpatial,
             window,
             cx,
@@ -985,7 +1047,7 @@ impl MaterialButton {
             .items_center()
             .justify_center()
             .flex_shrink_0()
-            .size(rem(self.size.icon_size()))
+            .size(rem(self.form_geometry().icon))
     }
 
     /// The leading/trailing slots: a visible progress indicator always takes
@@ -1010,7 +1072,7 @@ impl MaterialButton {
             let indicator = super::progress::indeterminate_circular_progress_with_playback(
                 (self.id.clone(), "button-progress-indicator"),
                 label,
-                size(rem(self.size.icon_size().min(24.)), rem(24.)),
+                size(rem(self.form_geometry().icon.min(24.)), rem(24.)),
                 opacity,
                 &playback.state.borrow().circular,
                 cx,
@@ -1021,14 +1083,14 @@ impl MaterialButton {
                 .child(indicator);
             return (Some(slot), None);
         }
+        let icon_size = self.form_geometry().icon;
         let slot = self.icon.take().map(|icon| {
             let icon = if self.disabled {
                 icon.color(disabled_icon)
             } else {
                 icon
             };
-            self.icon_slot_box()
-                .child(icon.size(rem(self.size.icon_size())))
+            self.icon_slot_box().child(icon.size(rem(icon_size)))
         });
         match self.icon_position {
             ButtonIconPosition::Leading => (slot, None),
@@ -1202,24 +1264,20 @@ impl RenderOnce for MaterialButton {
         if let Some(observer) = &self.progress_opacity_observer {
             observer.set(progress_opacity);
         }
-        let g = self.size.geometry();
+        let g = self.form_geometry();
         let ty = g.typography.scale();
         let colors = self.sample_colors(window, cx);
         let interaction = self.resolve_interaction(window, cx);
         let effects = self.sample_effects(&interaction, window, cx);
-        let (left_padding, right_padding) = horizontal_padding(
-            self.size,
-            self.variant,
-            self.icon.as_ref().map(|_| self.icon_position),
-            self.direction,
-        );
+        let (left_padding, right_padding) = g.padding;
         let progress = progress_playback
             .as_ref()
             .filter(|_| show_progress)
             .map(|playback| (playback, progress_opacity));
         let (leading, trailing) = self.slots(loading, progress, colors.disabled_icon, cx);
         let Interaction { focus, pressed, .. } = interaction;
-        let expanded_target = matches!(self.size, ButtonSize::ExtraSmall | ButtonSize::Small);
+        let expanded_target = matches!(self.size, ButtonSize::ExtraSmall | ButtonSize::Small)
+            && matches!(self.form, Form::Label | Form::Icon(_) | Form::Segment(_));
         // Capture the actual Base border box during its prepaint. A positioned
         // child has padding-box geometry, so it cannot independently reconstruct
         // the target when callers supply asymmetric borders.
@@ -1255,6 +1313,28 @@ impl RenderOnce for MaterialButton {
             cx,
         );
         let SampledColors { bg, fg, border, .. } = colors;
+        // A split segment: full outer ends, animated inner corners.
+        let corners = match self.form {
+            Form::Segment(segment) => {
+                let rem_size = window.rem_size();
+                let outer = rem(g.height / 2.).to_pixels(rem_size);
+                let inner = rem(effects.radius).to_pixels(rem_size);
+                let leading_side =
+                    (segment == Segment::Leading) == (self.direction == ButtonDirection::Ltr);
+                let (left, right) = if leading_side {
+                    (outer, inner)
+                } else {
+                    (inner, outer)
+                };
+                Some(Corners {
+                    top_left: left,
+                    bottom_left: left,
+                    top_right: right,
+                    bottom_right: right,
+                })
+            }
+            _ => None,
+        };
         let mut base = base
             .flex()
             .flex_row()
@@ -1264,21 +1344,30 @@ impl RenderOnce for MaterialButton {
             .items_center()
             .justify_center()
             .flex_shrink_0()
-            .min_w(rem(58.))
+            .min_w(rem(g.min_width))
+            .when_some(g.width, |b, width| b.w(rem(width)))
             .h(rem(g.height))
             .pl(rem(left_padding))
             .pr(rem(right_padding))
             .gap(rem(g.gap))
-            .rounded(rem(effects.radius))
+            .map(|b| match corners {
+                Some(corners) => b
+                    .rounded_tl(corners.top_left)
+                    .rounded_tr(corners.top_right)
+                    .rounded_br(corners.bottom_right)
+                    .rounded_bl(corners.bottom_left),
+                None => b.rounded(rem(effects.radius)),
+            })
             .bg(state::layer(bg, fg, effects.opacity))
             .text_color(fg)
             .font_family(ty.font_family)
             .text_size(ty.font_size)
             .line_height(ty.line_height)
             .font_weight(FontWeight(ty.font_weight as f32))
-            .when(self.variant == ButtonVariant::Outlined, |b| {
-                b.border(rem(g.outline)).border_color(border)
-            })
+            .when(
+                self.variant == ButtonVariant::Outlined && self.palette.is_none(),
+                |b| b.border(rem(g.outline)).border_color(border),
+            )
             .shadow(effects.shadows.into_shadows())
             .when(!self.disabled && self.preview.is_none(), |b| {
                 b.cursor_pointer()
@@ -1300,12 +1389,11 @@ impl RenderOnce for MaterialButton {
         )
         .hit_target(target_geometry);
         let forced_focus = self.preview == Some(InteractionPreview::Focused);
-        ButtonFocusRing::new(
-            base,
-            focus,
-            !self.disabled && (self.focusable || forced_focus),
-            rem(effects.radius),
-        )
+        let ring_enabled = !self.disabled && (self.focusable || forced_focus);
+        match corners {
+            Some(corners) => ButtonFocusRing::with_corners(base, focus, ring_enabled, corners),
+            None => ButtonFocusRing::new(base, focus, ring_enabled, rem(effects.radius)),
+        }
         .forced(forced_focus)
     }
 }

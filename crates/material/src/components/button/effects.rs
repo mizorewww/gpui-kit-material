@@ -14,7 +14,7 @@ enum Space {
 /// CSS color provenance matters: legacy RGB endpoints interpolate in sRGB;
 /// the reference's disabled `color-mix` endpoints use Oklab in Chromium.
 #[derive(Clone, Debug, PartialEq)]
-pub(super) struct CssColor {
+pub(crate) struct CssColor {
     expression: Arc<Expression>,
     space: Space,
 }
