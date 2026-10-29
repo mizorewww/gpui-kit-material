@@ -59,11 +59,29 @@ python3 scripts/profile-gallery.py /tmp/material-scroll --backend fast --seconds
   --scroll --scroll-input wheel
 ```
 
-`--scroll` (2–120 s) disables vertical sync and scrolls continuously up and
-down. `--scroll-input wheel` sends pixel wheel events through the normal input
-path; the default `programmatic` mode mutates the offset directly and bypasses
-wheel invalidation, so prefer `wheel` for gate evidence. Reports keep raw scroll
-positions, successful new-frame counts and the lowest FPS over ≥ 250 ms windows.
+`--scroll` (2–120 s) disables vertical sync and scrolls the whole Gallery
+top → bottom → top repeatedly, turning only at the real ends. Input comes from
+a foreground timer (`--input-hz`, default 1000), never from frame callbacks,
+so the driver cannot pace frames. `--scroll-input wheel` sends 8 px wheel
+events through the normal input path; `programmatic` mutates the offset
+directly and bypasses wheel invalidation, so prefer `wheel` for gate evidence.
+
+Reports keep raw positions, laps and row coverage, successful new-frame
+counts, the lowest FPS over ≥ 250 ms windows and a strict minimum FPS from the
+longest gap between newly drawn submissions. A run whose rate sits at the
+display refresh while VSync reads disabled is flagged invalid: on macOS a
+windowed `CAMetalLayer` with `displaySyncEnabled = NO` still blocks in
+`nextDrawable` until the compositor releases a drawable once per refresh.
+
+CPU frame time is judged per complete scope minus platform-reported blocking
+presentation waits (`nextDrawable`), which are reported separately with the
+raw scope totals. GPU time (Metal `GPUStartTime`/`GPUEndTime`, macOS only) is
+reported per frame under `gpu` and never counts toward the CPU budget.
+
+Runner exit status: `0` only for a complete scroll run where the CPU and FPS
+gates both pass; `1` when a measured gate failed; `2` for incomplete,
+unstable or unverifiable evidence. A startup run measures only the CPU gate,
+so it returns `1` or `2`, never `0`.
 
 The gallery FPS counter counts only successfully submitted new draws, sampled
 every 500 ms; skipped submissions, repeated presents and idle time do not count,

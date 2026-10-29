@@ -110,18 +110,50 @@ def source_identity(features):
     }
 
 
+def runner_exit_code(capture_code, inputs_stable, scroll, report_path):
+    """0: complete run, CPU and FPS gates both pass. 1: a measured gate
+    failed. 2: evidence incomplete, unstable or unverifiable.
+
+    A startup run measures only the CPU gate, so it can fail (1) but never
+    pass (0). Only a scroll run that the gallery itself reports as eligible,
+    with exit 0 and a strict minimum FPS of at least 500, returns 0.
+    """
+    if not inputs_stable:
+        return 2
+    if capture_code == 1:
+        return 1
+    if capture_code != 0 or not scroll:
+        return 2
+    try:
+        report = json.loads(report_path.read_text())
+    except (OSError, ValueError):
+        return 2
+    strict = report.get("strict") or {}
+    fps = strict.get("minimum_instantaneous_fps")
+    passed = (report.get("exit_code") == 0
+              and report.get("acceptance_eligible") is True
+              and (report.get("cpu") or {}).get("acceptance_eligible") is True
+              and (report.get("coverage") or {}).get("complete_gallery_traversal") is True
+              and isinstance(fps, (int, float)) and fps >= 500)
+    return 0 if passed else 2
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("output", type=Path, help="new evidence directory outside the repository")
     parser.add_argument("--seconds", type=float, default=10)
     parser.add_argument("--backend", choices=("upstream", "fast"), default="fast")
     parser.add_argument("--scroll", action="store_true",
-                        help="record bounded bidirectional scrolling with vertical sync disabled")
+                        help="record full top-bottom-top Gallery traversals with vertical sync disabled")
     parser.add_argument("--scroll-input", choices=("wheel", "programmatic"),
                         help="scroll input path (default: programmatic); requires --scroll")
+    parser.add_argument("--input-hz", type=int,
+                        help="timer-driven scroll input rate, 100..=2000 (default 1000); requires --scroll")
     args = parser.parse_args()
     if args.scroll_input and not args.scroll:
         parser.error("--scroll-input requires --scroll")
+    if args.input_hz is not None and (not args.scroll or not 100 <= args.input_hz <= 2000):
+        parser.error("--input-hz requires --scroll and must be in 100..=2000")
     if not math.isfinite(args.seconds) or not 0.1 <= args.seconds <= 3600:
         parser.error("--seconds must be finite and in 0.1..=3600")
     if args.scroll and not 2 <= args.seconds <= 120:
@@ -141,6 +173,7 @@ def main():
         "build_command": command,
         "requested_backend": args.backend,
         "scroll_input_mode": (args.scroll_input or "programmatic") if args.scroll else None,
+        "scroll_input_hz": (args.input_hz or 1000) if args.scroll else None,
         "requested_scenario": "bidirectional-scroll" if args.scroll else "startup",
         "rustc": output("rustc", "-Vv").decode(),
         "cargo": output("cargo", "-V").decode().strip(),
@@ -191,9 +224,12 @@ def main():
     env = os.environ.copy()
     env.pop("MATERIAL_SCROLL_PROFILE", None)
     env.pop("MATERIAL_SCROLL_INPUT", None)
+    env.pop("MATERIAL_SCROLL_INPUT_HZ", None)
     if args.scroll:
         env["MATERIAL_SCROLL_PROFILE"] = "1"
         env["MATERIAL_SCROLL_INPUT"] = args.scroll_input or "programmatic"
+        if args.input_hz is not None:
+            env["MATERIAL_SCROLL_INPUT_HZ"] = str(args.input_hz)
     env.update(MATERIAL_PROFILE_OUTPUT=str(destination / "frames.json"),
                MATERIAL_PROFILE_SECONDS=str(args.seconds))
     with (destination / "run.log").open("wb") as log:
@@ -214,9 +250,12 @@ def main():
     provenance["inputs_stable"] = (
         provenance["source_after_build"] == provenance["source_after_capture"]
         and provenance["binary_sha256"] == provenance["binary_sha256_after_capture"])
+    result = runner_exit_code(code, provenance["inputs_stable"], args.scroll,
+                              destination / "frames.json")
+    provenance["runner_exit_code"] = result
     save()
-    print(f"Evidence: {destination}; capture exit {code}; whole-gallery acceptance remains unverified.")
-    return code if code in (1, 2) and provenance["inputs_stable"] else 2
+    print(f"Evidence: {destination}; capture exit {code}; runner exit {result}.")
+    return result
 
 
 if __name__ == "__main__":
