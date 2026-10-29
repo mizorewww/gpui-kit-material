@@ -67,7 +67,7 @@ struct PaintedWave {
     opacity: f32,
 }
 
-pub(super) struct ButtonRipple {
+pub(crate) struct ButtonRipple {
     child: AnyElement,
     state: Entity<RippleState>,
     enabled: bool,
@@ -79,7 +79,7 @@ pub(super) struct ButtonRipple {
 }
 impl ButtonRipple {
     #[allow(clippy::too_many_arguments)]
-    pub(super) fn new(
+    pub(crate) fn new(
         child: impl IntoElement,
         id: ElementId,
         mounted: bool,

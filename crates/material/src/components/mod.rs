@@ -21,6 +21,7 @@ mod feedback;
 mod focus;
 mod preview;
 mod progress;
+mod roving;
 mod text;
 mod tile;
 mod title_bar;
@@ -56,5 +57,6 @@ pub use title_bar::{
 
 pub(crate) fn init(cx: &mut gpui::App) {
     button_group::init(cx);
+    roving::init(cx);
     choice::init(cx);
 }

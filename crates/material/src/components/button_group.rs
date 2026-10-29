@@ -29,7 +29,9 @@ pub(crate) fn init(cx: &mut App) {
     ]);
 }
 
-type Change = Rc<dyn Fn(&SharedString, &mut Window, &mut App)>;
+#[cfg(test)]
+use super::roving::destination;
+use super::roving::{Change, Direction, Roving as Navigation};
 #[derive(Clone)]
 struct OptionItem {
     value: SharedString,
@@ -179,50 +181,6 @@ impl ConnectedButtonGroup {
     }
 }
 
-#[derive(Clone)]
-struct Navigation {
-    values: Vec<SharedString>,
-    focus: Vec<FocusHandle>,
-    selected: Option<usize>,
-    on_change: Option<Change>,
-}
-#[derive(Clone, Copy)]
-enum Direction {
-    Next,
-    Previous,
-    First,
-    Last,
-}
-/// Arrow keys wrap; with no current option, Next starts at the first and Previous at the last.
-fn destination(count: usize, current: Option<usize>, direction: Direction) -> Option<usize> {
-    if count == 0 {
-        return None;
-    }
-    Some(match direction {
-        Direction::First => 0,
-        Direction::Last => count - 1,
-        Direction::Next => current.map_or(0, |index| (index + 1) % count),
-        Direction::Previous => current.map_or(count - 1, |index| (index + count - 1) % count),
-    })
-}
-impl Navigation {
-    fn navigate(&self, direction: Direction, window: &mut Window, cx: &mut App) {
-        let current = self
-            .focus
-            .iter()
-            .position(|focus| focus.is_focused(window))
-            .or(self.selected);
-        let Some(index) = destination(self.values.len(), current, direction) else {
-            return;
-        };
-        self.focus[index].focus(window, cx);
-        if self.selected != Some(index)
-            && let Some(on_change) = &self.on_change
-        {
-            on_change(&self.values[index], window, cx);
-        }
-    }
-}
 /// The resolved paint of one option for the current motion frame.
 #[derive(Clone, Copy, Debug, PartialEq)]
 struct OptionPaint {
@@ -370,28 +328,14 @@ fn focus_ring(
     .forced(forced)
 }
 
-/// The focus handle of each option, created on first sight. Handles of
-/// options that are gone are dropped, so the map tracks the current options
-/// instead of every value ever shown.
+/// The focus handle of each option, created on first sight (see
+/// [`super::roving::sync_handles`]).
 fn sync_handles(
     handles: &mut BTreeMap<SharedString, FocusHandle>,
     options: &[OptionItem],
-    mut create: impl FnMut() -> FocusHandle,
+    create: impl FnMut() -> FocusHandle,
 ) -> Vec<FocusHandle> {
-    let current = options
-        .iter()
-        .map(|option| {
-            handles
-                .entry(option.value.clone())
-                .or_insert_with(&mut create)
-                .clone()
-        })
-        .collect::<Vec<_>>();
-    // Values are unique, so any extra entry is stale.
-    if handles.len() > options.len() {
-        handles.retain(|value, _| options.iter().any(|option| &option.value == value));
-    }
-    current
+    super::roving::sync_handles(handles, options, |option| &option.value, create)
 }
 
 impl RenderOnce for ConnectedButtonGroup {
@@ -423,8 +367,11 @@ impl RenderOnce for ConnectedButtonGroup {
                     .collect()
             },
             focus: handles.clone(),
+            skip: Vec::new(),
             selected,
             on_change: self.on_change.clone(),
+            follow_focus: true,
+            reveal: None,
         };
         let next = navigation.clone();
         let previous = navigation.clone();
