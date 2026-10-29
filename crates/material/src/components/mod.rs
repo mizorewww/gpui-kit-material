@@ -16,6 +16,7 @@ pub use divider::{
 };
 pub use switch::{MaterialSwitch, SwitchIcons};
 mod caption;
+mod carousel;
 mod checkbox;
 mod chips;
 mod choice;
@@ -38,6 +39,10 @@ mod tooltip;
 
 pub use button_group::ConnectedButtonGroup;
 pub use caption::{Caption, CaptionButton, CaptionButtons, CaptionLabels, title_bar_control};
+pub use carousel::{
+    CAROUSEL_ITEM_RADIUS, CAROUSEL_SMALL_ITEM, CarouselItem, CarouselLayout, Keyline, Keylines,
+    MaterialCarousel,
+};
 pub use checkbox::{CheckboxState, MaterialCheckbox};
 pub use chips::{AssistChip, CHIP_HEIGHT, ChipStyle, FilterChip, InputChip, SuggestionChip, chip};
 pub use choice::{ChoiceGroup, ChoiceTile, Tint, choice_radio, tinted_icon};
