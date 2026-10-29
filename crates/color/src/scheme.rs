@@ -81,6 +81,12 @@ pub struct Scheme {
 }
 
 impl Scheme {
+    /// Override one semantic role in an application-defined scheme.
+    pub fn with_role(mut self, role: ColorRole, color: Color) -> Self {
+        self.colors[role as usize] = color;
+        self
+    }
+
     /// Derive every role from a built-in palette.
     pub fn from_palette(id: PaletteId) -> Self {
         let p = id.colors();
@@ -198,5 +204,20 @@ mod tests {
         assert_eq!(paper.blend(&ink, 0.), paper);
         assert_eq!(paper.blend(&ink, 1.), ink);
         assert!(paper.blend(&ink, 0.6).is_dark());
+    }
+}
+
+#[cfg(test)]
+mod custom_scheme_tests {
+    use super::*;
+    #[test]
+    fn overriding_one_role_preserves_other_roles_and_appearance() {
+        let before = Scheme::from_palette(PaletteId::Paper);
+        let after = before.with_role(ColorRole::ACCENT, Color::hex(0x0b57d0));
+        assert_eq!(after.get(ColorRole::ACCENT), Color::hex(0x0b57d0));
+        for role in ColorRole::ALL.iter().filter(|r| **r != ColorRole::ACCENT) {
+            assert_eq!(before.get(*role), after.get(*role));
+        }
+        assert_eq!(before.is_dark(), after.is_dark());
     }
 }

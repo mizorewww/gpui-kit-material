@@ -10,7 +10,7 @@ use gpui::{App, Rgba, Window, WindowAppearance};
 use std::{cell::RefCell, time::Instant};
 
 struct Paint {
-    target: Option<PaletteId>,
+    target: Option<Scheme>,
     from: Scheme,
     current: Scheme,
     started: Instant,
@@ -86,20 +86,24 @@ pub fn apply(preference: &ThemePreferences, window: &mut Window, cx: &mut App) -
 
 /// Paint one palette, transitioning from the current paint.
 pub fn apply_palette(id: PaletteId, window: &mut Window, cx: &mut App) -> bool {
-    let target = Scheme::from_palette(id);
+    apply_scheme(Scheme::from_palette(id), window, cx)
+}
+
+/// Apply a complete custom semantic scheme with the same animated transitions.
+pub fn apply_scheme(target: Scheme, window: &mut Window, cx: &mut App) -> bool {
     let reduce_motion = cx.reduce_motion();
     let (changed, running) = PAINT.with(|paint| {
         let mut paint = paint.borrow_mut();
         let now = Instant::now();
         if paint.target.is_none() {
-            paint.target = Some(id);
+            paint.target = Some(target);
             paint.current = target;
             paint.from = target;
             return (true, false);
         }
-        if paint.target != Some(id) {
+        if paint.target != Some(target) {
             paint.from = paint.current;
-            paint.target = Some(id);
+            paint.target = Some(target);
             paint.started = now;
         }
         let t = if reduce_motion {
