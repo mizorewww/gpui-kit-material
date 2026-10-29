@@ -26,6 +26,17 @@ This does not cache the owning view or suppress frame requests made by nested
 animations. Callers needing viewport-driven circular progress must use its
 separate sampling/scheduling API, not wrap an unconditional sampler.
 
+Virtualized callers may retain `RepeatAnimationPlayback` in their owning view
+and pass it through `with_repeat_playback`. This opt-in supports a single nonzero
+repeat and retains only its time origin, initialized on first layout. Unmounting
+does not reset its phase. The handle stores no view owner, pending timer, layout
+or paint cache; each mount retains its own scheduling state. A previously queued
+timer may notify its old owner once. A new handle starts a new playback.
+Use one handle per logical playback with unchanged duration and clock policy
+within one app. Synced repeats still use the app epoch, and reduced motion keeps
+the existing static sampling policy. Component-specific stop policies are not
+provided by this handle.
+
 Regression command:
 
 ```sh
