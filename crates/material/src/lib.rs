@@ -19,7 +19,8 @@
 //! Call `gpui_kit::init` and then [`init`] once at startup. Use Kit's
 //! `open_window` for the single Root, register [`icons::Assets`], and initialize [`theme::init_component_theme`] before Root's first
 //! render. Advance [`theme::advance_component_theme`] from input events and
-//! pre-frame callbacks. Base-only consumers can continue to use [`theme::apply`].
+//! pre-frame callbacks. Base-only consumers can paint with
+//! [`theme::apply_scheme`] at the start of each root render.
 extern crate gpui_kit as gpui;
 
 pub use gpui_kit_material_color as color;

@@ -89,11 +89,29 @@ pub fn system_dark(cx: &App) -> bool {
 /// start of each root render; it schedules frames while a transition runs.
 /// Returns whether the paint changed this frame, so an application can
 /// mirror the scheme into other toolkits only when needed.
+///
+/// This render-time path does not update the Component theme.
+#[deprecated(
+    note = "render-time path that leaves the Component theme stale; use `init_component_theme` \
+            and `advance_component_theme` with `preference.resolve(system_dark(cx))`, or \
+            `apply_scheme` for Base-only rendering"
+)]
 pub fn apply(preference: &ThemePreferences, window: &mut Window, cx: &mut App) -> bool {
-    apply_palette(preference.resolve(system_dark(cx)), window, cx)
+    apply_scheme(
+        Scheme::from_palette(preference.resolve(system_dark(cx))),
+        window,
+        cx,
+    )
 }
 
 /// Paint one palette, transitioning from the current paint.
+///
+/// This render-time path does not update the Component theme.
+#[deprecated(
+    note = "render-time path that leaves the Component theme stale; use `init_component_theme` \
+            and `advance_component_theme` with `Scheme::from_palette(id)`, or \
+            `apply_scheme(Scheme::from_palette(id), ..)` for Base-only rendering"
+)]
 pub fn apply_palette(id: PaletteId, window: &mut Window, cx: &mut App) -> bool {
     apply_scheme(Scheme::from_palette(id), window, cx)
 }
@@ -146,6 +164,12 @@ fn advance_paint(target: Scheme, cx: &App) -> (bool, bool) {
 }
 
 /// Set the text scale: 14px is 1rem at 100%, and every rem token follows it.
+///
+/// This leaves the Component theme's font size behind the window's rem size.
+#[deprecated(
+    note = "leaves the Component theme's font size stale; pass the scale to \
+            `init_component_theme` and `advance_component_theme`"
+)]
 pub fn apply_scale(scale: f32, window: &mut Window) {
     set_rem_scale(scale, window);
 }
@@ -358,6 +382,10 @@ mod tests {
     }
 
     #[gpui::test]
+    #[allow(
+        deprecated,
+        reason = "checks that the deprecated `apply_scale` still shares the rem authority"
+    )]
     fn legacy_and_component_paths_share_one_rem_authority(cx: &mut TestAppContext) {
         let (_, cx) = cx.add_window_view(|_, _| ScaleHarness);
         cx.update(|window, cx| {
@@ -405,7 +433,7 @@ mod tests {
     impl Render for PaletteHarness {
         fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
             motion::set_motion_scheme(self.motion);
-            apply_palette(self.palette, window, cx);
+            apply_scheme(Scheme::from_palette(self.palette), window, cx);
             div()
         }
     }

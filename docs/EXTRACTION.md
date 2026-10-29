@@ -8,8 +8,8 @@ switched to the kit yet; this table is the guide for that change.
 | `palettes.rs` | `color::palette` (serde behind the `serde` feature) |
 | `theme.rs` tokens `ColorToken` / `CANVAS`… | `color::ColorRole::CANVAS`… (`ColorRole` avoids GPUI's accessibility `Role`) |
 | `theme::palette_colors` | `color::Scheme::from_palette` |
-| `theme::color`, `blend`, `apply_preference`, `system_dark` | `theme::color`, `theme::blend`, `theme::apply` (returns whether paint changed), `theme::system_dark` |
-| `theme::apply_scale` | `theme::apply_scale` (gpui-component sync stays in the app) |
+| `theme::color`, `blend`, `apply_preference`, `system_dark` | `theme::color`, `theme::blend`, `theme::init_component_theme` + `theme::advance_component_theme` (with `ThemePreferences::resolve(system_dark(cx))`), `theme::system_dark` |
+| `theme::apply_scale` | the `scale` argument of `theme::init_component_theme` / `theme::advance_component_theme`, which also keeps gpui-component's theme in sync |
 | radii, `TILE_*`, `tile_corners`, `list_corners` | `tokens::shape` (`OuterCorners`) |
 | `TEXT_*` | `tokens::typography` (+ `rem(px)`) |
 | `CONTROL_HEIGHT`, `ICON_SLOT`, `SETTING_ITEM_INSET`, `COMPACT_WINDOW`, `title_bar_height` | `tokens::layout` (`ITEM_INSET`, `app_bar_height`) |

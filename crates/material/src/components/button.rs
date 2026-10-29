@@ -1669,7 +1669,11 @@ mod tests {
     impl Render for ColorsHarness {
         fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
             crate::motion::set_motion_scheme(crate::motion::MotionScheme::Expressive);
-            crate::theme::apply_palette(self.palette, window, cx);
+            crate::theme::apply_scheme(
+                crate::color::Scheme::from_palette(self.palette),
+                window,
+                cx,
+            );
             let mut button = MaterialButton::new("colors-button")
                 .variant(self.variant)
                 .disabled(self.disabled)
