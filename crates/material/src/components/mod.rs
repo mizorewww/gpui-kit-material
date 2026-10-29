@@ -9,7 +9,9 @@ pub use button::{
 mod fab;
 pub use fab::{ExtendedFab, Fab, FabColor};
 mod icon_button;
+mod split_button;
 pub use icon_button::{IconButton, IconButtonVariant};
+pub use split_button::{SplitButton, SplitButtonPart};
 mod button_group;
 mod controls;
 mod divider;
