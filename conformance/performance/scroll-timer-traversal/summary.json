@@ -1,0 +1,104 @@
+{
+  "schema": "gallery-scroll-evidence-summary-v1",
+  "acceptance_eligible": false,
+  "gates": {
+    "cpu_2ms": "FAIL (measured)",
+    "scroll_500fps": "FAIL (measured)"
+  },
+  "run": {
+    "backend": "native GPUI Fast, release",
+    "input_mode": "wheel",
+    "input_driver": "foreground timer 1000 Hz requested, missed deadlines skipped",
+    "requested_seconds": 30,
+    "source_head_at_build": "74a90f44dcc78c746680fe972a90a4d94fe8b4df",
+    "dirty_paths_at_build": [
+      " M crates/material/examples/gallery/mod.rs",
+      " M crates/material/examples/gallery/performance.rs",
+      " M crates/material/examples/gallery/scroll_performance.rs",
+      " M crates/material/src/components/tile.rs",
+      " M vendor/gpui-fast/MATERIAL-MIGRATION.json",
+      " M vendor/gpui-fast/src/profiler.rs",
+      " M vendor/gpui-fast/src/profiler/hang.rs",
+      " M vendor/gpui-fast/src/profiler/journal.rs",
+      " M vendor/gpui-fast/src/window.rs",
+      " M vendor/gpui-pre/presentation-timing-patch.md",
+      " M vendor/gpui-pre/src/profiler.rs",
+      " M vendor/gpui-pre/src/profiler/hang.rs",
+      " M vendor/gpui-pre/src/profiler/journal.rs",
+      " M vendor/gpui-pre/src/window.rs"
+    ],
+    "binary_sha256": "f6996cc86236c9f9d7665f5db62005fd24108d3c6f395b256f78fc31c2f65c14",
+    "runner": "binary run directly (bounded with timeout 60 s, process exited) because concurrent agents changed sources during scripts/profile-gallery.py builds; source identity is therefore commit plus dirty path list only",
+    "hardware": {
+      "uname": "Darwin MacbookProM2.local 27.2.0 Darwin Kernel Version 27.2.0: Wed Oct  7 23:15:04 PDT 2026; root:xnu-13432.41.4~3/RELEASE_ARM64_T8112 arm64 Darwin",
+      "model": "Mac14,7",
+      "cpu": "Apple M2",
+      "memory_bytes": "17179869184",
+      "available_parallelism": 8
+    },
+    "display_refresh_interval_ns": 16666667
+  },
+  "process_exit_code": 1,
+  "errors": [
+    "successful-new-frame timestamps are diagnostic only; complete start/end intervals and per-frame scroll-position association remain unverified; aggregate counts cannot prove rendered traversal"
+  ],
+  "coverage": {
+    "item_count": 119,
+    "contiguous_top_rows_from_zero": true,
+    "laps": 1,
+    "observed_offset_min": 0.0,
+    "observed_offset_max": 487.0,
+    "total_scrollable_pixels": null,
+    "visited_sections": null,
+    "visited_sections_reason": "section identity is not exposed to the driver; row coverage is recorded instead",
+    "logical_offset_traversal_complete": true,
+    "complete_gallery_traversal": false,
+    "definition": "logical offset lap reaches the reported bottom and returns to top; input observations do not prove every row was painted and successfully submitted, including rows below the deepest top row"
+  },
+  "fps": {
+    "minimum_full_window": 31.979538340106618,
+    "median_full_window": 59.995163039967814,
+    "observed_rate_near_or_below_refresh": true,
+    "vsync_initial": "disabled",
+    "vsync_final": "disabled"
+  },
+  "cpu_scope_summary_ns": {
+    "frames": 1793,
+    "max_ns": 56983125,
+    "median_ns": 16521125,
+    "p95_ns": 17041167,
+    "p99_ns": 23055417,
+    "over_budget_frames": 1793
+  },
+  "presentation_wait_summary_ns": {
+    "frames": 1793,
+    "max_ns": 25552625,
+    "median_ns": 9344500,
+    "p95_ns": 12389750,
+    "p99_ns": 13294166,
+    "over_budget_frames": 1722
+  },
+  "phase_median_ns": {
+    "draw_ns": 6997500,
+    "submit_ns": 9449375,
+    "submit_presentation_wait_ns": 9338209,
+    "request_layout_ns": 673166,
+    "prepaint_ns": 3512083,
+    "paint_ns": 733875
+  },
+  "gpu_summary_ns": {
+    "frames": 1787,
+    "max_ns": 19234208,
+    "median_ns": 2488583,
+    "p95_ns": 18712917,
+    "p99_ns": 19025667,
+    "over_budget_frames": 1787
+  },
+  "gpu_frames_without_time": 0,
+  "findings": [
+    "VSync reads disabled, yet the median new-frame rate equals the 60 Hz display refresh: CAMetalLayer nextDrawable blocks (median ~9.3 ms per frame) until the compositor releases a drawable. This is windowed macOS compositor pacing, not a displaySyncEnabled readback bug.",
+    "Even excluding that wait, draw alone has a median of ~7 ms of CPU work (layout, prepaint and paint), so the 2 ms CPU gate fails independently of presentation.",
+    "Input is now timer-driven and independent of frame callbacks; at most ~2 inputs land per 16.6 ms frame because the foreground thread is busy drawing, so one logical lap took most of the 30 s run.",
+    "Not like-for-like with scroll-wheel-fast-state (frame-bound 1 s local legs): this run traverses the full Gallery top-bottom-top."
+  ]
+}
