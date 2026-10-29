@@ -1,0 +1,94 @@
+{
+  "kind": "pinned-source-audit-and-required-capture-matrix",
+  "component": "card",
+  "reference_repository": "https://github.com/kyra-labs/m3exp-web",
+  "reference_commit": "3b1e0047c0021eab7b4c0128fa1bec95c76ca746",
+  "primary_url": "https://m3e.kyralabs.dev/components/card/",
+  "source_files": [
+    {
+      "path": "packages/m3e-css/src/card.css",
+      "sha256": "c9831890afdf38fb7eb50d4c56ef561fda3bef876bc167f0bc6184479177d280"
+    },
+    {
+      "path": "packages/m3e-react/src/card/Card.tsx",
+      "sha256": "039ee278c0834a795619d165ab514494b7a14fc2f2211e1fe9c9c87597324540"
+    },
+    {
+      "path": "apps/site/src/examples/card/variants.html",
+      "sha256": "e3da28260cac2656097a29b53fd9869fd7fbba8dddfb6844d4c82d14eeeb9bf3"
+    },
+    {
+      "path": "apps/site/src/examples/card/interactive.html",
+      "sha256": "8da788f3baa3b79c16782d33523d669f19dc0a480daed5a8f45ceddd51a72dcf"
+    },
+    {
+      "path": "apps/visual/tests/card.spec.ts",
+      "sha256": "083eb7e7e4eed77c9ae4bd3f8db36e9d980d06db060c219c9c5f352c3c0d3fee"
+    },
+    {
+      "path": "packages/m3e-tokens/src/generated/components/filled-card.css",
+      "sha256": "7e5258b1868a30b4d25d812b93ea77a2034fca91ca765f3e0efe9cbc3e5ff144"
+    },
+    {
+      "path": "packages/m3e-tokens/src/generated/components/elevated-card.css",
+      "sha256": "1f40035ece9c56b048b63c9cb4012f9b71f28ad5619349aafd27ca7f18494fd0"
+    },
+    {
+      "path": "packages/m3e-tokens/src/generated/components/outlined-card.css",
+      "sha256": "a50980dea9fc7622b424461a401bfbb5ce39172d29a8835d7d598b17e29a0b3f"
+    },
+    {
+      "path": "packages/m3e-tokens/src/generated/components/elevation-motion.css",
+      "sha256": "750b61a4c6a1efcf07accd192449649213ee834266f7d30af312c7afe1219650"
+    }
+  ],
+  "scope": "Source inspection only. Live deployment revision, browser computed styles, desktop/WASM pixels, accessibility, motion and performance are not verified. Component conformance remains unreviewed.",
+  "implementation_commit": "74a90f44dcc78c746680fe972a90a4d94fe8b4df",
+  "implementation_path": "crates/material/src/components/feedback.rs",
+  "required_cases": [
+    {
+      "id": "static-variants",
+      "cases": "Elevated, filled, outlined in light/dark; fixed outer size; no padding and site-example 16px padding; long text; changed root font size.",
+      "status": "pending"
+    },
+    {
+      "id": "inset-outline",
+      "cases": "Equal filled/outlined content rects and wrapping; outline painted inside rounded bounds without consuming layout.",
+      "status": "pending"
+    },
+    {
+      "id": "content-and-clipping",
+      "cases": "Parent text color deliberately differs from on-surface; caller override; edge-to-edge image and overflowing child are clipped.",
+      "status": "pending"
+    },
+    {
+      "id": "primary-and-secondary-actions",
+      "cases": "Button/link primary action, padding/body/title activation, Space/Enter/Tab; secondary button/link does not trigger primary.",
+      "status": "pending"
+    },
+    {
+      "id": "states",
+      "cases": "Rest, hover, focus-visible, pressed, dragged, disabled and combinations; disabled transitions; noninteractive card remains static.",
+      "status": "pending"
+    },
+    {
+      "id": "motion",
+      "cases": "Incoming/outgoing start, midpoint, endpoint; hover-to-press, leave during transition and reversal; normal/reduced-motion.",
+      "status": "pending"
+    },
+    {
+      "id": "dynamic-and-accessible",
+      "cases": "Variant changes, primary action mount/unmount, disabled toggle, role/name, focus ring and forced colors.",
+      "status": "pending"
+    }
+  ],
+  "source_findings": [
+    "Actual CSS keeps outlined hover/focus/pressed at its rest elevation, despite generated hover tokens; implementation must follow resolved component CSS.",
+    "Primary card explicitly sets on-surface text and clips overflow; the current adapter relies on inherited text color and does not clip.",
+    "Primary outlined border is an inset pseudo-element overlay; current border_1 consumes layout space.",
+    "Primary base card does not force padding or full width; site examples add 16px padding, while current convenience helper sets full width and rem-based padding.",
+    "Current adapter only provides static variants; interactive primary action, secondary-control isolation, disabled/dragged states and reference elevation transitions are not implemented.",
+    "Primary elevated disabled container mixes surface with the same surface endpoint; do not infer a different color from comments or token names."
+  ],
+  "next_implementation_scope": "Verify and correct static surface semantics first; then reuse Kit/Base behavior for interactive primary action without nesting secondary controls inside a button. Source rules tests do not establish raster, motion or performance PASS."
+}

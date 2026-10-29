@@ -736,7 +736,14 @@
         "url": "https://m3e.kyralabs.dev/components/card/",
         "status": "unreviewed",
         "variant_mapping": "requires complete variant audit"
-      }
+      },
+      "evidence": [
+        {
+          "kind": "pinned-primary-source-audit",
+          "path": "conformance/reference/card-source-audit.json",
+          "scope": "Independent source review identifies static surface and interactive/motion gaps and required capture cases. No visual, animation or performance PASS; live deployment revision unverified."
+        }
+      ]
     },
     {
       "id": "list",
