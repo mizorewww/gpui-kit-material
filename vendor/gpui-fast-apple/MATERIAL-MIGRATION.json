@@ -5,7 +5,6 @@
   "published_checksums": null,
   "archive_sha256": "c5f0aff0a75a63953782a609bf023c68cdb71c3dbd74478223db9bbd1b744795",
   "source_file_sha256": {
-    ".cargo-ok": "afbf9d0f3560b0fd7795e81c42a0a79ee6b6fc67e064f77826aee642cad28d91",
     "Cargo.lock": "e70ea4a410d6225e6c7c76362dd7fd88a790ea4aac2516b766ef2aced2674a45",
     "Cargo.toml": "31751839a9fec38c5c4b7bce8d897ba046afdedb1a480dd07f0f30b87d6bf867",
     "Cargo.toml.orig": "97866b0e73a8478ee46a3f7152654e47f53145caf8caf983ff52748d676a8376",
@@ -65,7 +64,7 @@
     {
       "path": "src/text_system.rs",
       "status": "merged",
-      "local_sha256": "eed9cc05b1d164ea606ac7eb3f0e56a2fb81a1b49f983e6550360f7483d0a266"
+      "local_sha256": "cc5586100bea8fb616755a14c7d3be3a38fa27760bd5b59d8275949dbfcdd9d5"
     },
     {
       "path": "tests/detailed_layout.rs",
@@ -101,5 +100,53 @@
       "path": "src/metal_renderer.rs, src/fast/layers/raster.rs",
       "scope": "attach_gpu_timing adds a completion handler (only while profiler tracing is enabled) that reports GPUStartTime/GPUEndTime, status and CPU commit time through gpui::profiler::record_gpu_execution for frame and raster-tile command buffers. Rendering and presentation are unchanged."
     }
-  ]
+  ],
+  "local_changes": {
+    "scope": "Every file that differs from the extracted published archive (Cargo's .cargo-ok extraction marker excluded); MATERIAL-MIGRATION.json itself is provenance.",
+    "modified": {
+      "Cargo.toml": {
+        "upstream_sha256": "31751839a9fec38c5c4b7bce8d897ba046afdedb1a480dd07f0f30b87d6bf867",
+        "local_sha256": "fce71bb4ae183b90f7d0f80a5045dd4e8387052bfb8a6ba5b6aa819ab47e640f",
+        "reason": "unicode-bidi 0.3.18 and the detailed_layout [[test]], as vendor/gpui-pre-apple (manifest_changes)."
+      },
+      "src/fast/layers/raster.rs": {
+        "upstream_sha256": "3893062c508aca573d8317ca89633979f608a8c6d21687b2a218c2ab9eac8a62",
+        "local_sha256": "67767534c3de5e1770cc668bd5e28a41769f387f75f7127c2f36bd29d40d802a",
+        "reason": "Raster-tile command buffers get attach_gpu_timing(\"raster_tiles\") (profiler_patches)."
+      },
+      "src/fast/rounded_clip_shader.rs": {
+        "upstream_sha256": "e48e86dee268738339c89589279be7fcf9a44d8ad62c43a56c6cf5d722e216b1",
+        "local_sha256": "850baf0e853468a49ba0f269d350315d1b28c029dd5f397239e68f32fb59df33",
+        "reason": "allow(dead_code) on stage() under runtime_shaders (warning_patches)."
+      },
+      "src/metal_renderer.rs": {
+        "upstream_sha256": "1634c0370a04cb88f598a1674bf146f6c285f5e6f2c947a772cbde43096a9cf9",
+        "local_sha256": "98c5dff36635b9d13c052bbc314e8dd46f003a2b81199475682bc73842360776",
+        "reason": "draw_with_status with per-draw autorelease pool (presentation_patch), nextDrawable presentation wait and attach_gpu_timing (profiler_patches), same as vendor/gpui-pre-apple; write_instances signature rustfmt-wrapped only."
+      },
+      "src/open_type.rs": {
+        "upstream_sha256": "bc827c157fdce50125b158adb595b665d82f38b62fc6b3a9693c65abae640453",
+        "local_sha256": "b346e8c86fb4fbb2fe08d9cf9d357fe04fafb130b394f2294d76d40e2900764f",
+        "reason": "Merged from vendor/gpui-pre-apple: concrete app-private fallback descriptors in the CoreText cascade (migrated)."
+      },
+      "src/text_system.rs": {
+        "upstream_sha256": "31ae84947cdb3f47314a04a68d9efbcecbe6e5d11e903e969487c235ad0b8b58",
+        "local_sha256": "cc5586100bea8fb616755a14c7d3be3a38fa27760bd5b59d8275949dbfcdd9d5",
+        "reason": "Merged from vendor/gpui-pre-apple: detailed layout, fonts without 'm', fallback cascade rebuild, sbix detection (migrated)."
+      }
+    },
+    "added": {
+      "tests/detailed_layout.rs": {
+        "sha256": "3759e317a8566b16c91438ce335946f6edd1b83a5d2d5eb3f58387a0ce7d2d05",
+        "reason": "Added: identical to vendor/gpui-pre-apple (migrated)."
+      }
+    },
+    "removed": {
+      "Cargo.lock": {
+        "upstream_sha256": "e70ea4a410d6225e6c7c76362dd7fd88a790ea4aac2516b766ef2aced2674a45",
+        "reason": "Package-level lockfile not retained; the workspace Cargo.lock owns resolution."
+      }
+    },
+    "unchanged_file_count": 41
+  }
 }
