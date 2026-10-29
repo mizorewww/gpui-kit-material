@@ -1,8 +1,17 @@
 name: CI
+# Hosted runners check formatting, lints, tests and the WASM build only. The
+# Gallery frame-budget (<= 2 ms CPU per frame) and scroll (>= 500 FPS) gates
+# are measured with scripts/profile-gallery.py on real hardware, because shared
+# virtual runners give neither stable timing nor a real display.
 on:
   push:
     branches: [main]
   pull_request:
+
+# A newer push to the same branch or pull request supersedes the running checks.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 defaults:
   run:
@@ -15,6 +24,7 @@ jobs:
       matrix:
         os: [macos-latest, ubuntu-latest, windows-latest]
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
         with:
@@ -44,16 +54,26 @@ jobs:
           cargo clippy --locked --workspace --all-targets --features gpui-kit-material/gpui-fast,gpui-kit-material/frame-profiler -- -D warnings
           cargo test --locked --workspace --features gpui-kit-material/gpui-fast,gpui-kit-material/frame-profiler
           cargo test --locked -p gpui-kit-material --example gallery --features gpui-fast,frame-profiler
+      # Clippy's -D warnings covers workspace members only. RUSTFLAGS also
+      # reaches the vendored path crates we patch (registry crates stay
+      # cap-linted); a separate target dir keeps the main cache valid.
+      - name: Deny warnings in vendored engine crates
+        if: runner.os == 'macOS'
+        env:
+          RUSTFLAGS: -D warnings
+          CARGO_TARGET_DIR: target/deny-warnings
+        run: cargo check --locked --workspace --all-targets
       - name: Vendored text layout regression tests
         if: runner.os == 'macOS'
         run: |
-          cargo test -p gpui-pre --test line_layout_options
-          cargo test -p gpui-pre --lib text_system
+          cargo test --locked -p gpui-pre --test line_layout_options
+          cargo test --locked -p gpui-pre --lib text_system
           cargo test --locked -p gpui-kit-material -p gpui-fast --features gpui-kit-material/gpui-fast,gpui-kit-material/frame-profiler --lib
           cargo test --locked -p gpui-kit-material -p gpui-fast --features gpui-kit-material/gpui-fast,gpui-kit-material/frame-profiler --test line_layout_options
 
   wasm:
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
         with:
@@ -69,7 +89,10 @@ jobs:
       - name: Check the upstream WASM gallery
         run: cargo clippy --locked -p gpui-kit-material-gallery-web --target wasm32-unknown-unknown --no-default-features -- -D warnings
       - name: Install the matching browser binding generator
-        run: cargo install wasm-bindgen-cli --version 0.2.129 --locked
+        run: |
+          version="$(awk '$0 == "name = \"wasm-bindgen\"" { getline; gsub(/version = |"/, ""); print; exit }' Cargo.lock)"
+          test -n "$version"
+          cargo install wasm-bindgen-cli --version "$version" --locked
       - name: Build upstream browser artifacts
         run: ./scripts/build-gallery-web.sh --upstream
       - name: Check the Fast WASM gallery
