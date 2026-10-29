@@ -147,7 +147,19 @@ fn advance_paint(target: Scheme, cx: &App) -> (bool, bool) {
 
 /// Set the text scale: 14px is 1rem at 100%, and every rem token follows it.
 pub fn apply_scale(scale: f32, window: &mut Window) {
-    window.set_rem_size(scale_pixels(scale));
+    set_rem_scale(scale, window);
+}
+
+// The single authority for the window's rem size: both the legacy
+// `apply_scale` path and `advance_component_theme` resolve the text scale
+// here. Returns whether the rem size changed.
+fn set_rem_scale(scale: f32, window: &mut Window) -> bool {
+    let font_size = scale_pixels(scale);
+    let changed = window.rem_size() != font_size;
+    if changed {
+        window.set_rem_size(font_size);
+    }
+    changed
 }
 
 // Explicit opt-in: existing Base-only callers never require a Component global.
@@ -287,15 +299,13 @@ pub fn advance_component_theme(
 ) -> bool {
     let (changed, running) = advance_paint(target, cx);
     sync_component_theme(scheme(), scale, cx);
-    let font_size = scale_pixels(scale);
-    let scale_changed = window.rem_size() != font_size;
-    if scale_changed {
-        window.set_rem_size(font_size);
-    }
+    let scale_changed = set_rem_scale(scale, window);
     if changed || scale_changed {
         // Material colors are thread-local, so cached Material-only entities do
         // not observe Component's global. Its queued refresh handles ordinary
         // event boundaries; this also makes synchronous draws see current paint.
+        // This refresh is the single invalidation owner for a theme or scale
+        // step: callers need not also notify their view for it.
         window.refresh();
     }
     running
@@ -338,6 +348,32 @@ mod tests {
         for t in [-1., 0., 0.3, 1., 2., f32::NAN] {
             assert_eq!(blend(rgba(from), rgba(to), t), rgba(from.blend(to, t)));
         }
+    }
+
+    struct ScaleHarness;
+    impl Render for ScaleHarness {
+        fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+            div()
+        }
+    }
+
+    #[gpui::test]
+    fn legacy_and_component_paths_share_one_rem_authority(cx: &mut TestAppContext) {
+        let (_, cx) = cx.add_window_view(|_, _| ScaleHarness);
+        cx.update(|window, cx| {
+            apply_scale(1.5, window);
+            assert_eq!(window.rem_size(), gpui::px(21.));
+            apply_scale(f32::NAN, window);
+            assert_eq!(window.rem_size(), gpui::px(14.));
+            advance_component_theme(Scheme::from_palette(PaletteId::Paper), 1.25, window, cx);
+            assert_eq!(window.rem_size(), gpui::px(17.5));
+            assert!(
+                !set_rem_scale(1.25, window),
+                "an equal scale is not a change"
+            );
+            assert!(set_rem_scale(-2., window));
+            assert_eq!(window.rem_size(), scale_pixels(1.));
+        });
     }
 
     #[gpui::test]
