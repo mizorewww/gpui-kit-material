@@ -1,0 +1,7 @@
+[toolchain]
+# Pinned to the stable release used to develop and verify this workspace.
+# CI installs exactly this toolchain; bump it deliberately in its own commit.
+channel = "1.99.1"
+profile = "minimal"
+components = ["clippy", "rustfmt"]
+targets = ["wasm32-unknown-unknown"]
