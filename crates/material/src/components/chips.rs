@@ -227,7 +227,14 @@ impl ChipBase {
         };
         let check = if check.is_finite() { check.max(0.) } else { 0. };
         let base = if dragged {
-            state::layer(paint.container, paint.layer, state::DRAG)
+            // A lifted flat chip gets the elevated container, so its shadow
+            // does not show through.
+            let lifted = if paint.container.a > 0. {
+                paint.container
+            } else {
+                color(SURFACE_CONTAINER_LOW)
+            };
+            state::layer(lifted, paint.layer, state::DRAG)
         } else if keyboard_focus {
             state::layer(paint.container, paint.layer, state::FOCUS)
         } else {
