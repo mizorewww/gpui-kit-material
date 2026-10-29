@@ -29,6 +29,7 @@ pub fn apply_features_and_fallbacks(
     font: &mut FontKitFont,
     features: &FontFeatures,
     fallbacks: Option<&FontFallbacks>,
+    concrete_fallbacks: &[Option<FontKitFont>],
 ) -> anyhow::Result<()> {
     unsafe {
         let mut keys = vec![kCTFontFeatureSettingsAttribute];
@@ -37,7 +38,7 @@ pub fn apply_features_and_fallbacks(
             && !fallbacks.fallback_list().is_empty()
         {
             keys.push(kCTFontCascadeListAttribute);
-            values.push(generate_fallback_array(fallbacks, font));
+            values.push(generate_fallback_array(fallbacks, font, concrete_fallbacks));
         }
         let attrs = CFDictionaryCreate(
             kCFAllocatorDefault,
@@ -102,13 +103,24 @@ fn generate_feature_array(features: &FontFeatures) -> CFMutableArrayRef {
     }
 }
 
-fn generate_fallback_array(fallbacks: &FontFallbacks, font: &mut FontKitFont) -> CFMutableArrayRef {
+fn generate_fallback_array(
+    fallbacks: &FontFallbacks,
+    font: &mut FontKitFont,
+    concrete_fallbacks: &[Option<FontKitFont>],
+) -> CFMutableArrayRef {
     unsafe {
         let symbolic_traits = font.native_font().symbolic_traits();
         let all_traits = font.native_font().all_traits();
 
         let fallback_array = CFArrayCreateMutable(kCFAllocatorDefault, 0, &kCFTypeArrayCallBacks);
-        for user_fallback in fallbacks.fallback_list() {
+        for (index, user_fallback) in fallbacks.fallback_list().iter().enumerate() {
+            // Preserve declared cascade order, resolving app-private fonts from
+            // their concrete descriptor instead of the process font registry.
+            if let Some(Some(fallback)) = concrete_fallbacks.get(index) {
+                let descriptor = fallback.native_font().copy_descriptor();
+                CFArrayAppendValue(fallback_array, descriptor.as_concrete_TypeRef() as _);
+                continue;
+            }
             let name = CFString::from(user_fallback.as_str());
 
             let traits_keys = [kCTFontWeightTrait, kCTFontSlantTrait];

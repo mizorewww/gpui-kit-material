@@ -73,6 +73,7 @@ struct AppleTextSystemState {
     memory_source: MemSource,
     system_source: SystemSource,
     fonts: Vec<FontKitFont>,
+    bitmap_color_fonts: HashSet<FontId>,
     font_selections: HashMap<Font, FontId>,
     font_ids_by_postscript_name: HashMap<String, FontId>,
     font_ids_by_font_key: HashMap<FontKey, SmallVec<[FontId; 4]>>,
@@ -86,6 +87,7 @@ impl AppleTextSystem {
             memory_source: MemSource::empty(),
             system_source: SystemSource::new(),
             fonts: Vec::new(),
+            bitmap_color_fonts: HashSet::default(),
             font_selections: HashMap::default(),
             font_ids_by_postscript_name: HashMap::default(),
             font_ids_by_font_key: HashMap::default(),
@@ -290,6 +292,11 @@ impl AppleTextSystemState {
             })
             .collect::<Result<Vec<_>>>()?;
         self.memory_source.add_fonts(fonts.into_iter())?;
+        // Previously selected fonts may carry a cascade built before a newly
+        // registered app-private fallback existed. Rebuild selections without
+        // removing font IDs still referenced by already-shaped frames.
+        self.font_selections.clear();
+        self.font_ids_by_font_key.clear();
         Ok(())
     }
 
@@ -309,34 +316,23 @@ impl AppleTextSystemState {
             .or_else(|_| self.system_source.select_family_by_name(name))?;
         for font in family.fonts() {
             let mut font = font.load()?;
+            let concrete_fallbacks = fallbacks
+                .into_iter()
+                .flat_map(|fallbacks| fallbacks.fallback_list())
+                .map(|name| {
+                    self.memory_source
+                        .select_best_match(
+                            &[font_kit::family_name::FamilyName::Title(name.clone())],
+                            &font.properties(),
+                        )
+                        .ok()
+                        .and_then(|handle| handle.load().ok())
+                })
+                .collect::<Vec<_>>();
 
-            apply_features_and_fallbacks(&mut font, features, fallbacks)?;
-            // This block contains a precautionary fix to guard against loading fonts
-            // that might cause panics due to `.unwrap()`s up the chain.
-            {
-                // We use the 'm' character for text measurements in various spots
-                // (e.g., the editor). However, at time of writing some of those usages
-                // will panic if the font has no 'm' glyph.
-                //
-                // Therefore, we check up front that the font has the necessary glyph.
-                let has_m_glyph = font.glyph_for_char('m').is_some();
-
-                // HACK: The 'Segoe Fluent Icons' font does not have an 'm' glyph,
-                // but we need to be able to load it for rendering Windows icons in
-                // the Storybook (on macOS).
-                let is_segoe_fluent_icons = font.full_name() == "Segoe Fluent Icons";
-
-                if !has_m_glyph && !is_segoe_fluent_icons {
-                    // I spent far too long trying to track down why a font missing the 'm'
-                    // character wasn't loading. This log statement will hopefully save
-                    // someone else from suffering the same fate.
-                    log::warn!(
-                        "font '{}' has no 'm' character and was not loaded",
-                        font.full_name()
-                    );
-                    continue;
-                }
-            }
+            apply_features_and_fallbacks(&mut font, features, fallbacks, &concrete_fallbacks)?;
+            // A valid non-Latin font need not contain 'm'. Text metrics callers
+            // use the platform fallback when their Latin measurement probe is absent.
 
             // We've seen a number of panics in production caused by calling font.properties()
             // which unwraps a downcast to CFNumber. This is an attempt to avoid the panic,
@@ -397,6 +393,9 @@ impl AppleTextSystemState {
                 .insert(postscript_name.clone(), font_id);
             self.postscript_names_by_font_id
                 .insert(font_id, postscript_name);
+            if has_sbix_table(&font) {
+                self.bitmap_color_fonts.insert(font_id);
+            }
             self.fonts.push(font);
         }
         Ok(font_ids)
@@ -422,20 +421,24 @@ impl AppleTextSystemState {
                 .insert(postscript_name.clone(), font_id);
             self.postscript_names_by_font_id
                 .insert(font_id, postscript_name);
-            self.fonts
-                .push(font_kit::font::Font::from_core_graphics_font(
-                    requested_font.copy_to_CGFont(),
-                ));
+            let font =
+                font_kit::font::Font::from_core_graphics_font(requested_font.copy_to_CGFont());
+            if has_sbix_table(&font) {
+                self.bitmap_color_fonts.insert(font_id);
+            }
+            self.fonts.push(font);
             font_id
         }
     }
 
     fn is_emoji(&self, font_id: FontId) -> bool {
-        self.postscript_names_by_font_id
-            .get(&font_id)
-            .is_some_and(|postscript_name| {
-                postscript_name == "AppleColorEmoji" || postscript_name == ".AppleColorEmojiUI"
-            })
+        self.bitmap_color_fonts.contains(&font_id)
+            || self
+                .postscript_names_by_font_id
+                .get(&font_id)
+                .is_some_and(|postscript_name| {
+                    postscript_name == "AppleColorEmoji" || postscript_name == ".AppleColorEmojiUI"
+                })
     }
 
     fn raster_bounds(&self, params: &RenderGlyphParams) -> Result<Bounds<DevicePixels>> {
@@ -1241,4 +1244,16 @@ mod tests {
         assert_eq!(layout.len, 0);
         assert!(layout.runs.is_empty());
     }
+}
+
+// Inspect capability once when assigning a font ID; do not copy bitmap tables
+// per glyph, and do not infer arbitrary color-font support from a family name.
+fn has_sbix_table(font: &FontKitFont) -> bool {
+    font.native_font()
+        .get_available_font_tables()
+        .is_some_and(|tables| {
+            tables
+                .iter()
+                .any(|tag| *tag == u32::from_be_bytes(*b"sbix"))
+        })
 }
