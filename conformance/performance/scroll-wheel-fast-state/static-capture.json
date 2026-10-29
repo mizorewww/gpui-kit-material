@@ -1,0 +1,7 @@
+{
+  "off_image": "../scroll-virtualized-baseline/settings-off.png",
+  "off_sha256": "e6fe5a71b0ef94432da34c0626633aa5eac0bb2127d5183d6e85e4b66911f085",
+  "off_matches_existing_image": true,
+  "on_image": "settings-on.png",
+  "scope": "Native reduced-motion Settings capture only; backend reads Disabled/Enabled. Not full visual/motion or performance conformance."
+}

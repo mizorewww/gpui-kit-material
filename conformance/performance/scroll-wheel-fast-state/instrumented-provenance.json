@@ -1,0 +1,21 @@
+{
+  "sample_exit": 0,
+  "gallery_exit": 1,
+  "binary_sha256_before": "376465184b3305a1f9e3eefb87028dcd8563d91b6faa409dea27540d64eb721e",
+  "binary_sha256_after": "376465184b3305a1f9e3eefb87028dcd8563d91b6faa409dea27540d64eb721e",
+  "source_commit": "53c62d4",
+  "note": "Separate instrumented wheel diagnostic; not acceptance evidence",
+  "source_commit_note": "This label refers to the compiled binary before the documentation update; stable build.json records the independently verified later repository identity. Binary SHA is identical.",
+  "sample_command_template": [
+    "sample",
+    "<owned-gallery-pid>",
+    "3",
+    "1",
+    "-file",
+    "stacks.txt"
+  ],
+  "main_thread_samples": 1692,
+  "next_drawable_samples": 1331,
+  "nested_semaphore_wait_samples": 1312,
+  "conclusion": "During this separate post-pool instrumented capture the main thread frequently waited for a drawable. Not a baseline time percentage or GPU execution timing."
+}

@@ -1,0 +1,236 @@
+{
+  "runs": {
+    "stable-wheel": {
+      "input_mode": "wheel",
+      "source_commit": "3d230c1bf7928be3faae2d7acfbfb90122b75611",
+      "inputs_stable": true,
+      "minimum_observed_window_fps": 58.51149677772311,
+      "cpu_summary": {
+        "frames": 601,
+        "max_ns": 22788000,
+        "median_ns": 16566959,
+        "p95_ns": 17256583,
+        "p99_ns": 18306500,
+        "over_budget_frames": 598
+      },
+      "coverage": {
+        "visited_logical_items": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8
+        ],
+        "observed_offset_min": 0.0,
+        "observed_offset_max": 130.0,
+        "total_scrollable_pixels": null,
+        "visited_sections": null,
+        "complete_gallery_traversal": false,
+        "limitation": "one-second alternating local legs; logical items listed only for ListState; section identity not instrumented, full Gallery coverage unverified"
+      },
+      "actual_vsync_initial": "disabled",
+      "actual_vsync_final": "disabled",
+      "acceptance_eligible": false,
+      "phase_median_ns": {
+        "draw_ns": 6220083.5,
+        "submit_ns": 10028083.5,
+        "request_layout_ns": 1105541.5,
+        "prepaint_ns": 1597521.0,
+        "paint_ns": 1262583.0
+      },
+      "engine_counter_delta": {
+        "frames": 600,
+        "views_built": 841,
+        "views_reused": 1177,
+        "nodes_created": 318,
+        "nodes_reused": 188418,
+        "lines_shaped": 44,
+        "layer_frames_composited": 49,
+        "layer_frames_repainted": 49,
+        "tiles_dirtied": 0,
+        "layer_rebuilds_for_input": 0,
+        "layers_demoted": 0
+      },
+      "view_retention_initial_final": [
+        true,
+        true
+      ],
+      "environment_overrides": {
+        "GPUI_VIEW_RETENTION": {
+          "present": false,
+          "value": null
+        },
+        "GPUI_SCROLL_LAYERS": {
+          "present": false,
+          "value": null
+        }
+      }
+    },
+    "source-drift": {
+      "input_mode": "wheel",
+      "source_commit": "53c62d438fb5f11d0bee679af60d562ec9819448",
+      "inputs_stable": false,
+      "minimum_observed_window_fps": 58.42957863263965,
+      "cpu_summary": {
+        "frames": 602,
+        "max_ns": 28354375,
+        "median_ns": 16569167,
+        "p95_ns": 17396708,
+        "p99_ns": 21966125,
+        "over_budget_frames": 599
+      },
+      "coverage": {
+        "visited_logical_items": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7
+        ],
+        "observed_offset_min": 0.0,
+        "observed_offset_max": 130.0,
+        "total_scrollable_pixels": null,
+        "visited_sections": null,
+        "complete_gallery_traversal": false,
+        "limitation": "one-second alternating local legs; logical items listed only for ListState; section identity not instrumented, full Gallery coverage unverified"
+      },
+      "actual_vsync_initial": "disabled",
+      "actual_vsync_final": "disabled",
+      "acceptance_eligible": false,
+      "phase_median_ns": {
+        "draw_ns": 6370708,
+        "submit_ns": 9926166,
+        "request_layout_ns": 1240959,
+        "prepaint_ns": 1595667,
+        "paint_ns": 1222583
+      },
+      "engine_counter_delta": {
+        "frames": 601,
+        "views_built": 841,
+        "views_reused": 1179,
+        "nodes_created": 318,
+        "nodes_reused": 188303,
+        "lines_shaped": 47,
+        "layer_frames_composited": 48,
+        "layer_frames_repainted": 48,
+        "tiles_dirtied": 0,
+        "layer_rebuilds_for_input": 0,
+        "layers_demoted": 0
+      },
+      "view_retention_initial_final": [
+        true,
+        true
+      ],
+      "environment_overrides": {
+        "GPUI_VIEW_RETENTION": {
+          "present": false,
+          "value": null
+        },
+        "GPUI_SCROLL_LAYERS": {
+          "present": false,
+          "value": null
+        }
+      }
+    },
+    "pool-programmatic": {
+      "input_mode": "programmatic",
+      "source_commit": "6187f4b1bbc05f017b14151ebfcb90f461262311",
+      "inputs_stable": true,
+      "minimum_observed_window_fps": 47.61615524284838,
+      "cpu_summary": {
+        "frames": 603,
+        "max_ns": 29419667,
+        "median_ns": 16536083,
+        "p95_ns": 17449042,
+        "p99_ns": 22052500,
+        "over_budget_frames": 600
+      },
+      "coverage": {
+        "visited_logical_items": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7
+        ],
+        "observed_offset_min": 0.0,
+        "observed_offset_max": 130.0,
+        "total_scrollable_pixels": null,
+        "visited_sections": null,
+        "complete_gallery_traversal": false,
+        "limitation": "one-second alternating local legs; logical items listed only for ListState; section identity not instrumented, full Gallery coverage unverified"
+      },
+      "actual_vsync_initial": "disabled",
+      "actual_vsync_final": "disabled",
+      "acceptance_eligible": false,
+      "phase_median_ns": {
+        "draw_ns": 6622875,
+        "submit_ns": 9603791,
+        "request_layout_ns": 1437667,
+        "prepaint_ns": 2646417,
+        "paint_ns": 1988292
+      }
+    },
+    "pool-wheel": {
+      "input_mode": "wheel",
+      "source_commit": "6187f4b1bbc05f017b14151ebfcb90f461262311",
+      "inputs_stable": true,
+      "minimum_observed_window_fps": 50.39571139008747,
+      "cpu_summary": {
+        "frames": 600,
+        "max_ns": 28378584,
+        "median_ns": 16569166,
+        "p95_ns": 17341750,
+        "p99_ns": 21843709,
+        "over_budget_frames": 600
+      },
+      "coverage": {
+        "visited_logical_items": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7
+        ],
+        "observed_offset_min": 0.0,
+        "observed_offset_max": 130.0,
+        "total_scrollable_pixels": null,
+        "visited_sections": null,
+        "complete_gallery_traversal": false,
+        "limitation": "one-second alternating local legs; logical items listed only for ListState; section identity not instrumented, full Gallery coverage unverified"
+      },
+      "actual_vsync_initial": "disabled",
+      "actual_vsync_final": "disabled",
+      "acceptance_eligible": false,
+      "phase_median_ns": {
+        "draw_ns": 6466417,
+        "submit_ns": 9840167,
+        "request_layout_ns": 1210125,
+        "prepaint_ns": 1674833,
+        "paint_ns": 1327375
+      }
+    }
+  },
+  "independent_review": "Raw frames, source/binary identity checks, input paths, cumulative counters and separate stack samples independently reviewed. Performance gates remain failed.",
+  "limits": [
+    "The source-drift run is retained but is not stable-source evidence.",
+    "Callback-driven local loops are not fixed hardware input trajectories or complete Gallery traversal.",
+    "Cumulative object/container counters are not mutually exclusive whole-frame categories or reuse percentages.",
+    "Per-draw autorelease cleanup did not establish a performance improvement; separate post-pool stacks still show drawable waiting.",
+    "Thermal state and Core Animation transaction adoption were not recorded; their roles remain unverified.",
+    "All slow/startup CPU scopes remain in the reports. Strict per-scroll submission intervals and GPU time remain unverified."
+  ]
+}
