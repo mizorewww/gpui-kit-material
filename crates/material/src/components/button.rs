@@ -4,6 +4,7 @@
 //! semantics are still pending; this module does not establish full conformance.
 use crate::{
     color::ColorRole,
+    icons::Icon,
     motion::{self, MotionToken},
     theme::color,
     tokens::typography::{TypeRole, rem},
@@ -64,6 +65,21 @@ impl ButtonShape {
     }
 }
 
+/// Logical placement of the optional icon, relative to the label.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum ButtonIconPosition {
+    #[default]
+    Leading,
+    Trailing,
+}
+/// Layout direction for logical icon placement and padding.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum ButtonDirection {
+    #[default]
+    Ltr,
+    Rtl,
+}
+
 #[derive(Clone, Copy, Debug)]
 struct Geometry {
     height: f32,
@@ -91,6 +107,14 @@ impl ButtonSize {
             Self::ExtraLarge => "xl",
         }
     }
+    fn icon_size(self) -> f32 {
+        match self {
+            Self::ExtraSmall | Self::Small => 20.,
+            Self::Medium => 24.,
+            Self::Large => 32.,
+            Self::ExtraLarge => 40.,
+        }
+    }
     fn geometry(self) -> Geometry {
         let (height, padding, gap, outline, square, pressed, typography) = match self {
             Self::ExtraSmall => (32., 12., 4., 1., 12., 8., TypeRole::LabelLarge),
@@ -108,6 +132,35 @@ impl ButtonSize {
             pressed,
             typography,
         }
+    }
+}
+
+fn horizontal_padding(
+    size: ButtonSize,
+    variant: ButtonVariant,
+    icon: Option<ButtonIconPosition>,
+    direction: ButtonDirection,
+) -> (f32, f32) {
+    let ordinary = size.geometry().padding;
+    let compact_text = variant == ButtonVariant::Text
+        && matches!(size, ButtonSize::ExtraSmall | ButtonSize::Small);
+    let (mut start, mut end) = if compact_text {
+        (12., 12.)
+    } else {
+        (ordinary, ordinary)
+    };
+    if let Some(position) = icon
+        && (compact_text || size == ButtonSize::Small)
+    {
+        (start, end) = match position {
+            ButtonIconPosition::Leading => (12., 16.),
+            ButtonIconPosition::Trailing => (16., 12.),
+        };
+    }
+    if direction == ButtonDirection::Rtl {
+        (end, start)
+    } else {
+        (start, end)
     }
 }
 
@@ -309,6 +362,10 @@ pub struct MaterialButton {
     focus_handle: Option<FocusHandle>,
     focusable: bool,
     base: gpui_base::Button,
+    children: Vec<AnyElement>,
+    icon: Option<Icon>,
+    icon_position: ButtonIconPosition,
+    direction: ButtonDirection,
     variant: ButtonVariant,
     size: ButtonSize,
     shape: ButtonShape,
@@ -325,6 +382,10 @@ impl MaterialButton {
             focus_handle: None,
             focusable: true,
             base: gpui_base::Button::new(id),
+            children: vec![],
+            icon: None,
+            icon_position: ButtonIconPosition::Leading,
+            direction: ButtonDirection::Ltr,
             variant: ButtonVariant::Filled,
             size: ButtonSize::Small,
             shape: ButtonShape::Round,
@@ -334,6 +395,19 @@ impl MaterialButton {
     }
     pub fn variant(mut self, variant: ButtonVariant) -> Self {
         self.variant = variant;
+        self
+    }
+    /// Set a decorative icon; the button supplies its reference slot size.
+    pub fn icon(mut self, icon: impl Into<Icon>) -> Self {
+        self.icon = Some(icon.into());
+        self
+    }
+    pub fn icon_position(mut self, position: ButtonIconPosition) -> Self {
+        self.icon_position = position;
+        self
+    }
+    pub fn direction(mut self, direction: ButtonDirection) -> Self {
+        self.direction = direction;
         self
     }
     pub fn button_size(mut self, size: ButtonSize) -> Self {
@@ -386,7 +460,7 @@ impl Styled for MaterialButton {
 }
 impl ParentElement for MaterialButton {
     fn extend(&mut self, elements: impl IntoIterator<Item = AnyElement>) {
-        self.base.extend(elements);
+        self.children.extend(elements);
     }
 }
 impl InteractiveElement for MaterialButton {
@@ -438,12 +512,25 @@ impl RenderOnce for MaterialButton {
         if let Some(observer) = &self.radius_observer {
             observer.set(radius);
         }
-        let padding = if self.variant == ButtonVariant::Text
-            && matches!(self.size, ButtonSize::ExtraSmall | ButtonSize::Small)
-        {
-            12.
-        } else {
-            g.padding
+        let (left_padding, right_padding) = horizontal_padding(
+            self.size,
+            self.variant,
+            self.icon.as_ref().map(|_| self.icon_position),
+            self.direction,
+        );
+        let slot = self.icon.map(|icon| {
+            let icon = if self.disabled { icon.color(fg) } else { icon };
+            div()
+                .flex()
+                .items_center()
+                .justify_center()
+                .flex_shrink_0()
+                .size(rem(self.size.icon_size()))
+                .child(icon.size(rem(self.size.icon_size())))
+        });
+        let (leading, trailing) = match self.icon_position {
+            ButtonIconPosition::Leading => (slot, None),
+            ButtonIconPosition::Trailing => (None, slot),
         };
         let level = if self.variant == ButtonVariant::Elevated {
             1
@@ -475,16 +562,26 @@ impl RenderOnce for MaterialButton {
         )
         .absolute()
         .size_full();
-        let base = self.base.track_focus(&focus).child(exit_observer);
+        let base = self
+            .base
+            .track_focus(&focus)
+            .children(leading)
+            .children(self.children)
+            .children(trailing)
+            .child(exit_observer);
         let base = observe_press(base, &pressed, &focus, self.disabled, self.focusable);
         base.flex()
             .flex_row()
+            .when(self.direction == ButtonDirection::Rtl, |b| {
+                b.flex_row_reverse()
+            })
             .items_center()
             .justify_center()
             .flex_shrink_0()
             .min_w(rem(58.))
             .h(rem(g.height))
-            .px(rem(padding))
+            .pl(rem(left_padding))
+            .pr(rem(right_padding))
             .gap(rem(g.gap))
             .rounded(rem(radius))
             .bg(bg)
@@ -873,5 +970,96 @@ mod tests {
         cx.deactivate_window();
         draw(cx);
         assert_eq!(sample.get(), 48., "window deactivation clears a held press");
+    }
+    struct IconHarness {
+        size: ButtonSize,
+        variant: ButtonVariant,
+        position: super::ButtonIconPosition,
+        direction: super::ButtonDirection,
+    }
+    impl Render for IconHarness {
+        fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+            window.set_rem_size(px(14.));
+            div().flex().items_start().child(
+                MaterialButton::new("icon-button")
+                    .button_size(self.size)
+                    .variant(self.variant)
+                    .icon_position(self.position)
+                    .direction(self.direction)
+                    .icon(crate::icons::IconName::Check.icon().size(px(100.)))
+                    .debug_selector(|| "icon-button".into())
+                    .child(
+                        div()
+                            .w(px(40.))
+                            .h(px(10.))
+                            .debug_selector(|| "icon-label".into()),
+                    ),
+            )
+        }
+    }
+    #[gpui::test]
+    fn icon_slots_and_logical_padding_match_all_sizes_variants_and_directions(
+        cx: &mut TestAppContext,
+    ) {
+        use super::{ButtonDirection, ButtonIconPosition};
+        cx.update(gpui_base::init);
+        let (view, cx) = cx.add_window_view(|_, _| IconHarness {
+            size: ButtonSize::Small,
+            variant: ButtonVariant::Filled,
+            position: ButtonIconPosition::Leading,
+            direction: ButtonDirection::Ltr,
+        });
+        for (size, icon, gap, pad) in [
+            (ButtonSize::ExtraSmall, 20., 4., 12.),
+            (ButtonSize::Small, 20., 8., 16.),
+            (ButtonSize::Medium, 24., 8., 24.),
+            (ButtonSize::Large, 32., 12., 48.),
+            (ButtonSize::ExtraLarge, 40., 16., 64.),
+        ] {
+            for variant in ButtonVariant::ALL {
+                for direction in [ButtonDirection::Ltr, ButtonDirection::Rtl] {
+                    for position in [ButtonIconPosition::Leading, ButtonIconPosition::Trailing] {
+                        view.update(cx, |this, cx| {
+                            this.size = size;
+                            this.variant = variant;
+                            this.position = position;
+                            this.direction = direction;
+                            cx.notify();
+                        });
+                        draw(cx);
+                        let button = cx.debug_bounds("icon-button").unwrap();
+                        let label = cx.debug_bounds("icon-label").unwrap();
+                        let special = size == ButtonSize::Small
+                            || (size == ButtonSize::ExtraSmall && variant == ButtonVariant::Text);
+                        let (icon_side, label_side) = if special { (12., 16.) } else { (pad, pad) };
+                        let border = if variant == ButtonVariant::Outlined {
+                            match size {
+                                ButtonSize::Large => 2.,
+                                ButtonSize::ExtraLarge => 3.,
+                                _ => 1.,
+                            }
+                        } else {
+                            0.
+                        };
+                        let expected = icon_side + label_side + icon + gap + 40. + 2. * border;
+                        assert!(
+                            (f32::from(button.size.width) - expected).abs() < 0.01,
+                            "{size:?} {variant:?} {position:?} {direction:?}"
+                        );
+                        let icon_left = (position == ButtonIconPosition::Leading)
+                            == (direction == ButtonDirection::Ltr);
+                        let expected_label = if icon_left {
+                            icon_side + icon + gap + border
+                        } else {
+                            label_side + border
+                        };
+                        assert!(
+                            (f32::from(label.left() - button.left()) - expected_label).abs() < 0.01,
+                            "label: {size:?} {variant:?} {position:?} {direction:?}"
+                        );
+                    }
+                }
+            }
+        }
     }
 }

@@ -109,12 +109,16 @@ and Text variants, five `ButtonSize`s through `.button_size(...)`, and Round or
 Square through `.shape(...)`. The default variant is Filled. Existing callers
 with an explicit `gpui_base::Button` return annotation must update that type.
 Activation, focus binding, keyboard input and disabled behavior remain in Base.
+Use `.icon(...)` for a decorative SVG icon, `.icon_position(...)` for logical
+Leading/Trailing placement, and `.direction(ButtonDirection::Rtl)` for mirrored
+layout. Slot dimensions follow button size, and disabled icons use the disabled
+content role even when the supplied icon has a custom color.
 
 The gallery includes all 50 variant/size/shape combinations and disabled samples.
 Press and release morph the radius with the reference FastSpatial curve, including
 interrupted transitions and reduced-motion handling. This is an intermediate
 implementation: color/state-layer transitions, ripple, the external
-focus ring, expanded touch targets, icon slots, toggle/loading and tracking still
+focus ring, expanded touch targets, toggle/loading and tracking still
 require implementation and independent visual/motion review.
 
 ## Reference themes

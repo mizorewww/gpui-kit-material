@@ -115,6 +115,51 @@ impl Render for Gallery {
                             .text_size(TEXT_AUX),
                     )
             });
+        let button_icons = gpui_base::v_flex()
+            .gap(rem(16.))
+            .child(section_title("button-icons", "Button icons"))
+            .children(ButtonSize::ALL.into_iter().map(|size| {
+                gpui_base::h_flex().flex_wrap().gap(rem(12.)).children(
+                    [
+                        (
+                            "Leading",
+                            ButtonIconPosition::Leading,
+                            ButtonDirection::Ltr,
+                            ButtonVariant::Filled,
+                        ),
+                        (
+                            "Trailing",
+                            ButtonIconPosition::Trailing,
+                            ButtonDirection::Ltr,
+                            ButtonVariant::Filled,
+                        ),
+                        (
+                            "RTL leading",
+                            ButtonIconPosition::Leading,
+                            ButtonDirection::Rtl,
+                            ButtonVariant::Text,
+                        ),
+                        (
+                            "RTL trailing",
+                            ButtonIconPosition::Trailing,
+                            ButtonDirection::Rtl,
+                            ButtonVariant::Text,
+                        ),
+                    ]
+                    .into_iter()
+                    .map(move |(label, position, direction, variant)| {
+                        material_button(
+                            SharedString::from(format!("icon-{size:?}-{label}")),
+                            variant,
+                        )
+                        .button_size(size)
+                        .icon(IconName::Check)
+                        .icon_position(position)
+                        .direction(direction)
+                        .child(label)
+                    }),
+                )
+            }));
         let typography_samples = TypeRole::ALL.into_iter().map(|role| {
             let spec = role.scale();
             gpui_base::v_flex()
@@ -437,6 +482,7 @@ impl Render for Gallery {
                                     }),
                                 )
                             }))
+                            .child(button_icons)
                             .child(gpui_base::h_flex().flex_wrap().gap(rem(12.)).children(
                                 ButtonVariant::ALL.into_iter().map(|variant| {
                                     material_button(
@@ -444,6 +490,7 @@ impl Render for Gallery {
                                         variant,
                                     )
                                     .disabled(true)
+                                    .icon(IconName::Check)
                                     .child(variant.name())
                                 }),
                             )),

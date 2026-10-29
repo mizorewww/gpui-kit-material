@@ -1,7 +1,10 @@
 //! Material components. Each module documents the M3 component it
 //! implements and what remains for M3 Expressive (`docs/ROADMAP.md`).
 mod button;
-pub use button::{ButtonShape, ButtonSize, ButtonVariant, MaterialButton, material_button};
+pub use button::{
+    ButtonDirection, ButtonIconPosition, ButtonShape, ButtonSize, ButtonVariant, MaterialButton,
+    material_button,
+};
 mod button_group;
 mod controls;
 pub use controls::{
