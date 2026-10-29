@@ -52,17 +52,12 @@ change animates the whole window on the slow effects spring.
 cargo run -p gpui-kit-material --example gallery
 ```
 
-## Material Symbols reference example
+## Material Symbols consumer example
 
-A native recreation of the Google Fonts icon browser, with the full symbol
-catalog, axis controls, SVG/PNG export and GPUI code output. Clone the sibling
-`gpui-material-symbols` repository, then run:
-
-```sh
-cargo run -p gpui-kit-material --example material_symbols
-```
-
-See [setup, component details and captures](docs/MATERIAL_SYMBOLS.md).
+The Google Fonts icon browser belongs to
+[gpui-material-symbols](https://github.com/mizorewww/gpui-material-symbols).
+It consumes this kit's Material components; this repository retains the reusable
+controls and their gallery demonstrations.
 
 ## Develop
 
