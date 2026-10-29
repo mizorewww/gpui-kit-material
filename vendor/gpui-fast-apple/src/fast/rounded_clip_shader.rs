@@ -80,6 +80,8 @@ float4 fast_rounded_clip_color(float4 color, float2 position, constant FastRound
     source
 }
 
+// Only the precompiled-shader build path stages a copy; runtime_shaders stitches `source`.
+#[cfg_attr(feature = "runtime_shaders", allow(dead_code))]
 pub fn stage(input: impl AsRef<std::path::Path>, output: impl AsRef<std::path::Path>) {
     std::fs::write(output, source(&std::fs::read_to_string(input).unwrap())).unwrap();
 }

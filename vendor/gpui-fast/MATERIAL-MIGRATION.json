@@ -203,5 +203,11 @@
       "sha256": "cb6c28e3e6065d62790ba38662d14f3f1510180375cacba18547720e8b48d9d5",
       "source": "matching fixture in vendor/gpui-pre; font licenses retained alongside the files"
     }
-  }
+  },
+  "warning_patches": [
+    {
+      "path": "src/fast/layers/reuse.rs",
+      "scope": "Move the next/rendered frame borrows used only by debug-bounds replay inside the cfg(any(test, feature = \"test-support\")) block so builds without test-support have no unused-variable warnings. No behavior change."
+    }
+  ]
 }

@@ -85,5 +85,11 @@
   "presentation_patch": {
     "path": "src/metal_renderer.rs",
     "scope": "draw_with_status reports real command-buffer submission; a per-call autoreleasepool drains temporary Metal references before returning to the presentation timer, including early returns. No synchronization, drawable timeout, buffering, or counting policy changes."
-  }
+  },
+  "warning_patches": [
+    {
+      "path": "src/fast/rounded_clip_shader.rs",
+      "scope": "build.rs includes this file; stage() is only called on the precompiled-shader path, so allow dead_code under the runtime_shaders feature. No behavior change."
+    }
+  ]
 }
