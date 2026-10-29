@@ -104,7 +104,8 @@ gpui_kit_material::motion::apply_scheme(
 Expressive is the default. A value transition retains its curve until it settles,
 including reversals, so changing schemes cannot jump an in-flight value. A mounted
 entrance retains its initial scheme; a new palette target uses the current scheme.
-Reduced motion still paints the final state immediately.
+Reduced-motion behavior is set per transition: spatial value transitions finish
+immediately, while supported non-spatial effects retain their fades.
 
 ## Buttons
 
@@ -119,14 +120,32 @@ Leading/Trailing placement, and `.direction(ButtonDirection::Rtl)` for mirrored
 layout. Slot dimensions follow button size, and disabled icons use the disabled
 content role even when the supplied icon has a custom color.
 
-The gallery includes all 50 variant/size/shape combinations and disabled samples.
-Press and release morph the radius with the reference FastSpatial curve, including
-interrupted transitions and reduced-motion handling. This is an intermediate
-implementation: color/state-layer transitions, ripple, expanded touch targets,
-toggle/loading and tracking still
-require implementation and independent visual/motion review. Keyboard focus draws
-a Secondary outline 3px wide with a 2px gap outside the button, without changing
-layout or hitboxes; pointer focus and disabled buttons do not draw it.
+The gallery includes all 50 variant/size/shape combinations, disabled samples,
+controlled toggles, and loading examples with no icon or either icon placement.
+Press and release morph the radius with FastSpatial, including interrupted
+transitions. Pointer ripples are enabled by default; `.ripple(false)` selects the
+pressed state layer. XS/S retain their 32/40px visual heights while their 48px
+interaction targets obey the same clipping and occlusion as the Base control.
+Keyboard focus draws a Secondary outline 3px wide with a 2px gap outside the
+button; pointer focus and disabled buttons do not draw it.
+
+Use `.toggle(true).selected(selected).on_change(...)` for controlled selection.
+The callback receives `(next_selected, click_event, window, app)`; update the
+application's state and request a render. `.toggle_on_click(false)` suppresses
+selection requests while preserving `on_click` for container-owned selection.
+
+`.progress(visible, accessible_label)` shows a circular indicator while keeping
+activation available. `.loading(loading, accessible_label)` also marks the
+button busy and disables activation. Both are controlled: visible button text
+comes from `.child(...)`, and `.disabled(...)` remains application-owned, so
+ending loading does not clear an independent disabled state. Keep the progress
+or loading configuration present with a false flag while hidden to preserve its
+animation phase. Indicator labels are always supplied by the application.
+
+These features have focused rule, input and motion tests and independent code
+reviews. Full desktop/browser visual and animation conformance remains pending,
+including typography tracking and the complete theme/scale/state matrix. See
+[`conformance/md3.json`](conformance/md3.json) for the scoped evidence.
 
 ## Reference themes
 
