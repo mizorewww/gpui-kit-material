@@ -18,6 +18,43 @@ use std::{
     time::{Duration, Instant},
 };
 
+/// Read cumulative counters only: never reset stats or enable per-node timing.
+fn engine_snapshot(window: &Window) -> Value {
+    #[cfg(feature = "gpui-fast")]
+    {
+        let stats = window.layout_stats();
+        json!({
+            "view_retention": window.view_retention(),
+            "frames": stats.frames,
+            "views_built": stats.views_built,
+            "views_reused": stats.views_reused,
+            "nodes_created": stats.nodes_created,
+            "nodes_reused": stats.nodes_reused,
+            "lines_shaped": stats.lines_shaped,
+            "layer_frames_composited": stats.layer_frames_composited,
+            "layer_frames_repainted": stats.layer_frames_repainted,
+            "tiles_dirtied": stats.tiles_dirtied,
+            "layer_rebuilds_for_input": stats.layer_rebuilds_for_input,
+            "layers_demoted": stats.layers_demoted
+        })
+    }
+    #[cfg(not(feature = "gpui-fast"))]
+    {
+        let _ = window;
+        Value::Null
+    }
+}
+
+fn engine_environment() -> Value {
+    // Deliberate whitelist; never serialize the process environment wholesale.
+    let entry = |key| match std::env::var_os(key) {
+        Some(value) => json!({"present":true,"value":value.to_string_lossy()}),
+        None => json!({"present":false,"value":null}),
+    };
+    json!({"GPUI_VIEW_RETENTION":entry("GPUI_VIEW_RETENTION"),
+        "GPUI_SCROLL_LAYERS":entry("GPUI_SCROLL_LAYERS")})
+}
+
 #[derive(Clone, Copy, Default, Debug, PartialEq, Eq)]
 pub(super) enum InputMode {
     #[default]
@@ -180,6 +217,9 @@ impl Session {
             duration: self.duration,
             target,
             input_mode: self.input_mode,
+            engine_initial: engine_snapshot(window),
+            engine_final: Value::Null,
+            engine_environment: engine_environment(),
             inputs: Vec::new(),
             raw: Vec::new(),
             errors: Vec::new(),
@@ -226,6 +266,7 @@ impl Session {
                 .update(cx, |_, window, _| {
                     let mut state = state.borrow_mut();
                     state.observe(window);
+                    state.engine_final = engine_snapshot(window);
                     state.stopped = true;
                 })
                 .is_err()
@@ -273,6 +314,9 @@ struct Drive {
     target: ScrollTarget,
     input_mode: InputMode,
     inputs: Vec<Value>,
+    engine_initial: Value,
+    engine_final: Value,
+    engine_environment: Value,
     raw: Vec<Observation>,
     errors: Vec<String>,
     previous: Option<Position>,
@@ -370,7 +414,10 @@ impl Drive {
         if minimum.is_none() {
             errors.push("no complete >=250ms observation window".into());
         }
-        json!({"schema":"gallery-scroll-observations-v1","input_mode":self.input_mode.name(),"raw_inputs":self.inputs,"raw_observations":raw,"windows":windows,
+        json!({"schema":"gallery-scroll-observations-v1","input_mode":self.input_mode.name(),"raw_inputs":self.inputs,
+            "engine_counters":{"initial":self.engine_initial,"final":self.engine_final,
+                "environment_overrides":self.engine_environment,
+                "scope":"cumulative window counters at driver install (after initial draw) and final observation; not per-frame metrics; counters are never reset and extra timing is not enabled; unavailable backend or missing final window is null"},"raw_observations":raw,"windows":windows,
             "minimum_observed_window_fps":minimum,"minimum_partial_window_fps":partial_minimum,"moved_up":self.moved_up,"moved_down":self.moved_down,
             "errors":errors,"cpu":cpu,"fps_overlay":true,
             "actual_vsync_initial":self.raw.first().map(|o|o.vsync),
@@ -485,6 +532,9 @@ mod tests {
             duration: Duration::from_secs(2),
             target: ScrollTarget::Pixels(ScrollHandle::new()),
             input_mode: InputMode::Programmatic,
+            engine_initial: Value::Null,
+            engine_final: Value::Null,
+            engine_environment: json!({}),
             inputs: Vec::new(),
             errors: Vec::new(),
             previous: None,
