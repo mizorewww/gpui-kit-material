@@ -446,26 +446,29 @@ impl Render for GalleryWindow {
             .text_color(color(ColorRole::INK))
             .font_family("Roboto")
             .child(
-                TitleBar::new("title-bar", TITLE_BAR)
-                    .labels(CaptionLabels {
+                TitleBar::new(
+                    "title-bar",
+                    TITLE_BAR,
+                    CaptionLabels {
                         minimize: "Minimize".into(),
                         maximize: "Maximize".into(),
                         restore: "Restore".into(),
                         close: "Close".into(),
-                    })
-                    .gap(rem(12.))
-                    .child(section_title("window-title", "gpui-kit-material"))
-                    .child(div().flex_1())
-                    .when_some(self.fps.clone(), |bar, fps| bar.child(fps))
-                    .child(title_bar_control(
-                        MaterialButton::new("gallery-settings-open")
-                            .variant(ButtonVariant::Text)
-                            .button_size(ButtonSize::ExtraSmall)
-                            .accessibility_label("Settings")
-                            .debug_selector(|| "gallery-settings-open".into())
-                            .child("Settings")
-                            .on_click(|_, window, cx| settings::open(window, cx)),
-                    )),
+                    },
+                )
+                .gap(rem(12.))
+                .child(section_title("window-title", "gpui-kit-material"))
+                .child(div().flex_1())
+                .when_some(self.fps.clone(), |bar, fps| bar.child(fps))
+                .child(title_bar_control(
+                    MaterialButton::new("gallery-settings-open")
+                        .variant(ButtonVariant::Text)
+                        .button_size(ButtonSize::ExtraSmall)
+                        .accessibility_label("Settings")
+                        .debug_selector(|| "gallery-settings-open".into())
+                        .child("Settings")
+                        .on_click(|_, window, cx| settings::open(window, cx)),
+                )),
             )
             .child(
                 AnyView::from(self.gallery.clone())
