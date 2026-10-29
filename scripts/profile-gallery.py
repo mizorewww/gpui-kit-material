@@ -117,7 +117,11 @@ def main():
     parser.add_argument("--backend", choices=("upstream", "fast"), default="fast")
     parser.add_argument("--scroll", action="store_true",
                         help="record bounded bidirectional scrolling with vertical sync disabled")
+    parser.add_argument("--scroll-input", choices=("wheel", "programmatic"),
+                        help="scroll input path (default: programmatic); requires --scroll")
     args = parser.parse_args()
+    if args.scroll_input and not args.scroll:
+        parser.error("--scroll-input requires --scroll")
     if not math.isfinite(args.seconds) or not 0.1 <= args.seconds <= 3600:
         parser.error("--seconds must be finite and in 0.1..=3600")
     if args.scroll and not 2 <= args.seconds <= 120:
@@ -136,6 +140,7 @@ def main():
         "source_before_build": source_identity(features),
         "build_command": command,
         "requested_backend": args.backend,
+        "scroll_input_mode": (args.scroll_input or "programmatic") if args.scroll else None,
         "requested_scenario": "bidirectional-scroll" if args.scroll else "startup",
         "rustc": output("rustc", "-Vv").decode(),
         "cargo": output("cargo", "-V").decode().strip(),
@@ -185,8 +190,10 @@ def main():
     save()
     env = os.environ.copy()
     env.pop("MATERIAL_SCROLL_PROFILE", None)
+    env.pop("MATERIAL_SCROLL_INPUT", None)
     if args.scroll:
         env["MATERIAL_SCROLL_PROFILE"] = "1"
+        env["MATERIAL_SCROLL_INPUT"] = args.scroll_input or "programmatic"
     env.update(MATERIAL_PROFILE_OUTPUT=str(destination / "frames.json"),
                MATERIAL_PROFILE_SECONDS=str(args.seconds))
     with (destination / "run.log").open("wb") as log:

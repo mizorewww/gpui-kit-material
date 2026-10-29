@@ -116,6 +116,12 @@ Record continuous bidirectional scrolling with `--scroll` (2–120 seconds):
 python3 scripts/profile-gallery.py /tmp/material-scroll --backend fast --seconds 10 --scroll
 ```
 
+Add `--scroll-input wheel` to dispatch pixel wheel events at the main scroll
+viewport center through the normal input handler. The default `programmatic`
+mode retains the earlier offset mutation plus window refresh for comparison;
+it bypasses the wheel-specific invalidation path and can prevent Fast retained
+reuse. Reports identify the mode and preserve wheel coordinates and deltas.
+
 This diagnostic disables vertical sync through the platform API and preserves
 raw scroll positions, successful new-frame counts, full CPU scopes and the
 lowest observed full-window FPS (windows of at least 250 ms). Short tails remain

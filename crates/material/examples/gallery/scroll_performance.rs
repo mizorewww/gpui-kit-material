@@ -5,7 +5,8 @@
 //! Inject its existing CPU report builder through `finish_cpu`; this module does
 //! not redefine the CPU acceptance boundary. FPS overlay remains enabled.
 use gpui::{
-    App, ListState, ScrollHandle, VsyncStatus, Window, WindowId,
+    App, ListState, PlatformInput, ScrollDelta, ScrollEvent, ScrollHandle, VsyncStatus, Window,
+    WindowId, point,
     profiler::{self, FrameEvent, FrameTimingCollector},
     px,
 };
@@ -16,6 +17,28 @@ use std::{
     rc::Rc,
     time::{Duration, Instant},
 };
+
+#[derive(Clone, Copy, Default, Debug, PartialEq, Eq)]
+pub(super) enum InputMode {
+    #[default]
+    Programmatic,
+    Wheel,
+}
+impl InputMode {
+    pub(super) fn from_environment() -> anyhow::Result<Self> {
+        match std::env::var("MATERIAL_SCROLL_INPUT").as_deref() {
+            Ok("wheel") => Ok(Self::Wheel),
+            Ok("programmatic") | Err(std::env::VarError::NotPresent) => Ok(Self::Programmatic),
+            _ => anyhow::bail!("MATERIAL_SCROLL_INPUT must be wheel or programmatic"),
+        }
+    }
+    pub(super) fn name(self) -> &'static str {
+        match self {
+            Self::Programmatic => "programmatic",
+            Self::Wheel => "wheel",
+        }
+    }
+}
 
 #[derive(Clone)]
 pub(super) enum ScrollTarget {
@@ -60,6 +83,32 @@ impl ScrollTarget {
             }
         }
     }
+    fn wheel(&self, down: bool, window: &mut Window, cx: &mut App) -> Option<Value> {
+        let bounds = match self {
+            Self::Pixels(handle) => handle.bounds(),
+            Self::List(list) => list.viewport_bounds(),
+        }
+        .intersect(&gpui::Bounds::new(
+            point(px(0.), px(0.)),
+            window.viewport_size(),
+        ));
+        if bounds.size.width <= px(0.) || bounds.size.height <= px(0.) {
+            return None;
+        }
+        let position = bounds.center();
+        let delta = if down { -8. } else { 8. };
+        window.dispatch_event(
+            PlatformInput::Scroll(ScrollEvent {
+                position,
+                delta: ScrollDelta::Pixels(point(px(0.), px(delta))),
+                ..Default::default()
+            }),
+            cx,
+        );
+        Some(
+            json!({"position_px":[f32::from(position.x),f32::from(position.y)],"delta_y_px":delta}),
+        )
+    }
     fn step(&self, down: bool) {
         let distance = if down { 8. } else { -8. };
         match self {
@@ -79,6 +128,7 @@ pub(super) struct Session {
     output: PathBuf,
     duration: Duration,
     collector: FrameTimingCollector,
+    input_mode: InputMode,
 }
 impl Session {
     pub(super) fn from_prepared(
@@ -98,6 +148,7 @@ impl Session {
             output,
             duration,
             collector,
+            input_mode: InputMode::from_environment()?,
         })
     }
 
@@ -128,6 +179,8 @@ impl Session {
             started,
             duration: self.duration,
             target,
+            input_mode: self.input_mode,
+            inputs: Vec::new(),
             raw: Vec::new(),
             errors: Vec::new(),
             previous: None,
@@ -218,6 +271,8 @@ struct Drive {
     started: Instant,
     duration: Duration,
     target: ScrollTarget,
+    input_mode: InputMode,
+    inputs: Vec<Value>,
     raw: Vec<Observation>,
     errors: Vec<String>,
     previous: Option<Position>,
@@ -315,7 +370,7 @@ impl Drive {
         if minimum.is_none() {
             errors.push("no complete >=250ms observation window".into());
         }
-        json!({"schema":"gallery-scroll-observations-v1","raw_observations":raw,"windows":windows,
+        json!({"schema":"gallery-scroll-observations-v1","input_mode":self.input_mode.name(),"raw_inputs":self.inputs,"raw_observations":raw,"windows":windows,
             "minimum_observed_window_fps":minimum,"minimum_partial_window_fps":partial_minimum,"moved_up":self.moved_up,"moved_down":self.moved_down,
             "errors":errors,"cpu":cpu,"fps_overlay":true,
             "actual_vsync_initial":self.raw.first().map(|o|o.vsync),
@@ -326,14 +381,14 @@ impl Drive {
                 "limitation":"one-second alternating local legs; logical items listed only for ListState; section identity not instrumented, full Gallery coverage unverified"},
             "acceptance_eligible":false,"exit_code":if known_cpu_failure||known_fps_failure {1}else{2},
             "strict_fps_limit":"callback observation timestamps are not per-successful-submission timestamps; coalesced increments cannot prove individual frame intervals; the full-window counter also includes FPS overlay and animations, and cannot attribute every counted frame to scrolling",
-            "scope":"programmatic bidirectional main-content scrolling; no synthetic refresh without offset change; startup and turns retained; GPU completion unmeasured"})
+            "scope":"bidirectional main-content scrolling; programmatic mode refreshes on offset change, wheel mode dispatches through platform input without explicit refresh; startup and turns retained; GPU completion unmeasured"})
     }
 }
 fn schedule(state: Rc<RefCell<Drive>>, window: &mut Window) {
     if state.borrow().stopped {
         return;
     }
-    window.on_next_frame(move |window, _| {
+    window.on_next_frame(move |window, cx| {
         let mut drive = state.borrow_mut();
         if drive.stopped || drive.started.elapsed() >= drive.duration {
             return;
@@ -349,10 +404,25 @@ fn schedule(state: Rc<RefCell<Drive>>, window: &mut Window) {
             drive.down = !drive.down;
             drive.leg_started = Instant::now();
         }
-        let before = drive.target.position();
-        drive.target.step(drive.down);
-        if drive.target.position() != before {
-            window.refresh();
+        match drive.input_mode {
+            InputMode::Programmatic => {
+                let before = drive.target.position();
+                drive.target.step(drive.down);
+                if drive.target.position() != before {
+                    window.refresh();
+                }
+            }
+            InputMode::Wheel => {
+                if let Some(mut input) = drive.target.wheel(drive.down, window, cx) {
+                    input["timestamp_ns"] = json!(drive.started.elapsed().as_nanos());
+                    drive.inputs.push(input);
+                } else {
+                    drive
+                        .errors
+                        .push("main scroll viewport has no visible area for wheel input".into());
+                    drive.stopped = true;
+                }
+            }
         }
         drop(drive);
         schedule(state, window);
@@ -362,12 +432,60 @@ fn schedule(state: Rc<RefCell<Drive>>, window: &mut Window) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[gpui::test]
+    fn wheel_dispatch_moves_list_through_scroll_handler(cx: &mut gpui::TestAppContext) {
+        use gpui::{Context, IntoElement, ListAlignment, ParentElement, Render, Styled, div, list};
+        // Match Gallery overdraw so measured content extends past the viewport.
+        let list_state = ListState::new(100, ListAlignment::Top, px(128.));
+        let events = Rc::new(std::cell::Cell::new(0));
+        let observed = events.clone();
+        list_state.set_scroll_handler(move |_, _, _| observed.set(observed.get() + 1));
+        struct View(ListState);
+        impl Render for View {
+            fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+                div().w(px(300.)).h(px(200.)).child(
+                    list(self.0.clone(), |_, _, _| {
+                        div().h(px(40.)).w_full().into_any_element()
+                    })
+                    .size_full(),
+                )
+            }
+        }
+        let (_view, cx) = cx.add_window_view(|_, _| View(list_state.clone()));
+        cx.update(|window, cx| window.draw(cx).clear(cx));
+        let target = ScrollTarget::List(list_state);
+        let before = target.position();
+        cx.update(|window, cx| {
+            assert!(target.wheel(true, window, cx).is_some());
+        });
+        assert!(
+            target.position() != before,
+            "dispatched input must move the list"
+        );
+        assert_eq!(
+            events.get(),
+            1,
+            "must use List's event handler, not scroll_by"
+        );
+        cx.update(|window, cx| {
+            window.draw(cx).clear(cx);
+            assert!(target.wheel(false, window, cx).is_some());
+        });
+        assert!(
+            target.position() == before,
+            "reverse input must return to the initial position"
+        );
+        assert_eq!(events.get(), 2);
+    }
+
     fn drive(count: u64) -> Drive {
         let now = Instant::now();
         Drive {
             started: now,
             duration: Duration::from_secs(2),
             target: ScrollTarget::Pixels(ScrollHandle::new()),
+            input_mode: InputMode::Programmatic,
+            inputs: Vec::new(),
             errors: Vec::new(),
             previous: None,
             down: false,
