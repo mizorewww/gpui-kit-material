@@ -1,32 +1,17 @@
 //! Matched shadow lists for CSS-compatible button elevation interpolation.
 
-use gpui::{BoxShadow, black, px};
+use crate::tokens::elevation;
+use gpui::BoxShadow;
 use gpui_base::Interpolate;
 
 #[derive(Clone, Debug, PartialEq)]
 pub(super) struct ShadowPair([BoxShadow; 2]);
 
 impl ShadowPair {
+    /// The shared M3 elevation layers. Level 0 is padded with transparent,
+    /// zero-geometry entries so transitions keep matched lists and reverse.
     pub(super) fn level(level: u8) -> Self {
-        match level {
-            1 => Self([
-                BoxShadow::new(px(0.), px(1.), black().opacity(0.3)).blur_radius(px(2.)),
-                BoxShadow::new(px(0.), px(1.), black().opacity(0.15))
-                    .blur_radius(px(3.))
-                    .spread_radius(px(1.)),
-            ]),
-            2 => Self([
-                BoxShadow::new(px(0.), px(1.), black().opacity(0.3)).blur_radius(px(2.)),
-                BoxShadow::new(px(0.), px(2.), black().opacity(0.15))
-                    .blur_radius(px(6.))
-                    .spread_radius(px(2.)),
-            ]),
-            // CSS pads `none` with transparent, zero-geometry shadows before
-            // interpolating lists. Keeping both entries also permits reversal.
-            _ => Self(std::array::from_fn(|_| {
-                BoxShadow::new(px(0.), px(0.), black().opacity(0.))
-            })),
-        }
+        Self(elevation::layers(level))
     }
 
     pub(super) fn into_shadows(self) -> Vec<BoxShadow> {
@@ -53,6 +38,7 @@ impl Interpolate for ShadowPair {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use gpui::{black, px};
 
     fn assert_shadow(shadow: &BoxShadow, y: f32, blur: f32, spread: f32, alpha: f32) {
         assert_eq!(shadow.offset.x, px(0.));
