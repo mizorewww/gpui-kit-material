@@ -183,6 +183,11 @@
           "kind": "browser-reduced-motion-transitions",
           "path": "conformance/reference/button-states-reduced-motion.json",
           "scope": "Same state cases with prefers-reduced-motion verified active. Confirms retained opacity and shadow transitions; does not establish spatial, ripple or whole-component reduced-motion conformance."
+        },
+        {
+          "kind": "browser-ripple-lifecycle",
+          "path": "conformance/reference/button-ripple.json",
+          "scope": "Actual pinned createButton/createRipple and full stylesheet: exact expansion and fade samples, release cleanup, border offsets, paint order, pointer routing, static reduced motion and dynamic media switching. Existing ordinary fades continue through preference changes; reduced-mode releases finish immediately. Does not establish whole-component desktop/browser pixel conformance."
         }
       ]
     },
