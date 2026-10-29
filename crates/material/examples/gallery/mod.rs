@@ -52,6 +52,7 @@ struct Gallery {
     button_effects_disabled: bool,
     button_effects_tonal: bool,
     button_ripple: bool,
+    button_active: bool,
     button_selections: [bool; 10],
     button_toggle_size: ButtonSize,
     button_loading: bool,
@@ -161,6 +162,19 @@ impl Render for Gallery {
                     .flex_wrap()
                     .gap(rem(12.))
                     .child(
+                        material_button("toggle-button-active", ButtonVariant::Outlined)
+                            .child(if self.button_active {
+                                "Release active samples"
+                            } else {
+                                "Keep samples active"
+                            })
+                            .on_click(cx.listener(|this, _, _, cx| {
+                                this.button_active = !this.button_active;
+                                cx.notify();
+                            }))
+                            .reveal("reveal-toggle-button-active", scroll),
+                    )
+                    .child(
                         material_button("toggle-button-disabled", ButtonVariant::Outlined)
                             .child(if self.button_effects_disabled {
                                 "Enable samples"
@@ -207,6 +221,7 @@ impl Render for Gallery {
                         },
                     )
                     .disabled(self.button_effects_disabled)
+                    .active_state(self.button_active)
                     .ripple(self.button_ripple)
                     .icon(IconName::Check)
                     .child(variant.name())
@@ -936,6 +951,7 @@ pub fn run(application: gpui::Application, initialize: impl FnOnce(&mut App) + '
                         button_effects_disabled: false,
                         button_effects_tonal: false,
                         button_ripple: true,
+                        button_active: false,
                         button_selections: [false; 10],
                         button_toggle_size: ButtonSize::Small,
                         button_loading: false,
