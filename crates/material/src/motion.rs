@@ -263,18 +263,44 @@ pub const SLOW_EFFECTS: Spring = Spring {
     stiffness: 800.,
 };
 
+// Bounds that keep every derived duration finite: a spring with no
+// damping or no stiffness never settles, and `Duration::from_secs_f32`
+// panics on the infinite or NaN time it would take.
+const MIN_DAMPING: f32 = 0.01;
+const MAX_DAMPING: f32 = 1000.;
+const MIN_STIFFNESS: f32 = 1.;
+const MAX_STIFFNESS: f32 = 1.0e6;
+
 impl Spring {
+    /// The same spring with damping and stiffness clamped to finite,
+    /// positive values. NaN damping falls back to critical damping and NaN
+    /// stiffness to the minimum.
+    pub fn sanitized(self) -> Self {
+        let damping = if self.damping.is_nan() {
+            1.
+        } else {
+            self.damping.clamp(MIN_DAMPING, MAX_DAMPING)
+        };
+        let stiffness = if self.stiffness.is_nan() {
+            MIN_STIFFNESS
+        } else {
+            self.stiffness.clamp(MIN_STIFFNESS, MAX_STIFFNESS)
+        };
+        Self { damping, stiffness }
+    }
+
     fn omega(self) -> f32 {
         self.stiffness.sqrt()
     }
 
     /// Time until the remaining distance stays under 0.1% of the change.
     pub fn duration(self) -> Duration {
-        let rate = self.damping.min(1.) * self.omega();
+        let spring = self.sanitized();
+        let rate = spring.damping.min(1.) * spring.omega();
         // A critically damped spring decays as (1 + ωt)·e^(-ωt), slower than
         // its envelope alone; 9.23/ω is where that falls below 0.001.
-        let seconds = if self.damping >= 1. {
-            9.23 / self.omega()
+        let seconds = if spring.damping >= 1. {
+            9.23 / spring.omega()
         } else {
             1000_f32.ln() / rate
         };
@@ -283,9 +309,14 @@ impl Spring {
 
     /// Position from rest at 0 toward 1 after `seconds`.
     pub fn position(self, seconds: f32) -> f32 {
+        let spring = self.sanitized();
+        // NaN time is treated as rest; infinite time has settled.
         let t = seconds.max(0.);
-        let omega = self.omega();
-        let zeta = self.damping;
+        if t == f32::INFINITY {
+            return 1.;
+        }
+        let omega = spring.omega();
+        let zeta = spring.damping;
         if zeta >= 1. {
             1. - (1. + omega * t) * (-omega * t).exp()
         } else {
@@ -336,7 +367,8 @@ pub fn page_enter<E: IntoElement + Styled + 'static>(
     rise_in(id, view, 12.)
 }
 
-/// Fades in while rising `distance` px into place: the offset follows the
+/// Fades in while rising `distance` (100%-scale px, painted in rems so it
+/// follows the text scale) into place: the offset follows the
 /// default spatial spring and the opacity its effects spring, on one clock.
 fn rise_in<E: IntoElement + Styled + 'static>(
     id: impl Into<ElementId>,
@@ -381,7 +413,7 @@ impl<E: IntoElement + Styled + 'static> RenderOnce for Entrance<E> {
                     let offset = spatial.position(t * seconds);
                     let opacity = effects.position(t * seconds);
                     view.relative()
-                        .top(px(distance * (1. - offset)))
+                        .top(crate::tokens::typography::rem(distance * (1. - offset)))
                         .opacity(opacity.clamp(0., 1.))
                 })
                 .into_any_element()
@@ -434,6 +466,44 @@ mod tests {
         Render, RenderOnce, Styled as _, TestAppContext, VisualTestContext, Window, div, px, size,
     };
     use std::{cell::Cell, rc::Rc, time::Duration};
+
+    #[test]
+    fn degenerate_springs_have_finite_durations_and_positions() {
+        let springs = [
+            super::Spring {
+                damping: 0.,
+                stiffness: 700.,
+            },
+            super::Spring {
+                damping: -1.,
+                stiffness: 700.,
+            },
+            super::Spring {
+                damping: 0.9,
+                stiffness: 0.,
+            },
+            super::Spring {
+                damping: f32::NAN,
+                stiffness: f32::NAN,
+            },
+            super::Spring {
+                damping: f32::INFINITY,
+                stiffness: f32::INFINITY,
+            },
+        ];
+        for spring in springs {
+            let duration = spring.duration();
+            assert!(duration > Duration::ZERO, "{spring:?}");
+            let curve = super::MotionCurve::Standard(spring);
+            assert!(curve.duration().as_secs_f32().is_finite());
+            for t in [0., 0.25, 0.5, 1., f32::NAN] {
+                assert!(curve.ease()(t).is_finite(), "{spring:?} at {t}");
+            }
+            assert!(spring.position(f32::INFINITY).is_finite());
+            assert_eq!(curve.ease()(1.), 1.);
+        }
+        assert_eq!(super::DEFAULT_SPATIAL.sanitized(), super::DEFAULT_SPATIAL);
+    }
 
     #[derive(gpui::IntoElement)]
     struct StatefulChild {
@@ -702,8 +772,8 @@ mod tests {
             if rise {
                 assert_eq!(
                     sample.borrow().inset.top,
-                    Some(px(0.).into()),
-                    "completed entrance cannot move backward"
+                    Some(crate::tokens::typography::rem(0.).into()),
+                    "completed entrance cannot move backward; its rise is in rems"
                 );
             }
         }

@@ -11,7 +11,11 @@ pub struct SampledSpring {
 
 impl SampledSpring {
     /// CSS linear() interpolation between uniformly spaced reference samples.
+    /// Non-finite progress is treated as the start, so it never paints NaN.
     pub fn position(self, progress: f32) -> f32 {
+        if !progress.is_finite() {
+            return 0.;
+        }
         let progress = progress.clamp(0., 1.);
         if progress >= 1. {
             return 1.;
@@ -74,6 +78,14 @@ pub const SLOW_EFFECTS: SampledSpring = SampledSpring {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn non_finite_progress_paints_the_start() {
+        for progress in [f32::NAN, f32::INFINITY, f32::NEG_INFINITY] {
+            assert_eq!(FAST_SPATIAL.position(progress), 0.);
+        }
+        assert_eq!(FAST_SPATIAL.position(1.), 1.);
+    }
 
     #[test]
     fn curves_match_browser_computed_transforms() {
