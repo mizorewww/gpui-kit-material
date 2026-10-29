@@ -470,21 +470,29 @@ fn observe_press(
         let focus = focus.clone();
         base = base
             .on_key_down(move |event, window, cx| {
+                // Only activation keys change the pressed visual; an unrelated
+                // key (including a modifier) during a held Space keeps it.
                 let stroke = &event.keystroke;
+                if !matches!(stroke.key.as_str(), "enter" | "space") {
+                    return;
+                }
                 let pressed = !window.default_prevented()
                     && focus.is_focused(window)
-                    && !stroke.modifiers.modified()
-                    && matches!(stroke.key.as_str(), "enter" | "space");
+                    && !stroke.modifiers.modified();
                 down.update(cx, |state, cx| {
-                    state.keyboard = pressed;
-                    cx.notify();
+                    if state.keyboard != pressed {
+                        state.keyboard = pressed;
+                        cx.notify();
+                    }
                 });
             })
             .on_key_up(move |event, _, cx| {
                 if matches!(event.keystroke.key.as_str(), "enter" | "space") {
                     up.update(cx, |state, cx| {
-                        state.keyboard = false;
-                        cx.notify();
+                        if state.keyboard {
+                            state.keyboard = false;
+                            cx.notify();
+                        }
                     });
                 }
             });
@@ -2028,6 +2036,16 @@ mod tests {
             16.,
             "unrelated key release does not release Space"
         );
+        for other in ["shift", "a", "shift-a"] {
+            key(cx, other, true);
+            draw(cx);
+            assert_eq!(
+                sample.get(),
+                16.,
+                "{other} pressed while holding Space keeps the pressed visual"
+            );
+            key(cx, other, false);
+        }
         cx.update(|window, cx| {
             let handle = view.read(cx).other.clone();
             window.focus(&handle, cx);
