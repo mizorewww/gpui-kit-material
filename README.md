@@ -117,9 +117,11 @@ content role even when the supplied icon has a custom color.
 The gallery includes all 50 variant/size/shape combinations and disabled samples.
 Press and release morph the radius with the reference FastSpatial curve, including
 interrupted transitions and reduced-motion handling. This is an intermediate
-implementation: color/state-layer transitions, ripple, the external
-focus ring, expanded touch targets, toggle/loading and tracking still
-require implementation and independent visual/motion review.
+implementation: color/state-layer transitions, ripple, expanded touch targets,
+toggle/loading and tracking still
+require implementation and independent visual/motion review. Keyboard focus draws
+a Secondary outline 3px wide with a 2px gap outside the button, without changing
+layout or hitboxes; pointer focus and disabled buttons do not draw it.
 
 ## Reference themes
 

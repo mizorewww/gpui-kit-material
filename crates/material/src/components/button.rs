@@ -2,6 +2,8 @@
 //! Reference: floor/material c910072f3fc5b660276731d8a935d7186f288364.
 //! Ripple, animated color/state layers, expanded touch targets and toggle/loading
 //! semantics are still pending; this module does not establish full conformance.
+mod focus_ring;
+
 use crate::{
     color::ColorRole,
     icons::Icon,
@@ -570,7 +572,8 @@ impl RenderOnce for MaterialButton {
             .children(trailing)
             .child(exit_observer);
         let base = observe_press(base, &pressed, &focus, self.disabled, self.focusable);
-        base.flex()
+        let base = base
+            .flex()
             .flex_row()
             .when(self.direction == ButtonDirection::Rtl, |b| {
                 b.flex_row_reverse()
@@ -599,7 +602,8 @@ impl RenderOnce for MaterialButton {
                     .focus_visible(move |s| s.bg(layer(bg, fg, 0.10)))
                     .active(move |s| s.bg(layer(bg, fg, 0.10)).shadow(elevation(level)))
             })
-            .refine_style(&self.style)
+            .refine_style(&self.style);
+        focus_ring::ButtonFocusRing::new(base, focus, !self.disabled && self.focusable, rem(radius))
     }
 }
 /// Convenience constructor with caller-supplied content and activation.
