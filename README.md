@@ -86,6 +86,9 @@ The shared gallery mounts GPUI Base's `Root` for Tab/Shift+Tab traversal and
 focus containment. Focus reveal is attached to individual controls and button
 options, so keyboard navigation brings the next control into view without
 pinning the page during manual scrolling.
+A persistent chapter navigator stays beside the content on wide windows and
+wraps above it on narrow windows. Its scroll area and keyboard focus reveal are
+independent of the examples; jumping between chapters preserves example state.
 
 Component alignment is tracked in [`conformance/md3.json`](conformance/md3.json).
 An available gallery example does not imply visual or motion conformance;

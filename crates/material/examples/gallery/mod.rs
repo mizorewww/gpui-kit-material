@@ -17,6 +17,19 @@ trait GalleryReveal: IntoElement + Sized {
 }
 impl<T: IntoElement> GalleryReveal for T {}
 
+const GALLERY_SECTIONS: [(&str, &str); 10] = [
+    ("themes", "Themes"),
+    ("motion", "Motion"),
+    ("buttons", "Buttons"),
+    ("toggles", "Toggles"),
+    ("loading", "Loading"),
+    ("icons", "Icons"),
+    ("labels", "Labels"),
+    ("feedback", "Feedback"),
+    ("colors", "Colors"),
+    ("typography", "Typography"),
+];
+
 struct Gallery {
     palette: PaletteId,
     reference_theme: Option<ThemeId>,
@@ -27,6 +40,9 @@ struct Gallery {
     engine: usize,
     details: bool,
     scroll: ScrollHandle,
+    navigation_scroll: ScrollHandle,
+    section_anchors: [ScrollAnchor; 10],
+    selected_section: usize,
     search: Entity<gpui_base::input::InputState>,
     slider: Entity<gpui_base::slider::SliderState>,
     switch: bool,
@@ -201,6 +217,8 @@ impl Render for Gallery {
                 }),
             ));
         let button_toggles = gpui_base::v_flex()
+            .id("gallery-section-toggles")
+            .anchor_scroll(Some(self.section_anchors[3].clone()))
             .gap(rem(16.))
             .child(section_title("button-toggles", "Toggle buttons"))
             .child(
@@ -266,7 +284,7 @@ impl Render for Gallery {
                     }),
             );
         let loading_variant = ButtonVariant::ALL[self.button_loading_variant];
-        let button_loading = gpui_base::v_flex().gap(rem(16.))
+        let button_loading = gpui_base::v_flex().id("gallery-section-loading").anchor_scroll(Some(self.section_anchors[4].clone())).gap(rem(16.))
             .child(section_title("button-loading", "Button progress and loading"))
             .child(gpui_base::h_flex().flex_wrap().gap(rem(12.))
                 .child(material_button("toggle-loading", ButtonVariant::Outlined)
@@ -300,6 +318,8 @@ impl Render for Gallery {
                     })))
             }));
         let button_icons = gpui_base::v_flex()
+            .id("gallery-section-icons")
+            .anchor_scroll(Some(self.section_anchors[5].clone()))
             .gap(rem(16.))
             .child(section_title("button-icons", "Button icons"))
             .children(ButtonSize::ALL.into_iter().map(|size| {
@@ -348,6 +368,30 @@ impl Render for Gallery {
                     }),
                 )
             }));
+        let text_labels = gpui_base::v_flex()
+            .id("gallery-section-labels")
+            .anchor_scroll(Some(self.section_anchors[6].clone()))
+            .gap(rem(16.))
+            .child(section_title("text-labels", "Text labels"))
+            .children(
+                [
+                    TypeRole::LabelLarge,
+                    TypeRole::LabelMedium,
+                    TypeRole::LabelSmall,
+                ]
+                .into_iter()
+                .map(|role| {
+                    let spec = role.scale();
+                    accessible_text(
+                        SharedString::from(format!("label-role-{}", role.name())),
+                        role.name(),
+                    )
+                    .font_family(spec.font_family)
+                    .text_size(spec.font_size)
+                    .line_height(spec.line_height)
+                    .font_weight(FontWeight(spec.font_weight as f32))
+                }),
+            );
         let typography_samples = TypeRole::ALL.into_iter().map(|role| {
             let spec = role.scale();
             gpui_base::v_flex()
@@ -526,6 +570,8 @@ impl Render for Gallery {
             );
 
         let feedback = gpui_base::v_flex()
+            .id("gallery-section-feedback")
+            .anchor_scroll(Some(self.section_anchors[7].clone()))
             .gap(rem(12.))
             .child(section_title("feedback", "Feedback"))
             .child(
@@ -592,9 +638,61 @@ impl Render for Gallery {
                     ),
             );
 
-        div()
-            .id("gallery")
-            .size_full()
+        let navigation = div()
+            .id("gallery-navigation")
+            .role(Role::Navigation)
+            .aria_label("Gallery sections")
+            .flex_shrink_0()
+            .min_h_0()
+            .overflow_y_scroll()
+            .track_scroll(&self.navigation_scroll)
+            .bg(color(ColorRole::SURFACE_CONTAINER_LOW))
+            .when(compact, |nav| nav.w_full().max_h(rem(160.)).border_b_1())
+            .when(!compact, |nav| nav.w(rem(176.)).h_full().border_r_1())
+            .border_color(color(ColorRole::OUTLINE_VARIANT))
+            .child(
+                gpui_base::v_flex()
+                    .p(rem(12.))
+                    .pt(rem(32.))
+                    .gap(rem(12.))
+                    .child(
+                        accessible_text("gallery-navigation-title", "Browse components")
+                            .text_size(TEXT_AUX),
+                    )
+                    .child(
+                        gpui_base::v_flex()
+                            .gap(rem(8.))
+                            .when(compact, |items| items.flex_row().flex_wrap())
+                            .children(GALLERY_SECTIONS.into_iter().enumerate().map(
+                                |(index, (id, label))| {
+                                    MaterialButton::new(SharedString::from(format!(
+                                        "navigate-{id}"
+                                    )))
+                                    .variant(ButtonVariant::Tonal)
+                                    .button_size(ButtonSize::ExtraSmall)
+                                    .toggle(true)
+                                    .selected(self.selected_section == index)
+                                    .toggle_on_click(false)
+                                    .child(label)
+                                    .when(!compact, |button| button.w_full().justify_start())
+                                    .on_click(cx.listener(move |this, _, window, cx| {
+                                        this.selected_section = index;
+                                        this.section_anchors[index].scroll_to(window, cx);
+                                        cx.notify();
+                                    }))
+                                    .reveal(
+                                        SharedString::from(format!("reveal-navigation-{id}")),
+                                        &self.navigation_scroll,
+                                    )
+                                },
+                            )),
+                    ),
+            );
+        let content = div()
+            .id("gallery-content")
+            .flex_1()
+            .min_w_0()
+            .min_h_0()
             .overflow_y_scroll()
             .track_scroll(&self.scroll)
             .bg(color(ColorRole::CANVAS))
@@ -616,6 +714,7 @@ impl Render for Gallery {
                     .child(
                         gpui_base::v_flex()
                             .gap(rem(12.))
+                            .id("gallery-section-themes").anchor_scroll(Some(self.section_anchors[0].clone()))
                             .child(section_title("reference-theme", "Material themes"))
                             .child(reference_themes)
                             .child(mode)
@@ -624,6 +723,7 @@ impl Render for Gallery {
                     .child(
                         gpui_base::v_flex()
                             .gap(rem(12.))
+                            .id("gallery-section-motion").anchor_scroll(Some(self.section_anchors[1].clone()))
                             .child(section_title("motion", "Motion"))
                             .child(motion_controls)
                             .child(
@@ -662,6 +762,7 @@ impl Render for Gallery {
                                 MaterialSlider::new(&self.slider, "Classic slider")
                                     .appearance(SliderAppearance::Classic).reveal("reveal-slider-classic",scroll),
                             )
+                            .child(section_title("buttons", "Buttons").anchor_scroll(Some(self.section_anchors[2].clone())))
                             .children(ButtonShape::ALL.into_iter().map(|shape| {
                                 gpui_base::v_flex().gap(rem(16.)).children(
                                     ButtonSize::ALL.into_iter().map(move |size| {
@@ -703,6 +804,7 @@ impl Render for Gallery {
                             .child(button_toggles)
                             .child(button_loading)
                             .child(button_icons)
+                            .child(text_labels)
                             .child(gpui_base::h_flex().flex_wrap().gap(rem(12.)).children(
                                 ButtonVariant::ALL.into_iter().map(|variant| {
                                     material_button(
@@ -751,6 +853,7 @@ impl Render for Gallery {
                     .child(
                         gpui_base::v_flex()
                             .gap(rem(12.))
+                            .id("gallery-section-colors").anchor_scroll(Some(self.section_anchors[8].clone()))
                             .child(section_title("reference-colors", "Material color roles"))
                             .child(
                                 gpui_base::h_flex()
@@ -762,10 +865,23 @@ impl Render for Gallery {
                     .child(
                         gpui_base::v_flex()
                             .gap(rem(20.))
+                            .id("gallery-section-typography").anchor_scroll(Some(self.section_anchors[9].clone()))
                             .child(section_title("type-scale", "Typography"))
                             .children(typography_samples),
                     ),
-            )
+            );
+        div()
+            .id("gallery")
+            .relative()
+            .size_full()
+            .flex()
+            .flex_row()
+            .when(compact, |layout| layout.flex_col())
+            .bg(color(ColorRole::CANVAS))
+            .text_color(color(ColorRole::INK))
+            .font_family("Roboto")
+            .child(navigation)
+            .child(content)
             .child(CaptionButtons::new(app_bar_height(window)))
     }
 }
@@ -807,6 +923,9 @@ pub fn run(application: gpui::Application, initialize: impl FnOnce(&mut App) + '
                             .default_value(40.)
                     });
                     cx.observe(&slider, |_, _, cx| cx.notify()).detach();
+                    let scroll = ScrollHandle::new();
+                    let section_anchors =
+                        std::array::from_fn(|_| ScrollAnchor::for_handle(scroll.clone()));
                     Gallery {
                         search,
                         slider,
@@ -831,7 +950,10 @@ pub fn run(application: gpui::Application, initialize: impl FnOnce(&mut App) + '
                         density: "auto".into(),
                         engine: 0,
                         details: false,
-                        scroll: ScrollHandle::new(),
+                        scroll,
+                        section_anchors,
+                        navigation_scroll: ScrollHandle::new(),
+                        selected_section: 0,
                     }
                 });
                 cx.new(|cx| gpui_base::Root::new(gallery, window, cx))
