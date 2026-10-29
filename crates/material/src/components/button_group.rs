@@ -110,8 +110,8 @@ impl ConnectedButtonGroup {
         self.size = Some(size);
         self
     }
-    /// Round (default) or square outer corners for unselected end options.
-    /// The selected option is always a full pill.
+    /// Round (default) or square ends: square ends of unselected options
+    /// take the inner corner radius. The selected option is a full pill.
     pub fn shape(mut self, shape: ButtonShape) -> Self {
         self.shape = shape;
         self
@@ -280,20 +280,21 @@ struct Metrics {
 }
 
 impl Metrics {
-    /// M3 Expressive connected group: each option is that size's button;
-    /// inner corners are XS 4, S 8, M 8, L 16, XL 20.
+    /// M3 Expressive connected group (Figma kit): each option is that
+    /// size's button; inner corners are XS 4, S 8, M 8, L 16, XL 20.
     fn of(size: ButtonSize, shape: ButtonShape) -> Self {
-        let (height, inner, square, padding, icon, text) = match size {
-            ButtonSize::ExtraSmall => (32., 4., 12., 12., 20., TypeRole::LabelLarge),
-            ButtonSize::Small => (40., 8., 12., 16., 20., TypeRole::LabelLarge),
-            ButtonSize::Medium => (56., 8., 16., 24., 24., TypeRole::TitleMedium),
-            ButtonSize::Large => (96., 16., 28., 48., 32., TypeRole::HeadlineSmall),
-            ButtonSize::ExtraLarge => (136., 20., 28., 64., 40., TypeRole::HeadlineLarge),
+        let (height, inner, padding, icon, text) = match size {
+            ButtonSize::ExtraSmall => (32., 4., 12., 20., TypeRole::LabelLarge),
+            ButtonSize::Small => (40., 8., 16., 20., TypeRole::LabelLarge),
+            ButtonSize::Medium => (56., 8., 24., 24., TypeRole::TitleMedium),
+            ButtonSize::Large => (96., 16., 48., 32., TypeRole::HeadlineSmall),
+            ButtonSize::ExtraLarge => (136., 20., 64., 40., TypeRole::HeadlineLarge),
         };
         Self {
             height,
             inner,
-            outer: (shape == ButtonShape::Square).then_some(square),
+            // Square groups round their ends like their inner corners.
+            outer: (shape == ButtonShape::Square).then_some(inner),
             padding: padding - 2.,
             icon,
             text: Some(text),
