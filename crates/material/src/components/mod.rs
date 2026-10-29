@@ -8,6 +8,8 @@ pub use button::{
 };
 mod fab;
 pub use fab::{ExtendedFab, Fab, FabColor};
+mod fab_menu;
+pub use fab_menu::{FabMenu, FabMenuColor, FabMenuItem};
 mod icon_button;
 mod split_button;
 pub use icon_button::{IconButton, IconButtonVariant};

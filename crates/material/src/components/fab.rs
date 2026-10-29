@@ -13,7 +13,7 @@ use crate::{
     color::ColorRole,
     icons::Icon,
     motion::{self, MotionToken},
-    tokens::typography::rem,
+    tokens::typography::{TypeRole, rem},
 };
 use gpui::{prelude::*, *};
 
@@ -221,9 +221,8 @@ impl ExtendedFab {
     fab_builders!();
 }
 
-/// The label's width in design px, measured only while it animates.
-fn label_width(label: &SharedString, size: FabSize, window: &Window) -> f32 {
-    let (_, _, _, role) = size.extended_size().extended();
+/// The label's width in design px.
+fn label_width(label: &SharedString, role: TypeRole, window: &Window) -> f32 {
     let scale = role.scale();
     let font_size = scale.font_size.to_pixels(window.rem_size());
     let run = TextRun {
@@ -244,6 +243,32 @@ fn label_width(label: &SharedString, size: FabSize, window: &Window) -> f32 {
     f32::from(width) * 14. / f32::from(window.rem_size())
 }
 
+/// A label revealed to `expansion` (0 … 1) of its width: absent at 0, laid
+/// out naturally at 1, and only measured and clipped while it moves.
+pub(super) fn revealed_label(
+    label: &SharedString,
+    role: TypeRole,
+    expansion: f32,
+    window: &Window,
+) -> Option<AnyElement> {
+    (expansion > 0.).then(|| {
+        let text = div().whitespace_nowrap().child(label.clone());
+        if expansion >= 1. {
+            text.into_any_element()
+        } else {
+            let width = label_width(label, role, window) * expansion;
+            div()
+                .overflow_hidden()
+                .flex_shrink_0()
+                .w(rem(width))
+                .h(role.scale().line_height)
+                .opacity(expansion.clamp(0., 1.))
+                .child(text)
+                .into_any_element()
+        }
+    })
+}
+
 impl RenderOnce for ExtendedFab {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let expansion = motion::token_value(
@@ -254,24 +279,7 @@ impl RenderOnce for ExtendedFab {
             cx,
         );
         let (_, _, _, role) = self.size.extended_size().extended();
-        // At rest the label lays out naturally (or is absent); only a moving
-        // label is measured and clipped to its share of its own width.
-        let label = (expansion > 0.).then(|| {
-            let text = div().whitespace_nowrap().child(self.label.clone());
-            if expansion >= 1. {
-                text.into_any_element()
-            } else {
-                let width = label_width(&self.label, self.size, window) * expansion;
-                div()
-                    .overflow_hidden()
-                    .flex_shrink_0()
-                    .w(rem(width))
-                    .h(role.scale().line_height)
-                    .opacity(expansion.clamp(0., 1.))
-                    .child(text)
-                    .into_any_element()
-            }
-        });
+        let label = revealed_label(&self.label, role, expansion, window);
         finish(
             MaterialButton::new(self.id)
                 .form(Form::ExtendedFab {

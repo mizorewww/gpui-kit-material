@@ -113,7 +113,19 @@ pub(crate) enum Form {
         expansion: f32,
     },
     Segment(Segment),
+    /// The FAB menu's toggle: a regular FAB that becomes the round close
+    /// button while `open`.
+    FabMenuToggle {
+        open: bool,
+    },
+    /// A FAB menu item at its animated 0 … 1 `expansion`.
+    FabMenuItem {
+        expansion: f32,
+    },
 }
+
+/// FAB menu item: height, horizontal padding, icon-label gap.
+pub(crate) const FAB_MENU_ITEM: (f32, f32, f32) = (56., 24., 8.);
 
 /// Container and content roles of one selection state.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -323,6 +335,25 @@ impl Form {
                     ..label
                 }
             }
+            Form::FabMenuToggle { .. } => {
+                Form::Fab(FabSize::Regular).geometry(size, variant, icon, direction)
+            }
+            Form::FabMenuItem { expansion } => {
+                let (height, padding, gap) = FAB_MENU_ITEM;
+                let t = expansion.clamp(0., 1.);
+                let collapsed = (height - 24.) / 2.;
+                let pad = collapsed + (padding - collapsed) * t;
+                FormGeometry {
+                    height,
+                    width: None,
+                    min_width: height,
+                    padding: (pad, pad),
+                    gap: gap * t,
+                    icon: 24.,
+                    typography: TypeRole::TitleMedium,
+                    outline: 0.,
+                }
+            }
             Form::Segment(Segment::Trailing) => {
                 let metrics = segment_metrics(size);
                 FormGeometry {
@@ -341,6 +372,10 @@ impl Form {
     pub(crate) fn fixed_radius(self) -> Option<f32> {
         match self {
             Form::Fab(fab) => Some(fab.radius()),
+            Form::FabMenuToggle { open: false } => Some(FabSize::Regular.radius()),
+            Form::FabMenuToggle { open: true } | Form::FabMenuItem { .. } => {
+                Some(FAB_MENU_ITEM.0 / 2.)
+            }
             Form::ExtendedFab { size, .. } => Some(size.extended_size().radius()),
             _ => None,
         }
