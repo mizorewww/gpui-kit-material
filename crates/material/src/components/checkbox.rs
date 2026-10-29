@@ -13,7 +13,7 @@ use super::radio::selection_paint;
 use crate::{
     color::ColorRole,
     motion::{self, MotionToken},
-    theme::{blend, color},
+    theme::color,
     tokens::{state, typography::rem},
 };
 use gpui::{prelude::*, *};
@@ -257,7 +257,12 @@ impl RenderOnce for MaterialCheckbox {
         } else {
             paint.outline
         };
-        let border = blend(outline, paint.container, fill);
+        // The fill paints under the outline too, so the outline fades out as
+        // the fill arrives instead of doubling a translucent container.
+        let border = Rgba {
+            a: outline.a * (1. - fill),
+            ..outline
+        };
         let background = Rgba {
             a: paint.container.a * fill,
             ..paint.container
