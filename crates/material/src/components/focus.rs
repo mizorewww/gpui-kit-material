@@ -1,10 +1,13 @@
 //! Focus presentation for composed controls, and scrolling that reveals
 //! newly focused rows without pinning them during manual scrolling.
-use crate::color::ColorRole;
+use super::button::ButtonFocusRing;
+use crate::tokens::{shape::RADIUS_FULL, typography::rem};
 use gpui::{prelude::*, *};
 
-/// Draw a visible outline around a component whose focus handle is internal.
-/// The wrapper observes descendants without adding a keyboard stop of its own.
+/// Draw the M3 keyboard focus indicator (the button's 3dp secondary ring, 2dp
+/// outside) around a component whose focus handle is internal. The wrapper
+/// observes descendants without adding a keyboard stop of its own, and shows
+/// the ring only for keyboard focus.
 #[derive(gpui::IntoElement)]
 pub struct FocusRing {
     id: ElementId,
@@ -52,19 +55,153 @@ impl RenderOnce for FocusRing {
                 }
             });
         }
-        div()
+        let wrapper = div()
             .id(self.id)
             .track_focus(&focus)
             .tab_stop(false)
             .flex_shrink_0()
-            .border_2()
-            .border_color(if active {
-                crate::theme::color(ColorRole::INK).into()
-            } else {
-                transparent_black()
-            })
             .rounded_full()
-            .child(self.child)
+            .child(self.child);
+        ButtonFocusRing::resolved(wrapper, active, rem(RADIUS_FULL.as_f32()))
+    }
+}
+
+/// How a [`RingedButton`] draws its keyboard focus ring.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) enum RingPlacement {
+    /// The M3 outer offset, for standalone controls.
+    Outer(Corners<Pixels>),
+    /// The M3 inner offset, for items packed edge to edge with neighbours.
+    Inner(Corners<Pixels>),
+}
+
+/// A GPUI Base button that draws the shared M3 keyboard focus ring. It
+/// forwards the builder methods callers chain on a button, and resolves its
+/// focus handle when it renders.
+#[derive(gpui::IntoElement)]
+pub struct RingedButton {
+    id: ElementId,
+    button: gpui_base::Button,
+    focus: Option<FocusHandle>,
+    placement: RingPlacement,
+    disabled: bool,
+}
+
+impl RingedButton {
+    pub(crate) fn new(id: impl Into<ElementId>, placement: RingPlacement) -> Self {
+        let id = id.into();
+        Self {
+            button: gpui_base::Button::new(id.clone()),
+            id,
+            focus: None,
+            placement,
+            disabled: false,
+        }
+    }
+
+    /// Restyle the inner button.
+    pub(crate) fn map(mut self, f: impl FnOnce(gpui_base::Button) -> gpui_base::Button) -> Self {
+        self.button = f(self.button);
+        self
+    }
+
+    /// Use a caller-owned focus handle, e.g. for roving focus in a group.
+    pub fn track_focus(mut self, focus: &FocusHandle) -> Self {
+        self.focus = Some(focus.clone());
+        self
+    }
+
+    /// The activation handler for pointer, Enter and Space input.
+    pub fn on_click(self, handler: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static) -> Self {
+        self.map(|button| button.on_click(handler))
+    }
+
+    pub fn disabled(mut self, disabled: bool) -> Self {
+        self.disabled = disabled;
+        self.map(|button| button.disabled(disabled))
+    }
+
+    pub fn accessibility_label(self, label: impl Into<SharedString>) -> Self {
+        self.map(|button| button.accessibility_label(label))
+    }
+
+    pub fn tab_stop(self, tab_stop: bool) -> Self {
+        self.map(|button| button.tab_stop(tab_stop))
+    }
+}
+
+impl Styled for RingedButton {
+    fn style(&mut self) -> &mut StyleRefinement {
+        self.button.style()
+    }
+}
+
+impl ParentElement for RingedButton {
+    fn extend(&mut self, elements: impl IntoIterator<Item = AnyElement>) {
+        self.button.extend(elements)
+    }
+}
+
+impl InteractiveElement for RingedButton {
+    fn interactivity(&mut self) -> &mut Interactivity {
+        self.button.interactivity()
+    }
+}
+
+impl StatefulInteractiveElement for RingedButton {}
+
+impl RenderOnce for RingedButton {
+    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
+        let focus = self.focus.unwrap_or_else(|| {
+            window
+                .use_keyed_state(
+                    ElementId::NamedChild(self.id.clone().into(), "focus".into()),
+                    cx,
+                    |_, cx| cx.focus_handle(),
+                )
+                .read(cx)
+                .clone()
+        });
+        #[cfg(test)]
+        let key = format!("{:?}", self.id);
+        let button = self.button.track_focus(&focus);
+        let enabled = !self.disabled;
+        let ring = match self.placement {
+            RingPlacement::Outer(corners) => {
+                ButtonFocusRing::with_corners(button, focus, enabled, corners)
+            }
+            RingPlacement::Inner(corners) => {
+                ButtonFocusRing::with_corners(button, focus, enabled, corners).inward()
+            }
+        };
+        #[cfg(test)]
+        let ring = ring.observe(test_rings::cell(key));
+        ring
+    }
+}
+
+/// Test hook: the focus ring each [`RingedButton`] last painted, by the
+/// debug form of its element id.
+#[cfg(test)]
+pub(crate) mod test_rings {
+    use gpui::{Bounds, Pixels};
+    use std::{cell::Cell, cell::RefCell, collections::HashMap, rc::Rc};
+    type Ring = Rc<Cell<Option<Bounds<Pixels>>>>;
+    thread_local! {
+        static RINGS: RefCell<HashMap<String, Ring>> = RefCell::new(HashMap::new());
+    }
+    pub(crate) fn cell(key: String) -> Ring {
+        RINGS.with(|rings| rings.borrow_mut().entry(key).or_default().clone())
+    }
+    /// The ring painted for the button whose id's debug form contains `part`.
+    pub(crate) fn painted(part: &str) -> Option<Bounds<Pixels>> {
+        RINGS.with(|rings| {
+            rings
+                .borrow()
+                .iter()
+                .find(|(key, _)| key.contains(part))
+                .and_then(|(_, ring)| ring.get())
+        })
     }
 }
 

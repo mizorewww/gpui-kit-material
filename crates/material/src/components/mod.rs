@@ -33,7 +33,7 @@ pub use feedback::{
     card_surface, chip, large_badge, notice_banner, outlined_badge, outlined_status_chip,
     small_badge, status_chip,
 };
-pub use focus::{FocusRing, RevealFocus, contain_scroll};
+pub use focus::{FocusRing, RevealFocus, RingedButton, contain_scroll};
 pub use progress::{
     CircularProgressFrame, CircularProgressPlayback, circular_indeterminate_frame,
     circular_progress, icon_spinner, icon_spinner_with_playback, indeterminate_circular_progress,

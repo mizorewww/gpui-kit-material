@@ -7,6 +7,7 @@ use crate::tokens::{elevation, layout::*, shape::*, state, typography::*};
 use gpui::{prelude::*, *};
 use std::rc::Rc;
 
+use super::focus::{RingPlacement, RingedButton};
 use super::text::accessible_text;
 
 /// The tone of a [`notice_banner`].
@@ -311,19 +312,23 @@ impl Snackbar {
     }
 }
 
-/// A button on the inverse surface, with its state layer in `fg`.
-fn inverse_button(id: ElementId, fg: Rgba, handler: SnackbarHandler) -> gpui_base::Button {
+/// A button on the inverse surface, with its state layer in `fg` and the
+/// shared keyboard focus ring.
+fn inverse_button(id: ElementId, fg: Rgba, handler: SnackbarHandler) -> RingedButton {
     let bg = color(INVERSE_SURFACE);
-    gpui_base::Button::new(id)
-        .flex()
-        .items_center()
-        .justify_center()
-        .flex_shrink_0()
-        .h(rem(40.))
-        .rounded_full()
-        .text_color(fg)
-        .hover(move |s| s.bg(state::hovered(bg, fg)))
-        .active(move |s| s.bg(state::pressed(bg, fg)))
+    RingedButton::new(id, RingPlacement::Outer(Corners::all(RADIUS_FULL)))
+        .map(move |button| {
+            button
+                .flex()
+                .items_center()
+                .justify_center()
+                .flex_shrink_0()
+                .h(rem(40.))
+                .rounded_full()
+                .text_color(fg)
+                .hover(move |s| s.bg(state::hovered(bg, fg)))
+                .active(move |s| s.bg(state::pressed(bg, fg)))
+        })
         .on_click(move |event, window, cx| handler(event, window, cx))
 }
 
@@ -371,8 +376,8 @@ impl RenderOnce for Snackbar {
                 bar.child(
                     inverse_button(child("close"), color(INVERSE_ON_SURFACE), handler)
                         .when(cfg!(test), |b| b.debug_selector(|| "snackbar-close".into()))
-                        .w(rem(40.))
                         .accessibility_label(label)
+                        .w(rem(40.))
                         .child(IconName::Close.icon().size(ICON_SLOT)),
                 )
             })
@@ -502,6 +507,44 @@ mod tests {
     fn snackbar_uses_m3_elevation_level_3() {
         assert_eq!(SNACKBAR_ELEVATION, 3);
         assert_eq!(elevation::level(SNACKBAR_ELEVATION), elevation::level3());
+    }
+
+    #[gpui::test]
+    fn snackbar_buttons_show_the_ring_only_for_keyboard_focus(cx: &mut TestAppContext) {
+        cx.update(gpui_base::init);
+        let (_, cx) = open(cx, true);
+        let action = cx.debug_bounds("snackbar-action").expect("action");
+        cx.simulate_click(action.center(), Modifiers::default());
+        redraw(cx);
+        assert!(
+            crate::components::focus::test_rings::painted("action").is_none(),
+            "pointer focus must not show the ring"
+        );
+        press_key(cx);
+        assert_eq!(
+            crate::components::focus::test_rings::painted("action"),
+            Some(action.dilate(px(5.))),
+            "keyboard focus shows the 3dp ring 2dp outside the button"
+        );
+    }
+
+    pub(crate) fn redraw(cx: &mut gpui::VisualTestContext) {
+        cx.update(|window, cx| {
+            window.refresh();
+            window.draw(cx).clear(cx);
+        });
+    }
+
+    /// A key press switches the window to keyboard modality.
+    pub(crate) fn press_key(cx: &mut gpui::VisualTestContext) {
+        let keystroke =
+            cx.update(|_, cx| gpui::Keystroke::parse_with_os("a", cx.platform_info().os).unwrap());
+        cx.simulate_event(gpui::KeyDownEvent {
+            keystroke,
+            is_held: false,
+            prefer_character_input: false,
+        });
+        redraw(cx);
     }
 
     #[gpui::test]

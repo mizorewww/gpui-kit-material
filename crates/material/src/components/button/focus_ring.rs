@@ -1,12 +1,40 @@
-//! Paint outside the actual button border box without changing layout or hitboxes.
+//! Paint the M3 focus indicator around (or, for tightly connected items,
+//! inside) a control without changing layout or hitboxes.
+//!
+//! The indicator is 3dp of secondary. Standalone controls use the M3 outer
+//! offset (2dp outside the border box); items packed edge to edge, such as
+//! connected tiles and connected button group options, use the M3 inner
+//! offset (3dp inside) so a neighbour painted later cannot cover it.
 use crate::{color::ColorRole, theme::color};
 use gpui::*;
 
+/// M3 focus indicator thickness.
+pub(crate) const RING_WIDTH: Pixels = px(3.);
+/// M3 focus indicator outer offset: the gap between the border box and the ring.
+pub(crate) const OUTER_OFFSET: Pixels = px(2.);
+/// M3 focus indicator inner offset: how far inside the border box the ring's
+/// outer edge sits.
+pub(crate) const INNER_OFFSET: Pixels = px(3.);
+
+enum Visibility {
+    /// Visible while this handle has keyboard focus.
+    Focus(FocusHandle),
+    /// Visible while the caller's resolved state says focus is inside, e.g. a
+    /// wrapper around a component whose own focus handle is private.
+    Resolved(bool),
+}
+
+enum Radius {
+    Rems(Rems),
+    Corners(Corners<Pixels>),
+}
+
 pub(crate) struct ButtonFocusRing {
     child: AnyElement,
-    focus: FocusHandle,
+    visibility: Visibility,
     enabled: bool,
-    radius: Rems,
+    radius: Radius,
+    inward: bool,
     #[cfg(test)]
     observed: Option<std::rc::Rc<std::cell::Cell<Option<Bounds<Pixels>>>>>,
 }
@@ -19,14 +47,87 @@ impl ButtonFocusRing {
     ) -> Self {
         Self {
             child: child.into_any_element(),
-            focus,
+            visibility: Visibility::Focus(focus),
             enabled,
-            radius,
+            radius: Radius::Rems(radius),
+            inward: false,
             #[cfg(test)]
             observed: None,
         }
     }
+
+    /// The outer ring around a control whose border box has these corners.
+    pub(crate) fn with_corners(
+        child: impl IntoElement,
+        focus: FocusHandle,
+        enabled: bool,
+        corners: Corners<Pixels>,
+    ) -> Self {
+        Self {
+            radius: Radius::Corners(corners),
+            ..Self::new(child, focus, enabled, Rems(0.))
+        }
+    }
+
+    /// The outer ring, shown while `active` (focus resolved by the caller to
+    /// be inside the child) and the last input came from the keyboard.
+    pub(crate) fn resolved(child: impl IntoElement, active: bool, radius: Rems) -> Self {
+        Self {
+            child: child.into_any_element(),
+            visibility: Visibility::Resolved(active),
+            enabled: true,
+            radius: Radius::Rems(radius),
+            inward: false,
+            #[cfg(test)]
+            observed: None,
+        }
+    }
+
+    /// Draw the ring at the M3 inner offset instead of the outer one.
+    pub(crate) fn inward(mut self) -> Self {
+        self.inward = true;
+        self
+    }
+
+    #[cfg(test)]
+    pub(crate) fn observe(
+        mut self,
+        observed: std::rc::Rc<std::cell::Cell<Option<Bounds<Pixels>>>>,
+    ) -> Self {
+        self.observed = Some(observed);
+        self
+    }
 }
+
+/// Ring bounds and corner radii for a border box with `corners`.
+pub(crate) fn ring_geometry(
+    bounds: Bounds<Pixels>,
+    corners: Corners<Pixels>,
+    inward: bool,
+) -> (Bounds<Pixels>, Corners<Pixels>) {
+    if inward {
+        let ring = bounds.inset(INNER_OFFSET);
+        let shrink = |radius: Pixels| (radius - INNER_OFFSET).max(px(0.));
+        let corners = Corners {
+            top_left: shrink(corners.top_left),
+            top_right: shrink(corners.top_right),
+            bottom_right: shrink(corners.bottom_right),
+            bottom_left: shrink(corners.bottom_left),
+        };
+        (ring, corners.clamp_radii_for_quad_size(ring.size))
+    } else {
+        let grow = OUTER_OFFSET + RING_WIDTH;
+        let ring = bounds.dilate(grow);
+        let corners = Corners {
+            top_left: corners.top_left + grow,
+            top_right: corners.top_right + grow,
+            bottom_right: corners.bottom_right + grow,
+            bottom_left: corners.bottom_left + grow,
+        };
+        (ring, corners.clamp_radii_for_quad_size(ring.size))
+    }
+}
+
 impl IntoElement for ButtonFocusRing {
     type Element = Self;
     fn into_element(self) -> Self {
@@ -73,20 +174,25 @@ impl Element for ButtonFocusRing {
         cx: &mut App,
     ) {
         self.child.paint(window, cx);
-        let visible =
-            self.enabled && self.focus.is_focused(window) && window.last_input_was_keyboard();
-        let ring_bounds = bounds.dilate(px(5.));
+        let focused = match &self.visibility {
+            Visibility::Focus(focus) => focus.is_focused(window),
+            Visibility::Resolved(active) => *active,
+        };
+        let visible = self.enabled && focused && window.last_input_was_keyboard();
+        let corners = match self.radius {
+            Radius::Rems(radius) => Corners::all(radius.to_pixels(window.rem_size())),
+            Radius::Corners(corners) => corners,
+        };
+        let (ring_bounds, ring_corners) = ring_geometry(bounds, corners, self.inward);
         #[cfg(test)]
         if let Some(observed) = &self.observed {
             observed.set(visible.then_some(ring_bounds));
         }
         if visible {
-            let corners = Corners::all(self.radius.to_pixels(window.rem_size()) + px(5.))
-                .clamp_radii_for_quad_size(ring_bounds.size);
             window.paint_quad(
                 outline(ring_bounds, color(ColorRole::SECONDARY), BorderStyle::Solid)
-                    .border_widths(px(3.))
-                    .corner_radii(corners),
+                    .border_widths(RING_WIDTH)
+                    .corner_radii(ring_corners),
             );
         }
     }
@@ -198,5 +304,27 @@ mod tests {
         cx.simulate_click(original.center(), Modifiers::default());
         draw(cx);
         assert!(observed.get().is_none());
+    }
+
+    #[test]
+    fn outer_and_inner_offsets_follow_m3() {
+        use super::ring_geometry;
+        use gpui::{Corners, bounds, point, size};
+        let b = bounds(point(px(10.), px(10.)), size(px(100.), px(80.)));
+        let corners = Corners {
+            top_left: px(24.),
+            top_right: px(24.),
+            bottom_right: px(6.),
+            bottom_left: px(2.),
+        };
+        let (outer, outer_corners) = ring_geometry(b, corners, false);
+        assert_eq!(outer, b.dilate(px(5.)), "2dp offset plus 3dp ring");
+        assert_eq!(outer_corners.top_left, px(29.));
+        assert_eq!(outer_corners.bottom_right, px(11.));
+        let (inner, inner_corners) = ring_geometry(b, corners, true);
+        assert_eq!(inner, b.inset(px(3.)), "the ring's outer edge 3dp inside");
+        assert_eq!(inner_corners.top_left, px(21.));
+        assert_eq!(inner_corners.bottom_right, px(3.));
+        assert_eq!(inner_corners.bottom_left, px(0.), "radii never go negative");
     }
 }

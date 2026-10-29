@@ -193,7 +193,6 @@ struct OptionPaint {
     foreground: Rgba,
     hover: Rgba,
     press: Rgba,
-    focus: Rgba,
     left_radius: Pixels,
     right_radius: Pixels,
 }
@@ -226,7 +225,6 @@ fn option_paint(
             foreground: ink.opacity(0.38),
             hover: ink.opacity(0.12),
             press: ink.opacity(0.12),
-            focus: gpui::transparent_black().into(),
             left_radius,
             right_radius,
         };
@@ -241,12 +239,6 @@ fn option_paint(
         // accent stays under hover and press.
         hover: blend(background, foreground, 0.08),
         press: blend(background, foreground, 0.10),
-        // The 2px focus ring is painted inside the option so it is never
-        // clipped. On an unselected option the accent ring reads against the
-        // neutral container; on the accent pill an accent ring would vanish,
-        // so it turns into the on-primary colour, a contrasting inner ring
-        // that stays legible in light and dark palettes.
-        focus: blend(color(ColorRole::ACCENT), color(ColorRole::ON_PRIMARY), t),
         left_radius,
         right_radius,
     }
@@ -283,6 +275,8 @@ fn item_style<T: Styled + StatefulInteractiveElement + gpui::prelude::FluentBuil
         .py_0()
         .rounded_l(paint.left_radius)
         .rounded_r(paint.right_radius)
+        // A transparent 2px border keeps the content inset; the focus ring is
+        // the shared one, drawn by `focus_ring`.
         .border_2()
         .border_color(gpui::transparent_black())
         .bg(paint.background)
@@ -298,9 +292,31 @@ fn item_style<T: Styled + StatefulInteractiveElement + gpui::prelude::FluentBuil
         .when(!disabled, |item| {
             item.hover(move |style| style.bg(paint.hover))
                 .active(move |style| style.bg(paint.press))
-                .focus_visible(move |style| style.border_color(paint.focus))
         })
 }
+/// The shared M3 keyboard focus ring around one option. Options sit 2dp
+/// apart, so the ring uses the M3 inner offset: an outer ring would be
+/// covered by the next option.
+fn focus_ring(
+    option: impl IntoElement,
+    focus: &FocusHandle,
+    disabled: bool,
+    paint: OptionPaint,
+) -> super::button::ButtonFocusRing {
+    super::button::ButtonFocusRing::with_corners(
+        option,
+        focus.clone(),
+        !disabled,
+        Corners {
+            top_left: paint.left_radius,
+            top_right: paint.right_radius,
+            bottom_right: paint.right_radius,
+            bottom_left: paint.left_radius,
+        },
+    )
+    .inward()
+}
+
 impl RenderOnce for ConnectedButtonGroup {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let disabled = self.disabled;
@@ -444,8 +460,9 @@ impl RenderOnce for ConnectedButtonGroup {
                         callback(&value, window, cx);
                     }
                 });
-                lane = lane.child(tab);
+                lane = lane.child(focus_ring(tab, &focus, disabled, paint));
             } else {
+                let click_focus = focus.clone();
                 let radio = item_style(
                     gpui_base::Radio::new(value.clone()),
                     paint,
@@ -465,12 +482,12 @@ impl RenderOnce for ConnectedButtonGroup {
                     radio.debug_selector(move || format!("{debug_kind}-choice-option-{index}"))
                 })
                 .on_change(move |_, _, window, cx| {
-                    focus.focus(window, cx);
+                    click_focus.focus(window, cx);
                     if !checked && let Some(callback) = &callback {
                         callback(&value, window, cx);
                     }
                 });
-                lane = lane.child(radio);
+                lane = lane.child(focus_ring(radio, &focus, disabled, paint));
             }
         }
         let group = div()

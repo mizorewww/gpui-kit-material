@@ -6,6 +6,7 @@ use crate::theme::color;
 use crate::tokens::{layout::*, shape::*, state, typography::*};
 use gpui::{prelude::*, *};
 
+use super::focus::{RingPlacement, RingedButton};
 use super::text::accessible_text;
 
 /// One tile of a connected group: the surface with [`tile_corners`].
@@ -14,6 +15,23 @@ pub fn tile(outer: OuterCorners) -> Div {
         div().w_full().min_w_0().bg(color(ColorRole::SURFACE)),
         outer,
     )
+}
+
+/// The corner radii [`tile_corners`] gives a tile with `outer` corners.
+pub(crate) fn outer_corner_radii(outer: OuterCorners) -> Corners<Pixels> {
+    let radius = |outside: bool| {
+        if outside {
+            TILE_RADIUS
+        } else {
+            TILE_INNER_RADIUS
+        }
+    };
+    Corners {
+        top_left: radius(outer[0]),
+        top_right: radius(outer[1]),
+        bottom_right: radius(outer[2]),
+        bottom_left: radius(outer[3]),
+    }
 }
 
 /// The tile at `index` of a vertical connected list of `count` tiles.
@@ -109,35 +127,35 @@ impl TileScale {
     /// A whole tile that acts: the surface with M3 state layers, the tile's
     /// corners and this scale's padding. Callers add one [`TileScale::row`]
     /// holding the leading slot, text column and trailing items.
-    pub fn button(self, id: impl Into<ElementId>, outer: OuterCorners) -> gpui_base::Button {
-        let (bg, ink) = (color(ColorRole::SURFACE), color(ColorRole::INK));
-        let button = gpui_base::Button::new(id)
-            .w_full()
-            .min_w_0()
-            .flex()
-            .items_center()
-            .justify_start()
-            .text_left()
-            .whitespace_normal()
-            .bg(bg)
-            .text_color(ink)
-            .cursor_pointer()
-            .hover(move |style| style.bg(state::hovered(bg, ink)))
-            .active(move |style| style.bg(state::pressed(bg, ink)))
-            // The outline is reserved for keyboard focus, so focus never
-            // moves the content.
-            .border_2()
-            .border_color(Rgba { a: 0., ..bg })
-            .focus_visible(|style| style.border_color(color(ColorRole::ACCENT)));
-        let button = match self {
-            TileScale::Regular => button.min_h(rem(64.)).px(ITEM_INSET).py(rem(16.)),
-            TileScale::Compact => button
-                .min_h(rem(68.))
-                .pl(ITEM_INSET)
-                .pr(rem(16.))
-                .py(rem(12.)),
-        };
-        tile_corners(button, outer)
+    pub fn button(self, id: impl Into<ElementId>, outer: OuterCorners) -> RingedButton {
+        let (bg, ink) = (color(ColorRole::SURFACE), color(ColorRole::ON_SURFACE));
+        let scale = self;
+        // Connected tiles sit 2dp apart, so the focus ring uses the M3 inner
+        // offset: an outer ring would be covered by the next tile.
+        RingedButton::new(id, RingPlacement::Inner(outer_corner_radii(outer))).map(move |button| {
+            let button = button
+                .w_full()
+                .min_w_0()
+                .flex()
+                .items_center()
+                .justify_start()
+                .text_left()
+                .whitespace_normal()
+                .bg(bg)
+                .text_color(ink)
+                .cursor_pointer()
+                .hover(move |style| style.bg(state::hovered(bg, ink)))
+                .active(move |style| style.bg(state::pressed(bg, ink)));
+            let button = match scale {
+                TileScale::Regular => button.min_h(rem(64.)).px(ITEM_INSET).py(rem(16.)),
+                TileScale::Compact => button
+                    .min_h(rem(68.))
+                    .pl(ITEM_INSET)
+                    .pr(rem(16.))
+                    .py(rem(12.)),
+            };
+            tile_corners(button, outer)
+        })
     }
 
     /// The gap between a tile's leading slot, text column and trailing items.
@@ -383,4 +401,62 @@ pub fn disclosure_chevron(open: bool) -> Icon {
     .icon()
     .size(rem(20.))
     .color(color(ColorRole::GRAY))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::components::focus::test_rings;
+    use core::prelude::v1::test;
+    use gpui::{Context, Modifiers, TestAppContext, VisualTestContext};
+
+    struct Harness;
+    impl Render for Harness {
+        fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+            window.set_rem_size(px(14.));
+            div().p(px(20.)).w(px(300.)).child(
+                TileScale::Regular
+                    .button("ring-tile", [true, true, false, false])
+                    .debug_selector(|| "ring-tile".into())
+                    .on_click(|_, _, _| {})
+                    .child(TileScale::Regular.row().child("Tile")),
+            )
+        }
+    }
+
+    fn draw(cx: &mut VisualTestContext) {
+        cx.update(|window, cx| {
+            window.refresh();
+            window.draw(cx).clear(cx);
+        });
+    }
+
+    #[gpui::test]
+    fn tile_buttons_show_the_inner_ring_only_for_keyboard_focus(cx: &mut TestAppContext) {
+        cx.update(gpui_base::init);
+        let (_, cx) = cx.add_window_view(|_, _| Harness);
+        draw(cx);
+        let tile = cx.debug_bounds("ring-tile").unwrap();
+        cx.simulate_click(tile.center(), Modifiers::default());
+        draw(cx);
+        assert!(test_rings::painted("ring-tile").is_none());
+        let keystroke =
+            cx.update(|_, cx| gpui::Keystroke::parse_with_os("a", cx.platform_info().os).unwrap());
+        cx.simulate_event(gpui::KeyDownEvent {
+            keystroke,
+            is_held: false,
+            prefer_character_input: false,
+        });
+        draw(cx);
+        assert_eq!(test_rings::painted("ring-tile"), Some(tile.inset(px(3.))));
+    }
+
+    #[test]
+    fn ring_corners_match_the_tile_corners() {
+        let corners = outer_corner_radii([true, true, false, false]);
+        assert_eq!(corners.top_left, TILE_RADIUS);
+        assert_eq!(corners.top_right, TILE_RADIUS);
+        assert_eq!(corners.bottom_right, TILE_INNER_RADIUS);
+        assert_eq!(corners.bottom_left, TILE_INNER_RADIUS);
+    }
 }
