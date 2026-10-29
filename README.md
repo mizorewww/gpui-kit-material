@@ -126,6 +126,13 @@ independent of the examples; jumping between chapters preserves example state.
 Component alignment is tracked in [`conformance/md3.json`](conformance/md3.json).
 An available gallery example does not imply visual or motion conformance;
 each component needs independent review and desktop/browser evidence.
+The entire gallery must also stay strictly below **2 ms per CPU frame** on both
+targets, including view rendering, layout, paint and graphics submission. Every
+component inherits this gate: a measured frame at or above 2 ms fails acceptance.
+Record individual frame timings, maximum and over-budget count, with first-frame
+and steady-state results reported separately; averages do not establish a pass.
+GPU timing is reported separately. Functional or visual reviews alone do not
+satisfy this performance requirement.
 
 `MaterialDivider` provides horizontal and vertical separators with full-width,
 start-inset, and middle-inset variants. `direction` resolves horizontal logical

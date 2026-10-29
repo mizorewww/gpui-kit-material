@@ -65,9 +65,41 @@
       "device-pixel-ratio",
       "zoom"
     ],
-    "completion": "Every applicable case has evidence and an independent PASS tied to the delivered implementation. Unspecified, untested, and unreviewed cases remain incomplete.",
+    "completion": "Every applicable case has evidence and an independent PASS tied to the delivered implementation. Unspecified, untested, and unreviewed cases remain incomplete. The entire gallery CPU frame must additionally satisfy the strict performance gate for every component acceptance.",
     "themes": "light and dark, every built-in palette, and reference baseline",
-    "review_invalidation": "Any implementation change invalidates affected prior PASS verdicts until independently reviewed again."
+    "review_invalidation": "Any implementation change invalidates affected prior PASS verdicts until independently reviewed again.",
+    "performance": {
+      "status": "unverified",
+      "scope": "entire gallery frame, on both desktop and wasm-browser; applies to acceptance of every component",
+      "metric": "CPU frame elapsed time including view rendering, layout, prepaint, paint, scene finalization and graphics command submission",
+      "threshold_ms": 2.0,
+      "comparison": "strictly less than; any measured frame >= 2.0 ms fails",
+      "aggregation": "maximum per-frame duration; also report median, p95, p99 and over-budget count",
+      "first_frame": "included; report cold-start and steady-state separately without excluding slow frames from acceptance",
+      "gpu": "measure and report separately; never substitute GPU or average FPS for CPU frame time",
+      "evidence_required": [
+        "exact source commit and dirty-worktree status",
+        "release build profile and build flags",
+        "hardware, OS, browser and graphics backend",
+        "viewport, device pixel ratio, zoom, theme and text scale",
+        "scenario and interaction schedule",
+        "per-frame raw timings and timing boundaries",
+        "frame count, maximum and over-budget count",
+        "independent subagent review"
+      ],
+      "scenarios": [
+        "initial frame",
+        "idle",
+        "hover and keyboard focus",
+        "press, release and toggle",
+        "interrupted and retargeted animations",
+        "loading and progress",
+        "scrolling and chapter navigation",
+        "theme and text-scale changes",
+        "reduced-motion transitions"
+      ],
+      "completion": "No component or gallery can pass without whole-gallery evidence below the strict budget. Existing functional or visual reviews do not establish performance acceptance."
+    }
   },
   "foundations": [
     {
@@ -204,7 +236,12 @@
           "path": "conformance/reference/button-active.json",
           "scope": "Actual pinned setActive API and full stylesheet: 300 combinations of variant, size, shape, ripple and plain/unselected/selected toggle, each at five settled active/disabled/restored states. Controlled active retains pressed shape while disabled and pressed opacity without ripple. No synthetic pointer, selection or wave is created. Excludes circular and intermediate browser motion."
         }
-      ]
+      ],
+      "performance": {
+        "status": "unverified",
+        "evidence": [],
+        "reviews": []
+      }
     },
     {
       "id": "icon-button",
@@ -218,189 +255,324 @@
           "path": "conformance/reference/icon-button.json",
           "scope": "Pinned createIconButton and full stylesheet. 120 variant/size/width/shape configurations, 1800 plain/toggle-off/selected states; 80 normal/reduced motion configurations at default width; API, change-event, ripple, baseline-dark endpoints and disabled-focus lifecycle samples. Independent replay matched two full configurations (30 states) and all eight disabled-focus lifecycles. Mouse left-edge hit tests do not establish raw touch, all edges or clipping. DOM/CSS reference evidence only; no implementation, raster or full accessibility-tree conformance."
         }
-      ]
+      ],
+      "performance": {
+        "status": "unverified",
+        "evidence": [],
+        "reviews": []
+      }
     },
     {
       "id": "button-group",
       "reference": "https://md3.io/components/button-group/",
       "status": "unreviewed",
       "cases": [],
-      "reviews": []
+      "reviews": [],
+      "performance": {
+        "status": "unverified",
+        "evidence": [],
+        "reviews": []
+      }
     },
     {
       "id": "split-button",
       "reference": "https://md3.io/components/split-button/",
       "status": "unreviewed",
       "cases": [],
-      "reviews": []
+      "reviews": [],
+      "performance": {
+        "status": "unverified",
+        "evidence": [],
+        "reviews": []
+      }
     },
     {
       "id": "fab",
       "reference": "https://md3.io/components/fab/",
       "status": "unreviewed",
       "cases": [],
-      "reviews": []
+      "reviews": [],
+      "performance": {
+        "status": "unverified",
+        "evidence": [],
+        "reviews": []
+      }
     },
     {
       "id": "fab-menu",
       "reference": "https://md3.io/components/fab-menu/",
       "status": "unreviewed",
       "cases": [],
-      "reviews": []
+      "reviews": [],
+      "performance": {
+        "status": "unverified",
+        "evidence": [],
+        "reviews": []
+      }
     },
     {
       "id": "extended-fab",
       "reference": "https://md3.io/components/extended-fab/",
       "status": "unreviewed",
       "cases": [],
-      "reviews": []
+      "reviews": [],
+      "performance": {
+        "status": "unverified",
+        "evidence": [],
+        "reviews": []
+      }
     },
     {
       "id": "checkbox",
       "reference": "https://md3.io/components/checkbox/",
       "status": "unreviewed",
       "cases": [],
-      "reviews": []
+      "reviews": [],
+      "performance": {
+        "status": "unverified",
+        "evidence": [],
+        "reviews": []
+      }
     },
     {
       "id": "switch",
       "reference": "https://md3.io/components/switch/",
       "status": "unreviewed",
       "cases": [],
-      "reviews": []
+      "reviews": [],
+      "performance": {
+        "status": "unverified",
+        "evidence": [],
+        "reviews": []
+      }
     },
     {
       "id": "radios",
       "reference": "https://md3.io/components/radios/",
       "status": "unreviewed",
       "cases": [],
-      "reviews": []
+      "reviews": [],
+      "performance": {
+        "status": "unverified",
+        "evidence": [],
+        "reviews": []
+      }
     },
     {
       "id": "chips",
       "reference": "https://md3.io/components/chips/",
       "status": "unreviewed",
       "cases": [],
-      "reviews": []
+      "reviews": [],
+      "performance": {
+        "status": "unverified",
+        "evidence": [],
+        "reviews": []
+      }
     },
     {
       "id": "slider",
       "reference": "https://md3.io/components/slider/",
       "status": "unreviewed",
       "cases": [],
-      "reviews": []
+      "reviews": [],
+      "performance": {
+        "status": "unverified",
+        "evidence": [],
+        "reviews": []
+      }
     },
     {
       "id": "text-field",
       "reference": "https://md3.io/components/text-field/",
       "status": "unreviewed",
       "cases": [],
-      "reviews": []
+      "reviews": [],
+      "performance": {
+        "status": "unverified",
+        "evidence": [],
+        "reviews": []
+      }
     },
     {
       "id": "select",
       "reference": "https://md3.io/components/select/",
       "status": "unreviewed",
       "cases": [],
-      "reviews": []
+      "reviews": [],
+      "performance": {
+        "status": "unverified",
+        "evidence": [],
+        "reviews": []
+      }
     },
     {
       "id": "search",
       "reference": "https://md3.io/components/search/",
       "status": "unreviewed",
       "cases": [],
-      "reviews": []
+      "reviews": [],
+      "performance": {
+        "status": "unverified",
+        "evidence": [],
+        "reviews": []
+      }
     },
     {
       "id": "datepicker",
       "reference": "https://md3.io/components/datepicker/",
       "status": "unreviewed",
       "cases": [],
-      "reviews": []
+      "reviews": [],
+      "performance": {
+        "status": "unverified",
+        "evidence": [],
+        "reviews": []
+      }
     },
     {
       "id": "timepicker",
       "reference": "https://md3.io/components/timepicker/",
       "status": "unreviewed",
       "cases": [],
-      "reviews": []
+      "reviews": [],
+      "performance": {
+        "status": "unverified",
+        "evidence": [],
+        "reviews": []
+      }
     },
     {
       "id": "navigation-rail",
       "reference": "https://md3.io/components/navigation-rail/",
       "status": "unreviewed",
       "cases": [],
-      "reviews": []
+      "reviews": [],
+      "performance": {
+        "status": "unverified",
+        "evidence": [],
+        "reviews": []
+      }
     },
     {
       "id": "navigation-bar",
       "reference": "https://md3.io/components/navigation-bar/",
       "status": "unreviewed",
       "cases": [],
-      "reviews": []
+      "reviews": [],
+      "performance": {
+        "status": "unverified",
+        "evidence": [],
+        "reviews": []
+      }
     },
     {
       "id": "drawer",
       "reference": "https://md3.io/components/drawer/",
       "status": "unreviewed",
       "cases": [],
-      "reviews": []
+      "reviews": [],
+      "performance": {
+        "status": "unverified",
+        "evidence": [],
+        "reviews": []
+      }
     },
     {
       "id": "tabs",
       "reference": "https://md3.io/components/tabs/",
       "status": "unreviewed",
       "cases": [],
-      "reviews": []
+      "reviews": [],
+      "performance": {
+        "status": "unverified",
+        "evidence": [],
+        "reviews": []
+      }
     },
     {
       "id": "menu",
       "reference": "https://md3.io/components/menu/",
       "status": "unreviewed",
       "cases": [],
-      "reviews": []
+      "reviews": [],
+      "performance": {
+        "status": "unverified",
+        "evidence": [],
+        "reviews": []
+      }
     },
     {
       "id": "top-app-bar",
       "reference": "https://md3.io/components/top-app-bar/",
       "status": "unreviewed",
       "cases": [],
-      "reviews": []
+      "reviews": [],
+      "performance": {
+        "status": "unverified",
+        "evidence": [],
+        "reviews": []
+      }
     },
     {
       "id": "bottom-app-bar",
       "reference": "https://md3.io/components/bottom-app-bar/",
       "status": "unreviewed",
       "cases": [],
-      "reviews": []
+      "reviews": [],
+      "performance": {
+        "status": "unverified",
+        "evidence": [],
+        "reviews": []
+      }
     },
     {
       "id": "toolbar",
       "reference": "https://md3.io/components/toolbar/",
       "status": "unreviewed",
       "cases": [],
-      "reviews": []
+      "reviews": [],
+      "performance": {
+        "status": "unverified",
+        "evidence": [],
+        "reviews": []
+      }
     },
     {
       "id": "card",
       "reference": "https://md3.io/components/card/",
       "status": "unreviewed",
       "cases": [],
-      "reviews": []
+      "reviews": [],
+      "performance": {
+        "status": "unverified",
+        "evidence": [],
+        "reviews": []
+      }
     },
     {
       "id": "list",
       "reference": "https://md3.io/components/list/",
       "status": "unreviewed",
       "cases": [],
-      "reviews": []
+      "reviews": [],
+      "performance": {
+        "status": "unverified",
+        "evidence": [],
+        "reviews": []
+      }
     },
     {
       "id": "carousel",
       "reference": "https://md3.io/components/carousel/",
       "status": "unreviewed",
       "cases": [],
-      "reviews": []
+      "reviews": [],
+      "performance": {
+        "status": "unverified",
+        "evidence": [],
+        "reviews": []
+      }
     },
     {
       "id": "divider",
@@ -419,63 +591,108 @@
           "path": "crates/material/src/components/divider_tests.rs",
           "scope": "1200 reference configurations compared for rendered width/height and physical margins; builder reversal and caller refinement tests; live baseline light/dark role resolution. GPUI block/flex layout only: browser inline formatting with text siblings, actual x/y, AX tree and full desktop/browser pixel coverage remain pending."
         }
-      ]
+      ],
+      "performance": {
+        "status": "unverified",
+        "evidence": [],
+        "reviews": []
+      }
     },
     {
       "id": "dialog",
       "reference": "https://md3.io/components/dialog/",
       "status": "unreviewed",
       "cases": [],
-      "reviews": []
+      "reviews": [],
+      "performance": {
+        "status": "unverified",
+        "evidence": [],
+        "reviews": []
+      }
     },
     {
       "id": "bottom-sheet",
       "reference": "https://md3.io/components/bottom-sheet/",
       "status": "unreviewed",
       "cases": [],
-      "reviews": []
+      "reviews": [],
+      "performance": {
+        "status": "unverified",
+        "evidence": [],
+        "reviews": []
+      }
     },
     {
       "id": "side-sheet",
       "reference": "https://md3.io/components/side-sheet/",
       "status": "unreviewed",
       "cases": [],
-      "reviews": []
+      "reviews": [],
+      "performance": {
+        "status": "unverified",
+        "evidence": [],
+        "reviews": []
+      }
     },
     {
       "id": "badge",
       "reference": "https://md3.io/components/badge/",
       "status": "unreviewed",
       "cases": [],
-      "reviews": []
+      "reviews": [],
+      "performance": {
+        "status": "unverified",
+        "evidence": [],
+        "reviews": []
+      }
     },
     {
       "id": "progress",
       "reference": "https://md3.io/components/progress/",
       "status": "unreviewed",
       "cases": [],
-      "reviews": []
+      "reviews": [],
+      "performance": {
+        "status": "unverified",
+        "evidence": [],
+        "reviews": []
+      }
     },
     {
       "id": "loading-indicator",
       "reference": "https://md3.io/components/loading-indicator/",
       "status": "unreviewed",
       "cases": [],
-      "reviews": []
+      "reviews": [],
+      "performance": {
+        "status": "unverified",
+        "evidence": [],
+        "reviews": []
+      }
     },
     {
       "id": "snackbar",
       "reference": "https://md3.io/components/snackbar/",
       "status": "unreviewed",
       "cases": [],
-      "reviews": []
+      "reviews": [],
+      "performance": {
+        "status": "unverified",
+        "evidence": [],
+        "reviews": []
+      }
     },
     {
       "id": "tooltip",
       "reference": "https://md3.io/components/tooltip/",
       "status": "unreviewed",
       "cases": [],
-      "reviews": []
+      "reviews": [],
+      "performance": {
+        "status": "unverified",
+        "evidence": [],
+        "reviews": []
+      }
     }
   ],
   "deliverables": [
@@ -483,7 +700,12 @@
       "id": "desktop-gallery",
       "status": "unreviewed",
       "evidence": [],
-      "reviews": []
+      "reviews": [],
+      "performance": {
+        "status": "unverified",
+        "evidence": [],
+        "reviews": []
+      }
     },
     {
       "id": "wasm-gallery",
@@ -495,7 +717,12 @@
           "scope": "Actual served WASM gallery canvas allocation at DPR 1, 2, 1.25, 1.5, then 1 with CSS resize observer notifications. Independent browser rerun matched backing dimensions and screenshots. CDP DPR-only changes can omit notifications; protocol includes a real 1px CSS resize. Not a complete component or gallery conformance verdict."
         }
       ],
-      "reviews": []
+      "reviews": [],
+      "performance": {
+        "status": "unverified",
+        "evidence": [],
+        "reviews": []
+      }
     }
   ]
 }
