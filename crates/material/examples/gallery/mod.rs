@@ -63,7 +63,6 @@ struct Gallery {
     pending_focus: Option<(usize, bool)>,
     last_rem: Pixels,
     color_columns: usize,
-    fps_display: Option<Entity<fps::FpsDisplay>>,
     feedback_spinner_playback: RepeatAnimationPlayback,
     feedback_linear_playback: RepeatAnimationPlayback,
     feedback_circular_playback: CircularProgressPlayback,
@@ -89,6 +88,8 @@ struct Gallery {
     button_progress: bool,
     button_loading_variant: usize,
     button_loading_clicks: usize,
+    #[cfg(test)]
+    renders: std::cell::Cell<usize>,
     #[cfg(test)]
     button_sync_rows: std::cell::RefCell<std::collections::BTreeSet<usize>>,
     button_loading_playbacks: [ButtonTransitionPlayback; 15],
@@ -148,6 +149,8 @@ impl Gallery {
             button_loading_variant: 0,
             button_loading_clicks: 0,
             #[cfg(test)]
+            renders: Default::default(),
+            #[cfg(test)]
             button_sync_rows: Default::default(),
             button_loading_playbacks: std::array::from_fn(|_| ButtonTransitionPlayback::default()),
             button_effect_playbacks: std::array::from_fn(|_| ButtonTransitionPlayback::default()),
@@ -169,7 +172,6 @@ impl Gallery {
             pending_focus: None,
             last_rem: window.rem_size(),
             color_columns,
-            fps_display: None,
             feedback_spinner_playback: RepeatAnimationPlayback::default(),
             feedback_linear_playback: RepeatAnimationPlayback::default(),
             feedback_circular_playback: CircularProgressPlayback::default(),
@@ -212,6 +214,8 @@ impl Gallery {
 
 impl Render for Gallery {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        #[cfg(test)]
+        self.renders.set(self.renders.get() + 1);
         self.feedback_circular_playback.observe_reduced_motion(cx);
         let progress_inputs = (
             self.button_progress,
@@ -383,25 +387,10 @@ impl Render for Gallery {
             }))
             .relative()
             .size_full()
+            .min_h_0()
             .bg(color(ColorRole::CANVAS))
             .text_color(color(ColorRole::INK))
             .font_family("Roboto")
-            .child(
-                TitleBar::new("title-bar", TITLE_BAR)
-                    .gap(rem(12.))
-                    .child(section_title("window-title", "gpui-kit-material"))
-                    .child(div().flex_1())
-                    .when_some(self.fps_display.clone(), |bar, fps| bar.child(fps))
-                    .child(
-                        MaterialButton::new("gallery-settings-open")
-                            .variant(ButtonVariant::Text)
-                            .button_size(ButtonSize::ExtraSmall)
-                            .accessibility_label("Settings")
-                            .debug_selector(|| "gallery-settings-open".into())
-                            .child("Settings")
-                            .on_click(|_, window, cx| settings::open(window, cx)),
-                    ),
-            )
             .child(
                 div()
                     .flex()
@@ -437,6 +426,51 @@ impl Render for Gallery {
     }
 }
 
+/// The window content: the title bar and its FPS counter over the cached
+/// Gallery, so a counter update renders only this bar and the counter, not
+/// every Gallery row. Gallery notifications and window refreshes (theme and
+/// scale steps) still render the Gallery again.
+struct GalleryWindow {
+    gallery: Entity<Gallery>,
+    fps: Option<Entity<fps::FpsDisplay>>,
+}
+
+impl Render for GalleryWindow {
+    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        gpui_base::v_flex()
+            .size_full()
+            .bg(color(ColorRole::CANVAS))
+            .text_color(color(ColorRole::INK))
+            .font_family("Roboto")
+            .child(
+                TitleBar::new("title-bar", TITLE_BAR)
+                    .labels(CaptionLabels {
+                        minimize: "Minimize".into(),
+                        maximize: "Maximize".into(),
+                        restore: "Restore".into(),
+                        close: "Close".into(),
+                    })
+                    .gap(rem(12.))
+                    .child(section_title("window-title", "gpui-kit-material"))
+                    .child(div().flex_1())
+                    .when_some(self.fps.clone(), |bar, fps| bar.child(fps))
+                    .child(
+                        MaterialButton::new("gallery-settings-open")
+                            .variant(ButtonVariant::Text)
+                            .button_size(ButtonSize::ExtraSmall)
+                            .accessibility_label("Settings")
+                            .debug_selector(|| "gallery-settings-open".into())
+                            .child("Settings")
+                            .on_click(|_, window, cx| settings::open(window, cx)),
+                    ),
+            )
+            .child(
+                AnyView::from(self.gallery.clone())
+                    .cached(StyleRefinement::default().flex_1().min_h_0().w_full()),
+            )
+    }
+}
+
 pub fn run(application: gpui::Application, initialize: impl FnOnce(&mut App) + 'static) {
     #[cfg(all(not(target_family = "wasm"), feature = "frame-profiler"))]
     let profiling = performance::prepare();
@@ -460,7 +494,7 @@ pub fn run(application: gpui::Application, initialize: impl FnOnce(&mut App) + '
         let viewport = size(px(960.), px(900.));
         #[cfg(not(target_family = "wasm"))]
         let viewport = capture::window_size(cx).unwrap_or(viewport);
-        let (_window, _gallery) = gpui_kit::open_window(
+        let (_window, _content) = gpui_kit::open_window(
             title_bar_window_options("gpui-kit-material", TITLE_BAR, viewport, cx),
             cx,
             move |window, cx| {
@@ -471,17 +505,14 @@ pub fn run(application: gpui::Application, initialize: impl FnOnce(&mut App) + '
                 let show_fps = capture::show_fps(cx);
                 #[cfg(target_family = "wasm")]
                 let show_fps = true;
-                if show_fps {
-                    let fps = cx.new(|cx| fps::FpsDisplay::new(window, cx));
-                    gallery.update(cx, |gallery, _| gallery.fps_display = Some(fps));
-                }
+                let fps = show_fps.then(|| cx.new(|cx| fps::FpsDisplay::new(window, cx)));
                 #[cfg(not(target_family = "wasm"))]
                 capture::install(&gallery, window, cx);
                 let initial = gallery.read(cx);
                 let initial_scheme = initial.target_scheme();
                 let initial_scale = initial.scale.parse().unwrap_or(1.);
                 theme::init_component_theme(initial_scheme, initial_scale, cx);
-                gallery
+                cx.new(|_| GalleryWindow { gallery, fps })
             },
         )
         .unwrap();
@@ -490,7 +521,7 @@ pub fn run(application: gpui::Application, initialize: impl FnOnce(&mut App) + '
             _window
                 .update(cx, |_, window, cx| {
                     if std::env::var_os("MATERIAL_SCROLL_PROFILE").is_some() {
-                        let target = _gallery.read(cx).list.clone().into();
+                        let target = _content.read(cx).gallery.read(cx).list.clone().into();
                         profiling.install_scroll(window, cx, target);
                     } else {
                         profiling.install(window, cx);
@@ -500,4 +531,54 @@ pub fn run(application: gpui::Application, initialize: impl FnOnce(&mut App) + '
         }
         cx.activate(true);
     });
+}
+
+#[cfg(test)]
+mod window_tests {
+    use super::{Gallery, GalleryWindow, fps};
+    // GPUI's attribute expands to an unqualified #[test]. Keep that name
+    // bound to Rust's test attribute rather than the parent's GPUI glob import.
+    use core::prelude::v1::test;
+    use gpui::{AnyWindowHandle, AppContext as _, TestAppContext, px, size};
+
+    fn draw(window: AnyWindowHandle, cx: &mut TestAppContext) {
+        cx.update_window(window, |_, window, cx| window.draw(cx).clear(cx))
+            .unwrap();
+        cx.run_until_parked();
+    }
+
+    #[gpui::test]
+    fn fps_updates_render_only_the_title_bar(cx: &mut TestAppContext) {
+        cx.update(|cx| {
+            gpui_kit::init(cx);
+            gpui_kit_material::init(cx);
+        });
+        let mut parts = None;
+        let window = cx.open_window(size(px(960.), px(600.)), |window, cx| {
+            let gallery = cx.new(|cx| Gallery::new(window, cx));
+            let fps = cx.new(|cx| fps::FpsDisplay::new(window, cx));
+            parts = Some((gallery.clone(), fps.clone()));
+            GalleryWindow {
+                gallery,
+                fps: Some(fps),
+            }
+        });
+        let (gallery, fps) = parts.unwrap();
+        draw(window.into(), cx);
+        // Settle first-frame work (playback and focus setup notify once).
+        draw(window.into(), cx);
+        draw(window.into(), cx);
+        let rendered = cx.read(|cx| gallery.read(cx).renders.get());
+        assert!(rendered > 0);
+        cx.update(|cx| fps.update(cx, |_, cx| cx.notify()));
+        draw(window.into(), cx);
+        assert_eq!(
+            cx.read(|cx| gallery.read(cx).renders.get()),
+            rendered,
+            "a counter update must reuse the cached Gallery"
+        );
+        cx.update(|cx| gallery.update(cx, |_, cx| cx.notify()));
+        draw(window.into(), cx);
+        assert_eq!(cx.read(|cx| gallery.read(cx).renders.get()), rendered + 1);
+    }
 }
