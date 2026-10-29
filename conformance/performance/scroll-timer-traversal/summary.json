@@ -8,10 +8,20 @@
   "run": {
     "backend": "native GPUI Fast, release",
     "input_mode": "wheel",
-    "input_driver": "foreground timer 1000 Hz requested, missed deadlines skipped",
+    "input_driver": "foreground timer, 1000 Hz requested; actual deadline policy for this binary is unverified",
     "requested_seconds": 30,
-    "source_head_at_build": "74a90f44dcc78c746680fe972a90a4d94fe8b4df",
-    "dirty_paths_at_build": [
+    "binary_sha256": "f6996cc86236c9f9d7665f5db62005fd24108d3c6f395b256f78fc31c2f65c14",
+    "runner": "binary run directly (bounded with timeout 60 s, process exited) because concurrent agents changed sources during scripts/profile-gallery.py builds; source identity is therefore commit plus dirty path list only",
+    "hardware": {
+      "uname": "Darwin MacbookProM2.local 27.2.0 Darwin Kernel Version 27.2.0: Wed Oct  7 23:15:04 PDT 2026; root:xnu-13432.41.4~3/RELEASE_ARM64_T8112 arm64 Darwin",
+      "model": "Mac14,7",
+      "cpu": "Apple M2",
+      "memory_bytes": "17179869184",
+      "available_parallelism": 8
+    },
+    "display_refresh_interval_ns": 16666667,
+    "runtime_source_commit_reported": "74a90f44dcc78c746680fe972a90a4d94fe8b4df",
+    "dirty_paths_reported_at_runtime": [
       " M crates/material/examples/gallery/mod.rs",
       " M crates/material/examples/gallery/performance.rs",
       " M crates/material/examples/gallery/scroll_performance.rs",
@@ -27,16 +37,8 @@
       " M vendor/gpui-pre/src/profiler/journal.rs",
       " M vendor/gpui-pre/src/window.rs"
     ],
-    "binary_sha256": "f6996cc86236c9f9d7665f5db62005fd24108d3c6f395b256f78fc31c2f65c14",
-    "runner": "binary run directly (bounded with timeout 60 s, process exited) because concurrent agents changed sources during scripts/profile-gallery.py builds; source identity is therefore commit plus dirty path list only",
-    "hardware": {
-      "uname": "Darwin MacbookProM2.local 27.2.0 Darwin Kernel Version 27.2.0: Wed Oct  7 23:15:04 PDT 2026; root:xnu-13432.41.4~3/RELEASE_ARM64_T8112 arm64 Darwin",
-      "model": "Mac14,7",
-      "cpu": "Apple M2",
-      "memory_bytes": "17179869184",
-      "available_parallelism": 8
-    },
-    "display_refresh_interval_ns": 16666667
+    "source_identity_limit": "The raw metadata reports a runtime Git commit and dirty path names, not dirty file contents or a verified build identity; binary_build_identity is null and no build.json is preserved. The recorded binary hash does not establish which dirty source bytes produced it.",
+    "input_policy_limit": "The original summary claimed missed deadlines were skipped, while frames.json describes immediate catch-up ticks. These sources disagree; the immutable raw report is retained and neither policy is established for the captured binary."
   },
   "process_exit_code": 1,
   "errors": [
@@ -96,9 +98,18 @@
   },
   "gpu_frames_without_time": 0,
   "findings": [
-    "VSync reads disabled, yet the median new-frame rate equals the 60 Hz display refresh: CAMetalLayer nextDrawable blocks (median ~9.3 ms per frame) until the compositor releases a drawable. This is windowed macOS compositor pacing, not a displaySyncEnabled readback bug.",
-    "Even excluding that wait, draw alone has a median of ~7 ms of CPU work (layout, prepaint and paint), so the 2 ms CPU gate fails independently of presentation.",
-    "Input is now timer-driven and independent of frame callbacks; at most ~2 inputs land per 16.6 ms frame because the foreground thread is busy drawing, so one logical lap took most of the 30 s run.",
-    "Not like-for-like with scroll-wheel-fast-state (frame-bound 1 s local legs): this run traverses the full Gallery top-bottom-top."
-  ]
+    "VSync reads disabled at all 3574 observations, median counted new-frame rate is about 60 FPS, and the whole nextDrawable API call has median elapsed time about 9.3445 ms per scope. These observations do not establish the limiting mechanism, isolate pure blocking, prove compositor release as the unique cause, or exclude state submission/readback issues.",
+    "Draw alone has a median elapsed time of about 6.9975 ms and prepaint about 3.5121 ms. Both exceed the complete-frame budget independently of the drawable call; the full synchronous scope remains the acceptance metric.",
+    "There are 3572 recorded inputs and 1787 successful-new-frame markers, about two inputs per successful frame in aggregate. This is not a per-frame maximum or proof of causality; input timing and submission association remain unverified.",
+    "One logical offset top-bottom-top lap is reported; actual successful presentation of every Gallery row is not established. This 30 s timer-driven run is not a paired comparison with the earlier 10 s frame-driven local legs.",
+    "Build provenance is incomplete. Retain this run as a failed diagnostic, not a verified reproduction of the runtime Git revision plus unspecified dirty files."
+  ],
+  "gpu_scope_limit": {
+    "raw_command_buffers": 1790,
+    "paired_frames": 1787,
+    "raw_buffers_outside_paired_frame_summary": 3,
+    "frames_without_gpu_time_scope": "paired frames only",
+    "over_budget_frames_definition": "The shared summary helper compares against 2 ms; this is a descriptive count, not a separately specified GPU acceptance gate."
+  },
+  "independent_review": "Source/evidence audit recomputed all reported CPU/FPS statistics and success marker counts; the limitations above prevent causal, source-reproducibility, full-rendered-traversal or performance-improvement claims. Both measured gates still fail."
 }
