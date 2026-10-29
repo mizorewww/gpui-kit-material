@@ -67,21 +67,47 @@ events through the normal input path; `programmatic` mutates the offset
 directly and bypasses wheel invalidation, so prefer `wheel` for gate evidence.
 
 Reports keep raw positions, laps and row coverage, successful new-frame
-counts, the lowest FPS over ≥ 250 ms windows and a strict minimum FPS from the
-longest gap between newly drawn submissions. A run whose rate sits at the
-display refresh while VSync reads disabled is flagged invalid: on macOS a
-windowed `CAMetalLayer` with `displaySyncEnabled = NO` still blocks in
-`nextDrawable` until the compositor releases a drawable once per refresh.
+counts, the lowest FPS over ≥ 250 ms windows, and draw-associated submission
+attempt gaps as a diagnostic. Runs whose rate sits near or below the display
+refresh while VSync reads disabled are marked (`observed_rate_near_or_below_refresh`).
+On macOS a windowed `CAMetalLayer` with `displaySyncEnabled = NO` was observed
+blocking in `nextDrawable` (dispatch semaphore) for most of each ~16.6 ms
+frame, so VSync readback alone does not prove unpaced presentation.
 
-CPU frame time is judged per complete scope minus platform-reported blocking
-presentation waits (`nextDrawable`), which are reported separately with the
-raw scope totals. GPU time (Metal `GPUStartTime`/`GPUEndTime`, macOS only) is
-reported per frame under `gpu` and never counts toward the CPU budget.
+The 2 ms judgement uses the whole synchronous CPU scope, including drawable
+acquisition. The elapsed time of each `nextDrawable` call is reported
+separately (`presentation_wait_*`, `diagnostic_*_excluding_drawable_call`) and
+never subtracted from acceptance. GPU time (Metal `GPUStartTime`/`GPUEndTime`,
+macOS only) is reported per frame under `gpu` and never counts toward the CPU
+budget; other backends report null with a reason.
 
-Runner exit status: `0` only for a complete scroll run where the CPU and FPS
-gates both pass; `1` when a measured gate failed; `2` for incomplete,
-unstable or unverifiable evidence. A startup run measures only the CPU gate,
-so it returns `1` or `2`, never `0`.
+Runner exit status: `0` only for a complete run the gallery reports eligible
+with the CPU and FPS gates both passing; `1` when a measured gate failed; `2`
+for incomplete, unstable or unverifiable evidence. Startup and browser runs
+cannot establish the FPS gate, so they return `1` or `2`, never `0`.
+
+### Browser (WASM)
+
+`--web` builds the release WASM Gallery, serves it with cross-origin isolation
+(finest `performance.now()` resolution) on a free local port and runs it in
+headless Chromium through `agent-browser` with
+`--disable-gpu-vsync,--disable-frame-rate-limit`, then closes the browser and
+server:
+
+```sh
+python3 scripts/profile-gallery.py /tmp/material-web --web --backend fast --seconds 15 --scroll
+```
+
+The same page works by hand: open `http://127.0.0.1:8080/?profile=scroll&seconds=15`
+(or `profile=startup`; optional `hz`, `legpx`) and read
+`window.__galleryProfile.report` when `done`. `www/profile.js` times every
+`requestAnimationFrame` callback (one whole GPUI frame) and the synchronous
+`run()` startup with `performance.now()` into preallocated buffers, and reads
+the engine's successful new-frame counter after each scope. The scroll driver
+dispatches 8 px DOM wheel events from a `MessageChannel` loop independent of
+animation frames. It cannot read the list position, so legs scroll a fixed
+distance and coverage stays unverified; GPU time is null (no WebGPU timestamp
+queries). Browser reports are never acceptance-eligible.
 
 The gallery FPS counter counts only successfully submitted new draws, sampled
 every 500 ms; skipped submissions, repeated presents and idle time do not count,

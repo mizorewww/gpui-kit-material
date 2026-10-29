@@ -138,6 +138,103 @@ def runner_exit_code(capture_code, inputs_stable, scroll, report_path):
     return 0 if passed else 2
 
 
+def web_profile(args, destination):
+    """Bounded headless browser run of the WASM Gallery (www/profile.js)."""
+    import functools
+    import http.server
+    import threading
+    import time
+    import uuid
+
+    build = ["./scripts/build-gallery-web.sh", "--release", "--" + args.backend]
+    provenance = {"build_command": build, "requested_backend": args.backend,
+                  "requested_scenario": "web-" + ("scroll" if args.scroll else "startup"),
+                  "source_before_build": repository_identity(ROOT),
+                  "acceptance_eligible": False}
+
+    def save():
+        (destination / "build.json").write_text(json.dumps(provenance, indent=2) + "\n")
+
+    save()
+    with (destination / "build.log").open("wb") as log:
+        built = subprocess.run(build, cwd=ROOT, stdout=log, stderr=subprocess.STDOUT)
+    provenance["build_exit_code"] = built.returncode
+    provenance["source_after_build"] = repository_identity(ROOT)
+    www = ROOT / "crates/gallery-web/www"
+    provenance["wasm_sha256"] = hashlib.sha256(
+        (www / "wasm/gpui_kit_material_gallery_web_bg.wasm").read_bytes()).hexdigest() \
+        if built.returncode == 0 else None
+    save()
+    if built.returncode:
+        return 2
+
+    class Handler(http.server.SimpleHTTPRequestHandler):
+        def end_headers(self):
+            # Cross-origin isolation gives performance.now() its finest resolution.
+            self.send_header("Cross-Origin-Opener-Policy", "same-origin")
+            self.send_header("Cross-Origin-Embedder-Policy", "require-corp")
+            self.send_header("Cache-Control", "no-store")
+            super().end_headers()
+
+        def log_message(self, *_):
+            pass
+
+    server = http.server.ThreadingHTTPServer(
+        ("127.0.0.1", 0), functools.partial(Handler, directory=str(www)))
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    session = "gallery-profile-" + uuid.uuid4().hex[:12]
+    query = f"profile={'scroll' if args.scroll else 'startup'}&seconds={args.seconds}"
+    if args.input_hz is not None:
+        query += f"&hz={args.input_hz}"
+    url = f"http://127.0.0.1:{server.server_address[1]}/?{query}"
+    browser_args = "--disable-gpu-vsync,--disable-frame-rate-limit,--enable-unsafe-webgpu"
+    provenance.update(url=url, browser_args=browser_args, viewport=[1280, 800])
+
+    def browser(*command, timeout=60):
+        return subprocess.run(["agent-browser", "--session", session, "--args", browser_args,
+                               *command], capture_output=True, text=True, timeout=timeout)
+
+    code = 2
+    try:
+        browser("set", "viewport", "1280", "800")
+        opened = browser("open", url)
+        if opened.returncode:
+            provenance["capture_error"] = opened.stderr + opened.stdout
+            return 2
+        deadline = time.monotonic() + args.seconds + 60
+        report = None
+        while time.monotonic() < deadline:
+            time.sleep(1)
+            result = browser("eval", "JSON.stringify(window.__galleryProfile ?? null)")
+            if result.returncode:
+                continue
+            value = json.loads(result.stdout)
+            value = json.loads(value) if isinstance(value, str) else value
+            if value and value.get("done"):
+                report = value["report"]
+                break
+        if report is None:
+            provenance["capture_error"] = "browser profile did not finish before the deadline"
+        else:
+            (destination / "frames.json").write_text(json.dumps(report, indent=2) + "\n")
+            code = report.get("exit_code", 2)
+        console = browser("console")
+        (destination / "console.txt").write_text(console.stdout)
+    except subprocess.TimeoutExpired:
+        provenance["capture_error"] = "browser command timed out"
+    finally:
+        browser("close")
+        server.shutdown()
+        provenance["capture_exit_code"] = code
+        provenance["source_after_capture"] = repository_identity(ROOT)
+        provenance["inputs_stable"] = (
+            provenance["source_after_build"] == provenance["source_after_capture"])
+        save()
+    # The browser report is never acceptance-eligible: 1 for a measured
+    # failure, otherwise 2.
+    return 1 if code == 1 and provenance["inputs_stable"] else 2
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("output", type=Path, help="new evidence directory outside the repository")
@@ -149,6 +246,8 @@ def main():
                         help="scroll input path (default: programmatic); requires --scroll")
     parser.add_argument("--input-hz", type=int,
                         help="timer-driven scroll input rate, 100..=2000 (default 1000); requires --scroll")
+    parser.add_argument("--web", action="store_true",
+                        help="profile the WASM Gallery in headless Chromium via agent-browser")
     args = parser.parse_args()
     if args.scroll_input and not args.scroll:
         parser.error("--scroll-input requires --scroll")
@@ -156,12 +255,18 @@ def main():
         parser.error("--input-hz requires --scroll and must be in 100..=2000")
     if not math.isfinite(args.seconds) or not 0.1 <= args.seconds <= 3600:
         parser.error("--seconds must be finite and in 0.1..=3600")
-    if args.scroll and not 2 <= args.seconds <= 120:
-        parser.error("--scroll requires --seconds in 2..=120")
+    if (args.scroll or args.web) and not 2 <= args.seconds <= 120:
+        parser.error("--scroll and --web require --seconds in 2..=120")
     destination = args.output.resolve()
     if destination == ROOT or ROOT in destination.parents:
         parser.error("use an output directory outside the repository to keep source fingerprints stable")
     destination.mkdir(parents=True, exist_ok=False)
+    if args.web:
+        if args.scroll_input:
+            parser.error("--scroll-input is native only; the browser driver uses DOM wheel events")
+        result = web_profile(args, destination)
+        print(f"Evidence: {destination}; runner exit {result}.")
+        return result
     features = "serde,embedded-symbols,frame-profiler"
     if args.backend == "fast":
         features += ",gpui-fast"
