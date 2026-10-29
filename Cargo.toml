@@ -30,6 +30,10 @@ debug = "line-tables-only"
 [profile.dev.package.gpui-pre]
 opt-level = 3
 
+# gpui-fast is the default backend; keep its dev builds as fast as gpui-pre.
+[profile.dev.package.gpui-fast]
+opt-level = 3
+
 [patch.crates-io]
 gpui-fast-macos = { path = "vendor/gpui-fast-macos" }
 gpui-pre-macos = { path = "vendor/gpui-pre-macos" }
