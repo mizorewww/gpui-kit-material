@@ -19,10 +19,13 @@ struct Gallery {
     slider: Entity<gpui_base::slider::SliderState>,
     switch: bool,
     sheet: bool,
+    motion_scheme: motion::MotionScheme,
+    motion_target: bool,
 }
 
 impl Render for Gallery {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        motion::apply_scheme(self.motion_scheme);
         theme::apply_palette(self.palette, window, cx);
         theme::apply_scale(self.scale.parse().unwrap_or(1.), window);
         let compact = is_compact(window);
@@ -90,6 +93,57 @@ impl Render for Gallery {
         }
 
         let details = self.details;
+        let motion_controls = ConnectedButtonGroup::new("motion-scheme", "Motion scheme")
+            .options([("expressive", "Expressive"), ("standard", "Standard")])
+            .selected(match self.motion_scheme {
+                motion::MotionScheme::Expressive => "expressive",
+                motion::MotionScheme::Standard => "standard",
+            })
+            .on_change(cx.listener(|this, value: &SharedString, _, cx| {
+                this.motion_scheme = if value == "standard" {
+                    motion::MotionScheme::Standard
+                } else {
+                    motion::MotionScheme::Expressive
+                };
+                cx.notify();
+            }));
+        let motion_rows = [
+            ("Fast spatial", motion::MotionToken::FastSpatial, false),
+            (
+                "Default spatial",
+                motion::MotionToken::DefaultSpatial,
+                false,
+            ),
+            ("Slow spatial", motion::MotionToken::SlowSpatial, false),
+            ("Fast effects", motion::MotionToken::FastEffects, true),
+            ("Default effects", motion::MotionToken::DefaultEffects, true),
+            ("Slow effects", motion::MotionToken::SlowEffects, true),
+        ]
+        .into_iter()
+        .enumerate()
+        .map(|(index, (label, token, effects))| {
+            let progress = motion::token_value(
+                SharedString::from(format!("motion-preview-{index}")),
+                if self.motion_target { 1. } else { 0. },
+                token,
+                window,
+                cx,
+            );
+            gpui_base::h_flex()
+                .gap(rem(12.))
+                .child(div().w(rem(160.)).child(label))
+                .child(
+                    div().w(rem(200.)).h(rem(24.)).child(
+                        div()
+                            .size(rem(24.))
+                            .rounded_full()
+                            .bg(color(ColorRole::ACCENT))
+                            .when(effects, |view| view.opacity(progress))
+                            .when(!effects, |view| view.ml(rem(progress * 160.))),
+                    ),
+                )
+        })
+        .collect::<Vec<_>>();
         let toggle = cx.listener(|this, _, _, cx| {
             this.details = !this.details;
             cx.notify();
@@ -193,6 +247,21 @@ impl Render for Gallery {
                         "intro",
                         "Components extracted from course2md; M3 Expressive arrives next.",
                     ))
+                    .child(
+                        gpui_base::v_flex()
+                            .gap(rem(12.))
+                            .child(section_title("motion", "Motion"))
+                            .child(motion_controls)
+                            .child(
+                                material_button("play-motion", ButtonVariant::Tonal)
+                                    .child("Toggle motion preview")
+                                    .on_click(cx.listener(|this, _, _, cx| {
+                                        this.motion_target = !this.motion_target;
+                                        cx.notify();
+                                    })),
+                            )
+                            .children(motion_rows),
+                    )
                     .child(
                         gpui_base::v_flex()
                             .gap(rem(12.))
@@ -304,6 +373,8 @@ pub fn run(application: gpui::Application) {
                         slider,
                         switch: false,
                         sheet: false,
+                        motion_scheme: motion::MotionScheme::Expressive,
+                        motion_target: false,
                         palette: PaletteId::Paper,
                         scale: "1".into(),
                         density: "auto".into(),

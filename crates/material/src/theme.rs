@@ -5,7 +5,7 @@
 //! change retargets from the current paint. Reduced motion paints the
 //! target at once.
 use crate::color::{Color, ColorRole, PaletteId, Scheme, ThemePreferences};
-use crate::motion::SLOW_EFFECTS;
+use crate::motion::{self, MotionToken};
 use gpui::{App, Rgba, Window, WindowAppearance};
 use std::cell::RefCell;
 #[cfg(not(target_family = "wasm"))]
@@ -18,6 +18,7 @@ struct Paint {
     from: Scheme,
     current: Scheme,
     started: Instant,
+    motion: motion::MotionCurve,
 }
 
 thread_local! {
@@ -29,6 +30,7 @@ thread_local! {
         from: Scheme::from_palette(PaletteId::Paper),
         current: Scheme::from_palette(PaletteId::Paper),
         started: Instant::now(),
+        motion: motion::MotionScheme::Expressive.resolve(MotionToken::SlowEffects),
     });
 }
 
@@ -96,31 +98,38 @@ pub fn apply_palette(id: PaletteId, window: &mut Window, cx: &mut App) -> bool {
 /// Apply a complete custom semantic scheme with the same animated transitions.
 pub fn apply_scheme(target: Scheme, window: &mut Window, cx: &mut App) -> bool {
     let reduce_motion = cx.reduce_motion();
+    let effects = motion::curve(MotionToken::SlowEffects);
     let (changed, running) = PAINT.with(|paint| {
         let mut paint = paint.borrow_mut();
-        let now = Instant::now();
+        let now = cx.background_executor().now();
         if paint.target.is_none() {
             paint.target = Some(target);
             paint.current = target;
             paint.from = target;
+            paint.started = now;
+            paint.motion = effects;
             return (true, false);
         }
         if paint.target != Some(target) {
             paint.from = paint.current;
             paint.target = Some(target);
             paint.started = now;
+            paint.motion = effects;
         }
-        let t = if reduce_motion {
-            1.
-        } else {
-            (now.duration_since(paint.started).as_secs_f32()
-                / SLOW_EFFECTS.duration().as_secs_f32())
-            .min(1.)
-        };
-        let next = paint.from.blend(&target, SLOW_EFFECTS.ease()(t));
+        if reduce_motion {
+            let changed = paint.current != target;
+            paint.current = target;
+            paint.from = target;
+            paint.started = now;
+            return (changed, false);
+        }
+        let t = (now.duration_since(paint.started).as_secs_f32()
+            / paint.motion.duration().as_secs_f32())
+        .min(1.);
+        let next = paint.from.blend(&target, paint.motion.ease()(t));
         let changed = next != paint.current;
         paint.current = next;
-        (changed, t < 1.)
+        (changed, paint.from != target && t < 1.)
     });
     if running {
         window.request_animation_frame();
@@ -131,4 +140,89 @@ pub fn apply_scheme(target: Scheme, window: &mut Window, cx: &mut App) -> bool {
 /// Set the text scale: 14px is 1rem at 100%, and every rem token follows it.
 pub fn apply_scale(scale: f32, window: &mut Window) {
     window.set_rem_size(gpui::px(crate::tokens::typography::BASE_PX * scale));
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use gpui::{Context, IntoElement, Render, TestAppContext, div};
+    use std::time::Duration;
+
+    struct PaletteHarness {
+        palette: PaletteId,
+        motion: motion::MotionScheme,
+    }
+    impl Render for PaletteHarness {
+        fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+            motion::apply_scheme(self.motion);
+            apply_palette(self.palette, window, cx);
+            div()
+        }
+    }
+
+    #[gpui::test]
+    fn palette_transition_keeps_its_curve_when_motion_scheme_changes(cx: &mut TestAppContext) {
+        let (view, cx) = cx.add_window_view(|_, _| PaletteHarness {
+            palette: PaletteId::Paper,
+            motion: motion::MotionScheme::Expressive,
+        });
+        cx.update(|window, cx| {
+            cx.set_reduce_motion(true);
+            window.draw(cx).clear(cx);
+            cx.set_reduce_motion(false);
+            view.update(cx, |view, _| view.palette = PaletteId::Ink);
+            window.draw(cx).clear(cx);
+        });
+        cx.executor().advance_clock(Duration::from_millis(100));
+        cx.update(|window, cx| {
+            window.refresh();
+            window.draw(cx).clear(cx);
+        });
+        let before = scheme();
+        cx.update(|window, cx| {
+            view.update(cx, |view, _| view.motion = motion::MotionScheme::Standard);
+            window.draw(cx).clear(cx);
+        });
+        assert_eq!(
+            scheme(),
+            before,
+            "changing a motion preference must not jump color"
+        );
+        cx.update(|window, cx| {
+            view.update(cx, |view, _| view.palette = PaletteId::Paper);
+            window.draw(cx).clear(cx);
+        });
+        assert_eq!(
+            scheme(),
+            before,
+            "a reversed palette starts at current paint"
+        );
+        cx.executor().advance_clock(Duration::from_millis(50));
+        cx.update(|window, cx| {
+            window.refresh();
+            window.draw(cx).clear(cx);
+        });
+        assert_ne!(scheme(), before);
+        cx.update(|window, cx| {
+            cx.set_reduce_motion(true);
+            window.draw(cx).clear(cx);
+        });
+        assert_eq!(scheme(), Scheme::from_palette(PaletteId::Paper));
+        cx.update(|window, cx| {
+            cx.set_reduce_motion(false);
+            window.draw(cx).clear(cx);
+        });
+        assert_eq!(
+            scheme(),
+            Scheme::from_palette(PaletteId::Paper),
+            "restoring motion must not resume the completed fade"
+        );
+        cx.executor().advance_clock(Duration::from_millis(50));
+        cx.update(|window, cx| {
+            window.refresh();
+            window.draw(cx).clear(cx);
+        });
+        assert_eq!(scheme(), Scheme::from_palette(PaletteId::Paper));
+        motion::apply_scheme(motion::MotionScheme::Expressive);
+    }
 }

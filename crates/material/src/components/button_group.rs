@@ -986,7 +986,9 @@ mod tests {
             assert_eq!(choice_bounds(cx, selectors[index]), before[index]);
             assert_eq!(choice_bounds(cx, labels[index]), label_before[index]);
         }
-        cx.executor().advance_clock(Duration::from_millis(300));
+        cx.executor().advance_clock(
+            crate::motion::curve(crate::motion::MotionToken::FastSpatial).duration(),
+        );
         draw_choice(cx);
         assert_selected("content-2", px(40.));
         assert_unselected("content-0", 0, 3, px(40.));
@@ -1082,7 +1084,9 @@ mod tests {
         assert!(returning.left_radius < middle.left_radius);
         assert!(returning.left_radius >= px(8.));
 
-        cx.executor().advance_clock(Duration::from_millis(300));
+        cx.executor().advance_clock(
+            crate::motion::curve(crate::motion::MotionToken::FastSpatial).duration(),
+        );
         cx.update(|window, cx| {
             window.refresh();
             window.draw(cx).clear(cx);

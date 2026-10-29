@@ -39,7 +39,8 @@ change animates the whole window on the slow effects spring.
   separate light/dark choices, animated palette transitions, a text scale.
 - **Tokens**: shape (connected tile corners), type scale, layout metrics,
   elevation, state layers.
-- **Motion**: M3 standard springs, entrances, retargetable values, disclosure.
+- **Motion**: md3.io Expressive sampled curves (spatial and effects, fast/default/slow),
+  selectable Standard springs, entrances, retargetable values, disclosure.
 - **Components**: connected button group (radio or tab semantics, roving
   focus), tiles and tile groups, choice tiles with radio indicator, tinted
   icons, badges, chips, notices, cards, linear progress and spinner, text
@@ -70,6 +71,21 @@ bindings stay out of Git.
 Component alignment is tracked in [`conformance/md3.json`](conformance/md3.json).
 An available gallery example does not imply visual or motion conformance;
 each component needs independent review and desktop/browser evidence.
+
+The gallery includes six motion previews and a Standard/Expressive selector.
+Applications can select their scheme at the start of each root render, before
+applying the theme:
+
+```rust
+gpui_kit_material::motion::apply_scheme(
+    gpui_kit_material::motion::MotionScheme::Expressive,
+);
+```
+
+Expressive is the default. A value transition retains its curve until it settles,
+including reversals, so changing schemes cannot jump an in-flight value. A mounted
+entrance retains its initial scheme; a new palette target uses the current scheme.
+Reduced motion still paints the final state immediately.
 
 ## Material Symbols consumer example
 

@@ -117,7 +117,8 @@ pub fn linear_progress(
     } else {
         0.
     };
-    let amount = crate::motion::value(id, target, window, cx);
+    // Spatial overshoot must not extend a measured fraction outside its track.
+    let amount = crate::motion::value(id, target, window, cx).clamp(0., 1.);
     let ink = color(if muted {
         ColorRole::CONTROL
     } else {
@@ -135,6 +136,7 @@ pub fn linear_progress(
                     .flex_shrink_0()
                     .h_full()
                     .w(relative(amount))
+                    .debug_selector(|| "material-progress-active".into())
                     .rounded_full()
                     .bg(ink),
             )
@@ -160,4 +162,64 @@ pub fn linear_progress(
             )
         })
         .into_any_element()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::progress;
+    use gpui::{Context, IntoElement, Render, TestAppContext, Window, div, prelude::*, px};
+    use std::time::Duration;
+
+    struct ProgressHarness {
+        target: f32,
+    }
+    impl Render for ProgressHarness {
+        fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+            crate::motion::apply_scheme(crate::motion::MotionScheme::Expressive);
+            div()
+                .w(px(100.))
+                .child(progress("bounded-progress", self.target, window, cx))
+        }
+    }
+
+    #[gpui::test]
+    fn expressive_overshoot_never_paints_beyond_the_progress_track(cx: &mut TestAppContext) {
+        let (view, cx) = cx.add_window_view(|_, _| ProgressHarness { target: 0. });
+        cx.update(|window, cx| window.draw(cx).clear(cx));
+        cx.update(|window, cx| {
+            view.update(cx, |view, _| view.target = 1.);
+            window.draw(cx).clear(cx);
+        });
+        // At 60%, the reference default spatial curve is above its endpoint.
+        cx.executor().advance_clock(Duration::from_millis(270));
+        cx.update(|window, cx| {
+            window.refresh();
+            window.draw(cx).clear(cx);
+        });
+        assert_eq!(
+            cx.debug_bounds("material-progress-active")
+                .unwrap()
+                .size
+                .width,
+            px(100.)
+        );
+        cx.executor().advance_clock(Duration::from_secs(1));
+        cx.update(|window, cx| {
+            window.refresh();
+            window.draw(cx).clear(cx);
+        });
+        cx.update(|window, cx| {
+            view.update(cx, |view, _| view.target = 0.);
+            window.draw(cx).clear(cx);
+        });
+        cx.executor().advance_clock(Duration::from_millis(270));
+        cx.update(|window, cx| {
+            window.refresh();
+            window.draw(cx).clear(cx);
+        });
+        assert!(
+            cx.debug_bounds("material-progress-active").is_none(),
+            "negative overshoot must not create a negative-width indicator"
+        );
+    }
 }

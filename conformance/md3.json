@@ -108,7 +108,13 @@
     {
       "id": "motion",
       "status": "unreviewed",
-      "evidence": [],
+      "evidence": [
+        {
+          "kind": "browser-sampled-reference",
+          "path": "conformance/fixtures/md3-expressive-browser.json",
+          "scope": "Six Expressive spatial/effects timing curves; does not establish per-component animation conformance."
+        }
+      ],
       "reference": "https://md3.io/styles/",
       "reference_status": "Coming on website; verify source and runtime"
     },

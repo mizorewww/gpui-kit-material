@@ -1935,6 +1935,7 @@ dependencies = [
  "gpui-kit-material-color",
  "gpui-pre",
  "gpui-pre-platform",
+ "serde_json",
  "web-time",
 ]
 

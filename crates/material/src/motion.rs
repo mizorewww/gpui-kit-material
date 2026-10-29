@@ -1,10 +1,141 @@
 //! The motion vocabulary: M3 springs, entrances and retargetable values.
 //!
-//! Springs are the Standard motion scheme's tokens (`motionSpring*` in
-//! Material Components for Android). The M3 Expressive scheme adds its own
-//! tokens alongside these (see `docs/ROADMAP.md`).
+//! Expressive uses md3.io's sampled CSS curves and durations. Standard preserves
+//! the original analytic Material springs. Apply the scheme at the start of a
+//! root render, like the theme; helpers below resolve it on the UI thread.
 use gpui::{prelude::*, *};
+use std::cell::Cell;
 use std::time::Duration;
+
+pub mod expressive;
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum MotionScheme {
+    Standard,
+    #[default]
+    Expressive,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum MotionToken {
+    FastSpatial,
+    DefaultSpatial,
+    SlowSpatial,
+    FastEffects,
+    DefaultEffects,
+    SlowEffects,
+}
+
+/// A resolved transition; use the same curve for timing and interpolation.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum MotionCurve {
+    Standard(Spring),
+    Expressive(expressive::SampledSpring),
+}
+
+impl MotionCurve {
+    pub fn duration(self) -> Duration {
+        match self {
+            Self::Standard(spring) => spring.duration(),
+            Self::Expressive(spring) => spring.duration,
+        }
+    }
+
+    pub fn ease(self) -> impl Fn(f32) -> f32 + Copy + 'static {
+        move |progress| match self {
+            Self::Standard(spring) => spring.ease()(progress),
+            Self::Expressive(spring) => spring.position(progress),
+        }
+    }
+
+    fn position(self, seconds: f32) -> f32 {
+        self.ease()(seconds / self.duration().as_secs_f32())
+    }
+}
+
+impl MotionScheme {
+    pub fn resolve(self, token: MotionToken) -> MotionCurve {
+        use MotionToken::*;
+        match self {
+            Self::Standard => MotionCurve::Standard(match token {
+                FastSpatial => FAST_SPATIAL,
+                DefaultSpatial => DEFAULT_SPATIAL,
+                SlowSpatial => SLOW_SPATIAL,
+                FastEffects => FAST_EFFECTS,
+                DefaultEffects => DEFAULT_EFFECTS,
+                SlowEffects => SLOW_EFFECTS,
+            }),
+            Self::Expressive => MotionCurve::Expressive(match token {
+                FastSpatial => expressive::FAST_SPATIAL,
+                DefaultSpatial => expressive::DEFAULT_SPATIAL,
+                SlowSpatial => expressive::SLOW_SPATIAL,
+                FastEffects => expressive::FAST_EFFECTS,
+                DefaultEffects => expressive::DEFAULT_EFFECTS,
+                SlowEffects => expressive::SLOW_EFFECTS,
+            }),
+        }
+    }
+}
+
+thread_local! {
+    static SCHEME: Cell<MotionScheme> = const { Cell::new(MotionScheme::Expressive) };
+}
+
+/// Set the motion scheme for this root's render. Defaults to Expressive.
+pub fn apply_scheme(scheme: MotionScheme) {
+    SCHEME.set(scheme);
+}
+
+pub fn curve(token: MotionToken) -> MotionCurve {
+    SCHEME.get().resolve(token)
+}
+
+#[derive(Clone, Copy)]
+struct RunningCurve {
+    curve: MotionCurve,
+    running: bool,
+}
+
+/// Follow a target with a semantic token. A scheme switch takes effect after
+/// the active transition (including interruptions) settles, so it cannot
+/// replace the easing underneath GPUI Base's existing transition clock.
+pub fn token_value(
+    id: impl Into<ElementId>,
+    target: f32,
+    token: MotionToken,
+    window: &mut Window,
+    cx: &mut App,
+) -> f32 {
+    let id = id.into();
+    let requested = curve(token);
+    let state = window.use_keyed_state((id.clone(), "material-motion-curve"), cx, |_, _| {
+        RunningCurve {
+            curve: requested,
+            running: false,
+        }
+    });
+    let active = state.read(cx);
+    let resolved = if active.running {
+        active.curve
+    } else {
+        requested
+    };
+    let sample = gpui_base::transition_with_status(
+        id,
+        target,
+        gpui_base::Transition::new(resolved.duration()).ease(resolved.ease()),
+        window,
+        cx,
+    );
+    state.update(cx, |state, _| {
+        state.curve = resolved;
+        state.running = matches!(
+            sample.status,
+            gpui_base::MotionStatus::Running | gpui_base::MotionStatus::Delayed
+        );
+    });
+    sample.value
+}
 
 /// Short fades, e.g. a menu's entrance.
 pub const ENTER_MS: u64 = 160;
@@ -28,6 +159,14 @@ pub const FAST_SPATIAL: Spring = Spring {
 pub const DEFAULT_SPATIAL: Spring = Spring {
     damping: 0.9,
     stiffness: 700.,
+};
+pub const SLOW_SPATIAL: Spring = Spring {
+    damping: 0.9,
+    stiffness: 300.,
+};
+pub const FAST_EFFECTS: Spring = Spring {
+    damping: 1.,
+    stiffness: 3800.,
 };
 pub const DEFAULT_EFFECTS: Spring = Spring {
     damping: 1.,
@@ -86,14 +225,11 @@ impl Spring {
 
 /// IDs belong to a logical state, not a frame or a progress value.
 pub fn enter<E: IntoElement + Styled + 'static>(id: impl Into<ElementId>, view: E) -> AnyElement {
-    // Keep the same ancestor ID chain when the preference changes. GPUI's
-    // AnimationElement already paints the final state without scheduling frames
-    // under reduce-motion; removing it here remounts every keyed child.
-    view.with_animation(
-        id,
-        Animation::new(DEFAULT_EFFECTS.duration()).with_easing(DEFAULT_EFFECTS.ease()),
-        |view, t| view.opacity(t),
-    )
+    Entrance {
+        id: id.into(),
+        view,
+        distance: None,
+    }
     .into_any_element()
 }
 
@@ -122,36 +258,64 @@ fn rise_in<E: IntoElement + Styled + 'static>(
     view: E,
     distance: f32,
 ) -> AnyElement {
-    let id = id.into();
-    let total = DEFAULT_SPATIAL.duration().max(DEFAULT_EFFECTS.duration());
-    let seconds = total.as_secs_f32();
-    view.with_animation(id, Animation::new(total), move |view, t| {
-        let (offset, opacity) = if t >= 1. {
-            (1., 1.)
-        } else {
-            (
-                DEFAULT_SPATIAL.position(t * seconds),
-                DEFAULT_EFFECTS.position(t * seconds),
-            )
-        };
-        view.relative()
-            .top(px(distance * (1. - offset)))
-            .opacity(opacity.clamp(0., 1.))
-    })
+    Entrance {
+        id: id.into(),
+        view,
+        distance: Some(distance),
+    }
     .into_any_element()
+}
+
+#[derive(IntoElement)]
+struct Entrance<E: IntoElement + Styled + 'static> {
+    id: ElementId,
+    view: E,
+    distance: Option<f32>,
+}
+
+impl<E: IntoElement + Styled + 'static> RenderOnce for Entrance<E> {
+    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
+        // A mounted entrance retains its curve even if a root switches schemes.
+        // Keep the wrapper and IDs stable when reduced motion changes, too.
+        let state =
+            window.use_keyed_state((self.id.clone(), "material-entrance-scheme"), cx, |_, _| {
+                (SCHEME.get(), false)
+            });
+        let (scheme, completed) = state.update(cx, |state, cx| {
+            state.1 |= cx.reduce_motion();
+            *state
+        });
+        let effects = scheme.resolve(MotionToken::DefaultEffects);
+        if let Some(distance) = self.distance {
+            let spatial = scheme.resolve(MotionToken::DefaultSpatial);
+            let total = spatial.duration().max(effects.duration());
+            let seconds = total.as_secs_f32();
+            self.view
+                .with_animation(self.id, Animation::new(total), move |view, t| {
+                    let t = if completed { 1. } else { t };
+                    let offset = spatial.position(t * seconds);
+                    let opacity = effects.position(t * seconds);
+                    view.relative()
+                        .top(px(distance * (1. - offset)))
+                        .opacity(opacity.clamp(0., 1.))
+                })
+                .into_any_element()
+        } else {
+            self.view
+                .with_animation(
+                    self.id,
+                    Animation::new(effects.duration()).with_easing(effects.ease()),
+                    move |view, t| view.opacity(if completed { 1. } else { t }),
+                )
+                .into_any_element()
+        }
+    }
 }
 
 /// A value that follows `target` on the default spatial spring, retargeting
 /// from its current presentation when the target changes again.
 pub fn value(id: impl Into<ElementId>, target: f32, window: &mut Window, cx: &mut App) -> f32 {
-    let id = id.into();
-    gpui_base::transition(
-        id,
-        target,
-        gpui_base::Transition::new(DEFAULT_SPATIAL.duration()).ease(DEFAULT_SPATIAL.ease()),
-        window,
-        cx,
-    )
+    token_value(id, target, MotionToken::DefaultSpatial, window, cx)
 }
 
 /// A selection moves and reshapes on the fast spatial spring, retargeting
@@ -162,14 +326,7 @@ pub fn selection_value(
     window: &mut Window,
     cx: &mut App,
 ) -> f32 {
-    let id = id.into();
-    gpui_base::transition(
-        id,
-        target,
-        gpui_base::Transition::new(FAST_SPATIAL.duration()).ease(FAST_SPATIAL.ease()),
-        window,
-        cx,
-    )
+    token_value(id, target, MotionToken::FastSpatial, window, cx)
 }
 
 /// Content shown in place when `open`, fading in as it arrives.
@@ -397,6 +554,175 @@ mod tests {
         assert_eq!(footer.top(), root.top() + px(28.));
         assert!(cx.debug_bounds("motion-reveal-surface").is_none());
         assert!(cx.debug_bounds("motion-reveal-content").is_none());
+    }
+
+    #[derive(IntoElement)]
+    struct EntranceProbe {
+        style: gpui::StyleRefinement,
+        sample: Rc<std::cell::RefCell<gpui::StyleRefinement>>,
+    }
+    impl gpui::Styled for EntranceProbe {
+        fn style(&mut self) -> &mut gpui::StyleRefinement {
+            &mut self.style
+        }
+    }
+    impl RenderOnce for EntranceProbe {
+        fn render(self, _: &mut Window, _: &mut App) -> impl IntoElement {
+            *self.sample.borrow_mut() = self.style;
+            div().size(px(40.))
+        }
+    }
+    struct EntranceHarness {
+        rise: bool,
+        sample: Rc<std::cell::RefCell<gpui::StyleRefinement>>,
+    }
+    impl Render for EntranceHarness {
+        fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+            let probe = EntranceProbe {
+                style: Default::default(),
+                sample: self.sample.clone(),
+            };
+            if self.rise {
+                super::page_enter("probe", probe)
+            } else {
+                super::enter("probe", probe)
+            }
+        }
+    }
+    #[gpui::test]
+    fn completed_entrances_do_not_rewind_when_reduced_motion_is_restored(cx: &mut TestAppContext) {
+        for rise in [false, true] {
+            let sample = Rc::new(std::cell::RefCell::new(gpui::StyleRefinement::default()));
+            let (_, cx) = cx.add_window_view({
+                let sample = sample.clone();
+                move |_, _| EntranceHarness { rise, sample }
+            });
+            cx.update(|window, cx| window.draw(cx).clear(cx));
+            cx.update(|window, cx| {
+                cx.set_reduce_motion(true);
+                window.refresh();
+                window.draw(cx).clear(cx);
+            });
+            assert_eq!(sample.borrow().opacity, Some(1.));
+            cx.update(|window, cx| {
+                cx.set_reduce_motion(false);
+                window.refresh();
+                window.draw(cx).clear(cx);
+            });
+            assert_eq!(
+                sample.borrow().opacity,
+                Some(1.),
+                "completed entrance cannot fade backward"
+            );
+            if rise {
+                assert_eq!(
+                    sample.borrow().inset.top,
+                    Some(px(0.).into()),
+                    "completed entrance cannot move backward"
+                );
+            }
+        }
+    }
+
+    struct SchemeHarness {
+        target: f32,
+        scheme: super::MotionScheme,
+        sample: Rc<Cell<f32>>,
+    }
+
+    impl Render for SchemeHarness {
+        fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+            super::apply_scheme(self.scheme);
+            self.sample
+                .set(super::value("scheme-transition", self.target, window, cx));
+            div().size(px(40.))
+        }
+    }
+
+    #[gpui::test]
+    fn switching_schemes_and_reversing_preserve_the_running_presentation(cx: &mut TestAppContext) {
+        use super::{MotionScheme, MotionToken};
+        let sample = Rc::new(Cell::new(-1.));
+        let (view, cx) = cx.add_window_view({
+            let sample = sample.clone();
+            move |_, _| SchemeHarness {
+                target: 0.,
+                scheme: MotionScheme::Expressive,
+                sample,
+            }
+        });
+        cx.update(|window, cx| window.draw(cx).clear(cx));
+        cx.update(|window, cx| {
+            view.update(cx, |view, _| view.target = 1.);
+            window.draw(cx).clear(cx);
+        });
+        cx.executor().advance_clock(Duration::from_millis(120));
+        cx.update(|window, cx| {
+            window.refresh();
+            window.draw(cx).clear(cx);
+        });
+        let before = sample.get();
+        assert!(
+            (before
+                - MotionScheme::Expressive
+                    .resolve(MotionToken::DefaultSpatial)
+                    .position(0.120))
+            .abs()
+                < 0.00001
+        );
+        cx.update(|window, cx| {
+            view.update(cx, |view, _| view.scheme = MotionScheme::Standard);
+            window.draw(cx).clear(cx);
+        });
+        assert_eq!(
+            sample.get(),
+            before,
+            "scheme change must not move an in-flight value"
+        );
+        cx.update(|window, cx| {
+            view.update(cx, |view, _| view.target = 0.);
+            window.draw(cx).clear(cx);
+        });
+        assert_eq!(
+            sample.get(),
+            before,
+            "reversal must begin at the presentation value"
+        );
+        cx.executor().advance_clock(Duration::from_millis(50));
+        cx.update(|window, cx| {
+            window.refresh();
+            window.draw(cx).clear(cx);
+        });
+        assert!(sample.get() < before && sample.get() > 0.);
+        cx.executor().advance_clock(Duration::from_secs(1));
+        cx.update(|window, cx| {
+            window.refresh();
+            window.draw(cx).clear(cx);
+        });
+        assert_eq!(sample.get(), 0.);
+        cx.update(|window, cx| {
+            view.update(cx, |view, _| view.target = 1.);
+            window.draw(cx).clear(cx);
+        });
+        cx.executor().advance_clock(Duration::from_millis(50));
+        cx.update(|window, cx| {
+            window.refresh();
+            window.draw(cx).clear(cx);
+        });
+        let standard = MotionScheme::Standard
+            .resolve(MotionToken::DefaultSpatial)
+            .position(0.050);
+        assert!(
+            (sample.get() - standard).abs() < 0.00001,
+            "settled values adopt the new scheme"
+        );
+        cx.update(|window, cx| {
+            cx.set_reduce_motion(true);
+            view.update(cx, |view, _| view.target = 0.);
+            window.draw(cx).clear(cx);
+        });
+        assert_eq!(sample.get(), 0.);
+        super::apply_scheme(MotionScheme::Expressive);
     }
 
     #[test]
