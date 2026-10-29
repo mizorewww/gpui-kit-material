@@ -455,6 +455,7 @@ impl RenderOnce for ConnectedButtonGroup {
                 )
                 .when_some(self.label_text_size, |item, size| item.text_size(size))
                 .checked(checked)
+                .tab_stop(entry == Some(index))
                 .disabled(disabled)
                 .accessibility_label(label)
                 .set_position(index + 1, count)
@@ -513,11 +514,144 @@ mod tests {
     use crate::color::ColorRole;
     use crate::icons::IconName;
     use gpui::{
-        Bounds, Context, FontWeight, IntoElement, Modifiers, ParentElement as _, Pixels, Render,
-        SharedString, Styled as _, TestAppContext, TextRun, VisualTestContext, Window, div, font,
-        px,
+        AppContext, Bounds, Context, FontWeight, IntoElement, Modifiers, ParentElement as _,
+        Pixels, Render, SharedString, Styled as _, TestAppContext, TextRun, VisualTestContext,
+        Window, div, font, px,
     };
     use std::time::Duration;
+
+    struct RovingHarness {
+        handles: [gpui::FocusHandle; 5],
+        selected: usize,
+        disabled: bool,
+        changes: usize,
+    }
+
+    impl Render for RovingHarness {
+        fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+            use gpui::InteractiveElement as _;
+            div()
+                .w(px(600.))
+                .tab_group()
+                .child(
+                    gpui_base::Button::new("before")
+                        .track_focus(&self.handles[0])
+                        .child("Before"),
+                )
+                .child(
+                    ConnectedButtonGroup::new("roving", "Choices")
+                        .options([("0", "First"), ("1", "Second"), ("2", "Third")])
+                        .focus_handles(self.handles[1..4].iter().cloned())
+                        .selected(self.selected.to_string())
+                        .disabled(self.disabled)
+                        .on_change(cx.listener(|this, value: &SharedString, _, cx| {
+                            this.selected = value.parse().unwrap();
+                            this.changes += 1;
+                            cx.notify();
+                        })),
+                )
+                .child(
+                    gpui_base::Button::new("after")
+                        .track_focus(&self.handles[4])
+                        .child("After"),
+                )
+        }
+    }
+
+    fn press_roving_key(cx: &mut VisualTestContext, key: &str) {
+        let keystroke =
+            cx.update(|_, cx| gpui::Keystroke::parse_with_os(key, cx.platform_info().os).unwrap());
+        cx.simulate_event(gpui::KeyDownEvent {
+            keystroke: keystroke.clone(),
+            is_held: false,
+            prefer_character_input: false,
+        });
+        cx.simulate_event(gpui::KeyUpEvent { keystroke });
+        draw_choice(cx);
+    }
+
+    #[gpui::test]
+    fn tab_traversal_uses_only_selected_radio_and_tracks_arrow_changes(cx: &mut TestAppContext) {
+        cx.update(|cx| {
+            gpui_base::init(cx);
+            super::init(cx);
+            cx.set_reduce_motion(true);
+        });
+        for disabled in [false, true] {
+            let handles: [gpui::FocusHandle; 5] =
+                cx.update(|cx| std::array::from_fn(|_| cx.focus_handle()));
+            let controls = cx.new(|_| RovingHarness {
+                handles: handles.clone(),
+                selected: 1,
+                disabled,
+                changes: 0,
+            });
+            let (_, cx) =
+                cx.add_window_view(|window, cx| gpui_base::Root::new(controls.clone(), window, cx));
+            cx.update(|window, cx| {
+                window.activate_window();
+                window.draw(cx).clear(cx);
+                handles[0].focus(window, cx);
+                window.draw(cx).clear(cx);
+            });
+            if disabled {
+                for (key, expected) in [("tab", 4), ("shift-tab", 0)] {
+                    press_roving_key(cx, key);
+                    cx.update(|window, cx| {
+                        assert_eq!(window.focused(cx).as_ref(), Some(&handles[expected]))
+                    });
+                }
+                cx.update(|_, cx| {
+                    assert_eq!(controls.read(cx).selected, 1);
+                    assert_eq!(controls.read(cx).changes, 0);
+                });
+                continue;
+            }
+            // Enter at the selected middle option, leave the entire group in
+            // one Tab, and re-enter at selection when traversing backwards.
+            for (key, expected) in [
+                ("tab", 2),
+                ("tab", 4),
+                ("shift-tab", 2),
+                ("shift-tab", 0),
+                ("tab", 2),
+                ("right", 3),
+            ] {
+                press_roving_key(cx, key);
+                cx.update(|window, cx| {
+                    assert_eq!(
+                        window.focused(cx).as_ref(),
+                        Some(&handles[expected]),
+                        "{key}"
+                    )
+                });
+            }
+            cx.update(|_, cx| {
+                assert_eq!(controls.read(cx).selected, 2);
+                assert_eq!(controls.read(cx).changes, 1);
+            });
+            for (key, expected) in [
+                ("tab", 4),
+                ("shift-tab", 3),
+                ("right", 1),
+                ("tab", 4),
+                ("shift-tab", 1),
+            ] {
+                press_roving_key(cx, key);
+                cx.update(|window, cx| {
+                    assert_eq!(
+                        window.focused(cx).as_ref(),
+                        Some(&handles[expected]),
+                        "{key}"
+                    )
+                });
+            }
+            cx.update(|_, cx| {
+                assert_eq!(controls.read(cx).selected, 0);
+                assert_eq!(controls.read(cx).changes, 2);
+            });
+        }
+    }
 
     struct FullWidthHarness {
         count: usize,
