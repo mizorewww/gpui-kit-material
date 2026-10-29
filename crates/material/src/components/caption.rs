@@ -23,9 +23,9 @@ use crate::icons::IconName;
 use crate::theme::color;
 use crate::tokens::state;
 use gpui::{
-    AnyElement, App, Decorations, InteractiveElement as _, IntoElement, MouseButton,
+    AnyElement, App, Decorations, ElementId, InteractiveElement as _, IntoElement, MouseButton,
     ParentElement as _, Pixels, RenderOnce, Rgba, SharedString, StatefulInteractiveElement as _,
-    Styled, Window, WindowControlArea, div, px, rgb,
+    Styled, Window, WindowControlArea, div, prelude::FluentBuilder as _, px, rgb,
 };
 use std::rc::Rc;
 
@@ -148,6 +148,19 @@ impl CaptionLabels {
     }
 }
 
+/// The buttons a preview shows: a window's full set, whatever the current
+/// window offers, and none for a caption the system draws.
+fn preview_buttons(caption: Caption) -> Vec<CaptionButton> {
+    if caption == Caption::System {
+        return Vec::new();
+    }
+    vec![
+        CaptionButton::Minimize,
+        CaptionButton::Maximize,
+        CaptionButton::Close,
+    ]
+}
+
 /// The buttons in order, as far as the window and its window manager allow.
 fn buttons(caption: Caption, window: &Window) -> Vec<CaptionButton> {
     if caption == Caption::System || window.is_fullscreen() {
@@ -200,12 +213,16 @@ pub(super) type CloseRequest = Rc<dyn Fn(&mut Window, &mut App) -> bool>;
 /// dialog, or nothing where the system draws them. Render it once per
 /// window, as a child of the root; a [`super::TitleBar`] renders its own, so
 /// a window with one needs no other.
+///
+/// [`CaptionButtons::preview`] instead draws them in place, e.g. in a
+/// catalog page: inert, in the page's flow, never over the real title bar.
 #[derive(gpui::IntoElement)]
 pub struct CaptionButtons {
     height: Pixels,
     labels: CaptionLabels,
     caption: Option<Caption>,
     on_close: Option<CloseRequest>,
+    preview: Option<ElementId>,
 }
 
 impl CaptionButtons {
@@ -216,7 +233,19 @@ impl CaptionButtons {
             labels,
             caption: None,
             on_close: None,
+            preview: None,
         }
+    }
+
+    /// Draw the buttons inline, where the parent lays them out, instead of
+    /// pinning them to the window's top-right corner above every dialog. A
+    /// preview shows minimize, maximize and close for its caption style
+    /// (nothing for [`Caption::System`]) and keeps the hover and press
+    /// states, but its buttons are not window control areas and do not act
+    /// on the window. `id` keeps several previews in one window apart.
+    pub fn preview(mut self, id: impl Into<ElementId>) -> Self {
+        self.preview = Some(id.into());
+        self
     }
 
     pub fn labels(mut self, labels: CaptionLabels) -> Self {
@@ -254,7 +283,12 @@ impl CaptionButtons {
 impl RenderOnce for CaptionButtons {
     fn render(self, window: &mut Window, _: &mut App) -> impl IntoElement {
         let caption = self.caption.unwrap_or_else(|| Caption::detect(window));
-        let buttons = buttons(caption, window);
+        let live = self.preview.is_none();
+        let buttons = if live {
+            buttons(caption, window)
+        } else {
+            preview_buttons(caption)
+        };
         if buttons.is_empty() {
             return div().into_any_element();
         }
@@ -263,25 +297,35 @@ impl RenderOnce for CaptionButtons {
         } else {
             ON_SURFACE_VARIANT
         });
+        let id = self
+            .preview
+            .clone()
+            .unwrap_or_else(|| ElementId::from("window-caption"));
         let row = gpui_base::h_flex()
-            .id("window-caption")
+            .id(id)
+            .flex_shrink_0()
             .text_color(glyph_color);
         let row = match caption {
-            Caption::Windows => row
-                .h(px(WINDOWS_BUTTON_HEIGHT).min(self.height))
-                .children(buttons.into_iter().map(|b| windows_button(b, &self.labels))),
-            _ => row
-                .h(self.height)
-                .items_center()
-                .pr(px(LINUX_END))
-                .gap(px(LINUX_GAP))
-                .children(
-                    buttons
-                        .into_iter()
-                        .map(|button| linux_button(button, &self.labels, self.on_close.clone())),
-                ),
+            Caption::Windows => row.h(px(WINDOWS_BUTTON_HEIGHT).min(self.height)).children(
+                buttons
+                    .into_iter()
+                    .map(|b| windows_button(b, &self.labels, live)),
+            ),
+            _ => {
+                row.h(self.height)
+                    .items_center()
+                    .pr(px(LINUX_END))
+                    .gap(px(LINUX_GAP))
+                    .children(buttons.into_iter().map(|button| {
+                        linux_button(button, &self.labels, live, self.on_close.clone())
+                    }))
+            }
         };
-        caption_layer(row, window)
+        if live {
+            caption_layer(row, window)
+        } else {
+            row.into_any_element()
+        }
     }
 }
 
@@ -307,8 +351,12 @@ fn caption_layer(row: impl IntoElement, window: &Window) -> AnyElement {
 }
 
 /// A Windows caption button: a window control area, so the system acts on
-/// it. It occludes the drag area behind it.
-fn windows_button(button: CaptionButton, labels: &CaptionLabels) -> gpui::Stateful<gpui::Div> {
+/// it, unless it is only a preview. It occludes the drag area behind it.
+fn windows_button(
+    button: CaptionButton,
+    labels: &CaptionLabels,
+    live: bool,
+) -> gpui::Stateful<gpui::Div> {
     let close = button == CaptionButton::Close;
     let ink = color(ON_SURFACE);
     let (hover, pressed) = if close {
@@ -323,7 +371,9 @@ fn windows_button(button: CaptionButton, labels: &CaptionLabels) -> gpui::Statef
         .role(gpui::Role::Button)
         .aria_label(labels.get(button))
         .occlude()
-        .window_control_area(button.area())
+        .when(live, |button_area| {
+            button_area.window_control_area(button.area())
+        })
         .flex()
         .flex_shrink_0()
         .items_center()
@@ -350,11 +400,13 @@ fn windows_button(button: CaptionButton, labels: &CaptionLabels) -> gpui::Statef
 }
 
 /// A Linux caption button: GPUI does not hit-test window controls there, so
-/// the button acts itself. As libadwaita draws them, every button, close
-/// included, takes the same neutral hover and press.
+/// the button acts itself, unless it is only a preview. As libadwaita draws
+/// them, every button, close included, takes the same neutral hover and
+/// press.
 fn linux_button(
     button: CaptionButton,
     labels: &CaptionLabels,
+    live: bool,
     on_close: Option<CloseRequest>,
 ) -> gpui::Stateful<gpui::Div> {
     let group = button.id();
@@ -393,6 +445,9 @@ fn linux_button(
         })
         .on_click(move |_, window, cx| {
             cx.stop_propagation();
+            if !live {
+                return;
+            }
             match button {
                 CaptionButton::Minimize => window.minimize_window(),
                 CaptionButton::Maximize | CaptionButton::Restore => window.zoom_window(),
@@ -461,7 +516,7 @@ pub(crate) mod tests {
                     CaptionButton::Maximize,
                     CaptionButton::Close,
                 ]
-                .map(|button| windows_button(button, &labels)),
+                .map(|button| windows_button(button, &labels, true)),
             );
             div()
                 .size_full()
@@ -499,6 +554,95 @@ pub(crate) mod tests {
             assert_eq!(view.read(cx).menu_presses, 1);
             assert_eq!(view.read(cx).backdrop_presses, 2);
         });
+    }
+
+    /// Two previews in a page's flow, as a catalog shows them.
+    struct PreviewHarness {
+        page_presses: usize,
+    }
+
+    impl Render for PreviewHarness {
+        fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+            div()
+                .id("page")
+                .size_full()
+                .flex()
+                .flex_col()
+                .items_start()
+                .on_mouse_down(
+                    MouseButton::Left,
+                    cx.listener(|this, _, _, _| this.page_presses += 1),
+                )
+                .child(
+                    div()
+                        .debug_selector(|| "windows-preview".into())
+                        .flex()
+                        .child(
+                            CaptionButtons::new(px(48.), test_labels())
+                                .caption(Caption::Windows)
+                                .preview("windows-preview"),
+                        ),
+                )
+                .child(
+                    div()
+                        .debug_selector(|| "linux-preview".into())
+                        .flex()
+                        .child(
+                            CaptionButtons::new(px(48.), test_labels())
+                                .caption(Caption::Linux)
+                                .on_close(|_, _| panic!("a preview must not close"))
+                                .preview("linux-preview"),
+                        ),
+                )
+                .child(
+                    div().debug_selector(|| "system-preview".into()).child(
+                        CaptionButtons::new(px(48.), test_labels())
+                            .caption(Caption::System)
+                            .preview("system-preview"),
+                    ),
+                )
+        }
+    }
+
+    #[gpui::test]
+    fn a_preview_lays_out_in_place_and_does_not_act_on_the_window(cx: &mut TestAppContext) {
+        let (view, cx) = cx.add_window_view(|_, _| PreviewHarness { page_presses: 0 });
+        cx.run_until_parked();
+        let windows = cx.debug_bounds("windows-preview").unwrap();
+        let linux = cx.debug_bounds("linux-preview").unwrap();
+        let system = cx.debug_bounds("system-preview").unwrap();
+        // In flow at the page's leading edge, not at the window's corner.
+        assert_eq!(windows.origin, gpui::point(px(0.), px(0.)));
+        assert_eq!(f32::from(windows.size.width), width_of(Caption::Windows, 3));
+        assert_eq!(f32::from(windows.size.height), WINDOWS_BUTTON_HEIGHT);
+        assert_eq!(linux.origin.y, windows.size.height);
+        assert_eq!(f32::from(linux.size.width), width_of(Caption::Linux, 3));
+        assert_eq!(system.size.height, px(0.));
+        // Pressing the Linux preview's close button keeps the window open
+        // and does not reach the page behind it.
+        let close = gpui::point(
+            linux.origin.x + px(width_of(Caption::Linux, 3) - LINUX_END - LINUX_BUTTON / 2.),
+            linux.origin.y + px(24.),
+        );
+        cx.simulate_click(close, Modifiers::default());
+        cx.update(|window, cx| {
+            assert!(window.viewport_size().width > px(0.));
+            assert_eq!(view.read(cx).page_presses, 0);
+        });
+    }
+
+    #[test]
+    fn a_preview_shows_the_full_set_whatever_the_window_offers() {
+        assert_eq!(
+            preview_buttons(Caption::Windows),
+            [
+                CaptionButton::Minimize,
+                CaptionButton::Maximize,
+                CaptionButton::Close
+            ]
+        );
+        assert_eq!(preview_buttons(Caption::Linux).len(), 3);
+        assert!(preview_buttons(Caption::System).is_empty());
     }
 
     #[test]
