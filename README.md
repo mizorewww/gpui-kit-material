@@ -1,29 +1,52 @@
 # gpui-kit-material
 
-Material 3 design tokens, motion and components for
-[Longbridge GPUI Kit](https://github.com/longbridge/gpui-kit). The target is a
-Material layer over its `gpui-component` controls and shared behavior, reusing
-Kit's facade, lifecycle and Material Symbols integration. Both gallery targets
-use Kit initialization and window creation, with one shared GPUI/Base dependency
-graph and a Material-to-Component theme bridge. Symbols now supply the shared
-icon source; individual control migration remains in progress; see [the architecture](docs/ARCHITECTURE.md).
+Material 3 / **M3 Expressive** tokens, motion and components for
+[Longbridge GPUI Kit](https://github.com/longbridge/gpui-kit).
 
-The kit started as the shared design primitives of the
-[course2md](https://github.com/mizorewww/course2md) desktop app. It is being
-grown into a complete **Material 3 Expressive** implementation; see
-[docs/ROADMAP.md](docs/ROADMAP.md).
+Components are thin Material adapters over Kit's `gpui-component` controls
+(`gpui_kit::component`): Kit owns behavior (input, focus, accessibility,
+overlays, windows), this crate owns Material visuals and motion. Icons come from
+[gpui-material-symbols](https://github.com/mizorewww/gpui-material-symbols).
+
+> **Status: pre-release (0.1).** The APIs below work and are tested, but no
+> component has passed visual/motion conformance review yet. Per-component
+> status lives in [`conformance/md3.json`](conformance/md3.json); the plan is in
+> [docs/ROADMAP.md](docs/ROADMAP.md).
 
 | Crate | Purpose |
 | --- | --- |
-| [`gpui-kit-material-color`](crates/color) | Color roles, built-in palettes, scheme derivation. No GPUI dependency. |
+| [`gpui-kit-material-color`](crates/color) | Color roles, palettes, reference themes, scheme derivation. No GPUI dependency. |
 | [`gpui-kit-material`](crates/material) | Theme runtime, tokens, motion, icons and components. |
+| [`gpui-kit-material-gallery-web`](crates/gallery-web) | WASM entry point for the shared gallery. |
 
-## Use
+## What's included
 
-Clone this repository and build with its committed `Cargo.lock`. Cargo fetches
-Material Symbols from the exact Git revision declared in `crates/material/Cargo.toml`,
-including its embedded assets. No sibling checkout is required or selected by
-default, so an older `../gpui-material-symbols` cannot override the dependency.
+- **Color & theme** — semantic `ColorRole`s, all 20 md3.io reference themes
+  (light/dark × standard/medium/high contrast, 52 roles each), 10 legacy
+  palettes (Paper/Ink, Nord, Tokyo Night, Catppuccin), animated theme
+  transitions and a 100–200% text scale. Dynamic seed/HCT schemes are pending.
+- **Tokens** — shape, type scale (15 roles), layout metrics, elevation, state
+  layers.
+- **Motion** — Expressive (default) and Standard schemes, spatial/effects
+  curves, entrances, retargetable values, per-transition reduced motion.
+- **Components** — `MaterialButton` (5 variants × 5 sizes × round/square,
+  toggle, loading, ripple, shape morph), `ConnectedButtonGroup`, dividers,
+  linear/circular progress, switch, slider, search field, side sheet, snackbar,
+  focus ring/reveal and a custom title bar with caption buttons. Tiles, choice
+  tiles, status badges, chips, notices and cards come from course2md and do not
+  yet follow M3 geometry.
+
+## Quick start
+
+```toml
+[dependencies]
+gpui-kit = { git = "https://github.com/longbridge/gpui-kit", branch = "main" }
+gpui-kit-material = { git = "https://github.com/mizorewww/gpui-kit-material" }
+```
+
+> The workspace patches GPUI, GPUI Base and GPUI Fast (see `[patch]` in
+> [Cargo.toml](Cargo.toml) and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#engine-patches)).
+> Downstream workspaces need the same patches until they land upstream.
 
 ```rust
 use gpui_kit_material::{icons::Assets, prelude::*, theme};
@@ -33,306 +56,61 @@ gpui_kit::application()
     .run(|cx| {
         gpui_kit::init(cx);
         gpui_kit_material::init(cx);
-        // Initialize the final Material scheme/scale before the first Root render:
-        // theme::init_component_theme(initial_scheme, 1.0, cx);
-        // Open content with gpui_kit::open_window; Kit supplies the Root.
+        // Project the initial scheme into Kit's theme before the first Root render.
+        theme::init_component_theme(initial_scheme, 1.0, cx);
+        // Open windows with gpui_kit::open_window; Kit supplies the Root.
     });
-
-// In theme-change events and pre-frame callbacks, before Root rendering:
-// let running = theme::advance_component_theme(target_scheme, scale, window, cx);
-// Schedule one next-frame callback while running; do not update Theme in render.
 ```
 
-Components paint with semantic roles (`color(ColorRole::SURFACE)`), so a palette
-change animates the whole window on the slow effects spring.
+Paint with semantic roles, never stored colors:
 
-## What's included
+```rust
+div().bg(color(ColorRole::SURFACE_CONTAINER)).text_color(color(ColorRole::ON_SURFACE))
+```
 
-- **Theme**: 10 built-in palettes (Paper/Ink, Nord, Tokyo Night, Catppuccin),
-  plus all 20 md3.io reference themes in light/dark and standard/medium/high
-  contrast, animated palette transitions, and a text scale.
-- **Tokens**: shape (connected tile corners), type scale, layout metrics,
-  elevation, state layers.
-- **Motion**: md3.io Expressive sampled curves (spatial and effects, fast/default/slow),
-  selectable Standard springs, entrances, retargetable values, disclosure.
-- **Components**: connected button group (radio or tab semantics, roving
-  focus), tiles and tile groups, choice tiles with radio indicator, tinted
-  icons, badges, chips, notices, cards, linear progress and spinner, text
-  roles with accessibility semantics, focus ring and focus reveal, snackbars,
-  and an application-drawn window title bar with Windows/Linux caption
-  buttons.
+Switch theme (animated on the slow effects spring) or motion scheme:
+
+```rust
+theme::apply_scheme(ThemeId::Ocean.scheme(ThemeMode::Dark, Contrast::High), window, cx);
+gpui_kit_material::motion::apply_scheme(gpui_kit_material::motion::MotionScheme::Standard);
+```
+
+Advance theme animation from input events and pre-frame callbacks with
+`theme::advance_component_theme`, never from `render`. A controlled toggle
+button (the caller owns `selected`; the button never stores it):
+
+```rust
+use gpui_kit_material::icons::IconName;
+
+let view = cx.entity();
+material_button("save", ButtonVariant::Tonal)
+    .button_size(ButtonSize::Medium)
+    .icon(IconName::Check)
+    .toggle(true)
+    .selected(self.saved)
+    .on_change(move |selected, _click, _window, cx| {
+        view.update(cx, |this, cx| { this.saved = selected; cx.notify(); });
+    })
+    .child(label)
+```
+
+Labels and accessible names come from the caller (the one remaining exception,
+`CaptionLabels::default()`, is slated for removal). See the rustdoc (`cargo doc --open -p gpui-kit-material`) for the full
+contracts of each component.
 
 ## Gallery
 
-```sh
-cargo run -p gpui-kit-material --example gallery
-```
-
-The title bar shows FPS, sampled every half second from the window's rendering
-successful new-frame submission count, including the counter's own updates.
-Skipped submissions and repeated presentation of the same drawn frame do not
-increase this FPS; it is not monitor refresh rate or GPU completion. Idle windows can
-show a low rate because GPUI renders on demand.
-
-Open **Settings → Vertical sync** to change presentation synchronization on
-macOS. The switch reads back the actual Metal setting; unsupported backends,
-including the browser, show a disabled control and an explanation. Turning it
-off enables demand-driven rendering on macOS without forcing an idle window to
-redraw. Platform safety throttles still apply. The setting applies to the current
-window.
-
-The desktop and WASM galleries use Kit's GPUI Fast backend by default. It can
-also be selected explicitly:
+One gallery module runs on desktop and in the browser.
 
 ```sh
-cargo run -p gpui-kit-material --example gallery --features gpui-fast
-./scripts/build-gallery-web.sh --fast
-```
-
-Use `--no-default-features --features serde,embedded-symbols` with the native
-Gallery command to run the upstream backend for comparison.
-For browser artifacts, use `./scripts/build-gallery-web.sh --upstream`.
-
-Both targets use the same Kit facade and Material components. The workspace
-patches GPUI Fast 0.1.12 to preserve the touch, animation, text and frame-timing
-contracts used by Material. Consumers outside this workspace need the same
-patches; see [the architecture](docs/ARCHITECTURE.md).
-
-Compare native release builds of the same Gallery with complete CPU scopes:
-
-```sh
-python3 scripts/profile-gallery.py /tmp/material-upstream --backend upstream --seconds 5
-python3 scripts/profile-gallery.py /tmp/material-fast --backend fast --seconds 5
-```
-
-The output records the selected backend, build flags, source identities and raw
-timings, including startup. A faster backend does not by itself establish the
-whole-Gallery 2 ms limit; every measured frame and the required interaction
-scenarios still need validation.
-
-Record continuous bidirectional scrolling with `--scroll` (2–120 seconds):
-
-```sh
-python3 scripts/profile-gallery.py /tmp/material-scroll --backend fast --seconds 10 --scroll
-```
-
-Add `--scroll-input wheel` to dispatch pixel wheel events at the main scroll
-viewport center through the normal input handler. The default `programmatic`
-mode retains the earlier offset mutation plus window refresh for comparison;
-it bypasses the wheel-specific invalidation path and can prevent Fast retained
-reuse. Reports identify the mode and preserve wheel coordinates and deltas.
-
-This diagnostic disables vertical sync through the platform API and preserves
-raw scroll positions, successful new-frame counts, full CPU scopes and the
-lowest observed full-window FPS (windows of at least 250 ms). Short tails remain
-separate. The required gates are **scrolling >= 500 FPS** and **every whole CPU
-frame <= 2 ms**. These observations cannot establish per-frame scroll submission
-times or complete Gallery traversal; incomplete evidence never passes. CPU
-startup is included, while FPS observation starts after the window opens.
-
-The native gallery can save its GPU-rendered frame with reproducible state:
-
-```sh
-cargo run -p gpui-kit-material --example gallery -- \
-  --capture /tmp/material-toggles.png --section toggles \
-  --width 1280 --height 720 --selected --reduced-motion --settle-ms 0
-```
-
-Run with `--help` for theme, text scale, state, and scroll options. State flags
-configure their existing demonstrations: `--active`, `--disabled`, and
-`--no-ripple` affect the button effects samples; `--selected` affects toggles;
-`--loading` affects loading samples. The adjacent
-JSON records the source revision, dirty-worktree status, requested and actual
-viewport, device scale, theme, motion preference, and selected state. The OS
-may constrain the window size; compare using the actual viewport and image
-pixel dimensions. Capture waits for chapter scrolling before the settle timer
-and returns a nonzero status if rendering, saving, or completion fails. An
-existing output file alone is not evidence that the current command succeeded.
-These frames support visual review; they are not timed animation samples or
-an automatic conformance verdict.
-
-The browser entrypoint uses the same Rust gallery module and components:
-
-```sh
-rustup target add wasm32-unknown-unknown
-cargo install wasm-bindgen-cli --version 0.2.129 --locked
-./scripts/build-gallery-web.sh
+cargo run -p gpui-kit-material --example gallery          # desktop (GPUI Fast backend)
+./scripts/build-gallery-web.sh --release                   # browser, then:
 python3 -m http.server 8080 --bind 127.0.0.1 --directory crates/gallery-web/www
 ```
 
-Open `http://localhost:8080`. The single-threaded browser build runs without
-cross-origin isolation headers. It embeds IBM Plex Sans (SIL OFL, bundled beside
-the font) for the web platform's default text measurements. Use
-`./scripts/build-gallery-web.sh --release` for an optimized build. Generated
-bindings stay out of Git.
-
-After building and serving the WASM gallery, its canvas allocation can be
-checked across 1×, 1.25×, 1.5×, and 2× device scales with `agent-browser`:
-
-```sh
-python3 scripts/check-gallery-dpr.py http://127.0.0.1:8080 /tmp/material-gallery-dpr
-```
-
-The check records screenshots and CSS/backing-store dimensions. It includes a
-real CSS resize with each emulated DPR change because Chromium's CDP emulation
-can omit resize and media-query events for a DPR-only change. It validates
-allocation after observer notification, not full component pixel conformance.
-
-Both gallery targets use the reference site's Roboto 400/500 font files, with
-pinned source hashes and the SIL OFL in
-`crates/material/examples/gallery/fonts/roboto`. Rebuild the static fonts with:
-
-```sh
-uv run --with 'fonttools[woff]==4.60.1' python scripts/build-reference-fonts.py
-```
-
-The Typography section displays all 15 reference roles, and the text scale
-selector supports 100%, 125%, 150%, and 200%. The page title uses headline-small
-(24px / 32px at 100%). Reference letter-spacing values are stored in the tokens;
-GPUI tracking support and full component typography alignment remain pending.
-
-The shared gallery uses Kit's window entry point to mount one `Root` for Tab/Shift+Tab traversal and
-focus containment. Focus reveal is attached to individual controls and button
-options, so keyboard navigation brings the next control into view without
-pinning the page during manual scrolling.
-A persistent chapter navigator stays beside the content on wide windows and
-wraps above it on narrow windows. Its scroll area and keyboard focus reveal are
-independent of the examples; jumping between chapters preserves example state.
-
-The alignment target is the complete component union of [M3 Expressive Web](https://m3e.kyralabs.dev/)
-and [md3.io](https://md3.io/). For overlapping components, M3 Expressive Web is
-authoritative for visuals, typography, states and animations. Exact visual and
-animation parity requires independent subagent review for every component on
-both targets. Existing md3.io evidence does not establish parity with the primary
-reference. Component alignment is tracked in [`conformance/md3.json`](conformance/md3.json).
-Work lands as atomic commits with frequent GitHub progress pushes.
-An available gallery example does not imply visual or motion conformance;
-each component needs independent review and desktop/browser evidence.
-The entire gallery must also stay at or below **2 ms per CPU frame** on both
-targets, including view rendering, layout, paint and graphics submission. Every
-component inherits this gate: a measured frame above 2 ms fails acceptance.
-Record individual frame timings, maximum and over-budget count, with first-frame
-and steady-state results reported separately; averages do not establish a pass.
-GPU timing is reported separately. Functional or visual reviews alone do not
-satisfy this performance requirement.
-
-`MaterialDivider` provides horizontal and vertical separators with full-width,
-start-inset, and middle-inset variants. `direction` resolves horizontal logical
-insets; the parent controls its own flow. `context(DividerContext::List)` or
-`Card` applies the reference ancestor spacing explicitly. Default geometry uses
-fixed pixels; callers can supply rem insets to align with scalable text. Vertical
-inset separators need a stretching row or a caller-supplied height. GPUI block
-and flex layouts are supported; browser inline formatting with text siblings
-remains a conformance gap. The Dividers chapter is available on both targets.
-
-The gallery includes six motion previews and a Standard/Expressive selector.
-Applications can select their scheme at the start of each root render, before
-applying the theme:
-
-```rust
-gpui_kit_material::motion::apply_scheme(
-    gpui_kit_material::motion::MotionScheme::Expressive,
-);
-```
-
-Expressive is the default. A value transition retains its curve until it settles,
-including reversals, so changing schemes cannot jump an in-flight value. A mounted
-entrance retains its initial scheme; a new palette target uses the current scheme.
-Reduced-motion behavior is set per transition: spatial value transitions finish
-immediately, while supported non-spatial effects retain their fades.
-
-## Buttons
-
-`material_button(id, variant)` now returns `MaterialButton`, a presentation
-wrapper over GPUI Base's button. It supports Filled, Elevated, Tonal, Outlined,
-and Text variants, five `ButtonSize`s through `.button_size(...)`, and Round or
-Square through `.shape(...)`. The default variant is Filled. Existing callers
-with an explicit `gpui_base::Button` return annotation must update that type.
-Activation, focus binding, keyboard input and disabled behavior remain in Base.
-Use `.icon(...)` for a decorative SVG icon, `.icon_position(...)` for logical
-Leading/Trailing placement, and `.direction(ButtonDirection::Rtl)` for mirrored
-layout. Slot dimensions follow button size, and disabled icons use the disabled
-content role even when the supplied icon has a custom color.
-Button text defaults to its type role’s font family (Roboto); caller
-`.font_family(...)` overrides remain supported. Applications must register the
-font to obtain reference glyph metrics; otherwise GPUI uses its font fallback.
-
-The gallery includes all 50 variant/size/shape combinations, disabled samples,
-controlled toggles, and loading examples with no icon or either icon placement.
-Press and release morph the radius with FastSpatial, including interrupted
-transitions. Pointer ripples are enabled by default; `.ripple(false)` selects the
-pressed state layer. XS/S retain their 32/40px visual heights while their 48px
-interaction targets obey the same clipping and occlusion as the Base control.
-Keyboard focus draws a Secondary outline 3px wide with a 2px gap outside the
-button; pointer focus and disabled buttons do not draw it.
-
-Use `.toggle(true).selected(selected).on_change(...)` for controlled selection.
-The callback receives `(next_selected, click_event, window, app)`; update the
-application's state and request a render. `.toggle_on_click(false)` suppresses
-selection requests while preserving `on_click` for container-owned selection.
-
-`.active_state(true)` keeps the pressed appearance while, for example, an
-associated menu stays open. It does not activate, select, focus or generate a
-ripple. This caller-owned visual state remains set when the button is disabled,
-as in the reference; clear it explicitly when the associated UI closes. GPUI’s
-`.active(style)` customization remains available.
-
-`.progress(visible, accessible_label)` shows a circular indicator while keeping
-activation available. `.loading(loading, accessible_label)` also marks the
-button busy and disables activation. Both are controlled: visible button text
-comes from `.child(...)`, and `.disabled(...)` remains application-owned, so
-ending loading does not clear an independent disabled state. Keep the progress
-or loading configuration present with a false flag while hidden to preserve its
-animation phase. Indicator labels are always supplied by the application.
-
-These features have focused rule, input and motion tests and independent code
-reviews. Full desktop/browser visual and animation conformance remains pending,
-including typography tracking and the complete theme/scale/state matrix. See
-[`conformance/md3.json`](conformance/md3.json) for the scoped evidence.
-
-## Reference themes
-
-The gallery starts with the Material baseline theme. Applications can select
-one of the 20 reference presets through the same animated theme runtime:
-
-```rust
-use gpui_kit_material::{prelude::*, theme};
-
-theme::apply_scheme(
-    ThemeId::Ocean.scheme(ThemeMode::Dark, Contrast::High),
-    window,
-    cx,
-);
-```
-
-The 120 preset configurations preserve the reference CSS's 52 colors, including
-fixed, inverse, surface-container, error, and status roles. The kit's selection,
-find-highlight, and status-container extensions are derived separately. Existing
-Paper/Nord/etc. palettes remain adapters from their original source colors.
-Dynamic seed/HCT generation is still pending.
-
-Qualified legacy names such as `ColorRole::ACCENT` remain aliases of canonical
-roles such as `ColorRole::PRIMARY`, sharing the same override storage. Code that
-imported the old enum variants with `use ColorRole::{ACCENT}` or `use ColorRole::*`
-must use qualified names or import the canonical variants instead.
-
-To recapture the preset fixtures from a clean checkout of the pinned reference:
-
-```sh
-python3 scripts/capture-reference-colors.py /path/to/floor-material /tmp/md3-colors.json
-```
-
-This requires `npx`, `git`, and `agent-browser`. The script checks the reference
-revision, compiles its Sass, and reads the browser's resolved CSS properties.
-The source revision and capture environment are recorded in the fixture; the
-reference implementation's MIT notice ships with the tables.
-
-## Material Symbols consumer example
-
-The Google Fonts icon browser belongs to
-[gpui-material-symbols](https://github.com/mizorewww/gpui-material-symbols).
-It consumes this kit's Material components; this repository retains the reusable
-controls and their gallery demonstrations.
+The title bar shows FPS of newly drawn frames; **Settings → Vertical sync**
+toggles Metal display sync on macOS. Headless capture, profiling and fixture
+tooling are described in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
 
 ## Develop
 
@@ -342,21 +120,21 @@ cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace
 ```
 
-The vendored paragraph-layout regressions run separately from workspace tests:
+CI runs these on macOS, Linux and Windows, plus both GPUI backends and the WASM
+gallery build. Project rules for contributors and agents — Kit reuse,
+conformance acceptance and the performance gates (every gallery CPU frame
+≤ 2 ms, scrolling ≥ 500 FPS) — are in [AGENTS.md](AGENTS.md).
 
-```sh
-cargo test -p gpui-pre --test line_layout_options
-cargo test -p gpui-pre --lib text_system
-```
-
-CI runs these on macOS and separately checks and builds the WASM gallery with
-the matching wasm-bindgen CLI. Browser rendering and component conformance
-review remain separate from build checks.
+| Document | Contents |
+| --- | --- |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Layers, Kit reuse, theme bridge, engine patches |
+| [docs/ROADMAP.md](docs/ROADMAP.md) | Component plan and acceptance criteria |
+| [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) | Gallery capture, profiling, WASM, fixtures |
+| [docs/EXTRACTION.md](docs/EXTRACTION.md) | Mapping from course2md, where the kit originated |
 
 ## License
 
-MIT. Palette sources and their licenses are listed in
-[crates/color/PALETTES.md](crates/color/PALETTES.md). Google Material Symbols
-assets and the Symbols integration are Apache-2.0; their source snapshots and
-licenses are retained in the pinned
+MIT. Palette sources and licenses: [crates/color/PALETTES.md](crates/color/PALETTES.md).
+Material Symbols assets are Apache-2.0, retained in the pinned
 [Symbols repository](https://github.com/mizorewww/gpui-material-symbols/tree/593aa15a46076f3e2870c23c0e4fd79f94f105bd).
+Roboto and IBM Plex Sans gallery fonts are SIL OFL, bundled with their licenses.
