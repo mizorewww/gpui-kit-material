@@ -24,6 +24,7 @@ pub struct Toggle {
     semantic_styles: ToggleStyles,
     pressed: bool,
     disabled: bool,
+    busy: bool,
     children: SmallVec<[AnyElement; 2]>,
     on_change: Option<ChangeHandler>,
     accessibility_label: Option<SharedString>,
@@ -64,6 +65,7 @@ impl Toggle {
             semantic_styles: ToggleStyles::default(),
             pressed: false,
             disabled: false,
+            busy: false,
             children: SmallVec::new(),
             on_change: None,
             accessibility_label: None,
@@ -81,6 +83,13 @@ impl Toggle {
 
     pub fn disabled(mut self, disabled: bool) -> Self {
         self.disabled = disabled;
+        self
+    }
+
+    /// Mark the control as busy for assistive technology. This does not disable
+    /// activation; applications independently choose the disabled state.
+    pub fn busy(mut self, busy: bool) -> Self {
+        self.busy = busy;
         self
     }
 
@@ -220,7 +229,7 @@ impl RenderOnce for Toggle {
             )
             .children(self.children)
             .refine_style(&style)
-            .a11y_disabled(disabled)
+            .a11y_control_state(disabled, self.busy)
     }
 }
 

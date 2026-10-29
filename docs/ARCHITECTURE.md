@@ -28,7 +28,8 @@ use both mirror `theme::scheme()` into gpui-component's `Theme` when
 **One GPUI.** The workspace pins the `gpui-pre` snapshot that the published
 `gpui-base` requires (`=0.3.10` with `gpui-base =0.8.1`). Bump them together.
 The workspace patches GPUI Base from `vendor/gpui-base` for CSS transition
-reversal and per-transition reduced-motion policy. Its normalized manifest and
+reversal, per-transition reduced-motion policy, toggle focus policy, and busy
+accessibility state on Button/Toggle. Its normalized manifest and
 license retain the published package provenance. This root Cargo patch applies
 only to builds in this workspace; downstream consumers need the same patch or
 a Base release containing these fixes.
