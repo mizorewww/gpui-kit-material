@@ -284,14 +284,16 @@ pub fn advance_component_theme(
     cx: &mut App,
 ) -> bool {
     let (changed, running) = advance_paint(target, cx);
-    let projected = sync_component_theme(scheme(), scale, cx);
+    sync_component_theme(scheme(), scale, cx);
     let font_size = scale_pixels(scale);
     let scale_changed = window.rem_size() != font_size;
     if scale_changed {
         window.set_rem_size(font_size);
     }
-    if (changed || scale_changed) && !projected {
-        // A changed M3-only role may have no Component counterpart.
+    if changed || scale_changed {
+        // Material colors are thread-local, so cached Material-only entities do
+        // not observe Component's global. Its queued refresh handles ordinary
+        // event boundaries; this also makes synchronous draws see current paint.
         window.refresh();
     }
     running
@@ -369,9 +371,11 @@ mod tests {
         });
         cx.update(|window, cx| {
             cx.set_reduce_motion(true);
+            window.refresh();
             window.draw(cx).clear(cx);
             cx.set_reduce_motion(false);
             view.update(cx, |view, _| view.palette = PaletteId::Ink);
+            window.refresh();
             window.draw(cx).clear(cx);
         });
         cx.executor().advance_clock(Duration::from_millis(100));
@@ -382,6 +386,7 @@ mod tests {
         let before = scheme();
         cx.update(|window, cx| {
             view.update(cx, |view, _| view.motion = motion::MotionScheme::Standard);
+            window.refresh();
             window.draw(cx).clear(cx);
         });
         assert_eq!(
@@ -391,6 +396,7 @@ mod tests {
         );
         cx.update(|window, cx| {
             view.update(cx, |view, _| view.palette = PaletteId::Paper);
+            window.refresh();
             window.draw(cx).clear(cx);
         });
         assert_eq!(
@@ -406,11 +412,13 @@ mod tests {
         assert_ne!(scheme(), before);
         cx.update(|window, cx| {
             cx.set_reduce_motion(true);
+            window.refresh();
             window.draw(cx).clear(cx);
         });
         assert_eq!(scheme(), Scheme::from_palette(PaletteId::Paper));
         cx.update(|window, cx| {
             cx.set_reduce_motion(false);
+            window.refresh();
             window.draw(cx).clear(cx);
         });
         assert_eq!(

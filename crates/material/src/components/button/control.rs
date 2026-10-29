@@ -6,7 +6,7 @@ use std::rc::Rc;
 type ClickHandler = Rc<dyn Fn(&ClickEvent, &mut Window, &mut App)>;
 pub(super) type ChangeHandler = Rc<dyn Fn(bool, &ClickEvent, &mut Window, &mut App)>;
 
-#[derive(IntoElement)]
+#[derive(gpui::IntoElement)]
 pub(super) struct BaseControl {
     #[cfg(test)]
     pub a11y_observer: Option<Rc<std::cell::RefCell<Vec<accesskit::Node>>>>,

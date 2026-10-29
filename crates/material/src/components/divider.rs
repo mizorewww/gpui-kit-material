@@ -40,7 +40,7 @@ pub enum DividerContext {
 /// is not implemented.
 /// Default thickness and spacing are fixed CSS pixel geometry, independent of
 /// typography. Callers can supply rem-valued insets when aligning with text.
-#[derive(IntoElement)]
+#[derive(gpui::IntoElement)]
 pub struct MaterialDivider {
     id: ElementId,
     orientation: DividerOrientation,

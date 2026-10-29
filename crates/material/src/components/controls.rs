@@ -11,7 +11,7 @@ use gpui_base::{
 use std::rc::Rc;
 
 /// Controlled M3 switch: 52×32 track and an animated 16→24 thumb.
-#[derive(IntoElement)]
+#[derive(gpui::IntoElement)]
 pub struct MaterialSwitch {
     id: ElementId,
     label: SharedString,
@@ -106,7 +106,7 @@ pub enum SliderAppearance {
     #[default]
     Expressive,
 }
-#[derive(IntoElement)]
+#[derive(gpui::IntoElement)]
 pub struct MaterialSlider {
     state: Entity<SliderState>,
     label: SharedString,
@@ -190,7 +190,7 @@ impl RenderOnce for MaterialSlider {
 }
 
 /// M3 search field. Editing, selection, clipboard and IME are owned by GPUI Base.
-#[derive(IntoElement)]
+#[derive(gpui::IntoElement)]
 pub struct SearchField {
     state: Entity<InputState>,
     leading: Option<AnyElement>,
@@ -235,7 +235,7 @@ impl RenderOnce for SearchField {
 
 /// A nonmodal M3 standard side sheet. It leaves the main content interactive;
 /// its controlled visibility retargets the spatial spring, including on close.
-#[derive(IntoElement)]
+#[derive(gpui::IntoElement)]
 pub struct MaterialSideSheet {
     id: ElementId,
     open: bool,

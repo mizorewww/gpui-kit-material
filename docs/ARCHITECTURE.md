@@ -105,6 +105,26 @@ accessibility state on Button/Toggle. Its normalized manifest and
 license retain its source provenance in `vendor/gpui-base/SOURCE.json`. These root Cargo patches apply
 only to builds in this workspace; downstream consumers need the same patch or
 a Base release containing these fixes.
+
+**GPUI Fast.** Material and Gallery-web expose `gpui-fast`, forwarding to Kit's
+official backend feature. Kit selects Fast for its public core, platform, Base,
+Component and assets types. Material's `gpui` crate alias points to Kit, so it
+cannot accidentally combine direct upstream types with the Fast facade.
+Cargo's additive dependencies still compile upstream packages; these do not
+define the selected facade's public types. The default upstream backend remains
+available for comparison.
+
+Fast 0.1.12 core, Apple and Web packages are patched in `vendor/gpui-fast*`.
+Their `MATERIAL-MIGRATION.json` files preserve published archive and source
+hashes. Compatibility patches cover full CPU scopes, repeat playback, detailed
+text layout, font registration, raw touch observation and expanded hit targets.
+Retained subtree and scroll-layer replay carry touch observers and independently
+clipped hit targets. Font generation invalidates retained views, layers and text
+measurements, while successful registration keeps unrelated App instances
+independent. Material paint changes synchronously refresh the window before
+drawing, including when Component also queues a global refresh. No-op theme
+updates keep retained content reusable. The Web dependency edges retain explicit
+single-threaded defaults; the package's multithreaded opt-in is unchanged.
 GPUI itself is patched from `vendor/gpui-pre` to expose paint-scoped passive raw
 touch observation and hitbox extensions independent of layout geometry.
 Extensions retain the original hitbox identity, clipping and occlusion rules.

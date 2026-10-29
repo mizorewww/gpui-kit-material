@@ -1,0 +1,56 @@
+{
+  "source_package": "gpui-fast-web",
+  "version": "0.1.12",
+  "published_vcs": null,
+  "published_checksums": null,
+  "archive_sha256": "ad903fddb78ae4c8f1c24b7fa07c79a0697da7614183d8c7dad67bd296802901",
+  "source_file_sha256": {
+    ".cargo-ok": "afbf9d0f3560b0fd7795e81c42a0a79ee6b6fc67e064f77826aee642cad28d91",
+    "Cargo.lock": "304fa06120cd487a62a22e76edffff0a74ac974a1b8ed26bfc43b33323b290ba",
+    "Cargo.toml": "6f317d525676d116acce313da939b2bd2c877c174476d04625c6ec65f92332b3",
+    "Cargo.toml.orig": "f59ac07ae7cb420fafc06ea28a43022629a40c53a0a854be035b52fca2ad3358",
+    "LICENSE": "5f78a733701db49b73da93addad8cb74f816f3789ef30c3c0e959e943ecd99b4",
+    "README.md": "0e89272d4cd1589baf04b4253d8176628ec13eed2a8f14d6fb502bb607eeaacd",
+    "src/canvas_fallback.rs": "f23fef0d3b68fabe50dea4e32a63fa5b0bc0506f4e9e7e04ece8b563e05e20c4",
+    "src/canvas_text.rs": "da73053a7f087e78aefb873f23502189224e8572fc0de49d52689f049f0cbfb3",
+    "src/dispatcher.rs": "2278e642e620a30605fe3ed8c391b0d94151ca79981fbd4c76a2bd61c06e8bb9",
+    "src/display.rs": "4ca631603993dba5125088911193d380908b4f5ac7cc89b21ef4c9136b9ad433",
+    "src/events.rs": "250ba40e44975b282cd74797e76c96de6ef5bdcc537a8009f7e876c8a47ff239",
+    "src/glyph_cache.rs": "d9beafc7c2a8029171151249a4ecd13bf7419d1a22809abbf86d3e823b665793",
+    "src/gpui_web.rs": "51360d028a5f0e495557732e7e257ccfd5de960a17a9a57487aeaa8562b10979",
+    "src/http_client.rs": "06cabc3449fac1a8878d31b9b8bf01d097cb52ec8993c794dc221f9b848226da",
+    "src/ime_mirror.rs": "4061ebd319b5928c2a25f659c4f1db9adb193d5873bbbfeba36468ca2706895d",
+    "src/keyboard.rs": "f13f68ea0aed387146d2ff95892bdd4f14b2e0a46231a2b06ea6c7e674e11a5d",
+    "src/logging.rs": "2d464ead162a6eb83b8d22b435c83a557a8ad7c6776966ff92f3e2a82fdae1fb",
+    "src/platform.rs": "cd049a650e8e70ea673ea0f76d0312ee6c77bcaffb0c486c987d4463e224610d",
+    "src/run_replacements.rs": "c00a0f957f156b3744a90d3687f773de0a0e259c6c8beb1c86bd3f17614c3f43",
+    "src/text_system.rs": "50d2d9da4a628d4363264dee69ae7eb271655007ccd5ef1bfbdb88954315808f",
+    "src/viewport.rs": "2f64241c990f6de9a874e7680baafa61feba6db96228c48fab26ac7faaf623f5",
+    "src/window.rs": "eda543e585912fcb012e2a3559d8fb2e9ad7570ba58746747af380d044085cb8"
+  },
+  "local_patch_base": "gpui-pre-web 0.3.10",
+  "migrated": [
+    {
+      "path": "src/canvas_size.rs",
+      "status": "added",
+      "local_sha256": "0c30b53010e38d1e9bb79e744d2936a5e19ce202ade2bbcdde9b8e11087db1c0"
+    },
+    {
+      "path": "src/gpui_web.rs",
+      "status": "merged",
+      "local_sha256": "94847c66838eb4bc59f907e78f368be5744d238f741b9439e3c005ed5f22b2dd"
+    },
+    {
+      "path": "src/window.rs",
+      "status": "merged",
+      "local_sha256": "8ebf060d877eae86a591be697fea53a78c917ad5a1db480c4294f9f34f291852"
+    }
+  ],
+  "conflicts": [],
+  "validation": "source migration only; no build/tests",
+  "manifest_changes": [],
+  "archive_verification": {
+    "files": 21,
+    "mismatches": []
+  }
+}

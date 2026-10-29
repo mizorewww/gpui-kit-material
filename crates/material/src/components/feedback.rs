@@ -150,7 +150,7 @@ type SnackbarHandler = Rc<dyn Fn(&ClickEvent, &mut Window, &mut App)>;
 /// M3 snackbar: a brief status message on the inverse surface, with an
 /// optional text action and close button. The caller places it (usually
 /// bottom-leading, 16px from the window edges) and removes it when done.
-#[derive(IntoElement)]
+#[derive(gpui::IntoElement)]
 pub struct Snackbar {
     id: ElementId,
     message: SharedString,

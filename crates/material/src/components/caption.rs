@@ -206,7 +206,7 @@ pub(super) type CloseRequest = Rc<dyn Fn(&mut Window, &mut App) -> bool>;
 /// dialog, or nothing where the system draws them. Render it once per
 /// window, as a child of the root; a [`super::TitleBar`] renders its own, so
 /// a window with one needs no other.
-#[derive(IntoElement)]
+#[derive(gpui::IntoElement)]
 pub struct CaptionButtons {
     height: Pixels,
     labels: CaptionLabels,

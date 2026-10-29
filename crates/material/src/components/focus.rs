@@ -5,7 +5,7 @@ use gpui::{prelude::*, *};
 
 /// Draw a visible outline around a component whose focus handle is internal.
 /// The wrapper observes descendants without adding a keyboard stop of its own.
-#[derive(IntoElement)]
+#[derive(gpui::IntoElement)]
 pub struct FocusRing {
     id: ElementId,
     child: AnyElement,
@@ -96,7 +96,7 @@ impl RevealScroll {
 
 /// Scrolls `scroll` so a newly focused descendant is visible, once per focus
 /// change or geometry change, never while the person scrolls by hand.
-#[derive(IntoElement)]
+#[derive(gpui::IntoElement)]
 pub struct RevealFocus {
     id: ElementId,
     child: AnyElement,

@@ -67,6 +67,30 @@ change animates the whole window on the slow effects spring.
 cargo run -p gpui-kit-material --example gallery
 ```
 
+Select Kit's GPUI Fast backend for retained rendering and layout:
+
+```sh
+cargo run -p gpui-kit-material --example gallery --features gpui-fast
+cargo build -p gpui-kit-material-gallery-web --target wasm32-unknown-unknown --features gpui-fast
+```
+
+Both targets use the same Kit facade and Material components. The workspace
+patches GPUI Fast 0.1.12 to preserve the touch, animation, text and frame-timing
+contracts used by Material. Consumers outside this workspace need the same
+patches; see [the architecture](docs/ARCHITECTURE.md).
+
+Compare native release builds of the same Gallery with complete CPU scopes:
+
+```sh
+python3 scripts/profile-gallery.py /tmp/material-upstream --backend upstream --seconds 5
+python3 scripts/profile-gallery.py /tmp/material-fast --backend fast --seconds 5
+```
+
+The output records the selected backend, build flags, source identities and raw
+timings, including startup. A faster backend does not by itself establish the
+whole-Gallery 2 ms limit; every measured frame and the required interaction
+scenarios still need validation.
+
 The native gallery can save its GPU-rendered frame with reproducible state:
 
 ```sh

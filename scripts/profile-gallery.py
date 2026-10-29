@@ -51,13 +51,14 @@ def repository_identity(root):
     }
 
 
-def source_identity():
+def source_identity(features):
     # Match the feature selection of the build. Resolve metadata on every check
     # so changing a path dependency or its feature graph cannot evade comparison.
     # Do not persist raw metadata: it can contain registry URLs and arbitrary
     # package metadata. Keep only local package identities and dependency edges.
     command = ["cargo", "metadata", "--locked", "--format-version", "1",
-               "--features", "frame-profiler"]
+               "--no-default-features", "--features",
+               ",".join("gpui-kit-material/" + feature for feature in features.split(","))]
     metadata = json.loads(output(*command))
     packages = {package["id"]: package for package in metadata["packages"]}
     nodes = {node["id"]: node for node in metadata["resolve"]["nodes"]}
@@ -113,6 +114,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("output", type=Path, help="new evidence directory outside the repository")
     parser.add_argument("--seconds", type=float, default=10)
+    parser.add_argument("--backend", choices=("upstream", "fast"), default="fast")
     args = parser.parse_args()
     if not math.isfinite(args.seconds) or not 0.1 <= args.seconds <= 3600:
         parser.error("--seconds must be finite and in 0.1..=3600")
@@ -120,12 +122,16 @@ def main():
     if destination == ROOT or ROOT in destination.parents:
         parser.error("use an output directory outside the repository to keep source fingerprints stable")
     destination.mkdir(parents=True, exist_ok=False)
+    features = "serde,embedded-symbols,frame-profiler"
+    if args.backend == "fast":
+        features += ",gpui-fast"
     command = ["cargo", "build", "--locked", "--release", "-p", "gpui-kit-material",
-               "--example", "gallery", "--features", "frame-profiler",
+               "--example", "gallery", "--no-default-features", "--features", features,
                "--message-format=json-render-diagnostics"]
     provenance = {
-        "source_before_build": source_identity(),
+        "source_before_build": source_identity(features),
         "build_command": command,
+        "requested_backend": args.backend,
         "rustc": output("rustc", "-Vv").decode(),
         "cargo": output("cargo", "-V").decode().strip(),
         "build_environment": {key: os.environ.get(key) for key in (
@@ -145,7 +151,7 @@ def main():
     with (destination / "build.log").open("wb") as log, (destination / "build-events.jsonl").open("wb") as events:
         built = subprocess.run(command, cwd=ROOT, stdout=events, stderr=log)
     provenance["build_exit_code"] = built.returncode
-    provenance["source_after_build"] = source_identity()
+    provenance["source_after_build"] = source_identity(features)
     save()
     if built.returncode:
         print(f"Build failed; see {destination / 'build.log'}", file=sys.stderr)
@@ -188,7 +194,7 @@ def main():
             code = 2
             provenance["capture_error"] = f"could not execute reported artifact: {error}"
     provenance["capture_exit_code"] = code
-    provenance["source_after_capture"] = source_identity()
+    provenance["source_after_capture"] = source_identity(features)
     provenance["binary_sha256_after_capture"] = hashlib.sha256(binary.read_bytes()).hexdigest()
     provenance["inputs_stable"] = (
         provenance["source_after_build"] == provenance["source_after_capture"]

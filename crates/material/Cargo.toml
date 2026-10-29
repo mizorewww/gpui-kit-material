@@ -15,6 +15,7 @@ default = ["serde", "embedded-symbols"]
 embedded-symbols = ["gpui-material-symbols/embed-assets"]
 serde = ["gpui-kit-material-color/serde"]
 frame-profiler = ["gpui-kit/profiler"]
+gpui-fast = ["gpui-kit/gpui-fast"]
 
 [dependencies]
 gpui-kit-material-color.workspace = true

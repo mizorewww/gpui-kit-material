@@ -388,9 +388,13 @@ mod tests {
     #[gpui::test]
     fn expressive_overshoot_never_paints_beyond_the_progress_track(cx: &mut TestAppContext) {
         let (view, cx) = cx.add_window_view(|_, _| ProgressHarness { target: 0. });
-        cx.update(|window, cx| window.draw(cx).clear(cx));
+        cx.update(|window, cx| {
+            window.refresh();
+            window.draw(cx).clear(cx);
+        });
         cx.update(|window, cx| {
             view.update(cx, |view, _| view.target = 1.);
+            window.refresh();
             window.draw(cx).clear(cx);
         });
         // At 60%, the reference default spatial curve is above its endpoint.
@@ -413,6 +417,7 @@ mod tests {
         });
         cx.update(|window, cx| {
             view.update(cx, |view, _| view.target = 0.);
+            window.refresh();
             window.draw(cx).clear(cx);
         });
         cx.executor().advance_clock(Duration::from_millis(270));

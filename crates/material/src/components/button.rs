@@ -420,7 +420,7 @@ fn observe_press(
 type HoverCallback = std::rc::Rc<dyn Fn(&bool, &mut Window, &mut App)>;
 
 /// Sized, shaped Material presentation; activation, keyboard and focus stay in Base.
-#[derive(IntoElement)]
+#[derive(gpui::IntoElement)]
 pub struct MaterialButton {
     #[cfg(test)]
     progress_opacity_observer: Option<std::rc::Rc<std::cell::Cell<f32>>>,
@@ -1494,12 +1494,14 @@ mod tests {
         });
         cx.update(|window, cx| {
             cx.set_reduce_motion(true);
+            window.refresh();
             window.draw(cx).clear(cx);
             cx.set_reduce_motion(false);
         });
         let initial = sample.get();
         cx.update(|window, cx| {
             view.update(cx, |view, _| view.variant = ButtonVariant::Tonal);
+            window.refresh();
             window.draw(cx).clear(cx);
         });
         assert_colors_close(sample.get(), initial);
@@ -1518,6 +1520,7 @@ mod tests {
         let midpoint = sample.get();
         cx.update(|window, cx| {
             view.update(cx, |view, _| view.palette = PaletteId::Ink);
+            window.refresh();
             window.draw(cx).clear(cx);
         });
         assert_colors_close(sample.get(), midpoint);
@@ -1531,6 +1534,7 @@ mod tests {
 
         cx.update(|window, cx| {
             view.update(cx, |view, _| view.disabled = true);
+            window.refresh();
             window.draw(cx).clear(cx);
         });
         cx.executor().advance_clock(Duration::from_millis(50));
@@ -1540,6 +1544,7 @@ mod tests {
         assert!(disabling.1.a > 0.38 && disabling.1.a < 1.);
         cx.update(|window, cx| {
             view.update(cx, |view, _| view.disabled = false);
+            window.refresh();
             window.draw(cx).clear(cx);
         });
         assert_colors_close(sample.get(), disabling);
@@ -1549,6 +1554,7 @@ mod tests {
         cx.update(|window, cx| {
             cx.set_reduce_motion(true);
             view.update(cx, |view, _| view.disabled = true);
+            window.refresh();
             window.draw(cx).clear(cx);
         });
         assert_colors_close(sample.get(), colors(ButtonVariant::Tonal, false));

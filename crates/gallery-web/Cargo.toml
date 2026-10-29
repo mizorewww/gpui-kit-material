@@ -8,6 +8,9 @@ publish = false
 [lib]
 crate-type = ["cdylib", "rlib"]
 
+[features]
+gpui-fast = ["gpui-kit/gpui-fast", "gpui-kit-material/gpui-fast"]
+
 # Shared Gallery source contains native-only profiling code. This acknowledges
 # that source's cfg without advertising a browser frame collector.
 [lints.rust]

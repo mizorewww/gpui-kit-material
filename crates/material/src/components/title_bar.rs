@@ -84,7 +84,7 @@ fn leading_for(traffic_lights: bool, height: Pixels) -> f32 {
 ///
 /// The bar sets its own height and horizontal padding after the caller's
 /// styles, so `.h()`, `.px()`, `.pl()` and `.pr()` on it have no effect.
-#[derive(IntoElement)]
+#[derive(gpui::IntoElement)]
 pub struct TitleBar {
     id: gpui::ElementId,
     base: Stateful<gpui::Div>,

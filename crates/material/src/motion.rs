@@ -293,7 +293,7 @@ fn rise_in<E: IntoElement + Styled + 'static>(
     .into_any_element()
 }
 
-#[derive(IntoElement)]
+#[derive(gpui::IntoElement)]
 struct Entrance<E: IntoElement + Styled + 'static> {
     id: ElementId,
     view: E,
@@ -377,7 +377,7 @@ mod tests {
     };
     use std::{cell::Cell, rc::Rc, time::Duration};
 
-    #[derive(IntoElement)]
+    #[derive(gpui::IntoElement)]
     struct StatefulChild {
         target: f32,
         mounts: Rc<Cell<usize>>,
@@ -583,7 +583,7 @@ mod tests {
         assert!(cx.debug_bounds("motion-reveal-content").is_none());
     }
 
-    #[derive(IntoElement)]
+    #[derive(gpui::IntoElement)]
     struct EntranceProbe {
         style: gpui::StyleRefinement,
         sample: Rc<std::cell::RefCell<gpui::StyleRefinement>>,
@@ -681,6 +681,7 @@ mod tests {
         cx.update(|window, cx| window.draw(cx).clear(cx));
         cx.update(|window, cx| {
             view.update(cx, |view, _| view.target = 1.);
+            window.refresh();
             window.draw(cx).clear(cx);
         });
         cx.executor().advance_clock(Duration::from_millis(120));
@@ -699,6 +700,7 @@ mod tests {
         );
         cx.update(|window, cx| {
             view.update(cx, |view, _| view.scheme = MotionScheme::Standard);
+            window.refresh();
             window.draw(cx).clear(cx);
         });
         assert_eq!(
@@ -708,6 +710,7 @@ mod tests {
         );
         cx.update(|window, cx| {
             view.update(cx, |view, _| view.target = 0.);
+            window.refresh();
             window.draw(cx).clear(cx);
         });
         assert_eq!(
@@ -729,6 +732,7 @@ mod tests {
         assert_eq!(sample.get(), 0.);
         cx.update(|window, cx| {
             view.update(cx, |view, _| view.target = 1.);
+            window.refresh();
             window.draw(cx).clear(cx);
         });
         cx.executor().advance_clock(Duration::from_millis(50));
@@ -746,6 +750,7 @@ mod tests {
         cx.update(|window, cx| {
             cx.set_reduce_motion(true);
             view.update(cx, |view, _| view.target = 0.);
+            window.refresh();
             window.draw(cx).clear(cx);
         });
         assert_eq!(sample.get(), 0.);
@@ -824,6 +829,7 @@ mod tests {
         assert_eq!(*sample.borrow(), start);
         cx.update(|window, cx| {
             view.update(cx, |view, _| view.target = target.clone());
+            window.refresh();
             window.draw(cx).clear(cx);
         });
         assert_eq!(*sample.borrow(), start);
@@ -838,6 +844,7 @@ mod tests {
         assert!((midpoint.0[1] - 29.2).abs() < 0.00001);
         cx.update(|window, cx| {
             view.update(cx, |view, _| view.target = start.clone());
+            window.refresh();
             window.draw(cx).clear(cx);
         });
         assert_eq!(*sample.borrow(), midpoint, "reversal must not jump");
@@ -861,6 +868,7 @@ mod tests {
         );
         cx.update(|window, cx| {
             view.update(cx, |view, _| view.target = target.clone());
+            window.refresh();
             window.draw(cx).clear(cx);
         });
         assert_eq!(
@@ -881,6 +889,7 @@ mod tests {
         cx.update(|window, cx| {
             cx.set_reduce_motion(false);
             view.update(cx, |view, _| view.target = start.clone());
+            window.refresh();
             window.draw(cx).clear(cx);
         });
         assert_eq!(

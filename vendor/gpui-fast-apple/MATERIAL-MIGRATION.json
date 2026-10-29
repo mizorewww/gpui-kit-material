@@ -1,0 +1,85 @@
+{
+  "source_package": "gpui-fast-apple",
+  "version": "0.1.12",
+  "published_vcs": null,
+  "published_checksums": null,
+  "archive_sha256": "c5f0aff0a75a63953782a609bf023c68cdb71c3dbd74478223db9bbd1b744795",
+  "source_file_sha256": {
+    ".cargo-ok": "afbf9d0f3560b0fd7795e81c42a0a79ee6b6fc67e064f77826aee642cad28d91",
+    "Cargo.lock": "e70ea4a410d6225e6c7c76362dd7fd88a790ea4aac2516b766ef2aced2674a45",
+    "Cargo.toml": "31751839a9fec38c5c4b7bce8d897ba046afdedb1a480dd07f0f30b87d6bf867",
+    "Cargo.toml.orig": "97866b0e73a8478ee46a3f7152654e47f53145caf8caf983ff52748d676a8376",
+    "LICENSE": "5f78a733701db49b73da93addad8cb74f816f3789ef30c3c0e959e943ecd99b4",
+    "README.md": "eeef048b2f4cf525444fb528bc8527a324bbbc435c1b176f5e728cad9509af87",
+    "build.rs": "f80615643780a85933590a7dbe5d841718dc7578bb159b2b581b637ac7854316",
+    "src/dispatcher.rs": "21ec54613d48cd3c419f2f694f75460d1019491c2406a7ed4dfa3374c84824cf",
+    "src/fast/composition.rs": "2ba0457a628a51f148679e02a2d60bca07fdd581b0256c0df00ba2c9a2f7a303",
+    "src/fast/layers/composite.rs": "75f3745462de069c4c97e40af7253098d1ab75144f4b3f70351cd1c4f98daa94",
+    "src/fast/layers/mod.rs": "ea50d20f8f51a8e7e4c39ef4d5859faa74d5f66ef56d73f92113261c543c9509",
+    "src/fast/layers/raster.rs": "3893062c508aca573d8317ca89633979f608a8c6d21687b2a218c2ab9eac8a62",
+    "src/fast/layers/tests.rs": "372c9850a19f239e9228d5e0f930fa0a7a17142dc1e2b25efcd91805de450a77",
+    "src/fast/layers/tile_cache.rs": "2b5203c595dc300b787813347039bcb69dec2f14e07a84b566ec6e0d1adc48ce",
+    "src/fast/mod.rs": "982f67fad27b0158e20c238833de888176a9c15b6c21b1445733897efce558f5",
+    "src/fast/paths.rs": "871a6a7129f5a19cb14ec57199fcd56590c0b3f020d7c214c701131422a9e2f7",
+    "src/fast/release_gpui/src/color.rs": "4292aa1a2bbc56b653aaef0702726325f8efb93f16226320519e257c3ba8a839",
+    "src/fast/release_gpui/src/geometry.rs": "900fc506a964cda44ed0cf1f97c01ff28d7268c87c9eeadbf7a4f1bb50e33edd",
+    "src/fast/release_gpui/src/platform/app_menu.rs": "c751e70bf50cf2366dad9d6b2a66fc3a8e9cd1547128173dbfc59520feb454cc",
+    "src/fast/release_gpui/src/platform/keyboard.rs": "8de8d585f4238204fd14113abded703afa6bb0a532dacabdf400df8249390376",
+    "src/fast/release_gpui/src/platform/keystroke.rs": "995f5791cbf50905b0ea47cca6cd628a546be355fe7b0c044c9689bdacbcb692",
+    "src/fast/release_gpui/src/platform/layer_shell.rs": "cdb4822c6589461045f09829640da3961e957d782c8e4763050b65701c90d305",
+    "src/fast/release_gpui/src/platform/platform_info.rs": "a01680ee1653b499c36ce5a49ce2a1d4377a380aa15d571ff8b36ec2181a96f0",
+    "src/fast/release_gpui/src/platform/popup.rs": "18a8aa2aaf3739c71d34233e7b2dabb4e902e5e27f9e1dcb362acd110478bb1a",
+    "src/fast/release_gpui/src/platform/scap_screen_capture.rs": "b6492678395e5a9a3335fd6babaa60192dc5b971efd32f896e33fb8fbbd7e484",
+    "src/fast/release_gpui/src/platform/test/dispatcher.rs": "dea03a78a0c64d486f2c5b7bc669ba281638a0f8ee53316a52993a0e5b5cabd0",
+    "src/fast/release_gpui/src/platform/test/display.rs": "f026713ec76569ea1402b6d1d4996636530d4f592245a0c97ac795d112f8debf",
+    "src/fast/release_gpui/src/platform/test/platform.rs": "45efc5a161664c8906c593fe9a90fb1b2643fd6fa1d9426a578908a9d600e80e",
+    "src/fast/release_gpui/src/platform/test/window.rs": "3b359c9e7943ccb065096c718756b32400dac3394bfd9ab6f361dda8163e97bd",
+    "src/fast/release_gpui/src/platform/test.rs": "52861874bfdd1433728d61bd7be3a40b1f8c27aae4e4cc9d31b311ef13bda994",
+    "src/fast/release_gpui/src/platform/threaded_dispatcher.rs": "aff57da6e74ddb0dbdb57f2c58b08236c1b78a4971e0c6d2f095f0746096f09c",
+    "src/fast/release_gpui/src/platform/visual_test.rs": "93d2a650c42546b469916ac8f5c6727da04522de58f5da1c44e6c3dd1506227f",
+    "src/fast/release_gpui/src/platform.rs": "7f95c2fe68fc225cb45451888355c4df2589632d7bde0d61fce554972f4825ca",
+    "src/fast/release_gpui/src/scene.rs": "42e120c1f817d047222784de895857fa43604c750e81a89fff2d24afe6e243a6",
+    "src/fast/release_gpui/src/window/a11y/debug.rs": "1990fae248c624dadbb83e907da9dd2e39603a118d35d39f9e497c0668ffab07",
+    "src/fast/release_gpui/src/window/a11y.rs": "765c268b7d11c30917fced0239a9541b78deac2bcce2388f2d2b8b01bd7f8ecc",
+    "src/fast/release_gpui/src/window/prompts.rs": "0d58ec14e8139af53b50f4ad67690f01959ed59ffafc4adb2cf522f3f6197164",
+    "src/fast/release_gpui/src/window.rs": "d3f00c28cc47446f6c73be67d00830446e0e3a9a7fadefdf54fff9e5ccadee0b",
+    "src/fast/rounded_clip.rs": "06e58c1a187465b5796b337b59a71cbb88d9bd7290fee0865935ee7d40955836",
+    "src/fast/rounded_clip_shader.rs": "e48e86dee268738339c89589279be7fcf9a44d8ad62c43a56c6cf5d722e216b1",
+    "src/fast/text_system.rs": "5f9d30568959fb13756fddc34702071cbfb61c0f99548ebdb5480802d9592a42",
+    "src/gpui_apple.rs": "868b4a245f9d24ef1831dad36132ce90fd2ac96a7edbdac6597dc04ae246bb21",
+    "src/keychain.rs": "636ce5b08fe6e939dfef73fafc3be719b21b35da356a7d7053afe4dbf4d6f71c",
+    "src/metal_atlas.rs": "c414bf9caf88413b04fb6a3214c4f070686b454c82c28fa471af9d1bcc91ddba",
+    "src/metal_renderer.rs": "1634c0370a04cb88f598a1674bf146f6c285f5e6f2c947a772cbde43096a9cf9",
+    "src/open_type.rs": "bc827c157fdce50125b158adb595b665d82f38b62fc6b3a9693c65abae640453",
+    "src/shaders.metal": "5ceaf9120161fa6f1a1addb171945459b24214d87dfecf6ed70f939b6e869576",
+    "src/text_system.rs": "31ae84947cdb3f47314a04a68d9efbcecbe6e5d11e903e969487c235ad0b8b58",
+    "src/thermal.rs": "a894594d2676d81968554171738ed6c42f0d0d859201f5658ab138f222e08395"
+  },
+  "local_patch_base": "gpui-pre-apple 0.3.10",
+  "migrated": [
+    {
+      "path": "src/open_type.rs",
+      "status": "merged",
+      "local_sha256": "b346e8c86fb4fbb2fe08d9cf9d357fe04fafb130b394f2294d76d40e2900764f"
+    },
+    {
+      "path": "src/text_system.rs",
+      "status": "merged",
+      "local_sha256": "eed9cc05b1d164ea606ac7eb3f0e56a2fb81a1b49f983e6550360f7483d0a266"
+    },
+    {
+      "path": "tests/detailed_layout.rs",
+      "status": "added",
+      "local_sha256": "3759e317a8566b16c91438ce335946f6edd1b83a5d2d5eb3f58387a0ce7d2d05"
+    }
+  ],
+  "conflicts": [],
+  "validation": "source migration only; no build/tests",
+  "manifest_changes": [
+    "unicode-bidi 0.3.18; detailed_layout test"
+  ],
+  "archive_verification": {
+    "files": 48,
+    "mismatches": []
+  }
+}

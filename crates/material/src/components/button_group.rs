@@ -34,7 +34,7 @@ struct OptionItem {
     label: SharedString,
 }
 
-#[derive(IntoElement)]
+#[derive(gpui::IntoElement)]
 pub struct ConnectedButtonGroup {
     id: ElementId,
     label: SharedString,

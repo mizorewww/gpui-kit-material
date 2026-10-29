@@ -216,7 +216,7 @@ mod tile_group {
     /// One section: a quiet title above a connected group of tiles, each
     /// item on its own surface with 24px outer and 6px inner corners and 2px
     /// between tiles, at the group's [`TileScale`].
-    #[derive(IntoElement)]
+    #[derive(gpui::IntoElement)]
     pub struct TileGroup {
         id: SharedString,
         title: SharedString,

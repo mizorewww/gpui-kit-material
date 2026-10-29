@@ -1,7 +1,7 @@
 [workspace]
 resolver = "3"
 members = ["crates/color", "crates/material", "crates/gallery-web"]
-exclude = ["vendor/gpui-kit", "vendor/gpui-base", "vendor/gpui-pre", "vendor/gpui-pre-web", "vendor/gpui-pre-apple"]
+exclude = ["vendor/gpui-kit", "vendor/gpui-base", "vendor/gpui-pre", "vendor/gpui-pre-web", "vendor/gpui-pre-apple", "vendor/gpui-fast", "vendor/gpui-fast-web", "vendor/gpui-fast-apple"]
 
 [workspace.package]
 version = "0.1.0"
@@ -31,6 +31,9 @@ debug = "line-tables-only"
 opt-level = 3
 
 [patch.crates-io]
+gpui-fast = { path = "vendor/gpui-fast" }
+gpui-fast-web = { path = "vendor/gpui-fast-web" }
+gpui-fast-apple = { path = "vendor/gpui-fast-apple" }
 gpui-base = { path = "vendor/gpui-base" }
 gpui-pre = { path = "vendor/gpui-pre" }
 gpui-pre-web = { path = "vendor/gpui-pre-web" }
