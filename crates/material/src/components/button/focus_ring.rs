@@ -2,7 +2,7 @@
 use crate::{color::ColorRole, theme::color};
 use gpui::*;
 
-pub(super) struct ButtonFocusRing {
+pub(crate) struct ButtonFocusRing {
     child: AnyElement,
     focus: FocusHandle,
     enabled: bool,
@@ -11,7 +11,7 @@ pub(super) struct ButtonFocusRing {
     observed: Option<std::rc::Rc<std::cell::Cell<Option<Bounds<Pixels>>>>>,
 }
 impl ButtonFocusRing {
-    pub(super) fn new(
+    pub(crate) fn new(
         child: impl IntoElement,
         focus: FocusHandle,
         enabled: bool,

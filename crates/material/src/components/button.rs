@@ -8,6 +8,7 @@ mod playback;
 pub use playback::{ButtonTransitionInputs, ButtonTransitionPlayback};
 mod effects;
 mod focus_ring;
+pub(crate) use focus_ring::ButtonFocusRing;
 mod hit_target;
 #[cfg(test)]
 mod loading_tests;
@@ -1266,7 +1267,7 @@ impl RenderOnce for MaterialButton {
             cx,
         )
         .hit_target(target_geometry);
-        focus_ring::ButtonFocusRing::new(
+        ButtonFocusRing::new(
             base,
             focus,
             !self.disabled && self.focusable,
