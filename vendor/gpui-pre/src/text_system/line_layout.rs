@@ -12,7 +12,7 @@ use std::{
     },
 };
 
-use super::LineWrapper;
+use super::{DetailedLineLayout, LineLayoutOptions, LineWrapper};
 
 /// A laid out and styled line of text
 #[derive(Default, Debug)]
@@ -467,6 +467,8 @@ pub(crate) struct LineLayoutCache {
 
 #[derive(Default)]
 struct FrameCache {
+    detailed_lines: FxHashMap<Arc<DetailedCacheKey>, Arc<DetailedLineLayout>>,
+    used_detailed_lines: Vec<Arc<DetailedCacheKey>>,
     lines: FxHashMap<Arc<CacheKey>, Arc<LineLayout>>,
     wrapped_lines: FxHashMap<Arc<CacheKey>, Arc<WrappedLineLayout>>,
     used_lines: Vec<Arc<CacheKey>>,
@@ -487,6 +489,7 @@ struct FrameCache {
 #[derive(Clone, Default)]
 pub(crate) struct LineLayoutIndex {
     font_generation: usize,
+    detailed_lines_index: usize,
     lines_index: usize,
     wrapped_lines_index: usize,
     lines_by_hash_index: usize,
@@ -513,6 +516,7 @@ impl LineLayoutCache {
         let frame = self.current_frame.read();
         LineLayoutIndex {
             font_generation,
+            detailed_lines_index: frame.used_detailed_lines.len(),
             lines_index: frame.used_lines.len(),
             wrapped_lines_index: frame.used_wrapped_lines.len(),
             lines_by_hash_index: frame.used_lines_by_hash.len(),
@@ -529,6 +533,15 @@ impl LineLayoutCache {
         }
         let mut current_frame = &mut *self.current_frame.write();
         let mut previous_frame = &mut *self.previous_frame.lock();
+
+        for key in &previous_frame.used_detailed_lines
+            [range.start.detailed_lines_index..range.end.detailed_lines_index]
+        {
+            if let Some((key, line)) = previous_frame.detailed_lines.remove_entry(key) {
+                current_frame.detailed_lines.insert(key, line);
+            }
+            current_frame.used_detailed_lines.push(key.clone());
+        }
 
         for key in &previous_frame.used_lines[range.start.lines_index..range.end.lines_index] {
             if let Some((key, line)) = previous_frame.lines.remove_entry(key) {
@@ -571,6 +584,9 @@ impl LineLayoutCache {
             return;
         }
         let mut current_frame = &mut *self.current_frame.write();
+        current_frame
+            .used_detailed_lines
+            .truncate(index.detailed_lines_index);
         current_frame.used_lines.truncate(index.lines_index);
         current_frame
             .used_wrapped_lines
@@ -588,6 +604,8 @@ impl LineLayoutCache {
         let mut curr_frame = self.current_frame.write();
         let mut prev_frame = self.previous_frame.lock();
         std::mem::swap(&mut *prev_frame, &mut *curr_frame);
+        curr_frame.detailed_lines.clear();
+        curr_frame.used_detailed_lines.clear();
         curr_frame.lines.clear();
         curr_frame.wrapped_lines.clear();
         curr_frame.used_lines.clear();
@@ -872,6 +890,43 @@ impl LineLayoutCache {
         layout
     }
 
+    /// Opt-in metadata layouts have a separate cache: a legacy hit cannot be
+    /// mistaken for a direction-aware result with complete cluster information.
+    pub fn layout_line_with_options(
+        &self,
+        text: &SharedString,
+        font_size: Pixels,
+        runs: &[FontRun],
+        options: LineLayoutOptions,
+    ) -> crate::Result<Arc<DetailedLineLayout>> {
+        let _font_generation = self.clear_if_font_generation_changed();
+        let key = Arc::new(DetailedCacheKey {
+            text: text.clone(),
+            font_size,
+            runs: SmallVec::from(runs),
+            options,
+        });
+        let mut frame = self.current_frame.write();
+        if let Some(layout) = frame.detailed_lines.get(&key).cloned() {
+            // Record every user, including a second cached view in this frame.
+            frame.used_detailed_lines.push(key);
+            return Ok(layout);
+        }
+        if let Some((key, layout)) = self.previous_frame.lock().detailed_lines.remove_entry(&key) {
+            frame.detailed_lines.insert(key.clone(), layout.clone());
+            frame.used_detailed_lines.push(key);
+            return Ok(layout);
+        }
+        let layout = self
+            .platform_text_system
+            .layout_line_with_options(text, font_size, runs, options)?;
+        layout.validate(text, options)?;
+        let layout = Arc::new(layout);
+        frame.detailed_lines.insert(key.clone(), layout.clone());
+        frame.used_detailed_lines.push(key);
+        Ok(layout)
+    }
+
     fn clear_if_font_generation_changed(&self) -> usize {
         let font_generation = self.font_generation.load(Ordering::Acquire);
         if self.cached_font_generation.load(Ordering::Acquire) == font_generation {
@@ -927,6 +982,14 @@ fn apply_force_width_to_layout(layout: &mut LineLayout, force_width: Pixels) {
 pub struct FontRun {
     pub len: usize,
     pub font_id: FontId,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+struct DetailedCacheKey {
+    text: SharedString,
+    font_size: Pixels,
+    runs: SmallVec<[FontRun; 1]>,
+    options: LineLayoutOptions,
 }
 
 trait AsCacheKeyRef {
@@ -1186,5 +1249,111 @@ mod tests {
 
         let positions = glyph_x_positions(&layout);
         assert_eq!(positions, vec![0.5, 0.5]);
+    }
+}
+
+#[cfg(test)]
+mod detailed_cache_tests {
+    use super::*;
+    use crate::{NoopTextSystem, ParagraphDirection};
+
+    #[test]
+    fn detailed_cache_tracks_each_consumer_and_font_generation() {
+        let generation = Arc::new(AtomicUsize::new(0));
+        let cache = LineLayoutCache::new(Arc::new(NoopTextSystem), generation.clone());
+        let text = SharedString::from("");
+        let options = LineLayoutOptions {
+            paragraph_direction: ParagraphDirection::Ltr,
+        };
+        let key = Arc::new(DetailedCacheKey {
+            text: text.clone(),
+            font_size: px(16.),
+            runs: SmallVec::new(),
+            options,
+        });
+        let layout = Arc::new(DetailedLineLayout {
+            layout: Arc::new(LineLayout::default()),
+            clusters: vec![],
+            paragraph_direction: ParagraphDirection::Ltr,
+        });
+        // Seed a valid result: the noop backend intentionally cannot produce detailed layouts.
+        cache
+            .current_frame
+            .write()
+            .detailed_lines
+            .insert(key, layout.clone());
+        cache
+            .layout_line_with_options(&text, px(16.), &[], options)
+            .unwrap();
+        let second_start = cache.layout_index();
+        let hit = cache
+            .layout_line_with_options(&text, px(16.), &[], options)
+            .unwrap();
+        assert!(Arc::ptr_eq(&hit, &layout));
+        let second_end = cache.layout_index();
+        assert_eq!(second_end.detailed_lines_index, 2);
+        cache.finish_frame();
+        // Only the second consumer survives: it must independently preserve the entry.
+        cache.reuse_layouts(second_start..second_end);
+        cache.finish_frame();
+        assert!(Arc::ptr_eq(
+            &cache
+                .layout_line_with_options(&text, px(16.), &[], options)
+                .unwrap(),
+            &layout
+        ));
+        let index = cache.layout_index();
+        cache
+            .layout_line_with_options(&text, px(16.), &[], options)
+            .unwrap();
+        cache.truncate_layouts(index.clone());
+        assert_eq!(
+            cache.layout_index().detailed_lines_index,
+            index.detailed_lines_index
+        );
+        // Different paragraph options and font size cannot reuse the seeded result.
+        assert!(
+            cache
+                .layout_line_with_options(
+                    &text,
+                    px(16.),
+                    &[],
+                    LineLayoutOptions {
+                        paragraph_direction: ParagraphDirection::Rtl
+                    }
+                )
+                .is_err()
+        );
+        assert!(
+            cache
+                .layout_line_with_options(&text, px(17.), &[], options)
+                .is_err()
+        );
+        assert!(
+            cache
+                .layout_line_with_options(&SharedString::from("x"), px(16.), &[], options)
+                .is_err()
+        );
+        assert!(
+            cache
+                .layout_line_with_options(
+                    &text,
+                    px(16.),
+                    &[FontRun {
+                        len: 0,
+                        font_id: FontId(1)
+                    }],
+                    options
+                )
+                .is_err()
+        );
+        generation.fetch_add(1, Ordering::Release);
+        assert!(
+            cache
+                .layout_line_with_options(&text, px(16.), &[], options)
+                .is_err()
+        );
+        assert!(cache.current_frame.read().detailed_lines.is_empty());
+        assert!(cache.previous_frame.lock().detailed_lines.is_empty());
     }
 }
