@@ -242,9 +242,12 @@ pub(crate) fn modal_focus(
 
 /// The modal scrim at the overlay's fade.
 pub(crate) fn scrim(fade: f32) -> Div {
+    // The scrim blocks the pointer (and wheel) from the content behind, so
+    // the page under a modal surface cannot scroll its owner away.
     div()
         .absolute()
         .inset_0()
+        .occlude()
         .bg(color(ColorRole::SCRIM).opacity(SCRIM_OPACITY * fade.clamp(0., 1.)))
 }
 
