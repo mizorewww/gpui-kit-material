@@ -13,6 +13,7 @@ categories = ["gui"]
 [features]
 default = ["serde"]
 serde = ["gpui-kit-material-color/serde"]
+frame-profiler = ["gpui/profiler"]
 
 [dependencies]
 gpui-kit-material-color.workspace = true

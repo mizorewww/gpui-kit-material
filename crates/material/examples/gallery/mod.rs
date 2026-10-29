@@ -3,6 +3,8 @@
 //! `cargo run -p gpui-kit-material --example gallery`
 #[cfg(not(target_family = "wasm"))]
 pub mod capture;
+#[cfg(all(not(target_family = "wasm"), feature = "frame-profiler"))]
+mod performance;
 
 use gpui::{prelude::*, *};
 use gpui_kit_material::color::palette::ALL as PALETTES;
@@ -965,6 +967,8 @@ impl Render for Gallery {
 }
 
 pub fn run(application: gpui::Application, initialize: impl FnOnce(&mut App) + 'static) {
+    #[cfg(all(not(target_family = "wasm"), feature = "frame-profiler"))]
+    let profiling = performance::prepare();
     let application = application.with_assets(Assets::new());
     application.run(move |cx: &mut App| {
         initialize(cx);
@@ -991,7 +995,11 @@ pub fn run(application: gpui::Application, initialize: impl FnOnce(&mut App) + '
                 window_bounds: Some(WindowBounds::Windowed(bounds)),
                 ..Default::default()
             },
-            |window, cx| {
+            move |window, cx| {
+                #[cfg(all(not(target_family = "wasm"), feature = "frame-profiler"))]
+                if let Some(profiling) = profiling {
+                    profiling.install(window, cx);
+                }
                 let gallery = cx.new(|cx| {
                     let search = cx.new(|cx| {
                         gpui_base::input::InputState::new(window, cx)
