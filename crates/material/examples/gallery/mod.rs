@@ -115,8 +115,37 @@ impl Render for Gallery {
                             .text_size(TEXT_AUX),
                     )
             });
+        let typography_samples = TypeRole::ALL.into_iter().map(|role| {
+            let spec = role.scale();
+            gpui_base::v_flex()
+                .gap(rem(4.))
+                .child(
+                    accessible_text(
+                        SharedString::from(format!("type-label-{}", role.name())),
+                        role.name(),
+                    )
+                    .text_size(TEXT_AUX)
+                    .text_color(color(ColorRole::ON_SURFACE_VARIANT)),
+                )
+                .child(
+                    accessible_text(
+                        SharedString::from(format!("type-sample-{}", role.name())),
+                        "The quick brown fox jumps over the lazy dog",
+                    )
+                    .whitespace_normal()
+                    .font_family(spec.font_family)
+                    .font_weight(FontWeight(spec.font_weight as f32))
+                    .text_size(spec.font_size)
+                    .line_height(spec.line_height),
+                )
+        });
         let scale = ConnectedButtonGroup::new("scale", "Text size")
-            .options([("1", "100%"), ("1.25", "125%"), ("1.5", "150%")])
+            .options([
+                ("1", "100%"),
+                ("1.25", "125%"),
+                ("1.5", "150%"),
+                ("2", "200%"),
+            ])
             .selected(self.scale.clone())
             .on_change(cx.listener(|this, value: &SharedString, _, cx| {
                 this.scale = value.clone();
@@ -428,6 +457,12 @@ impl Render for Gallery {
                                     .gap(rem(12.))
                                     .children(color_swatches),
                             ),
+                    )
+                    .child(
+                        gpui_base::v_flex()
+                            .gap(rem(20.))
+                            .child(section_title("type-scale", "Typography"))
+                            .children(typography_samples),
                     ),
             )
             .child(CaptionButtons::new(app_bar_height(window)))

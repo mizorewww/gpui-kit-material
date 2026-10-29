@@ -19,9 +19,9 @@ pub const TEXT_READER: Rems = rem(16.);
 pub const TEXT_TITLE: Rems = rem(18.);
 /// Section headings on a page (22px).
 pub const TEXT_SECTION: Rems = rem(22.);
-/// Legacy page title size (30px); use `TypeRole::HeadlineSmall` for M3 metrics.
-pub const TEXT_HEADLINE: Rems = rem(30.);
-pub const HEADLINE_LINE_HEIGHT: Rems = rem(36.);
+/// Page titles use the reference headline-small role (24px / 32px).
+pub const TEXT_HEADLINE: Rems = TypeRole::HeadlineSmall.scale().font_size;
+pub const HEADLINE_LINE_HEIGHT: Rems = TypeRole::HeadlineSmall.scale().line_height;
 /// Settings content reads one step larger than navigation.
 pub const TEXT_SETTINGS_BODY: Rems = rem(16.);
 pub const TEXT_SETTINGS_AUX: Rems = TEXT_BODY;

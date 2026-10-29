@@ -69,6 +69,19 @@ the font) for the web platform's default text measurements. Use
 `./scripts/build-gallery-web.sh --release` for an optimized build. Generated
 bindings stay out of Git.
 
+Both gallery targets use the reference site's Roboto 400/500 font files, with
+pinned source hashes and the SIL OFL in
+`crates/material/examples/gallery/fonts/roboto`. Rebuild the static fonts with:
+
+```sh
+uv run --with 'fonttools[woff]==4.60.1' python scripts/build-reference-fonts.py
+```
+
+The Typography section displays all 15 reference roles, and the text scale
+selector supports 100%, 125%, 150%, and 200%. The page title uses headline-small
+(24px / 32px at 100%). Reference letter-spacing values are stored in the tokens;
+GPUI tracking support and full component typography alignment remain pending.
+
 Component alignment is tracked in [`conformance/md3.json`](conformance/md3.json).
 An available gallery example does not imply visual or motion conformance;
 each component needs independent review and desktop/browser evidence.
