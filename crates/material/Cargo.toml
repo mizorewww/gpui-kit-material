@@ -11,13 +11,15 @@ keywords = ["material", "material-design", "gpui", "ui", "desktop"]
 categories = ["gui"]
 
 [features]
-default = ["serde"]
+default = ["serde", "embedded-symbols"]
+embedded-symbols = ["gpui-material-symbols/embed-assets"]
 serde = ["gpui-kit-material-color/serde"]
 frame-profiler = ["gpui-kit/profiler"]
 
 [dependencies]
 gpui-kit-material-color.workspace = true
 gpui-kit.workspace = true
+gpui-material-symbols = { git = "https://github.com/mizorewww/gpui-material-symbols", branch = "main", default-features = false, features = ["gpui-kit"] }
 gpui.workspace = true
 gpui-base.workspace = true
 anyhow.workspace = true

@@ -12,8 +12,8 @@ identified Component presentation gap; do not build a parallel generic toolkit.
 The galleries use the Kit facade for application initialization and window
 creation. The Material-to-Component theme bridge runs before Root preparation.
 Existing Material controls and regression fixtures still import GPUI/Base
-directly, resolving to the same patched packages as Kit. Symbols and individual
-control migration remain pending. Existing compatibility fixes must remain until
+directly, resolving to the same patched packages as Kit. Symbols provide the shared icon source; individual
+control migration remains pending. Existing compatibility fixes must remain until
 the same behavior is verified through the replacement dependency graph.
 The source-based reuse and removal conditions are recorded in
 [conformance/reuse-audit.json](../conformance/reuse-audit.json).
@@ -61,11 +61,22 @@ spacing and elevation remain Material-owned. Unmanaged fields retain Component
 mode-configuration behavior. This is currently a single-gallery-window policy,
 not independent per-window themes.
 
-**Icons.** Reuse the sibling Symbols repository's `MaterialSymbols` asset source,
-Kit `IconNamed` implementations and icon conversion. Retain only Material sizing,
-axis selection or API compatibility that the shared implementation cannot supply.
-Do not duplicate its font parser or SVG generation. Keep the dependency direction
-acyclic and preserve all styles, axes and supplemental variants.
+**Icons.** The sibling Symbols repository owns the asset source, font/SVG
+conversion, catalog and axes. Material's `Icon` only preserves its 20px default
+and existing size/color/rotation builders over Component Icon. The semantic
+`IconName` aliases use Rounded, FILL=0, weight 400, grade 0 and optical size 24,
+matching the primary reference site source (`apps/site/scripts/icons.js` and
+generated icon tokens at `3b1e004`). They return canonical `material-symbols/` paths; old literal
+`material-kit/icons/` paths are removed. Configured `SymbolIcon` conversions
+preserve all axes and styles, including selected FILL.
+
+Material initialization precomputes 103 Kit default path translations. The
+resolver only performs a hash lookup and clones the shared path during drawing.
+GitHub, heart-off and star-off have no equivalent and remain caller-owned; six
+approximate translations remain explicitly pending visual review. Raw SVG/data
+icons bypass the resolver. This is not blanket icon-conformance acceptance.
+Symbols SVG generation currently relies on GPUI's raster cache; cold-load and
+new-size/DPR costs still require measurement before adding another cache.
 
 **One GPUI.** During migration, align Kit and Symbols to the same source and
 resolved revision; a Git Base and registry Base with equal version numbers are
@@ -77,10 +88,12 @@ in `vendor/gpui-kit`. Its normalized manifest disables implicit WASM threading;
 `multithreaded-web` explicitly restores that capability and its toolchain/runtime
 requirements. Native platform defaults are preserved. Source hashes and the
 reproducible manifest normalization are recorded alongside the facade.
-The temporary Kit asset fallback embeds desktop icons but requests
-`/assets/icons/*.svg` on WASM. The Gallery web packaging does not yet supply
-that fallback catalog; existing Material icons remain embedded. Component icon
-coverage is unverified until the pending Symbols integration replaces it.
+The Gallery uses embedded Material Symbols on both targets, without Kit's
+HTTP icon fallback. Material's `embedded-symbols` default feature can be disabled
+by consumers that provide Symbols assets at runtime. The Symbols repository's
+Web consumer does this to retain its incremental downloads. The repositories
+must be adjacent for these workspace path patches; downstream builds need the
+same patch policy until the compatibility fixes are upstream.
 The vendored Base contains that
 revision's source plus the compatibility patches; both crates.io and Git Base
 references resolve to this one path package. GPUI remains exactly `=0.3.10`.

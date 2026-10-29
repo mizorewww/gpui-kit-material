@@ -4,6 +4,12 @@ on:
     branches: [main]
   pull_request:
 
+defaults:
+  run:
+    working-directory: gpui-kit-material
+env:
+  CARGO_BUILD_JOBS: 2
+
 jobs:
   check:
     strategy:
@@ -13,10 +19,19 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          path: gpui-kit-material
+      - uses: actions/checkout@v4
+        with:
+          repository: mizorewww/gpui-material-symbols
+          ref: d73f27c1b14d1a8330fb837945bb09b282257f1e
+          path: gpui-material-symbols
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy, rustfmt
       - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: gpui-kit-material -> target
       - name: Linux libraries
         if: runner.os == 'Linux'
         run: |
@@ -35,11 +50,20 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          path: gpui-kit-material
+      - uses: actions/checkout@v4
+        with:
+          repository: mizorewww/gpui-material-symbols
+          ref: d73f27c1b14d1a8330fb837945bb09b282257f1e
+          path: gpui-material-symbols
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy
           targets: wasm32-unknown-unknown
       - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: gpui-kit-material -> target
       - name: Check the WASM gallery
         run: cargo clippy --locked -p gpui-kit-material-gallery-web --target wasm32-unknown-unknown -- -D warnings
       - name: Install the matching browser binding generator

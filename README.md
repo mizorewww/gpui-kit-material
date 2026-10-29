@@ -5,8 +5,8 @@ Material 3 design tokens, motion and components for
 Material layer over its `gpui-component` controls and shared behavior, reusing
 Kit's facade, lifecycle and Material Symbols integration. Both gallery targets
 use Kit initialization and window creation, with one shared GPUI/Base dependency
-graph and a Material-to-Component theme bridge. Individual control and Symbols
-migration remains in progress; see [the architecture](docs/ARCHITECTURE.md).
+graph and a Material-to-Component theme bridge. Symbols now supply the shared
+icon source; individual control migration remains in progress; see [the architecture](docs/ARCHITECTURE.md).
 
 The kit started as the shared design primitives of the
 [course2md](https://github.com/mizorewww/course2md) desktop app. It is being
@@ -20,11 +20,15 @@ grown into a complete **Material 3 Expressive** implementation; see
 
 ## Use
 
+For workspace development, clone `gpui-material-symbols` alongside this repository
+as `../gpui-material-symbols`. The workspace patch uses that source; keep both
+repositories updated together.
+
 ```rust
 use gpui_kit_material::{icons::Assets, prelude::*, theme};
 
 gpui_kit::application()
-    .with_assets(Assets::with(gpui_kit::assets::Assets))
+    .with_assets(Assets::new())
     .run(|cx| {
         gpui_kit::init(cx);
         gpui_kit_material::init(cx);
@@ -289,5 +293,6 @@ review remain separate from build checks.
 ## License
 
 MIT. Palette sources and their licenses are listed in
-[crates/color/PALETTES.md](crates/color/PALETTES.md); Lucide glyphs are ISC
-([LICENSE-lucide](crates/material/assets/icons/LICENSE-lucide)).
+[crates/color/PALETTES.md](crates/color/PALETTES.md). Google Material Symbols
+assets and the sibling Symbols integration are Apache-2.0; their source snapshots
+and licenses are retained in `../gpui-material-symbols`.

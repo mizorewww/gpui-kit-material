@@ -1264,9 +1264,10 @@
   "icon_source": {
     "repository": "https://github.com/mizorewww/gpui-material-symbols",
     "local_path": "../gpui-material-symbols",
-    "policy": "Use this repository for Material icons; improve its coverage, rendering and performance as needed while preserving its GPUI Kit compatibility and separate optional Material adapter.",
-    "status": "integration pending",
-    "commits": "atomic by concern in each affected repository"
+    "policy": "Use the sibling Symbols library and its Kit integration; keep the Material consumer in a separate package so the library never depends on Material.",
+    "status": "integrated: canonical Symbols paths and Component Icon rendering; 103 Kit default translations, 3 explicit unsupported paths, 6 approximate translations; visual and performance acceptance pending",
+    "commits": "atomic by concern in each affected repository",
+    "inspected_commit": "d73f27c1b14d1a8330fb837945bb09b282257f1e"
   },
   "implementation_foundation": {
     "repository": "https://github.com/longbridge/gpui-kit",
@@ -1274,7 +1275,7 @@
     "entrypoint": "gpui-kit",
     "preferred_components": "gpui_kit::component (gpui-component)",
     "base": "use for source-verified presentation gaps, not as a blanket replacement for Component",
-    "status": "Kit startup and Component theme bridge integrated; control and Symbols migration pending; runtime visual/performance acceptance unverified",
+    "status": "Kit startup, Component theme bridge and Symbols integration implemented; individual control migration and runtime visual/performance acceptance pending",
     "icons": "reuse ../gpui-material-symbols Kit integration with the same dependency source/revision",
     "audit": "conformance/reuse-audit.json"
   }

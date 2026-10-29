@@ -9,7 +9,7 @@
 //! | Theme | [`theme`] | the painted scheme, palette transitions, [`theme::color`] |
 //! | Tokens | [`tokens`] | shape, type scale, layout metrics, elevation, state layers |
 //! | Motion | [`motion`] | M3 springs, entrances, retargetable values |
-//! | Icons | [`icons`] | the kit's own glyphs and their [`icons::Assets`] |
+//! | Icons | [`icons`] | Google Material Symbols through [`icons::Assets`] |
 //! | Components | [`components`] | Material presentation over Kit components and Base parts |
 //!
 //! Reuse [`gpui_kit::component`] controls where their presentation hooks meet the
@@ -17,8 +17,7 @@
 //! kit owns the Material appearance and motion, not another generic UI runtime.
 //!
 //! Call `gpui_kit::init` and then [`init`] once at startup. Use Kit's
-//! `open_window` for the single Root, compose [`icons::Assets`] with the Kit asset
-//! source, and initialize [`theme::init_component_theme`] before Root's first
+//! `open_window` for the single Root, register [`icons::Assets`], and initialize [`theme::init_component_theme`] before Root's first
 //! render. Advance [`theme::advance_component_theme`] from input events and
 //! pre-frame callbacks. Base-only consumers can continue to use [`theme::apply`].
 pub use gpui_kit_material_color as color;
@@ -33,6 +32,7 @@ pub use theme::color;
 
 /// Register the kit's key bindings. Call once, before opening windows.
 pub fn init(cx: &mut gpui::App) {
+    icons::init(cx);
     components::init(cx);
 }
 

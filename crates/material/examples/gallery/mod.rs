@@ -1041,11 +1041,7 @@ impl Render for Gallery {
 pub fn run(application: gpui::Application, initialize: impl FnOnce(&mut App) + 'static) {
     #[cfg(all(not(target_family = "wasm"), feature = "frame-profiler"))]
     let profiling = performance::prepare();
-    #[cfg(not(target_family = "wasm"))]
-    let kit_assets = gpui_kit::assets::Assets;
-    #[cfg(target_family = "wasm")]
-    let kit_assets = gpui_kit::assets::Assets::default();
-    let application = application.with_assets(Assets::with(kit_assets));
+    let application = application.with_assets(Assets::new());
     application.run(move |cx: &mut App| {
         #[cfg(target_family = "wasm")]
         cx.text_system()

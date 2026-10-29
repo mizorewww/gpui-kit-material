@@ -2490,6 +2490,7 @@ dependencies = [
  "gpui-base",
  "gpui-kit",
  "gpui-kit-material-color",
+ "gpui-material-symbols",
  "gpui-pre",
  "serde_json",
  "web-time",
@@ -2513,6 +2514,15 @@ dependencies = [
  "gpui-pre",
  "wasm-bindgen",
  "web-sys",
+]
+
+[[package]]
+name = "gpui-material-symbols"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "gpui-kit",
+ "ttf-parser",
 ]
 
 [[package]]
