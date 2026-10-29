@@ -638,8 +638,10 @@ impl Render for Gallery {
     }
 }
 
-pub fn run(application: gpui::Application) {
-    application.with_assets(Assets::new()).run(|cx: &mut App| {
+pub fn run(application: gpui::Application, initialize: impl FnOnce(&mut App) + 'static) {
+    let application = application.with_assets(Assets::new());
+    application.run(move |cx: &mut App| {
+        initialize(cx);
         #[cfg(target_family = "wasm")]
         cx.text_system()
             .add_fonts(vec![std::borrow::Cow::Borrowed(include_bytes!(

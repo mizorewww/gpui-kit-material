@@ -3,5 +3,5 @@
 mod gallery;
 
 fn main() {
-    gallery::run(gpui_platform::application());
+    gallery::run(gpui_platform::application(), |_| {});
 }

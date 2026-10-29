@@ -1954,6 +1954,7 @@ dependencies = [
  "gpui-pre",
  "gpui-pre-platform",
  "wasm-bindgen",
+ "web-sys",
 ]
 
 [[package]]
