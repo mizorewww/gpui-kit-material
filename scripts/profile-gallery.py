@@ -21,13 +21,16 @@ def output(*args):
     return subprocess.check_output(args, cwd=ROOT)
 
 
-def source_identity():
+def repository_identity(root):
     # Include staged, unstaged and non-ignored untracked inputs without copying
     # their contents into the evidence. Ignored build output is not source.
-    files = output("git", "ls-files", "-z", "--cached", "--others", "--exclude-standard")
+    def git(*args):
+        return subprocess.check_output(["git", "-C", str(root), *args])
+
+    files = git("ls-files", "-z", "--cached", "--others", "--exclude-standard")
     digest = hashlib.sha256()
     for name in sorted(set(files.split(b"\0")) - {b""}):
-        path = ROOT / os.fsdecode(name)
+        path = root / os.fsdecode(name)
         digest.update(name + b"\0")
         if path.is_symlink():
             digest.update(b"symlink\0" + os.fsencode(os.readlink(path)))
@@ -40,10 +43,69 @@ def source_identity():
             digest.update(b"missing\0")
         digest.update(b"\0")
     return {
-        "commit": output("git", "rev-parse", "HEAD").decode().strip(),
-        "status": output("git", "status", "--porcelain").decode(),
+        "repository": str(root),
+        "commit": git("rev-parse", "HEAD").decode().strip(),
+        "status": git("status", "--porcelain", "--untracked-files=all").decode(),
         "source_files_sha256": digest.hexdigest(),
         "scope": "tracked and non-ignored untracked files; external configuration is not fingerprinted",
+    }
+
+
+def source_identity():
+    # Match the feature selection of the build. Resolve metadata on every check
+    # so changing a path dependency or its feature graph cannot evade comparison.
+    # Do not persist raw metadata: it can contain registry URLs and arbitrary
+    # package metadata. Keep only local package identities and dependency edges.
+    command = ["cargo", "metadata", "--locked", "--format-version", "1",
+               "--features", "frame-profiler"]
+    metadata = json.loads(output(*command))
+    packages = {package["id"]: package for package in metadata["packages"]}
+    nodes = {node["id"]: node for node in metadata["resolve"]["nodes"]}
+    material_manifest = ROOT / "crates/material/Cargo.toml"
+    seeds = [key for key, package in packages.items()
+             if Path(package["manifest_path"]).resolve() == material_manifest]
+    if len(seeds) != 1:
+        raise RuntimeError("metadata did not resolve exactly one Material package")
+    reachable = set()
+    pending = seeds[:]
+    while pending:
+        key = pending.pop()
+        if key not in reachable:
+            reachable.add(key)
+            pending.extend(nodes[key]["dependencies"])
+
+    root = ROOT.resolve()
+    repositories = {}
+    local_packages = []
+    for key in sorted(reachable):
+        package = packages[key]
+        if package["source"] is not None:
+            continue
+        manifest = Path(package["manifest_path"]).resolve()
+        identity = {
+            "name": package["name"], "version": package["version"],
+            "manifest": str(manifest),
+            "manifest_sha256": hashlib.sha256(manifest.read_bytes()).hexdigest(),
+            "features": sorted(nodes[key]["features"]),
+            "dependencies": sorted({packages[dep]["name"] + "@" + packages[dep]["version"]
+                                    for dep in nodes[key]["dependencies"]}),
+        }
+        if root not in manifest.parents:
+            # A non-Git external source cannot be fingerprinted by this policy;
+            # fail closed instead of silently omitting it from the evidence.
+            repo = Path(subprocess.check_output(
+                ["git", "-C", str(manifest.parent), "rev-parse", "--show-toplevel"]
+            ).decode().strip()).resolve()
+            identity["external_repository"] = str(repo)
+            if str(repo) not in repositories:
+                repositories[str(repo)] = repository_identity(repo)
+        local_packages.append(identity)
+    return {
+        "root": repository_identity(root),
+        "metadata_command": command,
+        "local_packages": sorted(local_packages, key=lambda package: package["manifest"]),
+        "external_repositories": [repositories[key] for key in sorted(repositories)],
+        "dependency_scope": "Material resolved dependency closure, including target-conditional and dev dependencies; registry/Git sources are pinned by Cargo.lock",
     }
 
 
@@ -79,9 +141,9 @@ def main():
         (destination / "build.json").write_text(json.dumps(provenance, indent=2) + "\n")
 
     save()
-    # Lower build priority only; profiling runs at ordinary process priority.
+    # Build and profile at the caller's ordinary process priority.
     with (destination / "build.log").open("wb") as log, (destination / "build-events.jsonl").open("wb") as events:
-        built = subprocess.run(["nice", "-n", "10", *command], cwd=ROOT, stdout=events, stderr=log)
+        built = subprocess.run(command, cwd=ROOT, stdout=events, stderr=log)
     provenance["build_exit_code"] = built.returncode
     provenance["source_after_build"] = source_identity()
     save()
