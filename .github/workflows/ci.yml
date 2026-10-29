@@ -15,6 +15,9 @@ concurrency:
 
 defaults:
   run:
+    # bash on every runner: Windows' default pwsh does not stop multi-line
+    # steps at the first failing native command.
+    shell: bash
     working-directory: gpui-kit-material
 
 jobs:
