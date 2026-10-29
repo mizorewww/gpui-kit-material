@@ -376,7 +376,7 @@ pub(super) const ROWS: &[RowSpec] = &[
         gap: 16.0,
         section: None,
         interactive: false,
-        anchor: None,
+        anchor: Some("loading-click-count"),
     },
     RowSpec {
         gap: 16.0,
@@ -749,6 +749,8 @@ pub(super) const LOADING_SIZE_ROWS: usize = anchored_row("button-loading-sizes")
 const LOADING_SIZE_LAST: usize = LOADING_SIZE_ROWS + ButtonSize::ALL.len() - 1;
 /// The one source row that expands to as many physical rows as color columns need.
 const COLOR_SOURCE_ROW: usize = anchored_row("color-swatches");
+/// The count of loading sample activations.
+const CLICK_COUNT_ROW: usize = anchored_row("loading-click-count");
 
 impl Gallery {
     pub(super) fn render_row_content(
@@ -760,6 +762,8 @@ impl Gallery {
         let scroll = &self.list.clone();
         let color_start = index.saturating_sub(COLOR_SOURCE_ROW) * self.color_columns;
         let index = source_row(index, self.color_columns);
+        // A listener on this row remeasures only the rows its change resizes.
+        let row = index;
         match index {
             0 => {  (page_heading("title", "gpui-kit-material")).into_any_element() },
             1 => {  (supporting_info(
@@ -777,7 +781,7 @@ impl Gallery {
                     .into_iter()
                     .find(|id| id.name() == name.as_ref());
                 this.prepare_theme(window, cx);
-                this.list.remeasure(); cx.notify();
+                cx.notify();
             })), self.list.clone())).into_any_element() },
             4 => {  (RevealFocus::in_list("reveal-row-mode", ConnectedButtonGroup::new("reference-mode", "Material theme mode")
 
@@ -795,7 +799,7 @@ impl Gallery {
                 };
                 this.reference_theme.get_or_insert(ThemeId::Baseline);
                 this.prepare_theme(window, cx);
-                this.list.remeasure(); cx.notify();
+                cx.notify();
             })), self.list.clone())).into_any_element() },
             5 => {  (RevealFocus::in_list("reveal-row-contrast", ConnectedButtonGroup::new("reference-contrast", "Material contrast")
 
@@ -817,7 +821,7 @@ impl Gallery {
                 };
                 this.reference_theme.get_or_insert(ThemeId::Baseline);
                 this.prepare_theme(window, cx);
-                this.list.remeasure(); cx.notify();
+                cx.notify();
             })), self.list.clone())).into_any_element() },
             6 => {  (section_title("motion", "Motion")).into_any_element() },
             7 => {  (RevealFocus::in_list("reveal-row-motion_controls", ConnectedButtonGroup::new("motion-scheme", "Motion scheme")
@@ -834,13 +838,13 @@ impl Gallery {
                     motion::MotionScheme::Expressive
                 };
                 this.prepare_theme(window, cx);
-                this.list.remeasure(); cx.notify();
+                cx.notify();
             })), self.list.clone())).into_any_element() },
             8 => {  (material_button("play-motion", ButtonVariant::Tonal)
                                     .child("Toggle motion preview")
                                     .on_click(cx.listener(|this, _, _, cx| {
                                         this.motion_target = !this.motion_target;
-                                        this.list.remeasure(); cx.notify();
+                                        cx.notify();
                                     })).reveal("reveal-play-motion",scroll)).into_any_element() },
             9..=14 => { let sample_index = index - 9; (([
             ("Fast spatial", motion::MotionToken::FastSpatial, false),
@@ -887,7 +891,7 @@ impl Gallery {
                     this.palette = id;
                     this.reference_theme = None;
                     this.prepare_theme(window, cx);
-                    this.list.remeasure(); cx.notify();
+                    cx.notify();
                 }
             })), self.list.clone())).into_any_element() },
             17 => {  (RevealFocus::in_list("reveal-row-scale", ConnectedButtonGroup::new("scale", "Text size")
@@ -902,7 +906,7 @@ impl Gallery {
             .on_change(cx.listener(|this, value: &SharedString, window, cx| {
                 this.scale = value.clone();
                 this.prepare_theme(window, cx);
-                this.list.remeasure(); cx.notify();
+                cx.notify();
             })), self.list.clone())).into_any_element() },
             18 => {  (RevealFocus::in_list("reveal-row-density", ConnectedButtonGroup::new("density", "Density")
 
@@ -918,7 +922,7 @@ impl Gallery {
             .selected(self.density.clone())
             .on_change(cx.listener(|this, value: &SharedString, _, cx| {
                 this.density = value.clone();
-                this.list.remeasure(); cx.notify();
+                cx.notify();
             })), self.list.clone())).into_any_element() },
             19 => {  (section_title("controls", "Material controls")).into_any_element() },
             20 => {  (SearchField::new(&self.search).reveal("reveal-search",scroll)).into_any_element() },
@@ -926,7 +930,7 @@ impl Gallery {
                                     .checked(self.switch)
                                     .on_change(cx.listener(|this, checked: &bool, _, cx| {
                                         this.switch = *checked;
-                                        this.list.remeasure(); cx.notify();
+                                        cx.notify();
                                     })).reveal("reveal-switch",scroll)).into_any_element() },
             22 => {  (MaterialSlider::new(&self.slider, "Expressive slider").reveal("reveal-slider",scroll)).into_any_element() },
             23 => {  (MaterialSlider::new(&self.slider, "Classic slider")
@@ -976,9 +980,9 @@ impl Gallery {
                             } else {
                                 "Keep samples active"
                             })
-                            .on_click(cx.listener(|this, _, _, cx| {
+                            .on_click(cx.listener(move |this, _, _, cx| {
                                 this.button_active = !this.button_active;
-                                this.list.remeasure(); cx.notify();
+                                this.remeasure_rows(row..=row); cx.notify();
                             }))
                             .reveal("reveal-toggle-button-active", scroll),
                     )
@@ -989,9 +993,9 @@ impl Gallery {
                             } else {
                                 "Disable samples"
                             })
-                            .on_click(cx.listener(|this, _, _, cx| {
+                            .on_click(cx.listener(move |this, _, _, cx| {
                                 this.button_effects_disabled = !this.button_effects_disabled;
-                                this.list.remeasure(); cx.notify();
+                                this.remeasure_rows(row..=row); cx.notify();
                             }))
                             .reveal("reveal-toggle-button-disabled", scroll),
                     )
@@ -1000,7 +1004,7 @@ impl Gallery {
                             .child("Switch filled / tonal")
                             .on_click(cx.listener(|this, _, _, cx| {
                                 this.button_effects_tonal = !this.button_effects_tonal;
-                                this.list.remeasure(); cx.notify();
+                                cx.notify();
                             }))
                             .reveal("reveal-toggle-button-variant", scroll),
                     )
@@ -1011,9 +1015,9 @@ impl Gallery {
                             } else {
                                 "Turn ripple on"
                             })
-                            .on_click(cx.listener(|this, _, _, cx| {
+                            .on_click(cx.listener(move |this, _, _, cx| {
                                 this.button_ripple = !this.button_ripple;
-                                this.list.remeasure(); cx.notify();
+                                this.remeasure_rows(row..=row); cx.notify();
                             }))
                             .reveal("reveal-toggle-button-ripple", scroll),
                     )).into_any_element() },
@@ -1050,7 +1054,7 @@ impl Gallery {
                             .find(|size| size.name() == name.as_ref())
                         {
                             this.button_toggle_size = size;
-                            this.list.remeasure(); cx.notify();
+                            this.remeasure_rows(TOGGLE_SHAPE_ROWS..=TOGGLE_SHAPE_LAST); cx.notify();
                         }
                     })), self.list.clone())).into_any_element() },
             TOGGLE_SHAPE_ROWS..=TOGGLE_SHAPE_LAST => { let sample_index = index - TOGGLE_SHAPE_ROWS; ((ButtonShape::ALL
@@ -1086,7 +1090,7 @@ impl Gallery {
                                             move |selected, _, _, cx| {
                                                 let _ = entity.update(cx, |this, cx| {
                                                     this.button_selections[index] = selected;
-                                                    this.list.remeasure(); cx.notify();
+                                                    cx.notify();
                                                 });
                                             }
                                         })
@@ -1104,18 +1108,18 @@ impl Gallery {
             43 => { let loading_variant = ButtonVariant::ALL[self.button_loading_variant]; (gpui_base::h_flex().flex_wrap().gap(rem(12.))
                 .child(material_button("toggle-loading", ButtonVariant::Outlined)
                     .child(if self.button_loading { "Stop loading" } else { "Start loading" })
-                    .on_click(cx.listener(|this, _, _, cx| { this.button_loading = !this.button_loading; this.list.remeasure(); cx.notify(); }))
+                    .on_click(cx.listener(move |this, _, _, cx| { this.button_loading = !this.button_loading; this.remeasure_rows(row..=row); this.remeasure_rows(LOADING_SIZE_ROWS..=LOADING_SIZE_LAST); cx.notify(); }))
                     .reveal("reveal-toggle-loading", scroll))
                 .child(material_button("toggle-progress", ButtonVariant::Outlined)
                     .child(if self.button_progress { "Hide progress" } else { "Show progress" })
-                    .on_click(cx.listener(|this, _, _, cx| { this.button_progress = !this.button_progress; this.list.remeasure(); cx.notify(); }))
+                    .on_click(cx.listener(move |this, _, _, cx| { this.button_progress = !this.button_progress; this.remeasure_rows(row..=row); this.remeasure_rows(LOADING_SIZE_ROWS..=LOADING_SIZE_LAST); cx.notify(); }))
                     .reveal("reveal-toggle-progress", scroll))
                 .child(material_button("loading-variant", ButtonVariant::Outlined)
                     .child(SharedString::from(format!("Variant: {}", loading_variant.name())))
-                    .on_click(cx.listener(|this, _, _, cx| { this.button_loading_variant = (this.button_loading_variant + 1) % ButtonVariant::ALL.len(); this.list.remeasure(); cx.notify(); }))
+                    .on_click(cx.listener(move |this, _, _, cx| { this.button_loading_variant = (this.button_loading_variant + 1) % ButtonVariant::ALL.len(); this.remeasure_rows(row..=row); this.remeasure_rows(LOADING_SIZE_ROWS..=LOADING_SIZE_LAST); cx.notify(); }))
                     .reveal("reveal-loading-variant", scroll))).into_any_element() },
             44 => {  (accessible_text("loading-help", "Progress stays interactive. Loading disables the samples and changes their labels.")).into_any_element() },
-            45 => {  (accessible_text("loading-click-count", SharedString::from(format!("Sample activations: {}", self.button_loading_clicks)))).into_any_element() },
+            CLICK_COUNT_ROW => {  (accessible_text("loading-click-count", SharedString::from(format!("Sample activations: {}", self.button_loading_clicks))).debug_selector(|| "loading-click-count".into())).into_any_element() },
             LOADING_SIZE_ROWS..=LOADING_SIZE_LAST => { let loading_variant = ButtonVariant::ALL[self.button_loading_variant];let sample_index = index - LOADING_SIZE_ROWS; ((ButtonSize::ALL.into_iter().nth(sample_index).map(|size| {
                 gpui_base::v_flex().when(sample_index == 0, |row| row.debug_selector(|| "button-loading-sizes".into())).gap(rem(12.))
                     .child(accessible_text(SharedString::from(format!("loading-size-{size:?}")), size.name()))
@@ -1130,7 +1134,7 @@ impl Gallery {
                             .transition_playback(self.button_loading_playbacks[sample_index * 3 + icon_position].clone())
                             .progress_playback(self.button_progress_playbacks[sample_index * 3 + icon_position].clone())
                             .child(if self.button_loading { "Saving…" } else { "Save changes" })
-                            .on_click(cx.listener(|this, _, _, cx| { this.button_loading_clicks += 1; this.list.remeasure(); cx.notify(); }))
+                            .on_click(cx.listener(|this, _, _, cx| this.count_loading_activation(cx)))
                             .reveal(SharedString::from(format!("reveal-loading-{size:?}-{icon_position}")), scroll)
                     })))
             })).expect("gallery row")).into_any_element() },
@@ -1220,7 +1224,7 @@ impl Gallery {
                                     .child("Toggle side sheet")
                                     .on_click(cx.listener(|this, _, _, cx| {
                                         this.sheet = !this.sheet;
-                                        this.list.remeasure(); cx.notify();
+                                        cx.notify();
                                     })).reveal("reveal-open-sheet",scroll),
                             )
                             .child(
@@ -1233,7 +1237,7 @@ impl Gallery {
                                                 .child("Close")
                                                 .on_click(cx.listener(|this, _, _, cx| {
                                                     this.sheet = false;
-                                                    this.list.remeasure(); cx.notify();
+                                                    cx.notify();
                                                 })).reveal("reveal-close-sheet",scroll),
                                         ),
                                     ),
@@ -1263,13 +1267,13 @@ impl Gallery {
             .render(window, cx)
             .on_click(cx.listener(move |this, _, _, cx| {
                 this.engine = index;
-                this.list.remeasure(); cx.notify();
+                cx.notify();
             }));
             choices = choices.tile(move |_| tile.into_any_element());
         }
 
 choices.reveal("reveal-choices", scroll)}).into_any_element() },
-            64 => {  ({ let details = self.details; let toggle = cx.listener(|this, _, _, cx| { this.details = !this.details; this.list.remeasure(); cx.notify(); }); let settings = TileGroup::new("tiles", "Connected tiles")
+            64 => {  ({ let details = self.details; let toggle = cx.listener(move |this, _, _, cx| { this.details = !this.details; this.remeasure_rows(row..=row); cx.notify(); }); let settings = TileGroup::new("tiles", "Connected tiles")
             .tile(move |outer| {
                 TileScale::Regular
                     .button("details", outer)
@@ -1334,7 +1338,7 @@ choices.reveal("reveal-choices", scroll)}).into_any_element() },
                     .child("Show snackbar")
                     .on_click(cx.listener(|this, _, _, cx| {
                         this.snackbar = true;
-                        this.list.remeasure(); cx.notify();
+                        cx.notify();
                     }))
                     .reveal("reveal-show-snackbar", scroll)).into_any_element() },
             72 => {  (card_surface()
@@ -1463,6 +1467,21 @@ choices.reveal("reveal-choices", scroll)}).into_any_element() },
 }
 
 impl Gallery {
+    /// Invalidates the cached heights of source `rows` only. Rows the list
+    /// lays out this frame are measured again anyway; this keeps offscreen
+    /// rows whose content changed from scrolling at a stale height.
+    pub(super) fn remeasure_rows(&self, rows: std::ops::RangeInclusive<usize>) {
+        let start = physical_row(*rows.start(), self.color_columns);
+        let end = physical_row(*rows.end(), self.color_columns);
+        self.list.remeasure_items(start..end + 1);
+    }
+
+    fn count_loading_activation(&mut self, cx: &mut Context<Self>) {
+        self.button_loading_clicks += 1;
+        self.remeasure_rows(CLICK_COUNT_ROW..=CLICK_COUNT_ROW);
+        cx.notify();
+    }
+
     pub(super) fn scroll_to_section(&self, section: usize) {
         self.list.scroll_to(ListOffset {
             item_ix: self.section_rows[section],
@@ -1675,7 +1694,9 @@ pub(super) fn color_columns(window: &Window) -> usize {
 #[cfg(test)]
 mod keyboard_tests {
     use super::super::Gallery;
-    use super::{COLOR_SOURCE_ROW, EFFECT_SAMPLE_ROW, LOADING_SIZE_ROWS, TOGGLE_SHAPE_ROWS};
+    use super::{
+        CLICK_COUNT_ROW, COLOR_SOURCE_ROW, EFFECT_SAMPLE_ROW, LOADING_SIZE_ROWS, TOGGLE_SHAPE_ROWS,
+    };
     use gpui::{AppContext, TestAppContext, WindowHandle, px, size};
 
     fn draw(window: &WindowHandle<Gallery>, cx: &mut TestAppContext) {
@@ -1776,6 +1797,7 @@ mod keyboard_tests {
             (TOGGLE_SHAPE_ROWS, "button-toggle-shapes"),
             (LOADING_SIZE_ROWS, "button-loading-sizes"),
             (COLOR_SOURCE_ROW, "color-swatches"),
+            (CLICK_COUNT_ROW, "loading-click-count"),
         ] {
             let physical = window
                 .update(cx, |gallery, _, cx| {
