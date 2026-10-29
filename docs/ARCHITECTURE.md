@@ -85,12 +85,12 @@ the same patches until fixes land upstream. A patched Zed checkout overriding
 | Vendored | Source | Why |
 | --- | --- | --- |
 | `gpui-kit` | Git `main` at audited `bb85882`, unchanged source | Normalized manifest disables implicit WASM threading (`multithreaded-web` restores it). Hashes in `SOURCE.md`/`SOURCE.json`. |
-| `gpui-base` | 0.8.1 + patches (`SOURCE.json`) | CSS transition reversal, per-transition reduced motion, toggle focus policy, busy accessibility state on Button/Toggle, `TransitionPlayback`; `Hitbox.additional_bounds` follow-up in `text_selection.rs`. |
-| `gpui-pre` (GPUI `=0.3.10`) | + patches (`*-patch.md`; no `SOURCE.json` yet, and profiler, line-layout, window and SVG changes are undocumented) | Paint-scoped passive raw touch observation; hitbox extensions independent of layout (keeping identity, clipping, occlusion); animation visibility. |
-| `gpui-pre-apple` | 0.3.10 + patches (`VENDORED.md`) | Detailed CoreText layout (glyph positions, clusters, carets); `draw_with_status` submission reporting with a per-draw autorelease pool. |
-| `gpui-pre-web` | 0.3.10 + patch (no provenance note yet) | Keeps CSS viewport size separate from backing-store pixels; falls back to CSS size × DPR on inconsistent reports. |
-| `gpui-fast`, `-apple`, `-web` | 0.1.12 + patches (`MATERIAL-MIGRATION.json`) | Full CPU scopes, repeat playback, detailed text layout, font registration, raw touch and expanded hit targets through retained replay; synchronous refresh on Material paint changes; explicit single-threaded web defaults. |
-| `gpui-pre-macos`, `gpui-fast-macos` | + patches (`MATERIAL-PATCHES.md`, `SOURCE.json`) | Vsync control and submission statistics (below). |
+| `gpui-base` | Git `bb85882` (`crates/base`) + patches (`SOURCE.json`, `motion-patch.md`) | CSS transition reversal, per-transition reduced motion, `TransitionPlayback`, toggle focus policy, busy accessibility state; `RootTab`/`RootTabPrev` exports; `Hitbox.additional_bounds` follow-up in `text_selection.rs`. |
+| `gpui-pre` (GPUI `=0.3.10`) | crates.io + patches (`SOURCE.json`, `*-patch.md`) | Passive raw touch observation; hitbox extensions independent of layout; animation visibility and repeat playback; complete CPU frame scopes, presentation wait, GPU time and submission outcome in the profiler; submission statistics, vsync control and throttle retry; opt-in paragraph layout with clusters (`unicode-segmentation` pinned); test-harness repairs. |
+| `gpui-pre-apple` | crates.io + patches (`SOURCE.json`, `VENDORED.md`) | Detailed CoreText layout (direction, clusters, carets); non-Latin and app-private fallback fonts; `draw_with_status` with a per-draw autorelease pool, drawable-wait and GPU timestamps. |
+| `gpui-pre-web` | crates.io + patches (`SOURCE.json`, `MATERIAL-PATCHES.md`) | Keeps CSS viewport size separate from backing-store pixels (CSS × DPR fallback); successful submission count. |
+| `gpui-fast`, `-apple`, `-web` | 0.1.12 + patches (`MATERIAL-MIGRATION.json`, per-file `local_changes`) | The GPUI, Apple and web patches above carried through Fast retained/scroll replay and composition (touch observers, extended hit targets, font-generation invalidation); explicit single-threaded web defaults. |
+| `gpui-pre-macos`, `gpui-fast-macos` | crates.io + patches (`SOURCE.json`, `MATERIAL-PATCHES.md`) | Vsync control, demand waker, periodic-source report and submission statistics (below). |
 
 Touch patches leave gesture recognition, scrolling and activation in GPUI while
 letting Material start a ripple on touch-down and release it on cancellation.
