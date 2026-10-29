@@ -4,6 +4,12 @@
 use super::prelude::*;
 use std::sync::OnceLock;
 
+mod sections;
+use sections::{
+    EXTENDED_SIZES, FAB_SIZES, GROUP_VARIANTS, ICON_BANDS, ICON_TOGGLE_BANDS, ICON_VARIANTS,
+    SPLIT_VARIANTS,
+};
+
 /// The kit's variant order and captions.
 const VARIANTS: [(ButtonVariant, &str); 5] = [
     (ButtonVariant::Filled, "Filled"),
@@ -46,8 +52,7 @@ const BUTTON_GROUPS: PageInfo = PageInfo {
     guideline: Some("https://m3.material.io/components/button-groups/overview"),
 };
 
-/// The page's further sections, in the kit's order; Button groups is last
-/// and has specimens.
+/// The page's further sections, in the kit's order.
 const SECTIONS: [&PageInfo; 5] = [&ICON_BUTTON, &SPLIT_BUTTON, &FAB_MENU, &FAB, &BUTTON_GROUPS];
 
 /// One body row of the page.
@@ -74,6 +79,36 @@ pub(crate) enum Row {
     LoadingSize(usize),
     Icons(usize),
     Section(usize),
+    /// A band of an icon-button board (`toggle`: its selection).
+    IconMatrix {
+        variant: usize,
+        band: usize,
+        toggle: Option<bool>,
+    },
+    IconDemo,
+    /// A band of a split-button board: one size and variant.
+    Split {
+        size: usize,
+        variant: usize,
+    },
+    SplitDemo,
+    FabMenuColors,
+    FabMenuCounts,
+    FabMenuBlocks,
+    FabMenuDemo,
+    /// A band of the FAB (or extended FAB) board: one size.
+    Fab {
+        size: usize,
+        extended: bool,
+    },
+    FabDemo,
+    StandardGroups {
+        shape: usize,
+        variant: usize,
+    },
+    StandardGroupDemo,
+    ConnectedCounts,
+    ConnectedSizes(usize),
     GroupStates,
     GroupDemo,
 }
@@ -103,7 +138,54 @@ pub(crate) fn rows() -> &'static [Row] {
         rows.extend([Row::LoadingControls, Row::LoadingHelp, Row::LoadingCount]);
         rows.extend((0..ButtonSize::ALL.len()).map(Row::LoadingSize));
         rows.extend((0..ButtonSize::ALL.len()).map(Row::Icons));
-        rows.extend((0..SECTIONS.len()).map(Row::Section));
+        // Icon button: plain boards, then toggle boards, per variant.
+        rows.push(Row::Section(0));
+        rows.push(Row::IconDemo);
+        for variant in 0..ICON_VARIANTS.len() {
+            rows.extend((0..ICON_BANDS).map(|band| Row::IconMatrix {
+                variant,
+                band,
+                toggle: None,
+            }));
+        }
+        for variant in 0..ICON_VARIANTS.len() {
+            rows.extend((0..ICON_TOGGLE_BANDS).map(|band| Row::IconMatrix {
+                variant,
+                band,
+                toggle: Some(band % 2 == 1),
+            }));
+        }
+        rows.push(Row::Section(1));
+        rows.push(Row::SplitDemo);
+        for size in 0..ButtonSize::ALL.len() {
+            rows.extend((0..SPLIT_VARIANTS.len()).map(|variant| Row::Split { size, variant }));
+        }
+        rows.extend([
+            Row::Section(2),
+            Row::FabMenuDemo,
+            Row::FabMenuColors,
+            Row::FabMenuCounts,
+            Row::FabMenuBlocks,
+            Row::Section(3),
+            Row::FabDemo,
+        ]);
+        rows.extend((0..FAB_SIZES.len()).map(|size| Row::Fab {
+            size,
+            extended: false,
+        }));
+        rows.extend((0..EXTENDED_SIZES.len()).map(|size| Row::Fab {
+            size,
+            extended: true,
+        }));
+        rows.push(Row::Section(4));
+        rows.push(Row::StandardGroupDemo);
+        for shape in 0..ButtonShape::ALL.len() {
+            rows.extend(
+                (0..GROUP_VARIANTS.len()).map(|variant| Row::StandardGroups { shape, variant }),
+            );
+        }
+        rows.push(Row::ConnectedCounts);
+        rows.extend((0..ButtonShape::ALL.len()).map(Row::ConnectedSizes));
         rows.extend([Row::GroupStates, Row::GroupDemo]);
         rows
     })
@@ -135,6 +217,11 @@ pub struct Page {
     progress_playbacks: [ButtonProgressPlayback; 15],
     progress_inputs: Option<(bool, bool, bool)>,
     density: SharedString,
+    icon_selections: [bool; 4],
+    split_open: bool,
+    split_clicks: usize,
+    fab_menu_open: bool,
+    fab_extended: bool,
     #[cfg(test)]
     pub(crate) sync_rows: std::collections::BTreeSet<usize>,
 }
@@ -271,6 +358,11 @@ impl GalleryPage for Page {
             progress_playbacks: std::array::from_fn(|_| ButtonProgressPlayback::default()),
             progress_inputs: None,
             density: "auto".into(),
+            icon_selections: [false, true, false, true],
+            split_open: false,
+            split_clicks: 0,
+            fab_menu_open: false,
+            fab_extended: true,
             #[cfg(test)]
             sync_rows: Default::default(),
         }
@@ -288,6 +380,32 @@ impl GalleryPage for Page {
                 shape, selected, ..
             } => Band::of(shape * 2 + usize::from(selected), 4).row_gap() * 1.5,
             Row::Section(_) => 48.,
+            Row::IconMatrix { band, toggle, .. } => {
+                let bands = if toggle.is_some() {
+                    ICON_TOGGLE_BANDS
+                } else {
+                    ICON_BANDS
+                };
+                Band::of(band, bands).row_gap() * 1.5
+            }
+            Row::Split { variant, .. } => Band::of(variant, SPLIT_VARIANTS.len()).row_gap() * 1.5,
+            Row::Fab { size, extended } => {
+                let bands = if extended {
+                    EXTENDED_SIZES.len()
+                } else {
+                    FAB_SIZES.len()
+                };
+                Band::of(size, bands).row_gap() * 1.5
+            }
+            Row::StandardGroups { shape, variant } => {
+                Band::of(
+                    shape * GROUP_VARIANTS.len() + variant,
+                    2 * GROUP_VARIANTS.len(),
+                )
+                .row_gap()
+                    * 1.5
+            }
+            Row::ConnectedSizes(shape) => Band::of(shape, 2).row_gap() * 1.5,
             Row::EffectControls => 48.,
             Row::ToggleShape(_) | Row::LoadingSize(_) | Row::Icons(_) => 16.,
             _ => spec::ROW_GAP,
@@ -305,6 +423,12 @@ impl GalleryPage for Page {
                 | Row::LoadingSize(_)
                 | Row::Icons(_)
                 | Row::Section(_)
+                | Row::IconDemo
+                | Row::SplitDemo
+                | Row::FabMenuDemo
+                | Row::FabDemo
+                | Row::StandardGroupDemo
+                | Row::StandardGroups { .. }
                 | Row::GroupDemo
         )
     }
@@ -636,6 +760,157 @@ impl GalleryPage for Page {
                     .into_any_element()
             }
             Row::Section(index) => spec::section_header(SECTIONS[index]).into_any_element(),
+            Row::IconMatrix {
+                variant,
+                band,
+                toggle,
+            } => sections::icon_matrix(variant, band, toggle),
+            Row::IconDemo => spec::demo(
+                "icon-button-demo",
+                "Toggle icon buttons",
+                spec::demo_row().children(ICON_VARIANTS.into_iter().enumerate().map(
+                    |(index, (variant, name))| {
+                        IconButton::new(("icon-demo", index), spec::star_icon(), name)
+                            .variant(variant)
+                            .button_size(ButtonSize::Medium)
+                            .toggle(true)
+                            .selected(self.icon_selections[index])
+                            .on_change({
+                                let page = cx.entity().downgrade();
+                                move |selected, _, _, cx| {
+                                    let _ = page.update(cx, |this, cx| {
+                                        this.icon_selections[index] = selected;
+                                        cx.notify();
+                                    });
+                                }
+                            })
+                            .reveal(("reveal-icon-demo", index), &list)
+                    },
+                )),
+            )
+            .into_any_element(),
+            Row::Split { size, variant } => sections::split_matrix(size, variant),
+            Row::SplitDemo => spec::demo(
+                "split-button-demo",
+                "Split button",
+                spec::demo_row()
+                    .child(
+                        SplitButton::new("split-demo", "Save", "More save options")
+                            .icon(spec::star_icon())
+                            .button_size(ButtonSize::Medium)
+                            .open(self.split_open)
+                            .on_click(cx.listener(|this, _, _, cx| {
+                                this.split_clicks += 1;
+                                cx.notify();
+                            }))
+                            .on_toggle(cx.listener(|this, open: &bool, _, cx| {
+                                this.split_open = *open;
+                                cx.notify();
+                            }))
+                            .reveal("reveal-split-demo", &list),
+                    )
+                    .child(accessible_text(
+                        "split-demo-status",
+                        SharedString::from(format!(
+                            "Saved {} times · menu {}",
+                            self.split_clicks,
+                            if self.split_open { "open" } else { "closed" }
+                        )),
+                    )),
+            )
+            .into_any_element(),
+            Row::FabMenuColors => sections::fab_menu_colors(),
+            Row::FabMenuCounts => sections::fab_menu_counts(),
+            Row::FabMenuBlocks => sections::fab_menu_blocks(),
+            Row::FabMenuDemo => spec::demo(
+                "fab-menu-demo",
+                "FAB menu",
+                // Room for the open stack and the FAB's shadow inside the row.
+                div().h(rem(4. * 56. + 8. + 2. * 4. + 24.)).p(rem(12.)).flex().items_end().child(
+                    FabMenu::new("fab-menu-demo", IconName::Check, "Actions")
+                        .open(self.fab_menu_open)
+                        .items(["Reply", "Forward", "Archive"].into_iter().enumerate().map(
+                            |(index, label)| {
+                                FabMenuItem::new(("fab-menu-demo-item", index), spec::star_icon(), label)
+                                    .on_click(cx.listener(|this, _, _, cx| {
+                                        this.fab_menu_open = false;
+                                        cx.notify();
+                                    }))
+                            },
+                        ))
+                        .on_toggle(cx.listener(|this, open: &bool, _, cx| {
+                            this.fab_menu_open = *open;
+                            cx.notify();
+                        }))
+                        .reveal("reveal-fab-menu-demo", &list),
+                ),
+            )
+            .into_any_element(),
+            Row::Fab { size, extended } => sections::fab_matrix(size, extended),
+            Row::FabDemo => spec::demo(
+                "fab-demo",
+                "Extended FAB",
+                spec::demo_row()
+                    .child(
+                        material_button("fab-demo-toggle", ButtonVariant::Outlined)
+                            .child(if self.fab_extended { "Collapse" } else { "Expand" })
+                            .on_click(cx.listener(|this, _, _, cx| {
+                                this.fab_extended = !this.fab_extended;
+                                cx.notify();
+                            }))
+                            .reveal("reveal-fab-demo-toggle", &list),
+                    )
+                    .child(
+                        ExtendedFab::new("fab-demo", spec::star_icon(), "Compose")
+                            .expanded(self.fab_extended)
+                            .reveal("reveal-fab-demo", &list),
+                    )
+                    .child(
+                        ExtendedFab::new("fab-demo-medium", spec::star_icon(), "Compose")
+                            .size(FabSize::Medium)
+                            .color(FabColor::Tertiary)
+                            .expanded(self.fab_extended)
+                            .reveal("reveal-fab-demo-medium", &list),
+                    ),
+            )
+            .into_any_element(),
+            Row::StandardGroups { shape, variant } => sections::standard_groups(shape, variant),
+            Row::StandardGroupDemo => spec::demo(
+                "standard-group-demo",
+                "Examples & usage",
+                spec::demo_row()
+                    .child(
+                        ButtonGroup::new("usage-icons", "Playback")
+                            .button_size(ButtonSize::Medium)
+                            .items(["Previous", "Play", "Next", "Shuffle"].into_iter().enumerate().map(
+                                |(index, label)| {
+                                    IconButton::new(("usage-icon", index), spec::star_icon(), label)
+                                        .variant(IconButtonVariant::Tonal)
+                                        .button_size(ButtonSize::Medium)
+                                        .width(if index == 1 {
+                                            IconButtonWidth::Wide
+                                        } else {
+                                            IconButtonWidth::Default
+                                        })
+                                },
+                            )),
+                    )
+                    .child(
+                        ButtonGroup::new("usage-labels", "Actions")
+                            .button_size(ButtonSize::Small)
+                            .items(["Start", "Directions", "Share"].into_iter().enumerate().map(
+                                |(index, label)| {
+                                    MaterialButton::new(("usage-label", index))
+                                        .variant(ButtonVariant::Tonal)
+                                        .icon(spec::star_icon())
+                                        .child(label)
+                                },
+                            )),
+                    ),
+            )
+            .into_any_element(),
+            Row::ConnectedCounts => sections::connected_counts(),
+            Row::ConnectedSizes(shape) => sections::connected_sizes(shape),
             Row::GroupStates => board("button-group-states")
                 .caption("Connected button group")
                 .columns(1)
