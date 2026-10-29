@@ -72,6 +72,7 @@
       "status": "failed: measured native startup scopes exceed 2ms; other scenarios and WASM timing remain unverified",
       "scope": "entire gallery frame, on both desktop and wasm-browser; applies to acceptance of every component",
       "metric": "CPU frame elapsed time including view rendering, layout, prepaint, paint, scene finalization and graphics command submission",
+      "submission_timing": "Keep synchronous drawable acquisition and submission elapsed time in the complete frame budget, including cleanup. API-call elapsed time may be reported separately for diagnosis, but must not be subtracted to establish the <= 2 ms gate; it is not a measurement of pure blocking or GPU time.",
       "threshold_ms": 2.0,
       "comparison": "less than or equal to; any measured frame > 2.0 ms fails",
       "aggregation": "maximum per-frame duration; also report median, p95, p99 and over-budget count",
