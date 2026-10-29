@@ -406,6 +406,11 @@
           "kind": "browser-layout-and-setter-matrix",
           "path": "conformance/reference/divider.json",
           "scope": "Pinned createDivider and full stylesheet: horizontal/vertical, three variants, LTR/RTL, baseline light/dark, four root font scales, block/flex-row/flex-row-center/flex-column and plain/list/card ancestors; custom insets/thickness/color and setter round trips. Full matrix independently sampled with reduced motion and compared to normal. Reference behavior only; implementation, raster and accessibility-tree conformance remain pending."
+        },
+        {
+          "kind": "native-layout-and-theme-tests",
+          "path": "crates/material/src/components/divider_tests.rs",
+          "scope": "1200 reference configurations compared for rendered width/height and physical margins; builder reversal and caller refinement tests; live baseline light/dark role resolution. GPUI block/flex layout only: browser inline formatting with text siblings, actual x/y, AX tree and full desktop/browser pixel coverage remain pending."
         }
       ]
     },

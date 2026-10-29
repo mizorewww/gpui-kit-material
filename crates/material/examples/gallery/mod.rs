@@ -20,7 +20,7 @@ trait GalleryReveal: IntoElement + Sized {
 }
 impl<T: IntoElement> GalleryReveal for T {}
 
-const GALLERY_SECTIONS: [(&str, &str); 10] = [
+const GALLERY_SECTIONS: [(&str, &str); 11] = [
     ("themes", "Themes"),
     ("motion", "Motion"),
     ("buttons", "Buttons"),
@@ -31,6 +31,7 @@ const GALLERY_SECTIONS: [(&str, &str); 10] = [
     ("feedback", "Feedback"),
     ("colors", "Colors"),
     ("typography", "Typography"),
+    ("dividers", "Dividers"),
 ];
 
 struct Gallery {
@@ -44,7 +45,7 @@ struct Gallery {
     details: bool,
     scroll: ScrollHandle,
     navigation_scroll: ScrollHandle,
-    section_anchors: [ScrollAnchor; 10],
+    section_anchors: [ScrollAnchor; GALLERY_SECTIONS.len()],
     selected_section: usize,
     search: Entity<gpui_base::input::InputState>,
     slider: Entity<gpui_base::slider::SliderState>,
@@ -587,6 +588,64 @@ impl Render for Gallery {
                     )),
             );
 
+        let divider_samples = gpui_base::v_flex()
+            .id("gallery-section-dividers")
+            .anchor_scroll(Some(self.section_anchors[10].clone()))
+            .gap(rem(20.))
+            .child(section_title("dividers", "Dividers"))
+            .child("Horizontal: full width, start inset, both ends inset, RTL start inset")
+            .children(
+                [
+                    (DividerVariant::FullWidth, DividerDirection::Ltr),
+                    (DividerVariant::Inset, DividerDirection::Ltr),
+                    (DividerVariant::MiddleInset, DividerDirection::Ltr),
+                    (DividerVariant::Inset, DividerDirection::Rtl),
+                ]
+                .into_iter()
+                .enumerate()
+                .map(|(index, (variant, direction))| {
+                    div()
+                        .w_full()
+                        .bg(color(ColorRole::SURFACE_CONTAINER_HIGH))
+                        .child(
+                            MaterialDivider::new(("horizontal-divider", index))
+                                .variant(variant)
+                                .direction(direction),
+                        )
+                }),
+            )
+            .child("Vertical in a stretching row: full height, start inset, both ends inset")
+            .child(
+                div()
+                    .flex()
+                    .items_stretch()
+                    .h(rem(72.))
+                    .gap(rem(32.))
+                    .children(
+                        [
+                            DividerVariant::FullWidth,
+                            DividerVariant::Inset,
+                            DividerVariant::MiddleInset,
+                        ]
+                        .into_iter()
+                        .enumerate()
+                        .map(|(index, variant)| {
+                            MaterialDivider::new(("vertical-divider", index))
+                                .orientation(DividerOrientation::Vertical)
+                                .variant(variant)
+                        }),
+                    ),
+            )
+            .child("Custom: primary color, 2px thickness, 24px / 8px insets")
+            .child(
+                MaterialDivider::new("custom-divider")
+                    .variant(DividerVariant::MiddleInset)
+                    .inset_start(px(24.))
+                    .inset_end(px(8.))
+                    .thickness(px(2.))
+                    .color_role(ColorRole::PRIMARY),
+            );
+
         let feedback = gpui_base::v_flex()
             .id("gallery-section-feedback")
             .anchor_scroll(Some(self.section_anchors[7].clone()))
@@ -886,7 +945,8 @@ impl Render for Gallery {
                             .id("gallery-section-typography").anchor_scroll(Some(self.section_anchors[9].clone()))
                             .child(section_title("type-scale", "Typography"))
                             .children(typography_samples),
-                    ),
+                    )
+                    .child(divider_samples),
             );
         div()
             .id("gallery")

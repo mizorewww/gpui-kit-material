@@ -115,6 +115,15 @@ Component alignment is tracked in [`conformance/md3.json`](conformance/md3.json)
 An available gallery example does not imply visual or motion conformance;
 each component needs independent review and desktop/browser evidence.
 
+`MaterialDivider` provides horizontal and vertical separators with full-width,
+start-inset, and middle-inset variants. `direction` resolves horizontal logical
+insets; the parent controls its own flow. `context(DividerContext::List)` or
+`Card` applies the reference ancestor spacing explicitly. Default geometry uses
+fixed pixels; callers can supply rem insets to align with scalable text. Vertical
+inset separators need a stretching row or a caller-supplied height. GPUI block
+and flex layouts are supported; browser inline formatting with text siblings
+remains a conformance gap. The Dividers chapter is available on both targets.
+
 The gallery includes six motion previews and a Standard/Expressive selector.
 Applications can select their scheme at the start of each root render, before
 applying the theme:

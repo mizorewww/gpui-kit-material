@@ -7,8 +7,12 @@ pub use button::{
 };
 mod button_group;
 mod controls;
+mod divider;
 pub use controls::{
     MaterialSideSheet, MaterialSlider, MaterialSwitch, SearchField, SliderAppearance,
+};
+pub use divider::{
+    DividerContext, DividerDirection, DividerOrientation, DividerVariant, MaterialDivider,
 };
 mod caption;
 mod choice;
