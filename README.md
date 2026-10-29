@@ -68,15 +68,17 @@ Paint with semantic roles, never stored colors:
 div().bg(color(ColorRole::SURFACE_CONTAINER)).text_color(color(ColorRole::ON_SURFACE))
 ```
 
-Switch theme (animated on the slow effects spring) or motion scheme:
+Switch theme from an input event (it animates on the slow effects spring; keep
+calling `advance_component_theme` from a next-frame callback while it returns
+`true`, never from `render`), or switch the motion scheme:
 
 ```rust
-theme::apply_scheme(ThemeId::Ocean.scheme(ThemeMode::Dark, Contrast::High), window, cx);
+let ocean = ThemeId::Ocean.scheme(ThemeMode::Dark, Contrast::High);
+let running = theme::advance_component_theme(ocean, 1.0, window, cx);
 gpui_kit_material::motion::set_motion_scheme(gpui_kit_material::motion::MotionScheme::Standard);
 ```
 
-Advance theme animation from input events and pre-frame callbacks with
-`theme::advance_component_theme`, never from `render`. A controlled toggle
+A controlled toggle
 button (the caller owns `selected`; the button never stores it):
 
 ```rust
@@ -94,8 +96,7 @@ material_button("save", ButtonVariant::Tonal)
     .child(label)
 ```
 
-Labels and accessible names come from the caller (the one remaining exception,
-`CaptionLabels::default()`, is slated for removal). See the rustdoc (`cargo doc --open -p gpui-kit-material`) for the full
+Labels and accessible names always come from the caller. See the rustdoc (`cargo doc --open -p gpui-kit-material`) for the full
 contracts of each component.
 
 ## Gallery

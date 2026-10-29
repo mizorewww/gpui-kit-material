@@ -1297,7 +1297,7 @@
     "policy": "Use the sibling Symbols library and its Kit integration; keep the Material consumer in a separate package so the library never depends on Material.",
     "status": "integrated: canonical Symbols paths and Component Icon rendering; 103 Kit default translations, 3 explicit unsupported paths, 6 approximate translations; visual and performance acceptance pending",
     "commits": "atomic by concern in each affected repository",
-    "inspected_commit": "d73f27c1b14d1a8330fb837945bb09b282257f1e"
+    "inspected_commit": "593aa15a46076f3e2870c23c0e4fd79f94f105bd"
   },
   "implementation_foundation": {
     "repository": "https://github.com/longbridge/gpui-kit",

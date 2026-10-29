@@ -13,7 +13,7 @@ switched to the kit yet; this table is the guide for that change.
 | radii, `TILE_*`, `tile_corners`, `list_corners` | `tokens::shape` (`OuterCorners`) |
 | `TEXT_*` | `tokens::typography` (+ `rem(px)`) |
 | `CONTROL_HEIGHT`, `ICON_SLOT`, `SETTING_ITEM_INSET`, `COMPACT_WINDOW`, `title_bar_height` | `tokens::layout` (`ITEM_INSET`, `app_bar_height`) |
-| `shadow_card`, `shadow_popover` | `tokens::elevation::{level1, popover}` |
+| `shadow_card`, `shadow_popover` | `tokens::elevation::level0`…`level5` |
 | `motion.rs` springs, `enter`, `state_enter`, `page_enter`, `value`, `selection_value`, `disclosure` | `motion` |
 | `motion::{spinner, icon_spinner, progress, linear_progress, indeterminate_progress}` | `components` (progress) |
 | `choice_group::SingleChoiceGroup` | `components::ConnectedButtonGroup` |
