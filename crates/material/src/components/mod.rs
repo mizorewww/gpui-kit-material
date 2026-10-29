@@ -21,12 +21,13 @@ mod focus;
 mod progress;
 mod text;
 mod tile;
+mod title_bar;
 
 pub use button_group::ConnectedButtonGroup;
 pub use caption::{Caption, CaptionButton, CaptionButtons, CaptionLabels, title_bar_control};
 pub use choice::{ChoiceTile, Tint, choice_radio, tinted_icon};
 pub use feedback::{
-    BadgeKind, NoticeKind, badge, card_surface, chip, notice_banner, outlined_badge,
+    BadgeKind, NoticeKind, Snackbar, badge, card_surface, chip, notice_banner, outlined_badge,
 };
 pub use focus::{FocusRing, RevealFocus, contain_scroll};
 pub use progress::{
@@ -39,6 +40,9 @@ pub use text::{
 };
 pub use tile::{
     TileGroup, TileScale, disclosure_chevron, list_tile, tile, tile_chevron, tile_info,
+};
+pub use title_bar::{
+    TitleBar, title_bar_leading, title_bar_window_options, traffic_light_position,
 };
 
 pub(crate) fn init(cx: &mut gpui::App) {

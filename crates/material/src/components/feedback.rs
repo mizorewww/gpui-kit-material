@@ -1,9 +1,10 @@
-//! Status and notice surfaces: badges, chips, banners and cards.
+//! Status and notice surfaces: badges, chips, banners, cards and snackbars.
 use crate::color::ColorRole::{self, *};
 use crate::icons::IconName;
 use crate::theme::color;
-use crate::tokens::{elevation, layout::*, shape::*, typography::*};
+use crate::tokens::{elevation, layout::*, shape::*, state, typography::*};
 use gpui::{prelude::*, *};
+use std::rc::Rc;
 
 use super::text::accessible_text;
 
@@ -142,4 +143,179 @@ pub fn card_surface() -> Div {
         .border_color(color(ColorRole::CARD_LINE))
         .rounded(RADIUS_CARD)
         .shadow(elevation::level1())
+}
+
+type SnackbarHandler = Rc<dyn Fn(&ClickEvent, &mut Window, &mut App)>;
+
+/// M3 snackbar: a brief status message on the inverse surface, with an
+/// optional text action and close button. The caller places it (usually
+/// bottom-leading, 16px from the window edges) and removes it when done.
+#[derive(IntoElement)]
+pub struct Snackbar {
+    id: ElementId,
+    message: SharedString,
+    action: Option<(SharedString, SnackbarHandler)>,
+    close: Option<(SharedString, SnackbarHandler)>,
+}
+
+impl Snackbar {
+    pub fn new(id: impl Into<ElementId>, message: impl Into<SharedString>) -> Self {
+        Self {
+            id: id.into(),
+            message: message.into(),
+            action: None,
+            close: None,
+        }
+    }
+
+    /// A text button after the message, e.g. "Undo".
+    pub fn action(
+        mut self,
+        label: impl Into<SharedString>,
+        handler: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.action = Some((label.into(), Rc::new(handler)));
+        self
+    }
+
+    /// A close icon button, announced with `label`.
+    pub fn close(
+        mut self,
+        label: impl Into<SharedString>,
+        handler: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.close = Some((label.into(), Rc::new(handler)));
+        self
+    }
+}
+
+/// A button on the inverse surface, with its state layer in `fg`.
+fn inverse_button(id: ElementId, fg: Rgba, handler: SnackbarHandler) -> gpui_base::Button {
+    let bg = color(INVERSE_SURFACE);
+    gpui_base::Button::new(id)
+        .flex()
+        .items_center()
+        .justify_center()
+        .flex_shrink_0()
+        .h(rem(40.))
+        .rounded_full()
+        .text_color(fg)
+        .hover(move |s| s.bg(state::hovered(bg, fg)))
+        .active(move |s| s.bg(state::pressed(bg, fg)))
+        .on_click(move |event, window, cx| handler(event, window, cx))
+}
+
+impl RenderOnce for Snackbar {
+    fn render(self, _: &mut Window, _: &mut App) -> impl IntoElement {
+        let id = self.id;
+        let child = |name: &'static str| ElementId::NamedChild(id.clone().into(), name.into());
+        gpui_base::h_flex()
+            .id(id.clone())
+            .items_center()
+            .min_h(rem(48.))
+            .max_w(rem(560.))
+            .pl(rem(16.))
+            .pr(rem(if self.action.is_some() || self.close.is_some() {
+                4.
+            } else {
+                16.
+            }))
+            .gap(rem(4.))
+            .rounded(RADIUS_EXTRA_SMALL)
+            .bg(color(INVERSE_SURFACE))
+            .text_color(color(INVERSE_ON_SURFACE))
+            .text_size(TEXT_BODY)
+            .shadow(elevation::popover())
+            .child(
+                accessible_text(child("message"), self.message)
+                    .role(Role::Status)
+                    .flex_1()
+                    .min_w_0()
+                    .py(rem(14.))
+                    .whitespace_normal(),
+            )
+            .when_some(self.action, |bar, (label, handler)| {
+                bar.child(
+                    inverse_button(child("action"), color(INVERSE_PRIMARY), handler)
+                        .when(cfg!(test), |b| {
+                            b.debug_selector(|| "snackbar-action".into())
+                        })
+                        .px(rem(12.))
+                        .font_weight(FontWeight::MEDIUM)
+                        .child(label),
+                )
+            })
+            .when_some(self.close, |bar, (label, handler)| {
+                bar.child(
+                    inverse_button(child("close"), color(INVERSE_ON_SURFACE), handler)
+                        .when(cfg!(test), |b| b.debug_selector(|| "snackbar-close".into()))
+                        .w(rem(40.))
+                        .accessibility_label(label)
+                        .child(IconName::Close.icon().size(ICON_SLOT)),
+                )
+            })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    // The glob import of `gpui` shadows the built-in `#[test]` that
+    // `#[gpui::test]` expands to.
+    use core::prelude::v1::test;
+    use gpui::{Context, Modifiers, TestAppContext};
+
+    struct Harness {
+        buttons: bool,
+        actions: usize,
+        closes: usize,
+    }
+
+    impl Render for Harness {
+        fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+            let snackbar = Snackbar::new("saved", "Icon saved");
+            let snackbar = if self.buttons {
+                snackbar
+                    .action("Undo", cx.listener(|this, _, _, _| this.actions += 1))
+                    .close("Dismiss", cx.listener(|this, _, _, _| this.closes += 1))
+            } else {
+                snackbar
+            };
+            div().size_full().child(snackbar)
+        }
+    }
+
+    fn open(
+        cx: &mut TestAppContext,
+        buttons: bool,
+    ) -> (Entity<Harness>, &mut gpui::VisualTestContext) {
+        let (view, cx) = cx.add_window_view(move |_, _| Harness {
+            buttons,
+            actions: 0,
+            closes: 0,
+        });
+        cx.run_until_parked();
+        (view, cx)
+    }
+
+    #[gpui::test]
+    fn action_and_close_report_their_own_clicks(cx: &mut TestAppContext) {
+        let (view, cx) = open(cx, true);
+        let action = cx.debug_bounds("snackbar-action").expect("action").center();
+        let close = cx.debug_bounds("snackbar-close").expect("close").center();
+        cx.simulate_click(action, Modifiers::default());
+        cx.simulate_click(close, Modifiers::default());
+        cx.simulate_click(close, Modifiers::default());
+        view.read_with(cx, |h, _| {
+            assert_eq!(h.actions, 1);
+            assert_eq!(h.closes, 2);
+        });
+    }
+
+    #[gpui::test]
+    fn a_plain_snackbar_has_no_buttons(cx: &mut TestAppContext) {
+        let (_, cx) = open(cx, false);
+        assert!(cx.debug_bounds("snackbar-action").is_none());
+        assert!(cx.debug_bounds("snackbar-close").is_none());
+    }
 }

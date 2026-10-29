@@ -45,8 +45,9 @@ change animates the whole window on the slow effects spring.
 - **Components**: connected button group (radio or tab semantics, roving
   focus), tiles and tile groups, choice tiles with radio indicator, tinted
   icons, badges, chips, notices, cards, linear progress and spinner, text
-  roles with accessibility semantics, focus ring and focus reveal, and
-  Windows/Linux caption buttons.
+  roles with accessibility semantics, focus ring and focus reveal, snackbars,
+  and an application-drawn window title bar with Windows/Linux caption
+  buttons.
 
 ## Gallery
 

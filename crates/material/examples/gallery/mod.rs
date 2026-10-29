@@ -36,6 +36,9 @@ const GALLERY_SECTIONS: [(&str, &str); 11] = [
     ("dividers", "Dividers"),
 ];
 
+/// Fixed height keeps the native traffic lights centered at every text scale.
+const TITLE_BAR: Pixels = px(56.);
+
 struct Gallery {
     palette: PaletteId,
     reference_theme: Option<ThemeId>,
@@ -53,6 +56,7 @@ struct Gallery {
     slider: Entity<gpui_base::slider::SliderState>,
     switch: bool,
     sheet: bool,
+    snackbar: bool,
     motion_scheme: motion::MotionScheme,
     motion_target: bool,
     button_effects_disabled: bool,
@@ -681,6 +685,15 @@ impl Render for Gallery {
             ))
             .child(error_text("error", "Error text is announced as an alert."))
             .child(
+                material_button("show-snackbar", ButtonVariant::Tonal)
+                    .child("Show snackbar")
+                    .on_click(cx.listener(|this, _, _, cx| {
+                        this.snackbar = true;
+                        cx.notify();
+                    }))
+                    .reveal("reveal-show-snackbar", scroll),
+            )
+            .child(
                 card_surface()
                     .gap(rem(12.))
                     .child(semantic_label(
@@ -950,19 +963,50 @@ impl Render for Gallery {
                     )
                     .child(divider_samples),
             );
-        div()
+        gpui_base::v_flex()
             .id("gallery")
             .relative()
             .size_full()
-            .flex()
-            .flex_row()
-            .when(compact, |layout| layout.flex_col())
             .bg(color(ColorRole::CANVAS))
             .text_color(color(ColorRole::INK))
             .font_family("Roboto")
-            .child(navigation)
-            .child(content)
-            .child(CaptionButtons::new(app_bar_height(window)))
+            .child(
+                TitleBar::new("title-bar", TITLE_BAR)
+                    .gap(rem(12.))
+                    .child(section_title("window-title", "gpui-kit-material")),
+            )
+            .child(
+                div()
+                    .flex()
+                    .flex_1()
+                    .min_h_0()
+                    .min_w_0()
+                    .flex_row()
+                    .when(compact, |layout| layout.flex_col())
+                    .child(navigation)
+                    .child(content),
+            )
+            .when(self.snackbar, |root| {
+                root.child(
+                    div().absolute().left(px(16.)).bottom(px(16.)).child(
+                        Snackbar::new("snackbar", "Settings saved")
+                            .action(
+                                "Undo",
+                                cx.listener(|this, _, _, cx| {
+                                    this.snackbar = false;
+                                    cx.notify();
+                                }),
+                            )
+                            .close(
+                                "Dismiss",
+                                cx.listener(|this, _, _, cx| {
+                                    this.snackbar = false;
+                                    cx.notify();
+                                }),
+                            ),
+                    ),
+                )
+            })
     }
 }
 
@@ -989,12 +1033,8 @@ pub fn run(application: gpui::Application, initialize: impl FnOnce(&mut App) + '
         let viewport = size(px(960.), px(900.));
         #[cfg(not(target_family = "wasm"))]
         let viewport = capture::window_size(cx).unwrap_or(viewport);
-        let bounds = Bounds::centered(None, viewport, cx);
         cx.open_window(
-            WindowOptions {
-                window_bounds: Some(WindowBounds::Windowed(bounds)),
-                ..Default::default()
-            },
+            title_bar_window_options("gpui-kit-material", TITLE_BAR, viewport, cx),
             move |window, cx| {
                 #[cfg(all(not(target_family = "wasm"), feature = "frame-profiler"))]
                 if let Some(profiling) = profiling {
@@ -1020,6 +1060,7 @@ pub fn run(application: gpui::Application, initialize: impl FnOnce(&mut App) + '
                         slider,
                         switch: false,
                         sheet: false,
+                        snackbar: false,
                         motion_scheme: motion::MotionScheme::Expressive,
                         motion_target: false,
                         button_effects_disabled: false,

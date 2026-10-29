@@ -2,6 +2,8 @@
 use gpui::{Pixels, Styled, px};
 
 pub const RADIUS_PILL: Pixels = px(999.);
+/// Snackbars and other small, flat surfaces.
+pub const RADIUS_EXTRA_SMALL: Pixels = px(4.);
 /// Chips, badges, small covers and notices.
 pub const RADIUS_SMALL: Pixels = px(8.);
 /// Text fields and select fields.

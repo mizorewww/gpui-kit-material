@@ -200,11 +200,12 @@ fn trailing_for(caption_width: f32) -> f32 {
     }
 }
 
-type CloseRequest = Rc<dyn Fn(&mut Window, &mut App) -> bool>;
+pub(super) type CloseRequest = Rc<dyn Fn(&mut Window, &mut App) -> bool>;
 
 /// The caption buttons over the trailing end of a title bar, above any
 /// dialog, or nothing where the system draws them. Render it once per
-/// window, as a child of the root.
+/// window, as a child of the root; a [`super::TitleBar`] renders its own, so
+/// a window with one needs no other.
 #[derive(IntoElement)]
 pub struct CaptionButtons {
     height: Pixels,
