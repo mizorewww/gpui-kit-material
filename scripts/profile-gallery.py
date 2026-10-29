@@ -115,9 +115,13 @@ def main():
     parser.add_argument("output", type=Path, help="new evidence directory outside the repository")
     parser.add_argument("--seconds", type=float, default=10)
     parser.add_argument("--backend", choices=("upstream", "fast"), default="fast")
+    parser.add_argument("--scroll", action="store_true",
+                        help="record bounded bidirectional scrolling with vertical sync disabled")
     args = parser.parse_args()
     if not math.isfinite(args.seconds) or not 0.1 <= args.seconds <= 3600:
         parser.error("--seconds must be finite and in 0.1..=3600")
+    if args.scroll and not 2 <= args.seconds <= 120:
+        parser.error("--scroll requires --seconds in 2..=120")
     destination = args.output.resolve()
     if destination == ROOT or ROOT in destination.parents:
         parser.error("use an output directory outside the repository to keep source fingerprints stable")
@@ -132,6 +136,7 @@ def main():
         "source_before_build": source_identity(features),
         "build_command": command,
         "requested_backend": args.backend,
+        "requested_scenario": "bidirectional-scroll" if args.scroll else "startup",
         "rustc": output("rustc", "-Vv").decode(),
         "cargo": output("cargo", "-V").decode().strip(),
         "build_environment": {key: os.environ.get(key) for key in (
@@ -179,6 +184,9 @@ def main():
     provenance["binary_sha256"] = hashlib.sha256(binary.read_bytes()).hexdigest()
     save()
     env = os.environ.copy()
+    env.pop("MATERIAL_SCROLL_PROFILE", None)
+    if args.scroll:
+        env["MATERIAL_SCROLL_PROFILE"] = "1"
     env.update(MATERIAL_PROFILE_OUTPUT=str(destination / "frames.json"),
                MATERIAL_PROFILE_SECONDS=str(args.seconds))
     with (destination / "run.log").open("wb") as log:

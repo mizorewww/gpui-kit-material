@@ -110,6 +110,20 @@ timings, including startup. A faster backend does not by itself establish the
 whole-Gallery 2 ms limit; every measured frame and the required interaction
 scenarios still need validation.
 
+Record continuous bidirectional scrolling with `--scroll` (2–120 seconds):
+
+```sh
+python3 scripts/profile-gallery.py /tmp/material-scroll --backend fast --seconds 10 --scroll
+```
+
+This diagnostic disables vertical sync through the platform API and preserves
+raw scroll positions, successful new-frame counts, full CPU scopes and the
+lowest observed full-window FPS (windows of at least 250 ms). Short tails remain
+separate. The required gates are **scrolling >= 500 FPS** and **every whole CPU
+frame <= 2 ms**. These observations cannot establish per-frame scroll submission
+times or complete Gallery traversal; incomplete evidence never passes. CPU
+startup is included, while FPS observation starts after the window opens.
+
 The native gallery can save its GPU-rendered frame with reproducible state:
 
 ```sh

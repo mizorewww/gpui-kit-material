@@ -5,6 +5,8 @@
 pub mod capture;
 #[cfg(all(not(target_family = "wasm"), feature = "frame-profiler"))]
 mod performance;
+#[cfg(all(not(target_family = "wasm"), feature = "frame-profiler"))]
+mod scroll_performance;
 
 mod fps;
 mod settings;
@@ -1076,7 +1078,7 @@ pub fn run(application: gpui::Application, initialize: impl FnOnce(&mut App) + '
         let viewport = size(px(960.), px(900.));
         #[cfg(not(target_family = "wasm"))]
         let viewport = capture::window_size(cx).unwrap_or(viewport);
-        let (_window, _) = gpui_kit::open_window(
+        let (_window, _gallery) = gpui_kit::open_window(
             title_bar_window_options("gpui-kit-material", TITLE_BAR, viewport, cx),
             cx,
             move |window, cx| {
@@ -1152,7 +1154,14 @@ pub fn run(application: gpui::Application, initialize: impl FnOnce(&mut App) + '
         #[cfg(all(not(target_family = "wasm"), feature = "frame-profiler"))]
         if let Some(profiling) = profiling {
             _window
-                .update(cx, |_, window, cx| profiling.install(window, cx))
+                .update(cx, |_, window, cx| {
+                    if std::env::var_os("MATERIAL_SCROLL_PROFILE").is_some() {
+                        let target = _gallery.read(cx).scroll.clone().into();
+                        profiling.install_scroll(window, cx, target);
+                    } else {
+                        profiling.install(window, cx);
+                    }
+                })
                 .unwrap();
         }
         cx.activate(true);

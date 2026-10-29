@@ -99,6 +99,51 @@ impl Recording {
     }
 }
 impl Session {
+    pub(super) fn install_scroll(
+        mut self,
+        window: &mut Window,
+        cx: &mut App,
+        target: super::scroll_performance::ScrollTarget,
+    ) {
+        let viewport = window.viewport_size();
+        self.metadata["window"] = json!({"viewport_logical_px":[f32::from(viewport.width),f32::from(viewport.height)],
+            "dpr":window.scale_factor(),"rem_size_px":f32::from(window.rem_size())});
+        self.metadata["scenario_coverage"] =
+            json!("bounded bidirectional programmatic main-content scrolling");
+        self.metadata["workload"] = json!(
+            "actual 8px scroll steps, all startup/turn observations retained, FPS overlay enabled"
+        );
+        self.metadata["display_refresh_interval_ns"] = json!(
+            window
+                .refresh_interval(cx)
+                .map(|interval| interval.as_nanos())
+        );
+        self.metadata["display_refresh_note"] = json!(
+            "reported display cadence, separate from successful newly drawn frame submission FPS"
+        );
+        self.metadata["requested_vsync"] = json!("disabled; driver verifies readback throughout");
+        let session = super::scroll_performance::Session::from_prepared(
+            self.output,
+            self.duration,
+            self.collector,
+        )
+        .unwrap_or_else(|error| {
+            eprintln!("Invalid scroll profile: {error}");
+            std::process::exit(2)
+        });
+        session.install(window, cx, target, move |events, id, elapsed, errors| {
+            report(
+                Recording {
+                    events,
+                    errors,
+                    batch_sizes: Vec::new(),
+                },
+                id,
+                self.metadata,
+                elapsed,
+            )
+        });
+    }
     pub fn install(mut self, window: &Window, cx: &mut App) {
         let window_id = window.window_handle().window_id();
         let viewport = window.viewport_size();
