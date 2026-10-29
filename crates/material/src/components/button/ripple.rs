@@ -5,9 +5,13 @@ use std::time::Duration;
 
 const MOTION: Duration = Duration::from_millis(400);
 const LIFETIME: Duration = Duration::from_millis(450);
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 struct Wave {
     id: u64,
+    /// This wave's keyed-state ids, built once when it is pressed (or its
+    /// expansion restarts), so painting allocates no per-frame ids.
+    key: ElementId,
+    expansion: ElementId,
     center: Point<Pixels>,
     radius: Pixels,
     released: bool,
@@ -18,13 +22,33 @@ struct Wave {
 #[derive(Default)]
 struct RippleState {
     next: u64,
+    /// The owning button's ripple id, the parent of every wave id.
+    parent: Option<std::sync::Arc<ElementId>>,
     waves: Vec<Wave>,
+}
+/// The expansion clock id of `key` for one expansion generation.
+fn expansion_key(key: &ElementId, generation: u64) -> ElementId {
+    ElementId::NamedChild(
+        std::sync::Arc::new(key.clone()),
+        if generation == 0 {
+            SharedString::new_static("expand")
+        } else {
+            format!("expand-{generation}").into()
+        },
+    )
 }
 impl RippleState {
     fn press(&mut self, bounds: Bounds<Pixels>, position: Point<Pixels>, cx: &mut Context<Self>) {
         self.next += 1;
+        let parent = self
+            .parent
+            .clone()
+            .unwrap_or_else(|| std::sync::Arc::new(ElementId::Name("ripple".into())));
+        let key = ElementId::NamedChild(parent, self.next.to_string().into());
         self.waves.push(Wave {
             id: self.next,
+            expansion: expansion_key(&key, 0),
+            key,
             center: position - bounds.origin,
             radius: bounds.size.width.max(bounds.size.height),
             released: false,
@@ -98,9 +122,13 @@ impl ButtonRipple {
             if !mounted {
                 state.waves.clear();
             }
+            if state.parent.is_none() {
+                state.parent = Some(std::sync::Arc::new((id.clone(), "ripple-wave").into()));
+            }
             for wave in &mut state.waves {
                 if wave.reduced_motion && !reduced_motion {
                     wave.expansion_generation += 1;
+                    wave.expansion = expansion_key(&wave.key, wave.expansion_generation);
                 }
                 wave.reduced_motion = reduced_motion;
                 if wave.released && wave.fade_duration.is_none() {
@@ -121,16 +149,9 @@ impl ButtonRipple {
             let timing = Timing::new(MOTION).ease(easing.clone());
             waves.reserve_exact(count);
             for index in 0..count {
-                // Waves are Copy: read one at a time instead of cloning the list.
-                let wave = state.read(cx).waves[index];
-                let key = ElementId::NamedChild(
-                    id.clone().into(),
-                    format!("ripple-wave-{}", wave.id).into(),
-                );
-                let expansion = ElementId::NamedChild(
-                    key.clone().into(),
-                    format!("expand-{}", wave.expansion_generation).into(),
-                );
+                // Read one wave at a time; its ids are shared, not rebuilt.
+                let wave = state.read(cx).waves[index].clone();
+                let (key, expansion) = (wave.key.clone(), wave.expansion.clone());
                 let scale = animate_keyframes(expansion, &frames, timing.clone(), window, cx).value;
                 // The complete reference stylesheet retains opacity in transition-property
                 // under reduced motion. A running fade therefore keeps its original
