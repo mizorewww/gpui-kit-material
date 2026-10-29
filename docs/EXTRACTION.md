@@ -6,7 +6,7 @@ switched to the kit yet; this table is the guide for that change.
 | course2md (`desktop/src`) | gpui-kit-material |
 | --- | --- |
 | `palettes.rs` | `color::palette` (serde behind the `serde` feature) |
-| `theme.rs` tokens `ColorToken` / `CANVAS`… | `color::ColorRole::CANVAS`… (`ColorRole` avoids GPUI's accessibility `Role`) |
+| `theme.rs` tokens `ColorToken` / `CANVAS`… | `color::ColorRole::SURFACE_CONTAINER`… (canonical M3 roles; the old names remain as deprecated aliases. `ColorRole` avoids GPUI's accessibility `Role`) |
 | `theme::palette_colors` | `color::Scheme::from_palette` |
 | `theme::color`, `blend`, `apply_preference`, `system_dark` | `theme::color`, `theme::blend`, `theme::init_component_theme` + `theme::advance_component_theme` (with `ThemePreferences::resolve(system_dark(cx))`), `theme::system_dark` |
 | `theme::apply_scale` | the `scale` argument of `theme::init_component_theme` / `theme::advance_component_theme`, which also keeps gpui-component's theme in sync |

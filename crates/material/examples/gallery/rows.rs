@@ -920,7 +920,7 @@ impl Gallery {
                         div()
                             .size(rem(24.))
                             .rounded_full()
-                            .bg(color(ColorRole::ACCENT))
+                            .bg(color(ColorRole::PRIMARY))
                             .when(effects, |view| view.opacity(progress))
                             .when(!effects, |view| view.ml(rem(progress * 160.))),
                     ),

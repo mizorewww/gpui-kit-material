@@ -90,26 +90,35 @@ roles!(
 // extensions above remain independent; they are not claimed as M3 scheme roles.
 impl ColorRole {
     /// Legacy name for [`ColorRole::SURFACE_CONTAINER`], the window ground.
+    #[deprecated(note = "use `ColorRole::SURFACE_CONTAINER`")]
     pub const CANVAS: Self = Self::SURFACE_CONTAINER;
     /// Legacy name for [`ColorRole::SURFACE_CONTAINER_HIGHEST`]. Despite the
     /// name, this is the *highest* container, not
     /// [`ColorRole::SURFACE_CONTAINER_HIGH`].
+    #[deprecated(note = "use `ColorRole::SURFACE_CONTAINER_HIGHEST`")]
     pub const SURFACE_HIGH: Self = Self::SURFACE_CONTAINER_HIGHEST;
     /// Legacy name for [`ColorRole::ON_SURFACE`], primary text and icons.
+    #[deprecated(note = "use `ColorRole::ON_SURFACE`")]
     pub const INK: Self = Self::ON_SURFACE;
     /// Legacy name for [`ColorRole::ON_SURFACE_VARIANT`], secondary text
     /// and icons.
+    #[deprecated(note = "use `ColorRole::ON_SURFACE_VARIANT`")]
     pub const GRAY: Self = Self::ON_SURFACE_VARIANT;
     /// Legacy name for [`ColorRole::OUTLINE_VARIANT`], decorative dividers.
+    #[deprecated(note = "use `ColorRole::OUTLINE_VARIANT`")]
     pub const HAIRLINE: Self = Self::OUTLINE_VARIANT;
     /// Legacy name for [`ColorRole::OUTLINE`], control boundaries such as
     /// outlined fields and unselected checkboxes.
+    #[deprecated(note = "use `ColorRole::OUTLINE`")]
     pub const CONTROL: Self = Self::OUTLINE;
     /// Legacy name for [`ColorRole::PRIMARY`].
+    #[deprecated(note = "use `ColorRole::PRIMARY`")]
     pub const ACCENT: Self = Self::PRIMARY;
     /// Legacy name for [`ColorRole::ERROR`].
+    #[deprecated(note = "use `ColorRole::ERROR`")]
     pub const DANGER: Self = Self::ERROR;
     /// Legacy name for [`ColorRole::ERROR_CONTAINER`].
+    #[deprecated(note = "use `ColorRole::ERROR_CONTAINER`")]
     pub const DANGER_BG: Self = Self::ERROR_CONTAINER;
 }
 
@@ -140,7 +149,7 @@ impl Scheme {
         // with a trace of its accent, so surface tiles read as a layer above it.
         let canvas = hex(p.canvas).blend(hex(p.accent), if dark { 0.03 } else { 0.045 });
         let colors = std::array::from_fn(|index| match ColorRole::ALL[index] {
-            ColorRole::CANVAS => canvas,
+            ColorRole::SURFACE_CONTAINER => canvas,
             // Dark palettes' surfaces sit only a step above their canvas; lift
             // them as M3 lifts dark surface containers, so tiles and cards
             // read as layers.
@@ -154,7 +163,7 @@ impl Scheme {
             // Dark palettes raise surfaces by lightening them, so their
             // highest container builds on the surface rather than the
             // darker ground.
-            ColorRole::SURFACE_HIGH => {
+            ColorRole::SURFACE_CONTAINER_HIGHEST => {
                 if dark {
                     hex(p.surface).blend(hex(p.text), 0.13)
                 } else {
@@ -162,14 +171,14 @@ impl Scheme {
                 }
             }
             ColorRole::INSET => hex(p.inset),
-            ColorRole::INK => hex(p.text),
-            ColorRole::GRAY => hex(p.muted),
+            ColorRole::ON_SURFACE => hex(p.text),
+            ColorRole::ON_SURFACE_VARIANT => hex(p.muted),
             ColorRole::FAINT => hex(p.subtle),
-            ColorRole::HAIRLINE => hex(p.border),
+            ColorRole::OUTLINE_VARIANT => hex(p.border),
             // M3 cards are separated by tone rather than a full-strength outline.
             ColorRole::CARD_LINE => hex(p.surface).blend(hex(p.border), 0.55),
-            ColorRole::CONTROL => hex(p.control),
-            ColorRole::ACCENT => hex(p.accent),
+            ColorRole::OUTLINE => hex(p.control),
+            ColorRole::PRIMARY => hex(p.accent),
             ColorRole::ON_PRIMARY => hex(p.on_accent),
             // Container roles derive from each palette's own accent and text,
             // so every preset keeps its identity.
@@ -181,8 +190,8 @@ impl Scheme {
             ColorRole::SUCCESS_BG => tint(p.success, 0.12),
             ColorRole::WARNING => hex(p.warning),
             ColorRole::WARNING_BG => tint(p.warning, 0.12),
-            ColorRole::DANGER => hex(p.danger),
-            ColorRole::DANGER_BG => tint(p.danger, 0.12),
+            ColorRole::ERROR => hex(p.danger),
+            ColorRole::ERROR_CONTAINER => tint(p.danger, 0.12),
             ColorRole::SELECTION => hex(p.selection),
             // Selected text: the accent laid over whatever surface holds the
             // text, so it stays visible on tinted panels.
@@ -308,13 +317,13 @@ mod tests {
             let scheme = Scheme::from_palette(id);
             assert_eq!(scheme.is_dark(), id.is_dark());
             let (canvas, surface, high) = (
-                scheme.get(ColorRole::CANVAS),
+                scheme.get(ColorRole::SURFACE_CONTAINER),
                 scheme.get(ColorRole::SURFACE),
-                scheme.get(ColorRole::SURFACE_HIGH),
+                scheme.get(ColorRole::SURFACE_CONTAINER_HIGHEST),
             );
             assert_ne!(canvas, surface, "{}", id.name());
             assert_ne!(surface, high, "{}", id.name());
-            let ink = scheme.get(ColorRole::INK).luminance();
+            let ink = scheme.get(ColorRole::ON_SURFACE).luminance();
             assert_eq!(
                 ink > surface.luminance(),
                 id.is_dark(),
@@ -340,9 +349,9 @@ mod custom_scheme_tests {
     #[test]
     fn overriding_one_role_preserves_other_roles_and_appearance() {
         let before = Scheme::from_palette(PaletteId::Paper);
-        let after = before.with_role(ColorRole::ACCENT, Color::hex(0x0b57d0));
-        assert_eq!(after.get(ColorRole::ACCENT), Color::hex(0x0b57d0));
-        for role in ColorRole::ALL.iter().filter(|r| **r != ColorRole::ACCENT) {
+        let after = before.with_role(ColorRole::PRIMARY, Color::hex(0x0b57d0));
+        assert_eq!(after.get(ColorRole::PRIMARY), Color::hex(0x0b57d0));
+        for role in ColorRole::ALL.iter().filter(|r| **r != ColorRole::PRIMARY) {
             assert_eq!(before.get(*role), after.get(*role));
         }
         assert_eq!(before.is_dark(), after.is_dark());

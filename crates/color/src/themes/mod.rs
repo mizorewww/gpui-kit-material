@@ -267,6 +267,10 @@ mod tests {
     }
 
     #[test]
+    #[allow(
+        deprecated,
+        reason = "checks that the deprecated aliases keep sharing storage with their roles"
+    )]
     fn aliases_share_storage_and_reference_roles_are_not_duplicated() {
         let unique = REFERENCE_ROLES
             .into_iter()

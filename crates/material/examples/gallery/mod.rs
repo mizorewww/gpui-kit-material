@@ -367,8 +367,8 @@ impl Render for Gallery {
             .min_w_0()
             .min_h_0()
             .h_full()
-            .bg(color(ColorRole::CANVAS))
-            .text_color(color(ColorRole::INK))
+            .bg(color(ColorRole::SURFACE_CONTAINER))
+            .text_color(color(ColorRole::ON_SURFACE))
             .font_family("Roboto")
             .child(
                 gpui::list(self.list.clone(), move |index, window, cx| {
@@ -402,8 +402,8 @@ impl Render for Gallery {
             .relative()
             .size_full()
             .min_h_0()
-            .bg(color(ColorRole::CANVAS))
-            .text_color(color(ColorRole::INK))
+            .bg(color(ColorRole::SURFACE_CONTAINER))
+            .text_color(color(ColorRole::ON_SURFACE))
             .font_family("Roboto")
             .child(
                 div()
@@ -453,8 +453,8 @@ impl Render for GalleryWindow {
     fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
         gpui_base::v_flex()
             .size_full()
-            .bg(color(ColorRole::CANVAS))
-            .text_color(color(ColorRole::INK))
+            .bg(color(ColorRole::SURFACE_CONTAINER))
+            .text_color(color(ColorRole::ON_SURFACE))
             .font_family("Roboto")
             .child(
                 TitleBar::new("title-bar", TITLE_BAR, caption_labels())

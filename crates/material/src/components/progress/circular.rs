@@ -312,7 +312,7 @@ fn paint_progress(
 ) -> AnyElement {
     let (track, active) = geometry(frame);
     let track_color = color(ColorRole::SECONDARY_CONTAINER);
-    let active_color = color(ColorRole::ACCENT);
+    let active_color = color(ColorRole::PRIMARY);
     Progress::new(id)
         .accessibility_label(label)
         .indeterminate(fraction.is_none())

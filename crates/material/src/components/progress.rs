@@ -66,7 +66,7 @@ fn spin(
     playback: Option<RepeatAnimationPlayback>,
     cx: &App,
 ) -> AnyElement {
-    let icon = icon.color(color(ColorRole::ACCENT));
+    let icon = icon.color(color(ColorRole::PRIMARY));
     if cx.reduce_motion() {
         return icon.into_any_element();
     }
@@ -198,9 +198,9 @@ fn indeterminate_bar(
     cx: &App,
 ) -> AnyElement {
     let ink = color(if muted {
-        ColorRole::CONTROL
+        ColorRole::OUTLINE
     } else {
-        ColorRole::ACCENT
+        ColorRole::PRIMARY
     });
     let root = semantics(id.clone(), label, None);
     if cx.reduce_motion() {
@@ -278,9 +278,9 @@ fn measured_bar(
     // Spatial overshoot must not extend a measured fraction outside its track.
     let amount = crate::motion::value(id.clone(), target, window, cx).clamp(0., 1.);
     let ink = color(if muted {
-        ColorRole::CONTROL
+        ColorRole::OUTLINE
     } else {
-        ColorRole::ACCENT
+        ColorRole::PRIMARY
     });
     semantics(id, label, Some(target))
         .child(measured_pieces(bar_row(thickness), amount, thickness, ink))
@@ -519,7 +519,7 @@ mod layout_tests {
     }
     impl Render for LayoutHarness {
         fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
-            let ink = crate::theme::color(crate::color::ColorRole::ACCENT);
+            let ink = crate::theme::color(crate::color::ColorRole::PRIMARY);
             let bar = super::bar_row(px(4.));
             let bar = match self.case {
                 Case::Measured(amount) => super::measured_pieces(bar, amount, px(4.), ink),
