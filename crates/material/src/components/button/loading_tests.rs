@@ -255,3 +255,180 @@ fn visible_progress_fades_when_disabled_but_newly_shown_progress_adopts_opacity(
     });
     assert_eq!(opacity.get(), 0.7);
 }
+
+struct PersistentProgressProbe {
+    mounted: bool,
+    progress: bool,
+    loading: bool,
+    disabled: bool,
+    playback: super::ButtonProgressPlayback,
+    opacity: Rc<Cell<f32>>,
+}
+impl Render for PersistentProgressProbe {
+    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        let mut root = div().w(px(200.)).h(px(80.));
+        if self.mounted {
+            let mut button = MaterialButton::new("persistent-progress")
+                .progress(self.progress, "Progress")
+                .loading(self.loading, "Loading")
+                .disabled(self.disabled)
+                .progress_playback(self.playback.clone())
+                .child("Save");
+            button.progress_opacity_observer = Some(self.opacity.clone());
+            root = root.child(button);
+        }
+        root
+    }
+}
+
+#[gpui::test]
+fn caller_progress_preserves_visible_opacity_and_distinguishes_real_hide(cx: &mut TestAppContext) {
+    use std::time::Duration;
+    let playback = super::ButtonProgressPlayback::default();
+    let opacity = Rc::new(Cell::new(0.));
+    let (view, cx) = cx.add_window_view(|_, _| PersistentProgressProbe {
+        mounted: true,
+        progress: true,
+        loading: false,
+        disabled: false,
+        playback: playback.clone(),
+        opacity: opacity.clone(),
+    });
+    cx.update(|window, cx| {
+        window.refresh();
+        window.draw(cx).clear(cx);
+    });
+    assert_eq!(opacity.get(), 1.);
+    cx.update(|window, cx| {
+        view.update(cx, |view, _| view.mounted = false);
+        window.refresh();
+        window.draw(cx).clear(cx);
+        window.simulate_next_frame(cx);
+        window.refresh();
+        window.draw(cx).clear(cx);
+        playback.sync(true, false, true, cx);
+        assert_eq!(
+            window.simulate_next_frame(cx),
+            0,
+            "offscreen sync must not schedule"
+        );
+    });
+    cx.executor().advance_clock(Duration::from_millis(25));
+    cx.update(|window, cx| {
+        view.update(cx, |view, _| {
+            view.mounted = true;
+            view.disabled = true;
+        });
+        window.refresh();
+        window.draw(cx).clear(cx);
+    });
+    let easing = gpui_base::Easing::cubic_bezier(0.2, 0., 0., 1.).unwrap();
+    let expected = 1. - 0.3 * easing.sample(0.25);
+    assert!(
+        (opacity.get() - expected).abs() < 0.00001,
+        "remount must not adopt .7 or restart"
+    );
+    assert_eq!(playback.state.borrow().generation, 1);
+    // Reverse while absent. The Base engine owns shortening and interpolation.
+    cx.update(|window, cx| {
+        view.update(cx, |view, _| view.mounted = false);
+        window.refresh();
+        window.draw(cx).clear(cx);
+        playback.sync(true, false, false, cx);
+    });
+    let reversed = cx.update(|_, cx| playback.sample_inputs(true, false, false, cx).1.value);
+    assert!((reversed - expected).abs() < 0.00001);
+    cx.executor().advance_clock(Duration::from_millis(10));
+    cx.update(|window, cx| {
+        view.update(cx, |view, _| {
+            view.mounted = true;
+            view.disabled = false;
+        });
+        window.refresh();
+        window.draw(cx).clear(cx);
+    });
+    let p = easing.sample(0.25);
+    let reverse_progress = 0.010 / (0.100 * p);
+    let expected_reverse = expected + (1. - expected) * easing.sample(reverse_progress);
+    assert!((opacity.get() - expected_reverse).abs() < 0.00001);
+    cx.update(|window, cx| {
+        view.update(cx, |view, _| view.mounted = false);
+        window.refresh();
+        window.draw(cx).clear(cx);
+        playback.sync(false, false, true, cx);
+        playback.sync(false, true, false, cx);
+        view.update(cx, |view, _| {
+            view.mounted = true;
+            view.progress = false;
+            view.loading = true;
+        });
+        window.refresh();
+        window.draw(cx).clear(cx);
+    });
+    assert_eq!(
+        opacity.get(),
+        0.7,
+        "real hide/show adopts new loading opacity"
+    );
+    assert_eq!(playback.state.borrow().generation, 2);
+}
+
+#[gpui::test]
+fn caller_progress_retains_started_gate_and_offscreen_reduced_stop(cx: &mut TestAppContext) {
+    use std::time::Duration;
+    let playback = super::ButtonProgressPlayback::default();
+    cx.update(|cx| {
+        playback.sync(false, false, true, cx);
+        cx.set_reduce_motion(true);
+        playback.observe_reduced_motion(cx);
+        assert!(!playback.state.borrow().started);
+        cx.set_reduce_motion(false);
+    });
+    let (view, cx) = cx.add_window_view(|_, _| PersistentProgressProbe {
+        mounted: true,
+        progress: false,
+        loading: true,
+        disabled: false,
+        playback: playback.clone(),
+        opacity: Rc::new(Cell::new(0.)),
+    });
+    cx.update(|window, cx| {
+        window.refresh();
+        window.draw(cx).clear(cx);
+    });
+    assert!(playback.state.borrow().started);
+    cx.update(|window, cx| {
+        view.update(cx, |view, _| view.mounted = false);
+        window.refresh();
+        window.draw(cx).clear(cx);
+        window.simulate_next_frame(cx);
+        window.refresh();
+        window.draw(cx).clear(cx);
+    });
+    cx.executor().advance_clock(Duration::from_millis(150));
+    let stopped = cx.update(|window, cx| {
+        cx.set_reduce_motion(true);
+        playback.observe_reduced_motion(cx);
+        assert_eq!(window.simulate_next_frame(cx), 0);
+        // Reading the result must not itself observe reduced motion and stop
+        // the clock; only the explicit owner forwarding above may do that.
+        cx.set_reduce_motion(false);
+        playback.state.borrow().circular.sample(cx)
+    });
+    assert!(
+        (stopped.rotation_degrees
+            - crate::components::circular_indeterminate_frame(150.).rotation_degrees)
+            .abs()
+            < 0.002
+    );
+    cx.executor().advance_clock(Duration::from_secs(2));
+    cx.update(|window, cx| {
+        cx.set_reduce_motion(false);
+        playback.observe_reduced_motion(cx);
+        view.update(cx, |view, _| view.mounted = true);
+        window.refresh();
+        window.draw(cx).clear(cx);
+        assert_eq!(window.simulate_next_frame(cx), 0);
+        assert_eq!(playback.state.borrow().circular.sample(cx), stopped);
+    });
+}

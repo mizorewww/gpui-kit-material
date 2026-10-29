@@ -2,8 +2,8 @@
 //! implements and what remains for M3 Expressive (`docs/ROADMAP.md`).
 mod button;
 pub use button::{
-    ButtonDirection, ButtonIconPosition, ButtonShape, ButtonSize, ButtonVariant, MaterialButton,
-    material_button,
+    ButtonDirection, ButtonIconPosition, ButtonProgressPlayback, ButtonShape, ButtonSize,
+    ButtonVariant, MaterialButton, material_button,
 };
 mod button_group;
 mod controls;

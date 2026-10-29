@@ -26,6 +26,84 @@ use crate::{
 };
 use gpui::{prelude::*, *};
 
+/// Persistent progress/loading presentation for one logical button.
+///
+/// Keep this handle across virtual unmounts. Forward actual progress, loading,
+/// and disabled changes with [`Self::sync`] while unmounted; do not report a
+/// virtual unmount as hiding progress. Clones share playback, not interaction
+/// state. A fresh handle starts a new lifecycle.
+#[derive(Clone, Default)]
+pub struct ButtonProgressPlayback {
+    state: std::rc::Rc<std::cell::RefCell<ButtonProgressState>>,
+}
+
+#[derive(Default)]
+struct ButtonProgressState {
+    started: bool,
+    visible: bool,
+    generation: u64,
+    circular: super::progress::CircularProgressPlayback,
+    opacity: gpui_base::TransitionPlayback<f32>,
+}
+
+fn progress_opacity_policy() -> gpui_base::Transition {
+    gpui_base::Transition::new(std::time::Duration::from_millis(100))
+        .reduced_motion(gpui_base::ReducedMotion::Continue)
+        .easing(gpui_base::Easing::cubic_bezier(0.2, 0., 0., 1.).unwrap())
+}
+
+impl ButtonProgressPlayback {
+    /// Record real input changes at their event time without requesting frames.
+    /// `disabled` is the caller's independent flag; loading also disables.
+    /// First showing progress starts its circular clock. Hiding preserves that
+    /// clock, but the next show adopts the new opacity rather than resuming an
+    /// old hidden transition, matching the ordinary button API.
+    pub fn sync(&self, progress: bool, loading: bool, disabled: bool, cx: &App) {
+        self.sample_inputs(progress, loading, disabled, cx);
+    }
+
+    /// Forward a preference change after updating the app, including offscreen.
+    /// This does not start unused progress or restart a previously stopped loop.
+    /// Opacity retains its existing reduced-motion Continue policy.
+    pub fn observe_reduced_motion(&self, cx: &App) {
+        self.state.borrow().circular.observe_reduced_motion(cx);
+    }
+
+    fn sample_inputs(
+        &self,
+        progress: bool,
+        loading: bool,
+        disabled: bool,
+        cx: &App,
+    ) -> (
+        Option<super::progress::CircularProgressFrame>,
+        gpui_base::MotionValue<f32>,
+    ) {
+        let mut state = self.state.borrow_mut();
+        let visible = progress || loading;
+        if visible && !state.visible {
+            state.generation += 1;
+            state.opacity = gpui_base::TransitionPlayback::default();
+        }
+        state.started |= visible;
+        state.visible = visible;
+        let frame = state.started.then(|| state.circular.sample(cx));
+        let opacity = if visible {
+            state.opacity.sample(
+                if disabled || loading { 0.7 } else { 1. },
+                progress_opacity_policy(),
+                cx,
+            )
+        } else {
+            gpui_base::MotionValue {
+                value: 1.,
+                status: gpui_base::MotionStatus::Idle,
+            }
+        };
+        (frame, opacity)
+    }
+}
+
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum ButtonVariant {
     #[default]
@@ -448,6 +526,7 @@ pub struct MaterialButton {
     active_state: bool,
     progress: Option<(bool, SharedString)>,
     loading: Option<(bool, SharedString)>,
+    progress_playback: Option<ButtonProgressPlayback>,
     style: StyleRefinement,
 }
 impl MaterialButton {
@@ -480,6 +559,7 @@ impl MaterialButton {
             active_state: false,
             progress: None,
             loading: None,
+            progress_playback: None,
             style: StyleRefinement::default(),
         }
     }
@@ -558,6 +638,13 @@ impl MaterialButton {
         self.loading = Some((loading, label.into()));
         self
     }
+    /// Retain progress lifecycle and opacity across virtual unmounting.
+    /// While unmounted, the owner must forward real inputs and reduced motion
+    /// to the handle. Hover, pressed, focus and ripple remain mount-local.
+    pub fn progress_playback(mut self, playback: ButtonProgressPlayback) -> Self {
+        self.progress_playback = Some(playback);
+        self
+    }
     /// Keep the reference active appearance, for example while a menu is open.
     /// This only changes presentation: it does not focus, select, activate, or
     /// create a ripple. The caller owns this state independently of `disabled`.
@@ -633,50 +720,61 @@ impl RenderOnce for MaterialButton {
         let show_progress = loading || self.progress.as_ref().is_some_and(|(visible, _)| *visible);
         self.disabled |= loading;
         self.base = self.base.disabled(self.disabled).busy(loading);
-        let (progress_frame, progress_opacity) =
-            if self.loading.is_some() || self.progress.is_some() {
-                // The reference retains its canvas clock while display:none. Opacity
-                // transitions, unlike that clock, restart from the computed value on
-                // each new display, so a newly shown loading indicator starts at 0.7.
-                let mounted =
-                    window.use_keyed_state((self.id.clone(), "progress-mounted"), cx, |_, _| {
-                        (false, false, 0_u64)
-                    });
-                mounted.update(cx, |state, _| {
-                    if show_progress && !state.1 {
-                        state.2 += 1;
-                    }
-                    state.0 |= show_progress;
-                    state.1 = show_progress;
+        let (progress_frame, progress_opacity) = if let Some(playback) = &self.progress_playback {
+            let (frame, opacity) = playback.sample_inputs(
+                self.progress.as_ref().is_some_and(|(visible, _)| *visible),
+                loading,
+                self.disabled,
+                cx,
+            );
+            if matches!(
+                opacity.status,
+                gpui_base::MotionStatus::Running | gpui_base::MotionStatus::Delayed
+            ) {
+                window.request_animation_frame();
+            }
+            (frame, opacity.value)
+        } else if self.loading.is_some() || self.progress.is_some() {
+            // The reference retains its canvas clock while display:none. Opacity
+            // transitions, unlike that clock, restart from the computed value on
+            // each new display, so a newly shown loading indicator starts at 0.7.
+            let mounted =
+                window.use_keyed_state((self.id.clone(), "progress-mounted"), cx, |_, _| {
+                    (false, false, 0_u64)
                 });
-                let (started, _, generation) = *mounted.read(cx);
-                let frame = started.then(|| {
-                    super::progress::sample_circular_progress(
-                        (self.id.clone(), "button-progress"),
-                        window,
-                        cx,
-                    )
-                });
-                let opacity = if show_progress {
-                    gpui_base::transition(
-                        ElementId::NamedChild(
-                            self.id.clone().into(),
-                            format!("progress-opacity-{generation}").into(),
-                        ),
-                        if self.disabled { 0.7_f32 } else { 1. },
-                        gpui_base::Transition::new(std::time::Duration::from_millis(100))
-                            .reduced_motion(gpui_base::ReducedMotion::Continue)
-                            .easing(gpui_base::Easing::cubic_bezier(0.2, 0., 0., 1.).unwrap()),
-                        window,
-                        cx,
-                    )
-                } else {
-                    1.
-                };
-                (frame, opacity)
+            mounted.update(cx, |state, _| {
+                if show_progress && !state.1 {
+                    state.2 += 1;
+                }
+                state.0 |= show_progress;
+                state.1 = show_progress;
+            });
+            let (started, _, generation) = *mounted.read(cx);
+            let frame = started.then(|| {
+                super::progress::sample_circular_progress(
+                    (self.id.clone(), "button-progress"),
+                    window,
+                    cx,
+                )
+            });
+            let opacity = if show_progress {
+                gpui_base::transition(
+                    ElementId::NamedChild(
+                        self.id.clone().into(),
+                        format!("progress-opacity-{generation}").into(),
+                    ),
+                    if self.disabled { 0.7_f32 } else { 1. },
+                    progress_opacity_policy(),
+                    window,
+                    cx,
+                )
             } else {
-                (None, 1.)
+                1.
             };
+            (frame, opacity)
+        } else {
+            (None, 1.)
+        };
         #[cfg(test)]
         if let Some(observer) = &self.progress_opacity_observer {
             observer.set(progress_opacity);
@@ -831,14 +929,25 @@ impl RenderOnce for MaterialButton {
             .expect("visible progress has caller configuration")
             .1
             .clone();
-            let indicator = super::progress::circular_progress(
-                (self.id.clone(), "button-progress-indicator"),
-                label,
-                progress_frame.expect("visible progress has a mounted clock"),
-                None,
-                size(rem(self.size.icon_size().min(24.)), rem(24.)),
-                progress_opacity,
-            );
+            let indicator = if let Some(playback) = &self.progress_playback {
+                super::progress::indeterminate_circular_progress_with_playback(
+                    (self.id.clone(), "button-progress-indicator"),
+                    label,
+                    size(rem(self.size.icon_size().min(24.)), rem(24.)),
+                    progress_opacity,
+                    &playback.state.borrow().circular,
+                    cx,
+                )
+            } else {
+                super::progress::circular_progress(
+                    (self.id.clone(), "button-progress-indicator"),
+                    label,
+                    progress_frame.expect("visible progress has a mounted clock"),
+                    None,
+                    size(rem(self.size.icon_size().min(24.)), rem(24.)),
+                    progress_opacity,
+                )
+            };
             (
                 Some(
                     div()
