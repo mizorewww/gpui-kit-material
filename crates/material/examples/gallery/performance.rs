@@ -264,6 +264,18 @@ fn report(mut recording: Recording, target: WindowId, metadata: Value, elapsed: 
             FrameEvent::Complete(c) => c.start,
         })
         .min();
+    // Blocked presentation waits are reported per owning scope; a scope owns
+    // at most one submission (more is already an ambiguity error below).
+    let present_waits: HashMap<Instant, Duration> = recording
+        .events
+        .iter()
+        .filter_map(|event| match event {
+            FrameEvent::Complete(scope) if scope.window_id == target => scope
+                .present_start
+                .map(|at| (at, scope.presentation_wait)),
+            _ => None,
+        })
+        .collect();
     for event in &recording.events {
         let Some(origin) = origin else {
             recording
@@ -358,10 +370,13 @@ fn report(mut recording: Recording, target: WindowId, metadata: Value, elapsed: 
                 }
                 let draw = (d.draw_end - d.draw_start).as_nanos();
                 let submit = (p.present_end - p.present_start).as_nanos();
-                let total = draw + submit;
+                let wait = present_waits
+                    .get(&p.present_start)
+                    .map_or(0, |wait| wait.as_nanos().min(submit));
+                let total = draw + submit - wait;
                 costs.push(total);
                 pairs.push((d, p));
-                frames.push(json!({"index":frames.len(),"first_frame":frames.is_empty(),"draw_start_ns":timestamp(d.draw_start),"present_end_ns":timestamp(p.present_end),"draw_ns":draw,"submit_ns":submit,"measured_cpu_stage_ns":total,"wall_span_ns":(p.present_end-d.draw_start).as_nanos(),"request_layout_ns":d.phases.request_layout.as_nanos(),"prepaint_ns":d.phases.prepaint.as_nanos(),"paint_ns":d.phases.paint.as_nanos(),"measured_stages_over_budget":total>BUDGET_NS,"gpu_time_ns":Value::Null}));
+                frames.push(json!({"index":frames.len(),"first_frame":frames.is_empty(),"draw_start_ns":timestamp(d.draw_start),"present_end_ns":timestamp(p.present_end),"draw_ns":draw,"submit_ns":submit,"submit_presentation_wait_ns":wait,"measured_cpu_stage_ns":total,"measured_stage_ns_including_wait":draw+submit,"wall_span_ns":(p.present_end-d.draw_start).as_nanos(),"request_layout_ns":d.phases.request_layout.as_nanos(),"prepaint_ns":d.phases.prepaint.as_nanos(),"paint_ns":d.phases.paint.as_nanos(),"measured_stages_over_budget":total>BUDGET_NS,"gpu_time_ns":Value::Null}));
             }
         }
     }
@@ -379,6 +394,8 @@ fn report(mut recording: Recording, target: WindowId, metadata: Value, elapsed: 
     let mut draw_scopes = HashMap::new();
     let mut present_scopes = HashMap::new();
     let mut scope_costs = Vec::new();
+    let mut scope_elapsed = Vec::new();
+    let mut scope_waits = Vec::new();
     let mut scope_rows = Vec::new();
     let mut split_sums = Vec::new();
     let mut saw_initial = false;
@@ -441,9 +458,13 @@ fn report(mut recording: Recording, target: WindowId, metadata: Value, elapsed: 
                 )),
             }
         }
-        let cost = scope.duration().as_nanos();
+        let elapsed = scope.duration().as_nanos();
+        let wait = scope.presentation_wait.as_nanos().min(elapsed);
+        let cost = elapsed - wait;
         scope_costs.push(cost);
-        scope_rows.push(json!({"index":index,"source":format!("{:?}",scope.source),"cpu_elapsed_ns":cost,"draw_count":scope.draw_count,"present_count":scope.present_count,"next_frame_callbacks":scope.next_frame_callbacks,"over_budget":cost>BUDGET_NS,"gpu_time_ns":Value::Null}));
+        scope_elapsed.push(elapsed);
+        scope_waits.push(wait);
+        scope_rows.push(json!({"index":index,"source":format!("{:?}",scope.source),"cpu_elapsed_ns":cost,"scope_elapsed_ns":elapsed,"presentation_wait_ns":wait,"presentation_waits":scope.presentation_waits,"draw_count":scope.draw_count,"present_count":scope.present_count,"next_frame_callbacks":scope.next_frame_callbacks,"over_budget":cost>BUDGET_NS,"gpu_time_ns":Value::Null}));
     }
     for at in draws.keys() {
         if !draw_scopes.contains_key(at) {
@@ -492,11 +513,11 @@ fn report(mut recording: Recording, target: WindowId, metadata: Value, elapsed: 
                         .push(format!("frame {index} exceeds its owning scope"));
                 }
                 if d == p {
-                    frames[index]["cpu_frame_ns"] = json!(scopes[d].duration().as_nanos());
-                    frames[index]["over_budget"] =
-                        json!(scopes[d].duration().as_nanos() > BUDGET_NS);
+                    frames[index]["cpu_frame_ns"] = json!(scope_costs[d]);
+                    frames[index]["scope_elapsed_ns"] = json!(scope_elapsed[d]);
+                    frames[index]["over_budget"] = json!(scope_costs[d] > BUDGET_NS);
                 } else {
-                    let sum = scopes[d].duration().as_nanos() + scopes[p].duration().as_nanos();
+                    let sum = scope_costs[d] + scope_costs[p];
                     split_sums.push(sum);
                     frames[index]["cpu_frame_ns"] = Value::Null;
                     frames[index]["over_budget"] = json!(sum > BUDGET_NS);
@@ -511,7 +532,7 @@ fn report(mut recording: Recording, target: WindowId, metadata: Value, elapsed: 
             }
         }
     }
-    json!({"schema":"material-gallery-cpu-frames-v2","statistics_definition":"nearest-rank quantiles; median is p50 (lower middle for even sample counts)","budget_ns":BUDGET_NS,"budget_comparison":"every complete CPU scope must be at or below budget; known over-budget work fails even when acceptance is incomplete","acceptance_eligible":recording.errors.is_empty() && reasons.is_empty(),"eligibility_reasons":reasons,"scope":"whole synchronous CPU frame scopes plus exact draw/present associations","cpu_work_definition":"Complete event end-start includes callbacks, draw, submission and cleanup; split initial draw and submission remain separately measured, idle gaps are not CPU work","complete":recording.errors.is_empty(),"errors":recording.errors,"metadata":metadata,"capture_elapsed_ns":elapsed.as_nanos(),"summary":summary(&scope_costs),"split_scope_frames_summary":summary(&split_sums),"first_scope_summary":summary(&scope_costs[..scope_costs.len().min(1)]),"subsequent_scopes_summary":summary(&scope_costs[scope_costs.len().min(1)..]),"diagnostic_stage_summary":summary(&costs),"first_frame_stage_summary":summary(&costs[..costs.len().min(1)]),"subsequent_frames_stage_summary":summary(&costs[costs.len().min(1)..]),"collector_batch_sizes":recording.batch_sizes,"raw_events":raw,"cpu_scopes":scope_rows,"draw_lifecycle":draw_rows,"submissions":submission_rows,"frames":frames})
+    json!({"schema":"material-gallery-cpu-frames-v2","statistics_definition":"nearest-rank quantiles; median is p50 (lower middle for even sample counts)","budget_ns":BUDGET_NS,"budget_comparison":"every complete CPU scope must be at or below budget; known over-budget work fails even when acceptance is incomplete","acceptance_eligible":recording.errors.is_empty() && reasons.is_empty(),"eligibility_reasons":reasons,"scope":"whole synchronous CPU frame scopes plus exact draw/present associations","cpu_work_definition":"Complete event end-start includes callbacks, draw, submission and cleanup, minus blocked presentation waits (nextDrawable) reported by the platform; split initial draw and submission remain separately measured, idle gaps are not CPU work","presentation_wait_definition":"time blocked inside platform presentation waiting for a drawable; reported per scope and per frame, excluded from the 2 ms CPU judgement and retained in scope_elapsed_summary","complete":recording.errors.is_empty(),"errors":recording.errors,"metadata":metadata,"capture_elapsed_ns":elapsed.as_nanos(),"summary":summary(&scope_costs),"scope_elapsed_summary":summary(&scope_elapsed),"presentation_wait_summary":summary(&scope_waits),"split_scope_frames_summary":summary(&split_sums),"first_scope_summary":summary(&scope_costs[..scope_costs.len().min(1)]),"subsequent_scopes_summary":summary(&scope_costs[scope_costs.len().min(1)..]),"diagnostic_stage_summary":summary(&costs),"first_frame_stage_summary":summary(&costs[..costs.len().min(1)]),"subsequent_frames_stage_summary":summary(&costs[costs.len().min(1)..]),"collector_batch_sizes":recording.batch_sizes,"raw_events":raw,"cpu_scopes":scope_rows,"draw_lifecycle":draw_rows,"submissions":submission_rows,"frames":frames})
 }
 
 #[cfg(test)]
@@ -610,6 +631,8 @@ mod tests {
             present_count: 0,
             next_frame_callbacks: 0,
             power_interrupted: false,
+            presentation_wait: Duration::ZERO,
+            presentation_waits: 0,
         };
         let submit = CpuFrameTiming {
             window_id: d.window_id,
@@ -622,6 +645,8 @@ mod tests {
             present_count: 1,
             next_frame_callbacks: 0,
             power_interrupted: false,
+            presentation_wait: Duration::ZERO,
+            presentation_waits: 0,
         };
         let evidence = report(
             Recording {
@@ -655,6 +680,49 @@ mod tests {
         assert_eq!(exit_code(&evidence), 1);
     }
     #[test]
+    fn blocked_presentation_wait_is_reported_but_not_judged_as_cpu_work() {
+        let d = draw();
+        let p = PresentTiming {
+            window_id: d.window_id,
+            present_start: d.draw_end,
+            present_end: d.draw_end + Duration::from_millis(15),
+            animation_interval: None,
+        };
+        let frame = |wait: Duration| CpuFrameTiming {
+            window_id: d.window_id,
+            source: CpuFrameSource::Platform,
+            start: d.draw_start,
+            end: p.present_end,
+            draw_start: Some(d.draw_start),
+            present_start: Some(p.present_start),
+            draw_count: 1,
+            present_count: 1,
+            next_frame_callbacks: 0,
+            power_interrupted: false,
+            presentation_wait: wait,
+            presentation_waits: 1,
+        };
+        let events = |wait| {
+            vec![
+                FrameEvent::Draw(d),
+                FrameEvent::Present(p),
+                FrameEvent::Complete(frame(wait)),
+            ]
+        };
+        let evidence = report_events(events(Duration::from_micros(14_500)));
+        assert_eq!(evidence["summary"]["max_ns"], 1_500_000);
+        assert_eq!(evidence["scope_elapsed_summary"]["max_ns"], 16_000_000);
+        assert_eq!(evidence["presentation_wait_summary"]["max_ns"], 14_500_000);
+        assert_eq!(evidence["frames"][0]["measured_cpu_stage_ns"], 1_500_000);
+        assert_eq!(evidence["frames"][0]["over_budget"], false);
+        // Not a failure; ineligible only because no initial draw was captured.
+        assert_eq!(exit_code(&evidence), 2);
+        // Unreported time remains CPU work and fails.
+        let unexplained = report_events(events(Duration::from_millis(13)));
+        assert_eq!(unexplained["summary"]["over_budget_frames"], 1);
+        assert_eq!(exit_code(&unexplained), 1);
+    }
+    #[test]
     fn callback_only_over_budget_scope_fails_even_without_complete_frame_pairs() {
         let start = Instant::now();
         let id = WindowId::from(1);
@@ -669,6 +737,8 @@ mod tests {
             present_count: 0,
             next_frame_callbacks: 1,
             power_interrupted: false,
+            presentation_wait: Duration::ZERO,
+            presentation_waits: 0,
         };
         let evidence = report(
             Recording {
@@ -716,6 +786,8 @@ mod tests {
             present_count: 0,
             next_frame_callbacks: 0,
             power_interrupted: false,
+            presentation_wait: Duration::ZERO,
+            presentation_waits: 0,
         };
         let submitted = CpuFrameTiming {
             source: CpuFrameSource::Platform,

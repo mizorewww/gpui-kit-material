@@ -209,5 +209,11 @@
       "path": "src/fast/layers/reuse.rs",
       "scope": "Move the next/rendered frame borrows used only by debug-bounds replay inside the cfg(any(test, feature = \"test-support\")) block so builds without test-support have no unused-variable warnings. No behavior change."
     }
+  ],
+  "profiler_patches": [
+    {
+      "path": "src/profiler.rs",
+      "scope": "CpuFrameTiming gains presentation_wait/presentation_waits; record_presentation_wait attributes platform-reported blocking presentation waits to the innermost open CPU frame scope while tracing. Scope boundaries and durations are unchanged."
+    }
   ]
 }

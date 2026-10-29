@@ -1005,6 +1005,12 @@ pub struct CpuFrameTiming {
     pub next_frame_callbacks: usize,
     /// A sleep/wake interruption makes this unsuitable for timing acceptance.
     pub power_interrupted: bool,
+    /// Time the platform blocked inside presentation (for example waiting for
+    /// a free drawable) while this scope was open. Included in `duration()`;
+    /// consumers decide how to judge it. Zero when the platform reports none.
+    pub presentation_wait: Duration,
+    /// Number of blocking presentation waits reported for this scope.
+    pub presentation_waits: usize,
 }
 
 #[cfg(feature = "profiler")]
@@ -1049,6 +1055,8 @@ impl CpuFrameScope {
                     present_count: 0,
                     next_frame_callbacks: 0,
                     power_interrupted: false,
+                    presentation_wait: Duration::ZERO,
+                    presentation_waits: 0,
                 });
                 index
             })
@@ -1069,6 +1077,24 @@ impl CpuFrameScope {
     pub(crate) fn complete(&mut self) {
         self.completed = true;
     }
+}
+
+/// Report time a platform backend blocked inside frame presentation, such as
+/// waiting for the next drawable. Attributed to the innermost open CPU frame
+/// scope on this thread; ignored when tracing is disabled or no scope is open.
+/// Material patch: lets frame evidence separate blocked waiting from CPU work.
+pub fn record_presentation_wait(waited: Duration) {
+    #[cfg(feature = "profiler")]
+    if trace_enabled() {
+        CPU_FRAMES.with_borrow_mut(|frames| {
+            if let Some(frame) = frames.last_mut() {
+                frame.presentation_wait += waited;
+                frame.presentation_waits += 1;
+            }
+        });
+    }
+    #[cfg(not(feature = "profiler"))]
+    let _ = waited;
 }
 
 #[cfg(feature = "profiler")]

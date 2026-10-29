@@ -18,3 +18,8 @@ submission reporting. Its per-call autorelease pool drains temporary Metal
 references before returning to the presentation timer, including early returns;
 demand frames need not wait for the enclosing Cocoa event-loop pool.
 Synchronization, drawable timeout, buffering, and counting policy are unchanged.
+
+Profiler patch: while profiler tracing is enabled, `draw_with_status` times
+`CAMetalLayer nextDrawable` and reports it through
+`gpui::profiler::record_presentation_wait`, so frame evidence can separate
+blocked drawable waits from CPU work. Presentation policy is unchanged.

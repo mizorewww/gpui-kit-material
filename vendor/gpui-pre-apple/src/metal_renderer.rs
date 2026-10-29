@@ -543,7 +543,14 @@ impl MetalRenderer {
                 (viewport_size.width.ceil() as i32).into(),
                 (viewport_size.height.ceil() as i32).into(),
             );
-            let drawable = if let Some(drawable) = layer.next_drawable() {
+            // Material patch: nextDrawable can block until the compositor
+            // releases a drawable. Report that wait separately from CPU work.
+            let wait_started = gpui::profiler::trace_enabled().then(std::time::Instant::now);
+            let next_drawable = layer.next_drawable();
+            if let Some(wait_started) = wait_started {
+                gpui::profiler::record_presentation_wait(wait_started.elapsed());
+            }
+            let drawable = if let Some(drawable) = next_drawable {
                 drawable
             } else {
                 log::error!(

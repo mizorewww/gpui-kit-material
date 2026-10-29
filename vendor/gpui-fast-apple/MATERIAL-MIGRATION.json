@@ -91,5 +91,11 @@
       "path": "src/fast/rounded_clip_shader.rs",
       "scope": "build.rs includes this file; stage() is only called on the precompiled-shader path, so allow dead_code under the runtime_shaders feature. No behavior change."
     }
+  ],
+  "profiler_patches": [
+    {
+      "path": "src/metal_renderer.rs",
+      "scope": "draw_with_status times CAMetalLayer nextDrawable only while profiler tracing is enabled and reports it through gpui::profiler::record_presentation_wait. No synchronization, drawable count, timeout or presentation policy change."
+    }
   ]
 }
