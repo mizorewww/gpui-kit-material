@@ -19,6 +19,7 @@ mod caption;
 mod checkbox;
 mod chips;
 mod choice;
+mod dialog;
 mod feedback;
 mod focus;
 mod list;
@@ -38,6 +39,7 @@ pub use caption::{Caption, CaptionButton, CaptionButtons, CaptionLabels, title_b
 pub use checkbox::{CheckboxState, MaterialCheckbox};
 pub use chips::{AssistChip, CHIP_HEIGHT, ChipStyle, FilterChip, InputChip, SuggestionChip, chip};
 pub use choice::{ChoiceGroup, ChoiceTile, Tint, choice_radio, tinted_icon};
+pub use dialog::{DIALOG_WIDTH, MaterialDialog, SCRIM_OPACITY};
 pub use feedback::{
     BADGE_CONTAINER, BADGE_LABEL, BadgeKind, CARD_PADDING, CardSurface, CardVariant,
     LARGE_BADGE_PADDING, LARGE_BADGE_SIZE, NoticeKind, SMALL_BADGE_SIZE, Snackbar, StatusKind,
