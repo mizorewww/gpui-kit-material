@@ -35,6 +35,22 @@ struct OptionItem {
     label: SharedString,
 }
 
+/// `options` without repeated values, keeping each value's first occurrence,
+/// and whether there were none to drop.
+fn unique_options(options: impl IntoIterator<Item = OptionItem>) -> (Vec<OptionItem>, bool) {
+    let mut seen = std::collections::BTreeSet::new();
+    let mut unique = true;
+    let options = options
+        .into_iter()
+        .filter(|option| {
+            let first = seen.insert(option.value.clone());
+            unique &= first;
+            first
+        })
+        .collect();
+    (options, unique)
+}
+
 #[derive(gpui::IntoElement)]
 pub struct ConnectedButtonGroup {
     id: ElementId,
@@ -71,17 +87,21 @@ impl ConnectedButtonGroup {
             reveal_in: None,
         }
     }
+    /// The options as `(value, label)` pairs. Values identify an option's
+    /// focus and selection state, so they must be unique: a repeated value
+    /// is a caller bug (a debug assertion), and release builds keep only its
+    /// first occurrence.
     pub fn options<K: Into<SharedString>, V: Into<SharedString>>(
         mut self,
         options: impl IntoIterator<Item = (K, V)>,
     ) -> Self {
-        self.options = options
-            .into_iter()
-            .map(|(value, label)| OptionItem {
+        let (options, unique) =
+            unique_options(options.into_iter().map(|(value, label)| OptionItem {
                 value: value.into(),
                 label: label.into(),
-            })
-            .collect();
+            }));
+        debug_assert!(unique, "ConnectedButtonGroup option values must be unique");
+        self.options = options;
         self
     }
     pub fn selected(mut self, value: impl Into<SharedString>) -> Self {
@@ -318,6 +338,30 @@ fn focus_ring(
     .inward()
 }
 
+/// The focus handle of each option, created on first sight. Handles of
+/// options that are gone are dropped, so the map tracks the current options
+/// instead of every value ever shown.
+fn sync_handles(
+    handles: &mut BTreeMap<SharedString, FocusHandle>,
+    options: &[OptionItem],
+    mut create: impl FnMut() -> FocusHandle,
+) -> Vec<FocusHandle> {
+    let current = options
+        .iter()
+        .map(|option| {
+            handles
+                .entry(option.value.clone())
+                .or_insert_with(&mut create)
+                .clone()
+        })
+        .collect::<Vec<_>>();
+    // Values are unique, so any extra entry is stale.
+    if handles.len() > options.len() {
+        handles.retain(|value, _| options.iter().any(|option| &option.value == value));
+    }
+    current
+}
+
 impl RenderOnce for ConnectedButtonGroup {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let disabled = self.disabled;
@@ -328,15 +372,7 @@ impl RenderOnce for ConnectedButtonGroup {
             self.provided_focus.clone()
         } else {
             state.update(cx, |handles, cx| {
-                self.options
-                    .iter()
-                    .map(|option| {
-                        handles
-                            .entry(option.value.clone())
-                            .or_insert_with(|| cx.focus_handle())
-                            .clone()
-                    })
-                    .collect::<Vec<_>>()
+                sync_handles(handles, &self.options, || cx.focus_handle())
             })
         };
         let selected = self
@@ -529,8 +565,57 @@ impl RenderOnce for ConnectedButtonGroup {
 #[cfg(test)]
 mod tests {
     use super::{
-        ConnectedButtonGroup, Direction, OptionPaint, PAINTED, destination, option_paint, state,
+        ConnectedButtonGroup, Direction, OptionItem, OptionPaint, PAINTED, destination,
+        option_paint, state, sync_handles, unique_options,
     };
+
+    #[core::prelude::v1::test]
+    fn repeated_option_values_keep_their_first_occurrence() {
+        let item = |value: &str, label: &str| OptionItem {
+            value: value.into(),
+            label: label.into(),
+        };
+        let (options, unique) =
+            unique_options([item("a", "A"), item("b", "B"), item("a", "Again")]);
+        assert!(!unique);
+        let kept: Vec<_> = options
+            .iter()
+            .map(|o| (o.value.as_ref(), o.label.as_ref()))
+            .collect();
+        assert_eq!(kept, [("a", "A"), ("b", "B")]);
+        assert!(unique_options([item("a", "A"), item("b", "B")]).1);
+    }
+
+    #[gpui::test]
+    fn focus_handles_follow_the_current_options(cx: &mut TestAppContext) {
+        let item = |value: &str| OptionItem {
+            value: value.into(),
+            label: value.to_string().into(),
+        };
+        let mut map = std::collections::BTreeMap::new();
+        let first = cx.update(|cx| {
+            sync_handles(&mut map, &[item("a"), item("b"), item("c")], || {
+                cx.focus_handle()
+            })
+        });
+        assert_eq!(map.len(), 3);
+        let second =
+            cx.update(|cx| sync_handles(&mut map, &[item("c"), item("a")], || cx.focus_handle()));
+        assert_eq!(map.len(), 2, "the removed option's handle is pruned");
+        assert!(!map.contains_key("b"));
+        assert_eq!(
+            second,
+            [first[2].clone(), first[0].clone()],
+            "kept handles survive"
+        );
+    }
+
+    #[core::prelude::v1::test]
+    #[cfg_attr(debug_assertions, should_panic(expected = "must be unique"))]
+    fn repeated_option_values_are_rejected_in_debug_builds() {
+        let group = ConnectedButtonGroup::new("dupes", "Dupes").options([("a", "A"), ("a", "B")]);
+        assert_eq!(group.options.len(), 1);
+    }
 
     #[core::prelude::v1::test]
     fn state_layers_come_from_the_shared_tokens() {
