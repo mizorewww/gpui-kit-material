@@ -168,7 +168,8 @@ fn advance_paint(target: Scheme, cx: &App) -> (bool, bool) {
 /// This leaves the Component theme's font size behind the window's rem size.
 #[deprecated(
     note = "leaves the Component theme's font size stale; pass the scale to \
-            `init_component_theme` and `advance_component_theme`"
+            `init_component_theme` and `advance_component_theme`, which Base-only \
+            windows may call too"
 )]
 pub fn apply_scale(scale: f32, window: &mut Window) {
     set_rem_scale(scale, window);
