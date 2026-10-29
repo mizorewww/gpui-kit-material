@@ -29,6 +29,7 @@ pub struct Toggle {
     accessibility_label: Option<SharedString>,
     tab_index: isize,
     tab_stop: bool,
+    focusable: bool,
     tracked_focus: Option<FocusHandle>,
 }
 
@@ -68,6 +69,7 @@ impl Toggle {
             accessibility_label: None,
             tab_index: 0,
             tab_stop: true,
+            focusable: true,
             tracked_focus: None,
         }
     }
@@ -121,6 +123,13 @@ impl Toggle {
 
     pub fn tab_stop(mut self, tab_stop: bool) -> Self {
         self.tab_stop = tab_stop;
+        self
+    }
+
+    /// Whether activation moves focus here. A non-focusable toggle only
+    /// supports pointer activation, matching Button's composed-control policy.
+    pub fn focusable(mut self, focusable: bool) -> Self {
+        self.focusable = focusable;
         self
     }
 
@@ -186,13 +195,16 @@ impl RenderOnce for Toggle {
             .when_some(self.accessibility_label, |this, label| {
                 this.aria_label(label)
             })
-            .when(!disabled, |this| {
-                this.track_focus(
-                    &focus_handle
-                        .tab_index(self.tab_index)
-                        .tab_stop(self.tab_stop),
-                )
-            })
+            .when(
+                self.focusable && (!disabled || focus_handle.is_focused(window)),
+                |this| {
+                    this.track_focus(
+                        &focus_handle
+                            .tab_index(self.tab_index)
+                            .tab_stop(self.tab_stop && !disabled),
+                    )
+                },
+            )
             .when(disabled, |this| {
                 this.on_mouse_down(MouseButton::Left, |_, _, cx| {
                     cx.stop_propagation();
