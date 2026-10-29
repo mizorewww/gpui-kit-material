@@ -1,7 +1,7 @@
 //! Explicit native GPU capture for reproducible gallery evidence.
 use super::{GALLERY_SECTIONS, Gallery, ThemeMode};
 use anyhow::{Context as _, Result, bail, ensure};
-use gpui::{App, Entity, Global, Window, px, size};
+use gpui::{App, Entity, Global, ListOffset, ListState, Pixels, Window, px, size};
 use std::{cell::Cell, path::PathBuf, process::Command, rc::Rc, time::Duration};
 
 pub const USAGE: &str = "gallery [--capture output.png --section themes|motion|buttons|toggles|loading|icons|labels|feedback|colors|typography|dividers\n  --width 960 --height 900 --scale 1 --dark --reduced-motion --settle-ms 800\n  --active --disabled --selected --loading --no-ripple --offset-y 0 --settings --fps --vsync on|off]";
@@ -166,23 +166,33 @@ pub(super) fn install(view: &Entity<Gallery>, window: &mut Window, cx: &mut App)
         cx.notify();
     });
     let view = view.clone();
-    // Wait for a real layout before asking the chapter anchor to scroll.
+    // Wait for initial layout, then position the logical section row.
     window.on_next_frame(move |window, _| {
         window.on_next_frame(move |window, cx| {
             if options.settings {
                 super::settings::open(window, cx);
             }
-            let anchor = view.read(cx).section_anchors[options.section].clone();
-            anchor.scroll_to(window, cx);
-            // Anchor scrolling is itself deferred; capture only after that frame.
+            view.read(cx).scroll_to_section(options.section);
+            window.refresh();
+            // Allow the target rows to be measured and painted before settling.
             window.on_next_frame(move |window, cx| {
             window.spawn(cx, async move |cx| {
+                let positioned = cx.update(|window, cx| -> Result<()> {
+                    let scroll = view.read(cx).list.clone();
+                    scroll_measured_offset(&scroll, px(options.offset_y), window, cx)?;
+                    window.refresh();
+                    window.draw(cx).clear(cx);
+                    Ok(())
+                });
+                match positioned { Ok(Ok(())) => {}, Ok(Err(error)) | Err(error) => {
+                    eprintln!("Capture positioning failed: {error:#}");
+                    std::process::exit(1);
+                } }
+                // New rows mount while applying the offset. Their animations
+                // receive the full settle interval, just like the section row.
                 cx.background_executor().timer(Duration::from_millis(options.settle_ms)).await;
                 let result=cx.update(|window, cx| -> Result<()> {
-                    let scroll=view.read(cx).scroll.clone();
-                    let mut offset=scroll.offset();
-                    offset.y -= px(options.offset_y);
-                    scroll.set_offset(offset);
+                    let scroll=view.read(cx).list.clone();
                     window.refresh();
                     window.draw(cx).clear(cx);
                     let image=window.render_to_image().context("Native GPU image capture failed")?;
@@ -209,7 +219,7 @@ pub(super) fn install(view: &Entity<Gallery>, window: &mut Window, cx: &mut App)
                         "requested_vsync":options.vsync,
                         "vsync_status":format!("{:?}", window.vsync_status()),
                         "reduced_motion":cx.reduce_motion(),"settle_ms":options.settle_ms,
-                        "scroll_offset":{"x":f32::from(scroll.offset().x),"y":f32::from(scroll.offset().y)},
+                        "logical_scroll_top":{"item_ix":scroll.logical_scroll_top().item_ix,"offset_in_item":f32::from(scroll.logical_scroll_top().offset_in_item)},
                         "state":{"active":options.active,"disabled":options.disabled,"selected":options.selected,"loading":options.loading,"ripple":options.ripple},
                         "os":std::env::consts::OS,"architecture":std::env::consts::ARCH,
                         "fonts":"gallery/fonts/roboto (registered 400/500)",
@@ -229,6 +239,60 @@ pub(super) fn install(view: &Entity<Gallery>, window: &mut Window, cx: &mut App)
             });
         });
     });
+}
+
+/// Advance using measured row heights. A ListState's unmeasured entries have
+/// zero summary height, so pixel scroll_by cannot skip arbitrary unseen rows.
+/// This capture-only walk paints each crossed row before consuming its height;
+/// performance::prepare rejects combining profiling with --capture.
+fn scroll_measured_offset(
+    list: &ListState,
+    delta: Pixels,
+    window: &mut Window,
+    cx: &mut App,
+) -> Result<()> {
+    if delta == px(0.) || list.item_count() == 0 {
+        return Ok(());
+    }
+    let start = list.logical_scroll_top();
+    let mut index = start.item_ix.min(list.item_count() - 1);
+    let mut offset = start.offset_in_item + delta;
+    let measure = |index, window: &mut Window, cx: &mut App| -> Result<Pixels> {
+        list.scroll_to(ListOffset {
+            item_ix: index,
+            offset_in_item: px(0.),
+        });
+        window.refresh();
+        window.draw(cx).clear(cx);
+        list.bounds_for_item(index)
+            .map(|bounds| bounds.size.height)
+            .context("Capture could not measure the target Gallery row")
+    };
+    if offset < px(0.) {
+        while offset < px(0.) && index > 0 {
+            index -= 1;
+            offset += measure(index, window, cx)?;
+        }
+        offset = offset.max(px(0.));
+    } else {
+        loop {
+            let height = measure(index, window, cx)?;
+            if offset < height {
+                break;
+            }
+            if index + 1 == list.item_count() {
+                offset = height;
+                break;
+            }
+            offset -= height;
+            index += 1;
+        }
+    }
+    list.scroll_to(ListOffset {
+        item_ix: index,
+        offset_in_item: offset,
+    });
+    Ok(())
 }
 
 #[cfg(test)]
@@ -302,5 +366,61 @@ mod tests {
                 && options.loading
                 && !options.ripple
         );
+    }
+}
+
+#[cfg(test)]
+mod offset_tests {
+    use super::scroll_measured_offset;
+    use gpui::{
+        AppContext, Context, IntoElement, ListAlignment, ListOffset, ListState, Render,
+        TestAppContext, Window, div, list, prelude::*, px, size,
+    };
+
+    struct VariableRows {
+        list: ListState,
+    }
+    impl Render for VariableRows {
+        fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+            list(self.list.clone(), |index, _, _| {
+                let heights = [40., 200., 80., 140., 300., 100., 500., 120., 200., 100.];
+                div().h(px(heights[index])).w_full().into_any_element()
+            })
+            .size_full()
+        }
+    }
+
+    #[gpui::test]
+    fn capture_offset_measures_unknown_rows_in_both_directions(cx: &mut TestAppContext) {
+        let window = cx.open_window(size(px(200.), px(100.)), |_, _| VariableRows {
+            list: ListState::new(10, ListAlignment::Top, px(0.)),
+        });
+        cx.run_until_parked();
+        let list = window.update(cx, |view, _, _| view.list.clone()).unwrap();
+        list.scroll_to(ListOffset {
+            item_ix: 2,
+            offset_in_item: px(10.),
+        });
+        cx.update_window(window.into(), |_, window, cx| {
+            window.refresh();
+            window.draw(cx).clear(cx);
+            assert!(
+                list.bounds_for_item(4).is_none(),
+                "destination must not already be measured/visible"
+            );
+            scroll_measured_offset(&list, px(400.), window, cx).unwrap();
+            window.refresh();
+            window.draw(cx).clear(cx);
+            let reached = list.logical_scroll_top();
+            assert_eq!(reached.item_ix, 4);
+            assert_eq!(reached.offset_in_item, px(190.));
+            scroll_measured_offset(&list, px(-300.), window, cx).unwrap();
+            window.refresh();
+            window.draw(cx).clear(cx);
+            let returned = list.logical_scroll_top();
+            assert_eq!(returned.item_ix, 3);
+            assert_eq!(returned.offset_in_item, px(30.));
+        })
+        .unwrap();
     }
 }
