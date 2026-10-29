@@ -9,24 +9,44 @@ pub const fn rem(px: f32) -> Rems {
     rems(px / BASE_PX)
 }
 
-/// Supporting and auxiliary text (12px).
-pub const TEXT_AUX: Rems = rem(12.);
-/// Body and control labels (14px).
-pub const TEXT_BODY: Rems = rems(1.);
-/// Long-form reading (16px).
-pub const TEXT_READER: Rems = rem(16.);
-/// Card and dialog titles (18px).
-pub const TEXT_TITLE: Rems = rem(18.);
-/// Section headings on a page (22px).
-pub const TEXT_SECTION: Rems = rem(22.);
+// Legacy size constants. Each is defined from the M3 role it maps to where
+// the sizes agree; prefer `TypeRole::<role>.scale()` in new code so line
+// height and weight come with the size.
+
+/// Supporting and auxiliary text: body-small (12px).
+pub const TEXT_AUX: Rems = TypeRole::BodySmall.scale().font_size;
+/// Body and control labels: body-medium (14px).
+pub const TEXT_BODY: Rems = TypeRole::BodyMedium.scale().font_size;
+/// Long-form reading: body-large (16px).
+pub const TEXT_READER: Rems = TypeRole::BodyLarge.scale().font_size;
+/// Card and dialog titles: title-large (22px).
+pub const TEXT_TITLE: Rems = TypeRole::TitleLarge.scale().font_size;
+/// Section headings on a page: title-large (22px).
+pub const TEXT_SECTION: Rems = TypeRole::TitleLarge.scale().font_size;
 /// Page titles use the reference headline-small role (24px / 32px).
 pub const TEXT_HEADLINE: Rems = TypeRole::HeadlineSmall.scale().font_size;
 pub const HEADLINE_LINE_HEIGHT: Rems = TypeRole::HeadlineSmall.scale().line_height;
-/// Settings content reads one step larger than navigation.
-pub const TEXT_SETTINGS_BODY: Rems = rem(16.);
+/// Settings content reads one step larger than navigation: body-large (16px).
+pub const TEXT_SETTINGS_BODY: Rems = TypeRole::BodyLarge.scale().font_size;
+/// Settings supporting text: body-medium (14px).
 pub const TEXT_SETTINGS_AUX: Rems = TEXT_BODY;
-/// The main label of a settings tile (17px).
+/// The main label of a settings tile (17px). Off the M3 scale: it maps to
+/// [`TypeRole::BodyLarge`] (16px, the M3 list-item headline) and keeps its
+/// old size only until its caller migrates to that role.
 pub const TEXT_TILE_LABEL: Rems = rem(17.);
+
+/// The M3 role each legacy size constant maps to, by constant name.
+pub const LEGACY_ROLES: [(&str, TypeRole); 9] = [
+    ("TEXT_AUX", TypeRole::BodySmall),
+    ("TEXT_BODY", TypeRole::BodyMedium),
+    ("TEXT_READER", TypeRole::BodyLarge),
+    ("TEXT_TITLE", TypeRole::TitleLarge),
+    ("TEXT_SECTION", TypeRole::TitleLarge),
+    ("TEXT_HEADLINE", TypeRole::HeadlineSmall),
+    ("TEXT_SETTINGS_BODY", TypeRole::BodyLarge),
+    ("TEXT_SETTINGS_AUX", TypeRole::BodyMedium),
+    ("TEXT_TILE_LABEL", TypeRole::BodyLarge),
+];
 
 /// A role in the reference Material type scale.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -155,6 +175,24 @@ impl TypeRole {
 #[cfg(all(test, not(target_family = "wasm")))]
 mod tests {
     use super::*;
+
+    #[test]
+    fn legacy_sizes_are_their_mapped_roles() {
+        let sizes = [
+            TEXT_AUX,
+            TEXT_BODY,
+            TEXT_READER,
+            TEXT_TITLE,
+            TEXT_SECTION,
+            TEXT_HEADLINE,
+            TEXT_SETTINGS_BODY,
+            TEXT_SETTINGS_AUX,
+        ];
+        for (size, (name, role)) in sizes.into_iter().zip(LEGACY_ROLES) {
+            assert_eq!(size, role.scale().font_size, "{name}");
+        }
+        assert_eq!(LEGACY_ROLES[8], ("TEXT_TILE_LABEL", TypeRole::BodyLarge));
+    }
 
     #[test]
     fn all_roles_match_the_pinned_reference_type_scale() {
