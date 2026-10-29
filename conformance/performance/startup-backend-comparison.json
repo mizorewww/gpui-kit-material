@@ -1,0 +1,75 @@
+{
+  "schema": "material-native-startup-backend-comparison-v1",
+  "scenario": "One 5-second startup and naturally scheduled frames per backend; no automated interaction",
+  "source_scope": "Same stable dirty worktree including the in-progress Gallery row virtualization; not a clean checkout of source_commit",
+  "hardware": "Apple M2 / Mac14,7 / 16 GiB",
+  "viewport_logical_px": [
+    960,
+    780
+  ],
+  "dpr": 2,
+  "budget_ns": 2000000,
+  "verdict": "FAIL: every observed CPU scope exceeds budget in both runs",
+  "interpretation": "Fast initial draw is higher and both following platform scopes are lower in this pair. Three startup scopes do not establish steady-state or general interaction speedups. Initial drawing and first submission span scopes, so complete event recording does not establish complete first-frame acceptance. GPU and WASM CPU timing remain unverified.",
+  "independent_review": "PASS for matching source identities, actual compiled backend selection, binary stability, raw event/scope consistency and exact budget calculation; not performance acceptance",
+  "runs": [
+    {
+      "backend": "upstream",
+      "evidence": "upstream-startup-54e9667.json",
+      "source_commit": "54e96676e24de089b3ca30ea143c74dc16dcf5a6",
+      "source_dirty": true,
+      "source_files_sha256": "66a0dbed58170bfddfa561e07cd32b902aed2b6712e7215131a709049b5b49eb",
+      "binary_sha256": "76780d58a71803900cf52b7e1b2f91ea38bbf86d9d3df37a6123b68dceed9f52",
+      "cpu_scopes_ns": [
+        17901875,
+        5559791,
+        3051000
+      ],
+      "summary": {
+        "frames": 3,
+        "max_ns": 17901875,
+        "median_ns": 5559791,
+        "p95_ns": 17901875,
+        "p99_ns": 17901875,
+        "over_budget_frames": 3
+      },
+      "complete": true,
+      "acceptance_eligible": false,
+      "verdict": "FAIL"
+    },
+    {
+      "backend": "fast",
+      "evidence": "fast-startup-54e9667.json",
+      "source_commit": "54e96676e24de089b3ca30ea143c74dc16dcf5a6",
+      "source_dirty": true,
+      "source_files_sha256": "66a0dbed58170bfddfa561e07cd32b902aed2b6712e7215131a709049b5b49eb",
+      "binary_sha256": "6e79d2d6a002d6d67072011b3128bbee1de388bebc013a82daca3dcc23993844",
+      "cpu_scopes_ns": [
+        18495750,
+        5176542,
+        2382500
+      ],
+      "summary": {
+        "frames": 3,
+        "max_ns": 18495750,
+        "median_ns": 5176542,
+        "p95_ns": 18495750,
+        "p99_ns": 18495750,
+        "over_budget_frames": 3
+      },
+      "complete": true,
+      "acceptance_eligible": false,
+      "verdict": "FAIL"
+    }
+  ],
+  "static_capture": {
+    "scenario": "Themes section, baseline light, reduced motion, 960x780 logical, DPR 2",
+    "image": "backend-comparison-themes.png",
+    "png_sha256": "e799cd5f8b746abb2bbfd0f05e0cd70a5452f069700a4936ad01a86fe8ec46a9",
+    "result": "Upstream and Fast PNG files are byte-identical",
+    "scope": "One static view only; not reference-site visual conformance or animation verification"
+  },
+  "related_evidence": [
+    "startup-visibility-comparison.json"
+  ]
+}

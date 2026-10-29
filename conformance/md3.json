@@ -99,7 +99,7 @@
         "reduced-motion transitions"
       ],
       "completion": "No component or gallery can pass without whole-gallery evidence at or below the budget. Existing functional or visual reviews do not establish performance acceptance.",
-      "evidence": "conformance/performance/startup-visibility-comparison.json"
+      "evidence": "conformance/performance/startup-backend-comparison.json"
     },
     "reference_precedence": "Use reference_policy for all visual, motion, theme, typography and state assertions. A secondary-reference PASS cannot establish primary-reference conformance."
   },
