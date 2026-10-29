@@ -175,6 +175,7 @@ pub struct ListItem {
     disabled: bool,
     density: ListDensity,
     corners: Option<OuterCorners>,
+    container: ColorRole,
     preview: Option<InteractionPreview>,
     on_click: Option<Click>,
 }
@@ -195,6 +196,7 @@ impl ListItem {
             disabled: false,
             density: ListDensity::Standard,
             corners: None,
+            container: ColorRole::SURFACE,
             preview: None,
             on_click: None,
         }
@@ -238,6 +240,13 @@ impl ListItem {
     }
     pub fn disabled(mut self, disabled: bool) -> Self {
         self.disabled = disabled;
+        self
+    }
+    /// The resting container role (surface by default), e.g. a dialog's
+    /// surface-container-high so items sit on it. Selected rows keep the
+    /// secondary container.
+    pub fn container(mut self, role: ColorRole) -> Self {
+        self.container = role;
         self
     }
     pub fn density(mut self, density: ListDensity) -> Self {
@@ -463,7 +472,10 @@ impl RenderOnce for ListItem {
         let disabled = self.disabled || preview.is_some_and(InteractionPreview::is_disabled);
         let lines = self.lines();
         let (min_height, pad_y) = row_metrics(lines, self.density);
-        let paint = list_paint(self.selected, disabled);
+        let mut paint = list_paint(self.selected, disabled);
+        if !self.selected {
+            paint.container = color(self.container);
+        }
         let leading = self.leading_element(paint.support, disabled);
         let trailing = self.trailing_element(paint.support, disabled);
         let top_aligned = lines == ListLines::Three;
