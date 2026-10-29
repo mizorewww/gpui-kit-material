@@ -42,6 +42,3 @@ gpui-pre-apple = { path = "vendor/gpui-pre-apple" }
 [patch."https://github.com/longbridge/gpui-kit"]
 gpui-kit = { path = "vendor/gpui-kit" }
 gpui-base = { path = "vendor/gpui-base" }
-
-[patch."https://github.com/mizorewww/gpui-material-symbols"]
-gpui-material-symbols = { path = "../gpui-material-symbols" }

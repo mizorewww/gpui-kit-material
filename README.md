@@ -20,9 +20,10 @@ grown into a complete **Material 3 Expressive** implementation; see
 
 ## Use
 
-For workspace development, clone `gpui-material-symbols` alongside this repository
-as `../gpui-material-symbols`. The workspace patch uses that source; keep both
-repositories updated together.
+Clone this repository and build with its committed `Cargo.lock`. Cargo fetches
+Material Symbols from the exact Git revision declared in `crates/material/Cargo.toml`,
+including its embedded assets. No sibling checkout is required or selected by
+default, so an older `../gpui-material-symbols` cannot override the dependency.
 
 ```rust
 use gpui_kit_material::{icons::Assets, prelude::*, theme};
@@ -323,5 +324,6 @@ review remain separate from build checks.
 
 MIT. Palette sources and their licenses are listed in
 [crates/color/PALETTES.md](crates/color/PALETTES.md). Google Material Symbols
-assets and the sibling Symbols integration are Apache-2.0; their source snapshots
-and licenses are retained in `../gpui-material-symbols`.
+assets and the Symbols integration are Apache-2.0; their source snapshots and
+licenses are retained in the pinned
+[Symbols repository](https://github.com/mizorewww/gpui-material-symbols/tree/593aa15a46076f3e2870c23c0e4fd79f94f105bd).

@@ -52,8 +52,9 @@ Work in this order; each step lands with gallery coverage and tests.
      indicator (morphing shapes), badges, snackbar.
 6. **Icons**: Material Symbols via
    [gpui-material-symbols](https://github.com/mizorewww/gpui-material-symbols),
-   using the sibling `../gpui-material-symbols` repository and replacing the
-   Lucide glyphs. Improve that repository as needed for parity and performance;
+   using a pinned Git dependency and replacing the Lucide glyphs. The sibling
+   `../gpui-material-symbols` checkout remains available for explicit local
+   development, but is not required by default builds. Improve that repository as needed for parity and performance;
    keep its compatibility requirements and commit changes atomically there.
 7. **course2md adoption**: switch course2md to the Material adapters, removing
    redundant local implementations while retaining shared GPUI Kit behavior.

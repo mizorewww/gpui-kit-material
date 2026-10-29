@@ -29,7 +29,7 @@ gpui-kit-material
   theme       painted Scheme for this frame; palette transitions; text scale
   tokens      shape · typography · layout · elevation · state layers
   motion      M3 springs; enter / page_enter / value / selection_value
-  icons       Material Symbols via ../gpui-material-symbols and Kit integration
+  icons       Material Symbols via its pinned Git revision and Kit integration
   components  Material adapters over Kit Component; Base for verified gaps
 ```
 
@@ -63,7 +63,7 @@ spacing and elevation remain Material-owned. Unmanaged fields retain Component
 mode-configuration behavior. This is currently a single-gallery-window policy,
 not independent per-window themes.
 
-**Icons.** The sibling Symbols repository owns the asset source, font/SVG
+**Icons.** The Symbols repository owns the asset source, font/SVG
 conversion, catalog and axes. Material's `Icon` only preserves its 20px default
 and existing size/color/rotation builders over Component Icon. The semantic
 `IconName` aliases use Rounded, FILL=0, weight 400, grade 0 and optical size 24,
@@ -93,9 +93,11 @@ reproducible manifest normalization are recorded alongside the facade.
 The Gallery uses embedded Material Symbols on both targets, without Kit's
 HTTP icon fallback. Material's `embedded-symbols` default feature can be disabled
 by consumers that provide Symbols assets at runtime. The Symbols repository's
-Web consumer does this to retain its incremental downloads. The repositories
-must be adjacent for these workspace path patches; downstream builds need the
-same patch policy until the compatibility fixes are upstream.
+Web consumer does this to retain its incremental downloads. Symbols is pinned
+to a published Git commit containing the required features and embedded assets;
+the default build never substitutes an adjacent checkout. Engine compatibility
+patches are all inside this repository. Downstream workspaces need the same
+engine patch policy until the compatibility fixes are upstream.
 The vendored Base contains that
 revision's source plus the compatibility patches; both crates.io and Git Base
 references resolve to this one path package. GPUI remains exactly `=0.3.10`.
