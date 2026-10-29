@@ -5,7 +5,7 @@ use std::time::Duration;
 
 const MOTION: Duration = Duration::from_millis(400);
 const LIFETIME: Duration = Duration::from_millis(450);
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 struct Wave {
     id: u64,
     center: Point<Pixels>,
@@ -92,11 +92,12 @@ impl ButtonRipple {
     ) -> Self {
         let state =
             window.use_keyed_state((id.clone(), "ripple"), cx, |_, _| RippleState::default());
-        if !mounted {
-            state.update(cx, |state, _| state.waves.clear());
-        }
         let reduced_motion = cx.reduce_motion();
-        state.update(cx, |state, _| {
+        // One update reconciles mounting and media; idle buttons allocate nothing.
+        let count = state.update(cx, |state, _| {
+            if !mounted {
+                state.waves.clear();
+            }
             for wave in &mut state.waves {
                 if wave.reduced_motion && !reduced_motion {
                     wave.expansion_generation += 1;
@@ -110,15 +111,18 @@ impl ButtonRipple {
                     });
                 }
             }
+            state.waves.len()
         });
-        let frames = Keyframes::try_new([Keyframe::new(0., 0.), Keyframe::new(1., 1.)]).unwrap();
-        let timing = Timing::new(MOTION).ease(Easing::cubic_bezier(0.4, 0., 0.2, 1.).unwrap());
-        let waves = state
-            .read(cx)
-            .waves
-            .clone()
-            .iter()
-            .map(|wave| {
+        let mut waves = Vec::new();
+        if count > 0 {
+            let easing = Easing::cubic_bezier(0.4, 0., 0.2, 1.).expect("valid ripple easing");
+            let frames = Keyframes::try_new([Keyframe::new(0., 0.), Keyframe::new(1., 1.)])
+                .expect("valid ripple keyframes");
+            let timing = Timing::new(MOTION).ease(easing.clone());
+            waves.reserve_exact(count);
+            for index in 0..count {
+                // Waves are Copy: read one at a time instead of cloning the list.
+                let wave = state.read(cx).waves[index];
                 let key = ElementId::NamedChild(
                     id.clone().into(),
                     format!("ripple-wave-{}", wave.id).into(),
@@ -137,17 +141,17 @@ impl ButtonRipple {
                     if wave.released { 0. } else { 0.1 },
                     Transition::new(wave.fade_duration.unwrap_or(MOTION))
                         .reduced_motion(gpui_base::ReducedMotion::Continue)
-                        .easing(Easing::cubic_bezier(0.4, 0., 0.2, 1.).unwrap()),
+                        .easing(easing.clone()),
                     window,
                     cx,
                 );
-                PaintedWave {
+                waves.push(PaintedWave {
                     center: wave.center,
                     radius: wave.radius * scale,
                     opacity,
-                }
-            })
-            .collect();
+                });
+            }
+        }
         Self {
             child: child.into_any_element(),
             state,
@@ -550,6 +554,37 @@ mod tests {
                 .size_0(),
             )
         }
+    }
+    struct IdleHarness {
+        capacity: Rc<RefCell<Option<usize>>>,
+    }
+    impl Render for IdleHarness {
+        fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+            let ripple = ButtonRipple::new(
+                div().size(px(40.)),
+                "idle-ripple".into(),
+                true,
+                true,
+                gpui::Corners::default(),
+                gpui::Edges::default(),
+                rgba(0xffffffff),
+                window,
+                cx,
+            );
+            *self.capacity.borrow_mut() = Some(ripple.waves.capacity());
+            div().child(ripple)
+        }
+    }
+    #[gpui::test]
+    fn idle_ripple_allocates_no_painted_waves(cx: &mut TestAppContext) {
+        let capacity = Rc::new(RefCell::new(None));
+        let (_, cx) = cx.add_window_view({
+            let capacity = capacity.clone();
+            move |_, _| IdleHarness { capacity }
+        });
+        draw(cx);
+        draw(cx);
+        assert_eq!(*capacity.borrow(), Some(0), "idle render must not allocate");
     }
     #[gpui::test]
     fn default_prevented_press_starts_no_wave(cx: &mut TestAppContext) {
