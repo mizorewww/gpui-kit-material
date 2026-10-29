@@ -111,8 +111,10 @@ pub fn token_value(
 
 /// Follow an interpolatable target using the selected Material motion token.
 ///
-/// Each channel ID must retain the same value type. Interpolation is supplied
-/// by the value, so color spaces and compound geometry need not be flattened
+/// Each channel ID must retain the same value type.
+/// Effects tokens preserve fades under reduced motion, matching the reference
+/// CSS transition policy; spatial tokens finish immediately. Interpolation is
+/// supplied by the value, so color spaces and compound geometry need not be flattened
 /// into independent scalar clocks. Timing and retargeting belong to GPUI Base.
 pub fn token_transition<T>(
     id: impl Into<ElementId>,
@@ -141,7 +143,14 @@ where
     let sample = gpui_base::transition_with_status(
         id,
         target,
-        gpui_base::Transition::new(resolved.duration()).ease(resolved.ease()),
+        gpui_base::Transition::new(resolved.duration())
+            .ease(resolved.ease())
+            .reduced_motion(match token {
+                MotionToken::FastEffects
+                | MotionToken::DefaultEffects
+                | MotionToken::SlowEffects => gpui_base::ReducedMotion::Continue,
+                _ => gpui_base::ReducedMotion::Finish,
+            }),
         window,
         cx,
     );
@@ -797,7 +806,9 @@ mod tests {
     }
 
     #[gpui::test]
-    fn generic_effects_interpolate_reverse_and_respect_reduced_motion(cx: &mut TestAppContext) {
+    fn generic_effects_interpolate_reverse_and_preserve_fades_under_reduced_motion(
+        cx: &mut TestAppContext,
+    ) {
         let start = CompoundEffects(vec![0., 10.]);
         let target = CompoundEffects(vec![1., 30.]);
         let sample = Rc::new(std::cell::RefCell::new(start.clone()));
@@ -845,14 +856,28 @@ mod tests {
         });
         assert_eq!(
             *sample.borrow(),
-            start,
-            "reduced motion finishes immediately"
+            reversing,
+            "reduced motion preserves the in-flight fade"
         );
         cx.update(|window, cx| {
             view.update(cx, |view, _| view.target = target.clone());
             window.draw(cx).clear(cx);
         });
-        assert_eq!(*sample.borrow(), target);
+        assert_eq!(
+            *sample.borrow(),
+            reversing,
+            "retargeting still begins continuously"
+        );
+        cx.executor().advance_clock(Duration::from_millis(250));
+        cx.update(|window, cx| {
+            window.refresh();
+            window.draw(cx).clear(cx);
+        });
+        assert_eq!(
+            *sample.borrow(),
+            target,
+            "fade completes under reduced motion"
+        );
         cx.update(|window, cx| {
             cx.set_reduce_motion(false);
             view.update(cx, |view, _| view.target = start.clone());
