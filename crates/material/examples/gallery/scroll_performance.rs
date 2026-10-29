@@ -257,7 +257,7 @@ impl ScrollTarget {
 }
 
 /// Default input cadence. Input is driven by a timer, independent of frame
-/// callbacks, so the input rate never limits or follows the frame rate.
+/// callbacks; actual timing still depends on foreground availability.
 const DEFAULT_INPUT_HZ: u32 = 1_000;
 fn input_interval_from_environment() -> anyhow::Result<Duration> {
     let hz = match std::env::var("MATERIAL_SCROLL_INPUT_HZ") {
@@ -488,8 +488,8 @@ struct Drive {
     input_interval: Duration,
     refresh_interval: Option<Duration>,
     traversal: Traversal,
-    /// Exact CPU submission timestamps (present end, ns since driver start)
-    /// of newly drawn target-window frames, from the profiler's own events.
+    /// First Present-attempt end after Draw, ns since driver start. These
+    /// profiler events do not establish backend success or retry identity.
     new_draw_presents_ns: Vec<i128>,
     moved_up: bool,
     moved_down: bool,
@@ -576,18 +576,16 @@ impl Drive {
         }).collect();
         let visited_items: std::collections::BTreeSet<_> =
             self.raw.iter().filter_map(|o| o.position.item).collect();
-        // Every top row from 0 to the deepest one must have been observed; the
-        // rows below the deepest top row were in the final viewport at the end.
+        // Require contiguous observed logical top-row positions. This does not
+        // establish that those rows, or later viewport rows, were submitted.
         let contiguous_top_rows = visited_items
             .iter()
             .enumerate()
             .all(|(index, item)| index == *item);
         let complete_traversal = self.traversal.laps >= 1
             && (matches!(self.target, ScrollTarget::Pixels(_)) || contiguous_top_rows);
-        // Strict per-submission rate inside the measured driver span: the
-        // longest gap between consecutive newly drawn submissions bounds the
-        // minimum instantaneous FPS. Valid only when every one of those
-        // submissions is also counted as successful by the platform.
+        // Diagnostic attempts only. Present events include failed submissions;
+        // aggregate success counts cannot identify which attempt succeeded.
         let span_end = self.raw.last().map_or(0, |o| o.ns as i128);
         let in_span: Vec<i128> = self
             .new_draw_presents_ns
@@ -596,17 +594,17 @@ impl Drive {
             .filter(|ns| (0..=span_end).contains(ns))
             .collect();
         let longest_gap_ns = in_span.windows(2).map(|w| w[1] - w[0]).max();
-        let strict_minimum_fps = longest_gap_ns.map(|gap| 1e9 / gap.max(1) as f64);
+        let inverse_interior_attempt_gap_hz = longest_gap_ns.map(|gap| 1e9 / gap.max(1) as f64);
         let counted_new_frames = self
             .raw
             .first()
             .zip(self.raw.last())
             .and_then(|(a, b)| a.count.zip(b.count))
             .map(|(a, b)| b.saturating_sub(a));
-        let submissions_all_successful =
+        let aggregate_counter_covers_attempt_count =
             counted_new_frames.is_some_and(|count| count as usize >= in_span.len());
-        // VSync can read disabled while the compositor still paces drawable
-        // release at the display rate. Such a run cannot test the 500 FPS gate.
+        // Descriptive correlation only: a rate near/below display refresh
+        // cannot identify the limiting mechanism or invalidate known failure.
         let mut full_rates: Vec<f64> = windows
             .iter()
             .filter(|w| w["partial"] == false)
@@ -618,7 +616,7 @@ impl Drive {
             .refresh_interval
             .filter(|interval| !interval.is_zero())
             .map(|interval| 1e9 / interval.as_nanos() as f64);
-        let display_paced = median_rate
+        let observed_rate_near_or_below_refresh = median_rate
             .zip(refresh_hz)
             .is_some_and(|(rate, hz)| rate <= hz * 1.1)
             && self.raw.iter().all(|o| o.vsync == "disabled");
@@ -645,21 +643,12 @@ impl Drive {
         if !complete_traversal {
             errors.push("did not complete a full top-to-bottom-to-top Gallery traversal".into());
         }
-        if display_paced {
-            errors.push(format!(
-                "invalid run: median new-frame rate {:.1} FPS is at or below the {:.1} Hz display refresh while VSync reads disabled; presentation is still display-paced",
-                median_rate.unwrap_or_default(),
-                refresh_hz.unwrap_or_default()
-            ));
+        if inverse_interior_attempt_gap_hz.is_none() {
+            errors.push(
+                "fewer than two draw-associated submission attempts inside the driver span".into(),
+            );
         }
-        if strict_minimum_fps.is_none() {
-            errors.push("fewer than two newly drawn submissions inside the driver span".into());
-        } else if !submissions_all_successful {
-            errors.push("platform counted fewer successful frames than newly drawn submissions; strict rate unproven".into());
-        }
-        let strict_fps_failure = strict_minimum_fps.is_some_and(|fps| fps < 500.);
-        let cpu_eligible = cpu["acceptance_eligible"].as_bool().unwrap_or(false);
-        let eligible = errors.is_empty() && cpu_eligible;
+        errors.push("per-successful-draw-generation timestamps and scroll-position association are unavailable; aggregate counter coverage cannot prove individual attempt success or rendered traversal".into());
         json!({"schema":"gallery-scroll-observations-v1","input_mode":self.input_mode.name(),"raw_inputs":self.inputs.iter().map(|i| json!({"timestamp_ns":i.ns,"position_px":i.position,"delta_y_px":i.delta_y})).collect::<Vec<_>>(),
             "engine_counters":{"initial":self.engine_initial,"final":self.engine_final,
                 "environment_overrides":self.engine_environment,
@@ -675,24 +664,24 @@ impl Drive {
                 "observed_offset_min":offset_min,"observed_offset_max":offset_max,
                 "total_scrollable_pixels":total_scrollable_pixels,"visited_sections":null,
                 "visited_sections_reason":"section identity is not exposed to the driver; row coverage is recorded instead",
-                "complete_gallery_traversal":complete_traversal,
-                "definition":"a lap scrolls from the top until the list reports it is at the end, then back to the top; turns happen only at real ends; rows below the deepest top row are in the final viewport"},
-            "input_driver":{"source":"foreground timer, independent of frame callbacks","interval_ns":self.input_interval.as_nanos(),"step_px":8},
+                "logical_offset_traversal_complete":complete_traversal,"complete_gallery_traversal":false,
+                "definition":"logical offset lap reaches the reported bottom and returns to top; input observations do not prove every row was painted and successfully submitted, including rows below the deepest top row"},
+            "input_driver":{"source":"foreground timer, independent of frame callbacks","interval_ns":self.input_interval.as_nanos(),"step_px":8,"pacing_limit":"foreground work can delay timers; overdue deadlines are caught up with immediate ticks, so requested cadence is not measured constant input frequency"},
             "display_refresh_interval_ns":self.refresh_interval.map(|interval| interval.as_nanos()),
-            "median_full_window_fps":median_rate,"display_paced_while_vsync_disabled":display_paced,
-            "strict":{"newly_drawn_submissions_in_span":in_span.len(),"counted_successful_new_frames":counted_new_frames,
-                "all_submissions_successful":submissions_all_successful,"longest_submission_gap_ns":longest_gap_ns,
-                "minimum_instantaneous_fps":strict_minimum_fps,
-                "definition":"1e9 / longest gap between consecutive newly drawn submission end times (profiler Present events) inside the driver span; requires the platform success counter to cover every such submission"},
-            "acceptance_eligible":eligible,
-            "exit_code":if known_cpu_failure||known_fps_failure||strict_fps_failure {1} else if eligible {0} else {2},
-            "counter_limit":"the full-window counter also includes FPS overlay and animation frames; with input every interval, each frame still carries new scroll content",
-            "scope":"full top-bottom-top main-content traversal; programmatic mode refreshes on offset change, wheel mode dispatches through platform input without explicit refresh; startup and turns retained; GPU time is in cpu.gpu"})
+            "median_full_window_fps":median_rate,"observed_rate_near_or_below_refresh":observed_rate_near_or_below_refresh,"refresh_comparison_limit":"rate comparison is diagnostic correlation, not proof of compositor pacing or an excuse to ignore measured FPS failure",
+            "submission_attempt_diagnostic":{"raw_attempt_end_ns":self.new_draw_presents_ns,"draw_associated_attempts_in_span":in_span.len(),"counted_successful_new_frames":counted_new_frames,
+                "all_submissions_successful":Value::Null,"aggregate_counter_covers_attempt_count":aggregate_counter_covers_attempt_count,"longest_interior_attempt_gap_ns":longest_gap_ns,
+                "inverse_longest_interior_attempt_gap_hz":inverse_interior_attempt_gap_hz,
+                "definition":"attempt-only interior gaps; excludes start-to-first and last-to-end intervals; not a complete-run minimum or successful-frame rate; a failed first attempt and successful retry cannot be distinguished by aggregate counts"},
+            "acceptance_eligible":false,
+            "exit_code":if known_cpu_failure||known_fps_failure {1} else {2},
+            "counter_limit":"the full-window counter also includes FPS overlay and animation frames; input timing does not prove each counted frame carries changed scroll content",
+            "scope":"attempted logical top-bottom-top main-content traversal; programmatic mode refreshes on offset change, wheel mode dispatches through platform input without explicit refresh; startup and turns retained; GPU time is in cpu.gpu"})
     }
 }
-/// Present-end times of submissions that carry a new draw (not re-presents),
-/// relative to `origin`. Mirrors the CPU report's pairing: a Present is new
-/// when a Draw for that window arrived since the previous Present.
+/// First Present-attempt end after each Draw, relative to origin. This does
+/// not identify success: a failed attempt consumes pending and a successful
+/// retry is omitted. Retained only as a diagnostic, never an acceptance metric.
 fn new_draw_presents(events: &[FrameEvent], window: WindowId, origin: Instant) -> Vec<i128> {
     let mut pending = false;
     let mut presents = Vec::new();
@@ -945,47 +934,43 @@ mod tests {
         }
     }
     #[test]
-    fn display_paced_vsync_off_run_is_invalid() {
+    fn rate_near_refresh_is_diagnostic_and_low_counter_rate_still_fails() {
         let mut paced = drive(15); // 60 FPS over the 250 ms window
         paced.refresh_interval = Some(Duration::from_nanos(16_666_667));
         let report = paced.report(json!({"acceptance_eligible":true}));
-        assert_eq!(report["display_paced_while_vsync_disabled"], true);
+        assert_eq!(report["observed_rate_near_or_below_refresh"], true);
         assert_eq!(report["acceptance_eligible"], false);
         assert_eq!(report["exit_code"], 1);
         let mut fast = drive(250);
         fast.refresh_interval = Some(Duration::from_nanos(16_666_667));
         assert_eq!(
-            fast.report(json!({}))["display_paced_while_vsync_disabled"],
+            fast.report(json!({}))["observed_rate_near_or_below_refresh"],
             false
         );
     }
     #[test]
-    fn strict_rate_uses_longest_submission_gap_and_can_pass() {
-        let mut passing = drive(126);
-        // 126 submissions every 1.98 ms inside the 250 ms span.
-        passing.new_draw_presents_ns = (0..126).map(|i| i * 1_980_000).collect();
-        let report = passing.report(json!({"acceptance_eligible":true}));
-        assert_eq!(report["strict"]["longest_submission_gap_ns"], 1_980_000);
-        assert_eq!(report["errors"], json!([]));
-        assert_eq!(report["acceptance_eligible"], true);
-        assert_eq!(report["exit_code"], 0);
-        // One 2.1 ms gap is a failure even when the window average is 500+.
-        let mut gap = drive(126);
-        gap.new_draw_presents_ns = (0..126).map(|i| i * 1_900_000).collect();
-        gap.new_draw_presents_ns[60] += 200_000;
-        gap.new_draw_presents_ns[61] += 2_300_000;
-        let report = gap.report(json!({"acceptance_eligible":true}));
-        assert!(
-            report["strict"]["minimum_instantaneous_fps"]
-                .as_f64()
-                .unwrap()
-                < 500.
+    fn fast_attempts_covered_by_success_count_and_logical_lap_never_pass() {
+        let mut candidate = drive(126);
+        candidate.new_draw_presents_ns = (0..126).map(|i| i * 1_980_000).collect();
+        let report = candidate.report(json!({"acceptance_eligible":true}));
+        assert_eq!(
+            report["coverage"]["logical_offset_traversal_complete"],
+            true
         );
+        assert_eq!(report["coverage"]["complete_gallery_traversal"], false);
+        assert_eq!(
+            report["submission_attempt_diagnostic"]["aggregate_counter_covers_attempt_count"],
+            true
+        );
+        assert!(report["submission_attempt_diagnostic"]["all_submissions_successful"].is_null());
+        assert_eq!(report["acceptance_eligible"], false);
+        assert_eq!(report["exit_code"], 2);
+        // Even fast attempt timestamps cannot mask actual successful counts <500 FPS.
+        let mut slow_counter = drive(124);
+        slow_counter.new_draw_presents_ns = (0..124).map(|i| i * 1_000_000).collect();
+        let report = slow_counter.report(json!({"acceptance_eligible":true}));
         assert_eq!(report["exit_code"], 1);
-        // Uncounted submissions cannot prove success.
-        let mut uncounted = drive(10);
-        uncounted.new_draw_presents_ns = (0..126).map(|i| i * 1_980_000).collect();
-        assert_eq!(uncounted.report(json!({}))["acceptance_eligible"], false);
+        assert_eq!(report["acceptance_eligible"], false);
     }
     #[test]
     fn incomplete_traversal_is_not_eligible() {
