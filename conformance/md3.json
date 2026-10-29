@@ -188,6 +188,11 @@
           "kind": "browser-ripple-lifecycle",
           "path": "conformance/reference/button-ripple.json",
           "scope": "Actual pinned createButton/createRipple and full stylesheet: exact expansion and fade samples, release cleanup, border offsets, paint order, pointer routing, static reduced motion and dynamic media switching. Existing ordinary fades continue through preference changes; reduced-mode releases finish immediately. Does not establish whole-component desktop/browser pixel conformance."
+        },
+        {
+          "kind": "browser-loading-layout-and-circular-motion",
+          "path": "conformance/reference/button-loading.json",
+          "scope": "Pinned createButton and full stylesheet, ordinary/reduced modes, five variants and sizes, no/leading/trailing icon; progress-only, loading, repeated loading and restore. Includes exact circular motion samples. Establishes reference behavior, not implementation pixel equality or full component conformance."
         }
       ]
     },
