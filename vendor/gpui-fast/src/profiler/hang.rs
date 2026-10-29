@@ -795,6 +795,7 @@ mod tests {
                 IntervalBoundary::Presented(PresentedFrame {
                     frame: frame(window_id, presented_at),
                     presentation: PresentTiming {
+                        successful_new_frame: None,
                         window_id,
                         present_start: presented_at - Duration::from_millis(1),
                         present_end: presented_at,
@@ -824,6 +825,7 @@ mod tests {
         let window_id = WindowId::from(0xF1E1D);
 
         let presentation = PresentTiming {
+            successful_new_frame: None,
             window_id,
             present_start: at(380),
             present_end: at(400),
@@ -1155,6 +1157,7 @@ mod tests {
                     phases: Default::default(),
                 },
                 presentation: PresentTiming {
+                    successful_new_frame: None,
                     window_id,
                     present_start: at(145),
                     present_end: at(150),
@@ -1244,6 +1247,7 @@ mod tests {
                     phases: Default::default(),
                 },
                 presentation: PresentTiming {
+                    successful_new_frame: None,
                     window_id,
                     present_start: at(149),
                     present_end: at(150),
@@ -1357,6 +1361,7 @@ mod tests {
                         phases: Default::default(),
                     },
                     presentation: PresentTiming {
+                        successful_new_frame: None,
                         window_id,
                         present_start: at(submitted_ms),
                         // Time spent inside the submission doesn't make
@@ -1494,6 +1499,7 @@ mod tests {
                         phases: Default::default(),
                     },
                     presentation: PresentTiming {
+                        successful_new_frame: None,
                         window_id,
                         present_start: interval_end,
                         present_end: interval_end,
@@ -1852,6 +1858,7 @@ mod tests {
 
     fn presentation(window_id: WindowId, present_end: scheduler::Instant) -> PresentTiming {
         PresentTiming {
+            successful_new_frame: None,
             window_id,
             present_start: present_end - Duration::from_millis(1),
             present_end,

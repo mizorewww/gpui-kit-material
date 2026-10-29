@@ -3694,9 +3694,17 @@ impl Window {
         stats
     }
 
-    fn record_successful_submission(&mut self, before: Option<u64>, after: Option<u64>) {
-        if let (Some(before), Some(after)) = (before, after)
-            && after > before
+    fn record_successful_submission(
+        &mut self,
+        before: Option<u64>,
+        after: Option<u64>,
+    ) -> Option<bool> {
+        let (before, after) = (before?, after?);
+        if after < before {
+            // A reset cannot establish whether this submission succeeded.
+            return None;
+        }
+        if after > before
             && self.draw_generation != 0
             && self.last_successful_draw != Some(self.draw_generation)
         {
@@ -3707,6 +3715,9 @@ impl Window {
                     .saturating_add(1),
             );
             self.last_successful_draw = Some(self.draw_generation);
+            Some(true)
+        } else {
+            Some(false)
         }
     }
 
@@ -3719,15 +3730,17 @@ impl Window {
         let successful_before = self.platform_window.successful_frame_submissions();
         self.platform_window.draw(&self.rendered_frame.scene);
         let successful_after = self.platform_window.successful_frame_submissions();
-        self.record_successful_submission(successful_before, successful_after);
+        let _successful_new_frame =
+            self.record_successful_submission(successful_before, successful_after);
         self.submission_stats.count = self.submission_stats.count.saturating_add(1);
         self.submission_stats.last_submit = Some(Instant::now());
         #[cfg(feature = "profiler")]
-        self.window_profiler.record_present(
+        self.window_profiler.record_present_with_outcome(
             present_start,
             Instant::now(),
             self.active.get(),
             !self.next_frame_callbacks.borrow().is_empty(),
+            _successful_new_frame,
         );
         self.needs_present.set(false);
         profiling::finish_frame!();
@@ -8100,27 +8113,44 @@ mod tests {
         let window = cx.add_window(|_, _| EmptyView);
         cx.update_window(window.into(), |_, window, cx| {
             window.draw(cx).clear(cx);
-            window.record_successful_submission(None, None);
-            window.record_successful_submission(Some(0), Some(0));
+            assert_eq!(window.record_successful_submission(None, None), None);
+            assert_eq!(window.record_successful_submission(None, Some(1)), None);
+            assert_eq!(window.record_successful_submission(Some(0), None), None);
+            assert_eq!(
+                window.record_successful_submission(Some(0), Some(0)),
+                Some(false)
+            );
             assert_eq!(window.submission_stats.successful_new_frames, None);
-            window.record_successful_submission(Some(0), Some(1));
+            assert_eq!(
+                window.record_successful_submission(Some(0), Some(1)),
+                Some(true)
+            );
             assert_eq!(window.submission_stats.successful_new_frames, Some(1));
-            window.record_successful_submission(Some(1), Some(2));
+            assert_eq!(
+                window.record_successful_submission(Some(1), Some(2)),
+                Some(false)
+            );
             assert_eq!(
                 window.submission_stats.successful_new_frames,
                 Some(1),
                 "same scene re-present"
             );
             window.draw(cx).clear(cx);
-            window.record_successful_submission(Some(2), Some(2));
+            assert_eq!(
+                window.record_successful_submission(Some(2), Some(2)),
+                Some(false)
+            );
             assert_eq!(window.submission_stats.successful_new_frames, Some(1));
-            window.record_successful_submission(Some(2), Some(3));
+            assert_eq!(
+                window.record_successful_submission(Some(2), Some(3)),
+                Some(true)
+            );
             assert_eq!(
                 window.submission_stats.successful_new_frames,
                 Some(2),
                 "retry succeeds for new draw"
             );
-            window.record_successful_submission(Some(3), Some(0));
+            assert_eq!(window.record_successful_submission(Some(3), Some(0)), None);
             assert_eq!(
                 window.submission_stats.successful_new_frames,
                 Some(2),

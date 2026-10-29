@@ -213,7 +213,7 @@
   "profiler_patches": [
     {
       "path": "src/profiler.rs",
-      "scope": "CpuFrameTiming gains presentation_wait/presentation_waits; record_presentation_wait attributes platform-reported blocking presentation waits to the innermost open CPU frame scope while tracing. Scope boundaries and durations are unchanged."
+      "scope": "CpuFrameTiming gains presentation_wait/presentation_waits; record_presentation_wait attributes platform-reported presentation API-call elapsed time (including internal work and scheduling, not only blocking) to the innermost open CPU frame scope while tracing. Scope boundaries and durations are unchanged."
     },
     {
       "path": "src/profiler.rs",
@@ -222,6 +222,10 @@
     {
       "path": "src/profiler.rs, src/profiler/journal.rs",
       "scope": "Atomic fetch_update renamed to try_update for the pinned toolchain's deprecation; identical semantics."
+    },
+    {
+      "path": "src/window.rs, src/profiler.rs",
+      "scope": "PresentTiming.successful_new_frame carries the existing distinct-draw successful-submission decision: true for a confirmed new generation, false for known failed or repeated submission, unknown when counters are unavailable or reset. Raw events preserve failed-attempt/retry outcomes independently of latency filtering and pending-draw consumption; present_end is CPU observation of submission, not GPU completion or scanout. Complete CPU scope timing and submission behavior are unchanged."
     }
   ]
 }

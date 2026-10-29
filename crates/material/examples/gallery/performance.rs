@@ -351,7 +351,7 @@ fn report(mut recording: Recording, target: WindowId, metadata: Value, elapsed: 
                 draw_rows.push(json!({"draw_start_ns":timestamp(d.draw_start),"draw_end_ns":timestamp(d.draw_end),"disposition":"pending_at_capture_end"}));
             }
             FrameEvent::Present(p) => {
-                raw.push(json!({"event":"present","window":format!("{:?}",p.window_id),"start_ns":timestamp(p.present_start),"end_ns":timestamp(p.present_end),"animation_interval_ns":p.animation_interval.map(|v|v.as_nanos())}));
+                raw.push(json!({"event":"present","successful_new_frame":p.successful_new_frame,"window":format!("{:?}",p.window_id),"start_ns":timestamp(p.present_start),"end_ns":timestamp(p.present_end),"animation_interval_ns":p.animation_interval.map(|v|v.as_nanos())}));
                 if p.window_id != target {
                     continue;
                 }
@@ -367,7 +367,7 @@ fn report(mut recording: Recording, target: WindowId, metadata: Value, elapsed: 
                 }
                 let fresh = pending.remove(&p.window_id);
                 let d = fresh.or_else(|| last_submitted.get(&p.window_id).copied());
-                submission_rows.push(json!({"present_start_ns":timestamp(p.present_start),"present_end_ns":timestamp(p.present_end),"disposition":if fresh.is_some() { "new_draw" } else if d.is_some() { "re_present" } else { "unknown_scene" },"draw_start_ns":d.map(|draw| timestamp(draw.draw_start))}));
+                submission_rows.push(json!({"successful_new_frame":p.successful_new_frame,"present_start_ns":timestamp(p.present_start),"present_end_ns":timestamp(p.present_end),"disposition":if fresh.is_some() { "new_draw" } else if d.is_some() { "re_present" } else { "unknown_scene" },"draw_start_ns":d.map(|draw| timestamp(draw.draw_start))}));
                 let Some(d) = d else {
                     recording.errors.push(format!(
                         "present references an unobserved scene: {:?}",
@@ -647,7 +647,7 @@ mod tests {
             CpuFrameSource, CpuFrameTiming, DrawPhases, FrameEvent, FrameTiming, PresentTiming,
         },
     };
-    use serde_json::json;
+    use serde_json::{Value, json};
     use std::time::{Duration, Instant};
 
     fn draw() -> FrameTiming {
@@ -663,6 +663,39 @@ mod tests {
             phases: DrawPhases::default(),
         }
     }
+    #[test]
+    fn raw_and_submission_rows_preserve_tristate_success_marker() {
+        let d = draw();
+        let events = [Some(false), Some(true), None]
+            .into_iter()
+            .enumerate()
+            .map(|(index, marker)| {
+                let start = d.draw_end + Duration::from_millis(index as u64);
+                FrameEvent::Present(PresentTiming {
+                    window_id: d.window_id,
+                    present_start: start,
+                    present_end: start + Duration::from_micros(10),
+                    animation_interval: None,
+                    successful_new_frame: marker,
+                })
+            })
+            .collect();
+        let evidence = report_events(events);
+        for (index, expected) in [json!(false), json!(true), Value::Null]
+            .into_iter()
+            .enumerate()
+        {
+            assert_eq!(
+                evidence["raw_events"][index]["successful_new_frame"],
+                expected
+            );
+            assert_eq!(
+                evidence["submissions"][index]["successful_new_frame"],
+                expected
+            );
+        }
+    }
+
     #[test]
     fn partial_events_never_claim_completeness() {
         let draw = draw();
@@ -688,6 +721,7 @@ mod tests {
             present_start: draw.draw_end + Duration::from_millis(3),
             present_end: draw.draw_end + Duration::from_millis(4),
             animation_interval: None,
+            successful_new_frame: None,
         };
         let evidence = report(
             Recording {
@@ -724,6 +758,7 @@ mod tests {
             present_start: d.draw_end + Duration::from_millis(30),
             present_end: d.draw_end + Duration::from_millis(31),
             animation_interval: None,
+            successful_new_frame: None,
         };
         let first = CpuFrameTiming {
             window_id: d.window_id,
@@ -795,6 +830,7 @@ mod tests {
             present_start: d.draw_end,
             present_end: d.draw_end + Duration::from_millis(15),
             animation_interval: None,
+            successful_new_frame: None,
         };
         let frame = |wait: Duration| CpuFrameTiming {
             window_id: d.window_id,
@@ -855,6 +891,7 @@ mod tests {
             present_start: d.draw_end,
             present_end: d.draw_end + Duration::from_micros(500),
             animation_interval: None,
+            successful_new_frame: None,
         };
         let execution = |at, start: f64, end: f64, completed| GpuExecution {
             submitted_at: at,
@@ -951,6 +988,7 @@ mod tests {
             present_start: next.draw_end,
             present_end: next.draw_end + Duration::from_micros(100),
             animation_interval: None,
+            successful_new_frame: None,
         };
         let repeated = PresentTiming {
             present_start: present.present_end + Duration::from_millis(20),

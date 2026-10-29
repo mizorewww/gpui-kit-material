@@ -749,10 +749,9 @@ pub(crate) fn trace_scope() -> TraceGuard {
 #[cfg(any(feature = "bench-support", all(test, feature = "profiler")))]
 impl Drop for TraceGuard {
     fn drop(&mut self) {
-        let previous_state =
-            TRACE_STATE.try_update(Ordering::AcqRel, Ordering::Acquire, |state| {
-                (state & TRACE_SCOPE_COUNT_MASK > 0).then_some(state - 1)
-            });
+        let previous_state = TRACE_STATE.try_update(Ordering::AcqRel, Ordering::Acquire, |state| {
+            (state & TRACE_SCOPE_COUNT_MASK > 0).then_some(state - 1)
+        });
         match previous_state {
             Ok(1) => clear_trace_buffers(),
             Ok(_) => {}
@@ -953,6 +952,13 @@ pub struct PresentTiming {
     pub present_start: Instant,
     /// When the platform submission completed.
     pub present_end: Instant,
+    /// Whether this attempt successfully submitted a newly drawn generation.
+    /// `None` means the backend could not establish success (including a counter
+    /// reset); `Some(false)` includes failure and re-presenting an already
+    /// successful generation. `Some(true)` is observed by `present_end`, after
+    /// synchronous submission returns, not GPU completion or display time.
+    /// This result is independent of latency-sample validity and pending draws.
+    pub successful_new_frame: Option<bool>,
     /// The interval since the previous newly drawn frame was submitted, when
     /// both frames belong to an active animation.
     pub animation_interval: Option<Duration>,
@@ -1653,12 +1659,32 @@ impl WindowProfiler {
         window_active: bool,
         next_frame_scheduled: bool,
     ) {
-        note_cpu_phase(self.window_id, present_start, false);
-        self.record_present_at(
+        self.record_present_with_outcome(
             present_start,
             present_end,
             window_active,
             next_frame_scheduled,
+            None,
+        );
+    }
+
+    /// Records a raw submission with the Window's existing success decision.
+    /// Unknown outcomes retain the legacy entry point's behavior.
+    pub(crate) fn record_present_with_outcome(
+        &mut self,
+        present_start: Instant,
+        present_end: Instant,
+        window_active: bool,
+        next_frame_scheduled: bool,
+        successful_new_frame: Option<bool>,
+    ) {
+        note_cpu_phase(self.window_id, present_start, false);
+        self.record_present_at_with_outcome(
+            present_start,
+            present_end,
+            window_active,
+            next_frame_scheduled,
+            successful_new_frame,
         );
     }
 
@@ -1699,12 +1725,30 @@ impl WindowProfiler {
         &mut self.by_refresh_interval[index]
     }
 
+    #[cfg(test)]
     fn record_present_at(
         &mut self,
         present_start: Instant,
         present_end: Instant,
         window_active: bool,
         next_frame_scheduled: bool,
+    ) {
+        self.record_present_at_with_outcome(
+            present_start,
+            present_end,
+            window_active,
+            next_frame_scheduled,
+            None,
+        );
+    }
+
+    fn record_present_at_with_outcome(
+        &mut self,
+        present_start: Instant,
+        present_end: Instant,
+        window_active: bool,
+        next_frame_scheduled: bool,
+        successful_new_frame: Option<bool>,
     ) {
         let mut responded_to_input = false;
         if let Some(first_input_at) = self.first_input_at.take()
@@ -1743,6 +1787,7 @@ impl WindowProfiler {
             window_id: self.window_id,
             present_start,
             present_end,
+            successful_new_frame,
             animation_interval,
         };
         journal::record_present(present_timing, frame);
@@ -2208,7 +2253,13 @@ mod tests {
         let mut collector = FrameTimingCollector::new();
         let start = Instant::now();
         let end = start + Duration::from_micros(100);
-        profiler.record_present_at(start, end, true, true);
+        profiler.record_present_with_outcome(start, end, true, true, Some(false));
+        // The failed attempt consumes the latency sample. A successful retry
+        // must still carry its Window outcome without any pending draw.
+        assert!(profiler.pending_frame.is_none());
+        profiler.record_present_with_outcome(end, end, true, true, Some(true));
+        profiler.record_present_with_outcome(end, end, true, true, Some(false));
+        profiler.record_present(end, end, true, true);
         let presentations = collector
             .collect_unseen()
             .into_iter()
@@ -2217,7 +2268,11 @@ mod tests {
                 _ => None,
             })
             .collect::<Vec<_>>();
-        assert_eq!(presentations.len(), 1);
+        assert_eq!(presentations.len(), 4);
+        assert_eq!(presentations[0].successful_new_frame, Some(false));
+        assert_eq!(presentations[1].successful_new_frame, Some(true));
+        assert_eq!(presentations[2].successful_new_frame, Some(false));
+        assert_eq!(presentations[3].successful_new_frame, None);
         assert_eq!(presentations[0].present_start, start);
         assert_eq!(presentations[0].present_end, end);
         assert_eq!(presentations[0].animation_interval, None);
