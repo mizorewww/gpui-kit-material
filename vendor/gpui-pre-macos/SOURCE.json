@@ -2,6 +2,7 @@
   "package": "gpui-pre-macos",
   "version": "0.3.10",
   "source": "crates.io published archive",
+  "archive_url": "https://static.crates.io/crates/gpui-pre-macos/gpui-pre-macos-0.3.10.crate",
   "archive_sha256": "7e07a5e5c84f0b2160c194a1c852cc89d1942db66867938ceabcd7f763cb4386",
   "upstream_files": {
     "Cargo.lock": "e204ec0054c240c066a83b8afac741e8dba3a4cd746575599ff10c3b3e58ebb3",
@@ -21,8 +22,28 @@
     "src/window_appearance.rs": "c1ea31769bfd6b324339525b8ffec3be0f59a24495a7e491c1df66bd43db5b75"
   },
   "local_patches": [
-    "src/window.rs",
-    "src/display_link.rs"
+    "src/display_link.rs",
+    "src/window.rs"
   ],
+  "modified_files": {
+    "src/display_link.rs": {
+      "upstream_sha256": "088f3e0b8dd9b242a1f6c090a2c79ef081857cc917564673d61d84a48c6cf1cc",
+      "local_sha256": "0254d01fe67a54f8d23b53f2dc649cc99e94629bcd310262c4f81d27f42a376e",
+      "reason": "WindowFrameSource::is_running and wake: one coalesced demand request on the existing main-thread source (MATERIAL-PATCHES.md)."
+    },
+    "src/window.rs": {
+      "upstream_sha256": "1b256befa6b96cdb6d5888f1192aba9773311cd4d2c508165531401fcc15e21f",
+      "local_sha256": "fc5e1f02cc99deec68609588b0ee945b325cfa3e697a8c4f4cba428ab8796200",
+      "reason": "vsync_status/set_vsync, successful_frame_submissions via draw_with_status, has_periodic_frame_source, weak-owner demand frame_waker, unconditional anyhow::Result import (MATERIAL-PATCHES.md)."
+    }
+  },
+  "added_files": {},
+  "removed_files": {},
+  "unchanged_file_count": 13,
+  "provenance_files": [
+    "MATERIAL-PATCHES.md",
+    "SOURCE.json"
+  ],
+  "verification": "Archive downloaded from archive_url; its SHA-256 equals the crates.io index cksum and ~/.cargo/registry/cache. upstream_files are hashes of the extracted archive (excluding Cargo's .cargo-ok marker).",
   "validation": "source archive identity verified; runtime checks pending"
 }
