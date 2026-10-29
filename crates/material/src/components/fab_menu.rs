@@ -71,11 +71,15 @@ impl FabMenuColor {
 type ClickHandler = Rc<dyn Fn(&ClickEvent, &mut Window, &mut App)>;
 type ToggleHandler = Rc<dyn Fn(&bool, &mut Window, &mut App)>;
 
-/// One action of a FAB menu.
+/// One action of a FAB menu. Rendered on its own (e.g. a building-block
+/// specimen) it is the open item in its `color`; inside a menu it takes the
+/// menu's color.
+#[derive(gpui::IntoElement)]
 pub struct FabMenuItem {
     id: ElementId,
     icon: Icon,
     label: SharedString,
+    color: FabMenuColor,
     preview: Option<InteractionPreview>,
     on_click: Option<ClickHandler>,
 }
@@ -90,9 +94,15 @@ impl FabMenuItem {
             id: id.into(),
             icon: icon.into(),
             label: label.into(),
+            color: FabMenuColor::Primary,
             preview: None,
             on_click: None,
         }
+    }
+    /// The color of a stand-alone item (a menu's items take its color).
+    pub fn color(mut self, color: FabMenuColor) -> Self {
+        self.color = color;
+        self
     }
     pub fn preview_state(mut self, state: InteractionPreview) -> Self {
         self.preview = Some(state);
@@ -104,6 +114,33 @@ impl FabMenuItem {
     ) -> Self {
         self.on_click = Some(Rc::new(callback));
         self
+    }
+}
+
+impl FabMenuItem {
+    /// The item at a 0 … 1 `expansion` from FAB size to labelled pill.
+    fn button(self, expansion: f32, window: &Window) -> MaterialButton {
+        let label = revealed_label(&self.label, TypeRole::TitleMedium, expansion, window);
+        let mut button = MaterialButton::new(self.id)
+            .form(Form::FabMenuItem { expansion })
+            .palette(self.color.item_palette())
+            .icon(self.icon)
+            .accessibility_label(self.label)
+            .children(label)
+            .opacity(expansion.clamp(0., 1.));
+        if let Some(state) = self.preview {
+            button = button.preview_state(state);
+        }
+        if let Some(callback) = self.on_click {
+            button = button.on_click(move |event, window, cx| callback(event, window, cx));
+        }
+        button
+    }
+}
+
+impl RenderOnce for FabMenuItem {
+    fn render(self, window: &mut Window, _: &mut App) -> impl IntoElement {
+        self.button(1., window)
     }
 }
 
@@ -218,22 +255,11 @@ impl RenderOnce for FabMenu {
                 continue;
             }
             any_item = true;
-            let label = revealed_label(&item.label, TypeRole::TitleMedium, expansion, window);
-            let mut button = MaterialButton::new(item.id)
-                .form(Form::FabMenuItem { expansion })
-                .palette(self.color.item_palette())
-                .icon(item.icon)
-                .accessibility_label(item.label)
-                .tab_stop(open)
-                .children(label)
-                .opacity(expansion.clamp(0., 1.));
-            if let Some(state) = item.preview {
-                button = button.preview_state(state);
-            }
-            if let Some(callback) = item.on_click {
-                button = button.on_click(move |event, window, cx| callback(event, window, cx));
-            }
-            column = column.child(button);
+            column = column.child(
+                item.color(self.color)
+                    .button(expansion, window)
+                    .tab_stop(open),
+            );
         }
         let morph = motion::token_value(
             (self.id.clone(), "fab-menu-icon"),
