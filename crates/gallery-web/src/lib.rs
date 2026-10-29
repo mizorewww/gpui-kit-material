@@ -1,5 +1,8 @@
 //! Browser entrypoint; the component examples are shared with the desktop gallery.
 #[cfg(target_family = "wasm")]
+extern crate gpui_kit as gpui;
+
+#[cfg(target_family = "wasm")]
 #[path = "../../material/examples/gallery/mod.rs"]
 mod gallery;
 #[cfg(target_family = "wasm")]

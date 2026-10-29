@@ -1,4 +1,6 @@
 //! Desktop entrypoint for the shared Material gallery.
+extern crate gpui_kit as gpui;
+
 #[path = "gallery/mod.rs"]
 mod gallery;
 

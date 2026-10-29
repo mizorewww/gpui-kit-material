@@ -1,4 +1,6 @@
 //! Contract tests: extra pointer targets retain Base's sole activation authority.
+extern crate gpui_kit as gpui;
+
 use std::{cell::Cell, rc::Rc};
 
 use gpui::{

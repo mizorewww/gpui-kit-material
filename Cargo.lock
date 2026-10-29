@@ -2491,7 +2491,6 @@ dependencies = [
  "gpui-kit",
  "gpui-kit-material-color",
  "gpui-material-symbols",
- "gpui-pre",
  "serde_json",
  "web-time",
 ]
@@ -2511,7 +2510,6 @@ dependencies = [
  "gpui-base",
  "gpui-kit",
  "gpui-kit-material",
- "gpui-pre",
  "wasm-bindgen",
  "web-sys",
 ]

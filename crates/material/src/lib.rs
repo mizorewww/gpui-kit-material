@@ -20,6 +20,8 @@
 //! `open_window` for the single Root, register [`icons::Assets`], and initialize [`theme::init_component_theme`] before Root's first
 //! render. Advance [`theme::advance_component_theme`] from input events and
 //! pre-frame callbacks. Base-only consumers can continue to use [`theme::apply`].
+extern crate gpui_kit as gpui;
+
 pub use gpui_kit_material_color as color;
 
 pub mod components;

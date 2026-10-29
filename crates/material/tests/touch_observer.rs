@@ -1,5 +1,7 @@
 //! Contract tests for the small gpui-pre raw-touch observation patch.
 //! Observing a press must not take ownership of Base's tap recognizer.
+extern crate gpui_kit as gpui;
+
 use std::{
     cell::{Cell, RefCell},
     rc::Rc,

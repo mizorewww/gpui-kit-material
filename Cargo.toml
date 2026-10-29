@@ -16,9 +16,8 @@ gpui-kit-material-color = { path = "crates/color", version = "0.1.0" }
 # Kit owns application initialization and the Component layer. Cargo.lock pins
 # this branch to the audited revision; GPUI and the patched Base must be shared.
 gpui-kit = { git = "https://github.com/longbridge/gpui-kit", branch = "main" }
-# Direct engine/Base imports remain for existing Material APIs and regression
-# fixtures during migration; both resolve to Kit's exact implementations.
-gpui = { package = "gpui-pre", version = "=0.3.10" }
+# Base supplies presentation capabilities not exposed by Component; Kit selects
+# its engine backend along with the facade's public types.
 gpui-base = { version = "=0.8.1" }
 
 anyhow = "1"

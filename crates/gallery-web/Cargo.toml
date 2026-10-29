@@ -15,7 +15,6 @@ unexpected_cfgs = { level = "warn", check-cfg = ['cfg(feature, values("frame-pro
 
 [target.'cfg(target_family = "wasm")'.dependencies]
 gpui-kit.workspace = true
-gpui.workspace = true
 gpui-base.workspace = true
 gpui-kit-material = { path = "../material" }
 wasm-bindgen = "=0.2.129"

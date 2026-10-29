@@ -1,4 +1,6 @@
 //! Exercise the real Kit Root ordering, not only the theme projection helper.
+extern crate gpui_kit as gpui;
+
 use gpui_kit::{
     AppContext, Context, IntoElement, Pixels, Render, SharedString, TestAppContext, Window,
     WindowOptions, component::Theme, div, prelude::*, px,

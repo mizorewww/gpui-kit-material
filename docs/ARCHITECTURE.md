@@ -11,8 +11,10 @@ identified Component presentation gap; do not build a parallel generic toolkit.
 
 The galleries use the Kit facade for application initialization and window
 creation. The Material-to-Component theme bridge runs before Root preparation.
-Existing Material controls and regression fixtures still import GPUI/Base
-directly, resolving to the same patched packages as Kit. Symbols provide the shared icon source; individual
+Material controls, galleries and regression fixtures resolve their `gpui` import
+through the Kit facade; Base remains a direct dependency for the reviewed
+presentation gaps. This keeps their public engine types aligned when selecting
+a Kit backend. Symbols provide the shared icon source; individual
 control migration remains pending. Existing compatibility fixes must remain until
 the same behavior is verified through the replacement dependency graph.
 The source-based reuse and removal conditions are recorded in
