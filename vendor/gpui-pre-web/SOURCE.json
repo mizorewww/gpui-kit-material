@@ -1,7 +1,65 @@
 {
-  "crate": "gpui-pre-web",
+  "package": "gpui-pre-web",
   "version": "0.3.10",
-  "source": "https://crates.io/api/v1/crates/gpui-pre-web/0.3.10/download",
+  "source": "crates.io published archive",
+  "archive_url": "https://static.crates.io/crates/gpui-pre-web/gpui-pre-web-0.3.10.crate",
+  "license": "Apache-2.0 (LICENSE-APACHE retained)",
   "archive_sha256": "1acd86af2347f0dd8b63c441a5dbd43b3fcd7dac69b340827c3497da5a13d6fb",
-  "license_file": "LICENSE-APACHE"
+  "upstream_files": {
+    "Cargo.lock": "792e390642e5b0454af698408f60902a7ec856eaf73649f3d2006acf7380e2bb",
+    "Cargo.toml": "da6d7e9f6bc0a2de9020cb81aeebea4b6e7d989dccade83f0c22440ed68164ce",
+    "Cargo.toml.orig": "c1acfd929d3b088cd6f2a4e6806ed21593610291cc951ffc953c562863abcda6",
+    "LICENSE-APACHE": "752daf2fb234ca4a1fa372c073fe127f44b7b90fd2529ae44273a64f9d53da7a",
+    "src/canvas_fallback.rs": "f23fef0d3b68fabe50dea4e32a63fa5b0bc0506f4e9e7e04ece8b563e05e20c4",
+    "src/canvas_text.rs": "da73053a7f087e78aefb873f23502189224e8572fc0de49d52689f049f0cbfb3",
+    "src/dispatcher.rs": "2278e642e620a30605fe3ed8c391b0d94151ca79981fbd4c76a2bd61c06e8bb9",
+    "src/display.rs": "4ca631603993dba5125088911193d380908b4f5ac7cc89b21ef4c9136b9ad433",
+    "src/events.rs": "250ba40e44975b282cd74797e76c96de6ef5bdcc537a8009f7e876c8a47ff239",
+    "src/glyph_cache.rs": "d9beafc7c2a8029171151249a4ecd13bf7419d1a22809abbf86d3e823b665793",
+    "src/gpui_web.rs": "51360d028a5f0e495557732e7e257ccfd5de960a17a9a57487aeaa8562b10979",
+    "src/http_client.rs": "06cabc3449fac1a8878d31b9b8bf01d097cb52ec8993c794dc221f9b848226da",
+    "src/ime_mirror.rs": "4061ebd319b5928c2a25f659c4f1db9adb193d5873bbbfeba36468ca2706895d",
+    "src/keyboard.rs": "f13f68ea0aed387146d2ff95892bdd4f14b2e0a46231a2b06ea6c7e674e11a5d",
+    "src/logging.rs": "2d464ead162a6eb83b8d22b435c83a557a8ad7c6776966ff92f3e2a82fdae1fb",
+    "src/platform.rs": "cd049a650e8e70ea673ea0f76d0312ee6c77bcaffb0c486c987d4463e224610d",
+    "src/run_replacements.rs": "c00a0f957f156b3744a90d3687f773de0a0e259c6c8beb1c86bd3f17614c3f43",
+    "src/text_system.rs": "50d2d9da4a628d4363264dee69ae7eb271655007ccd5ef1bfbdb88954315808f",
+    "src/viewport.rs": "2f64241c990f6de9a874e7680baafa61feba6db96228c48fab26ac7faaf623f5",
+    "src/window.rs": "eda543e585912fcb012e2a3559d8fb2e9ad7570ba58746747af380d044085cb8"
+  },
+  "local_patches": [
+    "src/gpui_web.rs",
+    "src/window.rs"
+  ],
+  "modified_files": {
+    "src/gpui_web.rs": {
+      "upstream_sha256": "51360d028a5f0e495557732e7e257ccfd5de960a17a9a57487aeaa8562b10979",
+      "local_sha256": "94847c66838eb4bc59f907e78f368be5744d238f741b9439e3c005ed5f22b2dd",
+      "reason": "Declare the canvas_size module (MATERIAL-PATCHES.md)."
+    },
+    "src/window.rs": {
+      "upstream_sha256": "eda543e585912fcb012e2a3559d8fb2e9ad7570ba58746747af380d044085cb8",
+      "local_sha256": "28f76320963010d63471a0a23d0e6124442803f71eaf4f22263bec9d43a0c519",
+      "reason": "Resize observer uses canvas_dimensions and reacts to DPR/logical-size changes; successful_frame_submissions from WgpuRenderer::draw (MATERIAL-PATCHES.md)."
+    }
+  },
+  "added_files": {
+    "src/canvas_size.rs": {
+      "sha256": "0c30b53010e38d1e9bb79e744d2936a5e19ce202ade2bbcdde9b8e11087db1c0",
+      "reason": "Added: CSS viewport vs backing-store sizing with DPR-consistency fallback, plus unit tests (MATERIAL-PATCHES.md)."
+    }
+  },
+  "removed_files": {
+    "Cargo.lock": {
+      "upstream_sha256": "792e390642e5b0454af698408f60902a7ec856eaf73649f3d2006acf7380e2bb",
+      "reason": "Package-level lockfile not retained; the workspace Cargo.lock owns resolution."
+    }
+  },
+  "unchanged_file_count": 17,
+  "provenance_files": [
+    "MATERIAL-PATCHES.md",
+    "SOURCE.json"
+  ],
+  "verification": "Archive downloaded from archive_url; its SHA-256 equals the crates.io index cksum and ~/.cargo/registry/cache. upstream_files are hashes of the extracted archive (excluding Cargo's .cargo-ok marker).",
+  "validation": "source identity and per-file hashes verified; runtime acceptance is tracked separately"
 }
