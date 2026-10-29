@@ -6,6 +6,7 @@ pub use button::{
     ButtonTransitionInputs, ButtonTransitionPlayback, ButtonVariant, MaterialButton,
     material_button,
 };
+mod app_bar;
 mod button_group;
 mod controls;
 mod divider;
@@ -33,6 +34,10 @@ mod text;
 mod tile;
 mod title_bar;
 
+pub use app_bar::{
+    BOTTOM_APP_BAR_HEIGHT, BottomAppBar, TOP_APP_BAR_HEIGHT, TopAppBar, TopAppBarVariant,
+    collapsed_title_alpha,
+};
 pub use button_group::ConnectedButtonGroup;
 pub use caption::{Caption, CaptionButton, CaptionButtons, CaptionLabels, title_bar_control};
 pub use checkbox::{CheckboxState, MaterialCheckbox};
