@@ -1,4 +1,5 @@
-//! Status and notice surfaces: badges, chips, banners, cards and snackbars.
+//! Status and notice surfaces: M3 badges, status and assist chips, banners,
+//! cards and snackbars.
 use crate::color::ColorRole::{self, *};
 use crate::icons::IconName;
 use crate::theme::color;
@@ -56,8 +57,9 @@ pub fn notice_banner(
         )
 }
 
-/// Status badge kinds; text always pairs with its tinted background.
-pub enum BadgeKind {
+/// The tone of a [`status_chip`]; text always pairs with its tinted
+/// background.
+pub enum StatusKind {
     Success,
     Warning,
     Danger,
@@ -67,19 +69,24 @@ pub enum BadgeKind {
     Tonal,
 }
 
-/// Icon, padding and label belong to one container; callers append the label.
-pub fn badge(kind: BadgeKind) -> Div {
+/// Former name of [`StatusKind`]: these are status labels, not M3 badges.
+pub type BadgeKind = StatusKind;
+
+/// A status label chip: a tinted pill with an optional status icon. Icon,
+/// padding and label belong to one container; callers append the label.
+/// For the M3 notification badge, see [`small_badge`] and [`large_badge`].
+pub fn status_chip(kind: StatusKind) -> Div {
     let (text, bg, icon) = match kind {
-        BadgeKind::Success => (SUCCESS, SUCCESS_BG, Some(IconName::CheckCircle)),
-        BadgeKind::Warning => (WARNING, WARNING_BG, Some(IconName::Warning)),
-        BadgeKind::Danger => (ERROR, ERROR_CONTAINER, Some(IconName::Error)),
+        StatusKind::Success => (SUCCESS, SUCCESS_BG, Some(IconName::CheckCircle)),
+        StatusKind::Warning => (WARNING, WARNING_BG, Some(IconName::Warning)),
+        StatusKind::Danger => (ERROR, ERROR_CONTAINER, Some(IconName::Error)),
         // A clock would read as waiting; work in progress needs no icon.
-        BadgeKind::Progress => (PRIMARY, SECONDARY_CONTAINER, None),
+        StatusKind::Progress => (PRIMARY, SECONDARY_CONTAINER, None),
         // Neutral is a plain text chip without a status icon, on the
         // highest surface container: a step above the tile in light and dark
         // palettes alike (INSET sinks below the surface in dark ones).
-        BadgeKind::Neutral => (ON_SURFACE_VARIANT, SURFACE_CONTAINER_HIGHEST, None),
-        BadgeKind::Tonal => (ON_SECONDARY_CONTAINER, SECONDARY_CONTAINER, None),
+        StatusKind::Neutral => (ON_SURFACE_VARIANT, SURFACE_CONTAINER_HIGHEST, None),
+        StatusKind::Tonal => (ON_SECONDARY_CONTAINER, SECONDARY_CONTAINER, None),
     };
     let mut view = div()
         .flex()
@@ -96,25 +103,86 @@ pub fn badge(kind: BadgeKind) -> Div {
         .font_weight(FontWeight::MEDIUM)
         .whitespace_nowrap();
     if let Some(icon) = icon {
-        view = view.child(icon.icon().size(px(16.)));
+        view = view.child(icon.icon().size(STATUS_ICON));
     }
     view
 }
 
-/// A fact beside a label in the badge's size, outlined rather than filled:
-/// e.g. the engine a tile uses.
-pub fn outlined_badge(id: impl Into<ElementId>, label: impl Into<SharedString>) -> Stateful<Div> {
+/// The status icon shares the chip's text ruler.
+const STATUS_ICON: Rems = rem(16.);
+
+/// A status label; same as [`status_chip`], kept under its earlier name.
+pub fn badge(kind: StatusKind) -> Div {
+    status_chip(kind)
+}
+
+/// A fact beside a label in the status chip's size, outlined rather than
+/// filled: e.g. the engine a tile uses.
+pub fn outlined_status_chip(
+    id: impl Into<ElementId>,
+    label: impl Into<SharedString>,
+) -> Stateful<Div> {
     accessible_text(id, label)
         .flex_shrink_0()
         .px(rem(10.))
         .py(rem(4.))
         .rounded(RADIUS_SMALL)
         .border_1()
-        .border_color(color(ColorRole::HAIRLINE))
+        .border_color(color(OUTLINE_VARIANT))
         .text_size(TEXT_AUX)
         .line_height(rem(16.))
         .font_weight(FontWeight::MEDIUM)
-        .text_color(color(ColorRole::ON_SURFACE_VARIANT))
+        .text_color(color(ON_SURFACE_VARIANT))
+        .whitespace_nowrap()
+}
+
+/// An outlined status label; same as [`outlined_status_chip`], kept under its
+/// earlier name.
+pub fn outlined_badge(id: impl Into<ElementId>, label: impl Into<SharedString>) -> Stateful<Div> {
+    outlined_status_chip(id, label)
+}
+
+/// The M3 small badge: a 6dp dot. It carries no text, so it does not follow
+/// the text scale.
+pub const SMALL_BADGE_SIZE: Pixels = px(6.);
+/// The M3 large badge: at least 16dp square, around label-small text.
+pub const LARGE_BADGE_SIZE: Rems = rem(16.);
+/// Horizontal padding inside a large badge (4dp).
+pub const LARGE_BADGE_PADDING: Rems = rem(4.);
+/// The container and label roles of both M3 badges.
+pub const BADGE_CONTAINER: ColorRole = ERROR;
+pub const BADGE_LABEL: ColorRole = ON_ERROR;
+
+/// M3 small badge: a full-round error dot that marks new content on an icon.
+/// The caller positions it (6dp from the icon's top-trailing corner).
+pub fn small_badge() -> Div {
+    div()
+        .flex_shrink_0()
+        .size(SMALL_BADGE_SIZE)
+        .rounded(RADIUS_FULL)
+        .bg(color(BADGE_CONTAINER))
+}
+
+/// M3 large badge: a count or short label on an error pill, label-small on
+/// on-error, at least 16dp square and full-round. The caller positions it
+/// (12dp across and 14dp down from the icon's top-trailing corner) and
+/// supplies its text, e.g. "3" or "999+".
+pub fn large_badge(id: impl Into<ElementId>, label: impl Into<SharedString>) -> Stateful<Div> {
+    let scale = TypeRole::LabelSmall.scale();
+    accessible_text(id, label)
+        .flex()
+        .flex_shrink_0()
+        .items_center()
+        .justify_center()
+        .h(LARGE_BADGE_SIZE)
+        .min_w(LARGE_BADGE_SIZE)
+        .px(LARGE_BADGE_PADDING)
+        .rounded(RADIUS_FULL)
+        .bg(color(BADGE_CONTAINER))
+        .text_color(color(BADGE_LABEL))
+        .text_size(scale.font_size)
+        .line_height(scale.line_height)
+        .font_weight(FontWeight(scale.font_weight as f32))
         .whitespace_nowrap()
 }
 
@@ -394,6 +462,40 @@ mod tests {
         );
         assert_eq!(RADIUS_CARD, px(12.));
         assert_eq!(CARD_PADDING, rem(16.));
+    }
+
+    #[test]
+    fn badges_follow_m3_geometry_and_roles() {
+        assert_eq!(SMALL_BADGE_SIZE, px(6.));
+        assert_eq!(LARGE_BADGE_SIZE, rem(16.));
+        assert_eq!(LARGE_BADGE_PADDING, rem(4.));
+        assert_eq!((BADGE_CONTAINER, BADGE_LABEL), (ERROR, ON_ERROR));
+    }
+
+    #[gpui::test]
+    fn large_badge_hugs_short_labels_and_grows_for_long_ones(cx: &mut TestAppContext) {
+        struct Badges;
+        impl Render for Badges {
+            fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+                window.set_rem_size(px(14.));
+                div()
+                    .flex()
+                    .items_start()
+                    .child(large_badge("one", "3").debug_selector(|| "badge-short".into()))
+                    .child(large_badge("many", "999+").debug_selector(|| "badge-long".into()))
+                    .child(small_badge().debug_selector(|| "badge-dot".into()))
+            }
+        }
+        let (_, cx) = cx.add_window_view(|_, _| Badges);
+        cx.run_until_parked();
+        let short = cx.debug_bounds("badge-short").unwrap();
+        let long = cx.debug_bounds("badge-long").unwrap();
+        let dot = cx.debug_bounds("badge-dot").unwrap();
+        assert_eq!(short.size.height, px(16.));
+        assert_eq!(short.size.width, px(16.));
+        assert_eq!(long.size.height, px(16.));
+        assert!(long.size.width > px(16.));
+        assert_eq!(dot.size, gpui::size(px(6.), px(6.)));
     }
 
     #[test]
