@@ -717,15 +717,40 @@ impl StatefulInteractiveElement for MaterialButton {
         self
     }
 }
-impl RenderOnce for MaterialButton {
-    fn render(mut self, window: &mut Window, cx: &mut App) -> impl IntoElement {
-        use gpui_base::StyledExt;
-        let loading = self.loading.as_ref().is_some_and(|(visible, _)| *visible);
-        let show_progress = loading || self.progress.as_ref().is_some_and(|(visible, _)| *visible);
-        self.disabled |= loading;
+/// Transition-sampled visual channels for one render.
+struct SampledColors {
+    bg: Rgba,
+    fg: Rgba,
+    border: Rgba,
+    /// Disabled icon CSS is an explicit child color without a transition.
+    disabled_icon: Rgba,
+}
+
+/// Transient interaction state resolved from the passive press observer.
+struct Interaction {
+    focus: FocusHandle,
+    pressed: Entity<PressState>,
+    active: bool,
+    hovered: bool,
+    focused: bool,
+}
+
+/// State-layer opacity, elevation and shape sampled for one render.
+struct Effects {
+    opacity: f32,
+    shadows: shadow::ShadowPair,
+    radius: f32,
+}
+
+impl MaterialButton {
+    fn progress_visible(&self) -> bool {
+        self.progress.as_ref().is_some_and(|(visible, _)| *visible)
+    }
+
+    /// Keep the owner's no-op guard aligned with targets sampled by a
+    /// visible render, without injecting any resting interaction target.
+    fn record_transition_inputs(&self, cx: &App) {
         if let Some(playback) = &self.transition_playback {
-            // Keep the owner's no-op guard aligned with targets sampled by a
-            // visible render, without injecting any resting interaction target.
             playback.record_inputs(
                 ButtonTransitionInputs {
                     variant: self.variant,
@@ -740,54 +765,49 @@ impl RenderOnce for MaterialButton {
                 cx,
             );
         }
-        // `disabled()` already set Base; loading additionally disables it.
-        self.base = self.base.disabled(self.disabled).busy(loading);
-        // One lifecycle implementation serves both caller-owned and keyed
-        // playback. The keyed handle lives while the button renders each frame.
-        let progress_playback = (self.loading.is_some() || self.progress.is_some()).then(|| {
-            self.progress_playback.clone().unwrap_or_else(|| {
-                window
-                    .use_keyed_state((self.id.clone(), "progress-playback"), cx, |_, _| {
-                        ButtonProgressPlayback::default()
-                    })
-                    .read(cx)
-                    .clone()
-            })
-        });
-        let progress_opacity = match &progress_playback {
-            Some(playback) => {
-                let opacity = playback.sample_inputs(
-                    self.progress.as_ref().is_some_and(|(visible, _)| *visible),
-                    loading,
-                    self.disabled,
-                    cx,
-                );
-                if matches!(
-                    opacity.status,
-                    gpui_base::MotionStatus::Running | gpui_base::MotionStatus::Delayed
-                ) {
-                    window.request_animation_frame();
-                }
-                opacity.value
-            }
-            None => 1.,
-        };
-        #[cfg(test)]
-        if let Some(observer) = &self.progress_opacity_observer {
-            observer.set(progress_opacity);
+    }
+
+    /// One lifecycle implementation serves both caller-owned and keyed
+    /// playback. The keyed handle lives while the button renders each frame.
+    /// Returns the playback (when progress is configured) and its opacity.
+    fn sample_progress(
+        &self,
+        loading: bool,
+        window: &mut Window,
+        cx: &mut App,
+    ) -> (Option<ButtonProgressPlayback>, f32) {
+        if self.loading.is_none() && self.progress.is_none() {
+            return (None, 1.);
         }
-        let g = self.size.geometry();
-        let ty = g.typography.scale();
+        let playback = self.progress_playback.clone().unwrap_or_else(|| {
+            window
+                .use_keyed_state((self.id.clone(), "progress-playback"), cx, |_, _| {
+                    ButtonProgressPlayback::default()
+                })
+                .read(cx)
+                .clone()
+        });
+        let opacity = playback.sample_inputs(self.progress_visible(), loading, self.disabled, cx);
+        if matches!(
+            opacity.status,
+            gpui_base::MotionStatus::Running | gpui_base::MotionStatus::Delayed
+        ) {
+            window.request_animation_frame();
+        }
+        (Some(playback), opacity.value)
+    }
+
+    fn sample_colors(&self, window: &mut Window, cx: &mut App) -> SampledColors {
         let (bg_target, fg_target, border_target) = toggle_color_targets(
             self.variant,
             self.disabled,
             self.base.toggle,
             self.base.selected,
         );
-        // Disabled icon CSS is an explicit child color without a transition.
-        let disabled_icon_color = fg_target.resolve();
+        let disabled_icon = fg_target.resolve();
+        let transitions = self.transition_playback.as_ref();
         let bg = playback::token_sample(
-            self.transition_playback.as_ref().map(|p| &p.background),
+            transitions.map(|p| &p.background),
             (self.id.clone(), "background-color"),
             bg_target,
             MotionToken::DefaultEffects,
@@ -796,7 +816,7 @@ impl RenderOnce for MaterialButton {
         )
         .resolve();
         let fg = playback::token_sample(
-            self.transition_playback.as_ref().map(|p| &p.foreground),
+            transitions.map(|p| &p.foreground),
             (self.id.clone(), "foreground-color"),
             fg_target,
             MotionToken::DefaultEffects,
@@ -805,7 +825,7 @@ impl RenderOnce for MaterialButton {
         )
         .resolve();
         let border = playback::token_sample(
-            self.transition_playback.as_ref().map(|p| &p.border),
+            transitions.map(|p| &p.border),
             (self.id.clone(), "border-color"),
             border_target,
             MotionToken::DefaultEffects,
@@ -813,16 +833,20 @@ impl RenderOnce for MaterialButton {
             cx,
         )
         .resolve();
-        let radius = resting_radius(
-            self.size,
-            self.shape,
-            self.base.toggle && self.base.selected,
-        );
         #[cfg(test)]
         if let Some(observer) = &self.colors_observer {
             observer.set((bg, fg, border));
         }
-        let focus = self.focus_handle.unwrap_or_else(|| {
+        SampledColors {
+            bg,
+            fg,
+            border,
+            disabled_icon,
+        }
+    }
+
+    fn resolve_interaction(&self, window: &mut Window, cx: &mut App) -> Interaction {
+        let focus = self.focus_handle.clone().unwrap_or_else(|| {
             window
                 .use_keyed_state((self.id.clone(), "material-focus"), cx, |_, cx| {
                     cx.focus_handle()
@@ -839,12 +863,35 @@ impl RenderOnce for MaterialButton {
                 state.keyboard = false;
             });
         }
-        let active = self.active_state || pressed.read(cx).pointer || pressed.read(cx).keyboard;
-        let hovered = pressed.read(cx).hovered && !window.last_input_was_touch();
+        let press = pressed.read(cx);
+        let active = self.active_state || press.pointer || press.keyboard;
+        let hovered = press.hovered && !window.last_input_was_touch();
         let focused =
             self.focusable && focus.is_focused(window) && window.last_input_was_keyboard();
+        Interaction {
+            focus,
+            pressed,
+            active,
+            hovered,
+            focused,
+        }
+    }
+
+    fn sample_effects(
+        &self,
+        interaction: &Interaction,
+        window: &mut Window,
+        cx: &mut App,
+    ) -> Effects {
+        let Interaction {
+            active,
+            hovered,
+            focused,
+            ..
+        } = *interaction;
+        let transitions = self.transition_playback.as_ref();
         let opacity = playback::opacity_sample(
-            self.transition_playback.as_ref(),
+            transitions,
             (self.id.clone(), "state-opacity"),
             playback::state_opacity(
                 self.active_state,
@@ -866,7 +913,7 @@ impl RenderOnce for MaterialButton {
             active,
         );
         let shadows = playback::token_sample(
-            self.transition_playback.as_ref().map(|p| &p.shadow),
+            transitions.map(|p| &p.shadow),
             (self.id.clone(), "box-shadow"),
             shadow::ShadowPair::level(level),
             MotionToken::DefaultEffects,
@@ -877,10 +924,19 @@ impl RenderOnce for MaterialButton {
         if let Some(observer) = &self.effects_observer {
             *observer.borrow_mut() = (opacity, shadows.clone());
         }
+        let resting = resting_radius(
+            self.size,
+            self.shape,
+            self.base.toggle && self.base.selected,
+        );
         let radius = playback::token_sample(
-            self.transition_playback.as_ref().map(|p| &p.radius),
+            transitions.map(|p| &p.radius),
             (self.id.clone(), "pressed-radius"),
-            if active { g.pressed } else { radius },
+            if active {
+                self.size.geometry().pressed
+            } else {
+                resting
+            },
             MotionToken::FastSpatial,
             window,
             cx,
@@ -889,27 +945,32 @@ impl RenderOnce for MaterialButton {
         if let Some(observer) = &self.radius_observer {
             observer.set(radius);
         }
-        let (left_padding, right_padding) = horizontal_padding(
-            self.size,
-            self.variant,
-            self.icon.as_ref().map(|_| self.icon_position),
-            self.direction,
-        );
-        let slot = self.icon.filter(|_| !show_progress).map(|icon| {
-            let icon = if self.disabled {
-                icon.color(disabled_icon_color)
-            } else {
-                icon
-            };
-            div()
-                .flex()
-                .items_center()
-                .justify_center()
-                .flex_shrink_0()
-                .size(rem(self.size.icon_size()))
-                .child(icon.size(rem(self.size.icon_size())))
-        });
-        let (leading, trailing) = if show_progress {
+        Effects {
+            opacity,
+            shadows,
+            radius,
+        }
+    }
+
+    fn icon_slot_box(&self) -> Div {
+        div()
+            .flex()
+            .items_center()
+            .justify_center()
+            .flex_shrink_0()
+            .size(rem(self.size.icon_size()))
+    }
+
+    /// The leading/trailing slots: a visible progress indicator always takes
+    /// the start slot and replaces the icon.
+    fn slots(
+        &mut self,
+        loading: bool,
+        progress: Option<(&ButtonProgressPlayback, f32)>,
+        disabled_icon: Rgba,
+        cx: &App,
+    ) -> (Option<Div>, Option<Div>) {
+        if let Some((playback, opacity)) = progress {
             let label = if loading {
                 self.loading.as_ref()
             } else {
@@ -918,114 +979,220 @@ impl RenderOnce for MaterialButton {
             .expect("visible progress has caller configuration")
             .1
             .clone();
-            let playback = progress_playback
-                .as_ref()
-                .expect("visible progress has caller configuration");
             // Frame requests stay limited to a painted, on-screen indicator.
             let indicator = super::progress::indeterminate_circular_progress_with_playback(
                 (self.id.clone(), "button-progress-indicator"),
                 label,
                 size(rem(self.size.icon_size().min(24.)), rem(24.)),
-                progress_opacity,
+                opacity,
                 &playback.state.borrow().circular,
                 cx,
             );
-            (
-                Some(
-                    div()
-                        .flex()
-                        .items_center()
-                        .justify_center()
-                        .flex_shrink_0()
-                        .size(rem(self.size.icon_size()))
-                        .debug_selector(|| "material-button-progress-slot".into())
-                        .child(indicator),
-                ),
-                None,
-            )
-        } else {
-            match self.icon_position {
-                ButtonIconPosition::Leading => (slot, None),
-                ButtonIconPosition::Trailing => (None, slot),
+            let slot = self
+                .icon_slot_box()
+                .debug_selector(|| "material-button-progress-slot".into())
+                .child(indicator);
+            return (Some(slot), None);
+        }
+        let slot = self.icon.take().map(|icon| {
+            let icon = if self.disabled {
+                icon.color(disabled_icon)
+            } else {
+                icon
+            };
+            self.icon_slot_box()
+                .child(icon.size(rem(self.size.icon_size())))
+        });
+        match self.icon_position {
+            ButtonIconPosition::Leading => (slot, None),
+            ButtonIconPosition::Trailing => (None, slot),
+        }
+    }
+}
+
+/// Passive pointer/touch observer. A window exit must clear a held press even
+/// after the pointer has left the button. Its non-occluding hitbox (the Base
+/// border box captured in prepaint) only locates passive touch presses.
+fn pointer_observer(
+    pressed: &Entity<PressState>,
+    touch_enabled: bool,
+    target: hit_target::SharedTarget,
+) -> impl IntoElement {
+    let weak = pressed.downgrade();
+    canvas(
+        move |bounds, window, _| {
+            target
+                .get()
+                .unwrap_or_else(|| hit_target::ResolvedTarget::new(bounds, None, window))
+                .insert(window)
+        },
+        move |_, hitbox, window, _| {
+            let moving_hitbox = hitbox.clone();
+            let touch = weak.clone();
+            window.observe_touch_event(move |event, window, cx| match event.phase {
+                TouchPhase::Started
+                    if touch_enabled && hitbox.is_hovered_at(event.position, window) =>
+                {
+                    let _ = touch.update(cx, |state, cx| {
+                        state.pointer = true;
+                        state.hovered = false;
+                        state.outside_window = false;
+                        cx.notify();
+                    });
+                }
+                TouchPhase::Ended | TouchPhase::Cancelled => {
+                    let _ = touch.update(cx, |state, cx| {
+                        if state.pointer {
+                            state.pointer = false;
+                            state.hovered = false;
+                            cx.notify();
+                        }
+                    });
+                }
+                _ => {}
+            });
+            let moving = weak.clone();
+            window.on_mouse_event(move |event: &MouseMoveEvent, phase, window, cx| {
+                if phase == DispatchPhase::Capture {
+                    let _ = moving.update(cx, |state, cx| {
+                        if state.pointer || state.outside_window {
+                            state.outside_window = false;
+                            let hovered = moving_hitbox.is_hovered_at(event.position, window)
+                                && !window.last_input_was_touch();
+                            if state.hovered != hovered {
+                                state.hovered = hovered;
+                                cx.notify();
+                            }
+                        }
+                    });
+                }
+            });
+            window.on_mouse_event(move |_: &MouseExitEvent, phase, _, cx| {
+                if phase == DispatchPhase::Capture {
+                    let _ = weak.update(cx, |state, cx| {
+                        // A deferred native hover check can still see the last
+                        // in-window mouse position after exit. Keep it suppressed
+                        // until an actual pointer event enters the window again.
+                        state.outside_window = true;
+                        if state.pointer || state.hovered {
+                            state.hovered = false;
+                            state.pointer = false;
+                            cx.notify();
+                        }
+                    });
+                }
+            });
+        },
+    )
+    .absolute()
+    .size_full()
+}
+
+/// CSS :hover is independent of keyboard modality. Preserve the caller's
+/// GPUI modality preference separately, sharing the one native listener.
+fn bridge_hover(
+    base: BaseControl,
+    pressed: &Entity<PressState>,
+    callback: Option<HoverCallback>,
+    caller_mode: HoverListenerMode,
+    window: &mut Window,
+    cx: &mut App,
+) -> BaseControl {
+    if let Some(callback) = callback.clone() {
+        let caller_hovered = pressed.read(cx).native_hovered
+            && !pressed.read(cx).outside_window
+            && (!window.last_input_was_keyboard()
+                || matches!(caller_mode, HoverListenerMode::InputModalityIndependent));
+        if caller_hovered != pressed.read(cx).caller_hovered {
+            pressed.update(cx, |state, _| state.caller_hovered = caller_hovered);
+            let weak = pressed.downgrade();
+            window.defer(cx, move |window, cx| {
+                if let Some(state) = weak.upgrade()
+                    && state.read(cx).caller_hovered == caller_hovered
+                {
+                    callback(&caller_hovered, window, cx);
+                }
+            });
+        }
+    }
+    let hover_state = pressed.clone();
+    base.hover_listener_mode(HoverListenerMode::InputModalityIndependent)
+        .on_hover(move |hovered, window, cx| {
+            let caller_hovered = *hovered
+                && !hover_state.read(cx).outside_window
+                && (!window.last_input_was_keyboard()
+                    || matches!(caller_mode, HoverListenerMode::InputModalityIndependent));
+            let changed = hover_state.update(cx, |state, cx| {
+                // GPUI reports hover=false during a held mouse down; the passive
+                // move observer maintains pointer location for that interval.
+                if !state.pointer {
+                    let hovered =
+                        *hovered && !state.outside_window && !window.last_input_was_touch();
+                    if state.hovered != hovered {
+                        state.hovered = hovered;
+                        cx.notify();
+                    }
+                }
+                state.native_hovered = *hovered;
+                let changed = state.caller_hovered != caller_hovered;
+                state.caller_hovered = caller_hovered;
+                changed
+            });
+            if changed && let Some(callback) = &callback {
+                callback(&caller_hovered, window, cx);
             }
-        };
-        let weak = pressed.downgrade();
-        // A window exit must clear a held press even after the pointer has left
-        // the button. Its non-occluding hitbox only locates passive touch presses.
-        let touch_enabled = !self.disabled;
+        })
+}
+
+/// The ripple's ink and visibility from the final (caller-refined) style.
+/// Base's opacity scope ends after child.paint, so apply the same local
+/// multiplier to the overlay (ancestor opacity remains in Window).
+fn ripple_ink(painted: &Style, fg: Rgba) -> (Rgba, bool) {
+    let mut ink = painted.text.color.map(Rgba::from).unwrap_or(fg);
+    ink.a *= painted.opacity.unwrap_or(1.);
+    let visible = painted.visibility == Visibility::Visible;
+    if !visible {
+        ink.a = 0.;
+    }
+    (ink, visible)
+}
+
+impl RenderOnce for MaterialButton {
+    fn render(mut self, window: &mut Window, cx: &mut App) -> impl IntoElement {
+        use gpui_base::StyledExt;
+        let loading = self.loading.as_ref().is_some_and(|(visible, _)| *visible);
+        let show_progress = loading || self.progress_visible();
+        self.disabled |= loading;
+        self.record_transition_inputs(cx);
+        // `disabled()` already set Base; loading additionally disables it.
+        self.base = self.base.disabled(self.disabled).busy(loading);
+        let (progress_playback, progress_opacity) = self.sample_progress(loading, window, cx);
+        #[cfg(test)]
+        if let Some(observer) = &self.progress_opacity_observer {
+            observer.set(progress_opacity);
+        }
+        let g = self.size.geometry();
+        let ty = g.typography.scale();
+        let colors = self.sample_colors(window, cx);
+        let interaction = self.resolve_interaction(window, cx);
+        let effects = self.sample_effects(&interaction, window, cx);
+        let (left_padding, right_padding) = horizontal_padding(
+            self.size,
+            self.variant,
+            self.icon.as_ref().map(|_| self.icon_position),
+            self.direction,
+        );
+        let progress = progress_playback
+            .as_ref()
+            .filter(|_| show_progress)
+            .map(|playback| (playback, progress_opacity));
+        let (leading, trailing) = self.slots(loading, progress, colors.disabled_icon, cx);
+        let Interaction { focus, pressed, .. } = interaction;
         let expanded_target = matches!(self.size, ButtonSize::ExtraSmall | ButtonSize::Small);
         // Capture the actual Base border box during its prepaint. A positioned
         // child has padding-box geometry, so it cannot independently reconstruct
         // the target when callers supply asymmetric borders.
         let target_geometry = hit_target::SharedTarget::default();
-        let target_reader = target_geometry.clone();
-        let exit_observer = canvas(
-            move |bounds, window, _| {
-                target_reader
-                    .get()
-                    .unwrap_or_else(|| hit_target::ResolvedTarget::new(bounds, None, window))
-                    .insert(window)
-            },
-            move |_, hitbox, window, _| {
-                let moving_hitbox = hitbox.clone();
-                let touch = weak.clone();
-                window.observe_touch_event(move |event, window, cx| match event.phase {
-                    TouchPhase::Started
-                        if touch_enabled && hitbox.is_hovered_at(event.position, window) =>
-                    {
-                        let _ = touch.update(cx, |state, cx| {
-                            state.pointer = true;
-                            state.hovered = false;
-                            state.outside_window = false;
-                            cx.notify();
-                        });
-                    }
-                    TouchPhase::Ended | TouchPhase::Cancelled => {
-                        let _ = touch.update(cx, |state, cx| {
-                            if state.pointer {
-                                state.pointer = false;
-                                state.hovered = false;
-                                cx.notify();
-                            }
-                        });
-                    }
-                    _ => {}
-                });
-                let moving = weak.clone();
-                window.on_mouse_event(move |event: &MouseMoveEvent, phase, window, cx| {
-                    if phase == DispatchPhase::Capture {
-                        let _ = moving.update(cx, |state, cx| {
-                            if state.pointer || state.outside_window {
-                                state.outside_window = false;
-                                let hovered = moving_hitbox.is_hovered_at(event.position, window)
-                                    && !window.last_input_was_touch();
-                                if state.hovered != hovered {
-                                    state.hovered = hovered;
-                                    cx.notify();
-                                }
-                            }
-                        });
-                    }
-                });
-                window.on_mouse_event(move |_: &MouseExitEvent, phase, _, cx| {
-                    if phase == DispatchPhase::Capture {
-                        let _ = weak.update(cx, |state, cx| {
-                            // A deferred native hover check can still see the last
-                            // in-window mouse position after exit. Keep it suppressed
-                            // until an actual pointer event enters the window again.
-                            state.outside_window = true;
-                            if state.pointer || state.hovered {
-                                state.hovered = false;
-                                state.pointer = false;
-                                cx.notify();
-                            }
-                        });
-                    }
-                });
-            },
-        )
-        .absolute()
-        .size_full();
         let target_writer = target_geometry.clone();
         let base = self
             .base
@@ -1042,57 +1209,21 @@ impl RenderOnce for MaterialButton {
             .children(leading)
             .children(self.children)
             .children(trailing)
-            .child(exit_observer);
+            .child(pointer_observer(
+                &pressed,
+                !self.disabled,
+                target_geometry.clone(),
+            ));
         let base = observe_press(base, &pressed, &focus, self.disabled, self.focusable);
-        let hover_state = pressed.clone();
-        let callback = self.hover_callback;
-        let caller_mode = self.caller_hover_mode;
-        // CSS :hover is independent of keyboard modality. Preserve the caller's
-        // GPUI modality preference separately, sharing the one native listener.
-        if let Some(callback) = callback.clone() {
-            let caller_hovered = pressed.read(cx).native_hovered
-                && !pressed.read(cx).outside_window
-                && (!window.last_input_was_keyboard()
-                    || matches!(caller_mode, HoverListenerMode::InputModalityIndependent));
-            if caller_hovered != pressed.read(cx).caller_hovered {
-                pressed.update(cx, |state, _| state.caller_hovered = caller_hovered);
-                let weak = pressed.downgrade();
-                window.defer(cx, move |window, cx| {
-                    if let Some(state) = weak.upgrade()
-                        && state.read(cx).caller_hovered == caller_hovered
-                    {
-                        callback(&caller_hovered, window, cx);
-                    }
-                });
-            }
-        }
-        let base = base
-            .hover_listener_mode(HoverListenerMode::InputModalityIndependent)
-            .on_hover(move |hovered, window, cx| {
-                let caller_hovered = *hovered
-                    && !hover_state.read(cx).outside_window
-                    && (!window.last_input_was_keyboard()
-                        || matches!(caller_mode, HoverListenerMode::InputModalityIndependent));
-                let changed = hover_state.update(cx, |state, cx| {
-                    // GPUI reports hover=false during a held mouse down; the passive
-                    // move observer maintains pointer location for that interval.
-                    if !state.pointer {
-                        let hovered =
-                            *hovered && !state.outside_window && !window.last_input_was_touch();
-                        if state.hovered != hovered {
-                            state.hovered = hovered;
-                            cx.notify();
-                        }
-                    }
-                    state.native_hovered = *hovered;
-                    let changed = state.caller_hovered != caller_hovered;
-                    state.caller_hovered = caller_hovered;
-                    changed
-                });
-                if changed && let Some(callback) = &callback {
-                    callback(&caller_hovered, window, cx);
-                }
-            });
+        let base = bridge_hover(
+            base,
+            &pressed,
+            self.hover_callback,
+            self.caller_hover_mode,
+            window,
+            cx,
+        );
+        let SampledColors { bg, fg, border, .. } = colors;
         let mut base = base
             .flex()
             .flex_row()
@@ -1107,8 +1238,8 @@ impl RenderOnce for MaterialButton {
             .pl(rem(left_padding))
             .pr(rem(right_padding))
             .gap(rem(g.gap))
-            .rounded(rem(radius))
-            .bg(state::layer(bg, fg, opacity))
+            .rounded(rem(effects.radius))
+            .bg(state::layer(bg, fg, effects.opacity))
             .text_color(fg)
             .font_family(ty.font_family)
             .text_size(ty.font_size)
@@ -1117,19 +1248,12 @@ impl RenderOnce for MaterialButton {
             .when(self.variant == ButtonVariant::Outlined, |b| {
                 b.border(rem(g.outline)).border_color(border)
             })
-            .shadow(shadows.into_shadows())
+            .shadow(effects.shadows.into_shadows())
             .when(!self.disabled, |b| b.cursor_pointer())
             .refine_style(&self.style);
         let mut painted_style = Style::default();
         painted_style.refine(base.style());
-        let mut ripple_color = painted_style.text.color.map(Rgba::from).unwrap_or(fg);
-        // Base's opacity scope ends after child.paint; apply the same local
-        // multiplier to the overlay (ancestor opacity remains in Window).
-        ripple_color.a *= painted_style.opacity.unwrap_or(1.);
-        let ripple_visible = painted_style.visibility == Visibility::Visible;
-        if !ripple_visible {
-            ripple_color.a = 0.;
-        }
+        let (ripple_color, ripple_visible) = ripple_ink(&painted_style, fg);
         let base = ripple::ButtonRipple::new(
             base,
             self.id,
@@ -1142,7 +1266,12 @@ impl RenderOnce for MaterialButton {
             cx,
         )
         .hit_target(target_geometry);
-        focus_ring::ButtonFocusRing::new(base, focus, !self.disabled && self.focusable, rem(radius))
+        focus_ring::ButtonFocusRing::new(
+            base,
+            focus,
+            !self.disabled && self.focusable,
+            rem(effects.radius),
+        )
     }
 }
 /// Convenience constructor with caller-supplied content and activation.
