@@ -5,12 +5,13 @@
   "upstream": {
     "repository": "https://github.com/longbridge/gpui-kit",
     "commit": "bb85882e1faab845d9e7be33b69a152879a90f69",
-    "local_checkout": "/tmp/gpui-material-kit-reference"
+    "vendored_path": "vendor/gpui-kit"
   },
   "symbols": {
     "repository": "https://github.com/mizorewww/gpui-material-symbols",
     "local_path": "../gpui-material-symbols",
-    "inspected_commit": "8055339faa9e75d1457da4936755bcebaf9d84fd"
+    "inspected_commit": "593aa15a46076f3e2870c23c0e4fd79f94f105bd",
+    "pinned_by": "crates/material/Cargo.toml"
   },
   "reviewers": [
     "button_loading_audit: components",
@@ -20,7 +21,7 @@
   "items": [
     {
       "id": "kit-bootstrap",
-      "disposition": "replace-after-integration",
+      "disposition": "done",
       "priority": "P0",
       "local_paths": [
         "crates/material/examples/gallery.rs",
@@ -31,15 +32,15 @@
         "crates/kit/src/lib.rs"
       ],
       "action": "Use gpui_kit::application/init/open_window; remove direct Base initialization and manual Root construction.",
-      "conditions": "Keep capture/profiler setup and one Root; verify overlay initialization and native/Web entry points."
+      "conditions": "Keep capture/profiler setup and one Root; verify overlay initialization and native/Web entry points.",
+      "status": "Native gallery starts with gpui_kit::application() (examples/gallery.rs) and gallery::run calls gpui_kit::init and gpui_kit::open_window (examples/gallery/mod.rs); the WASM gallery enters through gpui_kit::platform::web_init/single_threaded_web (crates/gallery-web/src/lib.rs)."
     },
     {
       "id": "material-icons",
       "disposition": "replace-after-integration",
       "priority": "P0",
       "local_paths": [
-        "crates/material/src/icons.rs",
-        "crates/material/assets/icons"
+        "crates/material/src/icons.rs"
       ],
       "upstream_paths": [
         "crates/component/src/icon.rs"
@@ -63,14 +64,15 @@
     },
     {
       "id": "symbols-consumer-dependency",
-      "disposition": "restructure",
+      "disposition": "done",
       "priority": "P0",
       "local_paths": [
         "../gpui-material-symbols/Cargo.toml"
       ],
       "upstream_paths": [],
       "action": "Move the Material browser consumer into a separate workspace package in the Symbols repository.",
-      "conditions": "Keep Symbols core acyclic when Material depends on it; preserve Kit integration and consumer capabilities."
+      "conditions": "Keep Symbols core acyclic when Material depends on it; preserve Kit integration and consumer capabilities.",
+      "status": "Symbols d73f27c moved the Material browser into its own workspace member (browser/); the Symbols core package no longer depends on Material. Material pins Symbols 593aa15."
     },
     {
       "id": "story-gallery",
@@ -301,6 +303,114 @@
       ],
       "action": "Reuse Settings organization and real RadioGroup semantics for radio choices; keep only Material connected layout.",
       "conditions": "ListItem selected/on_click is not a substitute for complete button/radio keyboard and accessibility behavior."
+    },
+    {
+      "id": "progress-indicators",
+      "disposition": "retain-material-renderer",
+      "priority": "P1",
+      "local_paths": [
+        "crates/material/src/components/progress.rs",
+        "crates/material/src/components/progress/circular.rs"
+      ],
+      "upstream_paths": [
+        "crates/component/src/spinner.rs",
+        "crates/component/src/progress/progress.rs",
+        "crates/component/src/progress/progress_circle.rs"
+      ],
+      "action": "Keep Material linear/circular progress and spinner renderers; reuse Base Progress semantics (gpui_base::Progress value/indeterminate/accessibility_label) where they meet the contract.",
+      "conditions": "Component Progress paints one bar color with its track at opacity(0.2), Size-derived 4-10px pill heights and a fixed 1s ease_in_out single-segment sweep (static 32.5% insets under reduced motion); M3 needs a secondary-container track, a 4px indicator/track gap, an end stop dot and the reference sweep timing. ProgressCircle strokes min(15% of width, 5px), sizes from Size (size_2..size_5) and animates a 1s ease_in_out arc; the reference circular frames, stroke geometry and caller-owned playback that survives virtual unmounting are not available. Spinner rotates a Lucide Loader icon at 0.8s with no external playback handle; Material uses Material Symbols and RepeatAnimationPlayback."
+    },
+    {
+      "id": "divider",
+      "disposition": "retain-material-renderer",
+      "priority": "P2",
+      "local_paths": [
+        "crates/material/src/components/divider.rs"
+      ],
+      "upstream_paths": [
+        "crates/component/src/separator.rs"
+      ],
+      "action": "Keep MaterialDivider; Separator is not a styling adapter target for it.",
+      "conditions": "Separator draws a fixed 1px absolute line (solid or 4/2 dashed) in theme.border with an optional centred text label; it has no full-width/inset/middle-inset variants, logical start/end insets with RTL direction, list/card context margins, configurable thickness or ColorRole (OUTLINE_VARIANT) binding that the pinned md3.io divider fixture requires."
+    },
+    {
+      "id": "focus-ring",
+      "disposition": "retain-pending-hook",
+      "priority": "P1",
+      "local_paths": [
+        "crates/material/src/components/focus.rs"
+      ],
+      "upstream_paths": [
+        "crates/component/src/styled.rs",
+        "crates/base/src/component_traits.rs"
+      ],
+      "action": "Use FocusableExt::focus_ring to suppress Component rings on wrapped Kit controls; keep FocusRing for composed controls whose focus handle is internal.",
+      "conditions": "ThemeStyled::focus_ring_style is crate-private styling applied by a control from its own focus state: a 3px theme.ring band at 0.5 alpha outside the border (or a 1px line when Theme::focus_ring is off). It cannot observe a descendant's focus. FocusRing tracks a non-tab-stop container and resolves contains_focused after commit, painting a Material ColorRole::INK outline; FocusableExt only toggles a control's own ring."
+    },
+    {
+      "id": "vendor-gpui-fast",
+      "disposition": "retain-pending-equivalence",
+      "priority": "P0",
+      "local_paths": [
+        "vendor/gpui-fast"
+      ],
+      "upstream_paths": [
+        "Cargo.toml"
+      ],
+      "action": "Keep the vendored gpui-fast 0.1.12 (default backend) with the gpui-pre compatibility patches carried forward; see its MATERIAL-MIGRATION.json.",
+      "conditions": "Preserves raw touch observers and extended hitboxes through retained/scroll replay, full CPU profiler scopes, repeat playback, detailed text and font invalidation. Kit selects unpatched crates.io gpui-fast; remove only after each patch has an upstream equivalent and the regressions pass."
+    },
+    {
+      "id": "vendor-gpui-fast-apple",
+      "disposition": "retain-pending-equivalence",
+      "priority": "P0",
+      "local_paths": [
+        "vendor/gpui-fast-apple"
+      ],
+      "upstream_paths": [
+        "Cargo.toml"
+      ],
+      "action": "Keep merged detailed-layout text system, OpenType and Metal presentation patches; see its MATERIAL-MIGRATION.json.",
+      "conditions": "draw_with_status reports real command-buffer submission and drains autoreleased Metal objects per draw. Required for frame-submission evidence; verify against the published crate before removal."
+    },
+    {
+      "id": "vendor-gpui-fast-web",
+      "disposition": "retain-pending-equivalence",
+      "priority": "P0",
+      "local_paths": [
+        "vendor/gpui-fast-web"
+      ],
+      "upstream_paths": [
+        "Cargo.toml"
+      ],
+      "action": "Keep the canvas-size/DPR patches merged from gpui-pre-web; see its MATERIAL-MIGRATION.json.",
+      "conditions": "Backing-store sizing across DPR and viewport changes is validated by scripts/check-gallery-dpr.py; repeat that check before replacing."
+    },
+    {
+      "id": "vendor-gpui-fast-macos",
+      "disposition": "retain-pending-equivalence",
+      "priority": "P0",
+      "local_paths": [
+        "vendor/gpui-fast-macos"
+      ],
+      "upstream_paths": [
+        "Cargo.toml"
+      ],
+      "action": "Keep presentation-synchronization control, the weak-owner demand waker and renderer-outcome submission counting; see MATERIAL-PATCHES.md and SOURCE.json.",
+      "conditions": "The >=500 FPS scroll gate counts only successful newly drawn submissions with vertical sync disabled; the published crate cannot report or disable this. Does not guarantee a target FPS."
+    },
+    {
+      "id": "vendor-gpui-pre-macos",
+      "disposition": "retain-pending-equivalence",
+      "priority": "P1",
+      "local_paths": [
+        "vendor/gpui-pre-macos"
+      ],
+      "upstream_paths": [
+        "Cargo.toml"
+      ],
+      "action": "Keep the same presentation patches for the upstream comparison backend (--no-default-features); see MATERIAL-PATCHES.md and SOURCE.json.",
+      "conditions": "Needed so gpui-pre and gpui-fast measurements use the same submission accounting; Symbols must patch it too so one engine is shared."
     }
   ],
   "runtime_migration_status": "pending",
