@@ -193,14 +193,14 @@ pub(crate) mod test_rings {
     pub(crate) fn cell(key: String) -> Ring {
         RINGS.with(|rings| rings.borrow_mut().entry(key).or_default().clone())
     }
-    /// The ring painted for the button whose id's debug form contains `part`.
+    /// The ring painted for a button whose id's debug form contains `part`.
     pub(crate) fn painted(part: &str) -> Option<Bounds<Pixels>> {
         RINGS.with(|rings| {
             rings
                 .borrow()
                 .iter()
-                .find(|(key, _)| key.contains(part))
-                .and_then(|(_, ring)| ring.get())
+                .filter(|(key, _)| key.contains(part))
+                .find_map(|(_, ring)| ring.get())
         })
     }
 }

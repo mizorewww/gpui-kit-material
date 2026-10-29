@@ -26,7 +26,7 @@ mod title_bar;
 
 pub use button_group::ConnectedButtonGroup;
 pub use caption::{Caption, CaptionButton, CaptionButtons, CaptionLabels, title_bar_control};
-pub use choice::{ChoiceTile, Tint, choice_radio, tinted_icon};
+pub use choice::{ChoiceGroup, ChoiceTile, Tint, choice_radio, tinted_icon};
 pub use feedback::{
     AssistChip, BADGE_CONTAINER, BADGE_LABEL, BadgeKind, CARD_PADDING, CHIP_HEIGHT, CardVariant,
     LARGE_BADGE_PADDING, LARGE_BADGE_SIZE, NoticeKind, SMALL_BADGE_SIZE, Snackbar, StatusKind,
@@ -54,4 +54,5 @@ pub use title_bar::{
 
 pub(crate) fn init(cx: &mut gpui::App) {
     button_group::init(cx);
+    choice::init(cx);
 }
