@@ -43,7 +43,8 @@ pub fn list_tile(index: usize, count: usize) -> Div {
 /// settings read one step larger than denser option panels.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum TileScale {
-    /// Settings pages: 17px labels over 14px supporting text.
+    /// Settings pages: body-large (16px) labels over 14px supporting text,
+    /// the M3 list item headline and supporting roles.
     Regular,
     /// Denser panels: 16px labels over 13px supporting text.
     Compact,
@@ -52,7 +53,7 @@ pub enum TileScale {
 impl TileScale {
     pub fn label_size(self) -> Rems {
         match self {
-            TileScale::Regular => TEXT_TILE_LABEL,
+            TileScale::Regular => TypeRole::BodyLarge.scale().font_size,
             TileScale::Compact => rem(16.),
         }
     }
@@ -92,7 +93,7 @@ impl TileScale {
             .text_size(self.label_size())
             .line_height(self.label_line_height())
             .font_weight(gpui::FontWeight::MEDIUM)
-            .text_color(color(ColorRole::INK))
+            .text_color(color(ColorRole::ON_SURFACE))
     }
 
     /// Supporting text under a tile's label, regular gray.
@@ -108,7 +109,7 @@ impl TileScale {
             .text_size(self.support_size())
             .line_height(self.support_line_height())
             .font_weight(gpui::FontWeight::NORMAL)
-            .text_color(color(ColorRole::GRAY))
+            .text_color(color(ColorRole::ON_SURFACE_VARIANT))
     }
 
     /// One content tile of a connected group at this scale: the surface,
@@ -309,16 +310,8 @@ mod tile_group {
         fn render(self, _: &mut Window, _: &mut App) -> impl IntoElement {
             let count = self.tiles.len();
             let scale = self.scale;
-            let mut group = v_flex()
-                .w_full()
-                .min_w_0()
-                .flex_shrink_0()
-                .gap(TILE_GAP)
-                .child(
-                    super::super::section_title(self.id, self.title)
-                        .px(ITEM_INSET)
-                        .mb(SECTION_TITLE_GAP - TILE_GAP),
-                );
+            let title = super::super::section_title(self.id, self.title).px(ITEM_INSET);
+            let mut group = v_flex().w_full().min_w_0().gap(TILE_GAP);
             for (index, tile) in self.tiles.into_iter().enumerate() {
                 let first = index == 0;
                 let last = index + 1 == count;
@@ -355,7 +348,15 @@ mod tile_group {
                 };
                 group = group.child(element);
             }
-            group
+            // The title's gap follows its text, so it is in rems; the tiles
+            // keep their dp ground between them.
+            v_flex()
+                .w_full()
+                .min_w_0()
+                .flex_shrink_0()
+                .gap(SECTION_TITLE_SPACE)
+                .child(title)
+                .child(group)
         }
     }
 }
@@ -377,7 +378,7 @@ pub fn tile_info(id: impl Into<ElementId>, text: impl Into<SharedString>) -> Div
                     IconName::Info
                         .icon()
                         .size(rem(18.))
-                        .color(color(ColorRole::GRAY)),
+                        .color(color(ColorRole::ON_SURFACE_VARIANT)),
                 ),
         )
         .child(TileScale::Regular.support(id, text).flex_1())
@@ -388,7 +389,7 @@ pub fn tile_chevron() -> Icon {
     IconName::ChevronRight
         .icon()
         .size(rem(20.))
-        .color(color(ColorRole::GRAY))
+        .color(color(ColorRole::ON_SURFACE_VARIANT))
 }
 
 /// The chevron of an in-place disclosure; it turns over when open.
@@ -400,7 +401,7 @@ pub fn disclosure_chevron(open: bool) -> Icon {
     }
     .icon()
     .size(rem(20.))
-    .color(color(ColorRole::GRAY))
+    .color(color(ColorRole::ON_SURFACE_VARIANT))
 }
 
 #[cfg(test)]
@@ -449,6 +450,40 @@ mod tests {
         });
         draw(cx);
         assert_eq!(test_rings::painted("ring-tile"), Some(tile.inset(px(3.))));
+    }
+
+    struct GroupHarness;
+    impl Render for GroupHarness {
+        fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+            window.set_rem_size(px(21.));
+            div().w(px(300.)).debug_selector(|| "group".into()).child(
+                TileGroup::new("group-title", "Title")
+                    .child(div().h(px(30.)).debug_selector(|| "first".into()))
+                    .child(div().h(px(30.)).debug_selector(|| "second".into())),
+            )
+        }
+    }
+
+    #[gpui::test]
+    fn the_title_gap_follows_the_text_scale_and_tiles_keep_their_ground(cx: &mut TestAppContext) {
+        let (_, cx) = cx.add_window_view(|_, _| GroupHarness);
+        draw(cx);
+        let group = cx.debug_bounds("group").unwrap();
+        let first = cx.debug_bounds("first").unwrap();
+        let second = cx.debug_bounds("second").unwrap();
+        // 150% text scale: a 30px title line, then the 15px title gap.
+        assert_eq!(first.top() - group.top(), px(30. + 15.));
+        assert_eq!(second.top() - first.bottom(), TILE_GAP);
+    }
+
+    #[test]
+    fn regular_tile_labels_use_body_large() {
+        assert_eq!(
+            TileScale::Regular.label_size(),
+            TypeRole::BodyLarge.scale().font_size
+        );
+        assert_eq!(TileScale::Regular.label_line_height(), rem(24.));
+        assert_eq!(TileScale::Regular.support_size(), TEXT_SETTINGS_AUX);
     }
 
     #[test]
