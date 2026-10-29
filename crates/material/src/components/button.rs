@@ -1,9 +1,10 @@
 //! Material button presentation over GPUI Base activation and focus behavior.
 //! Reference: floor/material c910072f3fc5b660276731d8a935d7186f288364.
-//! Ripple, animated state transitions, expanded touch targets and toggle/loading
+//! Ripple, animated color/state layers, expanded touch targets and toggle/loading
 //! semantics are still pending; this module does not establish full conformance.
 use crate::{
     color::ColorRole,
+    motion::{self, MotionToken},
     theme::color,
     tokens::typography::{TypeRole, rem},
 };
@@ -187,9 +188,126 @@ fn elevation(level: u8) -> Vec<BoxShadow> {
     }
 }
 
+/// Passive visual state. Base remains the only activation authority.
+struct PressState {
+    pointer: bool,
+    keyboard: bool,
+    focus: FocusHandle,
+    focus_out: Option<Subscription>,
+    _activation: Subscription,
+}
+fn clear_press(state: &mut PressState) {
+    state.pointer = false;
+    state.keyboard = false;
+}
+fn press_state(
+    id: ElementId,
+    focus: &FocusHandle,
+    window: &mut Window,
+    cx: &mut App,
+) -> Entity<PressState> {
+    let state = window.use_keyed_state((id, "material-press"), cx, |window, cx| {
+        let activation =
+            cx.observe_window_activation(window, |state: &mut PressState, window, cx| {
+                if !window.is_window_active() {
+                    clear_press(state);
+                    cx.notify();
+                }
+            });
+        PressState {
+            pointer: false,
+            keyboard: false,
+            focus: focus.clone(),
+            focus_out: None,
+            _activation: activation,
+        }
+    });
+    if state.read(cx).focus_out.is_none() || state.read(cx).focus != *focus {
+        let weak = state.downgrade();
+        let subscription = window.on_focus_out(focus, cx, move |_, _, cx| {
+            let _ = weak.update(cx, |state, cx| {
+                state.keyboard = false;
+                cx.notify();
+            });
+        });
+        state.update(cx, |state, _| {
+            state.keyboard = false;
+            state.focus = focus.clone();
+            state.focus_out = Some(subscription);
+        });
+    }
+    state
+}
+fn observe_press(
+    mut base: gpui_base::Button,
+    state: &Entity<PressState>,
+    focus: &FocusHandle,
+    disabled: bool,
+    focusable: bool,
+) -> gpui_base::Button {
+    if disabled {
+        return base;
+    }
+    let down = state.clone();
+    base = base.on_mouse_down(MouseButton::Left, move |_, window, cx| {
+        if !window.default_prevented() {
+            down.update(cx, |state, cx| {
+                state.pointer = true;
+                cx.notify();
+            });
+        }
+    });
+    let up = state.clone();
+    let out = state.clone();
+    base = base
+        .on_mouse_up(MouseButton::Left, move |_, _, cx| {
+            up.update(cx, |state, cx| {
+                state.pointer = false;
+                cx.notify();
+            });
+        })
+        .on_mouse_up_out(MouseButton::Left, move |_, _, cx| {
+            out.update(cx, |state, cx| {
+                state.pointer = false;
+                cx.notify();
+            });
+        });
+    if focusable {
+        let down = state.clone();
+        let up = state.clone();
+        let focus = focus.clone();
+        base = base
+            .on_key_down(move |event, window, cx| {
+                let stroke = &event.keystroke;
+                let pressed = !window.default_prevented()
+                    && focus.is_focused(window)
+                    && !stroke.modifiers.modified()
+                    && matches!(stroke.key.as_str(), "enter" | "space");
+                down.update(cx, |state, cx| {
+                    state.keyboard = pressed;
+                    cx.notify();
+                });
+            })
+            .on_key_up(move |event, _, cx| {
+                if matches!(event.keystroke.key.as_str(), "enter" | "space") {
+                    up.update(cx, |state, cx| {
+                        state.keyboard = false;
+                        cx.notify();
+                    });
+                }
+            });
+    }
+    base
+}
+
 /// Sized, shaped Material presentation; activation, keyboard and focus stay in Base.
 #[derive(IntoElement)]
 pub struct MaterialButton {
+    #[cfg(test)]
+    radius_observer: Option<std::rc::Rc<std::cell::Cell<f32>>>,
+    id: ElementId,
+    focus_handle: Option<FocusHandle>,
+    focusable: bool,
     base: gpui_base::Button,
     variant: ButtonVariant,
     size: ButtonSize,
@@ -199,7 +317,13 @@ pub struct MaterialButton {
 }
 impl MaterialButton {
     pub fn new(id: impl Into<ElementId>) -> Self {
+        let id = id.into();
         Self {
+            #[cfg(test)]
+            radius_observer: None,
+            id: id.clone(),
+            focus_handle: None,
+            focusable: true,
             base: gpui_base::Button::new(id),
             variant: ButtonVariant::Filled,
             size: ButtonSize::Small,
@@ -237,6 +361,7 @@ impl MaterialButton {
         self
     }
     pub fn track_focus(mut self, handle: &FocusHandle) -> Self {
+        self.focus_handle = Some(handle.clone());
         self.base = self.base.track_focus(handle);
         self
     }
@@ -249,6 +374,7 @@ impl MaterialButton {
         self
     }
     pub fn focusable(mut self, focusable: bool) -> Self {
+        self.focusable = focusable;
         self.base = self.base.focusable(focusable);
         self
     }
@@ -270,7 +396,7 @@ impl InteractiveElement for MaterialButton {
 }
 impl StatefulInteractiveElement for MaterialButton {}
 impl RenderOnce for MaterialButton {
-    fn render(self, _: &mut Window, _: &mut App) -> impl IntoElement {
+    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         use gpui_base::StyledExt;
         let g = self.size.geometry();
         let ty = g.typography.scale();
@@ -280,6 +406,38 @@ impl RenderOnce for MaterialButton {
         } else {
             g.square
         };
+        let focus = self.focus_handle.unwrap_or_else(|| {
+            window
+                .use_keyed_state((self.id.clone(), "material-focus"), cx, |_, cx| {
+                    cx.focus_handle()
+                })
+                .read(cx)
+                .clone()
+        });
+        let pressed = press_state(self.id.clone(), &focus, window, cx);
+        if self.disabled || !self.focusable || !focus.is_focused(window) {
+            pressed.update(cx, |state, _| {
+                if self.disabled {
+                    state.pointer = false;
+                }
+                state.keyboard = false;
+            });
+        }
+        let radius = motion::token_value(
+            (self.id.clone(), "pressed-radius"),
+            if pressed.read(cx).pointer || pressed.read(cx).keyboard {
+                g.pressed
+            } else {
+                radius
+            },
+            MotionToken::FastSpatial,
+            window,
+            cx,
+        );
+        #[cfg(test)]
+        if let Some(observer) = &self.radius_observer {
+            observer.set(radius);
+        }
         let padding = if self.variant == ButtonVariant::Text
             && matches!(self.size, ButtonSize::ExtraSmall | ButtonSize::Small)
         {
@@ -297,8 +455,29 @@ impl RenderOnce for MaterialButton {
             ButtonVariant::Filled | ButtonVariant::Tonal => 1,
             _ => 0,
         };
-        self.base
-            .flex()
+        let weak = pressed.downgrade();
+        // A window exit must clear a held press even after the pointer has left
+        // the button. This canvas creates no hitbox and never handles activation.
+        let exit_observer = canvas(
+            |_, _, _| (),
+            move |_, _, window, _| {
+                window.on_mouse_event(move |_: &MouseExitEvent, phase, _, cx| {
+                    if phase == DispatchPhase::Capture {
+                        let _ = weak.update(cx, |state, cx| {
+                            if state.pointer {
+                                state.pointer = false;
+                                cx.notify();
+                            }
+                        });
+                    }
+                });
+            },
+        )
+        .absolute()
+        .size_full();
+        let base = self.base.track_focus(&focus).child(exit_observer);
+        let base = observe_press(base, &pressed, &focus, self.disabled, self.focusable);
+        base.flex()
             .flex_row()
             .items_center()
             .justify_center()
@@ -321,11 +500,7 @@ impl RenderOnce for MaterialButton {
                 b.cursor_pointer()
                     .hover(move |s| s.bg(layer(bg, fg, 0.08)).shadow(elevation(hover_level)))
                     .focus_visible(move |s| s.bg(layer(bg, fg, 0.10)))
-                    .active(move |s| {
-                        s.bg(layer(bg, fg, 0.10))
-                            .rounded(rem(g.pressed))
-                            .shadow(elevation(level))
-                    })
+                    .active(move |s| s.bg(layer(bg, fg, 0.10)).shadow(elevation(level)))
             })
             .refine_style(&self.style)
     }
@@ -482,5 +657,221 @@ mod tests {
         }
         draw(cx);
         cx.update(|_, cx| assert_eq!(view.read(cx).activations, 3));
+    }
+    struct MotionHarness {
+        disabled: bool,
+        shown: bool,
+        sample: std::rc::Rc<std::cell::Cell<f32>>,
+        focus: gpui::FocusHandle,
+        other: gpui::FocusHandle,
+        activations: usize,
+    }
+    impl Render for MotionHarness {
+        fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+            window.set_rem_size(px(14.));
+            crate::motion::apply_scheme(crate::motion::MotionScheme::Expressive);
+            let mut button = MaterialButton::new("motion-button")
+                .track_focus(&self.focus)
+                .button_size(ButtonSize::Large)
+                .disabled(self.disabled)
+                .child("Hold")
+                .debug_selector(|| "motion-button".into())
+                .on_click(cx.listener(|this, _, _, _| this.activations += 1));
+            button.radius_observer = Some(self.sample.clone());
+            div()
+                .flex()
+                .gap(px(30.))
+                .children(self.shown.then_some(button))
+                .child(
+                    gpui_base::Button::new("other")
+                        .track_focus(&self.other)
+                        .child("Other"),
+                )
+        }
+    }
+    fn key(cx: &mut VisualTestContext, name: &str, down: bool) {
+        let keystroke =
+            cx.update(|_, cx| gpui::Keystroke::parse_with_os(name, cx.platform_info().os).unwrap());
+        if down {
+            cx.simulate_event(gpui::KeyDownEvent {
+                keystroke,
+                is_held: false,
+                prefer_character_input: false,
+            });
+        } else {
+            cx.simulate_event(gpui::KeyUpEvent { keystroke });
+        }
+    }
+    #[gpui::test]
+    fn press_radius_matches_reference_and_retargets_without_jumps(cx: &mut TestAppContext) {
+        use gpui::{MouseButton, point};
+        use std::{cell::Cell, rc::Rc, time::Duration};
+        cx.update(gpui_base::init);
+        let sample = Rc::new(Cell::new(0.));
+        let (_, cx) = cx.add_window_view({
+            let sample = sample.clone();
+            move |_, cx| MotionHarness {
+                disabled: false,
+                shown: true,
+                sample,
+                focus: cx.focus_handle(),
+                other: cx.focus_handle(),
+                activations: 0,
+            }
+        });
+        draw(cx);
+        let center = cx.debug_bounds("motion-button").unwrap().center();
+        assert_eq!(sample.get(), 48.);
+        cx.simulate_mouse_down(center, MouseButton::Left, Modifiers::default());
+        draw(cx);
+        assert_eq!(sample.get(), 48.);
+        cx.executor().advance_clock(Duration::from_millis(100));
+        draw(cx);
+        let expected = 48.
+            + (16. - 48.)
+                * crate::motion::MotionScheme::Expressive
+                    .resolve(crate::motion::MotionToken::FastSpatial)
+                    .ease()(0.1 / 0.425);
+        assert!((sample.get() - expected).abs() < 0.001);
+        let before = sample.get();
+        cx.simulate_mouse_move(
+            center + point(px(1.), px(1.)),
+            MouseButton::Left,
+            Modifiers::default(),
+        );
+        draw(cx);
+        assert!(
+            (sample.get() - before).abs() < 0.001,
+            "held move must not release"
+        );
+        cx.simulate_mouse_up(
+            point(px(900.), px(800.)),
+            MouseButton::Left,
+            Modifiers::default(),
+        );
+        draw(cx);
+        assert!(
+            (sample.get() - before).abs() < 0.001,
+            "release must retarget continuously"
+        );
+        cx.executor().advance_clock(Duration::from_secs(1));
+        draw(cx);
+        assert_eq!(sample.get(), 48.);
+        cx.update(|_, cx| cx.set_reduce_motion(true));
+        cx.simulate_mouse_down(center, MouseButton::Left, Modifiers::default());
+        draw(cx);
+        assert_eq!(sample.get(), 16.);
+        cx.simulate_mouse_up(center, MouseButton::Left, Modifiers::default());
+        draw(cx);
+        assert_eq!(sample.get(), 48.);
+        cx.simulate_mouse_down(center, MouseButton::Left, Modifiers::default());
+        draw(cx);
+        cx.simulate_mouse_move(
+            point(px(900.), px(800.)),
+            MouseButton::Left,
+            Modifiers::default(),
+        );
+        draw(cx);
+        assert_eq!(sample.get(), 16.);
+        cx.simulate_event(gpui::MouseExitEvent {
+            position: point(px(1200.), px(1000.)),
+            pressed_button: Some(MouseButton::Left),
+            modifiers: Modifiers::default(),
+        });
+        draw(cx);
+        assert_eq!(
+            sample.get(),
+            48.,
+            "leaving window after moving outside must clear press"
+        );
+    }
+    #[gpui::test]
+    fn pressed_visuals_clear_on_blur_disable_and_remount(cx: &mut TestAppContext) {
+        use gpui::MouseButton;
+        use std::{cell::Cell, rc::Rc};
+        cx.update(|cx| {
+            gpui_base::init(cx);
+            cx.set_reduce_motion(true);
+        });
+        let sample = Rc::new(Cell::new(0.));
+        let (view, cx) = cx.add_window_view({
+            let sample = sample.clone();
+            move |_, cx| MotionHarness {
+                disabled: false,
+                shown: true,
+                sample,
+                focus: cx.focus_handle(),
+                other: cx.focus_handle(),
+                activations: 0,
+            }
+        });
+        draw(cx);
+        cx.update(|window, cx| {
+            let handle = view.read(cx).focus.clone();
+            window.focus(&handle, cx);
+        });
+        draw(cx);
+        key(cx, "space", true);
+        draw(cx);
+        assert_eq!(sample.get(), 16.);
+        key(cx, "a", false);
+        draw(cx);
+        assert_eq!(
+            sample.get(),
+            16.,
+            "unrelated key release does not release Space"
+        );
+        cx.update(|window, cx| {
+            let handle = view.read(cx).other.clone();
+            window.focus(&handle, cx);
+        });
+        draw(cx);
+        assert_eq!(sample.get(), 48.);
+        cx.update(|window, cx| {
+            let handle = view.read(cx).focus.clone();
+            window.focus(&handle, cx);
+        });
+        draw(cx);
+        key(cx, "space", false);
+        draw(cx);
+        cx.update(|_, cx| assert_eq!(view.read(cx).activations, 0));
+        key(cx, "space", true);
+        draw(cx);
+        view.update(cx, |this, cx| {
+            this.disabled = true;
+            cx.notify();
+        });
+        draw(cx);
+        assert_eq!(sample.get(), 48.);
+        key(cx, "space", false);
+        view.update(cx, |this, cx| {
+            this.disabled = false;
+            cx.notify();
+        });
+        draw(cx);
+        let center = cx.debug_bounds("motion-button").unwrap().center();
+        cx.simulate_mouse_down(center, MouseButton::Left, Modifiers::default());
+        draw(cx);
+        assert_eq!(sample.get(), 16.);
+        view.update(cx, |this, cx| {
+            this.shown = false;
+            cx.notify();
+        });
+        draw(cx);
+        cx.simulate_mouse_up(center, MouseButton::Left, Modifiers::default());
+        view.update(cx, |this, cx| {
+            this.shown = true;
+            cx.notify();
+        });
+        draw(cx);
+        assert_eq!(sample.get(), 48.);
+        cx.update(|window, _| window.activate_window());
+        cx.run_until_parked();
+        cx.simulate_mouse_down(center, MouseButton::Left, Modifiers::default());
+        draw(cx);
+        assert_eq!(sample.get(), 16.);
+        cx.deactivate_window();
+        draw(cx);
+        assert_eq!(sample.get(), 48., "window deactivation clears a held press");
     }
 }

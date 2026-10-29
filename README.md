@@ -111,7 +111,9 @@ with an explicit `gpui_base::Button` return annotation must update that type.
 Activation, focus binding, keyboard input and disabled behavior remain in Base.
 
 The gallery includes all 50 variant/size/shape combinations and disabled samples.
-This is an intermediate implementation: state transitions, ripple, the external
+Press and release morph the radius with the reference FastSpatial curve, including
+interrupted transitions and reduced-motion handling. This is an intermediate
+implementation: color/state-layer transitions, ripple, the external
 focus ring, expanded touch targets, icon slots, toggle/loading and tracking still
 require implementation and independent visual/motion review.
 
