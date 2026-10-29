@@ -96,6 +96,84 @@ struct RunningCurve {
     running: bool,
 }
 
+impl RunningCurve {
+    fn resolve(self, requested: MotionCurve) -> MotionCurve {
+        if self.running { self.curve } else { requested }
+    }
+    fn record(&mut self, resolved: MotionCurve, status: gpui_base::MotionStatus) {
+        self.curve = resolved;
+        self.running = matches!(
+            status,
+            gpui_base::MotionStatus::Running | gpui_base::MotionStatus::Delayed
+        );
+    }
+}
+
+fn token_policy(resolved: MotionCurve, token: MotionToken) -> gpui_base::Transition {
+    gpui_base::Transition::new(resolved.duration())
+        .ease(resolved.ease())
+        .reduced_motion(match token {
+            MotionToken::FastEffects | MotionToken::DefaultEffects | MotionToken::SlowEffects => {
+                gpui_base::ReducedMotion::Continue
+            }
+            _ => gpui_base::ReducedMotion::Finish,
+        })
+}
+
+/// Caller-owned token channel. Keeps the active curve and Base reversal clock
+/// across virtual unmounts, without retaining a window or scheduling frames.
+#[derive(Clone)]
+pub struct TokenTransitionPlayback<T> {
+    playback: gpui_base::TransitionPlayback<T>,
+    curve: std::rc::Rc<std::cell::Cell<Option<RunningCurve>>>,
+    target: std::rc::Rc<std::cell::RefCell<Option<T>>>,
+}
+impl<T> Default for TokenTransitionPlayback<T> {
+    fn default() -> Self {
+        Self {
+            playback: Default::default(),
+            curve: Default::default(),
+            target: Default::default(),
+        }
+    }
+}
+impl<T: gpui_base::Interpolate + PartialEq + 'static> TokenTransitionPlayback<T> {
+    /// Resample an initialized channel's current visual target, preserving
+    /// transient presentation while applying a motion preference change.
+    pub fn resample(&self, token: MotionToken, cx: &App) -> Option<gpui_base::MotionValue<T>> {
+        let target = self.target.borrow().clone()?;
+        Some(self.sample(target, token, cx))
+    }
+
+    /// Forward actual target/preference changes while unmounted. A channel's
+    /// first sample adopts its target; a fresh handle resets its lifecycle.
+    pub fn sample(&self, target: T, token: MotionToken, cx: &App) -> gpui_base::MotionValue<T> {
+        let requested = curve(token);
+        let mut active = self.curve.get().unwrap_or(RunningCurve {
+            curve: requested,
+            running: false,
+        });
+        // An unmounted channel may have settled without being sampled. Let
+        // Base evaluate its old target before choosing the next target's curve.
+        if active.running
+            && let Some(previous) = self.target.borrow().clone()
+        {
+            let old = self
+                .playback
+                .sample(previous, token_policy(active.curve, token), cx);
+            active.record(active.curve, old.status);
+        }
+        let resolved = active.resolve(requested);
+        *self.target.borrow_mut() = Some(target.clone());
+        let sample = self
+            .playback
+            .sample(target, token_policy(resolved, token), cx);
+        active.record(resolved, sample.status);
+        self.curve.set(Some(active));
+        sample
+    }
+}
+
 /// Follow a target with a semantic token. A scheme switch takes effect after
 /// the active transition (including interruptions) settles, so it cannot
 /// replace the easing underneath GPUI Base's existing transition clock.
@@ -135,31 +213,11 @@ where
         }
     });
     let active = state.read(cx);
-    let resolved = if active.running {
-        active.curve
-    } else {
-        requested
-    };
-    let sample = gpui_base::transition_with_status(
-        id,
-        target,
-        gpui_base::Transition::new(resolved.duration())
-            .ease(resolved.ease())
-            .reduced_motion(match token {
-                MotionToken::FastEffects
-                | MotionToken::DefaultEffects
-                | MotionToken::SlowEffects => gpui_base::ReducedMotion::Continue,
-                _ => gpui_base::ReducedMotion::Finish,
-            }),
-        window,
-        cx,
-    );
+    let resolved = active.resolve(requested);
+    let sample =
+        gpui_base::transition_with_status(id, target, token_policy(resolved, token), window, cx);
     state.update(cx, |state, _| {
-        state.curve = resolved;
-        state.running = matches!(
-            sample.status,
-            gpui_base::MotionStatus::Running | gpui_base::MotionStatus::Delayed
-        );
+        state.record(resolved, sample.status);
     });
     sample.value
 }

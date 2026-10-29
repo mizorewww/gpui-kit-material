@@ -176,6 +176,14 @@ similarly retains only the indicator clock and its reduced-motion stop state.
 These handles do not preserve transient pointer or focus state, nor rendered
 subtrees. A new handle explicitly starts a new logical playback.
 
+`ButtonTransitionPlayback` retains the button's color, shape, elevation and
+state-layer channels. Its token channels combine the same Base sampler with
+Material's active motion curve; a completed offscreen transition is settled
+before selecting the next target's curve. Visible buttons record actual inputs
+without applying a second resting target. Owners synchronize controlled inputs
+for unmounted buttons, after determining which rows participated in layout.
+Progress playback remains a separate handle for the indicator lifecycle.
+
 **No locale.** The kit ships no translated strings. Components that need
 accessible names (e.g. `CaptionLabels`) take them from the application.
 

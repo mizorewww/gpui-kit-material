@@ -4,6 +4,8 @@
 #[cfg(test)]
 mod active_tests;
 mod control;
+mod playback;
+pub use playback::{ButtonTransitionInputs, ButtonTransitionPlayback};
 mod effects;
 mod focus_ring;
 mod hit_target;
@@ -527,6 +529,7 @@ pub struct MaterialButton {
     progress: Option<(bool, SharedString)>,
     loading: Option<(bool, SharedString)>,
     progress_playback: Option<ButtonProgressPlayback>,
+    transition_playback: Option<ButtonTransitionPlayback>,
     style: StyleRefinement,
 }
 impl MaterialButton {
@@ -560,6 +563,7 @@ impl MaterialButton {
             progress: None,
             loading: None,
             progress_playback: None,
+            transition_playback: None,
             style: StyleRefinement::default(),
         }
     }
@@ -638,6 +642,14 @@ impl MaterialButton {
         self.loading = Some((loading, label.into()));
         self
     }
+    /// Keep visual transition clocks across virtual unmounting. Forward real
+    /// offscreen controlled changes through the handle's `sync` method.
+    /// Interaction state and ripple remain mount-local.
+    pub fn transition_playback(mut self, playback: ButtonTransitionPlayback) -> Self {
+        self.transition_playback = Some(playback);
+        self
+    }
+
     /// Retain progress lifecycle and opacity across virtual unmounting.
     /// While unmounted, the owner must forward real inputs and reduced motion
     /// to the handle. Hover, pressed, focus and ripple remain mount-local.
@@ -719,6 +731,23 @@ impl RenderOnce for MaterialButton {
         let loading = self.loading.as_ref().is_some_and(|(visible, _)| *visible);
         let show_progress = loading || self.progress.as_ref().is_some_and(|(visible, _)| *visible);
         self.disabled |= loading;
+        if let Some(playback) = &self.transition_playback {
+            // Keep the owner's no-op guard aligned with targets sampled by a
+            // visible render, without injecting any resting interaction target.
+            playback.record_inputs(
+                ButtonTransitionInputs {
+                    variant: self.variant,
+                    size: self.size,
+                    shape: self.shape,
+                    toggle: self.base.toggle,
+                    selected: self.base.selected,
+                    disabled: self.disabled,
+                    active: self.active_state,
+                    ripple: self.ripple,
+                },
+                cx,
+            );
+        }
         self.base = self.base.disabled(self.disabled).busy(loading);
         let (progress_frame, progress_opacity) = if let Some(playback) = &self.progress_playback {
             let (frame, opacity) = playback.sample_inputs(
@@ -789,7 +818,8 @@ impl RenderOnce for MaterialButton {
         );
         // Disabled icon CSS is an explicit child color without a transition.
         let disabled_icon_color = fg_target.resolve();
-        let bg = motion::token_transition(
+        let bg = playback::token_sample(
+            self.transition_playback.as_ref().map(|p| &p.background),
             (self.id.clone(), "background-color"),
             bg_target,
             MotionToken::DefaultEffects,
@@ -797,7 +827,8 @@ impl RenderOnce for MaterialButton {
             cx,
         )
         .resolve();
-        let fg = motion::token_transition(
+        let fg = playback::token_sample(
+            self.transition_playback.as_ref().map(|p| &p.foreground),
             (self.id.clone(), "foreground-color"),
             fg_target,
             MotionToken::DefaultEffects,
@@ -805,7 +836,8 @@ impl RenderOnce for MaterialButton {
             cx,
         )
         .resolve();
-        let border = motion::token_transition(
+        let border = playback::token_sample(
+            self.transition_playback.as_ref().map(|p| &p.border),
             (self.id.clone(), "border-color"),
             border_target,
             MotionToken::DefaultEffects,
@@ -843,42 +875,30 @@ impl RenderOnce for MaterialButton {
         let hovered = pressed.read(cx).hovered && !window.last_input_was_touch();
         let focused =
             self.focusable && focus.is_focused(window) && window.last_input_was_keyboard();
-        let opacity = gpui_base::transition(
+        let opacity = playback::opacity_sample(
+            self.transition_playback.as_ref(),
             (self.id.clone(), "state-opacity"),
-            if self.active_state && !self.ripple {
-                0.10
-            } else if self.disabled {
-                0.
-            } else if (active && !self.ripple) || focused {
-                0.10
-            } else if hovered {
-                0.08
-            } else {
-                0.
-            },
-            gpui_base::Transition::new(std::time::Duration::from_millis(100))
-                .reduced_motion(gpui_base::ReducedMotion::Continue)
-                .easing(
-                    gpui_base::Easing::cubic_bezier(0.2, 0., 0., 1.)
-                        .expect("valid Material easing"),
-                ),
+            playback::state_opacity(
+                self.active_state,
+                self.disabled,
+                self.ripple,
+                active,
+                focused,
+                hovered,
+            ),
+            playback::opacity_policy(),
             window,
             cx,
         );
-        let level = if self.disabled {
-            0
-        } else if self.variant == ButtonVariant::Elevated {
-            if hovered && !active { 2 } else { 1 }
-        } else if !self.base.toggle
-            && hovered
-            && !active
-            && matches!(self.variant, ButtonVariant::Filled | ButtonVariant::Tonal)
-        {
-            1
-        } else {
-            0
-        };
-        let shadows = motion::token_transition(
+        let level = playback::shadow_level(
+            self.variant,
+            self.disabled,
+            self.base.toggle,
+            hovered,
+            active,
+        );
+        let shadows = playback::token_sample(
+            self.transition_playback.as_ref().map(|p| &p.shadow),
             (self.id.clone(), "box-shadow"),
             shadow::ShadowPair::level(level),
             MotionToken::DefaultEffects,
@@ -889,7 +909,8 @@ impl RenderOnce for MaterialButton {
         if let Some(observer) = &self.effects_observer {
             *observer.borrow_mut() = (opacity, shadows.clone());
         }
-        let radius = motion::token_value(
+        let radius = playback::token_sample(
+            self.transition_playback.as_ref().map(|p| &p.radius),
             (self.id.clone(), "pressed-radius"),
             if active { g.pressed } else { radius },
             MotionToken::FastSpatial,

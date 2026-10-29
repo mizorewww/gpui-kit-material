@@ -1,6 +1,6 @@
 use super::{
-    ButtonShape, ButtonSize, ButtonVariant, MaterialButton, MotionToken, alpha, colors,
-    resting_radius, toggle_color_targets,
+    ButtonShape, ButtonSize, ButtonTransitionPlayback, ButtonVariant, MaterialButton, MotionToken,
+    alpha, colors, resting_radius, toggle_color_targets,
 };
 use crate::color::ColorRole;
 use gpui::{
@@ -399,4 +399,358 @@ fn toggle_hover_layers_keep_filled_and_tonal_flat_and_elevated_raised(cx: &mut T
             );
         }
     }
+}
+
+// Two real buttons share inputs and a fake clock; only the second unmounts.
+type UnmountColors = (gpui::Rgba, gpui::Rgba, gpui::Rgba);
+
+struct ToggleUnmountHarness {
+    playback: ButtonTransitionPlayback,
+    scheme: crate::motion::MotionScheme,
+    selected: bool,
+    mount_second: bool,
+    radius: [Rc<Cell<f32>>; 2],
+    colors: [Rc<Cell<UnmountColors>>; 2],
+}
+impl Render for ToggleUnmountHarness {
+    fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        window.set_rem_size(px(14.));
+        crate::motion::apply_scheme(self.scheme);
+        let mut root = div().flex().items_start();
+        for (index, id) in ["always-mounted-toggle", "remounted-toggle"]
+            .into_iter()
+            .enumerate()
+        {
+            if index == 1 && !self.mount_second {
+                continue;
+            }
+            let mut button = MaterialButton::new(id)
+                .toggle(true)
+                .selected(self.selected)
+                .variant(ButtonVariant::Filled)
+                .button_size(ButtonSize::Large)
+                .shape(ButtonShape::Round)
+                .child("Toggle");
+            if index == 1 {
+                button = button.transition_playback(self.playback.clone());
+            }
+            button.radius_observer = Some(self.radius[index].clone());
+            button.colors_observer = Some(self.colors[index].clone());
+            root = root.child(button);
+        }
+        root
+    }
+}
+
+#[gpui::test]
+fn controlled_toggle_transition_survives_virtual_unmount(cx: &mut TestAppContext) {
+    cx.update(|cx| {
+        gpui_base::init(cx);
+        cx.set_reduce_motion(false);
+    });
+    let radius = std::array::from_fn(|_| Rc::new(Cell::new(f32::NAN)));
+    let colors = std::array::from_fn(|_| {
+        Rc::new(Cell::new((
+            gpui::Rgba::default(),
+            gpui::Rgba::default(),
+            gpui::Rgba::default(),
+        )))
+    });
+    let (view, cx) = cx.add_window_view(|_, _| ToggleUnmountHarness {
+        playback: ButtonTransitionPlayback::default(),
+        scheme: crate::motion::MotionScheme::Expressive,
+        selected: false,
+        mount_second: true,
+        radius: radius.clone(),
+        colors: colors.clone(),
+    });
+    draw(cx);
+    let initial_radius = radius[0].get();
+    let initial_colors = colors[0].get();
+    assert_eq!(radius[1].get(), initial_radius);
+    assert_eq!(colors[1].get(), initial_colors);
+
+    // Start both actual rendered transitions at exactly the same instant.
+    view.update(cx, |this, cx| {
+        this.selected = true;
+        cx.notify();
+    });
+    draw(cx);
+    cx.executor().advance_clock(Duration::from_millis(10));
+    draw(cx);
+    assert_eq!(radius[0].get(), radius[1].get());
+    assert_eq!(colors[0].get(), colors[1].get());
+    assert_ne!(radius[0].get(), initial_radius);
+    assert_ne!(colors[0].get(), initial_colors);
+
+    view.update(cx, |this, cx| {
+        this.mount_second = false;
+        cx.notify();
+    });
+    let absent_radius = radius[1].get();
+    let absent_colors = colors[1].get();
+    // Two completed draws discard frame-local keyed state; neither frame
+    // constructs the second button. Keep the control running throughout.
+    for _ in 0..2 {
+        cx.executor().advance_clock(Duration::from_millis(10));
+        draw(cx);
+        assert_eq!(radius[1].get(), absent_radius);
+        assert_eq!(colors[1].get(), absent_colors);
+    }
+    cx.executor().advance_clock(Duration::from_millis(10));
+    view.update(cx, |this, cx| {
+        this.mount_second = true;
+        // A running transition must retain its original curve across a scheme
+        // switch, just like the continuously mounted control.
+        this.scheme = crate::motion::MotionScheme::Standard;
+        cx.notify();
+    });
+    draw(cx);
+
+    // At 40ms both expressive transitions are still in flight. Compare the
+    // rendered samples to an always-mounted control, not a parameter mirror.
+    let expected_radius = radius[0].get();
+    let expected_colors = colors[0].get();
+    let target_radius = resting_radius(ButtonSize::Large, ButtonShape::Round, true);
+    let (bg, fg, border) = toggle_color_targets(ButtonVariant::Filled, false, true, true);
+    let target_colors = (bg.resolve(), fg.resolve(), border.resolve());
+    assert!((expected_radius - target_radius).abs() > 0.001);
+    assert_ne!(expected_colors, target_colors);
+    let radius_matches = (radius[1].get() - expected_radius).abs() < 0.001;
+    let actual_colors = colors[1].get();
+    let colors_match = [
+        (actual_colors.0, expected_colors.0),
+        (actual_colors.1, expected_colors.1),
+        (actual_colors.2, expected_colors.2),
+    ]
+    .into_iter()
+    .all(|(actual, expected)| {
+        [
+            (actual.r, expected.r),
+            (actual.g, expected.g),
+            (actual.b, expected.b),
+            (actual.a, expected.a),
+        ]
+        .into_iter()
+        .all(|(actual, expected)| (actual - expected).abs() < 0.00001)
+    });
+    assert!(
+        radius_matches && colors_match,
+        "remount must preserve both transitions: radius actual={} control={expected_radius}; colors actual={actual_colors:?} control={expected_colors:?}",
+        radius[1].get(),
+    );
+}
+
+#[gpui::test]
+fn controlled_toggle_offscreen_reversal_matches_mounted_control(cx: &mut TestAppContext) {
+    cx.update(|cx| {
+        gpui_base::init(cx);
+        cx.set_reduce_motion(false);
+    });
+    let radius = std::array::from_fn(|_| Rc::new(Cell::new(f32::NAN)));
+    let colors = std::array::from_fn(|_| {
+        Rc::new(Cell::new((
+            gpui::Rgba::default(),
+            gpui::Rgba::default(),
+            gpui::Rgba::default(),
+        )))
+    });
+    let (view, cx) = cx.add_window_view(|_, _| ToggleUnmountHarness {
+        playback: ButtonTransitionPlayback::default(),
+        scheme: crate::motion::MotionScheme::Expressive,
+        selected: false,
+        mount_second: true,
+        radius: radius.clone(),
+        colors: colors.clone(),
+    });
+    draw(cx);
+    let initial = radius[0].get();
+    view.update(cx, |this, cx| {
+        this.selected = true;
+        this.mount_second = false;
+        this.playback.sync(
+            super::ButtonTransitionInputs {
+                variant: ButtonVariant::Filled,
+                size: ButtonSize::Large,
+                shape: ButtonShape::Round,
+                toggle: true,
+                selected: true,
+                ..Default::default()
+            },
+            cx,
+        );
+        cx.notify();
+    });
+    draw(cx);
+    cx.executor().advance_clock(Duration::from_millis(20));
+    draw(cx);
+    assert_ne!(radius[0].get(), initial);
+    view.update(cx, |this, cx| {
+        this.selected = false;
+        this.playback.sync(
+            super::ButtonTransitionInputs {
+                variant: ButtonVariant::Filled,
+                size: ButtonSize::Large,
+                shape: ButtonShape::Round,
+                toggle: true,
+                selected: false,
+                ..Default::default()
+            },
+            cx,
+        );
+        cx.notify();
+    });
+    draw(cx);
+    cx.executor().advance_clock(Duration::from_millis(5));
+    draw(cx);
+    view.update(cx, |this, cx| {
+        this.mount_second = true;
+        cx.notify();
+    });
+    draw(cx);
+    assert_ne!(
+        radius[0].get(),
+        initial,
+        "reverse transition must still be running"
+    );
+    assert!((radius[0].get() - radius[1].get()).abs() < 0.00001);
+    assert_eq!(
+        colors[0].get(),
+        colors[1].get(),
+        "offscreen retarget must retain Base reversal history"
+    );
+}
+
+#[gpui::test]
+fn offscreen_settled_toggle_uses_new_scheme_for_next_target(cx: &mut TestAppContext) {
+    cx.update(|cx| {
+        gpui_base::init(cx);
+        cx.set_reduce_motion(false);
+    });
+    let radius = std::array::from_fn(|_| Rc::new(Cell::new(f32::NAN)));
+    let colors = std::array::from_fn(|_| {
+        Rc::new(Cell::new((
+            gpui::Rgba::default(),
+            gpui::Rgba::default(),
+            gpui::Rgba::default(),
+        )))
+    });
+    let (view, cx) = cx.add_window_view(|_, _| ToggleUnmountHarness {
+        playback: ButtonTransitionPlayback::default(),
+        scheme: crate::motion::MotionScheme::Expressive,
+        selected: false,
+        mount_second: true,
+        radius: radius.clone(),
+        colors: colors.clone(),
+    });
+    draw(cx);
+    view.update(cx, |this, cx| {
+        this.selected = true;
+        cx.notify();
+    });
+    draw(cx);
+    cx.executor().advance_clock(Duration::from_millis(10));
+    draw(cx);
+    view.update(cx, |this, cx| {
+        this.mount_second = false;
+        cx.notify();
+    });
+    draw(cx);
+    cx.executor().advance_clock(Duration::from_secs(2));
+    draw(cx);
+    // Only the mounted control has observed completion. The retained handle
+    // must settle its previous target before selecting the new Standard curve.
+    view.update(cx, |this, cx| {
+        this.scheme = crate::motion::MotionScheme::Standard;
+        this.selected = false;
+        this.mount_second = true;
+        cx.notify();
+    });
+    draw(cx);
+    cx.executor().advance_clock(Duration::from_millis(20));
+    draw(cx);
+    assert!(
+        (radius[0].get() - radius[1].get()).abs() < 0.00001,
+        "new target must use the current scheme after an offscreen completion"
+    );
+    assert_eq!(colors[0].get(), colors[1].get());
+}
+
+#[gpui::test]
+fn visible_target_updates_sync_cache_before_offscreen_reversal(cx: &mut TestAppContext) {
+    cx.update(|cx| {
+        gpui_base::init(cx);
+        cx.set_reduce_motion(false);
+    });
+    let radius = std::array::from_fn(|_| Rc::new(Cell::new(f32::NAN)));
+    let colors = std::array::from_fn(|_| {
+        Rc::new(Cell::new((
+            gpui::Rgba::default(),
+            gpui::Rgba::default(),
+            gpui::Rgba::default(),
+        )))
+    });
+    let (view, cx) = cx.add_window_view(|_, _| ToggleUnmountHarness {
+        playback: ButtonTransitionPlayback::default(),
+        scheme: crate::motion::MotionScheme::Expressive,
+        selected: false,
+        mount_second: true,
+        radius: radius.clone(),
+        colors: colors.clone(),
+    });
+    view.update(cx, |this, cx| {
+        this.playback.sync(
+            super::ButtonTransitionInputs {
+                size: ButtonSize::Large,
+                toggle: true,
+                ..Default::default()
+            },
+            cx,
+        );
+    });
+    draw(cx);
+    let initial = radius[0].get();
+    view.update(cx, |this, cx| {
+        this.selected = true;
+        cx.notify();
+    });
+    draw(cx);
+    cx.executor().advance_clock(Duration::from_millis(20));
+    draw(cx);
+    assert_ne!(radius[0].get(), initial);
+    view.update(cx, |this, cx| {
+        this.selected = false;
+        this.mount_second = false;
+        this.playback.sync(
+            super::ButtonTransitionInputs {
+                variant: ButtonVariant::Filled,
+                size: ButtonSize::Large,
+                shape: ButtonShape::Round,
+                toggle: true,
+                selected: false,
+                ..Default::default()
+            },
+            cx,
+        );
+        cx.notify();
+    });
+    draw(cx);
+    cx.executor().advance_clock(Duration::from_millis(5));
+    draw(cx);
+    view.update(cx, |this, cx| {
+        this.mount_second = true;
+        cx.notify();
+    });
+    draw(cx);
+    assert_ne!(
+        radius[0].get(),
+        initial,
+        "reverse transition must still be running"
+    );
+    assert!((radius[0].get() - radius[1].get()).abs() < 0.00001);
+    assert_eq!(
+        colors[0].get(),
+        colors[1].get(),
+        "offscreen retarget must retain Base reversal history"
+    );
 }

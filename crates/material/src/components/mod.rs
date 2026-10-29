@@ -3,7 +3,8 @@
 mod button;
 pub use button::{
     ButtonDirection, ButtonIconPosition, ButtonProgressPlayback, ButtonShape, ButtonSize,
-    ButtonVariant, MaterialButton, material_button,
+    ButtonTransitionInputs, ButtonTransitionPlayback, ButtonVariant, MaterialButton,
+    material_button,
 };
 mod button_group;
 mod controls;
