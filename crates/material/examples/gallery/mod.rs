@@ -9,6 +9,14 @@ use gpui_kit_material::motion;
 use gpui_kit_material::prelude::*;
 use gpui_kit_material::theme;
 
+// Reveal only the newly focused control, not the entire long gallery page.
+trait GalleryReveal: IntoElement + Sized {
+    fn reveal(self, id: impl Into<ElementId>, scroll: &ScrollHandle) -> RevealFocus {
+        RevealFocus::new(id, self, scroll.clone()).inline()
+    }
+}
+impl<T: IntoElement> GalleryReveal for T {}
+
 struct Gallery {
     palette: PaletteId,
     reference_theme: Option<ThemeId>,
@@ -41,7 +49,9 @@ impl Render for Gallery {
         }
         theme::apply_scale(self.scale.parse().unwrap_or(1.), window);
         let compact = is_compact(window);
+        let scroll = &self.scroll;
         let palettes = ConnectedButtonGroup::new("palette", "Palette")
+            .reveal_in(scroll.clone())
             .options(PALETTES.map(|id| (id.name(), id.name())))
             .selected(if self.reference_theme.is_none() {
                 self.palette.name()
@@ -57,6 +67,7 @@ impl Render for Gallery {
                 }
             }));
         let reference_themes = ConnectedButtonGroup::new("reference-themes", "Material themes")
+            .reveal_in(scroll.clone())
             .options(themes::ALL.map(|id| (id.name(), id.name())))
             .selected(self.reference_theme.map(ThemeId::name).unwrap_or(""))
             .full_width()
@@ -67,6 +78,7 @@ impl Render for Gallery {
                 cx.notify();
             }));
         let mode = ConnectedButtonGroup::new("reference-mode", "Material theme mode")
+            .reveal_in(scroll.clone())
             .options([("light", "Light"), ("dark", "Dark")])
             .selected(if self.reference_mode == ThemeMode::Dark {
                 "dark"
@@ -83,6 +95,7 @@ impl Render for Gallery {
                 cx.notify();
             }));
         let contrast = ConnectedButtonGroup::new("reference-contrast", "Material contrast")
+            .reveal_in(scroll.clone())
             .options([
                 ("standard", "Standard contrast"),
                 ("medium", "Medium contrast"),
@@ -157,6 +170,10 @@ impl Render for Gallery {
                         .icon_position(position)
                         .direction(direction)
                         .child(label)
+                        .reveal(
+                            SharedString::from(format!("reveal-icon-{size:?}-{label}")),
+                            scroll,
+                        )
                     }),
                 )
             }));
@@ -185,6 +202,7 @@ impl Render for Gallery {
                 )
         });
         let scale = ConnectedButtonGroup::new("scale", "Text size")
+            .reveal_in(scroll.clone())
             .options([
                 ("1", "100%"),
                 ("1.25", "125%"),
@@ -197,6 +215,7 @@ impl Render for Gallery {
                 cx.notify();
             }));
         let density = ConnectedButtonGroup::new("density", "Density")
+            .reveal_in(scroll.clone())
             .segmented()
             .options([
                 ("auto", "Automatic"),
@@ -244,6 +263,7 @@ impl Render for Gallery {
 
         let details = self.details;
         let motion_controls = ConnectedButtonGroup::new("motion-scheme", "Motion scheme")
+            .reveal_in(scroll.clone())
             .options([("expressive", "Expressive"), ("standard", "Standard")])
             .selected(match self.motion_scheme {
                 motion::MotionScheme::Expressive => "expressive",
@@ -416,7 +436,7 @@ impl Render for Gallery {
                                     .on_click(cx.listener(|this, _, _, cx| {
                                         this.motion_target = !this.motion_target;
                                         cx.notify();
-                                    })),
+                                    })).reveal("reveal-play-motion",scroll),
                             )
                             .children(motion_rows),
                     )
@@ -432,19 +452,19 @@ impl Render for Gallery {
                         gpui_base::v_flex()
                             .gap(rem(16.))
                             .child(section_title("controls", "Material controls"))
-                            .child(SearchField::new(&self.search))
+                            .child(SearchField::new(&self.search).reveal("reveal-search",scroll))
                             .child(
                                 MaterialSwitch::new("example-switch", "Enable notifications")
                                     .checked(self.switch)
                                     .on_change(cx.listener(|this, checked: &bool, _, cx| {
                                         this.switch = *checked;
                                         cx.notify();
-                                    })),
+                                    })).reveal("reveal-switch",scroll),
                             )
-                            .child(MaterialSlider::new(&self.slider, "Expressive slider"))
+                            .child(MaterialSlider::new(&self.slider, "Expressive slider").reveal("reveal-slider",scroll))
                             .child(
                                 MaterialSlider::new(&self.slider, "Classic slider")
-                                    .appearance(SliderAppearance::Classic),
+                                    .appearance(SliderAppearance::Classic).reveal("reveal-slider-classic",scroll),
                             )
                             .children(ButtonShape::ALL.into_iter().map(|shape| {
                                 gpui_base::v_flex().gap(rem(16.)).children(
@@ -476,6 +496,7 @@ impl Render for Gallery {
                                                     .button_size(size)
                                                     .shape(shape)
                                                     .child(variant.name())
+                                                    .reveal(SharedString::from(format!("reveal-button-{shape:?}-{size:?}-{variant:?}")),scroll)
                                                         },
                                                     )),
                                             )
@@ -499,6 +520,7 @@ impl Render for Gallery {
                         div()
                             .relative()
                             .h(rem(220.))
+                            .p(px(8.))
                             .overflow_hidden()
                             .child(
                                 material_button("open-sheet", ButtonVariant::Tonal)
@@ -506,7 +528,7 @@ impl Render for Gallery {
                                     .on_click(cx.listener(|this, _, _, cx| {
                                         this.sheet = !this.sheet;
                                         cx.notify();
-                                    })),
+                                    })).reveal("reveal-open-sheet",scroll),
                             )
                             .child(
                                 MaterialSideSheet::new("gallery-sheet")
@@ -519,13 +541,13 @@ impl Render for Gallery {
                                                 .on_click(cx.listener(|this, _, _, cx| {
                                                     this.sheet = false;
                                                     cx.notify();
-                                                })),
+                                                })).reveal("reveal-close-sheet",scroll),
                                         ),
                                     ),
                             ),
                     )
-                    .child(choices)
-                    .child(settings)
+                    .child(choices.reveal("reveal-choices",scroll))
+                    .child(settings.reveal("reveal-settings",scroll))
                     .child(feedback)
                     .child(
                         gpui_base::v_flex()
@@ -572,7 +594,7 @@ pub fn run(application: gpui::Application) {
                 ..Default::default()
             },
             |window, cx| {
-                cx.new(|cx| {
+                let gallery = cx.new(|cx| {
                     let search = cx.new(|cx| {
                         gpui_base::input::InputState::new(window, cx)
                             .placeholder("Search components")
@@ -601,7 +623,8 @@ pub fn run(application: gpui::Application) {
                         details: false,
                         scroll: ScrollHandle::new(),
                     }
-                })
+                });
+                cx.new(|cx| gpui_base::Root::new(gallery, window, cx))
             },
         )
         .unwrap();

@@ -82,6 +82,11 @@ selector supports 100%, 125%, 150%, and 200%. The page title uses headline-small
 (24px / 32px at 100%). Reference letter-spacing values are stored in the tokens;
 GPUI tracking support and full component typography alignment remain pending.
 
+The shared gallery mounts GPUI Base's `Root` for Tab/Shift+Tab traversal and
+focus containment. Focus reveal is attached to individual controls and button
+options, so keyboard navigation brings the next control into view without
+pinning the page during manual scrolling.
+
 Component alignment is tracked in [`conformance/md3.json`](conformance/md3.json).
 An available gallery example does not imply visual or motion conformance;
 each component needs independent review and desktop/browser evidence.
