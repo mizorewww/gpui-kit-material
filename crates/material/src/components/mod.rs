@@ -23,6 +23,7 @@ mod navigation;
 mod preview;
 mod progress;
 mod roving;
+mod tabs;
 mod text;
 mod tile;
 mod title_bar;
@@ -49,6 +50,7 @@ pub use progress::{
     indeterminate_progress, indeterminate_progress_with_playback, linear_progress, progress,
     sample_circular_progress, spinner, spinner_with_playback,
 };
+pub use tabs::{MaterialTabs, TabItem, TabsVariant};
 pub use text::{
     accessible_text, error_text, info_callout, page_heading, section_heading, section_title,
     semantic_label, supporting_info,
