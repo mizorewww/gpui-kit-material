@@ -1,12 +1,16 @@
 //! Material button presentation over GPUI Base activation and focus behavior.
 //! Reference: floor/material c910072f3fc5b660276731d8a935d7186f288364.
-//! Expanded touch targets and toggle/loading semantics are still pending.
+//! Expanded touch targets and loading semantics are still pending.
+mod control;
 mod effects;
 mod focus_ring;
 mod ripple;
 mod ripple_clip;
 mod shadow;
+#[cfg(test)]
+mod toggle_tests;
 
+use control::BaseControl;
 use effects::CssColor;
 
 use crate::{
@@ -226,6 +230,56 @@ fn color_targets(variant: ButtonVariant, disabled: bool) -> (CssColor, CssColor,
         },
     )
 }
+fn resting_radius(size: ButtonSize, shape: ButtonShape, selected: bool) -> f32 {
+    let g = size.geometry();
+    if (shape == ButtonShape::Round) != selected {
+        g.height / 2.
+    } else {
+        g.square
+    }
+}
+
+fn toggle_color_targets(
+    variant: ButtonVariant,
+    disabled: bool,
+    toggle: bool,
+    selected: bool,
+) -> (CssColor, CssColor, CssColor) {
+    use ColorRole as C;
+    if !toggle {
+        return color_targets(variant, disabled);
+    }
+    if disabled {
+        let (_, fg, border) = color_targets(variant, true);
+        return (
+            if variant == ButtonVariant::Outlined {
+                CssColor::transparent()
+            } else {
+                CssColor::alpha_role(C::ON_SURFACE, 0.10)
+            },
+            fg,
+            border,
+        );
+    }
+    let roles = match (variant, selected) {
+        (ButtonVariant::Filled, false) => Some((C::SURFACE_CONTAINER, C::ON_SURFACE_VARIANT)),
+        (ButtonVariant::Filled | ButtonVariant::Elevated, true) => {
+            Some((C::PRIMARY, C::ON_PRIMARY))
+        }
+        (ButtonVariant::Tonal, true) => Some((C::SECONDARY, C::ON_SECONDARY)),
+        (ButtonVariant::Outlined, true) => Some((C::INVERSE_SURFACE, C::INVERSE_ON_SURFACE)),
+        _ => None,
+    };
+    match roles {
+        Some((bg, fg)) => (
+            CssColor::role(bg),
+            CssColor::role(fg),
+            CssColor::transparent(),
+        ),
+        None => color_targets(variant, false),
+    }
+}
+
 #[cfg(test)]
 fn colors(variant: ButtonVariant, disabled: bool) -> (Rgba, Rgba, Rgba) {
     let (bg, fg, border) = color_targets(variant, disabled);
@@ -293,12 +347,12 @@ fn press_state(
     state
 }
 fn observe_press(
-    mut base: gpui_base::Button,
+    mut base: BaseControl,
     state: &Entity<PressState>,
     focus: &FocusHandle,
     disabled: bool,
     focusable: bool,
-) -> gpui_base::Button {
+) -> BaseControl {
     if disabled {
         return base;
     }
@@ -374,7 +428,7 @@ pub struct MaterialButton {
     id: ElementId,
     focus_handle: Option<FocusHandle>,
     focusable: bool,
-    base: gpui_base::Button,
+    base: BaseControl,
     children: Vec<AnyElement>,
     icon: Option<Icon>,
     icon_position: ButtonIconPosition,
@@ -401,7 +455,7 @@ impl MaterialButton {
             id: id.clone(),
             focus_handle: None,
             focusable: true,
-            base: gpui_base::Button::new(id),
+            base: BaseControl::new(id),
             children: vec![],
             icon: None,
             icon_position: ButtonIconPosition::Leading,
@@ -413,6 +467,31 @@ impl MaterialButton {
             ripple: true,
             style: StyleRefinement::default(),
         }
+    }
+    /// Enable controlled toggle semantics and Material selected presentation.
+    pub fn toggle(mut self, enabled: bool) -> Self {
+        self.base.toggle = enabled;
+        self
+    }
+    /// Set the application-owned selection. This does not emit a change request.
+    pub fn selected(mut self, selected: bool) -> Self {
+        self.base.selected = selected;
+        self
+    }
+    /// Allow activation to request a selection change (enabled by default).
+    /// Disable this when a containing group owns selection; `on_click` still runs.
+    pub fn toggle_on_click(mut self, enabled: bool) -> Self {
+        self.base.toggle_on_click = enabled;
+        self
+    }
+    /// Handle Base's request to change selection. The caller must update the
+    /// value supplied to `selected`; the button never stores selection itself.
+    pub fn on_change(
+        mut self,
+        callback: impl Fn(bool, &ClickEvent, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.base.on_change = Some(std::rc::Rc::new(callback));
+        self
     }
     pub fn variant(mut self, variant: ButtonVariant) -> Self {
         self.variant = variant;
@@ -509,7 +588,12 @@ impl RenderOnce for MaterialButton {
         use gpui_base::StyledExt;
         let g = self.size.geometry();
         let ty = g.typography.scale();
-        let (bg_target, fg_target, border_target) = color_targets(self.variant, self.disabled);
+        let (bg_target, fg_target, border_target) = toggle_color_targets(
+            self.variant,
+            self.disabled,
+            self.base.toggle,
+            self.base.selected,
+        );
         // Disabled icon CSS is an explicit child color without a transition.
         let disabled_icon_color = fg_target.resolve();
         let bg = motion::token_transition(
@@ -536,11 +620,11 @@ impl RenderOnce for MaterialButton {
             cx,
         )
         .resolve();
-        let radius = if self.shape == ButtonShape::Round {
-            g.height / 2.
-        } else {
-            g.square
-        };
+        let radius = resting_radius(
+            self.size,
+            self.shape,
+            self.base.toggle && self.base.selected,
+        );
         #[cfg(test)]
         if let Some(observer) = &self.colors_observer {
             observer.set((bg, fg, border));
@@ -590,7 +674,8 @@ impl RenderOnce for MaterialButton {
             0
         } else if self.variant == ButtonVariant::Elevated {
             if hovered && !active { 2 } else { 1 }
-        } else if hovered
+        } else if !self.base.toggle
+            && hovered
             && !active
             && matches!(self.variant, ButtonVariant::Filled | ButtonVariant::Tonal)
         {
