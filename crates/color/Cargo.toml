@@ -1,0 +1,20 @@
+[package]
+name = "gpui-kit-material-color"
+description = "Material 3 color roles, built-in palettes and scheme derivation for gpui-kit-material, without a GPUI dependency"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+keywords = ["material", "color", "theme", "gpui"]
+categories = ["gui"]
+
+[features]
+default = ["serde"]
+serde = ["dep:serde"]
+
+[dependencies]
+serde = { workspace = true, optional = true }
+
+[dev-dependencies]
+serde_json.workspace = true

@@ -1,0 +1,30 @@
+[workspace]
+resolver = "3"
+members = ["crates/color", "crates/material"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+repository = "https://github.com/mizorewww/gpui-kit-material"
+authors = ["mizorewww"]
+
+[workspace.dependencies]
+gpui-kit-material-color = { path = "crates/color", version = "0.1.0" }
+
+# GPUI comes from the same `gpui-pre` snapshot that the published GPUI Kit
+# crates are built against, so `gpui-base` and this kit share one `gpui`.
+# Bump these together with gpui-base and the Cargo.lock entries.
+gpui = { package = "gpui-pre", version = "=0.3.10" }
+gpui_platform = { package = "gpui-pre-platform", version = "=0.3.10", features = ["font-kit", "x11", "wayland", "runtime_shaders"] }
+gpui-base = { version = "=0.8.1" }
+
+anyhow = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[profile.dev]
+debug = "line-tables-only"
+
+[profile.dev.package.gpui-pre]
+opt-level = 3
