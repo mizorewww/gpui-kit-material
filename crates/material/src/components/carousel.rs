@@ -361,9 +361,12 @@ pub(crate) fn neighbor(current: f32, step: f32, max: f32, forward: bool) -> f32 
 /// The kit paints carousel labels in untokenized white (`#FFFFFF`, Figma
 /// "Material 3 Design Kit" › Carousel › Label) over the scrim gradient on
 /// caller imagery, in both themes; no color role is white in both.
-fn label_on_imagery() -> Hsla {
-    gpui::white()
-}
+const LABEL_ON_IMAGERY: Rgba = Rgba {
+    r: 1.,
+    g: 1.,
+    b: 1.,
+    a: 1.,
+};
 
 /// An M3 carousel. `label` names it for assistive technology.
 #[derive(gpui::IntoElement)]
@@ -627,7 +630,7 @@ impl RenderOnce for MaterialCarousel {
                                 .children(item.content),
                         )
                         .when(has_text && text > 0., |tile| {
-                            let ink = label_on_imagery();
+                            let ink = LABEL_ON_IMAGERY;
                             tile.child(
                                 div()
                                     .absolute()

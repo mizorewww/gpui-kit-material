@@ -468,7 +468,7 @@ impl Element for CardSurface {
             window.paint_quad(quad(
                 bounds,
                 radii,
-                rgba(0x00000000),
+                transparent_black(),
                 px(1.),
                 outline,
                 BorderStyle::default(),
@@ -480,7 +480,7 @@ impl Element for CardSurface {
             window.paint_quad(quad(
                 bounds.dilate(px(5.)),
                 radius,
-                rgba(0x00000000),
+                transparent_black(),
                 px(3.),
                 color(SECONDARY),
                 BorderStyle::default(),

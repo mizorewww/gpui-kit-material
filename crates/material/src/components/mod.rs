@@ -21,6 +21,8 @@ mod a11y_tests;
 mod app_bar;
 mod button_group;
 #[cfg(test)]
+mod color_guard_tests;
+#[cfg(test)]
 mod controls;
 mod divider;
 mod slider;
