@@ -126,6 +126,10 @@ pub use navigation::{
     NavigationRail, RAIL_COLLAPSED_WIDTH, RAIL_EXPANDED_WIDTH, RailAlignment, navigation_scrim,
 };
 pub use navigation_drawer::{DRAWER_WIDTH, DrawerPosition, NavigationDrawer};
+mod adaptive;
+pub use adaptive::{
+    SizedContent, WindowHeightClass, WindowSizeClass, WindowWidthClass, sized_content,
+};
 pub use preview::InteractionPreview;
 pub use progress::{
     CircularProgress, CircularProgressFrame, CircularProgressPlayback, LINEAR_INDETERMINATE_MS,
