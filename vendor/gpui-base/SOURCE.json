@@ -92,7 +92,7 @@
     }
   },
   "package_version": "0.8.1",
-  "patch_application": "The original five patch files were three-way merged (upstream Git / published registry 0.8.1 base / local patched registry files) without conflicts. src/text_selection.rs (Hitbox follow-up) and the TransitionPlayback, RootTab and RootTabPrev additions were made directly on this checkout afterwards.",
+  "patch_application": "The original five patch files were three-way merged (upstream Git / published registry 0.8.1 base / local patched registry files) without conflicts. src/text_selection.rs (Hitbox follow-up) and the TransitionPlayback addition were made directly on this checkout afterwards.",
   "patch_base": {
     "package": "gpui-base",
     "registry_source_revision": "99576db58ec8103417c41a092e891b4022d24e7e",
