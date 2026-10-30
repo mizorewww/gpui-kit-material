@@ -207,6 +207,10 @@ impl RenderOnce for CircularProgress {
                     cx,
                 )
                 .max(0.);
+                if paint.amplitude <= super::linear::WAVE_VISIBLE {
+                    // A flat wave has no phase to show: no repeating frames.
+                    return root.child(div().size_full().child(ring_canvas(frame, paint, true)));
+                }
                 root.child(
                     div()
                         .size_full()

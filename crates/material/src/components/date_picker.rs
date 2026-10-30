@@ -271,6 +271,11 @@ impl DatePickerState {
     /// The years the year grid and lists offer.
     pub fn years(mut self, years: RangeInclusive<i32>) -> Self {
         self.years = years;
+        let shown = clamp_month(&self.years, self.year, self.month);
+        if shown != (self.year, self.month) {
+            (self.year, self.month) = shown;
+            self.cursor = first_of_month(shown.0, shown.1);
+        }
         self.reveal_cursor();
         self
     }
@@ -352,9 +357,14 @@ impl DatePickerState {
     fn apply(&mut self, selection: DateSelection) {
         self.selection = selection;
         if let Some(start) = selection.start() {
-            self.year = start.year();
-            self.month = start.month();
-            self.cursor = start;
+            // A date outside `years` stays selected, but the grid shows the
+            // nearest month the picker offers.
+            (self.year, self.month) = clamp_month(&self.years, start.year(), start.month());
+            self.cursor = if (start.year(), start.month()) == (self.year, self.month) {
+                start
+            } else {
+                first_of_month(self.year, self.month)
+            };
         }
     }
 
@@ -397,7 +407,9 @@ impl DatePickerState {
     }
 
     /// Show `year`/`month`, sliding from the current month.
+    /// Months outside `years` show the nearest month inside them.
     pub fn show_month(&mut self, year: i32, month: u32, cx: &mut Context<Self>) {
+        let (year, month) = clamp_month(&self.years, year, month);
         let target = first_of_month(year, month);
         let current = (self.year, self.month);
         let to = (target.year(), target.month());
@@ -587,9 +599,12 @@ impl DatePickerState {
 
     fn reveal_cursor(&self) {
         let years_from = *self.years.start();
+        // Never past the lists' ends: a year outside `years` reveals the
+        // nearest one.
+        let years = (self.years.end() - years_from + 1).max(1) as usize;
         match self.view {
             DatePickerView::Year => {
-                let index = (self.cursor.year() - years_from).max(0) as usize;
+                let index = ((self.cursor.year() - years_from).max(0) as usize).min(years - 1);
                 self.year_scroll
                     .scroll_to_item(index / YEAR_COLUMNS, ScrollStrategy::Center);
                 self.list_scroll
@@ -600,7 +615,7 @@ impl DatePickerState {
                     .scroll_to_item(self.cursor.month0() as usize, ScrollStrategy::Center);
             }
             DatePickerView::Day => {
-                let index = (self.year - years_from).max(0) as usize * 12 + self.month0();
+                let index = month_list_index(&self.years, self.year, self.month0());
                 self.month_scroll.scroll_to_item(index, ScrollStrategy::Top);
             }
         }
@@ -625,6 +640,30 @@ impl Render for DatePickerState {
     fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
         Empty
     }
+}
+
+/// `year`/`month` (normalized, so month 13 is January next year) kept
+/// inside the January of the first and the December of the last of `years`.
+fn clamp_month(years: &RangeInclusive<i32>, year: i32, month: u32) -> (i32, u32) {
+    let date = first_of_month(year, month);
+    let to = (date.year(), date.month());
+    if years.start() > years.end() {
+        return to;
+    }
+    to.clamp((*years.start(), 1), (*years.end(), 12))
+}
+
+/// The full-screen month list's row for `year`/`month0`, never past its
+/// last row (`years` holds twelve rows per year).
+fn month_list_index(years: &RangeInclusive<i32>, year: i32, month0: usize) -> usize {
+    let count = (years.end() - years.start() + 1).max(1) as usize * 12;
+    ((year - years.start()).max(0) as usize * 12 + month0).min(count - 1)
+}
+
+/// Whether `year`/`month` lies inside `years`.
+fn month_in_range(years: &RangeInclusive<i32>, year: i32, month: u32) -> bool {
+    let date = first_of_month(year, month);
+    clamp_month(years, year, month) == (date.year(), date.month())
 }
 
 fn previous(year: i32, month: u32) -> (i32, u32) {
@@ -822,6 +861,15 @@ struct Snapshot {
 }
 
 impl Snapshot {
+    /// Whether the month `delta` months from the shown one is offered.
+    fn can_step_months(&self, delta: i32) -> bool {
+        let total = self.year as i64 * 12 + self.month as i64 - 1 + delta as i64;
+        month_in_range(
+            &self.years,
+            total.div_euclid(12) as i32,
+            total.rem_euclid(12) as u32 + 1,
+        )
+    }
     fn is_disabled(&self, date: NaiveDate) -> bool {
         self.disabled.as_ref().is_some_and(|m| m.matched(&date))
     }
@@ -1129,18 +1177,24 @@ impl PickerCx {
                 row.child(
                     div()
                         .flex()
-                        .child(self.icon_button(
-                            "previous",
-                            "chevron_backward",
-                            l.previous_month.clone(),
-                            |s, _, cx| s.previous_month(cx),
-                        ))
-                        .child(self.icon_button(
-                            "next",
-                            "chevron_forward",
-                            l.next_month.clone(),
-                            |s, _, cx| s.next_month(cx),
-                        )),
+                        .child(
+                            self.icon_button(
+                                "previous",
+                                "chevron_backward",
+                                l.previous_month.clone(),
+                                |s, _, cx| s.previous_month(cx),
+                            )
+                            .disabled(!snap.can_step_months(-1)),
+                        )
+                        .child(
+                            self.icon_button(
+                                "next",
+                                "chevron_forward",
+                                l.next_month.clone(),
+                                |s, _, cx| s.next_month(cx),
+                            )
+                            .disabled(!snap.can_step_months(1)),
+                        ),
                 )
             })
     }
@@ -1529,33 +1583,43 @@ impl PickerCx {
             let (prev_label, prev) = previous;
             let (next_label, next) = next;
             let show_steppers = view == DatePickerView::Day;
+            // Steppers stop at the ends of `years`.
+            let months = if list == DatePickerView::Month { 1 } else { 12 };
+            let (has_prev, has_next) =
+                (snap.can_step_months(-months), snap.can_step_months(months));
             div()
                 .flex()
                 .items_center()
                 .when(show_steppers, |row| {
-                    row.child(self.icon_button(
-                        if list == DatePickerView::Month {
-                            "prev-month"
-                        } else {
-                            "prev-year"
-                        },
-                        "chevron_left",
-                        prev_label,
-                        move |s, _, cx| prev(s, cx),
-                    ))
+                    row.child(
+                        self.icon_button(
+                            if list == DatePickerView::Month {
+                                "prev-month"
+                            } else {
+                                "prev-year"
+                            },
+                            "chevron_left",
+                            prev_label,
+                            move |s, _, cx| prev(s, cx),
+                        )
+                        .disabled(!has_prev),
+                    )
                 })
                 .child(menu)
                 .when(show_steppers, |row| {
-                    row.child(self.icon_button(
-                        if list == DatePickerView::Month {
-                            "next-month"
-                        } else {
-                            "next-year"
-                        },
-                        "chevron_right",
-                        next_label,
-                        move |s, _, cx| next(s, cx),
-                    ))
+                    row.child(
+                        self.icon_button(
+                            if list == DatePickerView::Month {
+                                "next-month"
+                            } else {
+                                "next-year"
+                            },
+                            "chevron_right",
+                            next_label,
+                            move |s, _, cx| next(s, cx),
+                        )
+                        .disabled(!has_next),
+                    )
                 })
         };
         div()

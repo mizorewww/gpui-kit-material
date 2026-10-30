@@ -135,10 +135,20 @@ fn spin(
 
 /// Unmeasured work uses motion, never a fabricated completion percentage.
 ///
-/// Exposes a progress-indicator role without a name; use
-/// [`linear_progress`] to supply the caller's accessible label.
+/// Exposes a progress-indicator role without a name; prefer
+/// [`indeterminate_progress_with_label`], which names it.
 pub fn indeterminate_progress(id: impl Into<ElementId>, _cx: &App) -> AnyElement {
     LinearProgress::unlabelled(id).into_any_element()
+}
+
+/// [`indeterminate_progress`] named by the caller's `label` for assistive
+/// technology.
+pub fn indeterminate_progress_with_label(
+    id: impl Into<ElementId>,
+    label: impl Into<SharedString>,
+    _cx: &App,
+) -> AnyElement {
+    LinearProgress::new(id, label).into_any_element()
 }
 
 /// Indeterminate progress with a caller-owned clock; see
@@ -170,21 +180,10 @@ pub fn indeterminate_linear_progress_with_playback(
         .into_any_element()
 }
 
-/// Base's progress-indicator semantics: 0–100 range, a value only when
-/// measured, and an optional caller-supplied accessible name.
-#[cfg(test)]
-fn semantics(id: ElementId, label: Option<SharedString>, fraction: Option<f32>) -> Progress {
-    Progress::new(id)
-        .when_some(label, |progress, label| progress.accessibility_label(label))
-        .indeterminate(fraction.is_none())
-        .value(fraction.unwrap_or(0.) * 100.)
-        .w_full()
-}
-
 /// A measured fraction as Material 3 linear progress, 4px thick.
 ///
-/// Exposes a progress-indicator role and value without a name; use
-/// [`linear_progress`] to supply the caller's accessible label.
+/// Exposes a progress-indicator role and value without a name; prefer
+/// [`progress_with_label`], which names it.
 pub fn progress(
     id: impl Into<ElementId>,
     progress: f32,
@@ -192,6 +191,19 @@ pub fn progress(
     _cx: &mut App,
 ) -> AnyElement {
     LinearProgress::unlabelled(id)
+        .value(Some(progress))
+        .into_any_element()
+}
+
+/// [`progress`] named by the caller's `label` for assistive technology.
+pub fn progress_with_label(
+    id: impl Into<ElementId>,
+    label: impl Into<SharedString>,
+    progress: f32,
+    _window: &mut Window,
+    _cx: &mut App,
+) -> AnyElement {
+    LinearProgress::new(id, label)
         .value(Some(progress))
         .into_any_element()
 }
@@ -262,6 +274,60 @@ mod tests {
                 });
             }
             root
+        }
+    }
+
+    /// One wavy measured indicator, linear or circular.
+    struct WavyHarness {
+        value: f32,
+        circular: bool,
+    }
+
+    impl Render for WavyHarness {
+        fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+            let value = Some(self.value);
+            div().w(px(200.)).child(if self.circular {
+                super::CircularProgress::new("wavy", "Upload")
+                    .wavy()
+                    .value(value)
+                    .into_any_element()
+            } else {
+                super::LinearProgress::new("wavy", "Upload")
+                    .wavy()
+                    .value(value)
+                    .into_any_element()
+            })
+        }
+    }
+
+    /// Frames requested after drawing a settled wavy indicator at `value`.
+    fn frames_after_settling(cx: &mut TestAppContext, value: f32, circular: bool) -> usize {
+        let (_, cx) = cx.add_window_view(|_, _| WavyHarness { value, circular });
+        cx.update(|window, cx| {
+            window.refresh();
+            window.draw(cx).clear(cx);
+            // Let any first-frame motion settle, then draw once more.
+            window.simulate_next_frame(cx);
+            window.refresh();
+            window.draw(cx).clear(cx);
+            window.simulate_next_frame(cx)
+        })
+    }
+
+    #[gpui::test]
+    fn a_flat_wave_requests_no_frames(cx: &mut TestAppContext) {
+        for circular in [false, true] {
+            for value in [0.05, 0.1, 0.95, 0.97, 1.] {
+                assert_eq!(
+                    frames_after_settling(cx, value, circular),
+                    0,
+                    "circular {circular}, {value}: a flat wave kept the window busy"
+                );
+            }
+            assert!(
+                frames_after_settling(cx, 0.5, circular) > 0,
+                "a visible wave moves"
+            );
         }
     }
 
@@ -353,24 +419,18 @@ mod tests {
 #[cfg(test)]
 mod layout_tests {
     use gpui::{
-        Context, IntoElement, Render, TestAppContext, Window, accesskit, div, prelude::*, px,
+        Context, ElementId, IntoElement, Render, Role, TestAppContext, Window, div, prelude::*, px,
     };
+    use gpui_base::test_support::{ElementSnapshot, find};
 
-    struct A11yHarness {
-        nodes: std::rc::Rc<std::cell::RefCell<Vec<accesskit::Node>>>,
-    }
-    impl Render for A11yHarness {
+    /// Every shorthand and component, as an application renders them.
+    struct Rendered;
+    impl Render for Rendered {
         fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-            for (label, fraction) in [("Upload", Some(0.25)), ("Sync", None)] {
-                let mut node = accesskit::Node::new(accesskit::Role::GenericContainer);
-                super::semantics(label.into(), Some(label.into()), fraction)
-                    .render(window, cx)
-                    .into_element()
-                    .write_a11y_info(&mut node);
-                self.nodes.borrow_mut().push(node);
-            }
             div()
                 .w(px(200.))
+                .flex()
+                .flex_col()
                 .child(super::linear_progress(
                     "measured",
                     "Upload",
@@ -389,24 +449,47 @@ mod layout_tests {
                     window,
                     cx,
                 ))
+                .child(super::progress_with_label("named", "Copy", 0.5, window, cx))
+                .child(super::indeterminate_progress_with_label(
+                    "named-busy",
+                    "Index",
+                    cx,
+                ))
+                .child(super::progress("legacy", 0.5, window, cx))
+                .child(super::CircularProgress::new("ring", "Render").value(Some(0.75)))
         }
     }
 
+    fn node(window: &Window, id: &'static str) -> ElementSnapshot {
+        find(window, &[], &ElementId::from(id)).unwrap_or_else(|| panic!("{id} was not rendered"))
+    }
+
     #[gpui::test]
-    fn linear_progress_exposes_role_range_value_and_caller_label(cx: &mut TestAppContext) {
-        let nodes = std::rc::Rc::new(std::cell::RefCell::new(Vec::new()));
-        let (_, cx) = cx.add_window_view({
-            let nodes = nodes.clone();
-            move |_, _| A11yHarness { nodes }
-        });
+    fn rendered_progress_nodes_carry_role_and_caller_label(cx: &mut TestAppContext) {
+        cx.update(|cx| cx.set_reduce_motion(true));
+        let (_, cx) = cx.add_window_view(|_, _| Rendered);
         cx.update(|window, cx| window.draw(cx).clear(cx));
-        let nodes = nodes.borrow();
-        let (measured, unmeasured) = (&nodes[0], &nodes[1]);
-        assert_eq!(measured.label(), Some("Upload"));
-        assert_eq!(measured.numeric_value(), Some(25.));
-        assert_eq!(measured.min_numeric_value(), Some(0.));
-        assert_eq!(measured.max_numeric_value(), Some(100.));
-        assert_eq!(unmeasured.label(), Some("Sync"));
-        assert_eq!(unmeasured.numeric_value(), None);
+        cx.update(|window, _| {
+            for (id, label) in [
+                ("measured", "Upload"),
+                ("unmeasured", "Sync"),
+                ("named", "Copy"),
+                ("named-busy", "Index"),
+                ("ring", "Render"),
+            ] {
+                let node = node(window, id);
+                assert_eq!(node.role(), Some(Role::ProgressIndicator), "{id}");
+                assert_eq!(node.label(), Some(label), "{id}");
+                assert!(node.visible(), "{id}");
+            }
+            // The 4dp linear indicator fills its row.
+            let measured = node(window, "measured").bounds();
+            assert_eq!(measured.size.width, px(200.));
+            assert_eq!(measured.size.height, px(4.));
+            // The legacy shorthand stays unnamed.
+            let legacy = node(window, "legacy");
+            assert_eq!(legacy.role(), Some(Role::ProgressIndicator));
+            assert_eq!(legacy.label(), None);
+        });
     }
 }

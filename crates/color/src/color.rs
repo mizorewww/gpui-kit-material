@@ -47,9 +47,17 @@ impl Color {
         }
     }
 
-    /// Relative luminance with Rec. 709 weights on the stored channels.
+    /// Relative luminance (WCAG 2.x / sRGB): Rec. 709 weights on the
+    /// linearized channels, so mid gray `#808080` is about 0.216, not 0.5.
     pub fn luminance(self) -> f32 {
-        0.2126 * self.r + 0.7152 * self.g + 0.0722 * self.b
+        fn linear(channel: f32) -> f32 {
+            if channel <= 0.04045 {
+                channel / 12.92
+            } else {
+                ((channel + 0.055) / 1.055).powf(2.4)
+            }
+        }
+        0.2126 * linear(self.r) + 0.7152 * linear(self.g) + 0.0722 * linear(self.b)
     }
 }
 
@@ -66,5 +74,19 @@ mod tests {
         assert_eq!(black.blend(white, 2.), white, "t is clamped");
         assert_eq!(Color::hexa(0x10141680).a, 128. / 255.);
         assert!(white.luminance() > black.luminance());
+    }
+
+    #[test]
+    fn luminance_linearizes_srgb() {
+        assert_eq!(Color::hex(0xffffff).luminance(), 1.);
+        assert_eq!(Color::hex(0x000000).luminance(), 0.);
+        // WCAG: #808080 is 0.2159, far darker than its stored 0.502.
+        let gray = Color::hex(0x808080).luminance();
+        assert!((gray - 0.2159).abs() < 0.0005, "{gray}");
+        // The low segment is linear: #0A0A0A (0.0392) / 12.92.
+        let dark = Color::hex(0x0a0a0a).luminance();
+        assert!((dark - 10. / 255. / 12.92).abs() < 1e-6, "{dark}");
+        // Pure green carries the largest weight.
+        assert!((Color::hex(0x00ff00).luminance() - 0.7152).abs() < 1e-6);
     }
 }

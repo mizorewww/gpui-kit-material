@@ -463,83 +463,69 @@ fn default_format(value: f32) -> SharedString {
     }
 }
 
-impl MaterialSlider {
-    fn render_classic(self, cx: &mut App) -> AnyElement {
-        let p = self.state.read(cx).percentage().end;
-        let (track, width, height) = slider_geometry(SliderAppearance::Classic);
-        let paint = slider_paint(self.disabled);
-        Slider::new(&self.state)
-            .accessibility_label(self.label)
-            .disabled(self.disabled)
-            .w_full()
-            .h(rem(48.))
-            .child(
-                SliderTrack::new(&self.state)
-                    .disabled(self.disabled)
-                    .relative()
-                    .size_full()
-                    .child(
-                        SliderIndicator::new(&self.state)
-                            .absolute()
-                            .left_0()
-                            .top(rem((48. - track) / 2.))
-                            .w_full()
-                            .h(rem(track))
-                            .rounded_full()
-                            .bg(paint.inactive)
-                            .child(
-                                div()
-                                    .absolute()
-                                    .left_0()
-                                    .top_0()
-                                    .h_full()
-                                    .w(relative(p))
-                                    .rounded_full()
-                                    .bg(paint.active),
-                            ),
-                    )
-                    .child(
-                        SliderThumb::new(&self.state)
-                            .disabled(self.disabled)
-                            .absolute()
-                            .left(relative(p))
-                            .ml(rem(-width / 2.))
-                            .top(rem((48. - height) / 2.))
-                            .w(rem(width))
-                            .h(rem(height))
-                            .rounded_full()
-                            .bg(paint.handle),
-                    ),
-            )
-            .into_any_element()
-    }
-}
+/// The classic (M3 baseline) slider: a 4dp track and a 20dp round handle
+/// with a 40dp state layer, in a 48dp tall target. It shares the
+/// Expressive slider's focus, keyboard, press, preview, axis and range
+/// handling; only the geometry differs.
+const CLASSIC_TARGET: f32 = 48.;
+const CLASSIC_STATE_LAYER: f32 = 40.;
 
-/// Keyboard stepping: arrows by one step, Page keys by a tenth of the
-/// range, Home/End to the ends. A range moves its end thumb.
-fn stepped_value(key: &str, value: f32, min: f32, max: f32, step: f32) -> Option<f32> {
-    let step = if step > 0. { step } else { (max - min) / 100. };
-    let page = ((max - min) / 10.).max(step);
+/// Keyboard stepping: arrows by one step, Page keys by a tenth of the range
+/// rounded to whole steps, Home/End to the ends. `bounds` limits the moving
+/// thumb (a range thumb stops at the other one); `range` is the slider's
+/// min and max, the origin of its step grid. `None` for other keys or an
+/// invalid range (min above max, or NaN), which would otherwise panic.
+fn stepped_value(
+    key: &str,
+    value: f32,
+    bounds: (f32, f32),
+    range: (f32, f32),
+    step: f32,
+) -> Option<f32> {
+    let ((lo, hi), (min, max)) = (bounds, range);
+    if !(min <= max && lo <= hi) || value.is_nan() {
+        return None;
+    }
+    let discrete = step > 0. && step.is_finite();
+    let step = if discrete { step } else { (max - min) / 100. };
+    let page = if step > 0. {
+        ((max - min) / 10. / step).round().max(1.) * step
+    } else {
+        0.
+    };
     let next = match key {
         "right" | "up" => value + step,
         "left" | "down" => value - step,
         "pageup" => value + page,
         "pagedown" => value - page,
-        "home" => min,
-        "end" => max,
+        "home" => lo,
+        "end" => hi,
         _ => return None,
     };
-    Some(next.clamp(min, max))
+    let next = if discrete {
+        min + ((next - min) / step).round() * step
+    } else {
+        next
+    };
+    Some(next.min(hi).max(lo))
 }
 
 impl RenderOnce for MaterialSlider {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
-        if self.appearance == SliderAppearance::Classic {
-            return self.render_classic(cx);
-        }
         let id = self.id.clone();
+        let classic = self.appearance == SliderAppearance::Classic;
+        // A single slider focuses its Role::Slider node; a range focuses each
+        // thumb, so Tab moves between them and each takes the arrow keys.
         let focus = window
-            .use_keyed_state((id.clone(), "focus"), cx, |_, cx| cx.focus_handle())
+            .use_keyed_state((id.clone(), "focus"), cx, |_, cx| {
+                cx.focus_handle().tab_stop(true)
+            })
+            .read(cx)
+            .clone();
+        let start_focus = window
+            .use_keyed_state((id.clone(), "focus-start"), cx, |_, cx| {
+                cx.focus_handle().tab_stop(true)
+            })
             .read(cx)
             .clone();
         let press = window.use_keyed_state((id.clone(), "pressed"), cx, |_, _| false);
@@ -547,24 +533,39 @@ impl RenderOnce for MaterialSlider {
         let disabled = self.disabled || preview.is_some_and(|p| p.is_disabled());
         let live = !disabled && preview.is_none();
         let forced = |s| !disabled && preview == Some(s);
-        let keyboard_focus = forced(InteractionPreview::Focused)
-            || (live && focus.is_focused(window) && window.last_input_was_keyboard());
         let hovered = forced(InteractionPreview::Hovered);
         let pressed = forced(InteractionPreview::Pressed) || (live && *press.read(cx));
 
         let state = self.state.read(cx);
         let value = state.value();
+        let is_range = value.is_range();
         let (min, max, step) = (state.min_value(), state.max_value(), state.step_value());
         let percentage = state.percentage();
-        let handles: Vec<f32> = if value.is_range() {
+        let handles: Vec<f32> = if is_range {
             vec![percentage.start, percentage.end]
         } else {
             vec![percentage.end]
         };
-        let values: Vec<f32> = if value.is_range() {
+        let values: Vec<f32> = if is_range {
             vec![value.start(), value.end()]
         } else {
             vec![value.end()]
+        };
+        // Which thumb holds keyboard focus.
+        let keyboard = live && window.last_input_was_keyboard();
+        let focused_thumb = if is_range {
+            if start_focus.is_focused(window) {
+                Some(0)
+            } else if focus.is_focused(window) {
+                Some(1)
+            } else {
+                None
+            }
+        } else {
+            focus.is_focused(window).then_some(0)
+        };
+        let thumb_focused = move |i: usize| {
+            forced(InteractionPreview::Focused) || (keyboard && focused_thumb == Some(i))
         };
         let steps = (self.stops && step > 0. && max > min)
             .then(|| ((max - min) / step).round() as usize)
@@ -576,7 +577,9 @@ impl RenderOnce for MaterialSlider {
         } else {
             HANDLE_WIDTH
         };
-        let handle = if preview.is_some() {
+        let handle = if classic {
+            slider_geometry(SliderAppearance::Classic).1
+        } else if preview.is_some() {
             target_width
         } else {
             motion::token_value(
@@ -588,7 +591,7 @@ impl RenderOnce for MaterialSlider {
             )
             .clamp(HANDLE_PRESSED_WIDTH, HANDLE_WIDTH)
         };
-        let bubble = if !self.value_indicator {
+        let bubble = if !self.value_indicator || classic {
             0.
         } else if preview.is_some() {
             if pressed { 1. } else { 0. }
@@ -603,53 +606,102 @@ impl RenderOnce for MaterialSlider {
             .clamp(0., 1.)
         };
         let paint = slider_paint(disabled);
-        // The handle's state layer: on-primary over the primary handle.
-        let layer = if keyboard_focus {
-            state::FOCUS
-        } else if pressed {
-            state::PRESS
-        } else if hovered {
-            state::HOVER
-        } else {
-            0.
-        };
-        let handle_ink = if disabled {
-            paint.handle
-        } else {
-            state::layer(paint.handle, paint.on_active, layer)
+        // A handle's state layer: on-primary over the Expressive handle,
+        // primary around the classic one.
+        let layer = |i: usize| {
+            if thumb_focused(i) {
+                state::FOCUS
+            } else if pressed {
+                state::PRESS
+            } else if hovered {
+                state::HOVER
+            } else {
+                0.
+            }
         };
         let live_hover = state::layer(paint.handle, paint.on_active, state::HOVER);
         let horizontal = self.axis == Axis::Horizontal;
-        let scale = f32::from(rem(1.).to_pixels(window.rem_size()));
-        let track = TrackPaint {
-            axis: self.axis,
-            metrics,
-            handle,
-            handles: handles.clone(),
-            centered: self.centered,
-            steps,
-            paint,
-            scale,
+        let cross = if classic {
+            CLASSIC_TARGET
+        } else {
+            metrics.handle
         };
         let format = self
             .format
             .unwrap_or_else(|| std::rc::Rc::new(default_format));
         let ring_radius = rem(handle / 2.);
+        let label = self.label;
+        let orientation = if horizontal {
+            Orientation::Horizontal
+        } else {
+            Orientation::Vertical
+        };
 
         let thumbs = handles
             .iter()
             .zip(values.iter())
             .enumerate()
             .map(|(i, (&p, &v))| {
-                let start = value.is_range() && i == 0;
+                let start = is_range && i == 0;
+                let focused = thumb_focused(i);
                 let thumb = SliderThumb::new(&self.state)
                     .axis(self.axis)
                     .start(start)
                     .disabled(disabled)
                     .absolute()
+                    .when(is_range, |thumb| {
+                        // Each range thumb is a focusable slider of its own.
+                        let handle = if start { &start_focus } else { &focus };
+                        thumb
+                            .role(Role::Slider)
+                            .aria_label(label.clone())
+                            .aria_numeric_value(v as f64)
+                            .aria_min_numeric_value(min as f64)
+                            .aria_max_numeric_value(max as f64)
+                            .aria_orientation(orientation)
+                            .when(live, |thumb| thumb.track_focus(handle).tab_stop(true))
+                    });
+                if classic {
+                    let size = handle;
+                    let thumb = thumb.rounded_full().bg(paint.handle);
+                    let thumb = if horizontal {
+                        thumb
+                            .left(relative(p))
+                            .ml(rem(-size / 2.))
+                            .top(rem((CLASSIC_TARGET - size) / 2.))
+                    } else {
+                        thumb
+                            .bottom(relative(p))
+                            .mb(rem(-size / 2.))
+                            .left(rem((CLASSIC_TARGET - size) / 2.))
+                    }
+                    .w(rem(size))
+                    .h(rem(size));
+                    let opacity = layer(i);
+                    let halo = (CLASSIC_STATE_LAYER - size) / 2.;
+                    let thumb = thumb.when(opacity > 0. && !disabled, |thumb| {
+                        thumb.child(
+                            div()
+                                .absolute()
+                                .top(rem(-halo))
+                                .left(rem(-halo))
+                                .size(rem(CLASSIC_STATE_LAYER))
+                                .rounded_full()
+                                .bg(paint.handle.opacity(opacity)),
+                        )
+                    });
+                    return ButtonFocusRing::resolved(thumb, focused, ring_radius)
+                        .into_any_element();
+                }
+                let handle_ink = if disabled {
+                    paint.handle
+                } else {
+                    state::layer(paint.handle, paint.on_active, layer(i))
+                };
+                let thumb = thumb
                     .rounded(rem(2.))
                     .bg(handle_ink)
-                    .when(live && !pressed && !keyboard_focus, |t| {
+                    .when(live && !pressed && !focused, |t| {
                         t.hover(move |s| s.bg(live_hover))
                     });
                 let thumb = if horizontal {
@@ -667,7 +719,7 @@ impl RenderOnce for MaterialSlider {
                         .w_full()
                         .h(rem(handle))
                 };
-                let label = format(v);
+                let text = format(v);
                 // A specimen labels only the end thumb, as the kit does.
                 let labelled = preview.is_none() || i + 1 == handles.len();
                 let thumb = thumb.when(bubble > 0.01 && labelled, |thumb| {
@@ -690,7 +742,7 @@ impl RenderOnce for MaterialSlider {
                         })
                         .whitespace_nowrap()
                         .opacity(bubble)
-                        .child(label);
+                        .child(text);
                     // Centered on the handle, outside its far edge: a fixed-size
                     // anchor box keeps the pill centered without measuring it.
                     let anchor = div().absolute().flex().items_center().justify_center();
@@ -712,101 +764,117 @@ impl RenderOnce for MaterialSlider {
                     };
                     thumb.child(anchor.child(pill.relative()))
                 });
-                ButtonFocusRing::resolved(thumb, keyboard_focus, ring_radius).into_any_element()
+                ButtonFocusRing::resolved(thumb, focused, ring_radius).into_any_element()
             });
 
-        // The icon sits inside the active track's leading end, or past the
-        // handle on the inactive track when the active part is too short.
-        let icon = self
-            .icon
-            .filter(|_| metrics.icon > 0. && !self.centered && !value.is_range())
-            .map(|icon| {
-                let inset = ((metrics.track - metrics.icon) / 2.).min(16.);
-                let p = handles[0];
-                (icon, inset, p)
-            });
-
-        let indicator = SliderIndicator::new(&self.state)
-            .absolute()
-            .children(thumbs);
-        let indicator = if horizontal {
-            indicator
-                .left(rem(handle / 2.))
-                .right(rem(handle / 2.))
-                .top_0()
-                .bottom_0()
+        let track_view = if classic {
+            classic_track(&self.state, self.axis, disabled, &handles, &paint, thumbs)
         } else {
-            indicator
-                .top(rem(handle / 2.))
-                .bottom(rem(handle / 2.))
-                .left_0()
-                .right_0()
-        };
-        let canvas_track = track.clone();
-        let track_view = SliderTrack::new(&self.state)
-            .axis(self.axis)
-            .disabled(disabled)
-            .relative()
-            .size_full()
-            .child(
-                canvas(
-                    |_, _, _| {},
-                    move |bounds, _, window, _| paint_track(bounds, &canvas_track, window),
-                )
+            let scale = f32::from(rem(1.).to_pixels(window.rem_size()));
+            let track = TrackPaint {
+                axis: self.axis,
+                metrics,
+                handle,
+                handles: handles.clone(),
+                centered: self.centered,
+                steps,
+                paint,
+                scale,
+            };
+            // The icon sits inside the active track's leading end, or past the
+            // handle on the inactive track when the active part is too short.
+            let icon = self
+                .icon
+                .filter(|_| metrics.icon > 0. && !self.centered && !is_range)
+                .map(|icon| {
+                    let inset = ((metrics.track - metrics.icon) / 2.).min(16.);
+                    (icon, inset, handles[0])
+                });
+            let indicator = SliderIndicator::new(&self.state)
                 .absolute()
-                .size_full(),
-            )
-            .when_some(icon, |view, (icon, inset, p)| {
-                let size = metrics.icon;
-                let cross = (metrics.handle - size) / 2.;
-                // Too short an active track moves the icon past the handle.
-                let on_active = p >= ICON_MIN_FRACTION;
-                let ink = if on_active {
-                    paint.on_active
-                } else {
-                    paint.on_inactive
-                };
-                let slot = div()
+                .children(thumbs);
+            let indicator = if horizontal {
+                indicator
+                    .left(rem(handle / 2.))
+                    .right(rem(handle / 2.))
+                    .top_0()
+                    .bottom_0()
+            } else {
+                indicator
+                    .top(rem(handle / 2.))
+                    .bottom(rem(handle / 2.))
+                    .left_0()
+                    .right_0()
+            };
+            SliderTrack::new(&self.state)
+                .axis(self.axis)
+                .disabled(disabled)
+                .relative()
+                .size_full()
+                .child(
+                    canvas(
+                        |_, _, _| {},
+                        move |bounds, _, window, _| paint_track(bounds, &track, window),
+                    )
                     .absolute()
-                    .size(rem(size))
-                    .child(icon.size(rem(size)).color(ink));
-                view.child(match (horizontal, on_active) {
-                    (true, true) => slot.top(rem(cross)).left(rem(inset)),
-                    (true, false) => slot
-                        .top(rem(cross))
-                        .left(relative(p))
-                        .ml(rem(handle + HANDLE_GAP + inset)),
-                    (false, true) => slot.left(rem(cross)).bottom(rem(inset)),
-                    (false, false) => slot
-                        .left(rem(cross))
-                        .bottom(relative(p))
-                        .mb(rem(handle + HANDLE_GAP + inset)),
+                    .size_full(),
+                )
+                .when_some(icon, |view, (icon, inset, p)| {
+                    let size = metrics.icon;
+                    let cross = (metrics.handle - size) / 2.;
+                    // Too short an active track moves the icon past the handle.
+                    let on_active = p >= ICON_MIN_FRACTION;
+                    let ink = if on_active {
+                        paint.on_active
+                    } else {
+                        paint.on_inactive
+                    };
+                    let slot = div()
+                        .absolute()
+                        .size(rem(size))
+                        .child(icon.size(rem(size)).color(ink));
+                    view.child(match (horizontal, on_active) {
+                        (true, true) => slot.top(rem(cross)).left(rem(inset)),
+                        (true, false) => slot
+                            .top(rem(cross))
+                            .left(relative(p))
+                            .ml(rem(handle + HANDLE_GAP + inset)),
+                        (false, true) => slot.left(rem(cross)).bottom(rem(inset)),
+                        (false, false) => slot
+                            .left(rem(cross))
+                            .bottom(relative(p))
+                            .mb(rem(handle + HANDLE_GAP + inset)),
+                    })
                 })
-            })
-            .child(indicator);
+                .child(indicator)
+                .into_any_element()
+        };
 
         let slider = Slider::new(&self.state)
             .axis(self.axis)
-            .accessibility_label(self.label)
+            .accessibility_label(label)
             .disabled(disabled)
+            .when(live && !is_range, |slider| slider.track_focus(&focus))
             .size_full()
             .child(track_view);
         let state_entity = self.state.clone();
         let (release, release_out) = (press.clone(), press.clone());
         div()
             .id(id)
-            .track_focus(&focus)
-            .tab_stop(preview.is_none() && !disabled)
             .flex_shrink_0()
             .map(|root| {
                 if horizontal {
-                    root.w_full().h(rem(metrics.handle))
+                    root.w_full().h(rem(cross))
                 } else {
-                    root.h_full().w(rem(metrics.handle))
+                    root.h_full().w(rem(cross))
                 }
             })
             .when(live, |root| {
-                root.capture_any_mouse_down(move |_, window, cx| {
+                root.capture_any_mouse_down(move |event, window, cx| {
+                    // Only the primary button presses (and releases) the slider.
+                    if event.button != MouseButton::Left {
+                        return;
+                    }
                     press.update(cx, |pressed, _| *pressed = true);
                     window.refresh();
                 })
@@ -820,28 +888,35 @@ impl RenderOnce for MaterialSlider {
                 })
                 .on_key_down(move |event, window, cx| {
                     let key = event.keystroke.key.as_str();
+                    let moves_start = is_range && start_focus.is_focused(window);
                     state_entity.update(cx, |state, cx| {
                         let value = state.value();
-                        let Some(next) = stepped_value(
-                            key,
-                            value.end(),
-                            if value.is_range() {
-                                value.start()
-                            } else {
-                                state.min_value()
-                            },
-                            state.max_value(),
-                            state.step_value(),
-                        ) else {
+                        let range = (state.min_value(), state.max_value());
+                        let (current, bounds) = if moves_start {
+                            (value.start(), (range.0, value.end()))
+                        } else if value.is_range() {
+                            (value.end(), (value.start(), range.1))
+                        } else {
+                            (value.end(), range)
+                        };
+                        let Some(next) =
+                            stepped_value(key, current, bounds, range, state.step_value())
+                        else {
                             return;
                         };
-                        if value.is_range() {
+                        cx.stop_propagation();
+                        // At an end the key changes nothing and reports nothing.
+                        if next == current {
+                            return;
+                        }
+                        if moves_start {
+                            state.set_value((next, value.end()), window, cx);
+                        } else if value.is_range() {
                             state.set_value((value.start(), next), window, cx);
                         } else {
                             state.set_value(next, window, cx);
                         }
                         cx.emit(SliderEvent::Change(state.value()));
-                        cx.stop_propagation();
                     });
                 })
             })
@@ -850,10 +925,66 @@ impl RenderOnce for MaterialSlider {
     }
 }
 
+/// The classic track: a 4dp inactive bar with the active part from the
+/// start (or between a range's thumbs), along either axis.
+fn classic_track(
+    state: &Entity<SliderState>,
+    axis: Axis,
+    disabled: bool,
+    handles: &[f32],
+    paint: &SliderPaint,
+    thumbs: impl IntoIterator<Item = AnyElement>,
+) -> AnyElement {
+    let track = slider_geometry(SliderAppearance::Classic).0;
+    let inset = rem((CLASSIC_TARGET - track) / 2.);
+    let (from, to) = match handles {
+        [start, end] => (*start, *end),
+        [end] => (0., *end),
+        _ => (0., 0.),
+    };
+    let horizontal = axis == Axis::Horizontal;
+    let active = div().absolute().rounded_full().bg(paint.active);
+    let active = if horizontal {
+        active
+            .top_0()
+            .h_full()
+            .left(relative(from))
+            .w(relative((to - from).max(0.)))
+    } else {
+        active
+            .left_0()
+            .w_full()
+            .bottom(relative(from))
+            .h(relative((to - from).max(0.)))
+    };
+    // The value-mapping bar spans the whole track; thumbs overhang its ends.
+    let bar = SliderIndicator::new(state)
+        .absolute()
+        .rounded_full()
+        .bg(paint.inactive)
+        .child(active);
+    let bar = if horizontal {
+        bar.left_0().top(inset).w_full().h(rem(track))
+    } else {
+        bar.bottom_0().left(inset).h_full().w(rem(track))
+    };
+    // Thumbs are placed in the 48dp target, relative to the track view.
+    let thumbs = div().absolute().inset_0().children(thumbs);
+    SliderTrack::new(state)
+        .axis(axis)
+        .disabled(disabled)
+        .relative()
+        .size_full()
+        .child(bar)
+        .child(thumbs)
+        .into_any_element()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use core::prelude::v1::test;
+    use std::{cell::Cell, rc::Rc};
 
     #[test]
     fn sizes_follow_the_m3_expressive_tokens() {
@@ -946,13 +1077,173 @@ mod tests {
 
     #[test]
     fn keys_step_page_and_jump() {
-        assert_eq!(stepped_value("right", 50., 0., 100., 1.), Some(51.));
-        assert_eq!(stepped_value("down", 0., 0., 100., 1.), Some(0.));
-        assert_eq!(stepped_value("pageup", 50., 0., 100., 1.), Some(60.));
-        assert_eq!(stepped_value("end", 5., 0., 100., 1.), Some(100.));
-        assert_eq!(stepped_value("a", 5., 0., 100., 1.), None);
+        let full = (0., 100.);
+        assert_eq!(stepped_value("right", 50., full, full, 1.), Some(51.));
+        assert_eq!(stepped_value("down", 0., full, full, 1.), Some(0.));
+        assert_eq!(stepped_value("pageup", 50., full, full, 1.), Some(60.));
+        assert_eq!(stepped_value("end", 5., full, full, 1.), Some(100.));
+        assert_eq!(stepped_value("a", 5., full, full, 1.), None);
         assert_eq!(default_format(42.0001), "42");
         assert_eq!(default_format(0.25), "0.2");
+    }
+
+    #[test]
+    fn page_keys_stay_on_the_step_grid() {
+        let full = (0., 100.);
+        // A tenth of 0..100 is 10, off a step-3 grid: page by 9 instead.
+        assert_eq!(stepped_value("pageup", 0., full, full, 3.), Some(9.));
+        assert_eq!(stepped_value("pagedown", 99., full, full, 3.), Some(90.));
+        // The grid counts from min.
+        assert_eq!(
+            stepped_value("right", 7., (2., 52.), (2., 52.), 5.),
+            Some(12.)
+        );
+        // A range thumb stops at the other thumb.
+        assert_eq!(stepped_value("end", 10., (0., 40.), full, 1.), Some(40.));
+    }
+
+    #[test]
+    fn an_invalid_range_does_not_panic() {
+        assert_eq!(stepped_value("right", 5., (10., 0.), (10., 0.), 1.), None);
+        assert_eq!(
+            stepped_value("right", f32::NAN, (0., 1.), (0., 1.), 1.),
+            None
+        );
+        assert_eq!(
+            stepped_value("right", 0.5, (0., f32::NAN), (0., f32::NAN), 1.),
+            None
+        );
+    }
+
+    /// A slider configured by `configure`, over `state`.
+    struct Configured(Entity<SliderState>, fn(MaterialSlider) -> MaterialSlider);
+    impl Render for Configured {
+        fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+            window.set_rem_size(px(crate::tokens::typography::BASE_PX));
+            div().w(px(240.)).h(px(240.)).p(px(60.)).child(
+                div()
+                    .size_full()
+                    .debug_selector(|| "slider".into())
+                    .child((self.1)(MaterialSlider::new(&self.0, "Level"))),
+            )
+        }
+    }
+
+    fn configured(
+        cx: &mut TestAppContext,
+        state: SliderState,
+        configure: fn(MaterialSlider) -> MaterialSlider,
+    ) -> (Entity<SliderState>, &mut VisualTestContext) {
+        cx.update(|cx| {
+            gpui_base::init(cx);
+            cx.set_reduce_motion(true);
+        });
+        let (view, cx) = cx.add_window_view(|_, cx| Configured(cx.new(|_| state), configure));
+        draw(cx);
+        let state = view.read_with(cx, |v, _| v.0.clone());
+        (state, cx)
+    }
+
+    fn count_changes(state: &Entity<SliderState>, cx: &mut VisualTestContext) -> Rc<Cell<usize>> {
+        let changes = Rc::new(Cell::new(0));
+        cx.update(|_, cx| {
+            let changes = changes.clone();
+            cx.subscribe(state, move |_, event: &SliderEvent, _| {
+                if matches!(event, SliderEvent::Change(_)) {
+                    changes.set(changes.get() + 1)
+                }
+            })
+            .detach();
+        });
+        changes
+    }
+
+    #[gpui::test]
+    fn a_classic_slider_is_tabbable_and_steps_with_arrows(cx: &mut TestAppContext) {
+        let (state, cx) = configured(cx, SliderState::new().max(100.).default_value(30.), |s| {
+            s.appearance(SliderAppearance::Classic)
+        });
+        cx.update(|window, cx| window.focus_next(cx));
+        cx.simulate_keystrokes("right right");
+        assert_eq!(state.read_with(cx, |s, _| s.value().end()), 32.);
+    }
+
+    #[gpui::test]
+    fn a_vertical_classic_slider_follows_its_axis(cx: &mut TestAppContext) {
+        let (_, cx) = configured(cx, SliderState::new().max(100.).default_value(30.), |s| {
+            s.appearance(SliderAppearance::Classic).vertical()
+        });
+        let bounds = cx.debug_bounds("slider").unwrap();
+        let slider = cx.update(|window, _| {
+            gpui_base::test_support::snapshots(window)
+                .into_iter()
+                .find(|s| s.role() == Some(Role::Slider))
+                .unwrap()
+        });
+        assert_eq!(slider.bounds().size.width, px(48.), "a 48dp wide target");
+        assert_eq!(slider.bounds().size.height, bounds.size.height);
+    }
+
+    #[gpui::test]
+    fn keyboard_focus_lands_on_the_slider_node(cx: &mut TestAppContext) {
+        let (_, cx) = configured(cx, SliderState::new().max(100.).default_value(30.), |s| s);
+        cx.update(|window, cx| window.focus_next(cx));
+        draw(cx);
+        let slider = cx.update(|window, _| {
+            gpui_base::test_support::snapshots(window)
+                .into_iter()
+                .find(|s| s.role() == Some(Role::Slider))
+                .unwrap()
+        });
+        assert_eq!(slider.label(), Some("Level"));
+        assert_eq!(slider.focused(), Some(true), "{slider:?}");
+    }
+
+    #[gpui::test]
+    fn tab_moves_between_range_thumbs_and_each_takes_arrows(cx: &mut TestAppContext) {
+        let (state, cx) = configured(
+            cx,
+            SliderState::new().max(100.).default_value((20., 60.)),
+            |s| s,
+        );
+        cx.update(|window, cx| window.focus_next(cx));
+        cx.simulate_keystrokes("right");
+        assert_eq!(state.read_with(cx, |s, _| s.value()), (21., 60.).into());
+        cx.update(|window, cx| window.focus_next(cx));
+        cx.simulate_keystrokes("left left");
+        assert_eq!(state.read_with(cx, |s, _| s.value()), (21., 58.).into());
+    }
+
+    #[gpui::test]
+    fn keys_at_an_end_report_no_change(cx: &mut TestAppContext) {
+        let (state, cx) = configured(cx, SliderState::new().max(100.).default_value(100.), |s| s);
+        let changes = count_changes(&state, cx);
+        cx.update(|window, cx| window.focus_next(cx));
+        cx.simulate_keystrokes("right end pageup");
+        assert_eq!(changes.get(), 0);
+        cx.simulate_keystrokes("left");
+        assert_eq!(changes.get(), 1);
+    }
+
+    #[gpui::test]
+    fn only_the_primary_button_presses_the_slider(cx: &mut TestAppContext) {
+        let (_, cx) = configured(cx, SliderState::new().max(100.).default_value(30.), |s| s);
+        let thumb_width = |cx: &mut VisualTestContext| {
+            cx.update(|window, _| {
+                gpui_base::test_support::find(window, &[], &ElementId::from(("slider-thumb", 0u32)))
+                    .unwrap()
+                    .bounds()
+                    .size
+                    .width
+            })
+        };
+        let resting = thumb_width(cx);
+        assert_eq!(resting, px(HANDLE_WIDTH));
+        let at = cx.debug_bounds("slider").unwrap().center();
+        cx.simulate_mouse_down(at, MouseButton::Right, Modifiers::default());
+        cx.simulate_mouse_up(at, MouseButton::Right, Modifiers::default());
+        draw(cx);
+        assert_eq!(thumb_width(cx), resting, "a right click left it pressed");
     }
 
     struct SliderHarness(Entity<SliderState>, Option<InteractionPreview>);

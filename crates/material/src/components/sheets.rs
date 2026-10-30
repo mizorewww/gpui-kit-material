@@ -87,6 +87,7 @@ pub struct MaterialSideSheet {
     specimen: bool,
     width: Rems,
     headline: Option<SharedString>,
+    label: Option<SharedString>,
     back: Option<(SharedString, Handler)>,
     close_label: Option<SharedString>,
     actions: Vec<AnyElement>,
@@ -103,6 +104,7 @@ impl MaterialSideSheet {
             specimen: false,
             width: rem(320.),
             headline: None,
+            label: None,
             back: None,
             close_label: None,
             actions: Vec::new(),
@@ -132,6 +134,12 @@ impl MaterialSideSheet {
     /// The title-large headline in the header.
     pub fn headline(mut self, headline: impl Into<SharedString>) -> Self {
         self.headline = Some(headline.into());
+        self
+    }
+    /// The modal sheet's accessible name when it differs from (or there is
+    /// no) headline.
+    pub fn label(mut self, label: impl Into<SharedString>) -> Self {
+        self.label = Some(label.into());
         self
     }
     /// A leading back button named `label`.
@@ -311,9 +319,11 @@ impl RenderOnce for MaterialSideSheet {
             }
             let width = self.width.to_pixels(window.rem_size());
             let dismiss = self.on_dismiss.clone().filter(|_| open);
+            let name = self.label.clone().or_else(|| self.headline.clone());
             let surface = div()
                 .id(id)
                 .role(Role::Dialog)
+                .when_some(name, |surface, name| surface.aria_label(name))
                 .absolute()
                 .top_0()
                 .bottom_0()
@@ -414,6 +424,9 @@ struct Settle {
 
 struct BottomSheetState {
     height: Pixels,
+    /// Whether `height` is the sheet's measured height yet (it starts as
+    /// the viewport's).
+    measured: bool,
     expanded: bool,
     drag: Option<Drag>,
     settle: Option<Settle>,
@@ -452,6 +465,7 @@ pub struct MaterialBottomSheet {
     id: ElementId,
     open: Option<bool>,
     modal: bool,
+    label: Option<SharedString>,
     drag_handle: Option<SharedString>,
     partial: Option<Rems>,
     on_dismiss: Option<Handler>,
@@ -464,6 +478,7 @@ impl MaterialBottomSheet {
             id: id.into(),
             open: None,
             modal: false,
+            label: None,
             drag_handle: None,
             partial: None,
             on_dismiss: None,
@@ -478,6 +493,11 @@ impl MaterialBottomSheet {
     }
     pub fn modal(mut self, modal: bool) -> Self {
         self.modal = modal;
+        self
+    }
+    /// The modal sheet's accessible name.
+    pub fn label(mut self, label: impl Into<SharedString>) -> Self {
+        self.label = Some(label.into());
         self
     }
     /// Show the drag handle; `label` is its accessible name. Activating it
@@ -514,8 +534,17 @@ fn drag_handle_bar() -> Div {
 }
 
 impl MaterialBottomSheet {
-    fn surface(modal: bool, handle: Option<AnyElement>, children: Vec<AnyElement>) -> Div {
+    /// The sheet surface. `drag_layer` sits under the handle and content;
+    /// the content blocks it, so drags start from the handle row and the
+    /// sheet's own background, never from text, sliders or buttons inside.
+    fn surface(
+        modal: bool,
+        drag_layer: Option<AnyElement>,
+        handle: Option<AnyElement>,
+        children: Vec<AnyElement>,
+    ) -> Div {
         div()
+            .relative()
             .w_full()
             .max_w(rem(BOTTOM_SHEET_MAX_WIDTH))
             .flex()
@@ -524,8 +553,16 @@ impl MaterialBottomSheet {
             .rounded_t(BOTTOM_SHEET_RADIUS)
             .bg(color(ColorRole::SURFACE_CONTAINER_LOW))
             .when(!modal, |sheet| sheet.shadow(elevation::level1()))
+            .children(drag_layer)
             .children(handle)
-            .child(div().w_full().flex().flex_col().children(children))
+            .child(
+                div()
+                    .w_full()
+                    .flex()
+                    .flex_col()
+                    .block_mouse_except_scroll()
+                    .children(children),
+            )
     }
 }
 
@@ -564,7 +601,7 @@ impl RenderOnce for MaterialBottomSheet {
                 .flex_col()
                 .justify_end()
                 .items_center()
-                .child(Self::surface(modal, handle, self.children).flex_1())
+                .child(Self::surface(modal, None, handle, self.children).flex_1())
                 .into_any_element();
         };
         let id = self.id.clone();
@@ -573,6 +610,7 @@ impl RenderOnce for MaterialBottomSheet {
         let state = window.use_keyed_state((id.clone(), "bottom-sheet"), cx, |window, _| {
             BottomSheetState {
                 height: window.viewport_size().height,
+                measured: false,
                 expanded: false,
                 drag: None,
                 settle: None,
@@ -590,9 +628,15 @@ impl RenderOnce for MaterialBottomSheet {
         let partial = self
             .partial
             .map(|partial| f32::from(partial.to_pixels(window.rem_size())));
-        let (height, expanded, drag, settle) = {
+        let (height, measured, expanded, drag, settle) = {
             let s = state.read(cx);
-            (f32::from(s.height), s.expanded, s.drag, s.settle)
+            (
+                f32::from(s.height),
+                s.measured,
+                s.expanded,
+                s.drag,
+                s.settle,
+            )
         };
         let visible = match partial {
             Some(partial) if !expanded => partial.min(height),
@@ -651,22 +695,20 @@ impl RenderOnce for MaterialBottomSheet {
         let tracker = state.clone();
         let release_dismiss = dismiss.clone();
         let dragging = drag.is_some();
-        let sheet = div()
-            .id(id.clone())
-            .when(modal, |sheet| sheet.role(Role::Dialog))
-            .absolute()
-            .left_0()
-            .right_0()
-            .bottom(px(-offset))
-            .flex()
-            .justify_center()
-            .opacity(frame.opacity())
-            .occlude()
-            .on_mouse_down(MouseButton::Left, {
-                let state = state.clone();
-                move |event, window, cx| {
+        let starter = state.clone();
+        let drag_layer = canvas(
+            |bounds, window, _| window.insert_hitbox(bounds, HitboxBehavior::Normal),
+            move |_, hitbox, window, _| {
+                let starter = starter.clone();
+                window.on_mouse_event(move |event: &MouseDownEvent, phase, window, cx| {
+                    if phase != DispatchPhase::Bubble
+                        || event.button != MouseButton::Left
+                        || !hitbox.is_hovered(window)
+                    {
+                        return;
+                    }
                     let y = f32::from(event.position.y);
-                    state.update(cx, |state, _| {
+                    starter.update(cx, |state, _| {
                         state.drag = Some(Drag {
                             start: y,
                             offset: 0.,
@@ -675,10 +717,32 @@ impl RenderOnce for MaterialBottomSheet {
                         state.settle = None;
                     });
                     window.refresh();
-                }
+                });
+            },
+        )
+        .absolute()
+        .size_full()
+        .into_any_element();
+        let sheet = div()
+            .id(id.clone())
+            .when(modal, |sheet| {
+                sheet
+                    .role(Role::Dialog)
+                    .when_some(self.label, |sheet, label| sheet.aria_label(label))
             })
+            .absolute()
+            .left_0()
+            .right_0()
+            .bottom(px(-offset))
+            .flex()
+            .justify_center()
+            .opacity(frame.opacity())
+            // Until its height is measured the sheet would sit at the
+            // viewport-height guess; the next frame places it at its detent.
+            .when(!measured, |sheet| sheet.invisible())
+            .occlude()
             .child(
-                Self::surface(modal, handle, self.children).child(
+                Self::surface(modal, Some(drag_layer), handle, self.children).child(
                     canvas(
                         |_, _, _| {},
                         move |_, _, window, _| {
@@ -750,10 +814,20 @@ impl RenderOnce for MaterialBottomSheet {
             .child(
                 // Measure the sheet's height for the next frame's offsets.
                 canvas(
-                    move |bounds, _, cx| {
+                    move |bounds, window, cx| {
                         let height = bounds.size.height;
-                        if measure.read(cx).height != height {
-                            measure.update(cx, |state, _| state.height = height);
+                        let stale = {
+                            let state = measure.read(cx);
+                            !state.measured || state.height != height
+                        };
+                        if stale {
+                            measure.update(cx, |state, _| {
+                                state.height = height;
+                                state.measured = true;
+                            });
+                            // This frame used the old height (`refresh` is
+                            // ignored while drawing): draw again at the detent.
+                            window.request_animation_frame();
                         }
                     },
                     |_, _, _, _| {},
@@ -940,7 +1014,8 @@ mod tests {
         draw(cx);
         let body = cx.debug_bounds("bottom-body").unwrap();
         assert_eq!(body.bottom(), px(400.), "an open sheet meets the bottom");
-        let start = body.center();
+        // Drags start from the handle row above the content.
+        let start = point(body.left() + px(20.), body.top() - px(10.));
         cx.simulate_mouse_down(start, MouseButton::Left, Modifiers::default());
         draw(cx);
         cx.simulate_mouse_move(
@@ -980,5 +1055,71 @@ mod tests {
         draw(cx);
         draw(cx);
         assert!(cx.debug_bounds("bottom-body").is_none());
+    }
+
+    #[gpui::test]
+    fn pressing_content_does_not_drag_the_sheet(cx: &mut TestAppContext) {
+        cx.update(|cx| {
+            gpui_base::init(cx);
+            cx.set_reduce_motion(true);
+        });
+        let (view, cx) = cx.add_window_view(|_, _| BottomHarness {
+            open: true,
+            dismissals: 0,
+        });
+        draw(cx);
+        draw(cx);
+        let body = cx.debug_bounds("bottom-body").unwrap();
+        let start = body.center();
+        cx.simulate_mouse_down(start, MouseButton::Left, Modifiers::default());
+        draw(cx);
+        let end = point(start.x, start.y + px(180.));
+        cx.simulate_mouse_move(end, Some(MouseButton::Left), Modifiers::default());
+        draw(cx);
+        assert_eq!(
+            cx.debug_bounds("bottom-body").unwrap().top(),
+            body.top(),
+            "a press on the content (text, a slider) moved the sheet"
+        );
+        cx.simulate_mouse_up(end, MouseButton::Left, Modifiers::default());
+        draw(cx);
+        assert_eq!(view.read_with(cx, |v, _| v.dismissals), 0);
+    }
+
+    struct PartialHarness;
+    impl Render for PartialHarness {
+        fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+            div().relative().size(px(400.)).child(
+                MaterialBottomSheet::new("partial")
+                    .open(true)
+                    .partial_height(rem(100.))
+                    .child(div().debug_selector(|| "partial-body".into()).h(px(300.))),
+            )
+        }
+    }
+
+    #[gpui::test]
+    fn a_bottom_sheet_opens_at_its_measured_detent(cx: &mut TestAppContext) {
+        cx.update(|cx| {
+            gpui_base::init(cx);
+            cx.set_reduce_motion(true);
+        });
+        let (_, cx) = cx.add_window_view(|window, _| {
+            window.set_rem_size(px(crate::tokens::typography::BASE_PX));
+            PartialHarness
+        });
+        cx.update(|window, cx| {
+            window.refresh();
+            window.draw(cx).clear(cx);
+        });
+        // The first frame guessed the viewport height; it asks for another.
+        let frames = cx.update(|window, cx| window.simulate_next_frame(cx));
+        assert!(frames > 0, "the measured height was stored silently");
+        cx.update(|window, cx| window.draw(cx).clear(cx));
+        let body = cx.debug_bounds("partial-body").unwrap();
+        // 100dp of the sheet shows above the bottom edge.
+        assert_eq!(body.top(), px(300.), "{body:?}");
+        let frames = cx.update(|window, cx| window.simulate_next_frame(cx));
+        assert_eq!(frames, 0, "a settled sheet requests nothing");
     }
 }

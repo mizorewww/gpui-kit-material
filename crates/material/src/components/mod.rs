@@ -16,8 +16,12 @@ mod standard_button_group;
 pub use icon_button::{IconButton, IconButtonVariant};
 pub use split_button::{SplitButton, SplitButtonPart};
 pub use standard_button_group::{ButtonGroup, EXPANDED_RATIO, standard_group_gap};
+#[cfg(test)]
+mod a11y_tests;
 mod app_bar;
 mod button_group;
+#[cfg(test)]
+mod color_guard_tests;
 #[cfg(test)]
 mod controls;
 mod divider;
@@ -120,8 +124,9 @@ pub use progress::{
     circular_indeterminate_frame, circular_progress, circular_progress_size, icon_spinner,
     icon_spinner_with_playback, indeterminate_circular_progress,
     indeterminate_circular_progress_with_playback, indeterminate_linear_progress_with_playback,
-    indeterminate_progress, indeterminate_progress_with_playback, linear_indeterminate_lines,
-    linear_progress, progress, sample_circular_progress, spinner, spinner_with_playback,
+    indeterminate_progress, indeterminate_progress_with_label,
+    indeterminate_progress_with_playback, linear_indeterminate_lines, linear_progress, progress,
+    progress_with_label, sample_circular_progress, spinner, spinner_with_playback,
 };
 pub use radio::{MaterialRadio, MaterialRadioGroup};
 pub use sheets::{MaterialBottomSheet, MaterialSideSheet};

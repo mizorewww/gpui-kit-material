@@ -25,7 +25,7 @@ use crate::tokens::state;
 use gpui::{
     AnyElement, App, Decorations, ElementId, InteractiveElement as _, IntoElement, MouseButton,
     ParentElement as _, Pixels, RenderOnce, Rgba, SharedString, StatefulInteractiveElement as _,
-    Styled, Window, WindowControlArea, div, prelude::FluentBuilder as _, px, rgb,
+    Styled, Window, WindowControlArea, div, prelude::FluentBuilder as _, px,
 };
 use std::rc::Rc;
 
@@ -73,16 +73,32 @@ const LINUX_END: f32 = 12.;
 /// The glyphs are drawn on a 10px grid.
 const GLYPH: f32 = 10.;
 
-/// The close button turns the platform's red with white glyphs on Windows,
-/// whatever the palette.
+/// A platform color, not a Material role: Windows 11 turns a hovered
+/// caption close button red (`#C42B1C`) behind a white glyph whatever the
+/// app's palette, as its own title bars and WinUI 3's `TitleBar` caption
+/// buttons do. Pressed keeps the red at 90% opacity.
+const WINDOWS_CLOSE_RED: Rgba = Rgba {
+    r: 0xc4 as f32 / 255.,
+    g: 0x2b as f32 / 255.,
+    b: 0x1c as f32 / 255.,
+    a: 1.,
+};
+/// The glyph over [`WINDOWS_CLOSE_RED`].
+const WINDOWS_CLOSE_GLYPH: Rgba = Rgba {
+    r: 1.,
+    g: 1.,
+    b: 1.,
+    a: 1.,
+};
+
 fn close_hover() -> Rgba {
-    rgb(0xc42b1c)
+    WINDOWS_CLOSE_RED
 }
 
 fn close_pressed() -> Rgba {
     Rgba {
         a: 0.9,
-        ..rgb(0xc42b1c)
+        ..WINDOWS_CLOSE_RED
     }
 }
 
@@ -365,7 +381,7 @@ fn windows_button(
         let clear = Rgba { a: 0., ..ink };
         (state::hovered(clear, ink), state::pressed(clear, ink))
     };
-    let on_close = rgb(0xffffff);
+    let on_close = WINDOWS_CLOSE_GLYPH;
     div()
         .id(button.id())
         .role(gpui::Role::Button)

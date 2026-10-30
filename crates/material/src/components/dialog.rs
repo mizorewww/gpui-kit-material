@@ -51,6 +51,7 @@ pub struct MaterialDialog {
     id: ElementId,
     icon: Option<Icon>,
     headline: Option<SharedString>,
+    label: Option<SharedString>,
     supporting: Option<SharedString>,
     content: Vec<AnyElement>,
     actions: Vec<AnyElement>,
@@ -74,6 +75,7 @@ impl MaterialDialog {
             id: id.into(),
             icon: None,
             headline: None,
+            label: None,
             supporting: None,
             content: Vec::new(),
             actions: Vec::new(),
@@ -91,6 +93,12 @@ impl MaterialDialog {
     }
     pub fn headline(mut self, headline: impl Into<SharedString>) -> Self {
         self.headline = Some(headline.into());
+        self
+    }
+    /// The modal dialog's accessible name when it differs from (or there is
+    /// no) headline.
+    pub fn label(mut self, label: impl Into<SharedString>) -> Self {
+        self.label = Some(label.into());
         self
     }
     pub fn supporting_text(mut self, text: impl Into<SharedString>) -> Self {
@@ -434,6 +442,7 @@ impl RenderOnce for MaterialDialog {
         let cancel_dismiss = dismiss.clone();
         let viewport = window.viewport_size();
         let opacity = frame.opacity();
+        let name = self.label.clone().or_else(|| self.headline.clone());
         let surface = if full_screen {
             div()
                 .absolute()
@@ -452,6 +461,7 @@ impl RenderOnce for MaterialDialog {
         };
         gpui_base::Dialog::new(cx)
             .open(true)
+            .when_some(name, |dialog, name| dialog.accessibility_label(name))
             .focus_handle(focus)
             .close_on_escape(true)
             .close_on_backdrop_press(open)
