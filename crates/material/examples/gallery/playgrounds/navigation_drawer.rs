@@ -339,9 +339,8 @@ fn preview(
         .overflow_hidden()
         .border_1()
         .border_color(color(ColorRole::OUTLINE_VARIANT));
-    if modal {
-        frame.child(content).child(drawer).into_any_element()
-    } else if end {
+    // A modal drawer overlays the content; a standard one sits on its edge.
+    if modal || end {
         frame.child(content).child(drawer).into_any_element()
     } else {
         frame.child(drawer).child(content).into_any_element()
