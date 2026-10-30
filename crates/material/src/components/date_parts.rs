@@ -48,7 +48,7 @@ pub const GRID_WEEKS: usize = 6;
 pub(crate) type Activate = Rc<dyn Fn(&mut Window, &mut App)>;
 
 /// The weeks shown for `year`/`month` starting on `first_day`: always
-/// [`GRID_WEEKS`] rows of seven dates, padded with adjacent-month days.
+/// `GRID_WEEKS` (six) rows of seven dates, padded with adjacent-month days.
 pub fn month_weeks(year: i32, month: u32, first_day: Weekday) -> Vec<[NaiveDate; 7]> {
     let first = first_of_month(year, month);
     let offset =

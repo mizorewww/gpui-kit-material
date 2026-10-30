@@ -68,7 +68,7 @@ fn the_bar_paints_a_surface_container_high_pill(cx: &mut TestAppContext) {
             .find(|q| {
                 q.bounds.size.width.0 == 360. * scale
                     && q.bounds.size.height.0 == 56. * scale
-                    && q.background.is_opaque()
+                    && q.background == expected
             })
             .expect("the bar paints its container");
         assert_eq!(pill.background, expected);
