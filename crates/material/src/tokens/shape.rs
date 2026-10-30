@@ -1,7 +1,11 @@
 //! Corner radii and the connected-group corner rule.
 use gpui::{Pixels, Styled, px};
 
-// The M3 / M3 Expressive corner scale. Corners are dp-sized geometry and do
+// The M3 / M3 Expressive corner scale: m3e's `--m3e-sys-shape-corner-value-*`
+// (kyra-labs/m3exp-web 3b1e0047c0021eab7b4c0128fa1bec95c76ca746,
+// packages/m3e-tokens/src/generated/tokens.css, from Compose ShapeTokens.kt
+// @ androidx 19991f2c L28-L81); md3.io agrees. Fixture:
+// tests/fixtures/m3e-sys-tokens.json. Corners are dp-sized geometry and do
 // not follow the text scale.
 
 /// M3 corner none (0).
@@ -98,6 +102,28 @@ mod tests {
         for (radius, expected) in scale {
             assert_eq!(radius, px(expected));
         }
+        let fixture: serde_json::Value =
+            serde_json::from_str(include_str!("../../tests/fixtures/m3e-sys-tokens.json")).unwrap();
+        let reference = &fixture["shape_corner_px"];
+        for (radius, name) in [
+            (RADIUS_NONE, "none"),
+            (RADIUS_EXTRA_SMALL, "extra-small"),
+            (RADIUS_SMALL, "small"),
+            (RADIUS_MEDIUM, "medium"),
+            (RADIUS_LARGE, "large"),
+            (RADIUS_LARGE_INCREASED, "large-increased"),
+            (RADIUS_EXTRA_LARGE, "extra-large"),
+            (RADIUS_EXTRA_LARGE_INCREASED, "extra-large-increased"),
+            (RADIUS_EXTRA_EXTRA_LARGE, "extra-extra-large"),
+        ] {
+            assert_eq!(
+                radius,
+                px(reference[name].as_f64().unwrap() as f32),
+                "{name}"
+            );
+        }
+        // m3e's full corner is infinite; 999px rounds any control into a pill.
+        assert_eq!(reference["full"], "infinity");
         assert_eq!(FIELD_RADIUS, px(4.), "M3 text fields use extra-small");
         assert_eq!(RADIUS_CARD, px(12.), "M3 cards use medium");
     }

@@ -236,6 +236,7 @@ def sys_tokens(source, tokens):
         "shape_corner_px": dict(sorted(shape.items())),
         "elevation": elevation,
         "state_layer_opacity": state,
+        "disabled_alpha": float(tokens["--m3e-sys-state-disabled-alpha"]),
         "button": {
             "sizes": buttons,
             "defaults": {key.removeprefix("--m3e-comp-"): px(value)

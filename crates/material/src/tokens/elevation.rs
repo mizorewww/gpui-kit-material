@@ -1,7 +1,12 @@
 //! M3 elevation shadows, painted with [`ColorRole::SHADOW`].
 //!
 //! Each level is the reference two-layer box shadow: a key layer at 30% and
-//! an ambient layer at 15% of the shadow role.
+//! an ambient layer at 15% of the shadow role. The table is m3e's
+//! `--m3e-sys-elevation-level*-shadow` (kyra-labs/m3exp-web
+//! `3b1e0047c0021eab7b4c0128fa1bec95c76ca746`,
+//! `packages/m3e-tokens/src/generated/tokens.css`), which m3e vendors from
+//! Material Web 2.5.0 because Compose draws platform shadows; md3.io agrees.
+//! Fixture: `tests/fixtures/m3e-sys-tokens.json`.
 //!
 //! | Level | Key (x/y/blur/spread @ 30%) | Ambient (x/y/blur/spread @ 15%) |
 //! |-------|-----------------------------|---------------------------------|
@@ -140,6 +145,31 @@ mod tests {
             assert_layer(&shadows[1], ambient.0, ambient.1, ambient.2, 0.15);
         }
         assert_eq!(level(9), level5(), "levels above 5 clamp");
+    }
+
+    #[test]
+    fn levels_match_the_pinned_m3e_shadows() {
+        let fixture: serde_json::Value =
+            serde_json::from_str(include_str!("../../tests/fixtures/m3e-sys-tokens.json")).unwrap();
+        let levels = fixture["elevation"].as_array().unwrap();
+        assert_eq!(levels.len(), MAX_LEVEL as usize + 1);
+        assert!(levels[0]["layers"].as_array().unwrap().is_empty());
+        for level in 1..=MAX_LEVEL {
+            let reference = levels[level as usize]["layers"].as_array().unwrap();
+            let shadows = super::level(level);
+            assert_eq!(shadows.len(), reference.len());
+            for (shadow, layer) in shadows.iter().zip(reference) {
+                let value = |key: &str| layer[key].as_f64().unwrap() as f32;
+                assert_eq!(value("x"), 0.);
+                assert_layer(
+                    shadow,
+                    value("y"),
+                    value("blur"),
+                    value("spread"),
+                    value("opacity"),
+                );
+            }
+        }
     }
 
     #[test]
