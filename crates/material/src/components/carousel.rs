@@ -112,7 +112,9 @@ pub(crate) fn keylines(layout: CarouselLayout, width: f32, large: f32) -> Keylin
         }
         CarouselLayout::Uncontained => {
             let large = large.min(available);
-            let count = ((available + gap) / (large + gap)).ceil().max(1.) as usize;
+            // Items run off the trailing edge: keylines cover the viewport
+            // past the trailing padding.
+            let count = ((width - pad + gap) / (large + gap)).ceil().max(1.) as usize;
             (vec![large; count], count, large)
         }
         CarouselLayout::MultiBrowse => {
@@ -196,7 +198,9 @@ pub(crate) fn place(
     }
     if j >= last as f32 {
         let edge = lines[last];
-        let x = edge.x + (j - last as f32) * (edge.width + gap);
+        // Past the trailing keyline an item waits beyond the trailing
+        // padding (the leading padding mirrors it), so none peeks in.
+        let x = edge.x + (j - last as f32) * (edge.width + gap + lines[0].x);
         return Keyline {
             x,
             width: edge.width,
@@ -266,6 +270,8 @@ struct ScrollAnimation {
 
 #[derive(Default)]
 struct CarouselState {
+    /// Whether the start position has been applied.
+    started: bool,
     scroll: f32,
     width: Option<f32>,
     animation: Option<ScrollAnimation>,
@@ -412,6 +418,19 @@ impl RenderOnce for MaterialCarousel {
         let reduced = cx.reduce_motion();
 
         // Advance a snap or keyboard scroll animation.
+        if !state.read(cx).started {
+            // A center-aligned hero starts with its first item at the
+            // leading small keyline and the second at the hero.
+            let start = if layout == CarouselLayout::CenteredHero {
+                step.min(max)
+            } else {
+                0.
+            };
+            state.update(cx, |state, _| {
+                state.started = true;
+                state.scroll = start;
+            });
+        }
         let mut scroll = state.read(cx).scroll.clamp(0., max);
         if let Some(animation) = state.read(cx).animation {
             let curve = motion::curve(MotionToken::DefaultSpatial);
@@ -745,8 +764,12 @@ mod tests {
             "the next item moved toward the start"
         );
         assert!(
-            cx.debug_bounds("item-4").is_some(),
-            "a further item scrolled in"
+            cx.debug_bounds("item-3").is_some(),
+            "the next item scrolled in"
+        );
+        assert!(
+            cx.debug_bounds("item-4").is_none(),
+            "items beyond the keylines stay hidden"
         );
     }
 }
