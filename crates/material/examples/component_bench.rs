@@ -65,6 +65,9 @@ mod bench {
         KitList,
         /// Plain quads and text: the engine without components.
         Simple,
+        /// Plain rows, each built inside an update of one shared entity, as
+        /// rows that need that entity's `Context` for their listeners are.
+        Leased,
         /// A row of six instances of one component.
         Cells(Component),
     }
@@ -132,6 +135,10 @@ mod bench {
         quiet_frames: usize,
         settle_frames: usize,
         rows: usize,
+        /// Where wheel events land, from the list's left edge; the list's
+        /// center by default. Wheel events move the pointer there, and a
+        /// control under it hovers.
+        wheel_x: Option<f32>,
         idle_seconds: f64,
         width: f32,
         height: f32,
@@ -142,8 +149,8 @@ mod bench {
         let cells: Vec<&str> = CELLS.iter().map(|(name, _)| *name).collect();
         eprintln!(
             "invalid argument {arg}\nusage: component_bench [--mode scroll|redraw|idle] \
-             [--content material-list|kit-list|simple|{}] [--frames n] [--quiet-frames n] [--settle-frames n] \
-             [--rows n] [--idle-seconds s] [--width px] [--height px] [--out file.json]",
+             [--content material-list|kit-list|simple|leased|{}] [--frames n] [--quiet-frames n] [--settle-frames n] \
+             [--rows n] [--wheel-x px] [--idle-seconds s] [--width px] [--height px] [--out file.json]",
             cells.join("|")
         );
         std::process::exit(2)
@@ -158,6 +165,7 @@ mod bench {
             quiet_frames: 45,
             settle_frames: 90,
             rows: 4_000,
+            wheel_x: None,
             idle_seconds: 3.,
             width: 1280.,
             height: 800.,
@@ -181,6 +189,7 @@ mod bench {
                         "material-list" => Content::MaterialList,
                         "kit-list" => Content::KitList,
                         "simple" => Content::Simple,
+                        "leased" => Content::Leased,
                         other => Content::Cells(
                             CELLS
                                 .iter()
@@ -203,6 +212,9 @@ mod bench {
                         value().parse().unwrap_or_else(|_| usage("--settle-frames"))
                 }
                 "--rows" => options.rows = value().parse().unwrap_or_else(|_| usage("--rows")),
+                "--wheel-x" => {
+                    options.wheel_x = Some(value().parse().unwrap_or_else(|_| usage("--wheel-x")))
+                }
                 "--idle-seconds" => {
                     options.idle_seconds =
                         value().parse().unwrap_or_else(|_| usage("--idle-seconds"))
@@ -226,6 +238,7 @@ mod bench {
         renders: Rc<Cell<u64>>,
         row_builds: Rc<Cell<u64>>,
         inputs: Inputs,
+        shared: Entity<()>,
     }
 
     fn simple_row(index: usize) -> AnyElement {
@@ -457,6 +470,7 @@ mod bench {
             self.renders.set(self.renders.get() + 1);
             let (content, inputs, builds) =
                 (self.content, self.inputs.clone(), self.row_builds.clone());
+            let shared = self.shared.clone();
             div()
                 .size_full()
                 .bg(color(ColorRole::SURFACE))
@@ -468,6 +482,7 @@ mod bench {
                             Content::MaterialList => material_row(index),
                             Content::KitList => kit_row(index),
                             Content::Simple => simple_row(index),
+                            Content::Leased => shared.update(cx, |_, _| simple_row(index)),
                             Content::Cells(kind) => cell_row(kind, index, &inputs, window, cx),
                         }
                     })
@@ -486,6 +501,7 @@ mod bench {
         quiet: usize,
         settle: usize,
         frames: usize,
+        wheel_x: Option<f32>,
         view: Entity<Bench>,
         engine_at_start: Value,
         recorded: Vec<Frame>,
@@ -571,7 +587,10 @@ mod bench {
                 let bounds = list.viewport_bounds();
                 window.dispatch_event(
                     PlatformInput::Scroll(ScrollEvent {
-                        position: bounds.center(),
+                        position: match run.wheel_x {
+                            Some(x) => point(bounds.left() + px(x), bounds.center().y),
+                            None => bounds.center(),
+                        },
                         delta: ScrollDelta::Pixels(point(px(0.), px(-STEP_PX))),
                         ..Default::default()
                     }),
@@ -652,12 +671,14 @@ mod bench {
                     {
                         let (renders, row_builds) = (renders.clone(), row_builds.clone());
                         move |_, cx| {
+                            let shared = cx.new(|_| ());
                             cx.new(|_| Bench {
                                 list: ListState::new(rows, ListAlignment::Top, px(256.)),
                                 content,
                                 renders,
                                 row_builds,
                                 inputs: Default::default(),
+                                shared,
                             })
                         }
                     },
@@ -690,6 +711,7 @@ mod bench {
                                     "seconds":seconds,"metadata":metadata,
                                     "columns":["instructions","cycles","cpu_ns","allocations","allocated_bytes"],
                                     "total":after.0.since(before.0).row(),
+                                    "frames_before_window":before.1.0,
                                     "frames_drawn":after.1.0.saturating_sub(before.1.0),
                                     "views_built":after.1.1.saturating_sub(before.1.1),
                                     "root_renders":end_renders-start_renders,
@@ -723,8 +745,12 @@ mod bench {
                     );
                     cx.quit();
                 });
-                let (frames, quiet, settle) =
-                    (options.frames, options.quiet_frames, options.settle_frames);
+                let (frames, quiet, settle, wheel_x) = (
+                    options.frames,
+                    options.quiet_frames,
+                    options.settle_frames,
+                    options.wheel_x,
+                );
                 window
                     .update(cx, move |_, window, cx| {
                         let run = Run {
@@ -732,6 +758,7 @@ mod bench {
                             quiet,
                             settle,
                             frames,
+                            wheel_x,
                             view,
                             engine_at_start: Value::Null,
                             recorded: Vec::with_capacity(frames),
