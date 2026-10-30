@@ -50,6 +50,9 @@
 - Every component must appear in the shared desktop/WASM gallery, have tests
   for its meaningful rules, and receive independent subagent approval. A source
   review, successful build or reference fixture alone is not conformance PASS.
+- A component is stable only when it meets
+  [docs/PRODUCTION.md](docs/PRODUCTION.md). Keep
+  [docs/COVERAGE.md](docs/COVERAGE.md) honest when a component's status changes.
 - The Gallery is an interactive application, not a static board. Its UI follows
   md3.io's component pages (navigation by component group, live preview with
   theme and light/dark switch, and a configuration panel whose switches,
