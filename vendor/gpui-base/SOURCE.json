@@ -51,8 +51,8 @@
       "upstream_sha256": "cfbcc4cbe63aeb5bb6ffc27af0505b59c5fec3054310beaf29e947e14cf6424e"
     },
     "src/slider.rs": {
-      "local_sha256": "6e4fa57ebd6f99f4b46931ec27249c2b56c4306900cc52f98232c8c02784b59c",
-      "reason": "Step snapping counted from min with no snap for a non-positive step, AT Increment/Decrement that move only a range's end, and Slider::track_focus for a focusable slider node (motion-patch.md).",
+      "local_sha256": "204cd60d9f668329cbfe986cd00e1da914c943925de12609c09b67e44429808c",
+      "reason": "Step snapping counted from min, AT Increment/Decrement that move only a range's end, and Slider::track_focus for a focusable slider node (motion-patch.md).",
       "upstream_sha256": "71b801a92588d12f7931a5a9e1745fb62f4283ae87d651d4004ae9b41ad72da3"
     },
     "src/text_selection.rs": {

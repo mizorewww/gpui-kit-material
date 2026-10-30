@@ -419,12 +419,7 @@ impl SliderState {
 }
 
 /// `value` on the nearest step counted from `min`, kept inside the range.
-/// A step that is not positive and finite leaves the value continuous
-/// (a zero step used to divide by zero and produce NaN).
 fn snap_to_step(value: f32, min: f32, max: f32, step: f32) -> f32 {
-    if !(step > 0. && step.is_finite()) {
-        return value;
-    }
     (min + ((value - min) / step).round() * step)
         .min(max)
         .max(min)
@@ -981,16 +976,13 @@ mod tests {
     }
 
     #[test]
-    fn dragging_snaps_from_min_and_a_zero_step_stays_continuous() {
+    fn dragging_snaps_from_min() {
         // Steps count from `min`: 3 + 5k, not multiples of 5.
         assert_eq!(snap_to_step(9.4, 3., 100., 5.), 8.);
         assert_eq!(snap_to_step(11., 3., 100., 5.), 13.);
         // A step past the end stays inside the range.
         assert_eq!(snap_to_step(99., 3., 100., 5.), 98.);
         assert_eq!(snap_to_step(100., 0., 99., 10.), 99.);
-        // A zero (or invalid) step no longer divides by zero.
-        assert_eq!(snap_to_step(42.5, 0., 100., 0.), 42.5);
-        assert_eq!(snap_to_step(42.5, 0., 100., f32::NAN), 42.5);
     }
 
     #[test]
