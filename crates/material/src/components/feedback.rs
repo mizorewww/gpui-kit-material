@@ -3,7 +3,9 @@
 use crate::color::ColorRole::{self, *};
 use crate::icons::IconName;
 use crate::theme::color;
-use crate::tokens::{elevation, layout::*, shape::*, typography::*};
+use crate::tokens::{elevation, layout::*, shape::*, state, typography::*};
+
+use super::InteractionPreview;
 use gpui::{prelude::*, *};
 
 use super::text::accessible_text;
@@ -237,13 +239,18 @@ pub const CARD_PADDING: Rems = rem(16.);
 ///
 /// Fast's native overflow handling clips children to the rounded shape. The
 /// upstream backend currently provides rectangular overflow clipping only;
-/// rounded content clipping there remains unsupported. Interactive card states
-/// and their animations are outside this static surface's scope.
+/// rounded content clipping there remains unsupported. [`Self::state`] and
+/// [`Self::preview_state`] render the kit's interaction states;
+/// [`Self::interactive`] adds the live hover state (its elevation change is
+/// immediate, not animated).
 ///
 /// The outline paints above content without participating in layout.
 pub struct CardSurface {
     inner: Div,
     outline: Option<ColorRole>,
+    variant: CardVariant,
+    /// A specimen's forced focus: the 3dp secondary ring 2dp outside.
+    focus_ring: bool,
 }
 impl CardSurface {
     pub fn new(variant: CardVariant) -> Self {
@@ -256,7 +263,114 @@ impl CardSurface {
                 .rounded(RADIUS_CARD)
                 .shadow(elevation::level(style.elevation)),
             outline: style.outline,
+            variant,
+            focus_ring: false,
         }
+    }
+
+    /// Render a fixed interaction state as a specimen: the on-surface state
+    /// layer, the state's elevation and, when focused, the focus ring.
+    pub fn state(mut self, state: CardState) -> Self {
+        let container = color(card_style(self.variant).container);
+        self.inner = self
+            .inner
+            .bg(state::layer(
+                container,
+                color(ON_SURFACE),
+                state.layer_opacity(),
+            ))
+            .shadow(elevation::level(card_elevation(self.variant, state)));
+        self.focus_ring = state == CardState::Focused;
+        self
+    }
+
+    /// [`Self::state`] for one of the shared interaction previews.
+    pub fn preview_state(self, preview: InteractionPreview) -> Self {
+        self.state(preview.into())
+    }
+
+    /// A card the pointer can act on: hovering lays the 8% on-surface
+    /// state layer over it and raises it to its hovered elevation. The
+    /// caller supplies the action (and focus) on the content.
+    pub fn interactive(mut self) -> Self {
+        let container = color(card_style(self.variant).container);
+        let hover = state::hovered(container, color(ON_SURFACE));
+        let shadow = elevation::level(card_elevation(self.variant, CardState::Hovered));
+        self.inner = self
+            .inner
+            .hover(move |style| style.bg(hover).shadow(shadow.clone()));
+        self
+    }
+}
+
+/// The interaction states of a card, including the drag the shared
+/// [`InteractionPreview`] does not cover.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+pub enum CardState {
+    #[default]
+    Enabled,
+    Hovered,
+    Focused,
+    Pressed,
+    Dragged,
+}
+
+impl CardState {
+    /// Every state in the kit's order.
+    pub const ALL: [Self; 5] = [
+        Self::Enabled,
+        Self::Hovered,
+        Self::Focused,
+        Self::Pressed,
+        Self::Dragged,
+    ];
+
+    pub const fn name(self) -> &'static str {
+        match self {
+            Self::Enabled => "Enabled",
+            Self::Hovered => "Hovered",
+            Self::Focused => "Focused",
+            Self::Pressed => "Pressed",
+            Self::Dragged => "Dragged",
+        }
+    }
+
+    /// The on-surface state layer's opacity.
+    pub const fn layer_opacity(self) -> f32 {
+        match self {
+            Self::Enabled => 0.,
+            Self::Hovered => state::HOVER,
+            Self::Focused => state::FOCUS,
+            Self::Pressed => state::PRESS,
+            Self::Dragged => state::DRAG,
+        }
+    }
+}
+
+impl From<InteractionPreview> for CardState {
+    fn from(preview: InteractionPreview) -> Self {
+        match preview {
+            InteractionPreview::Hovered => Self::Hovered,
+            InteractionPreview::Focused => Self::Focused,
+            InteractionPreview::Pressed => Self::Pressed,
+            InteractionPreview::Enabled | InteractionPreview::Disabled => Self::Enabled,
+        }
+    }
+}
+
+/// The kit's elevation for each card variant and state: hovering raises a
+/// card one level, dragging to level 4 (elevated) or 3; a filled card stays
+/// at level 1 while focused or pressed.
+fn card_elevation(variant: CardVariant, state: CardState) -> u8 {
+    use CardState::*;
+    match (variant, state) {
+        (CardVariant::Elevated, Hovered) => 2,
+        (CardVariant::Elevated, Dragged) => 4,
+        (CardVariant::Elevated, _) => 1,
+        (_, Dragged) => 3,
+        (_, Hovered) => 1,
+        (CardVariant::Filled, Focused | Pressed) => 1,
+        _ => 0,
     }
 }
 impl Styled for CardSurface {
@@ -360,6 +474,18 @@ impl Element for CardSurface {
                 BorderStyle::default(),
             ));
         }
+        if self.focus_ring {
+            // The kit's focus indicator: 3dp secondary, 2dp outside.
+            let radius = px(f32::from(RADIUS_CARD) + 5.);
+            window.paint_quad(quad(
+                bounds.dilate(px(5.)),
+                radius,
+                rgba(0x00000000),
+                px(3.),
+                color(SECONDARY),
+                BorderStyle::default(),
+            ));
+        }
     }
 }
 
@@ -416,6 +542,21 @@ mod tests {
         );
         assert_eq!(RADIUS_CARD, px(12.));
         assert_eq!(CARD_PADDING, rem(16.));
+    }
+
+    #[test]
+    fn card_states_follow_the_kit_layers_and_elevation() {
+        use CardState::*;
+        let levels = |variant| CardState::ALL.map(|s| card_elevation(variant, s));
+        assert_eq!(levels(CardVariant::Elevated), [1, 2, 1, 1, 4]);
+        assert_eq!(levels(CardVariant::Filled), [0, 1, 1, 1, 3]);
+        assert_eq!(levels(CardVariant::Outlined), [0, 1, 0, 0, 3]);
+        assert_eq!(
+            CardState::ALL.map(CardState::layer_opacity),
+            [0., state::HOVER, state::FOCUS, state::PRESS, state::DRAG]
+        );
+        assert_eq!(CardState::from(InteractionPreview::Disabled), Enabled);
+        assert_eq!(CardState::from(InteractionPreview::Focused), Focused);
     }
 
     #[test]

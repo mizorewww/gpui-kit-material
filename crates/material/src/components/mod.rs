@@ -60,9 +60,9 @@ pub use checkbox::{CheckboxState, MaterialCheckbox};
 pub use chips::{AssistChip, CHIP_HEIGHT, ChipStyle, FilterChip, InputChip, SuggestionChip, chip};
 pub use choice::{ChoiceGroup, ChoiceTile, Tint, choice_radio, tinted_icon};
 pub use feedback::{
-    BADGE_CONTAINER, BADGE_LABEL, CARD_PADDING, CardSurface, CardVariant, LARGE_BADGE_PADDING,
-    LARGE_BADGE_SIZE, NoticeKind, SMALL_BADGE_SIZE, StatusKind, card, card_surface, large_badge,
-    notice_banner, outlined_status_chip, small_badge, status_chip,
+    BADGE_CONTAINER, BADGE_LABEL, CARD_PADDING, CardState, CardSurface, CardVariant,
+    LARGE_BADGE_PADDING, LARGE_BADGE_SIZE, NoticeKind, SMALL_BADGE_SIZE, StatusKind, card,
+    card_surface, large_badge, notice_banner, outlined_status_chip, small_badge, status_chip,
 };
 #[allow(deprecated)]
 pub use feedback::{BadgeKind, badge, outlined_badge};
