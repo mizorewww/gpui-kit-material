@@ -948,6 +948,7 @@ pub(crate) fn release_unclaimed_nodes(engine: &mut TaffyLayoutEngine) {
         let unstretched_styles = &mut retention.unstretched_styles;
         let robbed_parents = &mut retention.robbed_parents;
         let freed = &mut retention.stats.nodes_freed;
+        let mirrored = &mut engine.mirrored;
         retention.retained.retain(|_, node| {
             if node.claimed_in_frame == frame
                 || node.lingers && frame - node.claimed_in_frame < LIST_ROW_NODE_LINGER_FRAMES
@@ -956,6 +957,7 @@ pub(crate) fn release_unclaimed_nodes(engine: &mut TaffyLayoutEngine) {
             }
             unstretched_styles.remove(&node.id);
             robbed_parents.remove(&node.id);
+            mirrored.remove(&node.id);
             remove_node(taffy, node.id);
             *freed += 1;
             false
