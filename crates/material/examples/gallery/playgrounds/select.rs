@@ -131,11 +131,6 @@ fn preview(
     let open = preview.local("open", window, cx, |_, _| false);
     let is_open = *open.read(cx);
     let label = config.text("label");
-    let label: SharedString = if config.bool("required") && !label.is_empty() {
-        format!("{label}*").into()
-    } else {
-        label
-    };
     let select = preview.setter("selected", cx);
     let supporting = config.text("supporting");
     let mut dropdown = ExposedDropdown::new("playground-select", label)
@@ -154,6 +149,7 @@ fn preview(
         .selected(selected)
         .open(is_open)
         .error(config.bool("error"))
+        .required(config.bool("required"))
         .disabled(config.bool("disabled"))
         .width(280.)
         .on_open_change({

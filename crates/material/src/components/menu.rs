@@ -1399,6 +1399,7 @@ pub struct ExposedDropdown {
     open: bool,
     disabled: bool,
     error: bool,
+    required: bool,
     leading: Option<AnyElement>,
     supporting: Option<SharedString>,
     style: MenuStyle,
@@ -1420,6 +1421,7 @@ impl ExposedDropdown {
             open: false,
             disabled: false,
             error: false,
+            required: false,
             leading: None,
             supporting: None,
             style: MenuStyle::Standard,
@@ -1427,6 +1429,12 @@ impl ExposedDropdown {
             on_open_change: None,
             on_select: None,
         }
+    }
+    /// Mark the choice as required: the label and accessible name gain the
+    /// required mark. Enforcing it belongs to the form that owns the value.
+    pub fn required(mut self, required: bool) -> Self {
+        self.required = required;
+        self
     }
     pub fn variant(mut self, variant: TextFieldVariant) -> Self {
         self.variant = variant;
@@ -1526,6 +1534,7 @@ impl RenderOnce for ExposedDropdown {
             .variant(self.variant)
             .density(self.density)
             .label(self.label.clone())
+            .required(self.required)
             .trailing_icon(arrow)
             .error(self.error)
             .disabled(self.disabled)
@@ -1555,7 +1564,7 @@ impl RenderOnce for ExposedDropdown {
             .id((id.clone(), "trigger"))
             .debug_selector(|| "dropdown-trigger".into())
             .role(Role::ComboBox)
-            .aria_label(self.label.clone())
+            .aria_label(super::labeled::required_label(&self.label, self.required))
             .aria_value(value)
             .aria_expanded(open)
             .key_context(DROPDOWN_CONTEXT)
