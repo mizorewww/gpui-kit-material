@@ -9,6 +9,8 @@
 //! `cargo run -p gpui-kit-material --example gallery`
 #[cfg(not(target_family = "wasm"))]
 pub mod capture;
+#[cfg(all(not(target_family = "wasm"), feature = "instruction-bench"))]
+mod instr_bench;
 #[cfg(all(not(target_family = "wasm"), feature = "frame-profiler"))]
 mod interactions;
 #[cfg(all(not(target_family = "wasm"), feature = "frame-profiler"))]
@@ -554,6 +556,8 @@ impl Render for Gallery {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         #[cfg(test)]
         self.renders.set(self.renders.get() + 1);
+        #[cfg(all(not(target_family = "wasm"), feature = "instruction-bench"))]
+        instr_bench::note(instr_bench::Count::Gallery);
         let (motion_scheme, snackbar) = {
             let shared = self.shared.read(cx);
             (shared.motion_scheme, shared.snackbar)
@@ -566,6 +570,8 @@ impl Render for Gallery {
             .current_page()
             .and_then(|index| self.pages[index].as_ref())
         {
+            #[cfg(all(not(target_family = "wasm"), feature = "instruction-bench"))]
+            instr_bench::note(instr_bench::Count::Prepare);
             built.page.prepare(window, cx);
         }
         if self.last_rem != window.rem_size() {
@@ -619,6 +625,8 @@ impl Render for Gallery {
             .when(!lead_only, |content| {
                 content.child(
                     gpui::list(self.list.clone(), move |index, window, cx| {
+                        #[cfg(all(not(target_family = "wasm"), feature = "instruction-bench"))]
+                        instr_bench::note(instr_bench::Count::Row);
                         list_rows.borrow_mut().push(index);
                         view.update(cx, |this, cx| this.render_row(index, window, cx))
                             .unwrap_or_else(|_| div().into_any_element())
@@ -629,6 +637,8 @@ impl Render for Gallery {
             .child(
                 gpui::canvas(
                     move |_, _, cx| {
+                        #[cfg(all(not(target_family = "wasm"), feature = "instruction-bench"))]
+                        instr_bench::note(instr_bench::Count::AfterLayout);
                         let _ = sync_view.update(cx, |this, cx| {
                             this.after_layout(&rendered_rows.borrow(), cx);
                         });
@@ -786,37 +796,52 @@ pub fn run(application: gpui::Application, initialize: impl FnOnce(&mut App) + '
         let viewport = size(px(1280.), px(900.));
         #[cfg(not(target_family = "wasm"))]
         let viewport = capture::window_size(cx).unwrap_or(viewport);
-        let (_window, _content) = gpui_kit::open_window(
-            title_bar_window_options("gpui-kit-material", TITLE_BAR, viewport, cx),
-            cx,
-            move |window, cx| {
-                let gallery = cx.new(|cx| Gallery::new(window, cx));
-                // FPS is part of ordinary UI and profiler runs. Only deterministic
-                // screenshot captures omit the changing counter and its timer.
-                #[cfg(not(target_family = "wasm"))]
-                let show_fps = capture::show_fps(cx);
-                #[cfg(target_family = "wasm")]
-                let show_fps = true;
-                let fps = show_fps.then(|| cx.new(|cx| fps::FpsDisplay::new(window, cx)));
-                let top_bar = cx.new(|cx| top_bar::TopBar::new(gallery.clone(), window, cx));
-                #[cfg(not(target_family = "wasm"))]
-                capture::install(&gallery, window, cx);
-                #[cfg(not(target_family = "wasm"))]
-                let caption = capture::caption(cx);
-                #[cfg(target_family = "wasm")]
-                let caption = None;
-                let shared = gallery.read(cx).shared.read(cx);
-                let (initial_scheme, initial_scale) = (shared.target_scheme(), shared.text_scale());
-                theme::init_component_theme(initial_scheme, initial_scale, cx);
-                cx.new(|_| GalleryWindow {
-                    gallery,
-                    top_bar,
-                    fps,
-                    caption,
-                })
-            },
-        )
+        #[cfg(all(not(target_family = "wasm"), feature = "instruction-bench"))]
+        let instruction_bench = instr_bench::options();
+        #[allow(unused_mut)]
+        let mut window_options =
+            title_bar_window_options("gpui-kit-material", TITLE_BAR, viewport, cx);
+        // A run on a shared desktop is unfocused, and must not be throttled for it.
+        #[cfg(all(not(target_family = "wasm"), feature = "instruction-bench"))]
+        if instruction_bench.is_some() {
+            window_options.inactive_frame_interval = None;
+        }
+        let (_window, _content) = gpui_kit::open_window(window_options, cx, move |window, cx| {
+            let gallery = cx.new(|cx| Gallery::new(window, cx));
+            // FPS is part of ordinary UI and profiler runs. Only deterministic
+            // screenshot captures omit the changing counter and its timer.
+            #[cfg(not(target_family = "wasm"))]
+            let show_fps = capture::show_fps(cx);
+            #[cfg(target_family = "wasm")]
+            let show_fps = true;
+            let fps = show_fps.then(|| cx.new(|cx| fps::FpsDisplay::new(window, cx)));
+            let top_bar = cx.new(|cx| top_bar::TopBar::new(gallery.clone(), window, cx));
+            #[cfg(not(target_family = "wasm"))]
+            capture::install(&gallery, window, cx);
+            #[cfg(not(target_family = "wasm"))]
+            let caption = capture::caption(cx);
+            #[cfg(target_family = "wasm")]
+            let caption = None;
+            let shared = gallery.read(cx).shared.read(cx);
+            let (initial_scheme, initial_scale) = (shared.target_scheme(), shared.text_scale());
+            theme::init_component_theme(initial_scheme, initial_scale, cx);
+            cx.new(|_| GalleryWindow {
+                gallery,
+                top_bar,
+                fps,
+                caption,
+            })
+        })
         .unwrap();
+        #[cfg(all(not(target_family = "wasm"), feature = "instruction-bench"))]
+        if let Some(options) = instruction_bench {
+            _window
+                .update(cx, |_, window, cx| {
+                    let gallery = _content.read(cx).gallery.clone();
+                    instr_bench::install(options, gallery, window, cx);
+                })
+                .unwrap();
+        }
         #[cfg(all(not(target_family = "wasm"), feature = "frame-profiler"))]
         if let Some(interactions) = interactions {
             _window

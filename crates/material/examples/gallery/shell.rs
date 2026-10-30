@@ -393,6 +393,8 @@ impl Gallery {
     }
 
     pub(super) fn render_navigation(&self, cx: &mut Context<Self>) -> Stateful<Div> {
+        #[cfg(all(not(target_family = "wasm"), feature = "instruction-bench"))]
+        super::instr_bench::note(super::instr_bench::Count::Navigation);
         let searching = !self.query.trim().is_empty();
         let section = CATALOG[self.current].group.section();
         let mut groups: Vec<AnyElement> = Vec::new();
@@ -1100,6 +1102,8 @@ impl Render for LeadView {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         #[cfg(test)]
         self.renders.set(self.renders.get() + 1);
+        #[cfg(all(not(target_family = "wasm"), feature = "instruction-bench"))]
+        super::instr_bench::note(super::instr_bench::Count::Lead);
         let Some(gallery) = self.gallery.upgrade() else {
             return div().into_any_element();
         };
