@@ -212,6 +212,9 @@ struct TipState {
     bounds: Option<Bounds<Pixels>>,
     focus: Option<FocusHandle>,
     seen_focus: Option<FocusHandle>,
+    /// The side the positioner last placed the tooltip on, which differs
+    /// from the requested placement when it flipped to fit.
+    placed: std::rc::Rc<std::cell::Cell<Option<Placement>>>,
 }
 
 impl TipState {
@@ -387,7 +390,11 @@ impl RenderOnce for MaterialTooltip {
                 .into_any_element();
         };
         let tip_state = state.clone();
-        // The tooltip starts `TOOLTIP_TRAVEL` farther from its trigger.
+        // The tooltip starts `TOOLTIP_TRAVEL` farther from its trigger, on
+        // the side it is actually shown: a flipped tooltip travels away from
+        // the trigger, not into it.
+        let placed = state.read(cx).placed.clone();
+        let side = placed.get().unwrap_or(placement);
         let away = rem(TOOLTIP_TRAVEL * (1. - travel));
         let tip = div()
             .id("tooltip-motion")
@@ -396,7 +403,7 @@ impl RenderOnce for MaterialTooltip {
             })
             .relative()
             .opacity(fade.clamp(0., 1.))
-            .map(|tip| match placement {
+            .map(|tip| match side {
                 Placement::Top => tip.top(-away),
                 Placement::Bottom => tip.top(away),
                 Placement::Left => tip.left(-away),
@@ -411,10 +418,26 @@ impl RenderOnce for MaterialTooltip {
             .child(container(
                 ElementId::NamedChild(std::sync::Arc::new(id), "popup".into()),
                 self.content,
-            ));
+            ))
+            .child({
+                // The side is known only once positioned (before this
+                // prepaints): draw again when it changed.
+                let placed = placed.clone();
+                canvas(
+                    move |_, window, _| {
+                        if placed.get().is_some_and(|placed| placed != side) {
+                            window.request_animation_frame();
+                        }
+                    },
+                    |_, _, _, _| {},
+                )
+                .absolute()
+                .size_0()
+            });
         let positioner = gpui_base::Positioner::side(bounds)
             .placement(placement)
             .offset(rem(TOOLTIP_OFFSET).to_pixels(window.rem_size()))
+            .on_position(move |resolved| placed.set(resolved.placement))
             .child(tip);
         let positioner = if interactive {
             positioner.occlude()
@@ -503,5 +526,45 @@ mod tests {
         draw(cx);
         draw(cx);
         assert!(!tooltip_shown(cx), "hidden after the grace period");
+    }
+
+    /// A trigger against the window's top edge: a top tooltip flips below.
+    struct EdgeHarness;
+    impl Render for EdgeHarness {
+        fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+            window.set_rem_size(px(crate::tokens::typography::BASE_PX));
+            div().pl(px(100.)).child(
+                MaterialTooltip::plain("tip", "Save")
+                    .trigger(div().debug_selector(|| "trigger".into()).size(px(40.))),
+            )
+        }
+    }
+
+    #[gpui::test]
+    fn a_flipped_tooltip_travels_away_from_its_trigger(cx: &mut TestAppContext) {
+        cx.update(|cx| {
+            gpui_base::init(cx);
+            gpui_base::TooltipDefaults::new()
+                .with_show_delay(Duration::ZERO)
+                .install(cx);
+        });
+        let (_, cx) = cx.add_window_view(|_, _| EdgeHarness);
+        draw(cx);
+        let trigger = cx.debug_bounds("trigger").unwrap();
+        cx.simulate_mouse_move(trigger.center(), None, Modifiers::default());
+        // Mid-entrance (the motion clock does not advance between draws).
+        for _ in 0..3 {
+            cx.update(|window, cx| {
+                window.refresh();
+                window.draw(cx).clear(cx);
+            });
+        }
+        let popup = cx
+            .debug_bounds("tooltip-popup")
+            .expect("the tooltip is shown");
+        assert!(
+            popup.top() >= trigger.bottom() + px(TOOLTIP_OFFSET),
+            "a tooltip flipped below its trigger moved up into it: {popup:?} vs {trigger:?}"
+        );
     }
 }
