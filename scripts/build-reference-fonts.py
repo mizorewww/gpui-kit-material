@@ -16,7 +16,7 @@ source = root / 'roboto/Roboto-latin-wght.woff2'
 expected = sources['roboto/Roboto-latin-wght.woff2']['sha256']
 if hashlib.sha256(source.read_bytes()).hexdigest() != expected:
     raise SystemExit('Reference WOFF2 hash mismatch')
-for weight, name in [(400, 'Regular'), (500, 'Medium')]:
+for weight, name in [(400, 'Regular'), (500, 'Medium'), (600, 'SemiBold')]:
     font = TTFont(source, recalcTimestamp=False)
     font = instantiateVariableFont(font, {'wght': weight}, inplace=True, updateFontNames=True)
     font.flavor = None

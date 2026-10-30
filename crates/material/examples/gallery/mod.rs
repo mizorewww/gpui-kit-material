@@ -651,6 +651,7 @@ pub fn run(application: gpui::Application, initialize: impl FnOnce(&mut App) + '
             .add_fonts(vec![
                 std::borrow::Cow::Borrowed(include_bytes!("fonts/roboto/Roboto-Regular.ttf")),
                 std::borrow::Cow::Borrowed(include_bytes!("fonts/roboto/Roboto-Medium.ttf")),
+                std::borrow::Cow::Borrowed(include_bytes!("fonts/roboto/Roboto-SemiBold.ttf")),
             ])
             .expect("Failed to load the reference Roboto fonts");
         gpui_kit::init(cx);

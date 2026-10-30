@@ -31,5 +31,14 @@
     "license": "roboto/OFL.txt",
     "purpose": "Reference component font; Latin subset",
     "conversion": "fonttools 4.60.1 instantiateVariableFont wght=500 updateFontNames=True; WOFF2 to TTF; recalcTimestamp=False"
+  },
+  "roboto/Roboto-SemiBold.ttf": {
+    "source": "https://md3.io/fonts/Roboto-latin-wght.woff2",
+    "observed_on": "2026-10-29",
+    "version": "3.015; 2026",
+    "sha256": "f1a75de106c8ee4aea3a3e2ec971f2ad01b5fdd874a8bc2ec58f5f1c14b776ec",
+    "license": "roboto/OFL.txt",
+    "purpose": "Reference component font; Latin subset; weight 600 for the Figma kit's emphasized type styles",
+    "conversion": "fonttools 4.60.1 instantiateVariableFont wght=600 updateFontNames=True; WOFF2 to TTF; recalcTimestamp=False"
   }
 }
