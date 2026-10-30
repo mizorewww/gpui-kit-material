@@ -20,6 +20,7 @@ mod button_group;
 mod controls;
 mod divider;
 mod slider;
+mod snackbar;
 mod switch;
 pub use controls::MaterialSideSheet;
 pub use divider::{
@@ -30,6 +31,7 @@ pub use search::{
     SearchViewLayout,
 };
 pub use slider::{MaterialSlider, SliderAppearance, SliderSize};
+pub use snackbar::{SNACKBAR_CLOSE_ICON, Snackbar};
 pub use switch::{MaterialSwitch, SwitchIcons};
 mod caption;
 mod checkbox;
@@ -59,9 +61,9 @@ pub use chips::{AssistChip, CHIP_HEIGHT, ChipStyle, FilterChip, InputChip, Sugge
 pub use choice::{ChoiceGroup, ChoiceTile, Tint, choice_radio, tinted_icon};
 pub use feedback::{
     BADGE_CONTAINER, BADGE_LABEL, BadgeKind, CARD_PADDING, CardSurface, CardVariant,
-    LARGE_BADGE_PADDING, LARGE_BADGE_SIZE, NoticeKind, SMALL_BADGE_SIZE, Snackbar, StatusKind,
-    badge, card, card_surface, large_badge, notice_banner, outlined_badge, outlined_status_chip,
-    small_badge, status_chip,
+    LARGE_BADGE_PADDING, LARGE_BADGE_SIZE, NoticeKind, SMALL_BADGE_SIZE, StatusKind, badge, card,
+    card_surface, large_badge, notice_banner, outlined_badge, outlined_status_chip, small_badge,
+    status_chip,
 };
 pub use focus::{FocusRing, RevealFocus, RingedButton, contain_scroll};
 pub use loading_indicator::{
