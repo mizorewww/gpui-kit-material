@@ -329,20 +329,26 @@ pub fn wrap_columns(
 }
 
 /// The scale that fits `needed` px into `available` px: 1 when it fits,
-/// else a little under the ratio (borders do not scale), never below 0.4.
+/// else a little under the ratio (borders do not scale), never below 0.25.
 pub fn fit_scale(needed: f32, available: f32) -> f32 {
     if needed <= available + 0.5 || needed <= 0. {
         1.
     } else {
-        (available / needed * 0.97).clamp(0.4, 1.)
+        (available / needed * 0.97).clamp(0.25, 1.)
     }
 }
 
 /// Lays out, prepaints and paints its child at another rem size: the
 /// child's rem-based geometry and type scale with it.
-struct RemScaled {
+pub(crate) struct RemScaled {
     rem: Pixels,
     child: AnyElement,
+}
+
+impl RemScaled {
+    pub(crate) fn new(rem: Pixels, child: AnyElement) -> Self {
+        Self { rem, child }
+    }
 }
 
 impl IntoElement for RemScaled {
@@ -611,6 +617,9 @@ impl RenderOnce for Board {
             })
             .children(grids);
         let has_side_label = self.side_label.is_some();
+        // In a narrow card the side label goes over the board: the gutter
+        // would take the width the board needs.
+        let label_above = content_width(window) < NARROW_CONTENT;
         // The frame's drawn width, recorded by tests to catch overflow.
         let drawn_width = std::rc::Rc::new(std::cell::Cell::new(0f32));
         let rendered = groups;
@@ -634,23 +643,26 @@ impl RenderOnce for Board {
                     .w_full()
                     .flex()
                     .items_start()
+                    .when(label_above, |row| row.flex_col())
                     .when_some(self.side_label, |row, label| {
                         row.child(
                             div()
-                                .w(rem(SIDE_GUTTER))
+                                .when(!label_above, |gutter| gutter.w(rem(SIDE_GUTTER)))
                                 .flex_shrink_0()
                                 .pt(rem(if band.has_top() {
                                     BOARD_PADDING
                                 } else {
                                     CELL_GAP / 2.
                                 }))
-                                .pr(rem(8.))
+                                .when(!label_above, |gutter| gutter.pr(rem(8.)))
+                                .when(label_above, |gutter| gutter.pb(rem(8.)))
                                 .child(small_label("side-label", label).whitespace_normal()),
                         )
                     })
                     .child(
                         div()
-                            .flex_1()
+                            .when(!label_above, |holder| holder.flex_1())
+                            .when(label_above, |holder| holder.w_full())
                             .min_w_0()
                             .flex()
                             .flex_row()
@@ -716,6 +728,9 @@ pub fn content_width(window: &Window) -> f32 {
     super::shell::spec_content_width(window)
 }
 
+/// Below this content width a board's side label goes over the board.
+const NARROW_CONTENT: f32 = 560.;
+
 /// A free-form specimen row: wrapped items with the board cell gap, for
 /// live demos that are not a state matrix.
 pub fn demo_row() -> Div {
@@ -759,7 +774,7 @@ mod tests {
         assert_eq!(super::fit_scale(200.4, 200.), 1.);
         let scale = super::fit_scale(400., 200.);
         assert!(scale < 0.5 && 400. * scale <= 200.);
-        assert_eq!(super::fit_scale(10_000., 200.), 0.4);
+        assert_eq!(super::fit_scale(10_000., 200.), 0.25);
     }
 
     #[test]

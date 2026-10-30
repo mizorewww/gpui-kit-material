@@ -145,6 +145,10 @@ pub(crate) struct Gallery {
     last_rem: Pixels,
     theme_frame_pending: bool,
     theme_menu_open: bool,
+    /// The compact layout's modal navigation drawer.
+    drawer_open: bool,
+    /// The layout of the last frame, for what happens between frames.
+    shell_layout: shell::ShellLayout,
     capture: CaptureState,
     /// The rows the list builder rendered in the current frame.
     rendered_rows: Rc<RefCell<Vec<usize>>>,
@@ -190,6 +194,8 @@ impl Gallery {
             last_rem: window.rem_size(),
             theme_frame_pending: false,
             theme_menu_open: false,
+            drawer_open: false,
+            shell_layout: shell::ShellLayout::of(window),
             capture: CaptureState::default(),
             rendered_rows: Default::default(),
             _subscriptions: subscriptions,
@@ -310,7 +316,16 @@ impl Gallery {
         self.entries[self.current].scroll = Some(self.list.logical_scroll_top());
         self.current = entry;
         self.theme_menu_open = false;
+        self.drawer_open = false;
         cx.notify();
+    }
+
+    /// Open or close the compact layout's navigation drawer.
+    pub(crate) fn set_drawer_open(&mut self, open: bool, cx: &mut Context<Self>) {
+        if self.drawer_open != open {
+            self.drawer_open = open;
+            cx.notify();
+        }
     }
 
     /// Show `tab` on the current component page.
@@ -326,6 +341,10 @@ impl Gallery {
     pub(crate) fn set_query(&mut self, query: SharedString, cx: &mut Context<Self>) {
         if self.query != query {
             self.query = query;
+            // The compact layout's results are in its drawer.
+            if self.shell_layout == shell::ShellLayout::Compact && !self.query.trim().is_empty() {
+                self.drawer_open = true;
+            }
             cx.notify();
         }
     }
@@ -507,8 +526,13 @@ impl Render for Gallery {
                 });
             });
         }
-        let compact = is_compact(window);
-        let navigation = self.render_navigation(compact, cx);
+        let layout = shell::ShellLayout::of(window);
+        self.shell_layout = layout;
+        let compact = layout == shell::ShellLayout::Compact;
+        // A window widened past the drawer leaves nothing to reopen.
+        self.drawer_open &= compact;
+        let navigation = (!compact).then(|| self.render_navigation(cx));
+        let drawer = compact.then(|| self.render_drawer(window, cx));
         let view = cx.weak_entity();
         let sync_view = view.clone();
         // Reused across frames: the builder records this frame's rows.
@@ -566,10 +590,10 @@ impl Render for Gallery {
                     .min_h_0()
                     .min_w_0()
                     .flex_row()
-                    .when(compact, |layout| layout.flex_col())
-                    .child(navigation)
+                    .children(navigation)
                     .child(content),
             )
+            .children(drawer)
             .when(snackbar, |root| {
                 let dismiss = |shared: Entity<GalleryShared>| {
                     move |_: &ClickEvent, _: &mut Window, cx: &mut App| {
@@ -599,18 +623,44 @@ struct GalleryWindow {
     gallery: Entity<Gallery>,
     top_bar: Entity<top_bar::TopBar>,
     fps: Option<Entity<fps::FpsDisplay>>,
+    /// A caption style forced by a capture, to compare another platform's.
+    caption: Option<Caption>,
 }
 
 impl Render for GalleryWindow {
-    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        // The compact bar has no room for a counter, and labels its settings
+        // with an icon only.
+        let compact = shell::ShellLayout::of(window) == shell::ShellLayout::Compact;
+        let settings = title_bar_control(div().debug_selector(|| "gallery-settings-open".into()))
+            .child(if compact {
+                IconButton::new(
+                    "gallery-settings-open",
+                    playground::symbol("settings", 24.),
+                    "Settings",
+                )
+                .on_click(|_, window, cx| settings::open(window, cx))
+                .into_any_element()
+            } else {
+                MaterialButton::new("gallery-settings-open")
+                    .variant(ButtonVariant::Text)
+                    .button_size(ButtonSize::ExtraSmall)
+                    .accessibility_label("Settings")
+                    .child("Settings")
+                    .on_click(|_, window, cx| settings::open(window, cx))
+                    .into_any_element()
+            });
+        let mut bar = TitleBar::new("title-bar", TITLE_BAR, caption_labels());
+        if let Some(caption) = self.caption {
+            bar = bar.caption(caption);
+        }
         gpui_base::v_flex()
             .size_full()
             .bg(spec::page_background())
             .text_color(color(ColorRole::ON_SURFACE))
             .font_family("Roboto")
             .child(
-                TitleBar::new("title-bar", TITLE_BAR, caption_labels())
-                    .gap(rem(12.))
+                bar.gap(rem(if compact { 4. } else { 12. }))
                     .bg(color(ColorRole::SURFACE_CONTAINER_LOW))
                     .border_b_1()
                     .border_color(color(ColorRole::OUTLINE_VARIANT))
@@ -618,15 +668,12 @@ impl Render for GalleryWindow {
                         AnyView::from(self.top_bar.clone())
                             .cached(StyleRefinement::default().flex_1().min_w_0().h_full()),
                     )
-                    .when_some(self.fps.clone(), |bar, fps| bar.child(fps))
-                    .child(title_bar_control(
-                        MaterialButton::new("gallery-settings-open")
-                            .variant(ButtonVariant::Text)
-                            .button_size(ButtonSize::ExtraSmall)
-                            .accessibility_label("Settings")
-                            .debug_selector(|| "gallery-settings-open".into())
-                            .child("Settings")
-                            .on_click(|_, window, cx| settings::open(window, cx)),
+                    .when_some(self.fps.clone().filter(|_| !compact), |bar, fps| {
+                        bar.child(fps)
+                    })
+                    .child(spec::RemScaled::new(
+                        top_bar::chrome_rem(window),
+                        settings.into_any_element(),
                     )),
             )
             .child(
@@ -674,6 +721,10 @@ pub fn run(application: gpui::Application, initialize: impl FnOnce(&mut App) + '
                 let top_bar = cx.new(|cx| top_bar::TopBar::new(gallery.clone(), window, cx));
                 #[cfg(not(target_family = "wasm"))]
                 capture::install(&gallery, window, cx);
+                #[cfg(not(target_family = "wasm"))]
+                let caption = capture::caption(cx);
+                #[cfg(target_family = "wasm")]
+                let caption = None;
                 let shared = gallery.read(cx).shared.read(cx);
                 let (initial_scheme, initial_scale) = (shared.target_scheme(), shared.text_scale());
                 theme::init_component_theme(initial_scheme, initial_scale, cx);
@@ -681,6 +732,7 @@ pub fn run(application: gpui::Application, initialize: impl FnOnce(&mut App) + '
                     gallery,
                     top_bar,
                     fps,
+                    caption,
                 })
             },
         )
@@ -716,6 +768,73 @@ mod window_tests {
         cx.run_until_parked();
     }
 
+    /// The bar's content ends before the caption buttons at every width, and
+    /// trades its sections and field for the drawer's button when compact.
+    #[gpui::test]
+    fn the_top_bar_fits_every_width_beside_the_caption_buttons(cx: &mut TestAppContext) {
+        cx.update(|cx| {
+            gpui_kit::init(cx);
+            gpui_kit_material::init(cx);
+        });
+        let window = cx.open_window(size(px(1600.), px(800.)), |window, cx| {
+            let gallery = cx.new(|cx| Gallery::new(window, cx));
+            let fps = cx.new(|cx| fps::FpsDisplay::new(window, cx));
+            let top_bar = cx.new(|cx| top_bar::TopBar::new(gallery.clone(), window, cx));
+            GalleryWindow {
+                gallery,
+                top_bar,
+                fps: Some(fps),
+                caption: Some(gpui_kit_material::components::Caption::Windows),
+            }
+        });
+        let mut cx = gpui::VisualTestContext::from_window(window.into(), cx);
+        cx.update(|window, _| {
+            window.set_rem_size(px(gpui_kit_material::tokens::typography::BASE_PX))
+        });
+        let base = gpui_kit_material::tokens::typography::BASE_PX;
+        for (width, text_scale) in [
+            (1600., 1.),
+            (1280., 1.),
+            (1000., 1.),
+            (900., 1.),
+            (760., 1.),
+            (480., 1.),
+            // 200% text: 1280px is a compact 640 design px.
+            (1280., 2.),
+            (1920., 2.),
+            (1280., 1.5),
+            (800., 2.),
+        ] {
+            cx.update(|window, _| window.set_rem_size(px(base * text_scale)));
+            cx.simulate_resize(size(px(width), px(800.)));
+            draw(window.into(), &mut cx);
+            draw(window.into(), &mut cx);
+            let compact = width / text_scale < 900.;
+            assert_eq!(cx.debug_bounds("top-menu").is_some(), compact, "{width}");
+            assert_eq!(
+                cx.debug_bounds("top-section-components").is_none(),
+                compact,
+                "{width}"
+            );
+            // Three 46px Windows buttons and 8px of open space.
+            let end = px(width - 3. * 46. - 8.);
+            let settings = cx.debug_bounds("gallery-settings-open").unwrap();
+            assert!(settings.right() <= end, "{width}: {settings:?}");
+            let mode = cx.debug_bounds("mode-toggle").unwrap();
+            assert!(
+                mode.right() <= settings.left(),
+                "{width} at {text_scale}: {mode:?} collides with {settings:?}"
+            );
+            // The controls stay inside the fixed bar at any text scale.
+            for control in [mode, settings] {
+                assert!(
+                    control.top() >= px(0.) && control.bottom() <= super::TITLE_BAR,
+                    "{width} at {text_scale}: {control:?}"
+                );
+            }
+        }
+    }
+
     #[gpui::test]
     fn fps_updates_render_only_the_title_bar(cx: &mut TestAppContext) {
         cx.update(|cx| {
@@ -732,6 +851,7 @@ mod window_tests {
                 gallery,
                 top_bar,
                 fps: Some(fps),
+                caption: None,
             }
         });
         let (gallery, fps) = parts.unwrap();

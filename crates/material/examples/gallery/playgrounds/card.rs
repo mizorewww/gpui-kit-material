@@ -222,11 +222,8 @@ fn preview(
         Some(image) => card.child(image).child(text),
         None => card.child(text),
     };
-    // Tall cards (a square image) scroll inside the preview.
     div()
         .id("card-preview")
-        .max_h_full()
-        .overflow_y_scroll()
         .p(rem(8.))
         .flex()
         .flex_col()

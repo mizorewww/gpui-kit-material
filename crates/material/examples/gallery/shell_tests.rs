@@ -3,6 +3,7 @@
 use super::catalog::{self, CATALOG, Kind};
 use super::pages::PAGES;
 use super::playground::{Config, Value};
+use super::shell::ShellLayout;
 use super::{Gallery, Row, Tab};
 use gpui::{
     AppContext, Bounds, Modifiers, Pixels, TestAppContext, VisualTestContext, WindowHandle, point,
@@ -19,8 +20,19 @@ fn init(cx: &mut TestAppContext) {
 fn open(cx: &mut TestAppContext) -> (WindowHandle<Gallery>, VisualTestContext) {
     init(cx);
     let window = cx.open_window(size(px(1280.), px(900.)), Gallery::new);
-    let visual = VisualTestContext::from_window(window.into(), cx);
+    let mut visual = VisualTestContext::from_window(window.into(), cx);
+    design_rem(&window, &mut visual);
     (window, visual)
+}
+
+/// The 100% text scale, as the theme sets it: the layout's breakpoints are in
+/// design px, which window px only match at this rem.
+fn design_rem(window: &WindowHandle<Gallery>, cx: &mut VisualTestContext) {
+    window
+        .update(cx, |_, window, _| {
+            window.set_rem_size(px(gpui_kit_material::tokens::typography::BASE_PX))
+        })
+        .unwrap();
 }
 
 fn draw(window: &WindowHandle<Gallery>, cx: &mut VisualTestContext) {
@@ -375,9 +387,10 @@ fn every_spec_board_fits_its_row(cx: &mut TestAppContext) {
     use super::spec::OVERFLOWS;
     use gpui::{ListOffset, VisualContext as _};
     init(cx);
-    for width in [1280., 1600.] {
+    for width in [480., 760., 1000., 1280., 1600.] {
         let window = cx.open_window(size(px(width), px(900.)), Gallery::new);
         let mut cx = VisualTestContext::from_window(window.into(), cx);
+        design_rem(&window, &mut cx);
         cx.simulate_resize(size(px(width), px(900.)));
         for (index, entry) in CATALOG.iter().enumerate() {
             if entry.spec.is_none() {
@@ -417,4 +430,182 @@ fn every_spec_board_fits_its_row(cx: &mut TestAppContext) {
         }
         let _ = cx.window_handle();
     }
+}
+
+/// The reference widths and the layout each must get.
+const WIDTHS: [(f32, ShellLayout); 5] = [
+    (1600., ShellLayout::Wide),
+    (1280., ShellLayout::Wide),
+    (1000., ShellLayout::Medium),
+    (760., ShellLayout::Compact),
+    (480., ShellLayout::Compact),
+];
+
+fn resize(window: &WindowHandle<Gallery>, cx: &mut VisualTestContext, width: f32) {
+    cx.simulate_resize(size(px(width), px(900.)));
+    settle(window, cx);
+}
+
+#[gpui::test]
+fn the_shell_arranges_itself_for_the_window_width(cx: &mut TestAppContext) {
+    let (window, mut cx) = open(cx);
+    go(&window, &mut cx, "button");
+    for (width, layout) in WIDTHS {
+        resize(&window, &mut cx, width);
+        assert_eq!(ShellLayout::at(width), layout);
+        let canvas = bounds(&mut cx, "preview-canvas");
+        let config = bounds(&mut cx, "configuration-card");
+        if layout == ShellLayout::Wide {
+            assert!(config.left() > canvas.right(), "{width}: side by side");
+            assert!(config.top() < canvas.top(), "{width}: tops in one row");
+        } else {
+            assert!(config.top() >= canvas.bottom(), "{width}: stacked");
+            assert!(
+                (config.left() - canvas.left()).abs() <= px(1.)
+                    && (config.right() - canvas.right()).abs() <= px(1.),
+                "{width}: full width"
+            );
+        }
+        assert_eq!(
+            cx.debug_bounds("nav-button").is_some(),
+            layout != ShellLayout::Compact,
+            "{width}: the navigation is in the layout unless it is a drawer"
+        );
+        assert!(canvas.left() >= px(0.), "{width}");
+        assert!(
+            canvas.right() <= px(width),
+            "{width}: nothing past the edge"
+        );
+        assert!(
+            config.right() <= px(width),
+            "{width}: nothing past the edge"
+        );
+    }
+}
+
+/// Every preview at every reference width and at a short window stays inside
+/// its canvas: the page never scrolls sideways, the canvas grows with a tall
+/// preview, and nothing covers the card's header or is clipped by the card.
+#[gpui::test]
+fn every_preview_fits_its_canvas_at_every_width(cx: &mut TestAppContext) {
+    use super::shell::PREVIEW_DRAWN;
+    let (window, mut cx) = open(cx);
+    for (width, _) in WIDTHS {
+        for height in [780., 1200.] {
+            cx.simulate_resize(size(px(width), px(height)));
+            settle(&window, &mut cx);
+            for entry in CATALOG {
+                if !matches!(entry.kind, Kind::Component { .. }) {
+                    continue;
+                }
+                go(&window, &mut cx, entry.id);
+                let canvas = bounds(&mut cx, "preview-canvas");
+                let drawn = PREVIEW_DRAWN
+                    .with(|drawn| drawn.get())
+                    .expect("the preview was drawn");
+                let label = format!("{} at {width}x{height}", entry.id);
+                assert!(
+                    drawn.left() >= canvas.left() - px(0.5)
+                        && drawn.right() <= canvas.right() + px(0.5),
+                    "{label}: {drawn:?} in {canvas:?}"
+                );
+                assert!(
+                    drawn.top() >= canvas.top() - px(0.5)
+                        && drawn.bottom() <= canvas.bottom() + px(0.5),
+                    "{label}: {drawn:?} in {canvas:?}"
+                );
+            }
+        }
+    }
+}
+
+/// A contained overlay's screen keeps its height in the growing canvas.
+#[gpui::test]
+fn overlay_screens_keep_their_height(cx: &mut TestAppContext) {
+    let (window, mut cx) = open(cx);
+    for id in ["dialog", "bottom-sheet", "side-sheet"] {
+        go(&window, &mut cx, id);
+        let drawn = super::shell::PREVIEW_DRAWN
+            .with(|drawn| drawn.get())
+            .expect("the preview was drawn");
+        assert!(drawn.size.height >= px(320.), "{id}: {drawn:?}");
+    }
+}
+
+/// The default time picker is taller than a 780px window's pane: its card
+/// grows and the configuration card beside it keeps the row's height.
+#[gpui::test]
+fn a_tall_preview_grows_its_card_at_a_short_window(cx: &mut TestAppContext) {
+    let (window, mut cx) = open(cx);
+    go(&window, &mut cx, "time-picker");
+    cx.simulate_resize(size(px(1280.), px(780.)));
+    settle(&window, &mut cx);
+    let canvas = bounds(&mut cx, "preview-canvas");
+    let config = bounds(&mut cx, "configuration-card");
+    let tabs = bounds(&mut cx, "card-tabs");
+    let drawn = super::shell::PREVIEW_DRAWN
+        .with(|drawn| drawn.get())
+        .expect("the preview was drawn");
+    assert!(drawn.top() >= tabs.bottom(), "{drawn:?} under {tabs:?}");
+    assert!(drawn.bottom() <= canvas.bottom(), "{drawn:?} in {canvas:?}");
+    assert_eq!(config.bottom(), canvas.bottom() + px(1.));
+}
+
+#[gpui::test]
+fn the_compact_drawer_opens_navigates_and_dismisses(cx: &mut TestAppContext) {
+    let (window, mut cx) = open(cx);
+    cx.update(|_, cx| cx.set_reduce_motion(true));
+    go(&window, &mut cx, "button");
+    resize(&window, &mut cx, 480.);
+    let open = |window: &WindowHandle<Gallery>, cx: &mut VisualTestContext, value: bool| {
+        window
+            .update(cx, |g, _, cx| g.set_drawer_open(value, cx))
+            .unwrap();
+        settle(window, cx);
+    };
+    let is_open = |window: &WindowHandle<Gallery>, cx: &mut VisualTestContext| {
+        window.update(cx, |g, _, _| g.drawer_open).unwrap()
+    };
+    // The scrim dismisses, and takes the press from the page beneath it.
+    open(&window, &mut cx, true);
+    click(&window, &mut cx, point(px(470.), px(450.)));
+    assert!(!is_open(&window, &mut cx));
+    window
+        .update(&mut cx, |g, _, _| {
+            assert_eq!(g.current, catalog::position("button").unwrap())
+        })
+        .unwrap();
+    // A destination navigates and closes: the first group's heading, then
+    // the Overview row (12dp padding, 48dp dense rows).
+    open(&window, &mut cx, true);
+    click(&window, &mut cx, point(px(100.), px(12. + 48. + 24.)));
+    assert!(!is_open(&window, &mut cx));
+    window
+        .update(&mut cx, |g, _, _| {
+            assert_eq!(g.current, catalog::position("overview").unwrap())
+        })
+        .unwrap();
+    // Widening the window leaves no modal drawer behind.
+    open(&window, &mut cx, true);
+    resize(&window, &mut cx, 1280.);
+    assert!(!is_open(&window, &mut cx));
+}
+
+#[gpui::test]
+fn compact_search_shows_its_results_in_the_drawer(cx: &mut TestAppContext) {
+    let (window, mut cx) = open(cx);
+    resize(&window, &mut cx, 480.);
+    window
+        .update(&mut cx, |g, _, cx| g.set_query("sli".into(), cx))
+        .unwrap();
+    settle(&window, &mut cx);
+    window
+        .update(&mut cx, |g, _, _| {
+            assert!(g.drawer_open);
+            assert_eq!(
+                g.matches().collect::<Vec<_>>(),
+                [catalog::position("slider").unwrap()]
+            );
+        })
+        .unwrap();
 }
