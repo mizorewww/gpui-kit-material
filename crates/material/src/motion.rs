@@ -1,8 +1,14 @@
 //! The motion vocabulary: M3 springs, entrances and retargetable values.
 //!
-//! Expressive uses md3.io's sampled CSS curves and durations. Standard preserves
-//! the original analytic Material springs. Apply the scheme at the start of a
-//! root render, like the theme; helpers below resolve it on the UI thread.
+//! Both schemes are m3e.kyralabs.dev's analytic springs (kyra-labs/m3exp-web
+//! `3b1e0047c0021eab7b4c0128fa1bec95c76ca746`,
+//! `packages/m3e-tokens/src/generated/tokens.css`, generated from Compose
+//! Material3 1.5.0-beta01 `StandardMotionTokens.kt` / `ExpressiveMotionTokens.kt`
+//! @ androidx `19991f2c0858aadfcb442ce02b2c8e4743c96898`), timed by Compose's
+//! settle estimate. Under reduced motion, spatial tokens finish immediately and
+//! default/slow effects play the fast effects spring (m3e FOUNDATIONS §4).
+//! Apply the scheme at the start of a root render, like the theme; helpers
+//! below resolve it on the UI thread.
 use gpui::{prelude::*, *};
 use std::cell::Cell;
 use std::time::Duration;
@@ -30,25 +36,27 @@ pub enum MotionToken {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum MotionCurve {
     Standard(Spring),
-    Expressive(expressive::SampledSpring),
+    Expressive(Spring),
 }
 
 impl MotionCurve {
-    pub fn duration(self) -> Duration {
+    /// The scheme's spring behind this curve.
+    pub fn spring(self) -> Spring {
         match self {
-            Self::Standard(spring) => spring.duration(),
-            Self::Expressive(spring) => spring.duration,
+            Self::Standard(spring) | Self::Expressive(spring) => spring,
         }
+    }
+
+    pub fn duration(self) -> Duration {
+        self.spring().duration()
     }
 
     pub fn ease(self) -> impl Fn(f32) -> f32 + Copy + 'static {
-        move |progress| match self {
-            Self::Standard(spring) => spring.ease()(progress),
-            Self::Expressive(spring) => spring.position(progress),
-        }
+        self.spring().ease()
     }
 
-    fn position(self, seconds: f32) -> f32 {
+    /// Position after `seconds` of a 0 → 1 transition on this curve.
+    pub(crate) fn position(self, seconds: f32) -> f32 {
         self.ease()(seconds / self.duration().as_secs_f32())
     }
 }
@@ -95,6 +103,18 @@ pub fn apply_scheme(scheme: MotionScheme) {
 
 pub fn curve(token: MotionToken) -> MotionCurve {
     SCHEME.get().resolve(token)
+}
+
+/// The token a transition plays under the current motion preference: m3e
+/// replaces the default and slow effects springs with the fast one under
+/// reduced motion (spatial tokens finish through [`token_policy`]).
+fn effective_token(token: MotionToken, cx: &App) -> MotionToken {
+    match token {
+        MotionToken::DefaultEffects | MotionToken::SlowEffects if cx.reduce_motion() => {
+            MotionToken::FastEffects
+        }
+        token => token,
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -155,7 +175,7 @@ impl<T: gpui_base::Interpolate + PartialEq + 'static> TokenTransitionPlayback<T>
     /// Forward actual target/preference changes while unmounted. A channel's
     /// first sample adopts its target; a fresh handle resets its lifecycle.
     pub fn sample(&self, target: T, token: MotionToken, cx: &App) -> gpui_base::MotionValue<T> {
-        let requested = curve(token);
+        let requested = curve(effective_token(token, cx));
         let mut active = self.curve.get().unwrap_or(RunningCurve {
             curve: requested,
             running: false,
@@ -197,8 +217,9 @@ pub fn token_value(
 /// Follow an interpolatable target using the selected Material motion token.
 ///
 /// Each channel ID must retain the same value type.
-/// Effects tokens preserve fades under reduced motion, matching the reference
-/// CSS transition policy; spatial tokens finish immediately. Interpolation is
+/// Effects tokens preserve fades under reduced motion (default and slow
+/// effects on the fast effects spring), matching m3e's reduced-motion
+/// tokens; spatial tokens finish immediately. Interpolation is
 /// supplied by the value, so color spaces and compound geometry need not be flattened
 /// into independent scalar clocks. Timing and retargeting belong to GPUI Base.
 pub fn token_transition<T>(
@@ -212,7 +233,7 @@ where
     T: gpui_base::Interpolate + PartialEq + 'static,
 {
     let id = id.into();
-    let requested = curve(token);
+    let requested = curve(effective_token(token, cx));
     let state = window.use_keyed_state((id.clone(), "material-motion-curve"), cx, |_, _| {
         RunningCurve {
             curve: requested,
@@ -232,10 +253,12 @@ where
 /// Short fades, e.g. a menu's entrance.
 pub const ENTER_MS: u64 = 160;
 
-/// A Material 3 spring: the Standard motion scheme's tokens
-/// (`motionSpring*` in Material Components for Android). Spatial springs
-/// move or reshape something and may settle with a barely visible overshoot;
-/// effects springs fade color and opacity and never overshoot.
+/// A Material 3 spring (damping ratio, stiffness; unit mass). The constants
+/// below are the Standard motion scheme's tokens, which m3e generates from
+/// Compose `StandardMotionTokens.kt` (L20-L31) and lists in `tokens.css` as
+/// `--m3e-sys-motion-spring-standard-*`. Spatial springs move or reshape
+/// something and may settle with a barely visible overshoot; effects springs
+/// fade color and opacity and never overshoot.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Spring {
     pub damping: f32,
@@ -300,18 +323,14 @@ impl Spring {
         self.stiffness.sqrt()
     }
 
-    /// Time until the remaining distance stays under 0.1% of the change.
+    /// Compose's settle estimate for a 0 → 1 move at a 0.1% visibility
+    /// threshold, in whole milliseconds and at least 1ms: the `-duration`
+    /// m3e derives for every spring token (`packages/m3e-motion/src/linear.ts`,
+    /// `FloatSpringSpec.getDurationNanos`).
     pub fn duration(self) -> Duration {
         let spring = self.sanitized();
-        let rate = spring.damping.min(1.) * spring.omega();
-        // A critically damped spring decays as (1 + ωt)·e^(-ωt), slower than
-        // its envelope alone; 9.23/ω is where that falls below 0.001.
-        let seconds = if spring.damping >= 1. {
-            9.23 / spring.omega()
-        } else {
-            1000_f32.ln() / rate
-        };
-        Duration::from_secs_f32(seconds)
+        let millis = settle_estimate_millis(spring.stiffness as f64, spring.damping as f64, 1000.);
+        Duration::from_millis(millis.max(1))
     }
 
     /// Position from rest at 0 toward 1 after `seconds`.
@@ -343,6 +362,121 @@ impl Spring {
                 self.position(t * seconds)
             }
         }
+    }
+}
+
+/// Port of Compose `SpringEstimation.kt` (animation-core @ androidx
+/// `19991f2c0858aadfcb442ce02b2c8e4743c96898`, via m3e's
+/// `packages/m3e-motion/src/spring-estimation.ts`): the time in whole
+/// milliseconds after which a spring released `displacement` thresholds from
+/// rest stays within one threshold of its target.
+fn settle_estimate_millis(stiffness: f64, damping_ratio: f64, displacement: f64) -> u64 {
+    let delta = 1.;
+    let p0 = displacement.abs();
+    let v0 = 0.;
+    if p0 == 0. {
+        return 0;
+    }
+    let coefficient = 2. * damping_ratio * stiffness.sqrt();
+    let partial = coefficient * coefficient - 4. * stiffness;
+    let partial_real = if partial < 0. { 0. } else { partial.sqrt() };
+    let partial_imaginary = if partial < 0. {
+        partial.abs().sqrt()
+    } else {
+        0.
+    };
+    let r1 = (-coefficient + partial_real) * 0.5;
+    let i1 = partial_imaginary * 0.5;
+    let r2 = (-coefficient - partial_real) * 0.5;
+    let newton = |mut t: f64, f: &dyn Fn(f64) -> f64, df: &dyn Fn(f64) -> f64| {
+        let mut change = f64::MAX;
+        let mut iterations = 0;
+        while change > 0.001 && iterations < 100 {
+            iterations += 1;
+            let last = t;
+            t -= f(t) / df(t);
+            change = (last - t).abs();
+        }
+        t
+    };
+    let seconds = if damping_ratio > 1. {
+        let c2 = (r1 * p0 - v0) / (r1 - r2);
+        let c1 = p0 - c2;
+        let t1 = (delta / c1).abs().ln() / r1;
+        let t2 = (delta / c2).abs().ln() / r2;
+        let mut t = if !t1.is_finite() {
+            t2
+        } else if !t2.is_finite() {
+            t1
+        } else {
+            t1.max(t2)
+        };
+        let inflection = ((c1 * r1) / (-c2 * r2)).ln() / (r2 - r1);
+        let x_inflection = c1 * (r1 * inflection).exp() + c2 * (r2 * inflection).exp();
+        let signed = if inflection.is_nan() || inflection <= 0. {
+            -delta
+        } else if -x_inflection < delta {
+            if c2 > 0. && c1 < 0. {
+                t = 0.;
+            }
+            -delta
+        } else {
+            t = (-(c2 * r2 * r2) / (c1 * r1 * r1)).ln() / (r1 - r2);
+            delta
+        };
+        if (c1 * r1 * (r1 * t).exp() + c2 * r2 * (r2 * t).exp()).abs() < 0.0001 {
+            t
+        } else {
+            newton(
+                t,
+                &|t| c1 * (r1 * t).exp() + c2 * (r2 * t).exp() + signed,
+                &|t| c1 * r1 * (r1 * t).exp() + c2 * r2 * (r2 * t).exp(),
+            )
+        }
+    } else if damping_ratio < 1. {
+        // Under-damped: the envelope c·e^(r·t) of the oscillation.
+        let c2 = (v0 - r1 * p0) / i1;
+        (delta / (p0 * p0 + c2 * c2).sqrt()).ln() / r1
+    } else {
+        let r = r1;
+        let (c1, c2) = (p0, v0 - r * p0);
+        let t1 = (delta / c1).abs().ln() / r;
+        let guess = (delta / c2).abs().ln();
+        let mut lambert = guess;
+        for _ in 0..=5 {
+            lambert = guess - (lambert / r).abs().ln();
+        }
+        let t2 = lambert / r;
+        let mut t = if !t1.is_finite() {
+            t2
+        } else if !t2.is_finite() {
+            t1
+        } else {
+            t1.max(t2)
+        };
+        let inflection = -(r * c1 + c2) / (r * c2);
+        let x_inflection = c1 * (r * inflection).exp() + c2 * inflection * (r * inflection).exp();
+        let signed = if inflection.is_nan() || inflection <= 0. {
+            -delta
+        } else if -x_inflection < delta {
+            if c2 < 0. && c1 > 0. {
+                t = 0.;
+            }
+            -delta
+        } else {
+            t = -(2. / r) - c1 / c2;
+            delta
+        };
+        newton(t, &|t| (c1 + c2 * t) * (r * t).exp() + signed, &|t| {
+            (c2 * (r * t + 1.) + c1 * r) * (r * t).exp()
+        })
+    };
+    // Kotlin's Double.toLong(): truncation, NaN → 0, saturating.
+    let millis = seconds * 1000.;
+    if millis.is_nan() || millis <= 0. {
+        0
+    } else {
+        millis.min(u64::MAX as f64) as u64
     }
 }
 
@@ -973,10 +1107,15 @@ mod tests {
             window.refresh();
             window.draw(cx).clear(cx);
         });
-        // The 250ms DefaultEffects curve has a documented midpoint sample of 0.96.
+        // DefaultEffects is m3e's critically damped 1600 stiffness spring
+        // over its 230ms Compose settle estimate.
+        let expected = super::MotionScheme::Expressive
+            .resolve(super::MotionToken::DefaultEffects)
+            .position(0.125);
         let midpoint = sample.borrow().clone();
-        assert!((midpoint.0[0] - 0.96).abs() < 0.00001);
-        assert!((midpoint.0[1] - 29.2).abs() < 0.00001);
+        assert!((expected - 0.9596).abs() < 0.0001, "{expected}");
+        assert!((midpoint.0[0] - expected).abs() < 0.00001);
+        assert!((midpoint.0[1] - (10. + 20. * expected)).abs() < 0.0001);
         cx.update(|window, cx| {
             view.update(cx, |view, _| view.target = start.clone());
             window.refresh();

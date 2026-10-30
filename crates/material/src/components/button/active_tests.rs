@@ -209,7 +209,7 @@ fn controlled_active_retargets_spatial_motion_without_a_pointer_event(cx: &mut T
         + (16. - 48.)
             * crate::motion::MotionScheme::Expressive
                 .resolve(crate::motion::MotionToken::FastSpatial)
-                .ease()(0.1 / 0.425);
+                .position(0.1);
     assert!((radius.get() - expected).abs() < 0.001);
     let interrupted = radius.get();
     view.update(cx, |this, cx| {

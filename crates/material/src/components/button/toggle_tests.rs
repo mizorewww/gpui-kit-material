@@ -241,7 +241,7 @@ fn external_selection_retargets_fast_spatial_without_snapping(cx: &mut TestAppCo
         + (28. - 48.)
             * crate::motion::MotionScheme::Expressive
                 .resolve(MotionToken::FastSpatial)
-                .ease()(0.1 / 0.425);
+                .position(0.1);
     assert!((radius.get() - expected).abs() < 0.001);
     let before = radius.get();
     view.update(cx, |this, cx| {

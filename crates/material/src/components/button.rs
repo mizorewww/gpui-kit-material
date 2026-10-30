@@ -1567,7 +1567,7 @@ mod tests {
             &ShadowPair::level(1),
             crate::motion::MotionScheme::Expressive
                 .resolve(crate::motion::MotionToken::DefaultEffects)
-                .ease()(0.4),
+                .position(0.1),
         );
         assert_eq!(sample.borrow().1, expected);
         assert_ne!(sample.borrow().1, ShadowPair::level(1));
@@ -1883,11 +1883,14 @@ mod tests {
         draw(cx);
         let filled = colors(ButtonVariant::Filled, false);
         let tonal = colors(ButtonVariant::Tonal, false);
+        let progress = crate::motion::MotionScheme::Expressive
+            .resolve(crate::motion::MotionToken::DefaultEffects)
+            .position(0.125);
         assert_colors_close(
             sample.get(),
             (
-                crate::theme::blend(filled.0, tonal.0, 0.96),
-                crate::theme::blend(filled.1, tonal.1, 0.96),
+                crate::theme::blend(filled.0, tonal.0, progress),
+                crate::theme::blend(filled.1, tonal.1, progress),
                 tonal.2,
             ),
         );
@@ -2155,7 +2158,7 @@ mod tests {
             + (16. - 48.)
                 * crate::motion::MotionScheme::Expressive
                     .resolve(crate::motion::MotionToken::FastSpatial)
-                    .ease()(0.1 / 0.425);
+                    .position(0.1);
         assert!((sample.get() - expected).abs() < 0.001);
         cx.update(|_, cx| assert_eq!(view.read(cx).activations, 0));
         cx.simulate_event(TouchEvent {
@@ -2219,7 +2222,7 @@ mod tests {
             + (16. - 48.)
                 * crate::motion::MotionScheme::Expressive
                     .resolve(crate::motion::MotionToken::FastSpatial)
-                    .ease()(0.1 / 0.425);
+                    .position(0.1);
         assert!((sample.get() - expected).abs() < 0.001);
         let before = sample.get();
         cx.simulate_mouse_move(
