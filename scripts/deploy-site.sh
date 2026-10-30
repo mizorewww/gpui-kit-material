@@ -35,7 +35,8 @@ commit="$(git rev-parse --short HEAD)"
 
 status=0
 for path in / /gallery/ /api/; do
-  code="$(curl -sS -o /dev/null -w '%{http_code}' --retry 5 --retry-delay 5 --retry-all-errors "$origin$path")"
+  # A new hostname can take a few minutes to resolve and get its certificate.
+  code="$(curl -sS -o /dev/null -w '%{http_code}' --retry 30 --retry-delay 10 --retry-all-errors "$origin$path" || true)"
   echo "$code $origin$path"
   [[ "$code" == 200 ]] || status=1
 done

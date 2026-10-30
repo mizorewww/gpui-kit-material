@@ -279,7 +279,8 @@ def build_assets(output):
     font = (source / "Roboto-latin-wght.woff2").read_bytes()
     font_name = f"roboto-latin-wght.{content_hash(font)}.woff2"
     (fonts / font_name).write_bytes(font)
-    shutil.copy(source / "OFL.txt", fonts / "Roboto-OFL.txt")
+    license_text = (source / "OFL.txt").read_bytes()
+    (fonts / f"Roboto-OFL.{content_hash(license_text)}.txt").write_bytes(license_text)
     style = STYLE.replace("FONT_URL", font_name).encode()
     style_name = f"site.{content_hash(style)}.css"
     (fonts / style_name).write_bytes(style)
