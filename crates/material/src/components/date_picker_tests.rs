@@ -219,3 +219,46 @@ fn typed_dates_parse_into_the_selection(cx: &mut TestAppContext) {
         "invalid text keeps the last valid date"
     );
 }
+
+#[test]
+fn months_stay_inside_the_offered_years() {
+    let years = 2020..=2022;
+    assert_eq!(clamp_month(&years, 2019, 5), (2020, 1));
+    assert_eq!(clamp_month(&years, 2023, 1), (2022, 12));
+    assert_eq!(clamp_month(&years, 2021, 13), (2022, 1), "normalized");
+    assert!(month_in_range(&years, 2022, 12));
+    assert!(!month_in_range(&years, 2023, 1));
+    // The full-screen list has 36 rows; a later year reveals the last.
+    assert_eq!(month_list_index(&years, 2021, 2), 14);
+    assert_eq!(month_list_index(&years, 2030, 6), 35);
+}
+
+#[gpui::test]
+fn chevrons_and_set_value_respect_the_years(cx: &mut TestAppContext) {
+    cx.update(|cx| {
+        gpui_base::init(cx);
+        crate::init(cx);
+        cx.set_reduce_motion(true);
+    });
+    let state =
+        cx.new(|cx| DatePickerState::new(labels(), d(2025, 1, 5), cx).years(2025..=2025));
+    state.update(cx, |s, cx| s.previous_month(cx));
+    assert_eq!(state.read_with(cx, |s, _| s.displayed_month()), (2025, 1));
+    state.update(cx, |s, cx| s.previous_year(cx));
+    assert_eq!(state.read_with(cx, |s, _| s.displayed_month()), (2025, 1));
+    state.update(cx, |s, cx| s.show_month(2025, 12, cx));
+    state.update(cx, |s, cx| s.next_month(cx));
+    assert_eq!(state.read_with(cx, |s, _| s.displayed_month()), (2025, 12));
+    // A selection outside the years stays, but the grid shows their end.
+    state.update(cx, |s, cx| {
+        s.set_value(DateSelection::Single(Some(d(2030, 6, 1))), cx)
+    });
+    assert_eq!(
+        state.read_with(cx, |s, _| s.value()),
+        DateSelection::Single(Some(d(2030, 6, 1)))
+    );
+    assert_eq!(state.read_with(cx, |s, _| s.displayed_month()), (2025, 12));
+    // The grid renders there without indexing past its list.
+    let (_, cx) = cx.add_window_view(|_, _| Harness(state.clone()));
+    draw(cx);
+}
