@@ -136,7 +136,9 @@ pub use text::{
     accessible_text, error_text, info_callout, page_heading, section_heading, section_title,
     semantic_label, supporting_info,
 };
-pub use text_field::{TEXT_FIELD_HEIGHT, TEXT_FIELD_WIDTH, TextField, TextFieldVariant};
+pub use text_field::{
+    TEXT_FIELD_HEIGHT, TEXT_FIELD_WIDTH, TextField, TextFieldDensity, TextFieldVariant,
+};
 pub use tile::{
     TileGroup, TileScale, disclosure_chevron, list_tile, tile, tile_chevron, tile_info,
 };
