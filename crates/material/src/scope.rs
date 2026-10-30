@@ -30,6 +30,12 @@
 //! - What Kit defers itself reads its colors while rendering, which is in the
 //!   scope, but anything it reads while painting is not.
 //! - Drag previews, unless the preview is built with [`current_scope`].
+//! - Under GPUI Fast, a view two or more views inside a scheme scope can be rebuilt
+//!   on its own by a notification, outside the scope's phases. Views directly
+//!   inside rebuild with the view holding the scope, because the scope's global
+//!   swap marks that view's dependency on Kit's theme as changed.
+//! - Kit's theme is projected again when the scheme or text size changes. Another
+//!   field changed on Kit's global reaches the subtree at its next scheme change.
 //! - Kit's scrollbar styles, which Kit builds privately from its global theme.
 //! - An element built before the scope is entered reads the outer scheme for
 //!   any color it computed while being built. Build through [`Scope::child_with`]
@@ -261,6 +267,18 @@ impl Frame {
         result
     }
 
+    /// Whether this frame is being drawn now, directly or around the current one.
+    fn is_current(self: &Rc<Self>) -> bool {
+        let mut frame = CURRENT.with(|current| current.borrow().clone());
+        while let Some(current) = frame {
+            if Rc::ptr_eq(&current, self) {
+                return true;
+            }
+            frame = current.outer.clone();
+        }
+        false
+    }
+
     /// Run deferred work, which starts outside every scope, inside this one.
     fn reenter(
         self: &Rc<Self>,
@@ -268,6 +286,11 @@ impl Frame {
         cx: &mut App,
         f: &mut dyn FnMut(&mut Window, &mut App),
     ) {
+        // `Deferred` lays out in place: the frame may already be on the stack,
+        // and swapping Kit's themes twice would put the outer one back.
+        if self.is_current() {
+            return f(window, cx);
+        }
         match self.outer.clone() {
             Some(outer) => outer.reenter(window, cx, &mut |window, cx| {
                 self.enter(window, cx, |window, cx| f(window, cx))

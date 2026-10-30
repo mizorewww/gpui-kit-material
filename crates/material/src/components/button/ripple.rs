@@ -411,6 +411,14 @@ impl Element for ButtonRipple {
                 _ => {}
             }
         });
+        let release_on_long_press = self.state.downgrade();
+        window.on_mouse_event(move |event: &LongPressEvent, phase, _, cx| {
+            if phase == DispatchPhase::Capture
+                && matches!(event.phase, TouchPhase::Ended | TouchPhase::Cancelled)
+            {
+                let _ = release_on_long_press.update(cx, |state, cx| state.release(cx));
+            }
+        });
         let release_on_scroll = self.state.downgrade();
         window.on_mouse_event(move |_: &ScrollEvent, phase, _, cx| {
             if phase == DispatchPhase::Capture {

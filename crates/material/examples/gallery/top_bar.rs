@@ -129,7 +129,7 @@ impl Render for TopBar {
                         .h(rem(40.)),
                 ),
         );
-        let bar = div()
+        div()
             .id("top-bar")
             .size_full()
             .flex()
@@ -225,8 +225,7 @@ impl Render for TopBar {
                         })
                     })),
                 ),
-            ));
-        bar
+            ))
     }
 }
 

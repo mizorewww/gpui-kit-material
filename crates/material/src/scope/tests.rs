@@ -316,6 +316,139 @@ fn rtl_controls(cx: &mut TestAppContext) -> (Entity<RtlControls>, &mut VisualTes
     })
 }
 
+/// Reads Kit's theme and the scope's color while rendering in a deferred draw.
+#[derive(gpui::IntoElement)]
+struct KitProbe(Rc<Cell<Option<(Hsla, Rgba)>>>);
+impl RenderOnce for KitProbe {
+    fn render(self, _: &mut Window, cx: &mut App) -> impl IntoElement {
+        self.0
+            .set(Some((cx.theme().background, color(ColorRole::SURFACE))));
+        div().size(px(1.))
+    }
+}
+
+struct DeferredKit(Rc<Cell<Option<(Hsla, Rgba)>>>);
+impl Render for DeferredKit {
+    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        let seen = self.0.clone();
+        Scope::new("kit").scheme(ink()).child_with(move |_, _| {
+            div()
+                .child(deferred(current_scope(KitProbe(seen))))
+                .into_any_element()
+        })
+    }
+}
+
+#[gpui::test]
+fn deferred_content_laid_out_in_place_keeps_kit_in_the_scope(cx: &mut TestAppContext) {
+    cx.update(|cx| {
+        gpui_kit::init(cx);
+        theme::init_component_theme(paper(), 1., cx);
+        cx.set_reduce_motion(true);
+    });
+    let seen = Rc::new(Cell::new(None));
+    let (_, cx) = cx.add_window_view({
+        let seen = seen.clone();
+        move |_, _| DeferredKit(seen)
+    });
+    draw(cx);
+    let want = rgba(ink().get(ColorRole::SURFACE));
+    assert_eq!(seen.get(), Some((Hsla::from(want), want)));
+}
+
+/// A view that paints its scope's color and position, notified on its own.
+struct Inner {
+    color: Rc<Cell<Option<Rgba>>>,
+}
+impl Render for Inner {
+    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        self.color.set(Some(color(ColorRole::SURFACE)));
+        div().flex().w_full().h(px(10.)).child(
+            div()
+                .w(px(10.))
+                .h_full()
+                .debug_selector(|| "inner-cell".into()),
+        )
+    }
+}
+
+struct Outer(Entity<Inner>);
+impl Render for Outer {
+    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        Scope::new("outer")
+            .scheme(ink())
+            .direction(LayoutDirection::Rtl)
+            .child(
+                div().w(px(100.)).child(
+                    AnyView::from(self.0.clone())
+                        .cached(StyleRefinement::default().w(px(100.)).h(px(10.))),
+                ),
+            )
+    }
+}
+
+#[gpui::test]
+fn a_view_notified_alone_stays_in_its_scope(cx: &mut TestAppContext) {
+    cx.update(|cx| {
+        gpui_kit::init(cx);
+        theme::init_component_theme(paper(), 1., cx);
+        cx.set_reduce_motion(true);
+    });
+    let seen = Rc::new(Cell::new(None));
+    let inner_seen = seen.clone();
+    let (root, cx) = cx.add_window_view(move |_, cx| {
+        let inner = cx.new(|_| Inner { color: inner_seen });
+        let outer = cx.new(|_| Outer(inner));
+        CachedOuter(outer)
+    });
+    draw(cx);
+    let want = Some(rgba(ink().get(ColorRole::SURFACE)));
+    assert_eq!(seen.get(), want);
+    assert_eq!(cx.debug_bounds("inner-cell").unwrap().left(), px(90.));
+    let inner = root.read_with(cx, |root, cx| root.0.read(cx).0.clone());
+    seen.set(None);
+    inner.update(cx, |_, cx| cx.notify());
+    cx.update(|window, cx| window.draw(cx).clear(cx));
+    cx.run_until_parked();
+    assert_eq!(seen.get(), want, "rebuilt in the scope's scheme");
+    assert_eq!(
+        cx.debug_bounds("inner-cell").unwrap().left(),
+        px(90.),
+        "and direction"
+    );
+}
+
+struct CachedOuter(Entity<Outer>);
+impl Render for CachedOuter {
+    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        AnyView::from(self.0.clone()).cached(StyleRefinement::default().size_full())
+    }
+}
+
+#[gpui::test]
+fn an_application_direction_reaches_the_window_that_set_it(cx: &mut TestAppContext) {
+    cx.update(gpui_kit::init);
+    let (_, cx) = cx.add_window_view(|_, _| DirectionHarness {
+        direction: LayoutDirection::Ltr,
+    });
+    draw(cx);
+    cx.update(|window, cx| {
+        set_app_direction(LayoutDirection::Rtl, cx);
+        assert_eq!(cx.layout_direction(), LayoutDirection::Rtl);
+        window.refresh();
+        window.draw(cx).clear(cx);
+        assert_eq!(window.layout_direction(), LayoutDirection::Rtl);
+        set_window_direction(LayoutDirection::Ltr, window);
+        set_app_direction(LayoutDirection::Rtl, cx);
+        window.draw(cx).clear(cx);
+        assert_eq!(
+            window.layout_direction(),
+            LayoutDirection::Ltr,
+            "a window that chose keeps its own"
+        );
+    });
+}
+
 #[gpui::test]
 fn arrows_move_tabs_in_the_reading_direction(cx: &mut TestAppContext) {
     let (view, cx) = rtl_controls(cx);

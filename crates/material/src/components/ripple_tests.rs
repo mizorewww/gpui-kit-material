@@ -227,3 +227,20 @@ fn a_specimen_or_disabled_ripple_starts_no_wave(cx: &mut TestAppContext) {
         cx.simulate_mouse_up(at, MouseButton::Left, Modifiers::default());
     }
 }
+
+#[gpui::test]
+fn a_long_press_ending_releases_the_wave(cx: &mut TestAppContext) {
+    let (view, cx) = scroll_harness(cx);
+    draw(cx);
+    let at = cx.debug_bounds("list").unwrap().center();
+    touch(cx, TouchPhase::Started, at);
+    draw(cx);
+    assert!(pressed(&view, cx));
+    cx.simulate_event(gpui::LongPressEvent {
+        phase: TouchPhase::Ended,
+        start_position: at,
+        position: at,
+    });
+    draw(cx);
+    assert!(!pressed(&view, cx));
+}
