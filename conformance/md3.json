@@ -1,6 +1,7 @@
 {
   "reference": {
     "site": "https://md3.io/",
+    "role": "secondary reference (md3.io / floor/material). Provenance for the existing md3.io evidence only; token values come from reference_policy.primary wherever m3e defines them (see reference_policy.token_sources).",
     "repository": "https://github.com/floor/material",
     "source_commit": "c910072f3fc5b660276731d8a935d7186f288364",
     "package_version": "3.2.4",
@@ -159,9 +160,14 @@
       "status": "unreviewed",
       "evidence": [
         {
+          "kind": "m3e-source-tokens",
+          "path": "crates/material/tests/fixtures/m3e-typography.json",
+          "scope": "Primary-reference token values extracted from kyra-labs/m3exp-web 3b1e004 (reference_policy.token_sources.typography); unit tests compare the crate constants. Token data only; rendered, motion-timing and component conformance remain unreviewed."
+        },
+        {
           "kind": "source-type-scale",
           "path": "crates/material/tests/fixtures/md3-typography.json",
-          "scope": "15 reference type roles: default family, brand/plain typeface, size, line height, letter spacing and weight. Token data only; font loading, tracking rendering and component typography conformance remain pending."
+          "scope": "Superseded by the m3e fixture; retained as md3.io secondary evidence and no longer tested. 15 reference type roles: default family, brand/plain typeface, size, line height, letter spacing and weight. Token data only; font loading, tracking rendering and component typography conformance remain pending."
         },
         {
           "kind": "reference-font-assets",
@@ -171,45 +177,73 @@
       ],
       "reference": "https://md3.io/styles/typography/",
       "reference_status": "available",
-      "primary_reference_review": "pending: reconcile with m3e.kyralabs.dev; existing md3.io evidence is not a primary-reference PASS"
+      "primary_reference_review": "token values reconciled with m3e.kyralabs.dev source 3b1e004 and fixture-tested; independent subagent review pending; default family deviates (Roboto vs Google Sans Flex)",
+      "primary_reference": "https://m3e.kyralabs.dev/typography/"
     },
     {
       "id": "shape",
       "status": "unreviewed",
-      "evidence": [],
+      "evidence": [
+        {
+          "kind": "m3e-source-tokens",
+          "path": "crates/material/tests/fixtures/m3e-sys-tokens.json",
+          "scope": "Primary-reference token values extracted from kyra-labs/m3exp-web 3b1e004 (reference_policy.token_sources.shape); unit tests compare the crate constants. Token data only; rendered, motion-timing and component conformance remain unreviewed."
+        }
+      ],
       "reference": "https://md3.io/styles/shape/",
       "reference_status": "available",
-      "primary_reference_review": "pending: reconcile with m3e.kyralabs.dev; existing md3.io evidence is not a primary-reference PASS"
+      "primary_reference_review": "token values reconciled with m3e.kyralabs.dev source 3b1e004 and fixture-tested; independent subagent review pending",
+      "primary_reference": "https://m3e.kyralabs.dev/shapes/"
     },
     {
       "id": "elevation",
       "status": "unreviewed",
-      "evidence": [],
+      "evidence": [
+        {
+          "kind": "m3e-source-tokens",
+          "path": "crates/material/tests/fixtures/m3e-sys-tokens.json",
+          "scope": "Primary-reference token values extracted from kyra-labs/m3exp-web 3b1e004 (reference_policy.token_sources.elevation); unit tests compare the crate constants. Token data only; rendered, motion-timing and component conformance remain unreviewed."
+        }
+      ],
       "reference": "https://md3.io/styles/",
       "reference_status": "Coming on website; verify source and runtime",
-      "primary_reference_review": "pending: reconcile with m3e.kyralabs.dev; existing md3.io evidence is not a primary-reference PASS"
+      "primary_reference_review": "token values reconciled with m3e.kyralabs.dev source 3b1e004 and fixture-tested; independent subagent review pending",
+      "primary_reference": "https://m3e.kyralabs.dev/"
     },
     {
       "id": "motion",
       "status": "unreviewed",
       "evidence": [
         {
+          "kind": "m3e-source-tokens",
+          "path": "conformance/fixtures/m3e-motion.json",
+          "scope": "Primary-reference token values extracted from kyra-labs/m3exp-web 3b1e004 (reference_policy.token_sources.motion); unit tests compare the crate constants. Token data only; rendered, motion-timing and component conformance remain unreviewed."
+        },
+        {
           "kind": "browser-sampled-reference",
           "path": "conformance/fixtures/md3-expressive-browser.json",
-          "scope": "Six Expressive spatial/effects timing curves; does not establish per-component animation conformance."
+          "scope": "Superseded by the m3e fixture; retained as md3.io secondary evidence and no longer tested. Six Expressive spatial/effects timing curves; does not establish per-component animation conformance."
         }
       ],
       "reference": "https://md3.io/styles/",
       "reference_status": "Coming on website; verify source and runtime",
-      "primary_reference_review": "pending: reconcile with m3e.kyralabs.dev; existing md3.io evidence is not a primary-reference PASS"
+      "primary_reference_review": "token values reconciled with m3e.kyralabs.dev source 3b1e004 and fixture-tested; independent subagent review pending",
+      "primary_reference": "https://m3e.kyralabs.dev/motion/"
     },
     {
       "id": "states",
       "status": "unreviewed",
-      "evidence": [],
+      "evidence": [
+        {
+          "kind": "m3e-source-tokens",
+          "path": "crates/material/tests/fixtures/m3e-sys-tokens.json",
+          "scope": "Primary-reference token values extracted from kyra-labs/m3exp-web 3b1e004 (reference_policy.token_sources.states); unit tests compare the crate constants. Token data only; rendered, motion-timing and component conformance remain unreviewed."
+        }
+      ],
       "reference": "https://md3.io/styles/",
       "reference_status": "Coming on website; verify source and runtime",
-      "primary_reference_review": "pending: reconcile with m3e.kyralabs.dev; existing md3.io evidence is not a primary-reference PASS"
+      "primary_reference_review": "token values reconciled with m3e.kyralabs.dev source 3b1e004 and fixture-tested; independent subagent review pending",
+      "primary_reference": "https://m3e.kyralabs.dev/"
     },
     {
       "id": "icons",
@@ -228,6 +262,11 @@
       "cases": [],
       "reviews": [],
       "evidence": [
+        {
+          "kind": "m3e-source-tokens",
+          "path": "crates/material/tests/fixtures/m3e-sys-tokens.json",
+          "scope": "Primary-reference size, shape, padding, icon, outline and disabled-color tokens from kyra-labs/m3exp-web 3b1e004 (reference_policy.token_sources.button), unit-tested against button geometry and colors. The md3.io captures below remain secondary evidence for timing only."
+        },
         {
           "kind": "browser-color-transitions",
           "path": "conformance/reference/button-effects.json",
@@ -1120,7 +1159,7 @@
     "secondary": "https://md3.io/",
     "scope": "union of all components and their variants from both sites",
     "overlap": "m3e.kyralabs.dev is authoritative for the entire overlapping component, including visual tokens, typography, interaction states and animation",
-    "existing_reference_field": "Pinned md3.io source provenance retained for existing evidence; not the primary authority for overlapping components.",
+    "existing_reference_field": "Top-level `reference` pins md3.io (floor/material) provenance for existing secondary evidence only. It is not the primary authority for overlapping components or for any token listed in token_sources as m3e.",
     "existing_evidence": "Existing md3.io fixtures remain secondary-reference evidence. They do not establish conformance to the new primary source. Re-review against the selected source is required.",
     "catalog_status": "top-level union enumerated; variant and alias coverage still requires source and rendered-site audit",
     "primary_catalog": [
@@ -1284,7 +1323,109 @@
         "id": "top-app-bar",
         "url": "https://m3e.kyralabs.dev/components/top-app-bar/"
       }
-    ]
+    ],
+    "token_sources": {
+      "note": "Which source each crate token family comes from. Values listed as m3e are extracted from the pinned primary checkout by scripts/extract-m3e-tokens.py and tested against its fixtures; a matching fixture is token evidence, not a conformance PASS.",
+      "m3e_source": {
+        "repository": "https://github.com/kyra-labs/m3exp-web",
+        "source_commit": "3b1e0047c0021eab7b4c0128fa1bec95c76ca746",
+        "upstream": "Compose Material3 1.5.0-beta01 tokens @ androidx 19991f2c0858aadfcb442ce02b2c8e4743c96898 (m3exp-web SOURCE_PIN)"
+      },
+      "motion": {
+        "source": "m3e",
+        "scope": "Standard and Expressive spring parameters (damping ratio, stiffness), Compose settle durations and reduced-motion substitution (spatial finish; default/slow effects use fast effects)",
+        "m3e_paths": [
+          "packages/m3e-tokens/src/generated/tokens.css",
+          "packages/m3e-motion/src/linear.ts",
+          "packages/m3e-motion/src/spring-estimation.ts"
+        ],
+        "fixture": "conformance/fixtures/m3e-motion.json",
+        "implementation": [
+          "crates/material/src/motion.rs",
+          "crates/material/src/motion/expressive.rs"
+        ],
+        "superseded_md3_evidence": "conformance/fixtures/md3-expressive-browser.json"
+      },
+      "typography": {
+        "source": "m3e",
+        "scope": "15 roles and 15 emphasized styles: brand/plain typeface, size, line height, tracking, weight",
+        "m3e_paths": [
+          "packages/m3e-tokens/src/generated/tokens.css"
+        ],
+        "fixture": "crates/material/tests/fixtures/m3e-typography.json",
+        "implementation": [
+          "crates/material/src/tokens/typography.rs"
+        ],
+        "deviation": "Default family remains Roboto (bundled gallery font) instead of m3e Google Sans Flex (m3exp-web decision D1); not reconciled.",
+        "superseded_md3_evidence": "crates/material/tests/fixtures/md3-typography.json"
+      },
+      "shape": {
+        "source": "m3e",
+        "scope": "corner scale none..extra-extra-large; full rendered as 999px",
+        "m3e_paths": [
+          "packages/m3e-tokens/src/generated/tokens.css"
+        ],
+        "fixture": "crates/material/tests/fixtures/m3e-sys-tokens.json",
+        "implementation": [
+          "crates/material/src/tokens/shape.rs"
+        ],
+        "md3_agreement": "identical values"
+      },
+      "elevation": {
+        "source": "m3e",
+        "scope": "levels 0-5, two-layer key/ambient shadows at 30%/15%",
+        "m3e_paths": [
+          "packages/m3e-tokens/src/generated/tokens.css"
+        ],
+        "fixture": "crates/material/tests/fixtures/m3e-sys-tokens.json",
+        "implementation": [
+          "crates/material/src/tokens/elevation.rs"
+        ],
+        "md3_agreement": "identical values"
+      },
+      "states": {
+        "source": "m3e",
+        "scope": "hover/focus/pressed/dragged state-layer opacities and disabled alpha",
+        "m3e_paths": [
+          "packages/m3e-tokens/src/generated/tokens.css"
+        ],
+        "fixture": "crates/material/tests/fixtures/m3e-sys-tokens.json",
+        "implementation": [
+          "crates/material/src/tokens/state.rs"
+        ],
+        "md3_agreement": "identical values"
+      },
+      "button": {
+        "source": "m3e for sizes, shapes, paddings, icon sizes, outline widths and disabled colors; md3.io for state-layer, shadow, ripple, loading and color-transition timing",
+        "m3e_paths": [
+          "packages/m3e-tokens/src/generated/components/button-{x-small,small,medium,large,x-large}.css",
+          "packages/m3e-tokens/src/generated/components/button-defaults.css",
+          "packages/m3e-tokens/src/generated/components/{filled,elevated,filled-tonal,tonal,outlined,text}-button.css",
+          "packages/m3e-css/src/button.css"
+        ],
+        "fixture": "crates/material/tests/fixtures/m3e-sys-tokens.json",
+        "implementation": [
+          "crates/material/src/components/button.rs",
+          "crates/material/src/components/button/form.rs"
+        ],
+        "md3_only": [
+          "conformance/reference/button-states.json",
+          "conformance/reference/button-states-reduced-motion.json",
+          "conformance/reference/button-effects.json",
+          "conformance/reference/button-ripple.json",
+          "conformance/reference/button-loading.json",
+          "conformance/reference/button-circular.json",
+          "conformance/reference/button-active.json"
+        ],
+        "pending": "m3e button motion (press morph on default effects, toggle shape on fast spatial, colors on fast effects, ElevationDefaults shadow tweens) is not yet adopted; the md3.io captures cannot be re-run against m3e (see scripts/README.md)"
+      },
+      "color": {
+        "source": "md3.io",
+        "scope": "20 browser-resolved preset themes",
+        "fixture": "crates/color/tests/fixtures/md3-colors.json",
+        "pending": "m3e derives schemes from material-color-utilities 0.4.0 (spec 2025); not reconciled"
+      }
+    }
   },
   "delivery": {
     "commits": "atomic by concern",

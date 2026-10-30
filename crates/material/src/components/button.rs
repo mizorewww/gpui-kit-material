@@ -1,5 +1,10 @@
 //! Material button presentation over GPUI Base activation and focus behavior.
-//! Reference: floor/material c910072f3fc5b660276731d8a935d7186f288364.
+//! Sizes, paddings and disabled colors: m3e.kyralabs.dev (kyra-labs/m3exp-web
+//! 3b1e0047c0021eab7b4c0128fa1bec95c76ca746, `packages/m3e-css/src/button.css`
+//! and `packages/m3e-tokens/src/generated/components/button-*.css`; fixture
+//! `tests/fixtures/m3e-sys-tokens.json`). State-layer, shadow, ripple and
+//! color-transition timing still follow the md3.io captures of floor/material
+//! c910072f3fc5b660276731d8a935d7186f288364 (`conformance/reference/button-*.json`).
 //! Controlled toggle and loading presentation over Base behavior.
 #[cfg(test)]
 mod active_tests;
@@ -236,33 +241,13 @@ impl ButtonSize {
     }
 }
 
-fn horizontal_padding(
-    size: ButtonSize,
-    variant: ButtonVariant,
-    icon: Option<ButtonIconPosition>,
-    direction: ButtonDirection,
-) -> (f32, f32) {
-    let ordinary = size.geometry().padding;
-    let compact_text = variant == ButtonVariant::Text
-        && matches!(size, ButtonSize::ExtraSmall | ButtonSize::Small);
-    let (mut start, mut end) = if compact_text {
-        (12., 12.)
-    } else {
-        (ordinary, ordinary)
-    };
-    if let Some(position) = icon
-        && (compact_text || size == ButtonSize::Small)
-    {
-        (start, end) = match position {
-            ButtonIconPosition::Leading => (12., 16.),
-            ButtonIconPosition::Trailing => (16., 12.),
-        };
-    }
-    if direction == ButtonDirection::Rtl {
-        (end, start)
-    } else {
-        (start, end)
-    }
+/// Inline padding: m3e pads every variant, with or without an icon, by the
+/// size's leading/trailing space (XS: ButtonDefaults' 12px), unlike md3.io's
+/// compact text and small-icon paddings. Both sides are equal, so logical
+/// direction does not change them.
+fn horizontal_padding(size: ButtonSize) -> (f32, f32) {
+    let padding = size.geometry().padding;
+    (padding, padding)
 }
 
 #[cfg(test)]
@@ -270,16 +255,27 @@ fn alpha(mut color: Rgba, opacity: f32) -> Rgba {
     color.a *= opacity;
     color
 }
+/// Disabled colors follow m3e (`packages/m3e-css/src/button.css` at
+/// kyra-labs/m3exp-web 3b1e004): the token objects Compose uses, so the
+/// plain tonal button takes `FilledTonalButtonTokens` (on-surface at 12% and
+/// 38%) while the other variants use on-surface at 10% and
+/// on-surface-variant at 38%. Fixture: `tests/fixtures/m3e-sys-tokens.json`.
 fn color_targets(variant: ButtonVariant, disabled: bool) -> (CssColor, CssColor, CssColor) {
     use ColorRole as C;
     if disabled {
         return (
-            if matches!(variant, ButtonVariant::Text | ButtonVariant::Outlined) {
-                CssColor::transparent()
-            } else {
-                CssColor::alpha_role(C::ON_SURFACE, 0.10)
+            match variant {
+                ButtonVariant::Text | ButtonVariant::Outlined => CssColor::transparent(),
+                ButtonVariant::Tonal => CssColor::alpha_role(C::ON_SURFACE, 0.12),
+                ButtonVariant::Filled | ButtonVariant::Elevated => {
+                    CssColor::alpha_role(C::ON_SURFACE, 0.10)
+                }
             },
-            CssColor::alpha_role(C::ON_SURFACE_VARIANT, 0.38),
+            if variant == ButtonVariant::Tonal {
+                CssColor::alpha_role(C::ON_SURFACE, 0.38)
+            } else {
+                CssColor::alpha_role(C::ON_SURFACE_VARIANT, 0.38)
+            },
             if variant == ButtonVariant::Outlined {
                 CssColor::alpha_role(C::OUTLINE_VARIANT, 0.10)
             } else {
@@ -327,14 +323,16 @@ fn toggle_color_targets(
         return color_targets(variant, disabled);
     }
     if disabled {
-        let (_, fg, border) = color_targets(variant, true);
+        // m3e toggles: TonalButtonTokens for tonal, an outline-variant wash
+        // for outlined, and no container for text.
+        let (_, _, border) = color_targets(variant, true);
         return (
-            if variant == ButtonVariant::Outlined {
-                CssColor::transparent()
-            } else {
-                CssColor::alpha_role(C::ON_SURFACE, 0.10)
+            match variant {
+                ButtonVariant::Text => CssColor::transparent(),
+                ButtonVariant::Outlined => CssColor::alpha_role(C::OUTLINE_VARIANT, 0.10),
+                _ => CssColor::alpha_role(C::ON_SURFACE, 0.10),
             },
-            fg,
+            CssColor::alpha_role(C::ON_SURFACE_VARIANT, 0.38),
             border,
         );
     }
@@ -608,12 +606,7 @@ impl MaterialButton {
         self
     }
     fn form_geometry(&self) -> form::FormGeometry {
-        let geometry = self.form.geometry(
-            self.size,
-            self.variant,
-            self.icon.as_ref().map(|_| self.icon_position),
-            self.direction,
-        );
+        let geometry = self.form.geometry(self.size, self.direction);
         if self.open && self.form == Form::Segment(Segment::Trailing) {
             // The open, fully round trailing segment centers its chevron.
             let side = (geometry.padding.0 + geometry.padding.1) / 2.;
@@ -1567,7 +1560,7 @@ mod tests {
             &ShadowPair::level(1),
             crate::motion::MotionScheme::Expressive
                 .resolve(crate::motion::MotionToken::DefaultEffects)
-                .ease()(0.4),
+                .position(0.1),
         );
         assert_eq!(sample.borrow().1, expected);
         assert_ne!(sample.borrow().1, ShadowPair::level(1));
@@ -1883,11 +1876,14 @@ mod tests {
         draw(cx);
         let filled = colors(ButtonVariant::Filled, false);
         let tonal = colors(ButtonVariant::Tonal, false);
+        let progress = crate::motion::MotionScheme::Expressive
+            .resolve(crate::motion::MotionToken::DefaultEffects)
+            .position(0.125);
         assert_colors_close(
             sample.get(),
             (
-                crate::theme::blend(filled.0, tonal.0, 0.96),
-                crate::theme::blend(filled.1, tonal.1, 0.96),
+                crate::theme::blend(filled.0, tonal.0, progress),
+                crate::theme::blend(filled.1, tonal.1, progress),
                 tonal.2,
             ),
         );
@@ -1954,17 +1950,89 @@ mod tests {
         assert!((filled.r - (1. * 0.9 + content.r * 0.1)).abs() < 0.00001);
     }
     #[test]
+    fn size_geometry_matches_the_pinned_m3e_button_tokens() {
+        let fixture: serde_json::Value =
+            serde_json::from_str(include_str!("../../tests/fixtures/m3e-sys-tokens.json")).unwrap();
+        let button = &fixture["button"];
+        let defaults = &button["defaults"];
+        let px = |value: &serde_json::Value| value.as_f64().unwrap() as f32;
+        let corner = |value: &serde_json::Value| {
+            value
+                .as_str()
+                .unwrap()
+                .trim_end_matches("px")
+                .parse::<f32>()
+                .unwrap()
+        };
+        assert_eq!(px(&defaults["button-min-width"]), 58.);
+        for (size, name) in ButtonSize::ALL
+            .into_iter()
+            .zip(["x-small", "small", "medium", "large", "x-large"])
+        {
+            let reference = &button["sizes"][name];
+            let g = size.geometry();
+            assert_eq!(g.height, px(&reference["container_height"]), "{name}");
+            assert_eq!(size.icon_size(), px(&reference["icon_size"]), "{name}");
+            assert_eq!(g.outline, px(&reference["outline_width"]), "{name}");
+            assert_eq!(g.square, corner(&reference["shape_square"]), "{name}");
+            assert_eq!(g.pressed, corner(&reference["shape_pressed"]), "{name}");
+            // Compose ButtonDefaults overrides the XS padding and spacing.
+            let (padding, gap) = if size == ButtonSize::ExtraSmall {
+                (
+                    px(&defaults["button-x-small-content-padding-horizontal"]),
+                    px(&defaults["button-x-small-icon-spacing"]),
+                )
+            } else {
+                assert_eq!(reference["leading_space"], reference["trailing_space"]);
+                (
+                    px(&reference["leading_space"]),
+                    px(&reference["icon_label_space"]),
+                )
+            };
+            assert_eq!(
+                super::horizontal_padding(size),
+                (padding, padding),
+                "{name}"
+            );
+            assert_eq!(g.gap, gap, "{name}");
+        }
+    }
+
+    #[test]
     fn disabled_buttons_use_independent_content_container_and_outline_roles() {
+        let fixture: serde_json::Value =
+            serde_json::from_str(include_str!("../../tests/fixtures/m3e-sys-tokens.json")).unwrap();
+        let disabled = &fixture["button"]["disabled"];
         for variant in ButtonVariant::ALL {
             let (bg, fg, border) = colors(variant, true);
-            assert_eq!(fg, alpha(color(ColorRole::ON_SURFACE_VARIANT), 0.38));
+            // button.css maps the plain tonal button to FilledTonalButtonTokens.
+            let reference = &disabled[match variant {
+                ButtonVariant::Filled => "filled",
+                ButtonVariant::Elevated => "elevated",
+                ButtonVariant::Tonal => "filled-tonal",
+                ButtonVariant::Outlined => "outlined",
+                ButtonVariant::Text => "text",
+            }];
+            let content = match reference["content_color"].as_str().unwrap() {
+                "on-surface" => ColorRole::ON_SURFACE,
+                "on-surface-variant" => ColorRole::ON_SURFACE_VARIANT,
+                other => panic!("unexpected disabled content role {other}"),
+            };
+            let content_opacity = reference["content_opacity"].as_f64().unwrap() as f32;
+            assert_eq!(fg, alpha(color(content), content_opacity), "{variant:?}");
             assert_eq!(
-                bg.a,
+                bg,
                 if matches!(variant, ButtonVariant::Outlined | ButtonVariant::Text) {
-                    0.
+                    // Transparent disabled containers in button.css.
+                    alpha(rgba(0), 0.)
                 } else {
-                    0.10
-                }
+                    assert_eq!(reference["container_color"], "on-surface");
+                    alpha(
+                        color(ColorRole::ON_SURFACE),
+                        reference["container_opacity"].as_f64().unwrap() as f32,
+                    )
+                },
+                "{variant:?}"
             );
             assert_eq!(
                 border.a,
@@ -2155,7 +2223,7 @@ mod tests {
             + (16. - 48.)
                 * crate::motion::MotionScheme::Expressive
                     .resolve(crate::motion::MotionToken::FastSpatial)
-                    .ease()(0.1 / 0.425);
+                    .position(0.1);
         assert!((sample.get() - expected).abs() < 0.001);
         cx.update(|_, cx| assert_eq!(view.read(cx).activations, 0));
         cx.simulate_event(TouchEvent {
@@ -2219,7 +2287,7 @@ mod tests {
             + (16. - 48.)
                 * crate::motion::MotionScheme::Expressive
                     .resolve(crate::motion::MotionToken::FastSpatial)
-                    .ease()(0.1 / 0.425);
+                    .position(0.1);
         assert!((sample.get() - expected).abs() < 0.001);
         let before = sample.get();
         cx.simulate_mouse_move(
@@ -2430,9 +2498,8 @@ mod tests {
                         draw(cx);
                         let button = cx.debug_bounds("icon-button").unwrap();
                         let label = cx.debug_bounds("icon-label").unwrap();
-                        let special = size == ButtonSize::Small
-                            || (size == ButtonSize::ExtraSmall && variant == ButtonVariant::Text);
-                        let (icon_side, label_side) = if special { (12., 16.) } else { (pad, pad) };
+                        // m3e: the size's leading/trailing space on both sides.
+                        let (icon_side, label_side) = (pad, pad);
                         let border = if variant == ButtonVariant::Outlined {
                             match size {
                                 ButtonSize::Large => 2.,

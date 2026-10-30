@@ -18,6 +18,7 @@ script's docstring (`--help`) and [docs/DEVELOPMENT.md](../docs/DEVELOPMENT.md).
 | `capture-button-ripple.py` | `conformance/reference/button-ripple.json` (ordinary, reduced and dynamic media) |
 | `capture-icon-button.py` | `conformance/reference/icon-button.json`; `--resume` continues, `--expand` unpacks the interned fixture |
 | `capture-divider.py` | `conformance/reference/divider.json` |
+| `extract-m3e-tokens.py` | `conformance/fixtures/m3e-motion.json`, `crates/material/tests/fixtures/m3e-typography.json` and `m3e-sys-tokens.json` from a clean kyra-labs/m3exp-web checkout at its pinned `REVISION` (reads committed generated tokens only) |
 | `check-gallery-dpr.py` | Validates WASM canvas backing size across DPR/viewport changes of a served gallery |
 | `build-gallery-web.sh` | Builds the WASM gallery (`--fast`, `--upstream`, `--release`) into `crates/gallery-web/www/wasm` |
 | `profile-gallery.py` | Builds and records a native Gallery CPU frame profile with provenance (frame-budget/FPS gates) |
@@ -25,5 +26,34 @@ script's docstring (`--help`) and [docs/DEVELOPMENT.md](../docs/DEVELOPMENT.md).
 | `freeze-conformance-fonts.py` | Static Noto Arabic/Hebrew/Emoji instances under `fonts/conformance/`, recorded in its `SOURCES.json` |
 | `subset-conformance-emoji.py` | `fonts/conformance/notocoloremoji/NotoColorEmoji-Probe.ttf` (probe-sequence subset of the hash-pinned download) |
 | `convert-conformance-emoji-sbix.py` | `NotoColorEmoji-Probe-sbix.ttf`: the probe subset's CBDT strikes repackaged as sbix for CoreText |
+
+## m3e.kyralabs.dev (primary reference)
+
+m3e token values are read from source, not captured: `extract-m3e-tokens.py`
+parses the generated CSS custom properties that m3exp-web commits
+(`packages/m3e-tokens/src/generated/`), which are exact Compose values,
+whereas a browser would only report the same strings back. The `capture-button-*`
+drivers cannot simply be pointed at m3e:
+
+- Their samplers construct buttons through floor/material's JavaScript
+  factories (`createButton`, `createRipple`, loading/circular modifiers) and
+  its compiled Sass. m3e buttons are plain `.m3e-button` CSS classes plus
+  optional React (`@kyralabs/m3e-react`) with a different DOM, class
+  vocabulary and state model, so every sampler and its assertions would need
+  rewriting, not re-targeting.
+- m3e's CSS `transition`s use ≤ 40-stop `linear()` approximations, while its
+  interactive motion (press morph, toggle shape) is driven by JS springs
+  (`motion` 14.1.0) once `data-spring` is set. A computed-style capture would
+  measure the approximation or a third-party frame loop rather than the
+  Compose spring the crate now evaluates exactly.
+- `packages/m3e-css` resolves `@kyralabs/m3e-tokens/...` imports through the
+  pnpm workspace, so a capture needs `pnpm install` of m3exp-web's toolchain;
+  the drivers deliberately run only pinned bun/Sass against an untouched
+  checkout.
+
+Behavioral m3e captures (state-layer/elevation tweens, ripple, focus ring)
+therefore need new m3e-specific samplers; until they exist the
+`conformance/reference/button-*.json` files remain md3.io secondary evidence
+(see `reference_policy.token_sources` in `conformance/md3.json`).
 
 Font scripts run under `uv` with `fonttools==4.60.1` (see each docstring).

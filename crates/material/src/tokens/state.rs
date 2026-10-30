@@ -1,5 +1,14 @@
 //! M3 state layers and disabled emphasis, resolved over the container so a
 //! selected control keeps its color under hover and press.
+//!
+//! Opacities are m3e's `--m3e-sys-state-*-state-layer-opacity` and
+//! `--m3e-sys-state-disabled-alpha` (kyra-labs/m3exp-web
+//! `3b1e0047c0021eab7b4c0128fa1bec95c76ca746`,
+//! `packages/m3e-tokens/src/generated/tokens.css`, from Compose
+//! `StateTokens.kt` @ androidx `19991f2c` L22-L25). Disabled containers vary
+//! per component in m3e (e.g. 10% for most buttons, 12% for the plain tonal
+//! button); [`DISABLED_CONTAINER`] is the classic 12% default. Fixture:
+//! `tests/fixtures/m3e-sys-tokens.json`.
 use gpui::Rgba;
 
 pub const HOVER: f32 = 0.08;
@@ -74,6 +83,25 @@ mod tests {
         ]
         .into_iter()
         .all(|(x, y)| (x - y).abs() < 1e-6)
+    }
+
+    #[test]
+    fn layer_opacities_match_the_pinned_m3e_tokens() {
+        let fixture: serde_json::Value =
+            serde_json::from_str(include_str!("../../tests/fixtures/m3e-sys-tokens.json")).unwrap();
+        let reference = &fixture["state_layer_opacity"];
+        for (opacity, name) in [
+            (HOVER, "hover"),
+            (FOCUS, "focus"),
+            (PRESS, "pressed"),
+            (DRAG, "dragged"),
+        ] {
+            assert_eq!(opacity, reference[name].as_f64().unwrap() as f32, "{name}");
+        }
+        assert_eq!(
+            DISABLED_CONTENT,
+            fixture["disabled_alpha"].as_f64().unwrap() as f32
+        );
     }
 
     #[test]

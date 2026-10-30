@@ -39,14 +39,19 @@ fn toggle_roles_and_shape_swap_match_reference_for_every_variant_and_size() {
             } else {
                 assert_eq!((bg, fg, border), colors(variant, false));
             }
+            // m3e button.css toggles: on-surface at 10%, an outline-variant
+            // wash for outlined, and no container for text.
             let (bg, fg, border) = resolved(true);
             assert_eq!(
-                bg.a,
-                if variant == ButtonVariant::Outlined {
-                    0.
-                } else {
-                    0.1
-                }
+                bg,
+                match variant {
+                    ButtonVariant::Text => colors(variant, true).0,
+                    ButtonVariant::Outlined => {
+                        alpha(crate::theme::color(C::OUTLINE_VARIANT), 0.1)
+                    }
+                    _ => alpha(crate::theme::color(C::ON_SURFACE), 0.1),
+                },
+                "{variant:?}"
             );
             assert_eq!(fg, alpha(crate::theme::color(C::ON_SURFACE_VARIANT), 0.38));
             assert_eq!(
@@ -241,7 +246,7 @@ fn external_selection_retargets_fast_spatial_without_snapping(cx: &mut TestAppCo
         + (28. - 48.)
             * crate::motion::MotionScheme::Expressive
                 .resolve(MotionToken::FastSpatial)
-                .ease()(0.1 / 0.425);
+                .position(0.1);
     assert!((radius.get() - expected).abs() < 0.001);
     let before = radius.get();
     view.update(cx, |this, cx| {
