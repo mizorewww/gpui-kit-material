@@ -15,6 +15,7 @@ pub mod date_time_pickers;
 pub mod dialogs;
 pub mod dividers;
 pub mod elevation;
+pub mod examples;
 pub mod lists;
 pub mod loading_progress;
 pub mod menu;
@@ -51,6 +52,7 @@ pub static PAGES: &[PageEntry] = &[
     entry::<shape::Page>(),
     entry::<motion::Page>(),
     entry::<elevation::Page>(),
+    entry::<examples::Page>(),
     entry::<app_bars::Page>(),
     entry::<badges::Page>(),
     entry::<buttons::Page>(),
@@ -93,6 +95,7 @@ mod tests {
                 "Shape",
                 "Motion",
                 "Elevation",
+                "Examples",
                 "App bars",
                 "Badges",
                 "Buttons",
