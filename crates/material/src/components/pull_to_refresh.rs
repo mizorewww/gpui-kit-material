@@ -587,6 +587,7 @@ impl RenderOnce for PullToRefresh {
                     LoadingIndicator::new((id.clone(), "pull-progress"), label.clone())
                         .contained(true)
                         .progress(Some(fraction.min(1.)))
+                        .turn(pull_loading_rotation(fraction))
                         .into_any_element()
                 }
             } else {

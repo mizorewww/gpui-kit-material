@@ -220,6 +220,7 @@ pub struct LoadingIndicator {
     contained: bool,
     size: f32,
     shape: Option<LoadingShape>,
+    turn: f32,
     playback: Option<RepeatAnimationPlayback>,
 }
 
@@ -232,6 +233,7 @@ impl LoadingIndicator {
             contained: false,
             size: LOADING_INDICATOR_SIZE,
             shape: None,
+            turn: 0.,
             playback: None,
         }
     }
@@ -254,6 +256,15 @@ impl LoadingIndicator {
     /// A measured fraction (0-1), or `None` for indeterminate.
     pub fn progress(mut self, progress: Option<f32>) -> Self {
         self.progress = progress;
+        self
+    }
+
+    /// An extra turn of a measured indicator, in degrees: pull to refresh turns
+    /// it back past the threshold. A non-finite turn is ignored.
+    pub fn turn(mut self, degrees: f32) -> Self {
+        if degrees.is_finite() {
+            self.turn = degrees;
+        }
         self
     }
 
@@ -345,7 +356,8 @@ impl RenderOnce for LoadingIndicator {
             let shown =
                 crate::motion::value((self.id.clone(), "loading-progress"), target, window, cx)
                     .clamp(0., 1.);
-            let frame = LoadingFrame::determinate(shown);
+            let mut frame = LoadingFrame::determinate(shown);
+            frame.rotation_degrees += self.turn;
             let canvas = held_canvas(frame, ink, &self.id, window, cx);
             return root.child(canvas);
         }
