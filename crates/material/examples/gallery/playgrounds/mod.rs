@@ -5,12 +5,16 @@ pub mod badge;
 pub mod badge;
 pub mod badge;
 pub mod badge;
+pub mod badge;
 pub mod button;
 pub mod loading_indicator;
 pub mod progress;
 pub mod snackbar;
 pub mod switch;
 pub mod text_field;
+pub mod tooltip;
+#[cfg(test)]
+mod test_support;
 #[cfg(test)]
 mod test_support;
 #[cfg(test)]

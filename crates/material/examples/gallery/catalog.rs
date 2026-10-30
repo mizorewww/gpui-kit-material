@@ -461,7 +461,7 @@ pub static CATALOG: &[Entry] = &[
         Communication,
         "Brief labels or messages that appear on hover or focus.",
         spec("tooltips"),
-        None,
+        Some(&playgrounds::tooltip::PLAYGROUND),
     ),
     // Styles
     document(
