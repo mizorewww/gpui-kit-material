@@ -216,33 +216,3 @@ pub const fn entry<P: GalleryPage>() -> PageEntry {
         build: build::<P>,
     }
 }
-
-/// A page whose components do not exist yet: the kit header alone and no
-/// specimens. Replace the invocation with a page struct when they land.
-macro_rules! header_only_page {
-    ($info:expr) => {
-        pub struct Page;
-        impl $crate::gallery::page::GalleryPage for Page {
-            const INFO: $crate::gallery::page::PageInfo = $info;
-            fn new(
-                _: $crate::gallery::page::PageCx,
-                _: &mut gpui::Window,
-                _: &mut gpui::Context<Self>,
-            ) -> Self {
-                Page
-            }
-            fn row_count(&self, _: &gpui::Window) -> usize {
-                0
-            }
-            fn render_row(
-                &mut self,
-                _: usize,
-                _: &mut gpui::Window,
-                _: &mut gpui::Context<Self>,
-            ) -> gpui::AnyElement {
-                unreachable!("a header-only page has no body rows")
-            }
-        }
-    };
-}
-pub(crate) use header_only_page;

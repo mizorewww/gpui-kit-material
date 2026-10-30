@@ -2483,6 +2483,7 @@ name = "gpui-kit-material"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "chrono",
  "gpui-base",
  "gpui-kit",
  "gpui-kit-material-color",

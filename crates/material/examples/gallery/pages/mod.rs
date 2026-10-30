@@ -37,7 +37,7 @@ pub mod typography;
 pub mod prelude {
     pub(crate) use super::super::GalleryReveal;
     pub(crate) use super::super::page::{
-        CaptureState, GalleryPage, GalleryShared, PageCx, PageInfo, header_only_page,
+        CaptureState, GalleryPage, GalleryShared, PageCx, PageInfo,
     };
     pub(crate) use super::super::spec::{self, Band, board};
     pub use gpui::{prelude::*, *};

@@ -22,6 +22,8 @@ gpui-kit-material-color.workspace = true
 gpui-kit.workspace = true
 gpui-material-symbols = { git = "https://github.com/mizorewww/gpui-material-symbols", rev = "593aa15a46076f3e2870c23c0e4fd79f94f105bd", default-features = false, features = ["gpui-kit"] }
 gpui-base.workspace = true
+# Already in Cargo.lock through GPUI Base's calendar; the pickers share its date types.
+chrono = { version = "0.4.38", default-features = false, features = ["clock"] }
 
 [target.'cfg(target_family = "wasm")'.dependencies]
 web-time = "1"
