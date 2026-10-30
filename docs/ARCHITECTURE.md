@@ -114,9 +114,26 @@ adjacent `../gpui-material-symbols` checkout is never substituted implicitly.
 One GPUI and one Base implementation are shared across Material, Kit and
 Symbols. Git and registry packages with equal versions are still different
 identities, so the root `[patch]` tables redirect every source to `vendor/`.
-**These patches apply only inside this workspace**; downstream workspaces need
-the same patches until fixes land upstream. A patched Zed checkout overriding
-`gpui-pre` overrides it for this kit too.
+**These patches apply only inside this workspace**; a downstream workspace needs
+the consumer patch set below until fixes land upstream. A patched Zed checkout
+overriding `gpui-pre` overrides it for this kit too.
+
+### Consumer patch set
+
+A consumer patches `gpui-kit`, `gpui-base`, `gpui-pre`, `gpui-fast`,
+`gpui-pre-apple` and `gpui-fast-apple`, exactly as
+[crates/consumer-check/Cargo.toml](../crates/consumer-check/Cargo.toml) does; CI
+builds that crate on every target and both backends, beside upstream's `gpui-fps`.
+Its engine has upstream's `FrameEvent`, `PlatformWindow` and frame path.
+
+Everything else in `vendor/` is a **dev-only overlay** for the Gallery's FPS display
+and vsync switch, `engine_bench` and `scripts/profile-gallery.py`: frame statistics,
+vsync control, CPU scopes, presentation timing and GPU time. `gpui-pre` and
+`gpui-fast` gate them behind the `frame-observation` Cargo feature, and only the
+overlay's backend manifests (`gpui-*-macos`, `-linux`, `-windows`, `-web`) turn it
+on. No library code may use them; `crates/consumer-check` fails to build if it does.
+Inside this workspace the feature is therefore always on, so upstream's `gpui-fps`
+does not compile here (`E0004`, `FrameEvent::Complete`) and is not used here.
 
 | Vendored | Source | Why |
 | --- | --- | --- |
@@ -124,11 +141,11 @@ the same patches until fixes land upstream. A patched Zed checkout overriding
 | `gpui-base` | Git `bb85882` (`crates/base`) + patches (`SOURCE.json`, `motion-patch.md`) | CSS transition reversal, per-transition reduced motion, `TransitionPlayback`, toggle focus policy, busy accessibility state; `Hitbox.additional_bounds` follow-up in `text_selection.rs`; input caller caret color; vertical `Toolbar` axis; slider step snapping from min, assistive Increment/Decrement that move only a range's end, `Slider::track_focus`, right-to-left pointer math; `Dialog::accessibility_label`. |
 | `gpui-pre` (GPUI `=0.3.10`) | crates.io + patches (`SOURCE.json`, `*-patch.md`) | Layout direction; letter spacing; passive raw touch observation; hitbox extensions independent of layout; animation visibility and repeat playback; complete CPU frame scopes, presentation wait, GPU time and submission outcome in the profiler; submission statistics, vsync control and throttle retry; `em`/`ch` metrics for fonts without `m`; overflowing spaces hang instead of starting a wrapped row; test-harness repairs. |
 | `gpui-pre-apple` | crates.io + patches (`SOURCE.json`, `VENDORED.md`) | Non-Latin and app-private fallback fonts; `draw_with_status` with a per-draw autorelease pool, drawable-wait and GPU timestamps. |
-| `gpui-pre-web` | crates.io + patches (`SOURCE.json`, `MATERIAL-PATCHES.md`) | Successful submission count. |
+| `gpui-pre-web` (dev-only) | crates.io + patches (`SOURCE.json`, `MATERIAL-PATCHES.md`) | Successful submission count. |
 | `gpui-fast`, `-apple`, `-web` | 0.1.12 + patches (`MATERIAL-MIGRATION.json`, per-file `local_changes`) | The GPUI, Apple and web patches above carried through Fast retained/scroll replay and composition (touch observers, extended hit targets); explicit single-threaded web defaults. |
-| `gpui-pre-macos`, `gpui-fast-macos` | crates.io + patches (`SOURCE.json`, `MATERIAL-PATCHES.md`) | Vsync control, demand waker, periodic-source report and submission statistics (below). |
-| `gpui-pre-linux`, `gpui-fast-linux`, `gpui-pre-wgpu`, `gpui-fast-wgpu`, `wgpu` | crates.io + patches (`SOURCE.json`, `MATERIAL-PATCHES.md`) | Submission statistics from the present status `wgpu` otherwise discards, and vsync control through `PresentMode` (below). |
-| `gpui-pre-windows`, `gpui-fast-windows` | crates.io + patches (`SOURCE.json`, `MATERIAL-PATCHES.md`) | Submission statistics counting only `S_OK` presents, and vsync control through the DXGI sync interval (below). |
+| `gpui-pre-macos`, `gpui-fast-macos` (dev-only) | crates.io + patches (`SOURCE.json`, `MATERIAL-PATCHES.md`) | Vsync control, demand waker, periodic-source report and submission statistics (below). |
+| `gpui-pre-linux`, `gpui-fast-linux`, `gpui-pre-wgpu`, `gpui-fast-wgpu`, `wgpu` (dev-only) | crates.io + patches (`SOURCE.json`, `MATERIAL-PATCHES.md`) | Submission statistics from the present status `wgpu` otherwise discards, and vsync control through `PresentMode` (below). |
+| `gpui-pre-windows`, `gpui-fast-windows` (dev-only) | crates.io + patches (`SOURCE.json`, `MATERIAL-PATCHES.md`) | Submission statistics counting only `S_OK` presents, and vsync control through the DXGI sync interval (below). |
 
 Touch patches leave gesture recognition, scrolling and activation in GPUI while
 letting Material start a ripple on touch-down and release it on cancellation.
@@ -140,6 +157,8 @@ packages additively; they do not define the facade's public types. Disable
 default features to compare against upstream.
 
 ## Frame observation
+
+Dev-only: see [Consumer patch set](#consumer-patch-set).
 
 Submission statistics count attempts and, separately, successfully submitted
 **new** draw generations; FPS uses only the latter. Backends without a success

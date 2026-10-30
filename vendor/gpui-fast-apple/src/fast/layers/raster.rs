@@ -180,6 +180,7 @@ fn encode(
     unsafe {
         command_buffer.add_completed_handler(&*RcBlock::as_ptr(&block).cast());
     }
+    #[cfg(feature = "frame-observation")]
     crate::metal_renderer::attach_gpu_timing(&command_buffer, "raster_tiles");
     command_buffer.commit();
     Ok(())

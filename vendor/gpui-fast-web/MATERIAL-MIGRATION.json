@@ -49,6 +49,11 @@
         "upstream_sha256": "eda543e585912fcb012e2a3559d8fb2e9ad7570ba58746747af380d044085cb8",
         "local_sha256": "70865007f6ef795e2d0bdd5fa5a381f0a3ad3bcaa4a0f531784eeeff43f7b4d5",
         "reason": "successful_frame_submissions, as vendor/gpui-pre-web (MATERIAL-PATCHES.md there)."
+      },
+      "Cargo.toml": {
+        "upstream_sha256": "6f317d525676d116acce313da939b2bd2c877c174476d04625c6ec65f92332b3",
+        "local_sha256": "a4d8c65e82e4e09b1372065a0b1db62995b776d48d86628e450d111bdacdf1d4",
+        "reason": "Turns on the engine's dev-only frame-observation feature for this overlay (vendor/gpui-pre-web/MATERIAL-PATCHES.md)."
       }
     },
     "added": {},
@@ -58,6 +63,6 @@
         "reason": "Package-level lockfile not retained; the workspace Cargo.lock owns resolution."
       }
     },
-    "unchanged_file_count": 19
+    "unchanged_file_count": 18
   }
 }

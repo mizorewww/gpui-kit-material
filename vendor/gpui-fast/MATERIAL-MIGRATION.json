@@ -233,12 +233,12 @@
     "modified": {
       "src/app.rs": {
         "upstream_sha256": "2d698e066335022335d3b3f4611f66e55e192fedeee56b1960ebea3f0a62eb23",
-        "local_sha256": "33e1f4093aadd37044a66fccc1ec10bb587b08ef53c9370985828f546818b213",
+        "local_sha256": "afddf5e78b0d18117654a4bf32f884f7404417396f4bd36fae8991e28cdcc9b6",
         "reason": "CpuFrameScope around initial and test-app draws (vendor/gpui-pre/cpu-frame-scope-patch.md). Material performance patch: record_entities_accessed updates only the entities that entered or left the tracked set instead of removing and re-inserting all of them each frame; the resulting maps are identical. Application layout direction (vendor/gpui-pre/layout-direction-patch.md). App::swap_global_quietly (vendor/gpui-pre/quiet-global-swap-patch.md)."
       },
       "src/app/bench_context.rs": {
         "upstream_sha256": "6bef320831a933502651903f85b849b6ea371b84c6822b7b88d3e064dc8c9818",
-        "local_sha256": "30293a50e5b164b738f59a438387dd103d67ba83dbe8c2018a1ce92d6c232f4a",
+        "local_sha256": "17db9c8a89f3e2468c1eff5df4831df98a4017542c5d7b87aaa2966169ddc4bc",
         "reason": "Ignore FrameEvent::Complete in legacy phase metrics (vendor/gpui-pre/cpu-frame-scope-patch.md)."
       },
       "src/elements/animation.rs": {
@@ -298,27 +298,27 @@
       },
       "src/platform.rs": {
         "upstream_sha256": "7f95c2fe68fc225cb45451888355c4df2589632d7bde0d61fce554972f4825ca",
-        "local_sha256": "59463a5dfdc0d4e9f60171bbc506ecfaeb8ff18caa6a068af983a76af4648678",
+        "local_sha256": "5a8eb080854a7382dd64eaf2cc149879ec7a4f94fa20053ce8951483ae9916d5",
         "reason": "VsyncStatus, vsync_status/set_vsync, has_periodic_frame_source, successful_frame_submissions (vendor/gpui-pre/frame-submission-patch.md); declares frame_submission."
       },
       "src/platform/test/window.rs": {
         "upstream_sha256": "3b359c9e7943ccb065096c718756b32400dac3394bfd9ab6f361dda8163e97bd",
-        "local_sha256": "bdbe9eb2e46f4f8204db9a8a6b0d7012957fc92adaa1bfa96d9afa7e59a31b15",
+        "local_sha256": "a21c3791e57b46a23a8a79b5566afcb2e935287db200c13f0e21f30fd4267e78",
         "reason": "periodic_frame_source switch for the throttle-retry test (vendor/gpui-pre/frame-submission-patch.md)."
       },
       "src/profiler.rs": {
         "upstream_sha256": "65e9553a9d6c6606e0425ee075a6b482ffce39656672ee6fc4ca2b46812e4fcb",
-        "local_sha256": "2d21fd1c7c986c73cd1c8aa66f6881d8379747313107966e5d3b028f5e08f174",
+        "local_sha256": "1286ef43c8240d0292ee0f8eb99a5a54e35040c954a0d7ec7df6ff616b4e4f01",
         "reason": "CPU frame scopes (cpu-frame-scope-patch.md); presentation wait, GpuExecution store, successful_new_frame, raw Present recording, try_update (presentation-timing-patch.md); see profiler_patches."
       },
       "src/profiler/hang.rs": {
         "upstream_sha256": "c174ede51b6cc4da1345553d32323b063f1ae727f89c266affca42a04b2e3759",
-        "local_sha256": "081a02c645c6bc1a5207addb7a003abaf7eca3975f45a2afb8d379dca3e0429d",
+        "local_sha256": "19dd25e22b31747d8c9eadd71b3d686cc98add0c58f04c5ea5772fd20b14d9a3",
         "reason": "Test fixtures set successful_new_frame; the slow-view journal test matches samples to the Draw event that contains them, because Fast can retain views in later frames without re-rendering (test only)."
       },
       "src/profiler/journal.rs": {
         "upstream_sha256": "78240995b3727fb3cdcf4f8c06f38f81c49f9a3a0793b414450e19bb7da00c3e",
-        "local_sha256": "61b815bdb44b5812b1ce377c1660ac9ee4e3c9ba6f34faa7a457332e347b4e6b",
+        "local_sha256": "8474498fd108c9c01e9a2390b2fb090ad898b48f45ff56aea8c867160fc784a4",
         "reason": "try_update instead of deprecated fetch_update; test fixtures set successful_new_frame (presentation-timing-patch.md)."
       },
       "src/style.rs": {
@@ -343,7 +343,7 @@
       },
       "src/window.rs": {
         "upstream_sha256": "d3f00c28cc47446f6c73be67d00830446e0e3a9a7fadefdf54fff9e5ccadee0b",
-        "local_sha256": "a2ed03afafa9b96a22ca713bef502ceff6ce0bd832e19704c1e7db6baf92b439",
+        "local_sha256": "4246eeb2dfc62aaa711c203f7e61464b814bfffaff1582a5df53e327deef4431",
         "reason": "Same GPUI window patches as vendor/gpui-pre (hitbox extension, touch observers, CPU frame scope, submission stats/vsync/throttle retry, present outcome); touch-observer storage and FrameDirtyAccumulator made pub(crate) for Fast layer reuse. Layout direction on the window, recorded per layout node (vendor/gpui-pre/layout-direction-patch.md)."
       },
       "src/elements/text.rs": {
@@ -380,6 +380,11 @@
         "upstream_sha256": "4c0ce82fba13490ec6494245971a6a4a322fc55ca2944c60e708fdbcd5dcee8e",
         "local_sha256": "debe130befb6e5819c5438dbcbfc987a17468ee075b67673a1a71bae3ce7c216",
         "reason": "LineWrapper::letter_spacing (vendor/gpui-pre/letter-spacing-patch.md)."
+      },
+      "Cargo.toml": {
+        "upstream_sha256": "1f8d49e1f08e320cf393fcacb2ac402044ddb7aaf8dffc4572e31aa3d5a9e7ea",
+        "local_sha256": "b01f32721377a3712286427ce84e1d2ea895c0c0e7d2a30b690017c29b75764c",
+        "reason": "The dev-only frame-observation feature (vendor/gpui-pre/frame-submission-patch.md)."
       }
     },
     "added": {
@@ -418,6 +423,6 @@
         "reason": "Package-level lockfile not retained; the workspace Cargo.lock owns resolution."
       }
     },
-    "unchanged_file_count": 140
+    "unchanged_file_count": 139
   }
 }

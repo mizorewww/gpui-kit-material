@@ -26,7 +26,7 @@ Text patches (`src/text_system.rs`, `src/open_type.rs`, added
 - Color-bitmap glyph support is detected once per font ID from the presence of
   an `sbix` table instead of matching the Apple Color Emoji PostScript names.
 
-Presentation patches (`src/metal_renderer.rs`). `draw_with_status` reports
+Presentation patches (`src/metal_renderer.rs`), behind the crate's dev-only `frame-observation` feature; with it off, `draw` is upstream's. `draw_with_status` reports
 actual command-buffer submission (`draw` delegates to it). Its per-call autorelease pool drains temporary Metal
 references before returning to the presentation timer, including early returns;
 demand frames need not wait for the enclosing Cocoa event-loop pool.

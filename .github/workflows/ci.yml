@@ -64,8 +64,20 @@ jobs:
           cargo test --locked -p gpui-fast-wgpu --lib present_mode
       - name: Frame submission rules
         run: |
-          cargo test --locked -p gpui-pre --lib frame_submission
-          cargo test --locked -p gpui-fast --lib frame_submission
+          # Selecting a backend is what turns frame-observation on in the engine.
+          cargo test --locked -p gpui-pre -p gpui-pre-macos --lib frame_submission
+          cargo test --locked -p gpui-fast -p gpui-fast-macos --lib frame_submission
+      - name: Engine rules with frame observation off, as a consumer builds them
+        working-directory: gpui-kit-material/crates/consumer-check
+        run: |
+          cargo test --locked -p consumer-check -p gpui-pre --lib profiler
+          cargo test --locked -p consumer-check -p gpui-fast --features gpui-fast --lib profiler
+      # Builds the library beside upstream's gpui-fps against only the patches a
+      # consumer needs, so library code cannot start to depend on the dev overlay.
+      - name: Consumer patch set
+        run: |
+          cargo check --locked --manifest-path crates/consumer-check/Cargo.toml
+          cargo check --locked --manifest-path crates/consumer-check/Cargo.toml --features gpui-fast
       # Clippy's -D warnings covers workspace members only. RUSTFLAGS also
       # reaches the vendored path crates we patch (registry crates stay
       # cap-linted); a separate target dir keeps the main cache valid.
@@ -98,6 +110,10 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: gpui-kit-material -> target
+      - name: Consumer patch set
+        run: |
+          cargo check --locked --manifest-path crates/consumer-check/Cargo.toml --target wasm32-unknown-unknown
+          cargo check --locked --manifest-path crates/consumer-check/Cargo.toml --target wasm32-unknown-unknown --features gpui-fast
       - name: Check the upstream WASM gallery
         run: cargo clippy --locked -p gpui-kit-material-gallery-web --target wasm32-unknown-unknown --no-default-features -- -D warnings
       - name: Install the matching browser binding generator

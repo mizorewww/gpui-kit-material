@@ -25,6 +25,7 @@
     "src/window_appearance.rs": "c1ea31769bfd6b324339525b8ffec3be0f59a24495a7e491c1df66bd43db5b75"
   },
   "local_patches": [
+    "Cargo.toml",
     "src/display_link.rs",
     "src/fast/composition.rs",
     "src/window.rs"
@@ -44,11 +45,16 @@
       "upstream_sha256": "d559ef3d21486e7e20fade38d917105ff4924d883143f5ef3aaca48faab5d1d8",
       "local_sha256": "7cade7717a737b3ca1aa3721191e318499dbae4b17b05c36da2299951c962bca",
       "reason": "vsync_status/set_vsync, successful_frame_submissions via draw_with_status, has_periodic_frame_source, weak-owner demand frame_waker, unconditional anyhow::Result import (MATERIAL-PATCHES.md). Material presentation patch: step() skips a frame request until the renderer has a prefetched drawable (drawable_ready_or_wake) and start_display_link hands the renderer the frame source's thread-safe waker."
+    },
+    "Cargo.toml": {
+      "upstream_sha256": "dd418ecd00552bbbb6a2e9ca52ef8fe32ade58ab939c4b09a358a3f7e9e6cd4a",
+      "local_sha256": "ad5a843138eb853b8f00ccf21309e1222351a0ee7cfcdf633abea15cc2e3f0d8",
+      "reason": "Turns on the engine's dev-only frame-observation feature for this overlay (MATERIAL-PATCHES.md)."
     }
   },
   "added_files": {},
   "removed_files": {},
-  "unchanged_file_count": 15,
+  "unchanged_file_count": 14,
   "provenance_files": [
     "MATERIAL-PATCHES.md",
     "SOURCE.json"

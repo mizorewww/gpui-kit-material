@@ -517,10 +517,56 @@ impl MetalRenderer {
         // nothing to do
     }
 
+    #[cfg(not(feature = "frame-observation"))]
+    pub fn draw(&mut self, scene: &Scene) {
+        let layer = match &self.layer {
+            Some(l) => l.clone(),
+            None => {
+                log::error!(
+                    "draw() called on headless renderer - use render_scene_to_image() instead"
+                );
+                return;
+            }
+        };
+        let viewport_size = layer.drawable_size();
+        let viewport_size: Size<DevicePixels> = size(
+            (viewport_size.width.ceil() as i32).into(),
+            (viewport_size.height.ceil() as i32).into(),
+        );
+        let drawable = if let Some(drawable) = layer.next_drawable() {
+            drawable
+        } else {
+            log::error!(
+                "failed to retrieve next drawable, drawable size: {:?}",
+                viewport_size
+            );
+            return;
+        };
+
+        let command_buffer = match self.render_frame(scene, drawable.texture(), viewport_size) {
+            Ok(command_buffer) => command_buffer,
+            Err(error) => {
+                log::error!("failed to render: {error:#}");
+                return;
+            }
+        };
+
+        if self.presents_with_transaction {
+            command_buffer.commit();
+            command_buffer.wait_until_scheduled();
+            drawable.present();
+        } else {
+            command_buffer.present_drawable(drawable);
+            command_buffer.commit();
+        }
+    }
+
+    #[cfg(feature = "frame-observation")]
     pub fn draw(&mut self, scene: &Scene) {
         self.draw_with_status(scene);
     }
 
+    #[cfg(feature = "frame-observation")]
     /// Submit a drawable and report whether a real command buffer/presentation
     /// was issued. This is not GPU completion or display presentation timing.
     pub fn draw_with_status(&mut self, scene: &Scene) -> bool {
@@ -1746,7 +1792,7 @@ impl gpui::PlatformHeadlessRenderer for MetalHeadlessRenderer {
     }
 }
 
-
+#[cfg(feature = "frame-observation")]
 /// Material patch: while profiler tracing is enabled, report the driver's
 /// GPUStartTime/GPUEndTime for a command buffer committed after this call.
 pub(crate) fn attach_gpu_timing(command_buffer: &metal::CommandBufferRef, kind: &'static str) {

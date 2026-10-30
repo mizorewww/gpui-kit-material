@@ -1242,6 +1242,7 @@ enum InputModality {
     Touch,
 }
 
+#[cfg(feature = "frame-observation")]
 /// Returned CPU submission attempts for this window, not GPU presentation timestamps.
 /// A composed frame counts once even when its platform submission has multiple surfaces.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -1324,8 +1325,11 @@ pub struct Window {
         SubscriberSet<(), Box<dyn FnMut(WindowVisibility, &mut Window, &mut App) -> bool>>,
     hovered: Rc<Cell<bool>>,
     pub(crate) needs_present: Rc<Cell<bool>>,
+    #[cfg(feature = "frame-observation")]
     submission_stats: WindowSubmissionStats,
+    #[cfg(feature = "frame-observation")]
     draw_generation: u64,
+    #[cfg(feature = "frame-observation")]
     last_successful_draw: Option<u64>,
     /// Tracks recent input event timestamps to determine if input is arriving at a high rate.
     /// Used to selectively enable VRR optimization only when input rate exceeds 60fps.
@@ -1824,7 +1828,7 @@ impl Window {
             let input_rate_tracker = input_rate_tracker.clone();
             let mut deferred_force_render = false;
             move |request_frame_options| {
-                #[cfg(feature = "profiler")]
+                #[cfg(all(feature = "profiler", feature = "frame-observation"))]
                 let mut cpu_frame = profiler::CpuFrameScope::new(
                     handle.window_id(),
                     profiler::CpuFrameSource::Platform,
@@ -1900,6 +1904,7 @@ impl Window {
                         // A periodic source will retry after the deadline. An
                         // immediate wake here would busy-loop on platforms with
                         // both a display link and an unpaced demand waker.
+                        #[cfg(feature = "frame-observation")]
                         handle
                             .update(&mut cx, |_, window, _| {
                                 if !window.platform_window.has_periodic_frame_source() {
@@ -1908,6 +1913,19 @@ impl Window {
                                 }
                             })
                             .log_err();
+                        // Deferred by throttling: ask demand-driven platforms to retry.
+                        #[cfg(not(feature = "frame-observation"))]
+                        handle
+                            .update(&mut cx, |_, window, _| {
+                                window.platform_window.schedule_frame();
+                            })
+                            .log_err();
+                        // The demand that entered this branch (a deferred forced
+                        // render or pending next-frame callbacks) is still
+                        // unserved; platforms that stop requesting frames for
+                        // idle windows need a wakeup to deliver the retry.
+                        #[cfg(not(feature = "frame-observation"))]
+                        invalidator.wake_platform();
                         #[cfg(feature = "profiler")]
                         profiler::journal::record_frame_skipped(
                             window_id,
@@ -1930,7 +1948,7 @@ impl Window {
                 if !pending_next_frame_callbacks.is_empty() {
                     handle
                         .update(&mut cx, |_, window, cx| {
-                            #[cfg(feature = "profiler")]
+                            #[cfg(all(feature = "profiler", feature = "frame-observation"))]
                             cpu_frame.callbacks(pending_next_frame_callbacks.len());
                             for callback in pending_next_frame_callbacks {
                                 callback(window, cx);
@@ -1998,7 +2016,7 @@ impl Window {
                         profiler::journal::FrameSkipReason::NoRenderNeeded,
                     );
                 }
-                #[cfg(feature = "profiler")]
+                #[cfg(all(feature = "profiler", feature = "frame-observation"))]
                 cpu_frame.complete();
             }
         }));
@@ -2241,8 +2259,11 @@ impl Window {
             visibility_observers: SubscriberSet::new(),
             hovered,
             needs_present,
+            #[cfg(feature = "frame-observation")]
             submission_stats: WindowSubmissionStats::default(),
+            #[cfg(feature = "frame-observation")]
             draw_generation: 0,
+            #[cfg(feature = "frame-observation")]
             last_successful_draw: None,
             input_rate_tracker,
             #[cfg(feature = "profiler")]
@@ -2904,12 +2925,14 @@ impl Window {
             .retain(&(), |callback| callback(self, cx));
     }
 
+    #[cfg(feature = "frame-observation")]
     /// Read the backend's actual presentation synchronization setting.
     /// Browser-controlled and unsupported backends return Unsupported.
     pub fn vsync_status(&self) -> crate::VsyncStatus {
         self.platform_window.vsync_status()
     }
 
+    #[cfg(feature = "frame-observation")]
     /// Set presentation synchronization. An error leaves support or application
     /// failure visible to the caller; query the actual status before updating UI.
     /// This does not change display-link/rAF pacing or promise unlimited FPS.
@@ -3683,7 +3706,10 @@ impl Window {
         if self.focus != focus_before_listeners {
             self.refresh();
         }
-        self.draw_generation = self.draw_generation.saturating_add(1);
+        #[cfg(feature = "frame-observation")]
+        {
+            self.draw_generation = self.draw_generation.saturating_add(1);
+        }
         self.needs_present.set(true);
 
         #[cfg(feature = "profiler")]
@@ -3723,6 +3749,7 @@ impl Window {
         self.invalidator.replace_views(views);
     }
 
+    #[cfg(feature = "frame-observation")]
     /// Observe platform submission attempts without scheduling a frame.
     /// This is CPU submission activity, not display refresh or GPU completion FPS.
     pub fn submission_stats(&self) -> WindowSubmissionStats {
@@ -3734,6 +3761,7 @@ impl Window {
         stats
     }
 
+    #[cfg(feature = "frame-observation")]
     fn record_successful_submission(
         &mut self,
         before: Option<u64>,
@@ -3767,14 +3795,27 @@ impl Window {
         let _foreground_turn = profiler::journal::foreground_turn();
         #[cfg(feature = "profiler")]
         let present_start = Instant::now();
+        #[cfg(feature = "frame-observation")]
         let successful_before = self.platform_window.successful_frame_submissions();
         self.platform_window.draw(&self.rendered_frame.scene);
+        #[cfg(feature = "frame-observation")]
         let successful_after = self.platform_window.successful_frame_submissions();
+        #[cfg(feature = "frame-observation")]
         let _successful_new_frame =
             self.record_successful_submission(successful_before, successful_after);
-        self.submission_stats.count = self.submission_stats.count.saturating_add(1);
-        self.submission_stats.last_submit = Some(Instant::now());
-        #[cfg(feature = "profiler")]
+        #[cfg(feature = "frame-observation")]
+        {
+            self.submission_stats.count = self.submission_stats.count.saturating_add(1);
+            self.submission_stats.last_submit = Some(Instant::now());
+        }
+        #[cfg(all(feature = "profiler", not(feature = "frame-observation")))]
+        self.window_profiler.record_present(
+            present_start,
+            Instant::now(),
+            self.active.get(),
+            !self.next_frame_callbacks.borrow().is_empty(),
+        );
+        #[cfg(all(feature = "profiler", feature = "frame-observation"))]
         self.window_profiler.record_present_with_outcome(
             present_start,
             Instant::now(),
@@ -8132,6 +8173,7 @@ mod tests {
         WindowOptions, canvas, div, hsla, point, px, size,
     };
 
+    #[cfg(feature = "frame-observation")]
     #[gpui::test]
     fn unsupported_vsync_does_not_report_a_successful_setting(cx: &mut TestAppContext) {
         let window = cx.add_window(|_, _| EmptyView);
@@ -8145,6 +8187,7 @@ mod tests {
         .unwrap();
     }
 
+    #[cfg(feature = "frame-observation")]
     #[gpui::test]
     fn successful_submission_counts_new_draws_and_allows_retry_after_failure(
         cx: &mut TestAppContext,
@@ -8199,6 +8242,7 @@ mod tests {
         .unwrap();
     }
 
+    #[cfg(feature = "frame-observation")]
     #[gpui::test]
     fn submission_stats_count_present_not_layout_or_frame_requests(cx: &mut TestAppContext) {
         let window = cx.add_window(|_, _| EmptyView);
@@ -8869,6 +8913,7 @@ mod tests {
 
     /// Periodic backends wait for a future tick instead of re-queuing an
     /// immediate request while the inactive-window deadline is closed.
+    #[cfg(feature = "frame-observation")]
     #[gpui::test]
     fn test_periodic_source_throttle_waits_and_resumes(cx: &mut TestAppContext) {
         cx.app.borrow_mut().mode = crate::app::GpuiMode::Production;

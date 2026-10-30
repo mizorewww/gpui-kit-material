@@ -106,12 +106,12 @@
     "modified": {
       "Cargo.toml": {
         "upstream_sha256": "31751839a9fec38c5c4b7bce8d897ba046afdedb1a480dd07f0f30b87d6bf867",
-        "local_sha256": "f6772be0d17bd9836238039104989fda84d223db69b3e57be5391ef7c8f3e271",
-        "reason": "The font_fallback [[test]], as vendor/gpui-pre-apple (manifest_changes)."
+        "local_sha256": "d02e8a78377e570f6a7717339a7c93f160a0baccf27c6637623b009380d840f6",
+        "reason": "The font_fallback [[test]] and the dev-only frame-observation feature, as vendor/gpui-pre-apple (manifest_changes)."
       },
       "src/fast/layers/raster.rs": {
         "upstream_sha256": "3893062c508aca573d8317ca89633979f608a8c6d21687b2a218c2ab9eac8a62",
-        "local_sha256": "67767534c3de5e1770cc668bd5e28a41769f387f75f7127c2f36bd29d40d802a",
+        "local_sha256": "98b430a8ad1a677f9a4915b61760d63426e681f3f0bd6ea626b6a10018304ecb",
         "reason": "Raster-tile command buffers get attach_gpu_timing(\"raster_tiles\") (profiler_patches)."
       },
       "src/fast/rounded_clip_shader.rs": {
@@ -121,8 +121,8 @@
       },
       "src/metal_renderer.rs": {
         "upstream_sha256": "1634c0370a04cb88f598a1674bf146f6c285f5e6f2c947a772cbde43096a9cf9",
-        "local_sha256": "98c5dff36635b9d13c052bbc314e8dd46f003a2b81199475682bc73842360776",
-        "reason": "draw_with_status with per-draw autorelease pool (presentation_patch), nextDrawable presentation wait and attach_gpu_timing (profiler_patches), same as vendor/gpui-pre-apple; write_instances signature rustfmt-wrapped only."
+        "local_sha256": "0d61dec59838735d15b8ec0f7d449a7887c185e49d08d6090b4cd2bafd9c4a0f",
+        "reason": "Behind frame-observation only: draw_with_status with per-draw autorelease pool (presentation_patch), nextDrawable presentation wait and attach_gpu_timing (profiler_patches), same as vendor/gpui-pre-apple. With the feature off, draw is upstream's."
       },
       "src/open_type.rs": {
         "upstream_sha256": "bc827c157fdce50125b158adb595b665d82f38b62fc6b3a9693c65abae640453",

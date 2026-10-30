@@ -39,6 +39,7 @@ repository = "https://github.com/longbridge/gpui-fast"
 resolver = "2"
 
 [features]
+frame-observation = ["gpui/frame-observation"]
 bench-support = ["gpui/bench-support"]
 default = []
 font-kit = [

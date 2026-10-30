@@ -52,6 +52,7 @@
     "src/wrapper.rs": "a17bfb94697904d650a0db4007880262256d06bf96cb00af387e73fde7536c8b"
   },
   "local_patches": [
+    "Cargo.toml",
     "src/directx_renderer.rs",
     "src/fast/composition.rs",
     "src/window.rs"
@@ -71,11 +72,16 @@
       "upstream_sha256": "4b765250edf2e941fee42e3169305b7cf2f7e26d691ba3cd187f364fab2eb711",
       "local_sha256": "5eaf7b5903fc72c3b5e08eff3d95168a16e86303e8d2bb4fe1bc5126e1c2a16e",
       "reason": "successful_frame_submissions, vsync_status, set_vsync (MATERIAL-PATCHES.md)."
+    },
+    "Cargo.toml": {
+      "upstream_sha256": "4386a0828d34cb00693b66be1a27f4005ea520bb8179b9ed001ac4c10de9a434",
+      "local_sha256": "5c40e188aac0228727e4920e6f6c9b3cfcbe69f1e16b8bb67ed1e0aa8f42aa7a",
+      "reason": "Turns on the engine's dev-only frame-observation feature for this overlay (MATERIAL-PATCHES.md)."
     }
   },
   "added_files": {},
   "removed_files": {},
-  "unchanged_file_count": 42,
+  "unchanged_file_count": 41,
   "provenance_files": [
     "MATERIAL-PATCHES.md",
     "SOURCE.json"

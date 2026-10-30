@@ -54,7 +54,9 @@ gpui-kit-material = { git = "https://github.com/mizorewww/gpui-kit-material" }
 
 > The workspace patches GPUI, GPUI Base and GPUI Fast (see `[patch]` in
 > [Cargo.toml](Cargo.toml) and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#engine-patches)).
-> Downstream workspaces need the same patches until they land upstream.
+> Downstream workspaces need only the patches listed in
+> [crates/consumer-check/Cargo.toml](crates/consumer-check/Cargo.toml) until they
+> land upstream; the rest of `vendor/` is dev-only frame observation for the Gallery.
 
 ```rust
 use gpui_kit_material::{color::themes::{Contrast, ThemeId, ThemeMode}, icons::Assets, theme};

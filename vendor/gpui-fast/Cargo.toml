@@ -48,6 +48,7 @@ repository = "https://github.com/longbridge/gpui-fast"
 resolver = "2"
 
 [features]
+frame-observation = []
 bench = ["bench-support"]
 bench-support = [
     "profiler",

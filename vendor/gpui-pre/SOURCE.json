@@ -173,6 +173,7 @@
     "tests/action_macros.rs": "47b69024f403feb6cb63c9990a6993b8582856146f5a6ae16984714321956a84"
   },
   "local_patches": [
+    "Cargo.toml",
     "src/app.rs",
     "src/app/bench_context.rs",
     "src/elements/animation.rs",
@@ -196,12 +197,12 @@
   "modified_files": {
     "src/app.rs": {
       "upstream_sha256": "d05a9bf9f1f46180b64282380d2d40acc8a957463e1ebecb94dab9e174a39dd5",
-      "local_sha256": "0bc34be0211f6572d56b6530a2dafd9cffe12887e9c1f4f1b6c945eebe1a136d",
+      "local_sha256": "c767b80d580980d003ec1aae85ddf6de82805cd1865ef38c3006cf234ea7af68",
       "reason": "CpuFrameScope around the initial open_window draw and test-app draws (cpu-frame-scope-patch.md). Application layout direction (layout-direction-patch.md). App::swap_global_quietly (quiet-global-swap-patch.md)."
     },
     "src/app/bench_context.rs": {
       "upstream_sha256": "6bef320831a933502651903f85b849b6ea371b84c6822b7b88d3e064dc8c9818",
-      "local_sha256": "30293a50e5b164b738f59a438387dd103d67ba83dbe8c2018a1ce92d6c232f4a",
+      "local_sha256": "17db9c8a89f3e2468c1eff5df4831df98a4017542c5d7b87aaa2966169ddc4bc",
       "reason": "Ignore FrameEvent::Complete in legacy phase metrics (cpu-frame-scope-patch.md)."
     },
     "src/elements/animation.rs": {
@@ -216,27 +217,27 @@
     },
     "src/platform.rs": {
       "upstream_sha256": "d5a1f49466edafc882f2646c0d97b7febcec61aa2a3df43f08035a812c9be7b5",
-      "local_sha256": "e81a1b1ac897b91ca1732662f6a20f866c07138ac2e4dedc1433a6a0c1f06a1d",
+      "local_sha256": "12661f1317dcec17748de79a069c61354a906670b0ef9948c9e265e4399ffa94",
       "reason": "VsyncStatus, vsync_status/set_vsync, has_periodic_frame_source, successful_frame_submissions; declares frame_submission (frame-submission-patch.md)."
     },
     "src/platform/test/window.rs": {
       "upstream_sha256": "3b359c9e7943ccb065096c718756b32400dac3394bfd9ab6f361dda8163e97bd",
-      "local_sha256": "bdbe9eb2e46f4f8204db9a8a6b0d7012957fc92adaa1bfa96d9afa7e59a31b15",
+      "local_sha256": "a21c3791e57b46a23a8a79b5566afcb2e935287db200c13f0e21f30fd4267e78",
       "reason": "periodic_frame_source switch for the throttle-retry test (frame-submission-patch.md)."
     },
     "src/profiler.rs": {
       "upstream_sha256": "65e9553a9d6c6606e0425ee075a6b482ffce39656672ee6fc4ca2b46812e4fcb",
-      "local_sha256": "2d21fd1c7c986c73cd1c8aa66f6881d8379747313107966e5d3b028f5e08f174",
+      "local_sha256": "1286ef43c8240d0292ee0f8eb99a5a54e35040c954a0d7ec7df6ff616b4e4f01",
       "reason": "CpuFrameScope/CpuFrameTiming/FrameEvent::Complete (cpu-frame-scope-patch.md); presentation wait, GpuExecution store, successful_new_frame, raw Present recording and try_update (presentation-timing-patch.md)."
     },
     "src/profiler/hang.rs": {
       "upstream_sha256": "c174ede51b6cc4da1345553d32323b063f1ae727f89c266affca42a04b2e3759",
-      "local_sha256": "4fc2a73d8b5c4d2d45374d1516ee6f55509f210c69fc021f21ba13cea89fb93e",
-      "reason": "Test fixtures set PresentTiming.successful_new_frame (presentation-timing-patch.md)."
+      "local_sha256": "dfaa348552696c1f872bb8b2adf41c31e399fdb18c3f9b76da6601e8fef22d0a",
+      "reason": "Test fixtures set PresentTiming.successful_new_frame behind frame-observation (presentation-timing-patch.md)."
     },
     "src/profiler/journal.rs": {
       "upstream_sha256": "78240995b3727fb3cdcf4f8c06f38f81c49f9a3a0793b414450e19bb7da00c3e",
-      "local_sha256": "61b815bdb44b5812b1ce377c1660ac9ee4e3c9ba6f34faa7a457332e347b4e6b",
+      "local_sha256": "8474498fd108c9c01e9a2390b2fb090ad898b48f45ff56aea8c867160fc784a4",
       "reason": "try_update instead of deprecated fetch_update; test fixtures set successful_new_frame (presentation-timing-patch.md)."
     },
     "src/style.rs": {
@@ -261,7 +262,7 @@
     },
     "src/window.rs": {
       "upstream_sha256": "83bace5e5cf503b21c789c4ca7bc3b11965c2256cb5a2398f2b70e5baf7aa1bb",
-      "local_sha256": "97e18a124cd588f70037bb9ca5580992d0f3480952063868c688fdfadf8b10bf",
+      "local_sha256": "594641a87bd7d4e1de81acb221da980358e198f763daf868d0e2a81cf2241012",
       "reason": "Hitbox.additional_bounds/contains_pointer/insert_hitbox_with_extension (hitbox-extension-patch.md); touch observers (touch-observer-patch.md); CPU frame scope (cpu-frame-scope-patch.md); WindowSubmissionStats, vsync, throttle retry (frame-submission-patch.md); present outcome (presentation-timing-patch.md). Layout direction on the window, recorded per layout node (layout-direction-patch.md)."
     },
     "src/elements/text.rs": {
@@ -288,6 +289,11 @@
       "upstream_sha256": "58feea87a0f1e150d8d733886fe9601d5afcd37f91b00c80d6717d5e9b7272ed",
       "local_sha256": "a60d97baacd375ac4d3428c8079dad934ae09e70a43561772cc90730f4a1023e",
       "reason": "LineWrapper::letter_spacing (letter-spacing-patch.md)."
+    },
+    "Cargo.toml": {
+      "upstream_sha256": "17c581884c21901f604eec93d32171dd17518606ce726fd7e59f9a442abc07de",
+      "local_sha256": "86a6f52566d0702799a2b77f50e5579c9c24eac24b891c830f8d2a5795f813a9",
+      "reason": "The dev-only frame-observation feature, which gates frame statistics, vsync control, CPU scopes, presentation timing and GPU time (frame-submission-patch.md)."
     }
   },
   "added_files": {
@@ -322,7 +328,7 @@
       "reason": "Not retained; Cargo.toml is the normalized manifest Cargo builds (test-harness-patch.md)."
     }
   },
-  "unchanged_file_count": 143,
+  "unchanged_file_count": 142,
   "provenance_files": [
     "SOURCE.json",
     "animation-visibility-patch.md",

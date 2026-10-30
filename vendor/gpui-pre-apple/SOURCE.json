@@ -35,13 +35,13 @@
   "modified_files": {
     "Cargo.toml": {
       "upstream_sha256": "4122e9ce7929cf5a8b568dff13ec7a167e030d341d3289f9c92f0dcb80e5950d",
-      "local_sha256": "9a66a07de0d1a621da7f5516b50a49b5ea37d7c52e73f5d0487d05deddf3cd57",
-      "reason": "The font_fallback [[test]] (VENDORED.md)."
+      "local_sha256": "ae219575b1968d4f9600debc3dbd79363e4ee437989dff62d602c1d40dad0e1e",
+      "reason": "The font_fallback [[test]] and the dev-only frame-observation feature (VENDORED.md)."
     },
     "src/metal_renderer.rs": {
       "upstream_sha256": "d3cdb56263ad992c11263c9de9cc23aeccf202fe85ab42312f22549b44864b75",
-      "local_sha256": "e906bfbac323fce6823cc3ea0bb4f9bb791bf371ed1b70d7ab8bebd84609406c",
-      "reason": "draw_with_status with per-draw autorelease pool, nextDrawable presentation wait and attach_gpu_timing (VENDORED.md)."
+      "local_sha256": "2dd03b6482b93f92d872f32542cb9b346679d10899d5b57ce602ca6b2ee2749c",
+      "reason": "Behind frame-observation only: draw_with_status with per-draw autorelease pool, nextDrawable presentation wait and attach_gpu_timing (VENDORED.md). With the feature off, draw is upstream's."
     },
     "src/open_type.rs": {
       "upstream_sha256": "bc827c157fdce50125b158adb595b665d82f38b62fc6b3a9693c65abae640453",

@@ -373,7 +373,7 @@
         "Cargo.toml"
       ],
       "action": "Keep the vendored gpui-fast 0.1.12 (default backend) with the gpui-pre compatibility patches carried forward; see its MATERIAL-MIGRATION.json.",
-      "conditions": "Preserves raw touch observers and extended hitboxes through retained/scroll replay, full CPU profiler scopes and repeat playback. Kit selects unpatched crates.io gpui-fast; remove only after each patch has an upstream equivalent and the regressions pass."
+      "conditions": "Preserves raw touch observers and extended hitboxes through retained/scroll replay, full CPU profiler scopes and repeat playback. Kit selects unpatched crates.io gpui-fast; remove only after each patch has an upstream equivalent and the regressions pass. Frame observation in this crate sits behind the dev-only frame-observation feature; crates/consumer-check builds it off."
     },
     {
       "id": "vendor-gpui-fast-apple",
@@ -386,7 +386,7 @@
         "Cargo.toml"
       ],
       "action": "Keep the merged text system, OpenType and Metal presentation patches; see its MATERIAL-MIGRATION.json.",
-      "conditions": "draw_with_status reports real command-buffer submission and drains autoreleased Metal objects per draw. Required for frame-submission evidence; verify against the published crate before removal."
+      "conditions": "draw_with_status reports real command-buffer submission and drains autoreleased Metal objects per draw. Required for frame-submission evidence; verify against the published crate before removal. Frame observation in this crate sits behind the dev-only frame-observation feature; crates/consumer-check builds it off."
     },
     {
       "id": "vendor-gpui-fast-web",
@@ -398,7 +398,7 @@
       "upstream_paths": [
         "Cargo.toml"
       ],
-      "action": "Keep the submission counting merged from gpui-pre-web; see its MATERIAL-MIGRATION.json. The canvas-size patch is gone: upstream's sizing is correct at real device scale factors.",
+      "action": "Dev-only overlay; a consumer does not patch this. Keep the submission counting merged from gpui-pre-web; see its MATERIAL-MIGRATION.json. The canvas-size patch is gone: upstream's sizing is correct at real device scale factors.",
       "conditions": "Backing-store sizing at real device scale factors is validated by scripts/check-gallery-dpr.py; repeat that check after any web backend update."
     },
     {
@@ -411,7 +411,7 @@
       "upstream_paths": [
         "Cargo.toml"
       ],
-      "action": "Keep presentation-synchronization control, the weak-owner demand waker and renderer-outcome submission counting; see MATERIAL-PATCHES.md and SOURCE.json.",
+      "action": "Dev-only overlay; a consumer does not patch this. Keep presentation-synchronization control, the weak-owner demand waker and renderer-outcome submission counting; see MATERIAL-PATCHES.md and SOURCE.json.",
       "conditions": "The >=500 FPS scroll gate counts only successful newly drawn submissions with vertical sync disabled; the published crate cannot report or disable this. Does not guarantee a target FPS."
     },
     {
@@ -424,7 +424,7 @@
       "upstream_paths": [
         "Cargo.toml"
       ],
-      "action": "Keep the same presentation patches for the upstream comparison backend (--no-default-features); see MATERIAL-PATCHES.md and SOURCE.json.",
+      "action": "Dev-only overlay; a consumer does not patch this. Keep the same presentation patches for the upstream comparison backend (--no-default-features); see MATERIAL-PATCHES.md and SOURCE.json.",
       "conditions": "Needed so gpui-pre and gpui-fast measurements use the same submission accounting; Symbols must patch it too so one engine is shared."
     },
     {
@@ -896,7 +896,7 @@
       "upstream_paths": [
         "Cargo.toml"
       ],
-      "action": "Keep present-status submission counting and PresentMode vsync control; see each MATERIAL-PATCHES.md and SOURCE.json.",
+      "action": "Dev-only overlay; a consumer does not patch this. Keep present-status submission counting and PresentMode vsync control; see each MATERIAL-PATCHES.md and SOURCE.json.",
       "conditions": "The published crates report no success signal and discard the present status, so the Gallery FPS counter is otherwise unavailable on Linux. Does not raise frame requests above the display's refresh rate."
     },
     {
@@ -910,7 +910,7 @@
       "upstream_paths": [
         "Cargo.toml"
       ],
-      "action": "Keep S_OK submission counting and DXGI sync-interval vsync control; see MATERIAL-PATCHES.md and SOURCE.json.",
+      "action": "Dev-only overlay; a consumer does not patch this. Keep S_OK submission counting and DXGI sync-interval vsync control; see MATERIAL-PATCHES.md and SOURCE.json.",
       "conditions": "The published crates report no success signal and treat DXGI_STATUS_OCCLUDED as success, so the Gallery FPS counter is otherwise unavailable on Windows. Does not raise frame requests above the display's refresh rate."
     }
   ],
