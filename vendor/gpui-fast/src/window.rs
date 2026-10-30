@@ -1296,7 +1296,7 @@ pub struct Window {
     pub(crate) rem_size_override_stack: SmallVec<[Pixels; 8]>,
     /// The direction being laid out and painted: the window's, or a subtree's
     /// while it draws.
-    layout_direction: LayoutDirection,
+    pub(crate) layout_direction: LayoutDirection,
     /// Whether [`Window::set_layout_direction`] chose it, so the application
     /// default no longer applies.
     layout_direction_is_own: bool,
@@ -3230,14 +3230,6 @@ impl Window {
         }
     }
 
-    /// Follow a new application direction unless this window chose its own.
-    pub(crate) fn follow_app_layout_direction(&mut self, direction: LayoutDirection) {
-        if !self.layout_direction_is_own && self.layout_direction != direction {
-            self.layout_direction = direction;
-            self.refresh();
-        }
-    }
-
     /// Run `f` with `direction` in effect, for one drawing phase of a subtree.
     /// An element overriding direction wraps its request_layout, prepaint and
     /// paint.
@@ -3578,6 +3570,9 @@ impl Window {
     /// the contents of the new [`Scene`], use [`Self::present`].
     #[profiling::function]
     pub fn draw(&mut self, cx: &mut App) -> ArenaClearNeeded {
+        if !self.layout_direction_is_own {
+            self.layout_direction = cx.layout_direction();
+        }
         // Drain every draw in profiler builds so a previous frame's
         // first-invalidation timestamp can't be attributed to this one.
         #[cfg(feature = "profiler")]

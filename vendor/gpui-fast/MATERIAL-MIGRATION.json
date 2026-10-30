@@ -238,7 +238,7 @@
       },
       "src/app.rs": {
         "upstream_sha256": "2d698e066335022335d3b3f4611f66e55e192fedeee56b1960ebea3f0a62eb23",
-        "local_sha256": "8f89000403a366bebc7469d8e498a57de5e1f97e8bbbb5ba3027d786e0c633d5",
+        "local_sha256": "168e11c9eca31f14db66764166dbc6a93b9756906bcd4d3cd088d1e177ac7dfc",
         "reason": "CpuFrameScope around initial and test-app draws (vendor/gpui-pre/cpu-frame-scope-patch.md). Application layout direction (vendor/gpui-pre/layout-direction-patch.md)."
       },
       "src/app/bench_context.rs": {
@@ -293,8 +293,8 @@
       },
       "src/fast/splice.rs": {
         "upstream_sha256": "4436ab4f8934aec0e95e73edf69fb3ea36c1b01cb6fe494037cb9923ea221efd",
-        "local_sha256": "12d873c49c9d60155ead908d183083911ab16816deee3072287eee7f347b6aba",
-        "reason": "Layout splicing is refused or invalidated after a font-generation change (font registration invalidation)."
+        "local_sha256": "2d41fb7e10200eb39e7b6dd66b2b7e2e555b830f1a560da9ddcdcf863a03dc65",
+        "reason": "Layout splicing is refused or invalidated after a font-generation change (font registration invalidation). A view rebuilt alone keeps its direction (vendor/gpui-pre/layout-direction-patch.md)."
       },
       "src/fast/tests/layers_oracle.rs": {
         "upstream_sha256": "ff28ee326fccca43f6d3a04bf7f3d76693ee0d09e6096c3101fabdc1177f35e6",
@@ -358,7 +358,7 @@
       },
       "src/window.rs": {
         "upstream_sha256": "d3f00c28cc47446f6c73be67d00830446e0e3a9a7fadefdf54fff9e5ccadee0b",
-        "local_sha256": "c2a5a75c3bea2e71cbf4585ca010cff108f860c6c9733654b50f00981d53a8a7",
+        "local_sha256": "a2ed03afafa9b96a22ca713bef502ceff6ce0bd832e19704c1e7db6baf92b439",
         "reason": "Same GPUI window patches as vendor/gpui-pre (hitbox extension, touch observers, CPU frame scope, submission stats/vsync/throttle retry, present outcome); touch-observer storage and FrameDirtyAccumulator made pub(crate) for Fast layer reuse. Layout direction on the window, recorded per layout node (vendor/gpui-pre/layout-direction-patch.md)."
       },
       "src/tab_stop.rs": {
