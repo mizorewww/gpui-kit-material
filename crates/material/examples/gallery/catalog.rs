@@ -338,7 +338,7 @@ pub static CATALOG: &[Entry] = &[
         "Navigation suite",
         Navigation,
         "One set of destinations as a bar, rail or drawer, by window width.",
-        None,
+        spec("navigation"),
         Some(&playgrounds::navigation_suite::PLAYGROUND),
     ),
     component(
@@ -443,7 +443,7 @@ pub static CATALOG: &[Entry] = &[
         "Canonical layouts",
         Containment,
         "List-detail, supporting pane and feed layouts that adapt to their width.",
-        None,
+        spec("examples"),
         Some(&playgrounds::canonical_layouts::PLAYGROUND),
     ),
     // Communication
@@ -484,7 +484,7 @@ pub static CATALOG: &[Entry] = &[
         "Pull to refresh",
         Communication,
         "Pull the top of a list down to refresh it.",
-        None,
+        spec("loading-progress"),
         Some(&playgrounds::pull_to_refresh::PLAYGROUND),
     ),
     component(
