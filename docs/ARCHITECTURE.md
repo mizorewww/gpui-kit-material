@@ -108,6 +108,8 @@ the same patches until fixes land upstream. A patched Zed checkout overriding
 | `gpui-pre-web` | crates.io + patches (`SOURCE.json`, `MATERIAL-PATCHES.md`) | Keeps CSS viewport size separate from backing-store pixels (CSS × DPR fallback); successful submission count. |
 | `gpui-fast`, `-apple`, `-web` | 0.1.12 + patches (`MATERIAL-MIGRATION.json`, per-file `local_changes`) | The GPUI, Apple and web patches above carried through Fast retained/scroll replay and composition (touch observers, extended hit targets, font-generation invalidation); explicit single-threaded web defaults. |
 | `gpui-pre-macos`, `gpui-fast-macos` | crates.io + patches (`SOURCE.json`, `MATERIAL-PATCHES.md`) | Vsync control, demand waker, periodic-source report and submission statistics (below). |
+| `gpui-pre-linux`, `gpui-fast-linux`, `gpui-pre-wgpu`, `gpui-fast-wgpu`, `wgpu` | crates.io + patches (`SOURCE.json`, `MATERIAL-PATCHES.md`) | Submission statistics from the present status `wgpu` otherwise discards, and vsync control through `PresentMode` (below). |
+| `gpui-pre-windows`, `gpui-fast-windows` | crates.io + patches (`SOURCE.json`, `MATERIAL-PATCHES.md`) | Submission statistics counting only `S_OK` presents, and vsync control through the DXGI sync interval (below). |
 
 Touch patches leave gesture recognition, scrolling and activation in GPUI while
 letting Material start a ripple on touch-down and release it on cancellation.
@@ -127,8 +129,13 @@ counters every 500 ms in its own view (included in profiles, disabled for static
 captures).
 
 `VsyncStatus` reports capability and actual state. The macOS backends forward
-it to Metal's display-sync property for existing and new surfaces; unsupported
-backends return an error rather than a pretend value. With vsync off, real frame
+it to Metal's display-sync property for existing and new surfaces; Linux to the
+surface's `wgpu::PresentMode` (X11 starts on `Fifo`, Wayland on `Mailbox`); Windows
+to the DXGI sync interval (upstream's 0, so it starts `Disabled`). Unsupported
+backends return an error rather than a pretend value. On Linux and Windows frame
+requests stay paced by the display (X11 refresh timer, Wayland frame callback,
+`DwmFlush`), so vsync off cannot exceed its refresh rate there and the 500 FPS gate
+is not measurable until those backends gain a demand-driven frame source. With vsync off, real frame
 demand drives the coalescing main-thread source; the display link remains only
 as a safety throttle, so clean windows gain no render loop.
 

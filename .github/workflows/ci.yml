@@ -57,6 +57,15 @@ jobs:
           cargo clippy --locked --workspace --all-targets --features gpui-kit-material/gpui-fast,gpui-kit-material/frame-profiler -- -D warnings
           cargo test --locked --workspace --features gpui-kit-material/gpui-fast,gpui-kit-material/frame-profiler
           cargo test --locked -p gpui-kit-material --example gallery --features gpui-fast,frame-profiler
+      - name: Linux present mode rules
+        if: runner.os == 'Linux'
+        run: |
+          cargo test --locked -p gpui-pre-wgpu --lib present_mode
+          cargo test --locked -p gpui-fast-wgpu --lib present_mode
+      - name: Frame submission rules
+        run: |
+          cargo test --locked -p gpui-pre --lib frame_submission
+          cargo test --locked -p gpui-fast --lib frame_submission
       # Clippy's -D warnings covers workspace members only. RUSTFLAGS also
       # reaches the vendored path crates we patch (registry crates stay
       # cap-linted); a separate target dir keeps the main cache valid.
