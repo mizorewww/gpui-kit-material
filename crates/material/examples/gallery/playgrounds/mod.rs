@@ -11,6 +11,7 @@ pub mod select;
 pub mod slider;
 pub mod switch;
 pub mod text_field;
+pub mod time_picker;
 
 #[cfg(test)]
 mod testing;

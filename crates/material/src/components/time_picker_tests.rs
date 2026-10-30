@@ -151,3 +151,88 @@ fn typing_in_input_mode_updates_the_time(cx: &mut TestAppContext) {
     cx.simulate_keystrokes("2 0 3 5");
     assert_eq!(state.read_with(cx, |s, _| s.time()), t(20, 35));
 }
+
+#[test]
+fn minute_steps_snap_to_their_grid() {
+    assert_eq!(step_minutes(10, 15, 1), 15, "off grid: up to the next mark");
+    assert_eq!(
+        step_minutes(10, 15, -1),
+        0,
+        "off grid: down to the previous mark"
+    );
+    assert_eq!(step_minutes(15, 15, 1), 30);
+    assert_eq!(step_minutes(45, 15, 1), 0, "wraps within the hour");
+    assert_eq!(step_minutes(0, 5, -1), 55);
+    assert_eq!(step_minutes(7, 1, 1), 8);
+}
+
+#[test]
+fn limits_clamp_and_fade_out_of_range_values() {
+    let limits = Some((t(9, 30), t(17, 0)));
+    assert_eq!(clamp_time(t(8, 0), limits), t(9, 30));
+    assert_eq!(clamp_time(t(18, 0), limits), t(17, 0));
+    assert_eq!(clamp_time(t(12, 0), limits), t(12, 0));
+    assert_eq!(clamp_time(t(8, 0), None), t(8, 0));
+    assert!(!within_limits(t(9, 0), TimeUnit::Hour, 8, limits));
+    assert!(
+        within_limits(t(9, 0), TimeUnit::Hour, 9, limits),
+        "9:30-9:59 fits"
+    );
+    assert!(!within_limits(t(9, 0), TimeUnit::Minute, 15, limits));
+    assert!(within_limits(t(9, 0), TimeUnit::Minute, 45, limits));
+    assert!(!within_limits(t(17, 0), TimeUnit::Minute, 5, limits));
+}
+
+#[gpui::test]
+fn seconds_steps_and_limits_shape_the_state(cx: &mut TestAppContext) {
+    cx.update(|cx| {
+        gpui_kit::init(cx);
+        crate::init(cx);
+        cx.set_reduce_motion(true);
+    });
+    let (view, cx) = cx.add_window_view(|window, cx| {
+        Harness(cx.new(|cx| {
+            TimePickerState::new(labels(), t(7, 10), window, cx)
+                .seconds("Second", window, cx)
+                .minute_step(15)
+                .limits(t(8, 0), t(20, 0), window, cx)
+                .unit(TimeUnit::Minute)
+        }))
+    });
+    let state = view.read_with(cx, |h, _| h.0.clone());
+    draw(cx);
+    assert_eq!(
+        state.read_with(cx, |s, _| s.time()),
+        t(8, 0),
+        "moved inside the limits"
+    );
+    assert!(state.read_with(cx, |s, _| s.shows_seconds()));
+    cx.update(|window, cx| state.read(cx).dial_focus().clone().focus(window, cx));
+    cx.simulate_keystrokes("up up");
+    assert_eq!(
+        state.read_with(cx, |s, _| s.time()),
+        t(8, 30),
+        "15-minute steps"
+    );
+    cx.update(|window, cx| state.update(cx, |s, cx| s.set_pm(true, window, cx)));
+    assert_eq!(
+        state.read_with(cx, |s, _| s.time()),
+        t(20, 0),
+        "PM clamps to the latest"
+    );
+    cx.update(|_, cx| state.update(cx, |s, cx| s.set_unit(TimeUnit::Second, cx)));
+    cx.update(|window, cx| state.update(cx, |s, cx| s.step(-1, window, cx)));
+    assert_eq!(
+        state.read_with(cx, |s, _| s.time()),
+        t(20, 0),
+        "seconds wrap within the minute (to 20:00:59), clamped back to the latest"
+    );
+    cx.update(|window, cx| state.update(cx, |s, cx| s.set_time(t(12, 0), window, cx)));
+    cx.update(|window, cx| state.update(cx, |s, cx| s.step(-1, window, cx)));
+    assert_eq!(
+        state.read_with(cx, |s, _| s.time()),
+        NaiveTime::from_hms_opt(12, 0, 59).unwrap(),
+        "seconds wrap within the minute"
+    );
+    draw(cx);
+}

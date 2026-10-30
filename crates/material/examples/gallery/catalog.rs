@@ -306,7 +306,7 @@ pub static CATALOG: &[Entry] = &[
         SelectionInput,
         "Select a time on a dial or with the keyboard.",
         spec("date-time-pickers"),
-        None,
+        Some(&playgrounds::time_picker::PLAYGROUND),
     ),
     // Navigation
     component(
