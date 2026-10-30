@@ -241,15 +241,20 @@ impl RenderOnce for FabMenu {
         let mut column = div().flex().flex_col().items_end().gap(rem(ITEM_GAP));
         let mut any_item = false;
         for (index, item) in self.items.into_iter().enumerate() {
-            let expansion = gpui_base::transition(
-                ElementId::from((item.id.clone(), "fab-menu-expansion")),
-                if open { 1f32 } else { 0. },
-                gpui_base::Transition::new(curve.duration())
-                    .ease(curve.ease())
-                    .delay(stagger(index, count, open)),
-                window,
-                cx,
-            );
+            // Render runs in the parent's id scope, so key each item's
+            // expansion under the menu's own id: two menus with the same
+            // item ids must not share a transition.
+            let expansion = window.with_element_namespace(self.id.clone(), |window| {
+                gpui_base::transition(
+                    ElementId::from((item.id.clone(), "fab-menu-expansion")),
+                    if open { 1f32 } else { 0. },
+                    gpui_base::Transition::new(curve.duration())
+                        .ease(curve.ease())
+                        .delay(stagger(index, count, open)),
+                    window,
+                    cx,
+                )
+            });
             // A settled closed menu lays out no items.
             if !open && expansion <= 0. {
                 continue;
@@ -306,7 +311,7 @@ mod tests {
     use crate::{color::ColorRole, icons::IconName, motion};
     use gpui::{
         Context, InteractiveElement as _, IntoElement, ParentElement as _, Render, Styled as _,
-        TestAppContext, VisualTestContext, Window, div, px,
+        TestAppContext, VisualTestContext, Window, div, prelude::FluentBuilder as _, px,
     };
     use std::time::Duration;
 
@@ -336,19 +341,32 @@ mod tests {
 
     struct Harness {
         open: bool,
+        twin: bool,
     }
     impl Render for Harness {
         fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
             window.set_rem_size(px(14.));
-            div().flex().items_start().p(px(40.)).child(
-                div().flex().debug_selector(|| "menu".into()).child(
-                    FabMenu::new("menu", IconName::Check, "Actions")
-                        .open(self.open)
-                        .items((0..3usize).map(|index| {
-                            FabMenuItem::new(("item", index), IconName::Check, "Action")
-                        })),
-                ),
-            )
+            div()
+                .flex()
+                .items_start()
+                .p(px(40.))
+                .child(
+                    div().flex().debug_selector(|| "menu".into()).child(
+                        FabMenu::new("menu", IconName::Check, "Actions")
+                            .open(self.open)
+                            .items((0..3usize).map(|index| {
+                                FabMenuItem::new(("item", index), IconName::Check, "Action")
+                            })),
+                    ),
+                )
+                .when(self.twin, |row| {
+                    // A closed sibling menu whose items reuse the same ids.
+                    row.child(div().flex().debug_selector(|| "twin".into()).child(
+                        FabMenu::new("twin", IconName::Check, "Actions").items((0..3usize).map(
+                            |index| FabMenuItem::new(("item", index), IconName::Check, "Action"),
+                        )),
+                    ))
+                })
         }
     }
 
@@ -366,7 +384,10 @@ mod tests {
             cx.set_reduce_motion(false);
             motion::set_motion_scheme(motion::MotionScheme::Expressive);
         });
-        let (view, cx) = cx.add_window_view(|_, _| Harness { open: false });
+        let (view, cx) = cx.add_window_view(|_, _| Harness {
+            open: false,
+            twin: false,
+        });
         draw(cx);
         let closed = cx.debug_bounds("menu").unwrap().size;
         assert_eq!(closed.height, px(56.));
@@ -390,5 +411,38 @@ mod tests {
         draw(cx);
         draw(cx);
         assert_eq!(cx.debug_bounds("menu").unwrap().size.height, px(56.));
+    }
+
+    #[gpui::test]
+    fn sibling_menus_with_equal_item_ids_open_independently(cx: &mut TestAppContext) {
+        cx.update(|cx| {
+            gpui_base::init(cx);
+            cx.set_reduce_motion(false);
+            motion::set_motion_scheme(motion::MotionScheme::Expressive);
+        });
+        let (view, cx) = cx.add_window_view(|_, _| Harness {
+            open: false,
+            twin: true,
+        });
+        draw(cx);
+        view.update(cx, |view, cx| {
+            view.open = true;
+            cx.notify();
+        });
+        draw(cx);
+        cx.executor().advance_clock(Duration::from_millis(60));
+        draw(cx);
+        // A transition shared with the closed twin would be recreated at its
+        // target every frame and jump open instead of growing.
+        let growing = cx.debug_bounds("menu").unwrap().size.width;
+        cx.executor().advance_clock(Duration::from_secs(2));
+        draw(cx);
+        draw(cx);
+        let open = cx.debug_bounds("menu").unwrap().size.width;
+        assert!(
+            growing > px(56.) && growing < open,
+            "{growing:?} of {open:?}"
+        );
+        assert_eq!(cx.debug_bounds("twin").unwrap().size.height, px(56.));
     }
 }
