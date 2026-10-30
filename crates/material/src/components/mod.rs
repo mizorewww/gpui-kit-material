@@ -19,8 +19,9 @@ pub use standard_button_group::{ButtonGroup, EXPANDED_RATIO, standard_group_gap}
 mod button_group;
 mod controls;
 mod divider;
+mod slider;
 mod switch;
-pub use controls::{MaterialSideSheet, MaterialSlider, SliderAppearance};
+pub use controls::MaterialSideSheet;
 pub use divider::{
     DividerContext, DividerDirection, DividerOrientation, DividerVariant, MaterialDivider,
 };
@@ -28,6 +29,7 @@ pub use search::{
     SEARCH_BAR_HEIGHT, SEARCH_SUGGESTION_HEIGHT, SearchField, SearchSuggestion, SearchView,
     SearchViewLayout,
 };
+pub use slider::{MaterialSlider, SliderAppearance, SliderSize};
 pub use switch::{MaterialSwitch, SwitchIcons};
 mod caption;
 mod checkbox;
