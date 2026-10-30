@@ -366,3 +366,55 @@ fn shared_theme_changes_start_a_transition_and_other_changes_rerender(cx: &mut T
         })
         .unwrap();
 }
+
+/// No spec board is drawn wider than its row at the Gallery's reference
+/// widths: wide boards wrap their columns instead (no horizontal
+/// scrolling, nothing clipped).
+#[gpui::test]
+fn every_spec_board_fits_its_row(cx: &mut TestAppContext) {
+    use super::spec::OVERFLOWS;
+    use gpui::{ListOffset, VisualContext as _};
+    init(cx);
+    for width in [1280., 1600.] {
+        let window = cx.open_window(size(px(width), px(900.)), Gallery::new);
+        let mut cx = VisualTestContext::from_window(window.into(), cx);
+        cx.simulate_resize(size(px(width), px(900.)));
+        for (index, entry) in CATALOG.iter().enumerate() {
+            if entry.spec.is_none() {
+                continue;
+            }
+            window
+                .update(&mut cx, |g, _, cx| {
+                    g.navigate(index, cx);
+                    if matches!(entry.kind, Kind::Component { .. }) {
+                        g.set_tab(Tab::Specs, cx);
+                    }
+                })
+                .unwrap();
+            settle(&window, &mut cx);
+            let rows = window.update(&mut cx, |g, _, _| g.row_count()).unwrap();
+            for row in 0..rows {
+                window
+                    .update(&mut cx, |g, _, cx| {
+                        g.list.scroll_to(ListOffset {
+                            item_ix: row,
+                            offset_in_item: px(0.),
+                        });
+                        cx.notify();
+                    })
+                    .unwrap();
+                // The first frame measures a new board; the next regroups.
+                draw(&window, &mut cx);
+                OVERFLOWS.with(|overflows| overflows.borrow_mut().clear());
+                draw(&window, &mut cx);
+                let overflows = OVERFLOWS.with(|overflows| overflows.take());
+                assert!(
+                    overflows.is_empty(),
+                    "{} at {width}px, row {row}: {overflows:?}",
+                    entry.id
+                );
+            }
+        }
+        let _ = cx.window_handle();
+    }
+}

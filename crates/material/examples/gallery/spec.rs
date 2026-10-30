@@ -290,6 +290,14 @@ thread_local! {
 }
 const MEASURE_LIMIT: usize = 4096;
 
+#[cfg(test)]
+thread_local! {
+    /// Measured boards whose frame was drawn wider than their row.
+    pub static OVERFLOWS: std::cell::RefCell<Vec<String>> = const {
+        std::cell::RefCell::new(Vec::new())
+    };
+}
+
 /// Split columns of `widths` px into runs of adjacent columns that each fit
 /// `available` px, given `lead` px before each run's first column (row
 /// labels) and `gap` px between columns. Every run holds at least one
@@ -318,6 +326,77 @@ pub fn wrap_columns(
         runs.push(start..widths.len());
     }
     runs
+}
+
+/// The scale that fits `needed` px into `available` px: 1 when it fits,
+/// else a little under the ratio (borders do not scale), never below 0.4.
+pub fn fit_scale(needed: f32, available: f32) -> f32 {
+    if needed <= available + 0.5 || needed <= 0. {
+        1.
+    } else {
+        (available / needed * 0.97).clamp(0.4, 1.)
+    }
+}
+
+/// Lays out, prepaints and paints its child at another rem size: the
+/// child's rem-based geometry and type scale with it.
+struct RemScaled {
+    rem: Pixels,
+    child: AnyElement,
+}
+
+impl IntoElement for RemScaled {
+    type Element = Self;
+    fn into_element(self) -> Self {
+        self
+    }
+}
+
+impl Element for RemScaled {
+    type RequestLayoutState = ();
+    type PrepaintState = ();
+    fn id(&self) -> Option<ElementId> {
+        None
+    }
+    fn source_location(&self) -> Option<&'static std::panic::Location<'static>> {
+        None
+    }
+    fn request_layout(
+        &mut self,
+        _: Option<&GlobalElementId>,
+        _: Option<&InspectorElementId>,
+        window: &mut Window,
+        cx: &mut App,
+    ) -> (LayoutId, ()) {
+        let child = &mut self.child;
+        let id = window.with_rem_size(Some(self.rem), |window| child.request_layout(window, cx));
+        (id, ())
+    }
+    fn prepaint(
+        &mut self,
+        _: Option<&GlobalElementId>,
+        _: Option<&InspectorElementId>,
+        _: Bounds<Pixels>,
+        _: &mut (),
+        window: &mut Window,
+        cx: &mut App,
+    ) {
+        let child = &mut self.child;
+        window.with_rem_size(Some(self.rem), |window| child.prepaint(window, cx));
+    }
+    fn paint(
+        &mut self,
+        _: Option<&GlobalElementId>,
+        _: Option<&InspectorElementId>,
+        _: Bounds<Pixels>,
+        _: &mut (),
+        _: &mut (),
+        window: &mut Window,
+        cx: &mut App,
+    ) {
+        let child = &mut self.child;
+        window.with_rem_size(Some(self.rem), |window| child.paint(window, cx));
+    }
 }
 
 impl RenderOnce for Board {
@@ -356,6 +435,22 @@ impl RenderOnce for Board {
             }
             None => std::iter::once(0..columns).collect(),
         };
+        // A group still wider than the row (one specimen wider than the
+        // row, e.g. an extra-large button group) is drawn at a smaller rem
+        // so it fits instead of being clipped.
+        let scales: Vec<f32> = groups
+            .iter()
+            .map(|group| match &measured {
+                Some(measure) => {
+                    let widths = fixed.as_deref().unwrap_or(&measure.columns[..columns]);
+                    let needed = lead_of(measure.columns[columns])
+                        + widths[group.clone()].iter().sum::<f32>()
+                        + gap * group.len().saturating_sub(1) as f32;
+                    fit_scale(needed, measure.available - chrome)
+                }
+                None => 1.,
+            })
+            .collect();
         let wrapped = groups.len() > 1;
         // Until the board is measured, keep its first frame inside its row.
         let unmeasured = measured.is_none();
@@ -433,6 +528,7 @@ impl RenderOnce for Board {
                 }
             }
             let widths = frame_widths.clone();
+            let scale = scales[group_index];
             let grid = div()
                 .w_full()
                 .grid()
@@ -454,7 +550,9 @@ impl RenderOnce for Board {
                     let mut widths = widths.borrow_mut();
                     for (bounds, column) in bounds.iter().zip(&item_columns) {
                         if let Some(column) = column {
-                            let width = f32::from(bounds.size.width);
+                            // Record unscaled widths, so scaling does not
+                            // feed back into the grouping.
+                            let width = f32::from(bounds.size.width) / scale;
                             widths[*column] = widths[*column].max(width);
                         }
                     }
@@ -471,7 +569,16 @@ impl RenderOnce for Board {
                             .border_dashed()
                             .border_color(board_outline().opacity(0.6))
                     })
-                    .child(grid)
+                    .map(|group| {
+                        if scale < 1. {
+                            group.child(RemScaled {
+                                rem: rem_size * scale,
+                                child: grid.into_any_element(),
+                            })
+                        } else {
+                            group.child(grid)
+                        }
+                    })
                     .into_any_element(),
             );
         }
@@ -504,6 +611,8 @@ impl RenderOnce for Board {
             })
             .children(grids);
         let has_side_label = self.side_label.is_some();
+        // The frame's drawn width, recorded by tests to catch overflow.
+        let drawn_width = std::rc::Rc::new(std::cell::Cell::new(0f32));
         let rendered = groups;
         let caption = self.caption.filter(|_| band.has_top());
         div()
@@ -546,6 +655,14 @@ impl RenderOnce for Board {
                             .flex()
                             .flex_row()
                             .when(unmeasured, |holder| holder.overflow_hidden())
+                            .when(cfg!(test), |holder| {
+                                let drawn = drawn_width.clone();
+                                holder.on_children_prepainted(move |frames, _, _| {
+                                    if let Some(frame) = frames.first() {
+                                        drawn.set(f32::from(frame.size.width));
+                                    }
+                                })
+                            })
                             .child(frame),
                     )
                     // Runs after the grids' listeners: record this frame's
@@ -555,6 +672,15 @@ impl RenderOnce for Board {
                         let holder = bounds.get(usize::from(has_side_label));
                         let Some(holder) = holder else { return };
                         let available = f32::from(holder.size.width);
+                        #[cfg(test)]
+                        if !unmeasured && drawn_width.get() > available + 1. {
+                            OVERFLOWS.with(|overflows| {
+                                overflows.borrow_mut().push(format!(
+                                    "{key}: {} px in {available} px",
+                                    drawn_width.get()
+                                ))
+                            });
+                        }
                         let mut widths = frame_widths.borrow().clone();
                         if let Some(fixed) = &fixed {
                             widths[..columns].copy_from_slice(fixed);
@@ -626,6 +752,15 @@ pub fn demo(
 mod tests {
     use super::{Band, wrap_columns};
     use core::prelude::v1::test;
+
+    #[test]
+    fn oversized_groups_scale_to_fit() {
+        assert_eq!(super::fit_scale(100., 200.), 1.);
+        assert_eq!(super::fit_scale(200.4, 200.), 1.);
+        let scale = super::fit_scale(400., 200.);
+        assert!(scale < 0.5 && 400. * scale <= 200.);
+        assert_eq!(super::fit_scale(10_000., 200.), 0.4);
+    }
 
     #[test]
     fn columns_wrap_into_runs_that_fit() {
