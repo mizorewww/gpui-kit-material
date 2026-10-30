@@ -36,6 +36,23 @@ colors; they paint `ColorRole`s through `theme::color`. Material, galleries and
 fixtures import `gpui` through the Kit facade so engine types always match the
 selected backend.
 
+## Reference sources
+
+Token values follow the priority **Figma M3 Design Kit > md3.io >
+m3e.kyralabs.dev**, applied per token family and per value: the first
+reference that defines a value wins, and the value's rustdoc and fixture
+record that source. Outranked fixtures stay as untested secondary evidence.
+`reference_policy.token_sources` in
+[conformance/md3.json](../conformance/md3.json) is the per-family record:
+
+| Family | Source | Fixture |
+| --- | --- | --- |
+| Color | Figma kit `Schemes/*` variables for the baseline theme (6 modes); md3.io for the other 19 themes and info/success/warning | `crates/color/tests/fixtures/figma-baseline-colors.json`, `md3-colors.json` |
+| Typography | Figma kit text styles and Typescale/Font theme variables (Roboto) | `crates/material/tests/fixtures/figma-typography.json` |
+| Shape, elevation, state layers | Figma kit Shape variables, elevation effect styles, State Layers variables | `crates/material/tests/fixtures/figma-sys-tokens.json` |
+| Motion | The kit has none: md3.io sampled curves for Expressive; m3e springs for Standard (absent from md3.io) | `conformance/fixtures/md3-expressive-browser.json`, `m3e-motion.json` |
+| Button geometry and disabled colors | Figma kit Buttons page; timing from md3.io captures | `crates/material/tests/fixtures/figma-button.json`, `conformance/reference/button-*.json` |
+
 ## Lifecycle and theme bridge
 
 Galleries use `gpui_kit::application`, `init` and `open_window`; Kit owns the

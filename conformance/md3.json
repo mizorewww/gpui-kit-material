@@ -1,7 +1,7 @@
 {
   "reference": {
     "site": "https://md3.io/",
-    "role": "secondary reference (md3.io / floor/material). Provenance for the existing md3.io evidence only; token values come from reference_policy.primary wherever m3e defines them (see reference_policy.token_sources).",
+    "role": "md3.io / floor/material: second in the reference priority (Figma kit > md3.io > m3e.kyralabs.dev). Wins for values the Figma kit does not define (e.g. Expressive motion curves, non-baseline themes, button timing); see reference_policy.token_sources.",
     "repository": "https://github.com/floor/material",
     "source_commit": "c910072f3fc5b660276731d8a935d7186f288364",
     "package_version": "3.2.4",
@@ -146,28 +146,39 @@
       "status": "unreviewed",
       "evidence": [
         {
+          "kind": "figma-variables",
+          "path": "crates/color/tests/fixtures/figma-baseline-colors.json",
+          "scope": "Figma kit M3 Schemes/* variables for the baseline theme in six modes (reference_policy.token_sources.color); unit-tested. Token data only."
+        },
+        {
           "kind": "browser-resolved-presets",
           "path": "crates/color/tests/fixtures/md3-colors.json",
-          "scope": "20 reference themes, two modes and three contrast levels; 52 roles per configuration. Does not establish HCT/dynamic color or component visual conformance."
+          "scope": "Authoritative (md3.io) for the 19 non-baseline themes and the info/success/warning roles; baseline roles defined by the Figma kit are outranked. 20 themes, two modes, three contrast levels, 52 roles. Does not establish HCT/dynamic color or component visual conformance."
         }
       ],
       "reference": "https://md3.io/styles/color/",
       "reference_status": "available",
-      "primary_reference_review": "pending: reconcile with m3e.kyralabs.dev; existing md3.io evidence is not a primary-reference PASS"
+      "primary_reference_review": "token values reconciled with the Figma M3 Design Kit (highest priority) and fixture-tested; independent subagent review pending",
+      "primary_reference": "figma:ozddDB2Z1v51f1IFZlUuJ2"
     },
     {
       "id": "typography",
       "status": "unreviewed",
       "evidence": [
         {
+          "kind": "figma-text-styles",
+          "path": "crates/material/tests/fixtures/figma-typography.json",
+          "scope": "Figma kit text styles and Typescale/Font theme variables (reference_policy.token_sources.typography); unit-tested. Token data only; tracking rendering remains pending."
+        },
+        {
           "kind": "m3e-source-tokens",
           "path": "crates/material/tests/fixtures/m3e-typography.json",
-          "scope": "Primary-reference token values extracted from kyra-labs/m3exp-web 3b1e004 (reference_policy.token_sources.typography); unit tests compare the crate constants. Token data only; rendered, motion-timing and component conformance remain unreviewed."
+          "scope": "Outranked by the Figma kit; retained as m3e secondary evidence and no longer tested for this family."
         },
         {
           "kind": "source-type-scale",
           "path": "crates/material/tests/fixtures/md3-typography.json",
-          "scope": "Superseded by the m3e fixture; retained as md3.io secondary evidence and no longer tested. 15 reference type roles: default family, brand/plain typeface, size, line height, letter spacing and weight. Token data only; font loading, tracking rendering and component typography conformance remain pending."
+          "scope": "Outranked by the Figma kit; retained as md3.io secondary evidence and no longer tested. 15 reference type roles: default family, brand/plain typeface, size, line height, letter spacing and weight. Token data only; font loading, tracking rendering and component typography conformance remain pending."
         },
         {
           "kind": "reference-font-assets",
@@ -177,73 +188,88 @@
       ],
       "reference": "https://md3.io/styles/typography/",
       "reference_status": "available",
-      "primary_reference_review": "token values reconciled with m3e.kyralabs.dev source 3b1e004 and fixture-tested; independent subagent review pending; default family deviates (Roboto vs Google Sans Flex)",
-      "primary_reference": "https://m3e.kyralabs.dev/typography/"
+      "primary_reference_review": "token values reconciled with the Figma M3 Design Kit (highest priority) and fixture-tested; independent subagent review pending",
+      "primary_reference": "figma:ozddDB2Z1v51f1IFZlUuJ2"
     },
     {
       "id": "shape",
       "status": "unreviewed",
       "evidence": [
         {
+          "kind": "figma-variables",
+          "path": "crates/material/tests/fixtures/figma-sys-tokens.json",
+          "scope": "Figma kit Shape variables (reference_policy.token_sources.shape); unit-tested. Token data only."
+        },
+        {
           "kind": "m3e-source-tokens",
           "path": "crates/material/tests/fixtures/m3e-sys-tokens.json",
-          "scope": "Primary-reference token values extracted from kyra-labs/m3exp-web 3b1e004 (reference_policy.token_sources.shape); unit tests compare the crate constants. Token data only; rendered, motion-timing and component conformance remain unreviewed."
+          "scope": "Outranked by the Figma kit; retained as m3e secondary evidence and no longer tested for this family."
         }
       ],
       "reference": "https://md3.io/styles/shape/",
       "reference_status": "available",
-      "primary_reference_review": "token values reconciled with m3e.kyralabs.dev source 3b1e004 and fixture-tested; independent subagent review pending",
-      "primary_reference": "https://m3e.kyralabs.dev/shapes/"
+      "primary_reference_review": "token values reconciled with the Figma M3 Design Kit (highest priority) and fixture-tested; independent subagent review pending",
+      "primary_reference": "figma:ozddDB2Z1v51f1IFZlUuJ2"
     },
     {
       "id": "elevation",
       "status": "unreviewed",
       "evidence": [
         {
+          "kind": "figma-effect-styles",
+          "path": "crates/material/tests/fixtures/figma-sys-tokens.json",
+          "scope": "Figma kit elevation effect styles, light and dark (reference_policy.token_sources.elevation); unit-tested. Token data only."
+        },
+        {
           "kind": "m3e-source-tokens",
           "path": "crates/material/tests/fixtures/m3e-sys-tokens.json",
-          "scope": "Primary-reference token values extracted from kyra-labs/m3exp-web 3b1e004 (reference_policy.token_sources.elevation); unit tests compare the crate constants. Token data only; rendered, motion-timing and component conformance remain unreviewed."
+          "scope": "Outranked by the Figma kit; retained as m3e secondary evidence and no longer tested for this family."
         }
       ],
       "reference": "https://md3.io/styles/",
       "reference_status": "Coming on website; verify source and runtime",
-      "primary_reference_review": "token values reconciled with m3e.kyralabs.dev source 3b1e004 and fixture-tested; independent subagent review pending",
-      "primary_reference": "https://m3e.kyralabs.dev/"
+      "primary_reference_review": "token values reconciled with the Figma M3 Design Kit (highest priority) and fixture-tested; independent subagent review pending",
+      "primary_reference": "figma:ozddDB2Z1v51f1IFZlUuJ2"
     },
     {
       "id": "motion",
       "status": "unreviewed",
       "evidence": [
         {
-          "kind": "m3e-source-tokens",
-          "path": "conformance/fixtures/m3e-motion.json",
-          "scope": "Primary-reference token values extracted from kyra-labs/m3exp-web 3b1e004 (reference_policy.token_sources.motion); unit tests compare the crate constants. Token data only; rendered, motion-timing and component conformance remain unreviewed."
-        },
-        {
           "kind": "browser-sampled-reference",
           "path": "conformance/fixtures/md3-expressive-browser.json",
-          "scope": "Superseded by the m3e fixture; retained as md3.io secondary evidence and no longer tested. Six Expressive spatial/effects timing curves; does not establish per-component animation conformance."
+          "scope": "Authoritative for the Expressive scheme (md3.io outranks m3e; the Figma kit has no motion): six Expressive spatial/effects curves and durations, unit-tested. Does not establish per-component animation conformance."
+        },
+        {
+          "kind": "m3e-source-tokens",
+          "path": "conformance/fixtures/m3e-motion.json",
+          "scope": "Authoritative only for the Standard scheme (absent from md3.io): spring parameters, Compose settle durations, linear() stops and reduced-motion substitution, unit-tested. Its Expressive springs are outranked by md3.io."
         }
       ],
       "reference": "https://md3.io/styles/",
       "reference_status": "Coming on website; verify source and runtime",
-      "primary_reference_review": "token values reconciled with m3e.kyralabs.dev source 3b1e004 and fixture-tested; independent subagent review pending",
-      "primary_reference": "https://m3e.kyralabs.dev/motion/"
+      "primary_reference_review": "Expressive reconciled with md3.io (Figma kit defines no motion), Standard with m3e; fixture-tested; independent subagent review pending",
+      "primary_reference": "https://md3.io/ (Expressive); https://m3e.kyralabs.dev/motion/ (Standard)"
     },
     {
       "id": "states",
       "status": "unreviewed",
       "evidence": [
         {
+          "kind": "figma-variables",
+          "path": "crates/material/tests/fixtures/figma-sys-tokens.json",
+          "scope": "Figma kit State Layers opacities and disabled alpha (reference_policy.token_sources.states); unit-tested. Token data only."
+        },
+        {
           "kind": "m3e-source-tokens",
           "path": "crates/material/tests/fixtures/m3e-sys-tokens.json",
-          "scope": "Primary-reference token values extracted from kyra-labs/m3exp-web 3b1e004 (reference_policy.token_sources.states); unit tests compare the crate constants. Token data only; rendered, motion-timing and component conformance remain unreviewed."
+          "scope": "Outranked by the Figma kit; retained as m3e secondary evidence and no longer tested for this family."
         }
       ],
       "reference": "https://md3.io/styles/",
       "reference_status": "Coming on website; verify source and runtime",
-      "primary_reference_review": "token values reconciled with m3e.kyralabs.dev source 3b1e004 and fixture-tested; independent subagent review pending",
-      "primary_reference": "https://m3e.kyralabs.dev/"
+      "primary_reference_review": "token values reconciled with the Figma M3 Design Kit (highest priority) and fixture-tested; independent subagent review pending",
+      "primary_reference": "figma:ozddDB2Z1v51f1IFZlUuJ2"
     },
     {
       "id": "icons",
@@ -263,9 +289,9 @@
       "reviews": [],
       "evidence": [
         {
-          "kind": "m3e-source-tokens",
-          "path": "crates/material/tests/fixtures/m3e-sys-tokens.json",
-          "scope": "Primary-reference size, shape, padding, icon, outline and disabled-color tokens from kyra-labs/m3exp-web 3b1e004 (reference_policy.token_sources.button), unit-tested against button geometry and colors. The md3.io captures below remain secondary evidence for timing only."
+          "kind": "figma-component-tokens",
+          "path": "crates/material/tests/fixtures/figma-button.json",
+          "scope": "Figma kit Buttons page size, padding, gap, icon, label style, corner, outline and disabled-color values (reference_policy.token_sources.button), unit-tested against button geometry and colors. The md3.io captures below remain evidence for timing only."
         },
         {
           "kind": "browser-color-transitions",
@@ -1135,7 +1161,21 @@
   ],
   "objective": "Reproduce the complete union of https://m3e.kyralabs.dev/ and https://md3.io/ components, styles and animations on desktop and WASM galleries, with m3e.kyralabs.dev authoritative for overlapping components; use https://gpui-kit.com/ for gallery organization. Exact visual and animation parity, independent subagent approval for every component, whole-gallery CPU frames <= 2 ms and continuous vertical-scrolling rendering throughput >= 500 FPS, atomic commits and frequent GitHub progress pushes are required. Material icons must come from the gpui-material-symbols repository, pinned by Git revision for default builds; its sibling checkout may be used explicitly for development and improved as needed. Build on Longbridge gpui-kit and its gpui-component layer, reusing existing controls and infrastructure before implementing Material-specific differences.",
   "reference_policy": {
-    "primary": {
+    "priority": [
+      "figma-m3-design-kit",
+      "md3.io",
+      "m3e.kyralabs.dev"
+    ],
+    "priority_rule": "Per token family (color, shape, type, motion, state, geometry) and per value: use the first reference in priority that defines the value and record that source with the value (rustdoc and fixture). Lower-priority fixtures that are outranked stay as untested secondary evidence.",
+    "figma": {
+      "name": "Google Material 3 Design Kit (Figma Community)",
+      "file": "Material 3 Design Kit (Community)",
+      "file_key": "ozddDB2Z1v51f1IFZlUuJ2",
+      "observed_on": "2026-10-30",
+      "extraction": "Figma Plugin API in the user's open copy (~/Developer/.figma-tools): local variables, text styles, effect styles and component nodes; values recorded with node/style/variable ids in each figma-*.json fixture",
+      "defines": "baseline color scheme (6 modes), type scale and emphasized styles, font theme, shape scale, elevation effect styles, state-layer opacities, component geometry and colors. It defines no motion values."
+    },
+    "m3e": {
       "site": "https://m3e.kyralabs.dev/",
       "repository": "https://github.com/kyra-labs/m3exp-web",
       "source_commit": "3b1e0047c0021eab7b4c0128fa1bec95c76ca746",
@@ -1156,13 +1196,13 @@
       },
       "package_version_origin": "cloned source package.json files; deployed versions not verified"
     },
-    "secondary": "https://md3.io/",
+    "secondary": "https://md3.io/ (second priority); https://m3e.kyralabs.dev/ (third)",
     "scope": "union of all components and their variants from both sites",
-    "overlap": "m3e.kyralabs.dev is authoritative for the entire overlapping component, including visual tokens, typography, interaction states and animation",
-    "existing_reference_field": "Top-level `reference` pins md3.io (floor/material) provenance for existing secondary evidence only. It is not the primary authority for overlapping components or for any token listed in token_sources as m3e.",
-    "existing_evidence": "Existing md3.io fixtures remain secondary-reference evidence. They do not establish conformance to the new primary source. Re-review against the selected source is required.",
+    "overlap": "Superseded: overlaps are resolved per value by `priority`, not per component.",
+    "existing_reference_field": "Top-level `reference` pins md3.io (floor/material) provenance; it is authoritative only where token_sources names md3.io.",
+    "existing_evidence": "Fixtures from an outranked source remain secondary evidence and are not tested; they do not establish conformance.",
     "catalog_status": "top-level union enumerated; variant and alias coverage still requires source and rendered-site audit",
-    "primary_catalog": [
+    "m3e_catalog": [
       {
         "id": "badge",
         "url": "https://m3e.kyralabs.dev/components/badge/"
@@ -1325,89 +1365,93 @@
       }
     ],
     "token_sources": {
-      "note": "Which source each crate token family comes from. Values listed as m3e are extracted from the pinned primary checkout by scripts/extract-m3e-tokens.py and tested against its fixtures; a matching fixture is token evidence, not a conformance PASS.",
+      "note": "Which reference each crate token family comes from under `priority`. Figma values are extracted with the Figma Plugin API; m3e values by scripts/extract-m3e-tokens.py; md3.io values by the capture scripts. A matching fixture is token evidence, not a conformance PASS.",
       "m3e_source": {
         "repository": "https://github.com/kyra-labs/m3exp-web",
         "source_commit": "3b1e0047c0021eab7b4c0128fa1bec95c76ca746",
         "upstream": "Compose Material3 1.5.0-beta01 tokens @ androidx 19991f2c0858aadfcb442ce02b2c8e4743c96898 (m3exp-web SOURCE_PIN)"
       },
-      "motion": {
-        "source": "m3e",
-        "scope": "Standard and Expressive spring parameters (damping ratio, stiffness), Compose settle durations and reduced-motion substitution (spatial finish; default/slow effects use fast effects)",
-        "m3e_paths": [
-          "packages/m3e-tokens/src/generated/tokens.css",
-          "packages/m3e-motion/src/linear.ts",
-          "packages/m3e-motion/src/spring-estimation.ts"
+      "color": {
+        "source": "figma for the baseline theme; md3.io for everything else",
+        "scope": "Baseline: the 46 roles the kit defines in M3 variables Schemes/* (VariableCollectionId:54778:406) for Light/Dark x standard/medium/high contrast. md3.io: info/success/warning roles and the 19 other preset themes, which the kit lacks.",
+        "fixture": [
+          "crates/color/tests/fixtures/figma-baseline-colors.json",
+          "crates/color/tests/fixtures/md3-colors.json"
         ],
-        "fixture": "conformance/fixtures/m3e-motion.json",
+        "implementation": [
+          "crates/color/src/themes/data.rs",
+          "crates/color/src/themes/mod.rs"
+        ],
+        "changed": "Baseline differs from md3.io in 108 values: on-*-container tones in light standard, and most medium/high-contrast roles.",
+        "pending": "m3e derives schemes from material-color-utilities 0.4.0 (spec 2025); outranked where the kit or md3.io defines a role"
+      },
+      "typography": {
+        "source": "figma",
+        "scope": "15 roles and 15 emphasized styles: brand/plain typeface, family (Roboto for both faces, Font theme Baseline), size, line height, tracking, weight",
+        "figma_nodes": "Styles page (49823:12141) text styles M3/<group>/<size>[-emphasized]; Typescale (VariableCollectionId:55064:15508) and Font theme (VariableCollectionId:55064:15502) variables",
+        "fixture": "crates/material/tests/fixtures/figma-typography.json",
+        "implementation": [
+          "crates/material/src/tokens/typography.rs"
+        ],
+        "outranked_evidence": [
+          "crates/material/tests/fixtures/md3-typography.json",
+          "crates/material/tests/fixtures/m3e-typography.json"
+        ],
+        "note": "Emphasized title-medium/title-small/label styles are SemiBold (600); the gallery bundles Roboto 400/500 only."
+      },
+      "shape": {
+        "source": "figma",
+        "scope": "corner scale none..extra-extra-large and full (1000)",
+        "figma_nodes": "Shape variables Corner/* (VariableCollectionId:55064:15586)",
+        "fixture": "crates/material/tests/fixtures/figma-sys-tokens.json",
+        "implementation": [
+          "crates/material/src/tokens/shape.rs"
+        ],
+        "agreement": "md3.io and m3e identical for every finite step"
+      },
+      "elevation": {
+        "source": "figma",
+        "scope": "levels 0-5, two-layer key/ambient shadows at 30%/15%",
+        "figma_nodes": "effect styles M3/Elevation Light/1-5 and M3/Elevation Dark/1-5",
+        "fixture": "crates/material/tests/fixtures/figma-sys-tokens.json",
+        "implementation": [
+          "crates/material/src/tokens/elevation.rs"
+        ],
+        "agreement": "md3.io and m3e identical"
+      },
+      "states": {
+        "source": "figma",
+        "scope": "hover/focus/pressed/dragged state-layer opacities (08/10/10/16) and disabled content alpha 0.38",
+        "figma_nodes": "M3 variables State Layers/<role>/Opacity-08|10|16; Buttons page State=Hovered/Focused/Pressed/Disabled variants",
+        "fixture": "crates/material/tests/fixtures/figma-sys-tokens.json",
+        "implementation": [
+          "crates/material/src/tokens/state.rs"
+        ],
+        "agreement": "md3.io and m3e identical"
+      },
+      "motion": {
+        "source": "md3.io for the Expressive scheme; m3e for the Standard scheme (the Figma kit defines no motion)",
+        "scope": "Expressive: md3.io sampled linear() curves and durations for all six tokens (425/450/625 ms spatial, 175/250/350 ms effects) and md3.io reduced-motion policy (spatial finish, effects unchanged). Standard: m3e spring parameters, Compose settle durations and m3e reduced-motion substitution (default/slow effects use fast effects), since md3.io has no Standard scheme.",
+        "fixture": [
+          "conformance/fixtures/md3-expressive-browser.json",
+          "conformance/fixtures/m3e-motion.json"
+        ],
+        "reduced_motion_evidence": "conformance/reference/button-states-reduced-motion.json",
         "implementation": [
           "crates/material/src/motion.rs",
           "crates/material/src/motion/expressive.rs"
         ],
-        "superseded_md3_evidence": "conformance/fixtures/md3-expressive-browser.json"
-      },
-      "typography": {
-        "source": "m3e",
-        "scope": "15 roles and 15 emphasized styles: brand/plain typeface, size, line height, tracking, weight",
-        "m3e_paths": [
-          "packages/m3e-tokens/src/generated/tokens.css"
-        ],
-        "fixture": "crates/material/tests/fixtures/m3e-typography.json",
-        "implementation": [
-          "crates/material/src/tokens/typography.rs"
-        ],
-        "deviation": "Default family remains Roboto (bundled gallery font) instead of m3e Google Sans Flex (m3exp-web decision D1); not reconciled.",
-        "superseded_md3_evidence": "crates/material/tests/fixtures/md3-typography.json"
-      },
-      "shape": {
-        "source": "m3e",
-        "scope": "corner scale none..extra-extra-large; full rendered as 999px",
-        "m3e_paths": [
-          "packages/m3e-tokens/src/generated/tokens.css"
-        ],
-        "fixture": "crates/material/tests/fixtures/m3e-sys-tokens.json",
-        "implementation": [
-          "crates/material/src/tokens/shape.rs"
-        ],
-        "md3_agreement": "identical values"
-      },
-      "elevation": {
-        "source": "m3e",
-        "scope": "levels 0-5, two-layer key/ambient shadows at 30%/15%",
-        "m3e_paths": [
-          "packages/m3e-tokens/src/generated/tokens.css"
-        ],
-        "fixture": "crates/material/tests/fixtures/m3e-sys-tokens.json",
-        "implementation": [
-          "crates/material/src/tokens/elevation.rs"
-        ],
-        "md3_agreement": "identical values"
-      },
-      "states": {
-        "source": "m3e",
-        "scope": "hover/focus/pressed/dragged state-layer opacities and disabled alpha",
-        "m3e_paths": [
-          "packages/m3e-tokens/src/generated/tokens.css"
-        ],
-        "fixture": "crates/material/tests/fixtures/m3e-sys-tokens.json",
-        "implementation": [
-          "crates/material/src/tokens/state.rs"
-        ],
-        "md3_agreement": "identical values"
+        "outranked_evidence": "conformance/fixtures/m3e-motion.json springs.expressive"
       },
       "button": {
-        "source": "m3e for sizes, shapes, paddings, icon sizes, outline widths and disabled colors; md3.io for state-layer, shadow, ripple, loading and color-transition timing",
-        "m3e_paths": [
-          "packages/m3e-tokens/src/generated/components/button-{x-small,small,medium,large,x-large}.css",
-          "packages/m3e-tokens/src/generated/components/button-defaults.css",
-          "packages/m3e-tokens/src/generated/components/{filled,elevated,filled-tonal,tonal,outlined,text}-button.css",
-          "packages/m3e-css/src/button.css"
-        ],
-        "fixture": "crates/material/tests/fixtures/m3e-sys-tokens.json",
+        "source": "figma for sizes, paddings, gaps, icon sizes, label styles, corners, outline widths and disabled colors; md3.io for state-layer, shadow, ripple, loading and color-transition timing",
+        "figma_nodes": "Buttons page: Button (57994:2227), Button - text (58650:8094), Button - elevated (58650:9294), Button - outline (58650:10213), Button - tonal (58651:11237), Toggle button (57994:2328) and its elevated/outline/tonal sets",
+        "fixture": "crates/material/tests/fixtures/figma-button.json",
         "implementation": [
           "crates/material/src/components/button.rs",
           "crates/material/src/components/button/form.rs"
         ],
+        "changed": "XL outline 3 -> 2 px; disabled content on-surface @38% for every variant; disabled container on-surface @10% for every variant including text and outlined; disabled outlined outline is full outline-variant; selected outlined toggles drop the outline.",
         "md3_only": [
           "conformance/reference/button-states.json",
           "conformance/reference/button-states-reduced-motion.json",
@@ -1417,13 +1461,7 @@
           "conformance/reference/button-circular.json",
           "conformance/reference/button-active.json"
         ],
-        "pending": "m3e button motion (press morph on default effects, toggle shape on fast spatial, colors on fast effects, ElevationDefaults shadow tweens) is not yet adopted; the md3.io captures cannot be re-run against m3e (see scripts/README.md)"
-      },
-      "color": {
-        "source": "md3.io",
-        "scope": "20 browser-resolved preset themes",
-        "fixture": "crates/color/tests/fixtures/md3-colors.json",
-        "pending": "m3e derives schemes from material-color-utilities 0.4.0 (spec 2025); not reconciled"
+        "outranked_evidence": "crates/material/tests/fixtures/m3e-sys-tokens.json"
       }
     }
   },
