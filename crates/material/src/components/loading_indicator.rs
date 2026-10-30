@@ -4,15 +4,19 @@
 //! and the Figma kit's "Loading indicator" set (48dp container, 38dp
 //! active indicator, primary or on-primary-container on primary-container).
 //!
-//! Each shape is a rounded polygon (straight edges joined by circular corner
-//! arcs, as `androidx.graphics.shapes.RoundedPolygon` builds them). Every
-//! shape is star-shaped around its center, so it is resampled once into a
-//! fixed table of radii at equal angles; morphing interpolates those radii
-//! and the result is painted as one GPUI path.
-use crate::{color::ColorRole, motion::Spring, theme::color, tokens::typography::rem};
+//! The shapes and their morphs come from [`crate::shapes`], with Compose's
+//! `LoadingIndicator.kt` scale factor and centering; each frame is painted as
+//! one GPUI path.
+use crate::{
+    color::ColorRole,
+    motion::Spring,
+    shapes::{Morph, PathCache, RoundedPolygon, ShapeKind, morph_path, polygon_path},
+    theme::color,
+    tokens::typography::rem,
+};
 use gpui::{prelude::*, *};
 use gpui_base::Progress;
-use std::{f32::consts::TAU, sync::OnceLock, time::Duration};
+use std::{sync::OnceLock, time::Duration};
 
 /// One of the Material shapes the loading indicator morphs between.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -40,16 +44,27 @@ impl LoadingShape {
         Self::Oval,
     ];
 
-    fn index(self) -> usize {
-        self as usize
+    /// This shape in the Material shape library.
+    pub const fn kind(self) -> ShapeKind {
+        match self {
+            Self::Circle => ShapeKind::Circle,
+            Self::SoftBurst => ShapeKind::SoftBurst,
+            Self::Cookie9Sided => ShapeKind::Cookie9Sided,
+            Self::Pentagon => ShapeKind::Pentagon,
+            Self::Pill => ShapeKind::Pill,
+            Self::Sunny => ShapeKind::Sunny,
+            Self::Cookie4Sided => ShapeKind::Cookie4Sided,
+            Self::Oval => ShapeKind::Oval,
+        }
     }
 }
 
-/// The container (48dp) and the indicator's radius inside it: the 38dp
-/// active-indicator box, inset so a rotating shape stays inside it (the
-/// kit's soft burst measures 33-34dp across).
+/// The container (48dp), from the Figma kit and Compose's
+/// `LoadingIndicatorTokens`.
 pub const LOADING_INDICATOR_SIZE: f32 = 48.;
-const SHAPE_RADIUS: f32 = 17.5;
+/// The 38dp active-indicator box inside the container (Figma kit; Compose's
+/// `ActiveIndicatorScale`).
+const ACTIVE_INDICATOR_SCALE: f32 = 38. / LOADING_INDICATOR_SIZE;
 
 /// One morph lasts this long on the reference's spring, then the next starts.
 const MORPH_INTERVAL_MS: f32 = 650.;
@@ -130,228 +145,65 @@ pub fn loading_indicator_frame(elapsed_ms: f32) -> LoadingFrame {
     }
 }
 
-/// Radii sampled at this many equal angles, the first at three o'clock.
-const SAMPLES: usize = 120;
-type Radii = [f32; SAMPLES];
-
-/// A polygon vertex and the radius of the arc that rounds it.
-#[derive(Clone, Copy)]
-struct Vertex {
-    x: f32,
-    y: f32,
-    rounding: f32,
-}
-
-fn star(points: usize, inner: f32, outer_round: f32, inner_round: f32, turn: f32) -> Vec<Vertex> {
-    (0..points * 2)
-        .map(|i| {
-            let angle = turn + i as f32 * TAU / (points * 2) as f32;
-            let (radius, rounding) = if i % 2 == 0 {
-                (1., outer_round)
-            } else {
-                (inner, inner_round)
-            };
-            Vertex {
-                x: radius * angle.cos(),
-                y: radius * angle.sin(),
-                rounding,
-            }
-        })
-        .collect()
-}
-
-fn regular(points: usize, rounding: f32, turn: f32) -> Vec<Vertex> {
-    (0..points)
-        .map(|i| {
-            let angle = turn + i as f32 * TAU / points as f32;
-            Vertex {
-                x: angle.cos(),
-                y: angle.sin(),
-                rounding,
-            }
-        })
-        .collect()
-}
-
-/// Scale by (`sx`, `sy`), then turn by `turn` radians.
-fn transformed(vertices: Vec<Vertex>, sx: f32, sy: f32, turn: f32) -> Vec<Vertex> {
-    let (sin, cos) = turn.sin_cos();
-    vertices
-        .into_iter()
-        .map(|v| {
-            let (x, y) = (v.x * sx, v.y * sy);
-            Vertex {
-                x: x * cos - y * sin,
-                y: x * sin + y * cos,
-                rounding: v.rounding,
-            }
-        })
-        .collect()
-}
-
-/// The vertices of each shape, from the Compose `MaterialShapes` outlines
-/// rescaled to a unit outer radius.
-fn vertices(shape: LoadingShape) -> Vec<Vertex> {
-    use std::f32::consts::{FRAC_PI_2, FRAC_PI_4};
-    match shape {
-        LoadingShape::Circle => regular(48, 0., 0.),
-        LoadingShape::SoftBurst => star(10, 0.69, 0.096, 0.096, -FRAC_PI_2),
-        LoadingShape::Cookie9Sided => star(9, 0.8, 0.5, 0.5, -FRAC_PI_2),
-        LoadingShape::Pentagon => regular(5, 0.31, -FRAC_PI_2),
-        // A capsule: a 2 x 1.56 rectangle with fully rounded ends, on the
-        // rising diagonal.
-        LoadingShape::Pill => transformed(
-            vec![
-                Vertex {
-                    x: 1.,
-                    y: 0.78,
-                    rounding: 0.779,
-                },
-                Vertex {
-                    x: -1.,
-                    y: 0.78,
-                    rounding: 0.779,
-                },
-                Vertex {
-                    x: -1.,
-                    y: -0.78,
-                    rounding: 0.779,
-                },
-                Vertex {
-                    x: 1.,
-                    y: -0.78,
-                    rounding: 0.779,
-                },
-            ],
-            1.,
-            1.,
-            -FRAC_PI_4,
-        ),
-        LoadingShape::Sunny => star(8, 0.8, 0.15, 0.15, -FRAC_PI_2),
-        LoadingShape::Cookie4Sided => star(4, 0.4, 0.248, 0.224, -FRAC_PI_4),
-        LoadingShape::Oval => transformed(regular(48, 0., 0.), 1., 0.64, -FRAC_PI_4),
+/// The polygons' scale in the active-indicator box (Compose's
+/// `calculateScaleFactor`): a shape fills its box less than the circle it
+/// sweeps while rotating, so all of them shrink to keep every one inside.
+fn scale_factor<'a>(polygons: impl IntoIterator<Item = &'a RoundedPolygon>) -> f32 {
+    let mut factor = 1_f32;
+    for polygon in polygons {
+        let bounds = polygon.bounds(true);
+        let max = polygon.max_bounds();
+        let scale_x = (bounds[2] - bounds[0]) / (max[2] - max[0]);
+        let scale_y = (bounds[3] - bounds[1]) / (max[3] - max[1]);
+        // The larger, so a pill does not throw off the whole set.
+        factor = factor.min(scale_x.max(scale_y));
     }
+    factor
 }
 
-/// The outline of a rounded polygon as a closed polyline: each corner is
-/// replaced by the circular arc of its rounding radius tangent to both
-/// edges, shrunk where two corners would overlap on one edge.
-fn rounded_outline(vertices: &[Vertex]) -> Vec<(f32, f32)> {
-    const ARC_STEPS: usize = 10;
-    let n = vertices.len();
-    let mut outline = Vec::with_capacity(n * (ARC_STEPS + 1));
-    for i in 0..n {
-        let p = vertices[i];
-        let a = vertices[(i + n - 1) % n];
-        let b = vertices[(i + 1) % n];
-        let (ax, ay) = (a.x - p.x, a.y - p.y);
-        let (bx, by) = (b.x - p.x, b.y - p.y);
-        let (la, lb) = (ax.hypot(ay), bx.hypot(by));
-        let (ua, ub) = ((ax / la, ay / la), (bx / lb, by / lb));
-        let half = (ua.0 * ub.0 + ua.1 * ub.1).clamp(-1., 1.).acos() / 2.;
-        if p.rounding <= 0. || half.tan().abs() < 1e-4 || half > 1.5 {
-            outline.push((p.x, p.y));
-            continue;
-        }
-        let mut cut = p.rounding / half.tan();
-        let room = la.min(lb) / 2.;
-        let radius = if cut > room {
-            cut = room;
-            room * half.tan()
+/// The indeterminate set's scale.
+fn indeterminate_factor() -> f32 {
+    static FACTOR: OnceLock<f32> = OnceLock::new();
+    *FACTOR.get_or_init(|| scale_factor(LoadingShape::SEQUENCE.map(|s| s.kind().polygon())))
+}
+
+/// The determinate morph and its scale. Compose turns the circle by 360°/20
+/// for a smoother morph into the soft burst.
+fn determinate() -> &'static (Morph, f32) {
+    static DETERMINATE: OnceLock<(Morph, f32)> = OnceLock::new();
+    DETERMINATE.get_or_init(|| {
+        let circle = ShapeKind::Circle.polygon().rotated(360. / 20.).normalized();
+        let burst = ShapeKind::SoftBurst.polygon();
+        let factor = scale_factor([&circle, burst]);
+        (Morph::new(&circle, burst), factor)
+    })
+}
+
+/// The frame's outline, in a container of `container` px around `center`.
+fn frame_path(frame: LoadingFrame, center: Point<Pixels>, container: f32) -> Option<Path<Pixels>> {
+    let side = container * ACTIVE_INDICATOR_SCALE;
+    let turn = frame.rotation_degrees;
+    let (from, to) = (frame.from, frame.to);
+    if from == to {
+        let factor = if from == LoadingShape::Circle {
+            determinate().1
         } else {
-            p.rounding
+            indeterminate_factor()
         };
-        let start = (p.x + ua.0 * cut, p.y + ua.1 * cut);
-        let end = (p.x + ub.0 * cut, p.y + ub.1 * cut);
-        let (bisect_x, bisect_y) = (ua.0 + ub.0, ua.1 + ub.1);
-        let bisect = bisect_x.hypot(bisect_y);
-        let distance = radius / half.sin();
-        let center = (
-            p.x + bisect_x / bisect * distance,
-            p.y + bisect_y / bisect * distance,
-        );
-        let from = (start.1 - center.1).atan2(start.0 - center.0);
-        let to = (end.1 - center.1).atan2(end.0 - center.0);
-        let mut sweep = to - from;
-        if sweep > std::f32::consts::PI {
-            sweep -= TAU;
-        } else if sweep < -std::f32::consts::PI {
-            sweep += TAU;
-        }
-        for step in 0..=ARC_STEPS {
-            let angle = from + sweep * step as f32 / ARC_STEPS as f32;
-            outline.push((
-                center.0 + radius * angle.cos(),
-                center.1 + radius * angle.sin(),
-            ));
-        }
+        polygon_path(from.kind().polygon(), center, side * factor, turn)
+    } else if (from, to) == (LoadingShape::Circle, LoadingShape::SoftBurst) {
+        let (morph, factor) = determinate();
+        morph_path(morph, frame.morph, center, side * factor, turn)
+    } else {
+        let morph = from.kind().morph_to(to.kind());
+        morph_path(
+            morph,
+            frame.morph,
+            center,
+            side * indeterminate_factor(),
+            turn,
+        )
     }
-    outline
-}
-
-/// The outline's distance from the center along each sample angle,
-/// normalized so the farthest point is 1.
-fn polar(outline: &[(f32, f32)]) -> Radii {
-    let mut radii = [0.; SAMPLES];
-    for (i, radius) in radii.iter_mut().enumerate() {
-        let angle = i as f32 * TAU / SAMPLES as f32;
-        let (dx, dy) = (angle.cos(), angle.sin());
-        for (j, &(px, py)) in outline.iter().enumerate() {
-            let (qx, qy) = outline[(j + 1) % outline.len()];
-            let (ex, ey) = (qx - px, qy - py);
-            // Solve t·d = p + s·e for the ray parameter t and edge parameter s.
-            let det = ex * dy - ey * dx;
-            if det.abs() < 1e-9 {
-                continue;
-            }
-            let t = (ex * py - ey * px) / det;
-            let s = (dx * py - dy * px) / det;
-            if (-1e-5..=1. + 1e-5).contains(&s) && t > *radius {
-                *radius = t;
-            }
-        }
-    }
-    let max = radii.iter().copied().fold(0., f32::max).max(1e-6);
-    radii.map(|radius| radius / max)
-}
-
-fn radii(shape: LoadingShape) -> &'static Radii {
-    static TABLE: OnceLock<[Radii; 8]> = OnceLock::new();
-    &TABLE.get_or_init(|| {
-        [
-            LoadingShape::Circle,
-            LoadingShape::SoftBurst,
-            LoadingShape::Cookie9Sided,
-            LoadingShape::Pentagon,
-            LoadingShape::Pill,
-            LoadingShape::Sunny,
-            LoadingShape::Cookie4Sided,
-            LoadingShape::Oval,
-        ]
-        .map(|shape| polar(&rounded_outline(&vertices(shape))))
-    })[shape.index()]
-}
-
-/// The frame's outline: `radius` px from `center` at the farthest point.
-fn frame_path(frame: LoadingFrame, center: Point<Pixels>, radius: f32) -> Option<Path<Pixels>> {
-    let (from, to) = (radii(frame.from), radii(frame.to));
-    let turn = frame.rotation_degrees.to_radians();
-    let mut path = PathBuilder::fill();
-    for i in 0..SAMPLES {
-        let r = (from[i] + (to[i] - from[i]) * frame.morph).max(0.05) * radius;
-        let angle = turn + i as f32 * TAU / SAMPLES as f32;
-        let at = point(
-            center.x + px(r * angle.cos()),
-            center.y + px(r * angle.sin()),
-        );
-        if i == 0 {
-            path.move_to(at);
-        } else {
-            path.line_to(at);
-        }
-    }
-    path.close();
-    path.build().ok()
 }
 
 /// M3 Expressive loading indicator.
@@ -368,6 +220,7 @@ pub struct LoadingIndicator {
     contained: bool,
     size: f32,
     shape: Option<LoadingShape>,
+    turn: f32,
     playback: Option<RepeatAnimationPlayback>,
 }
 
@@ -380,6 +233,7 @@ impl LoadingIndicator {
             contained: false,
             size: LOADING_INDICATOR_SIZE,
             shape: None,
+            turn: 0.,
             playback: None,
         }
     }
@@ -405,26 +259,68 @@ impl LoadingIndicator {
         self
     }
 
+    /// An extra turn of a measured indicator, in degrees: pull to refresh turns
+    /// it back past the threshold. A non-finite turn is ignored.
+    pub fn turn(mut self, degrees: f32) -> Self {
+        if degrees.is_finite() {
+            self.turn = degrees;
+        }
+        self
+    }
+
     /// A specimen: hold one shape, without animating.
     pub fn shape(mut self, shape: LoadingShape) -> Self {
         self.shape = Some(shape);
         self
     }
 
-    /// A caller-owned clock that survives virtual unmounting.
+    /// A caller-owned clock that survives virtual unmounting. This is the
+    /// indicator's one use of the vendored engine's repeat-playback patch,
+    /// kept for callers that pass it: without it the indicator runs on GPUI's
+    /// stock repeating animation, restarting if it unmounts.
     pub fn playback(mut self, playback: RepeatAnimationPlayback) -> Self {
         self.playback = Some(playback);
         self
     }
 }
 
+/// A frame that holds still until its input changes: the path is reused while
+/// frame, size and origin are unchanged. The indicator owns the cache through
+/// keyed state.
+fn held_canvas(
+    frame: LoadingFrame,
+    ink: Rgba,
+    id: &ElementId,
+    window: &mut Window,
+    cx: &mut App,
+) -> impl IntoElement + use<> {
+    let paths = window.use_keyed_state((id.clone(), "loading-path"), cx, |_, _| {
+        PathCache::<(LoadingFrame, f32, Point<Pixels>)>::default()
+    });
+    canvas(
+        |_, _, _| {},
+        move |bounds, _, window, cx| {
+            let container = f32::from(bounds.size.width.min(bounds.size.height));
+            let center = bounds.center();
+            let path = paths.update(cx, |paths, _| {
+                paths.path((frame, container, center), || {
+                    frame_path(frame, center, container)
+                })
+            });
+            if let Some(path) = path {
+                window.paint_path(path, ink);
+            }
+        },
+    )
+    .size_full()
+}
+
 fn shape_canvas(frame: LoadingFrame, ink: Rgba) -> impl IntoElement {
     canvas(
         |_, _, _| {},
         move |bounds, _, window, _| {
-            let scale =
-                f32::from(bounds.size.width.min(bounds.size.height)) / LOADING_INDICATOR_SIZE;
-            if let Some(path) = frame_path(frame, bounds.center(), SHAPE_RADIUS * scale) {
+            let container = f32::from(bounds.size.width.min(bounds.size.height));
+            if let Some(path) = frame_path(frame, bounds.center(), container) {
                 window.paint_path(path, ink);
             }
         },
@@ -453,29 +349,32 @@ impl RenderOnce for LoadingIndicator {
                 root.bg(color(ColorRole::PRIMARY_CONTAINER))
             });
         if let Some(shape) = self.shape {
-            return root.child(shape_canvas(LoadingFrame::still(shape), ink));
+            let canvas = held_canvas(LoadingFrame::still(shape), ink, &self.id, window, cx);
+            return root.child(canvas);
         }
         if let Some(target) = measured {
-            let shown = crate::motion::value((self.id, "loading-progress"), target, window, cx)
-                .clamp(0., 1.);
-            return root.child(shape_canvas(LoadingFrame::determinate(shown), ink));
+            let shown =
+                crate::motion::value((self.id.clone(), "loading-progress"), target, window, cx)
+                    .clamp(0., 1.);
+            let mut frame = LoadingFrame::determinate(shown);
+            frame.rotation_degrees += self.turn;
+            let canvas = held_canvas(frame, ink, &self.id, window, cx);
+            return root.child(canvas);
         }
-        let playback = self.playback;
-        root.child(
-            div()
-                .size_full()
-                .with_animation(
-                    self.id,
-                    Animation::new(Duration::from_secs_f32(LOOP_MS / 1000.)).repeat(),
-                    move |slot, t| {
-                        slot.child(shape_canvas(loading_indicator_frame(t * LOOP_MS), ink))
-                    },
-                )
-                .when_some(playback, |animation, playback| {
-                    animation.with_repeat_playback(playback)
-                })
-                .repeat_when_visible(),
-        )
+        let animation = Animation::new(Duration::from_secs_f32(LOOP_MS / 1000.)).repeat();
+        let paint =
+            move |slot: Div, t| slot.child(shape_canvas(loading_indicator_frame(t * LOOP_MS), ink));
+        let slot = div().size_full();
+        match self.playback {
+            // GPUI's stock repeating animation: its clock, and holding the
+            // first frame under reduced motion, are the element's own.
+            None => root.child(slot.with_animation(self.id, animation, paint)),
+            Some(playback) => root.child(
+                slot.with_animation(self.id, animation, paint)
+                    .with_repeat_playback(playback)
+                    .repeat_when_visible(),
+            ),
+        }
     }
 }
 
@@ -518,6 +417,41 @@ mod tests {
         assert!((a - b - 90. - constant).abs() < 0.5, "{a} {b}");
     }
 
+    const SAMPLES: usize = 120;
+
+    /// The outline's distance from the center along equal angles, normalized
+    /// so the farthest point is 1.
+    fn radii(shape: LoadingShape) -> [f32; SAMPLES] {
+        // Compose's normalization centers the control-point box, so a shape's
+        // own center can sit slightly off the box's (0.504 for the circle).
+        let (cx, cy) = shape.kind().polygon().center();
+        let mut outline = Vec::new();
+        for cubic in shape.kind().polygon().cubics() {
+            outline.extend((0..24).map(|i| cubic.point_at(i as f32 / 24.)));
+        }
+        let mut radii = [0_f32; SAMPLES];
+        for (i, radius) in radii.iter_mut().enumerate() {
+            let angle = i as f32 * std::f32::consts::TAU / SAMPLES as f32;
+            let (dx, dy) = (angle.cos(), angle.sin());
+            for (j, &(px, py)) in outline.iter().enumerate() {
+                let (qx, qy) = outline[(j + 1) % outline.len()];
+                let (px, py, ex, ey) = (px - cx, py - cy, qx - px, qy - py);
+                // Solve t·d = p + s·e for the ray parameter t and edge parameter s.
+                let det = ex * dy - ey * dx;
+                if det.abs() < 1e-9 {
+                    continue;
+                }
+                let t = (ex * py - ey * px) / det;
+                let s = (dx * py - dy * px) / det;
+                if (-1e-5..=1. + 1e-5).contains(&s) && t > *radius {
+                    *radius = t;
+                }
+            }
+        }
+        let max = radii.iter().copied().fold(0., f32::max).max(1e-6);
+        radii.map(|radius| radius / max)
+    }
+
     #[test]
     fn shapes_are_normalized_star_shaped_and_distinct() {
         let circle = radii(LoadingShape::Circle);
@@ -534,7 +468,7 @@ mod tests {
         let pill = radii(LoadingShape::Pill);
         let quarter = SAMPLES / 4;
         assert!((0..SAMPLES).all(|i| (cookie[i] - cookie[(i + quarter) % SAMPLES]).abs() < 0.02));
-        assert!((0..SAMPLES).any(|i| (pill[i] - pill[(i + quarter) % SAMPLES]).abs() > 0.2));
+        assert!((0..SAMPLES).any(|i| (pill[i] - pill[(i + quarter) % SAMPLES]).abs() > 0.1));
     }
 
     #[test]
@@ -544,7 +478,49 @@ mod tests {
         let full = LoadingFrame::determinate(2.);
         assert_eq!((full.to, full.morph), (LoadingShape::SoftBurst, 1.));
         assert_eq!(full.rotation_degrees, 180.);
-        assert!(frame_path(full, point(px(24.), px(24.)), 17.5).is_some());
+        assert!(frame_path(full, point(px(24.), px(24.)), 48.).is_some());
+    }
+
+    #[test]
+    fn every_morph_of_the_sequence_stays_in_the_active_box_while_it_turns() {
+        // Compose's scale keeps the turning shape inside the 38dp box, up to
+        // the outline's corners that the longer of its two axes lets out.
+        let half = 48. * ACTIVE_INDICATOR_SCALE / 2. * indeterminate_factor();
+        let sequence = LoadingShape::SEQUENCE;
+        for (i, from) in sequence.into_iter().enumerate() {
+            let to = sequence[(i + 1) % sequence.len()];
+            let morph = from.kind().morph_to(to.kind());
+            for cubic in morph.as_cubics(0.5) {
+                let (x, y) = cubic.anchor0();
+                let reach = (x - 0.5).hypot(y - 0.5) * 2. * half;
+                assert!(reach < 48. / 2., "{from:?} -> {to:?}: {reach}");
+            }
+        }
+        // The soft burst, the indicator's face, is the size the kit draws
+        // (33-34dp across at rest, Figma "Loading indicator").
+        let burst = ShapeKind::SoftBurst.polygon().bounds(false);
+        let across = (burst[2] - burst[0]) * half * 2.;
+        assert!((30. ..=38.).contains(&across), "{across}");
+    }
+
+    #[test]
+    fn the_determinate_morph_is_the_rotated_circle_into_the_soft_burst() {
+        let (morph, factor) = determinate();
+        assert!((0.5..=1.).contains(factor), "{factor}");
+        let start = morph.as_cubics(0.);
+        // At 0 it is a circle: every anchor is the same distance out.
+        for cubic in &start {
+            let (x, y) = cubic.anchor0();
+            assert!(((x - 0.5).hypot(y - 0.5) - 0.5).abs() < 0.02, "{x} {y}");
+        }
+    }
+
+    #[test]
+    fn shapes_map_onto_the_library() {
+        assert_eq!(LoadingShape::Pill.kind(), ShapeKind::Pill);
+        for shape in LoadingShape::SEQUENCE {
+            assert_ne!(shape.kind(), ShapeKind::Circle);
+        }
     }
 
     struct Harness;

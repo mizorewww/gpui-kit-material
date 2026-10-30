@@ -42,3 +42,20 @@ preset's different fixed roles in light and dark. They do not generate colors
 from arbitrary seeds. The original palettes above remain separate legacy
 adapters, and application extensions (selection, find highlights, and status
 containers) are derived by the kit rather than copied reference roles.
+
+## Dynamic color
+
+`src/dynamic/` is a Rust port of
+[material-color-utilities](https://github.com/material-foundation/material-color-utilities)
+at commit `bd811e4ca2ab94c4ce3cadc89c19b1820b9704b3`, retrieved 2026-10-30 as a
+GitHub tarball (sha256
+`31b1196089d41b322eaf080d88b20265fd7544627721529f488bd151c0984dd3`).
+Copyright Google LLC, licensed under Apache-2.0: the license is at
+`licenses/material-color-utilities.txt`, and each ported file keeps its
+copyright notice and states that it was modified. The rest of this crate is MIT,
+so the crate's license is `MIT AND Apache-2.0`.
+
+`tests/fixtures/mcu-schemes.json` holds every role of 416 schemes (four seeds,
+all variants, both specs, both modes, contrast -1, 0, 0.5 and 1), produced by
+running that pinned TypeScript under bun. It is what holds the 2025 spec to
+upstream, for which upstream publishes no vectors of its own.

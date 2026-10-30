@@ -3,10 +3,12 @@
 Every component and variant in the three references, against the
 [production standard](PRODUCTION.md). Audited at commit `45de656` by reading the
 component source, playgrounds and tests, the Figma kit page outlines, the
-md3.io configuration panels, and the m3e documentation pages.
+md3.io configuration panels, and the m3e documentation pages. The rows for color,
+shape, loading indicator, navigation suite, pull to refresh and canonical layouts
+were updated when that work landed, without a new audit of the other rows.
 
-**Result: 0 components are production-ready.** Of the 46 rows below, 41 are
-implemented, 40 with a playground, all with tests. None has independent approval, committed
+**Result: 0 components are production-ready.** Of the 46 rows below, 44 are
+implemented, 43 with a playground, all with tests. None has independent approval, committed
 captures against the kit, RTL (two have a direction option), or per-component
 performance results.
 
@@ -66,7 +68,7 @@ Limits of this audit:
 | Navigation rail | Y | Y | Y | `NavigationRail` | Yes | 16 (shared) + 2 | attr, RM | none | none | XR rail |
 | Navigation bar | Y | Y | Y | `NavigationBar` | Yes | shared + 2 | attr, RM | none | none | XR bar |
 | Navigation drawer | Y | Y | Y | `NavigationDrawer` | Yes | 5 + 2 | attr | none | none | none found |
-| Navigation suite | - | - | Y | none | No | 0 | - | - | none | **Not implemented**; only `NavigationBar::adaptive` |
+| Navigation suite | - | - | Y | `NavigationSuite` | Yes | 6 + 4 | code | none | none | Focus across a change of form is tested only from bar to rail. Defaults to the drawer when expanded (m3e: expanded rail, available as an option). Specs tab shows the kit's Navigation page: no reference has its own boards |
 | Tabs | Y | Y | Y | `MaterialTabs` | Yes | 9 + 2 | attr, RM | none | none | none found |
 | Menu | Y | Y | Y | `MaterialMenu` | Yes | 16 + 3 | code | none | none | No ripple |
 | Top app bar | Y | Y | Y | `TopAppBar` | Yes | 13 (shared) + 3 | attr, RM | none | none | XR app bar; no Small-image option, only a title slot |
@@ -93,16 +95,16 @@ Limits of this audit:
 | Badge | Y | Y | Y | `Badge` | Yes | 3 + 2 | attr | none | none | none found |
 | Avatar | Y | - | - | `Avatar` | Yes | 3 + 0 | attr | none | none | none found |
 | Linear and circular progress | Y | Y | Y | `LinearProgress`, `CircularProgress` | Yes | 16 + 2 | tree, RM | none | none | Wave height and percentage label are not options. No reference defines a contained form |
-| Loading indicator | Y | Y | Y | `LoadingIndicator` | Yes | 5 + 1 | attr | none | none | none found |
+| Loading indicator | Y | Y | Y | `LoadingIndicator` | Yes | 8 + 1 | attr | none | none | `.playback` still needs the vendored repeat patch; determinate turns opposite to Compose |
 | Snackbar | Y | Y | Y | `Snackbar` | Yes | 7 + 3 | code | none | none | Position and duration are playground-only; no ripple |
 | Tooltip | Y | Y | Y | `MaterialTooltip` | Yes | 4 + 4 | code | none | none | No `preview_state` |
-| Pull to refresh | - | - | Y | none | No | 0 | - | - | none | **Not implemented**; only a loading-indicator scenario with that name |
+| Pull to refresh | - | - | Y | `PullToRefresh` | Yes | 14 + 3 | code, RM | none | m3e JVM fixture (`conformance/fixtures/m3e-pull-to-refresh.json`) | Refreshing spinner paints primary (reference: on-surface-variant) with the shared circular progress's stroke (reference: 2.5dp). No real touch-device run. Specs tab shows the kit's Loading & progress page |
 
 ## Layout and primitives
 
 | Component | F | M | E | Rust | Playground | Tests | A11y | RTL | Evidence | Missing |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Canonical layouts | - | - | Y | none | No | 0 | - | - | none | **Not implemented**: list-detail, supporting pane, feed |
+| Canonical layouts | - | - | Y | `PaneScaffold`, `FeedLayout` | Yes | 24 + 5 | code, RM | option | none | Levitated panes and hinges (not in m3e either). Handle fling velocity. `FeedLayout` is not virtualized; `feed_metrics` lets a caller do it. Feed takes one extra frame to settle its columns when its width changes class. Specs tab shows the kit's Examples page |
 | Primitives | - | - | Y | Partial: `CardSurface`, `FocusRing` | No | - | - | - | none | No public generic surface or ripple primitive |
 | XR variants | Y | - | - | none | No | 0 | - | - | none | **Not implemented**: app bar, dialog, navigation rail and bar, toolbar |
 
@@ -110,9 +112,9 @@ Limits of this audit:
 
 | Area | State | Source | Evidence | Missing |
 | --- | --- | --- | --- | --- |
-| Color | Implemented | Figma baseline, md3.io other themes | Fixtures, tests | Dynamic color (HCT, seed schemes) |
+| Color | Implemented | Figma baseline, md3.io other themes, material-color-utilities (dynamic) | Fixtures, tests, upstream vectors | Image-derived seeds; multiple source colors; no committed seed captures |
 | Typography | Partial | Figma | Fixtures, tests | Letter spacing not painted: GPUI exposes no tracking |
-| Shape | Partial | Figma | Fixtures, tests | Expressive shape library, general morphing |
+| Shape | Implemented | Figma (corners), Compose `MaterialShapes` (library, morphing) | Fixtures, tests | Clipping content to a shape |
 | Elevation and state layers | Implemented | Figma | Fixtures, tests | none found |
 | Motion | Implemented | md3.io (Expressive), m3e (Standard) | Fixtures, tests | No per-component timed comparison outside buttons |
 | Icons | Implemented | Material Symbols | Provenance in Symbols repository | Six approximate Kit translations unreviewed |
@@ -132,7 +134,7 @@ Status of each [production criterion](PRODUCTION.md) across all components.
 | Assistive technology pass | **Not done**: tree assertions only, under GPUI Fast |
 | Reduced motion | Supported by the `motion` module; tested only where the tables say `RM` |
 | Text scale 100–200% | Runtime support; **no per-component layout tests** |
-| RTL | **Not met**: `MaterialButton` and `MaterialDivider` only |
+| RTL | **Not met**: `MaterialButton`, `MaterialDivider` and `PaneScaffold` only |
 | Contrast themes | Tokens tested; no per-component capture |
 | Visual evidence | **Not met**: no committed light/dark captures against the kit |
 | Performance budgets | **Unverified** per component and as a whole on this commit |
