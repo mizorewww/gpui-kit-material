@@ -472,6 +472,14 @@ pub static CATALOG: &[Entry] = &[
         Some(&playgrounds::loading_indicator::PLAYGROUND),
     ),
     component(
+        "pull-to-refresh",
+        "Pull to refresh",
+        Communication,
+        "Pull the top of a list down to refresh it.",
+        None,
+        Some(&playgrounds::pull_to_refresh::PLAYGROUND),
+    ),
+    component(
         "snackbar",
         "Snackbar",
         Communication,

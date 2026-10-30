@@ -210,6 +210,10 @@ pub(crate) fn thumbnail(id: &'static str) -> AnyElement {
                     .selected("home"),
             )
             .into_any_element(),
+        "pull-to-refresh" => LoadingIndicator::new(key("pull"), "Refreshing")
+            .contained(true)
+            .progress(Some(0.7))
+            .into_any_element(),
         "navigation-bar" => div()
             .w(rem(300.))
             .child(

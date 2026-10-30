@@ -26,6 +26,7 @@ pub mod navigation_drawer;
 pub mod navigation_rail;
 pub mod navigation_suite;
 pub mod progress;
+pub mod pull_to_refresh;
 pub mod radio;
 pub mod search;
 pub mod select;
