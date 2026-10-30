@@ -54,7 +54,7 @@ pub use date_parts::{
     first_of_month, month_weeks, week_days,
 };
 pub use date_picker::{
-    DATE_INPUT_PICKER_WIDTH, DATE_PICKER_WIDTH, DateInputMode, DateMatcher, DatePicker,
+    DATE_INPUT_PICKER_WIDTH, DATE_PICKER_WIDTH, DateFormat, DateInputMode, DateMatcher, DatePicker,
     DatePickerEvent, DatePickerLabels, DatePickerState, DatePickerVariant, DatePickerView,
     DateSelection, PickerDialog, today,
 };
