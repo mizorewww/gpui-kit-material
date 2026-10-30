@@ -265,6 +265,60 @@ mod tests {
         }
     }
 
+    /// One wavy measured indicator, linear or circular.
+    struct WavyHarness {
+        value: f32,
+        circular: bool,
+    }
+
+    impl Render for WavyHarness {
+        fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+            let value = Some(self.value);
+            div().w(px(200.)).child(if self.circular {
+                super::CircularProgress::new("wavy", "Upload")
+                    .wavy()
+                    .value(value)
+                    .into_any_element()
+            } else {
+                super::LinearProgress::new("wavy", "Upload")
+                    .wavy()
+                    .value(value)
+                    .into_any_element()
+            })
+        }
+    }
+
+    /// Frames requested after drawing a settled wavy indicator at `value`.
+    fn frames_after_settling(cx: &mut TestAppContext, value: f32, circular: bool) -> usize {
+        let (_, cx) = cx.add_window_view(|_, _| WavyHarness { value, circular });
+        cx.update(|window, cx| {
+            window.refresh();
+            window.draw(cx).clear(cx);
+            // Let any first-frame motion settle, then draw once more.
+            window.simulate_next_frame(cx);
+            window.refresh();
+            window.draw(cx).clear(cx);
+            window.simulate_next_frame(cx)
+        })
+    }
+
+    #[gpui::test]
+    fn a_flat_wave_requests_no_frames(cx: &mut TestAppContext) {
+        for circular in [false, true] {
+            for value in [0.05, 0.1, 0.95, 0.97, 1.] {
+                assert_eq!(
+                    frames_after_settling(cx, value, circular),
+                    0,
+                    "circular {circular}, {value}: a flat wave kept the window busy"
+                );
+            }
+            assert!(
+                frames_after_settling(cx, 0.5, circular) > 0,
+                "a visible wave moves"
+            );
+        }
+    }
+
     #[gpui::test]
     fn explicit_repeat_clocks_survive_unmount_and_reduced_motion(cx: &mut TestAppContext) {
         for kind in 0..4 {

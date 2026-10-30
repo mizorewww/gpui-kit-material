@@ -252,6 +252,10 @@ fn bar_canvas(active: Active, paint: BarPaint) -> impl IntoElement {
     .size_full()
 }
 
+/// Below this amplitude (dp) a determinate wave is flat to the eye, so its
+/// phase stops repeating and the window can idle.
+pub(super) const WAVE_VISIBLE: f32 = 0.01;
+
 /// Determinate amplitude: flat at or below 10% and at or above 95%.
 pub(super) fn wave_amplitude(amount: f32) -> f32 {
     if amount > 0.1 && amount < 0.95 {
@@ -307,6 +311,14 @@ impl RenderOnce for LinearProgress {
                     cx,
                 )
                 .max(0.);
+                if paint.amplitude <= WAVE_VISIBLE {
+                    // A flat wave has no phase to show: no repeating frames.
+                    return root.child(
+                        div()
+                            .size_full()
+                            .child(bar_canvas(Active::Measured(amount), paint)),
+                    );
+                }
                 root.child(
                     div()
                         .size_full()
