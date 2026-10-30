@@ -5,10 +5,11 @@ pub mod button;
 pub mod extended_fab;
 pub mod fab;
 pub mod icon_button;
+pub mod split_button;
 pub mod switch;
-pub mod text_field;
 #[cfg(test)]
 mod test_support;
+pub mod text_field;
 
 /// The common imports of playground modules.
 pub mod prelude {

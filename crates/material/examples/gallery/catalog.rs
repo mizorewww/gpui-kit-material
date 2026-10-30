@@ -201,7 +201,7 @@ pub static CATALOG: &[Entry] = &[
         Actions,
         "One primary action, with more options close by.",
         slice("buttons", split_button_rows),
-        None,
+        Some(&playgrounds::split_button::PLAYGROUND),
     ),
     component(
         "fab",
