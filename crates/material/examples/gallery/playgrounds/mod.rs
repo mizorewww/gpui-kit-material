@@ -7,6 +7,7 @@ pub mod bottom_app_bar;
 pub mod bottom_sheet;
 pub mod button;
 pub mod button_group;
+pub mod canonical_layouts;
 pub mod card;
 pub mod carousel;
 pub mod checkbox;

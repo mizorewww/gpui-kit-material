@@ -210,6 +210,18 @@ pub(crate) fn thumbnail(id: &'static str) -> AnyElement {
                     .selected("home"),
             )
             .into_any_element(),
+        "canonical-layouts" => row()
+            .child(
+                surface(ColorRole::SURFACE_CONTAINER, 12.)
+                    .w(rem(72.))
+                    .h(rem(96.)),
+            )
+            .child(
+                surface(ColorRole::SURFACE_CONTAINER_HIGHEST, 12.)
+                    .w(rem(144.))
+                    .h(rem(96.)),
+            )
+            .into_any_element(),
         "pull-to-refresh" => LoadingIndicator::new(key("pull"), "Refreshing")
             .contained(true)
             .progress(Some(0.7))

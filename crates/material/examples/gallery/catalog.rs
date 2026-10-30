@@ -438,6 +438,14 @@ pub static CATALOG: &[Entry] = &[
         spec("sheets"),
         Some(&playgrounds::side_sheet::PLAYGROUND),
     ),
+    component(
+        "canonical-layouts",
+        "Canonical layouts",
+        Containment,
+        "List-detail, supporting pane and feed layouts that adapt to their width.",
+        None,
+        Some(&playgrounds::canonical_layouts::PLAYGROUND),
+    ),
     // Communication
     component(
         "badge",
