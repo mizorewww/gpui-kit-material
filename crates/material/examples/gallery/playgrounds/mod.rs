@@ -2,6 +2,7 @@
 //! exports a `PLAYGROUND` static that `super::catalog` points its entry at.
 //! See `super::playground` for the API.
 pub mod button;
+pub mod checkbox;
 pub mod select;
 pub mod switch;
 pub mod text_field;

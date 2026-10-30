@@ -234,7 +234,7 @@ pub static CATALOG: &[Entry] = &[
         SelectionInput,
         "Make a choice, or represent a partial selection.",
         spec("checkboxes"),
-        None,
+        Some(&playgrounds::checkbox::PLAYGROUND),
     ),
     component(
         "switch",
