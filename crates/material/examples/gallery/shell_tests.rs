@@ -423,7 +423,10 @@ fn every_spec_board_fits_its_row(cx: &mut TestAppContext) {
                 draw(&window, &mut cx);
                 let overflows = OVERFLOWS.with(|overflows| overflows.take());
                 if !overflows.is_empty() {
-                    failures.push(format!("{} at {width}px, row {row}: {overflows:?}", entry.id));
+                    failures.push(format!(
+                        "{} at {width}px, row {row}: {overflows:?}",
+                        entry.id
+                    ));
                 }
             }
         }
