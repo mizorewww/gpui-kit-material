@@ -5,6 +5,7 @@
 //! List requires precomputed sizes, while MessageScroller imposes log/tail
 //! semantics inappropriate for these pages.
 use super::catalog::{CATALOG, Group, Kind};
+use super::playground::CompactSelect;
 use super::spec::type_role;
 use super::*;
 use std::sync::OnceLock;
@@ -443,7 +444,10 @@ impl Gallery {
             .border_color(outline())
             .child(
                 div()
-                    .w(rem(232.))
+                    // Two fixed tabs with room for "Live preview" at any
+                    // text scale (both labels scale with the rem).
+                    .w(rem(240.))
+                    .flex_shrink_0()
                     .debug_selector(|| "card-tabs".into())
                     .child(
                         MaterialTabs::new("view-tabs", "Playground view")
@@ -468,12 +472,16 @@ impl Gallery {
             )
             .child(div().flex_1())
             .child(
-                ExposedDropdown::new("preview-theme", "Theme")
-                    .variant(TextFieldVariant::Outlined)
-                    .options(THEMES.map(|(_, label)| label))
-                    .selected(theme)
+                accessible_text("theme-label", "Theme")
+                    .map(|text| type_role(text, TypeRole::LabelLarge))
+                    .text_color(color(ColorRole::ON_SURFACE)),
+            )
+            .child(
+                CompactSelect::new("preview-theme", "Theme")
+                    .options(THEMES.map(|(_, label)| SharedString::new_static(label)))
+                    .selected(theme.unwrap_or(0))
                     .open(self.theme_menu_open)
-                    .width(140.)
+                    .width(116.)
                     .on_open_change(cx.listener(|this, open: &bool, _, cx| {
                         this.theme_menu_open = *open;
                         cx.notify();
@@ -486,6 +494,7 @@ impl Gallery {
             )
             .child(
                 ConnectedButtonGroup::new("preview-mode", "Preview mode")
+                    .button_size(ButtonSize::ExtraSmall)
                     .options([("light", "Light"), ("dark", "Dark")])
                     .selected(if dark { "dark" } else { "light" })
                     .on_change(move |value: &SharedString, _, cx| {
