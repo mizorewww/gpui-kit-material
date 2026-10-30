@@ -30,6 +30,9 @@ pub struct LineWrapper {
     text_system: Arc<TextSystem>,
     pub(crate) font_id: FontId,
     pub(crate) font_size: Pixels,
+    /// Added to each character's width by truncation and wrapping. A pooled
+    /// wrapper's handle starts at zero.
+    pub letter_spacing: Pixels,
     cached_ascii_char_widths: [Option<Pixels>; 128],
     cached_other_char_widths: HashMap<char, Pixels>,
 }
@@ -43,6 +46,7 @@ impl LineWrapper {
             text_system,
             font_id,
             font_size,
+            letter_spacing: px(0.),
             cached_ascii_char_widths: [None; 128],
             cached_other_char_widths: HashMap::default(),
         }
@@ -542,6 +546,11 @@ impl LineWrapper {
 
     #[inline(always)]
     fn width_for_char(&mut self, c: char) -> Pixels {
+        self.shaped_width_for_char(c) + self.letter_spacing
+    }
+
+    #[inline(always)]
+    fn shaped_width_for_char(&mut self, c: char) -> Pixels {
         if (c as u32) < 128 {
             if let Some(cached_width) = self.cached_ascii_char_widths[c as usize] {
                 cached_width
