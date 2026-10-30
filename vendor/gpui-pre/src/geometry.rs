@@ -4018,3 +4018,48 @@ mod tests {
         assert!(bounds1.intersects(&bounds1));
     }
 }
+
+/// The direction a subtree lays out in.
+///
+/// Under [`LayoutDirection::Rtl`] each child's position mirrors inside its
+/// parent after layout, so flex order, padding, margins, gaps and absolute
+/// offsets all flip without restyling. Text keeps its own bidirectional order.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+pub enum LayoutDirection {
+    /// Left to right.
+    #[default]
+    Ltr,
+    /// Right to left.
+    Rtl,
+}
+
+impl LayoutDirection {
+    /// Whether this is [`LayoutDirection::Rtl`].
+    pub const fn is_rtl(self) -> bool {
+        matches!(self, Self::Rtl)
+    }
+}
+
+impl<T: Clone + Debug + Default + PartialEq> Corners<T> {
+    /// These corners with left and right exchanged.
+    pub fn flip_x(self) -> Self {
+        Corners {
+            top_left: self.top_right,
+            top_right: self.top_left,
+            bottom_right: self.bottom_left,
+            bottom_left: self.bottom_right,
+        }
+    }
+}
+
+impl<T: Clone + Debug + Default + PartialEq> Edges<T> {
+    /// These edges with left and right exchanged.
+    pub fn flip_x(self) -> Self {
+        Edges {
+            top: self.top,
+            right: self.left,
+            bottom: self.bottom,
+            left: self.right,
+        }
+    }
+}

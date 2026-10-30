@@ -836,7 +836,7 @@ impl TextLayout {
                 line.paint_background(
                     line_origin,
                     line_height,
-                    text_style.text_align,
+                    text_style.text_align.in_direction(window.layout_direction()),
                     Some(bounds),
                     window,
                     cx,
@@ -847,7 +847,7 @@ impl TextLayout {
                 line.paint(
                     line_origin,
                     line_height,
-                    text_style.text_align,
+                    text_style.text_align.in_direction(window.layout_direction()),
                     Some(bounds),
                     window,
                     cx,

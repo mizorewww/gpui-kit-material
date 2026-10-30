@@ -35,6 +35,8 @@ pub struct TaffyLayoutEngine {
     absolute_outer_origins: FxHashMap<LayoutId, Point<f32>>,
     computed_layouts: FxHashSet<LayoutId>,
     layout_bounds_scratch_space: Vec<LayoutId>,
+    /// Nodes laid out right to left: their children's positions mirror.
+    mirrored: FxHashSet<LayoutId>,
 }
 
 const EXPECT_MESSAGE: &str = "we should avoid taffy layout errors by construction if possible";
@@ -49,6 +51,7 @@ impl TaffyLayoutEngine {
             absolute_outer_origins: FxHashMap::default(),
             computed_layouts: FxHashSet::default(),
             layout_bounds_scratch_space: Vec::new(),
+            mirrored: FxHashSet::default(),
         }
     }
 
@@ -57,6 +60,7 @@ impl TaffyLayoutEngine {
         self.absolute_layout_bounds.clear();
         self.absolute_outer_origins.clear();
         self.computed_layouts.clear();
+        self.mirrored.clear();
     }
 
     pub fn request_layout(
@@ -353,6 +357,42 @@ impl TaffyLayoutEngine {
     // snapped independently, but the raw content-box origin can carry a
     // 1dp residual into descendants.
 
+    /// Record whether `id` lays its children out right to left. Left-to-right
+    /// trees never touch the set.
+    pub(crate) fn set_mirrored(&mut self, id: LayoutId, mirrored: bool) {
+        if mirrored {
+            self.mirrored.insert(id);
+        } else if !self.mirrored.is_empty() {
+            self.mirrored.remove(&id);
+        }
+    }
+
+    /// The offset of a child at `location` inside `parent`, mirrored when the
+    /// parent lays out right to left. A horizontally scrolling parent mirrors
+    /// across its content, so the children stay in its scrollable range.
+    fn child_offset(
+        &self,
+        parent: LayoutId,
+        location: taffy::geometry::Point<f32>,
+        width: f32,
+    ) -> taffy::geometry::Point<f32> {
+        if self.mirrored.is_empty() || !self.mirrored.contains(&parent) {
+            return location;
+        }
+        let parent_layout = self.taffy.layout(parent.into()).expect(EXPECT_MESSAGE);
+        let scrolls = self.taffy.style(parent.into()).expect(EXPECT_MESSAGE).overflow.x
+            == taffy::style::Overflow::Scroll;
+        let extent = if scrolls {
+            parent_layout.size.width.max(parent_layout.scrollable_overflow_rect.right)
+        } else {
+            parent_layout.size.width
+        };
+        taffy::geometry::Point {
+            x: extent - location.x - width,
+            y: location.y,
+        }
+    }
+
     pub fn layout_bounds(&mut self, id: LayoutId, scale_factor: f32) -> Bounds<Pixels> {
         if let Some(layout) = self.absolute_layout_bounds.get(&id).cloned() {
             return layout;
@@ -371,7 +411,8 @@ impl TaffyLayoutEngine {
                     .absolute_outer_origins
                     .get(&parent_id)
                     .expect("parent absolute outer origin should be cached");
-                parent_origin + Point::from(layout_location)
+                parent_origin
+                    + Point::from(self.child_offset(parent_id, layout_location, layout_size.width))
             }
             None => Point::from(layout_location),
         };
