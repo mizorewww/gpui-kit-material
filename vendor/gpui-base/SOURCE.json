@@ -13,6 +13,7 @@
     "src/input/base/state.rs",
     "src/lib.rs",
     "src/motion.rs",
+    "src/slider.rs",
     "src/text_selection.rs",
     "src/toggle.rs",
     "src/toolbar.rs"
@@ -42,6 +43,11 @@
       "local_sha256": "d55dad6487967b7196bbf2217b9e31a5afbdfa4f6e1f6f2cb8eeb151dc1fbc10",
       "reason": "CSS reversal, negative-delay scaling, per-transition reduced motion, and TransitionPlayback (motion-patch.md).",
       "upstream_sha256": "cfbcc4cbe63aeb5bb6ffc27af0505b59c5fec3054310beaf29e947e14cf6424e"
+    },
+    "src/slider.rs": {
+      "local_sha256": "6e4fa57ebd6f99f4b46931ec27249c2b56c4306900cc52f98232c8c02784b59c",
+      "reason": "Step snapping counted from min with no snap for a non-positive step, AT Increment/Decrement that move only a range's end, and Slider::track_focus for a focusable slider node (motion-patch.md).",
+      "upstream_sha256": "71b801a92588d12f7931a5a9e1745fb62f4283ae87d651d4004ae9b41ad72da3"
     },
     "src/text_selection.rs": {
       "local_sha256": "be2bc711ab2f1b109c73b1c45411b5b58029c46d852ae6962164ec7bd9cd75f4",

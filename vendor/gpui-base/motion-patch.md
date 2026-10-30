@@ -53,6 +53,19 @@ The local compatibility surface is restricted to:
   longer move it) and reports `Orientation::Vertical`; the default stays
   horizontal and unchanged. Test: `a_vertical_toolbar_roves_with_up_and_down`.
 
+- `src/slider.rs`: three narrow corrections. Dragging snapped with
+  `(value / step).round() * step`, so a zero step produced NaN and steps were
+  counted from 0 rather than `min` (a 3..100 slider with step 5 landed on
+  10, not 8 or 13); values now snap to `min + k * step` inside the range,
+  and a step that is not positive and finite leaves the value continuous.
+  The accessibility Increment/Decrement actions set a single value, which
+  collapsed a range; they now move only the range's end (never past its
+  start). `Slider::track_focus(&FocusHandle)` makes the `Role::Slider` node
+  itself focusable (observed by `test_support`), so keyboard focus and
+  assistive technology land on the slider instead of an unnamed wrapper.
+  Tests: `dragging_snaps_from_min_and_a_zero_step_stays_continuous`,
+  `accessibility_steps_move_only_a_ranges_end`.
+
 These patches require source unification for both the Kit Git dependency and
 any registry Base dependency in the consuming workspace. Cargo patches are not
 inherited by downstream consumers of a published Material crate.
