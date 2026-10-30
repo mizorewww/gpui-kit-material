@@ -10,7 +10,7 @@
 //! leaves the suggestions reachable by Tab and pointer); the view's back
 //! button always collapses it. The State control follows all of these.
 use super::prelude::*;
-use gpui_base::input::{InputEvent, InputState};
+use gpui_base::input::InputState;
 
 /// The place suggestions: city and country.
 const PLACES: [(&str, &str); 8] = [
@@ -134,37 +134,7 @@ fn preview(
     cx: &mut Context<PlaygroundState>,
 ) -> AnyElement {
     let input: Entity<InputState> = preview.input("query", window, cx);
-    if preview.changed("query-events", ()) {
-        // Focus expands the view when asked to.
-        cx.subscribe_in(
-            &input,
-            window,
-            |state: &mut PlaygroundState, _, event: &InputEvent, window, cx| {
-                if matches!(event, InputEvent::Focus)
-                    && state.config.bool("expand_on_focus")
-                    && !state.config.bool("disabled")
-                {
-                    state.set_value("state", VIEW, window, cx);
-                }
-            },
-        )
-        .detach();
-    }
     let disabled = config.bool("disabled");
-    // The input's focus event can arrive before this subscription sees it
-    // (or not at all in an inactive window), so the focus transition is
-    // also caught here.
-    let focused = input.read(cx).focus_handle(cx).is_focused(window);
-    if preview.changed("query-focused", focused)
-        && focused
-        && config.bool("expand_on_focus")
-        && config.option("state") == "bar"
-        && !disabled
-    {
-        cx.defer_in(window, |state, window, cx| {
-            state.set_value("state", VIEW, window, cx)
-        });
-    }
     let placeholder = config.text("placeholder");
     if preview.changed("input-mode", (&placeholder, disabled)) {
         input.update(cx, |input, cx| {
@@ -247,22 +217,16 @@ fn preview(
             SearchViewStyle::Contained
         })
         .expanded(expanded)
+        .expand_on_focus(config.bool("expand_on_focus") && config.option("state") == "bar")
+        .collapse_on_blur(config.bool("collapse_on_blur"))
+        .on_expanded_change({
+            let set_state = set_state.clone();
+            move |expanded, window, cx| set_state(if *expanded { VIEW } else { BAR }, window, cx)
+        })
         .suggestions(suggestions);
-    let collapse_on_blur = config.bool("collapse_on_blur") && expanded;
-    let outside = set_state.clone();
     div()
         .id("search-frame")
         .debug_selector(|| "playground-search".into())
-        .key_context("PlaygroundSearch")
-        .when(collapse_on_blur, |frame| {
-            frame
-                .on_mouse_down_out(move |_, window, cx| outside(BAR, window, cx))
-                .on_key_down(move |event, window, cx| {
-                    if event.keystroke.key == "escape" {
-                        set_state(BAR, window, cx);
-                    }
-                })
-        })
         .map(|frame| {
             if full_screen {
                 // A phone-sized area for the view to cover.

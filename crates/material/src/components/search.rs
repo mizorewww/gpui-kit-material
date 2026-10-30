@@ -292,6 +292,7 @@ impl SearchSuggestion {
                 alpha(on_surface, state::HOVER),
                 alpha(on_surface, state::PRESS),
             )
+            .ripple(on_surface)
             .accessibility_label(label)
             .tab_stop(live)
             .map(|button| {
@@ -380,6 +381,9 @@ pub struct SearchView {
     layout: SearchViewLayout,
     view_style: SearchViewStyle,
     expanded: bool,
+    expand_on_focus: bool,
+    collapse_on_blur: bool,
+    on_expanded_change: Option<Rc<dyn Fn(&bool, &mut Window, &mut App)>>,
     suggestions: Vec<SearchSuggestion>,
     max_visible: usize,
     style: StyleRefinement,
@@ -393,6 +397,9 @@ impl SearchView {
             layout: SearchViewLayout::Docked,
             view_style: SearchViewStyle::Contained,
             expanded: false,
+            expand_on_focus: false,
+            collapse_on_blur: false,
+            on_expanded_change: None,
             suggestions: Vec::new(),
             max_visible: 5,
             style: StyleRefinement::default(),
@@ -409,6 +416,26 @@ impl SearchView {
     }
     pub fn expanded(mut self, expanded: bool) -> Self {
         self.expanded = expanded;
+        self
+    }
+    /// Ask to expand when the bar's input gains focus (not for a disabled
+    /// bar). The caller owns the state: see [`Self::on_expanded_change`].
+    pub fn expand_on_focus(mut self, expand: bool) -> Self {
+        self.expand_on_focus = expand;
+        self
+    }
+    /// Ask to collapse on a press outside the view or on Escape inside it.
+    pub fn collapse_on_blur(mut self, collapse: bool) -> Self {
+        self.collapse_on_blur = collapse;
+        self
+    }
+    /// Called with the state [`Self::expand_on_focus`] and
+    /// [`Self::collapse_on_blur`] ask for.
+    pub fn on_expanded_change(
+        mut self,
+        f: impl Fn(&bool, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_expanded_change = Some(Rc::new(f));
         self
     }
     pub fn suggestion(mut self, suggestion: SearchSuggestion) -> Self {
@@ -440,6 +467,23 @@ pub(crate) fn results_height(rows: usize, max_visible: usize, t: f32) -> f32 {
 impl RenderOnce for SearchView {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let id = self.id.clone();
+        // Focus moves refresh the window, so the rising edge shows up here for
+        // pointer and keyboard alike. The request waits for the frame to end.
+        let on_change = self.on_expanded_change.clone();
+        if let (BarInput::Live(input), true, Some(on_change)) =
+            (&self.bar.input, self.expand_on_focus, &on_change)
+        {
+            let focused = input.read(cx).focus_handle(cx).is_focused(window);
+            let last = window.use_keyed_state((id.clone(), "bar-focused"), cx, |_, _| false);
+            if *last.read(cx) != focused {
+                last.update(cx, |last, _| *last = focused);
+                if focused && !self.expanded && !self.bar.disabled {
+                    let on_change = on_change.clone();
+                    window.defer(cx, move |window, cx| on_change(&true, window, cx));
+                }
+            }
+        }
+        let collapse = on_change.filter(|_| self.collapse_on_blur && self.expanded);
         let expand = motion::token_value(
             (id.clone(), "expand"),
             if self.expanded { 1. } else { 0. },
@@ -575,7 +619,15 @@ impl RenderOnce for SearchView {
             }
         };
         root.style().refine(&self.style);
-        root
+        root.when_some(collapse, |root, collapse| {
+            let outside = collapse.clone();
+            root.on_mouse_down_out(move |_, window, cx| outside(&false, window, cx))
+                .on_key_down(move |event, window, cx| {
+                    if event.keystroke.key == "escape" {
+                        collapse(&false, window, cx);
+                    }
+                })
+        })
     }
 }
 
