@@ -1420,18 +1420,27 @@ impl App {
     ) {
         let mut tracked_entities =
             std::mem::take(self.tracked_entities.entry(window_handle.id).or_default());
+        // Material performance patch: most entities stay tracked frame to
+        // frame, so only entities that left are removed and only those missing
+        // are inserted. A window's invalidator never changes, so the maps end
+        // as removing and inserting every entity would leave them.
         for entity in tracked_entities.iter() {
-            self.window_invalidators_by_entity
-                .entry(*entity)
-                .and_modify(|windows| {
-                    windows.remove(&window_handle.id);
-                });
+            if !entities.contains(entity) {
+                self.window_invalidators_by_entity
+                    .entry(*entity)
+                    .and_modify(|windows| {
+                        windows.remove(&window_handle.id);
+                    });
+            }
         }
         for entity in entities.iter() {
-            self.window_invalidators_by_entity
+            let windows = self
+                .window_invalidators_by_entity
                 .entry(*entity)
-                .or_default()
-                .insert(window_handle.id, invalidator.clone());
+                .or_default();
+            if !windows.contains_key(&window_handle.id) {
+                windows.insert(window_handle.id, invalidator.clone());
+            }
             self.current_window_by_entity
                 .insert(*entity, window_handle.id);
         }

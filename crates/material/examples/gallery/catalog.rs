@@ -334,6 +334,14 @@ pub static CATALOG: &[Entry] = &[
         Some(&playgrounds::navigation_drawer::PLAYGROUND),
     ),
     component(
+        "navigation-suite",
+        "Navigation suite",
+        Navigation,
+        "One set of destinations as a bar, rail or drawer, by window width.",
+        spec("navigation"),
+        Some(&playgrounds::navigation_suite::PLAYGROUND),
+    ),
+    component(
         "tabs",
         "Tabs",
         Navigation,
@@ -430,6 +438,14 @@ pub static CATALOG: &[Entry] = &[
         spec("sheets"),
         Some(&playgrounds::side_sheet::PLAYGROUND),
     ),
+    component(
+        "canonical-layouts",
+        "Canonical layouts",
+        Containment,
+        "List-detail, supporting pane and feed layouts that adapt to their width.",
+        spec("examples"),
+        Some(&playgrounds::canonical_layouts::PLAYGROUND),
+    ),
     // Communication
     component(
         "badge",
@@ -462,6 +478,14 @@ pub static CATALOG: &[Entry] = &[
         "Show that content is on its way, for short waits.",
         spec("loading-progress"),
         Some(&playgrounds::loading_indicator::PLAYGROUND),
+    ),
+    component(
+        "pull-to-refresh",
+        "Pull to refresh",
+        Communication,
+        "Pull the top of a list down to refresh it.",
+        spec("loading-progress"),
+        Some(&playgrounds::pull_to_refresh::PLAYGROUND),
     ),
     component(
         "snackbar",

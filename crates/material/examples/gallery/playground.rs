@@ -42,6 +42,7 @@
 //! `Control::Text`, `changed` to apply a configuration change to such an
 //! editor once, and `local` for other preview-only state. Configuration
 //! survives navigation: each page keeps its [`PlaygroundState`].
+use super::shell::{LeadView, panes_stacked};
 use super::spec::type_role;
 use gpui::{prelude::*, *};
 use gpui_base::input::{InputEvent, InputState, TextareaState};
@@ -49,7 +50,9 @@ use gpui_base::slider::{SliderEvent, SliderState};
 use gpui_kit_material::icons::{Icon, Symbol};
 use gpui_kit_material::prelude::*;
 use std::any::Any;
+use std::cell::Cell;
 use std::collections::HashMap;
+use std::rc::Rc;
 
 /// One configuration control. Option values double as their labels, as on
 /// md3.io (e.g. `"filled"`, `"XS"`).
@@ -1065,6 +1068,101 @@ impl RenderOnce for CompactSelect {
                     change(next, window, cx);
                 }
             })
+    }
+}
+
+/// The preview canvas as its own view. A running component animation,
+/// hover or press invalidates the view being drawn; rendered inline, that
+/// was the whole Gallery (its content list re-laid out the page's lead row
+/// every animation frame). As a view, only the preview is rebuilt.
+///
+/// A preview says how to arrange the panes while it renders, which is after
+/// the lead row around it has. The lead row must not read the playground state
+/// for that, as the state changes every frame and the row would be built again
+/// with it, so this view publishes the hint in a cell and is its invalidation
+/// owner: a hint that changed draws the lead row and the panel again, in the
+/// next frame.
+pub struct PreviewView {
+    state: Entity<PlaygroundState>,
+    hint: Rc<Cell<PaneHint>>,
+    dependents: (WeakEntity<LeadView>, WeakEntity<PanelView>),
+    _observe: Subscription,
+}
+
+impl PreviewView {
+    pub fn new(
+        state: Entity<PlaygroundState>,
+        hint: Rc<Cell<PaneHint>>,
+        dependents: (WeakEntity<LeadView>, WeakEntity<PanelView>),
+        cx: &mut Context<Self>,
+    ) -> Self {
+        let observe = cx.observe(&state, |_, _, cx| cx.notify());
+        Self {
+            state,
+            hint,
+            dependents,
+            _observe: observe,
+        }
+    }
+}
+
+impl Render for PreviewView {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let (preview, hint) = self.state.update(cx, |state, cx| {
+            (state.render_preview(window, cx), state.pane_hint())
+        });
+        if self.hint.replace(hint) != hint {
+            let (lead, panel) = self.dependents.clone();
+            cx.defer(move |cx| {
+                let _ = lead.update(cx, |_, cx| cx.notify());
+                let _ = panel.update(cx, |_, cx| cx.notify());
+            });
+        }
+        preview
+    }
+}
+
+/// The configuration card's body as its own view, so editing a control or
+/// animating one (a switch, a segmented button) rebuilds only the panel and
+/// the preview that observes the same state.
+pub struct PanelView {
+    state: Entity<PlaygroundState>,
+    hint: Rc<Cell<PaneHint>>,
+    _observe: Subscription,
+}
+
+impl PanelView {
+    pub fn new(
+        state: Entity<PlaygroundState>,
+        hint: Rc<Cell<PaneHint>>,
+        cx: &mut Context<Self>,
+    ) -> Self {
+        let observe = cx.observe(&state, |_, _, cx| cx.notify());
+        Self {
+            state,
+            hint,
+            _observe: observe,
+        }
+    }
+}
+
+impl Render for PanelView {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let panel = self
+            .state
+            .update(cx, |state, cx| state.render_panel(window, cx));
+        // Stacked, the card is as tall as its controls and the page scrolls.
+        if panes_stacked(window, self.hint.get()) {
+            return panel;
+        }
+        let scroll = self.state.read(cx).scroll.clone();
+        div()
+            .id("configuration-body")
+            .size_full()
+            .overflow_y_scroll()
+            .track_scroll(&scroll)
+            .child(panel)
+            .into_any_element()
     }
 }
 

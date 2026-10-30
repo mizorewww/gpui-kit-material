@@ -8,7 +8,7 @@ use crate::color::{Color, ColorRole, PaletteId, Scheme, ThemePreferences};
 use crate::motion::{self, MotionToken};
 use gpui::{App, Global, Hsla, Pixels, Rgba, Window, WindowAppearance};
 use gpui_kit::component::{Theme as ComponentTheme, ThemeMode as ComponentThemeMode};
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 #[cfg(not(target_family = "wasm"))]
 use std::time::Instant;
 #[cfg(target_family = "wasm")]
@@ -33,6 +33,19 @@ thread_local! {
         started: Instant::now(),
         motion: motion::MotionScheme::Expressive.resolve(MotionToken::SlowEffects),
     });
+    static SCHEME_OVERRIDE: Cell<Option<Scheme>> = const { Cell::new(None) };
+}
+
+/// Paint `scheme` in place of whatever target the application root passes to
+/// [`advance_component_theme`] or [`apply_scheme`], until cleared with `None`.
+///
+/// This is for a scheme chooser below the view that owns the theme, such as a
+/// seed-color control on a settings page. It takes effect on the next advance;
+/// the caller must also advance or refresh, because the root has no reason to.
+/// An application whose root owns the choice should pass the scheme as its
+/// target instead.
+pub fn set_scheme_override(scheme: Option<Scheme>) {
+    SCHEME_OVERRIDE.set(scheme);
 }
 
 /// Convert a kit color to GPUI's.
@@ -127,6 +140,7 @@ pub fn apply_scheme(target: Scheme, window: &mut Window, cx: &mut App) -> bool {
 
 // Both the Base-only renderer and the Component pre-frame driver use one sampler.
 fn advance_paint(target: Scheme, cx: &App) -> (bool, bool) {
+    let target = SCHEME_OVERRIDE.get().unwrap_or(target);
     let reduce_motion = cx.reduce_motion();
     let effects = motion::curve(MotionToken::SlowEffects);
     PAINT.with(|paint| {
@@ -359,6 +373,21 @@ mod tests {
     use super::*;
     use gpui::{Context, IntoElement, Render, TestAppContext, div};
     use std::time::Duration;
+
+    #[gpui::test]
+    fn an_override_wins_over_the_target_until_cleared(cx: &mut TestAppContext) {
+        let chosen = Scheme::from_palette(PaletteId::Ink);
+        let target = Scheme::from_palette(PaletteId::Paper);
+        cx.update(|cx| {
+            cx.set_reduce_motion(true);
+            set_scheme_override(Some(chosen));
+            advance_paint(target, cx);
+            assert_eq!(scheme(), chosen);
+            set_scheme_override(None);
+            advance_paint(target, cx);
+            assert_eq!(scheme(), target);
+        });
+    }
 
     #[test]
     fn component_projection_keeps_unowned_tokens_and_uses_one_rem_baseline() {
