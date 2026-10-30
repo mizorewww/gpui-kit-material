@@ -21,10 +21,8 @@
 //! button is a Base [`gpui_base::Button`] (button role, pointer, Enter and
 //! Space activation, pressed state for toggles).
 //!
-//! Base's toolbar handles only Left/Right and reports a horizontal
-//! orientation (`gpui-base/src/toolbar.rs`, `handle_key_down` and its
-//! render). A vertical toolbar therefore also forwards Up/Down to the same
-//! window tab-order walk, constrained to the toolbar's subtree.
+//! A vertical toolbar sets Base's axis, so Up/Down rove focus and assistive
+//! technology hears a vertical orientation.
 use super::InteractionPreview;
 use super::button::{ButtonFocusRing, ButtonRipple};
 use super::navigation::{NavIcon, ripple_corners, type_role};
@@ -552,16 +550,12 @@ impl RenderOnce for Toolbar {
         let gone = !self.visible && shown <= 0.001;
         let container = color(self.scheme.container());
 
-        // Up/Down for a vertical toolbar: the same subtree-constrained walk
-        // Base runs for Left/Right.
-        let column = window
-            .use_keyed_state((self.id.clone(), "toolbar-column"), cx, |_, cx| {
-                cx.focus_handle().tab_stop(false)
-            })
-            .read(cx)
-            .clone();
-
         let bar = gpui_base::Toolbar::new(self.id.clone())
+            .axis(if vertical {
+                Axis::Vertical
+            } else {
+                Axis::Horizontal
+            })
             .aria_label(self.label)
             .when(cfg!(test), |bar| bar.debug_selector(|| "toolbar".into()))
             .flex()
@@ -593,22 +587,8 @@ impl RenderOnce for Toolbar {
             .when(!gone, |bar| bar.children(self.items));
 
         let bar = div()
-            .track_focus(&column)
             .flex()
             .when(docked, |wrapper| wrapper.w_full())
-            .when(vertical, |wrapper| {
-                let column = column.clone();
-                wrapper.on_key_down(move |event, window, cx| {
-                    let forward = match event.keystroke.key.as_str() {
-                        "down" => true,
-                        "up" => false,
-                        _ => return,
-                    };
-                    move_focus(&column, forward, window, cx);
-                    cx.stop_propagation();
-                })
-            })
-            .on_any_mouse_down(|_, window, _| window.prevent_default())
             .child(bar);
 
         if docked {
@@ -645,35 +625,6 @@ impl RenderOnce for Toolbar {
                 .into_any_element(),
         }
     }
-}
-
-/// Move focus to the next (or previous) tab stop inside `container`:
-/// walk the window's tab order, passing over stops outside the container,
-/// and go back where focus started when no other stop inside is reachable.
-/// Mirrors `gpui_base::toolbar::move_focus`, which Base keeps private.
-fn move_focus(container: &FocusHandle, forward: bool, window: &mut Window, cx: &mut App) {
-    let Some(start) = window.focused(cx) else {
-        return;
-    };
-    let mut visited = vec![start.clone()];
-    loop {
-        if forward {
-            window.focus_next(cx);
-        } else {
-            window.focus_prev(cx);
-        }
-        let Some(focused) = window.focused(cx) else {
-            break;
-        };
-        if visited.contains(&focused) {
-            break;
-        }
-        if container.contains_focused(window, cx) {
-            return;
-        }
-        visited.push(focused);
-    }
-    window.focus(&start, cx);
 }
 
 #[cfg(test)]

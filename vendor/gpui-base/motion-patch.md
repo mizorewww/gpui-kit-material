@@ -46,6 +46,12 @@ The local compatibility surface is restricted to:
   error caret) had no way to paint it. `None` restores the projected caret;
   nothing else in the style changes. Test:
   `a_caller_caret_color_wins_over_the_projected_style`.
+- `src/toolbar.rs`: `Toolbar::axis(Axis)`. Upstream handles only Left/Right
+  and always reports a horizontal orientation, so a vertical toolbar needed
+  a private copy of the subtree-constrained focus walk and still announced
+  "horizontal". A vertical axis moves focus with Up/Down (Left/Right no
+  longer move it) and reports `Orientation::Vertical`; the default stays
+  horizontal and unchanged. Test: `a_vertical_toolbar_roves_with_up_and_down`.
 
 These patches require source unification for both the Kit Git dependency and
 any registry Base dependency in the consuming workspace. Cargo patches are not
