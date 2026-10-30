@@ -16,6 +16,7 @@ mod scroll_performance;
 
 pub(crate) mod catalog;
 mod fps;
+mod overview;
 pub(crate) mod page;
 mod pages;
 pub(crate) mod playground;
