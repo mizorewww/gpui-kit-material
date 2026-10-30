@@ -8,6 +8,8 @@
 
 mod fast;
 mod dispatcher;
+mod drawable_prefetch;
+pub use drawable_prefetch::DrawableWaker;
 pub mod keychain;
 mod metal_atlas;
 pub mod metal_renderer;

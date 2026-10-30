@@ -121,8 +121,8 @@
       },
       "src/metal_renderer.rs": {
         "upstream_sha256": "1634c0370a04cb88f598a1674bf146f6c285f5e6f2c947a772cbde43096a9cf9",
-        "local_sha256": "98c5dff36635b9d13c052bbc314e8dd46f003a2b81199475682bc73842360776",
-        "reason": "draw_with_status with per-draw autorelease pool (presentation_patch), nextDrawable presentation wait and attach_gpu_timing (profiler_patches), same as vendor/gpui-pre-apple; write_instances signature rustfmt-wrapped only."
+        "local_sha256": "0ce33570eb64bdcd19854ec314ff24a2d344311d61eafa7618f4bf2f0570670d",
+        "reason": "draw_with_status with per-draw autorelease pool (presentation_patch), nextDrawable presentation wait and attach_gpu_timing (profiler_patches), same as vendor/gpui-pre-apple; write_instances signature rustfmt-wrapped only. Material presentation patch: drawable acquisition moved off the main thread (src/drawable_prefetch.rs); draw_with_status takes the prefetched drawable and only waits (reported as presentation wait) when none is ready; prefetch pauses during transactional presentation and is requested on drawable-size changes; set_drawable_waker/drawable_ready_or_wake for the platform window."
       },
       "src/open_type.rs": {
         "upstream_sha256": "bc827c157fdce50125b158adb595b665d82f38b62fc6b3a9693c65abae640453",
@@ -133,12 +133,21 @@
         "upstream_sha256": "31ae84947cdb3f47314a04a68d9efbcecbe6e5d11e903e969487c235ad0b8b58",
         "local_sha256": "cc5586100bea8fb616755a14c7d3be3a38fa27760bd5b59d8275949dbfcdd9d5",
         "reason": "Merged from vendor/gpui-pre-apple: detailed layout, fonts without 'm', fallback cascade rebuild, sbix detection (migrated)."
+      },
+      "src/gpui_apple.rs": {
+        "upstream_sha256": "868b4a245f9d24ef1831dad36132ce90fd2ac96a7edbdac6597dc04ae246bb21",
+        "local_sha256": "89a8d98ac94514d19fa23b9634a49276652d6ad55f6c0f8dbb03f232752fd8d3",
+        "reason": "Declares the drawable_prefetch module and re-exports DrawableWaker (Material presentation patch)."
       }
     },
     "added": {
       "tests/detailed_layout.rs": {
         "sha256": "3759e317a8566b16c91438ce335946f6edd1b83a5d2d5eb3f58387a0ce7d2d05",
         "reason": "Added: identical to vendor/gpui-pre-apple (migrated)."
+      },
+      "src/drawable_prefetch.rs": {
+        "sha256": "4acaa95afa5363c84098321747e4ac59be5b4cac6c91e171a968aa0efc0ba17b",
+        "reason": "Added: per-renderer drawable prefetch thread holding at most one acquired CAMetalDrawable, with a thread-safe window waker (Material presentation patch)."
       }
     },
     "removed": {
@@ -147,6 +156,6 @@
         "reason": "Package-level lockfile not retained; the workspace Cargo.lock owns resolution."
       }
     },
-    "unchanged_file_count": 41
+    "unchanged_file_count": 40
   }
 }
