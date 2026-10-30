@@ -187,7 +187,6 @@
     "src/style.rs",
     "src/styled.rs",
     "src/svg_renderer.rs",
-    "src/tab_stop.rs",
     "src/taffy.rs",
     "src/text_system.rs",
     "src/text_system/line_layout.rs",
@@ -265,11 +264,6 @@
       "local_sha256": "97e18a124cd588f70037bb9ca5580992d0f3480952063868c688fdfadf8b10bf",
       "reason": "Hitbox.additional_bounds/contains_pointer/insert_hitbox_with_extension (hitbox-extension-patch.md); touch observers (touch-observer-patch.md); CPU frame scope (cpu-frame-scope-patch.md); WindowSubmissionStats, vsync, throttle retry (frame-submission-patch.md); present outcome (presentation-timing-patch.md). Layout direction on the window, recorded per layout node (layout-direction-patch.md)."
     },
-    "src/tab_stop.rs": {
-      "upstream_sha256": "0c14aec0196ad632601015e166dfcd3df72228292646120bbc3857c3631cd680",
-      "local_sha256": "62a51ab7de3043ee2f4ffe5f8d9eddf8019021a64c4d633b99bde3cf693f9a10",
-      "reason": "Material performance patch: TabStopMap records only its insertion history while painting and builds the tab order and focus lookup lazily on the first query (Tab navigation, a11y dump); query results unchanged. Replaying a reused view's or composited layer's tab stops no longer updates a SumTree per insertion."
-    },
     "src/elements/text.rs": {
       "upstream_sha256": "3ffcc422356924ae4d6eef864421f56588be65cd931c8fe35d7e5e6438c23346",
       "local_sha256": "dea83a3f75dc1620dcd9b416798df71a1417bc94324457ef5a23b2af4a159318",
@@ -328,7 +322,7 @@
       "reason": "Not retained; Cargo.toml is the normalized manifest Cargo builds (test-harness-patch.md)."
     }
   },
-  "unchanged_file_count": 142,
+  "unchanged_file_count": 143,
   "provenance_files": [
     "SOURCE.json",
     "animation-visibility-patch.md",
@@ -340,7 +334,6 @@
     "letter-spacing-patch.md",
     "presentation-timing-patch.md",
     "quiet-global-swap-patch.md",
-    "tab-stop-index-patch.md",
     "test-harness-patch.md",
     "touch-observer-patch.md"
   ],

@@ -346,11 +346,6 @@
         "local_sha256": "a2ed03afafa9b96a22ca713bef502ceff6ce0bd832e19704c1e7db6baf92b439",
         "reason": "Same GPUI window patches as vendor/gpui-pre (hitbox extension, touch observers, CPU frame scope, submission stats/vsync/throttle retry, present outcome); touch-observer storage and FrameDirtyAccumulator made pub(crate) for Fast layer reuse. Layout direction on the window, recorded per layout node (vendor/gpui-pre/layout-direction-patch.md)."
       },
-      "src/tab_stop.rs": {
-        "upstream_sha256": "0c14aec0196ad632601015e166dfcd3df72228292646120bbc3857c3631cd680",
-        "local_sha256": "62a51ab7de3043ee2f4ffe5f8d9eddf8019021a64c4d633b99bde3cf693f9a10",
-        "reason": "Material performance patch: TabStopMap records only its insertion history while painting and builds the tab order and focus lookup lazily on the first query (Tab navigation, a11y dump); query results unchanged. Replaying a reused view's or composited layer's tab stops no longer updates a SumTree per insertion."
-      },
       "src/elements/text.rs": {
         "upstream_sha256": "8f2de269d51ad703618666283161c151191070d88e697afe9c73fd8aef6551ef",
         "local_sha256": "3030dece3c8c2d40da6ebd0465099034b3d93231a7760cd7f5d58936323a15e6",
@@ -423,6 +418,6 @@
         "reason": "Package-level lockfile not retained; the workspace Cargo.lock owns resolution."
       }
     },
-    "unchanged_file_count": 139
+    "unchanged_file_count": 140
   }
 }
