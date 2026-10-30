@@ -368,6 +368,8 @@ pub enum SearchViewStyle {
     Divided,
 }
 
+type ExpandedChange = Rc<dyn Fn(&bool, &mut Window, &mut App)>;
+
 /// The M3 search view: a search bar that expands into a results surface.
 ///
 /// The caller controls `expanded` (typically opening on the input's focus and
@@ -383,7 +385,7 @@ pub struct SearchView {
     expanded: bool,
     expand_on_focus: bool,
     collapse_on_blur: bool,
-    on_expanded_change: Option<Rc<dyn Fn(&bool, &mut Window, &mut App)>>,
+    on_expanded_change: Option<ExpandedChange>,
     suggestions: Vec<SearchSuggestion>,
     max_visible: usize,
     style: StyleRefinement,

@@ -75,6 +75,8 @@ pub fn horizontal_arrow(key: &str, rtl: bool) -> Option<i32> {
     Some(if rtl { -forward } else { forward })
 }
 
+type BuildChild = Box<dyn FnOnce(&mut Window, &mut App) -> AnyElement>;
+
 /// A subtree's overrides. Set a scheme, a direction or both.
 #[derive(gpui::IntoElement)]
 pub struct Scope {
@@ -82,7 +84,7 @@ pub struct Scope {
     scheme: Option<Scheme>,
     direction: Option<LayoutDirection>,
     child: Option<AnyElement>,
-    build: Option<Box<dyn FnOnce(&mut Window, &mut App) -> AnyElement>>,
+    build: Option<BuildChild>,
 }
 
 impl Scope {

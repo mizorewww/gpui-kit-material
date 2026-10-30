@@ -34,6 +34,9 @@ pub fn required_label(label: &SharedString, required: bool) -> SharedString {
     }
 }
 
+/// What pressing a visible label does.
+pub(crate) type Activate = Rc<dyn Fn(&mut Window, &mut App)>;
+
 /// The text beside a selection control.
 pub(crate) struct ControlLabel {
     pub id: ElementId,
@@ -47,7 +50,7 @@ pub(crate) struct ControlLabel {
     pub fill: bool,
     /// Space between the control and the text, in design px.
     pub gap: f32,
-    pub activate: Option<Rc<dyn Fn(&mut Window, &mut App)>>,
+    pub activate: Option<Activate>,
 }
 
 impl ControlLabel {

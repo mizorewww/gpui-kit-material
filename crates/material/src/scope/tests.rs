@@ -241,7 +241,7 @@ impl Render for DirectionHarness {
 
 #[gpui::test]
 fn a_direction_scope_mirrors_its_subtree_and_reads_back(cx: &mut TestAppContext) {
-    cx.update(|cx| gpui_kit::init(cx));
+    cx.update(gpui_kit::init);
     let (view, cx) = cx.add_window_view(|_, _| DirectionHarness {
         direction: LayoutDirection::Ltr,
     });
@@ -391,7 +391,7 @@ impl Render for ScrolledRow {
 
 #[gpui::test]
 fn mirrored_layout_survives_retained_frames_and_scrolling(cx: &mut TestAppContext) {
-    cx.update(|cx| gpui_kit::init(cx));
+    cx.update(gpui_kit::init);
     let (view, cx) = cx.add_window_view(|_, _| ScrolledRow {
         scroll: gpui::ScrollHandle::new(),
         rtl: true,
