@@ -240,8 +240,7 @@ fn chevrons_and_set_value_respect_the_years(cx: &mut TestAppContext) {
         crate::init(cx);
         cx.set_reduce_motion(true);
     });
-    let state =
-        cx.new(|cx| DatePickerState::new(labels(), d(2025, 1, 5), cx).years(2025..=2025));
+    let state = cx.new(|cx| DatePickerState::new(labels(), d(2025, 1, 5), cx).years(2025..=2025));
     state.update(cx, |s, cx| s.previous_month(cx));
     assert_eq!(state.read_with(cx, |s, _| s.displayed_month()), (2025, 1));
     state.update(cx, |s, cx| s.previous_year(cx));

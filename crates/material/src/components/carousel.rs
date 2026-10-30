@@ -453,9 +453,7 @@ fn schedule_snap(
                     Some(due.saturating_duration_since(cx.background_executor().now()))
                 });
                 match wait {
-                    Ok(Some(wait)) if !wait.is_zero() => {
-                        cx.background_executor().timer(wait).await
-                    }
+                    Ok(Some(wait)) if !wait.is_zero() => cx.background_executor().timer(wait).await,
                     Ok(Some(_)) => break,
                     _ => return,
                 }
@@ -830,10 +828,7 @@ mod tests {
         assert_eq!(snap(90., 196., 1000.), 0.);
         assert_eq!(snap(5000., 196., 392.), 392.);
         let start = keylines(CarouselLayout::MultiBrowse, 412., 188.);
-        assert_eq!(
-            max_scroll(&start, 3, CarouselLayout::MultiBrowse, 412.),
-            0.
-        );
+        assert_eq!(max_scroll(&start, 3, CarouselLayout::MultiBrowse, 412.), 0.);
         assert_eq!(
             max_scroll(&start, 5, CarouselLayout::MultiBrowse, 412.),
             2. * start.step

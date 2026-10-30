@@ -630,7 +630,13 @@ impl RenderOnce for MaterialBottomSheet {
             .map(|partial| f32::from(partial.to_pixels(window.rem_size())));
         let (height, measured, expanded, drag, settle) = {
             let s = state.read(cx);
-            (f32::from(s.height), s.measured, s.expanded, s.drag, s.settle)
+            (
+                f32::from(s.height),
+                s.measured,
+                s.expanded,
+                s.drag,
+                s.settle,
+            )
         };
         let visible = match partial {
             Some(partial) if !expanded => partial.min(height),

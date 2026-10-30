@@ -1120,16 +1120,12 @@ mod tests {
     impl Render for Configured {
         fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
             window.set_rem_size(px(crate::tokens::typography::BASE_PX));
-            div()
-                .w(px(240.))
-                .h(px(240.))
-                .p(px(60.))
-                .child(
-                    div()
-                        .size_full()
-                        .debug_selector(|| "slider".into())
-                        .child((self.1)(MaterialSlider::new(&self.0, "Level"))),
-                )
+            div().w(px(240.)).h(px(240.)).p(px(60.)).child(
+                div()
+                    .size_full()
+                    .debug_selector(|| "slider".into())
+                    .child((self.1)(MaterialSlider::new(&self.0, "Level"))),
+            )
         }
     }
 
@@ -1164,11 +1160,9 @@ mod tests {
 
     #[gpui::test]
     fn a_classic_slider_is_tabbable_and_steps_with_arrows(cx: &mut TestAppContext) {
-        let (state, cx) = configured(
-            cx,
-            SliderState::new().max(100.).default_value(30.),
-            |s| s.appearance(SliderAppearance::Classic),
-        );
+        let (state, cx) = configured(cx, SliderState::new().max(100.).default_value(30.), |s| {
+            s.appearance(SliderAppearance::Classic)
+        });
         cx.update(|window, cx| window.focus_next(cx));
         cx.simulate_keystrokes("right right");
         assert_eq!(state.read_with(cx, |s, _| s.value().end()), 32.);
@@ -1176,11 +1170,9 @@ mod tests {
 
     #[gpui::test]
     fn a_vertical_classic_slider_follows_its_axis(cx: &mut TestAppContext) {
-        let (_, cx) = configured(
-            cx,
-            SliderState::new().max(100.).default_value(30.),
-            |s| s.appearance(SliderAppearance::Classic).vertical(),
-        );
+        let (_, cx) = configured(cx, SliderState::new().max(100.).default_value(30.), |s| {
+            s.appearance(SliderAppearance::Classic).vertical()
+        });
         let bounds = cx.debug_bounds("slider").unwrap();
         let slider = cx.update(|window, _| {
             gpui_base::test_support::snapshots(window)
@@ -1194,11 +1186,7 @@ mod tests {
 
     #[gpui::test]
     fn keyboard_focus_lands_on_the_slider_node(cx: &mut TestAppContext) {
-        let (_, cx) = configured(
-            cx,
-            SliderState::new().max(100.).default_value(30.),
-            |s| s,
-        );
+        let (_, cx) = configured(cx, SliderState::new().max(100.).default_value(30.), |s| s);
         cx.update(|window, cx| window.focus_next(cx));
         draw(cx);
         let slider = cx.update(|window, _| {
@@ -1228,11 +1216,7 @@ mod tests {
 
     #[gpui::test]
     fn keys_at_an_end_report_no_change(cx: &mut TestAppContext) {
-        let (state, cx) = configured(
-            cx,
-            SliderState::new().max(100.).default_value(100.),
-            |s| s,
-        );
+        let (state, cx) = configured(cx, SliderState::new().max(100.).default_value(100.), |s| s);
         let changes = count_changes(&state, cx);
         cx.update(|window, cx| window.focus_next(cx));
         cx.simulate_keystrokes("right end pageup");
@@ -1243,22 +1227,14 @@ mod tests {
 
     #[gpui::test]
     fn only_the_primary_button_presses_the_slider(cx: &mut TestAppContext) {
-        let (_, cx) = configured(
-            cx,
-            SliderState::new().max(100.).default_value(30.),
-            |s| s,
-        );
+        let (_, cx) = configured(cx, SliderState::new().max(100.).default_value(30.), |s| s);
         let thumb_width = |cx: &mut VisualTestContext| {
             cx.update(|window, _| {
-                gpui_base::test_support::find(
-                    window,
-                    &[],
-                    &ElementId::from(("slider-thumb", 0u32)),
-                )
-                .unwrap()
-                .bounds()
-                .size
-                .width
+                gpui_base::test_support::find(window, &[], &ElementId::from(("slider-thumb", 0u32)))
+                    .unwrap()
+                    .bounds()
+                    .size
+                    .width
             })
         };
         let resting = thumb_width(cx);

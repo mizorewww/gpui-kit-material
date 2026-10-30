@@ -1585,36 +1585,41 @@ impl PickerCx {
             let show_steppers = view == DatePickerView::Day;
             // Steppers stop at the ends of `years`.
             let months = if list == DatePickerView::Month { 1 } else { 12 };
-            let (has_prev, has_next) = (snap.can_step_months(-months), snap.can_step_months(months));
+            let (has_prev, has_next) =
+                (snap.can_step_months(-months), snap.can_step_months(months));
             div()
                 .flex()
                 .items_center()
                 .when(show_steppers, |row| {
-                    row.child(self.icon_button(
-                        if list == DatePickerView::Month {
-                            "prev-month"
-                        } else {
-                            "prev-year"
-                        },
-                        "chevron_left",
-                        prev_label,
-                        move |s, _, cx| prev(s, cx),
+                    row.child(
+                        self.icon_button(
+                            if list == DatePickerView::Month {
+                                "prev-month"
+                            } else {
+                                "prev-year"
+                            },
+                            "chevron_left",
+                            prev_label,
+                            move |s, _, cx| prev(s, cx),
+                        )
+                        .disabled(!has_prev),
                     )
-                    .disabled(!has_prev))
                 })
                 .child(menu)
                 .when(show_steppers, |row| {
-                    row.child(self.icon_button(
-                        if list == DatePickerView::Month {
-                            "next-month"
-                        } else {
-                            "next-year"
-                        },
-                        "chevron_right",
-                        next_label,
-                        move |s, _, cx| next(s, cx),
+                    row.child(
+                        self.icon_button(
+                            if list == DatePickerView::Month {
+                                "next-month"
+                            } else {
+                                "next-year"
+                            },
+                            "chevron_right",
+                            next_label,
+                            move |s, _, cx| next(s, cx),
+                        )
+                        .disabled(!has_next),
                     )
-                    .disabled(!has_next))
                 })
         };
         div()
