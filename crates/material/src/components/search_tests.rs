@@ -123,6 +123,33 @@ fn the_docked_view_reveals_its_rows_and_activates_suggestions(cx: &mut TestAppCo
 }
 
 #[gpui::test]
+fn a_collapsing_view_ignores_clicks_on_its_fading_rows(cx: &mut TestAppContext) {
+    let (view, cx) = setup(cx, SearchViewLayout::Docked);
+    cx.update(|_, cx| cx.set_reduce_motion(false));
+    view.update(cx, |v, cx| {
+        v.expanded = true;
+        cx.notify();
+    });
+    draw(cx);
+    cx.executor()
+        .advance_clock(std::time::Duration::from_secs(2));
+    draw(cx);
+    let results = cx.debug_bounds("search-results").unwrap();
+    let row = point(results.center().x, results.top() + px(32.));
+    view.update(cx, |v, cx| {
+        v.expanded = false;
+        cx.notify();
+    });
+    draw(cx);
+    cx.executor()
+        .advance_clock(std::time::Duration::from_millis(20));
+    draw(cx);
+    assert!(cx.debug_bounds("search-results").is_some(), "still fading");
+    cx.simulate_click(row, Modifiers::default());
+    cx.update(|_, cx| assert_eq!(view.read(cx).picked.get(), None));
+}
+
+#[gpui::test]
 fn the_full_screen_view_fills_its_area(cx: &mut TestAppContext) {
     let (view, cx) = setup(cx, SearchViewLayout::FullScreen);
     view.update(cx, |v, cx| {

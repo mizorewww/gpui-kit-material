@@ -263,7 +263,9 @@ impl SearchSuggestion {
         self
     }
 
-    fn render(self, id: ElementId) -> AnyElement {
+    /// The row; only a `live` (expanded) view's rows take focus or clicks,
+    /// so a collapsing view's fading rows cannot be activated.
+    fn render(self, id: ElementId, live: bool) -> AnyElement {
         let on_surface = color(ColorRole::ON_SURFACE);
         let clear = alpha(on_surface, 0.);
         let label = self.label.clone();
@@ -273,6 +275,7 @@ impl SearchSuggestion {
                 alpha(on_surface, state::PRESS),
             )
             .accessibility_label(label)
+            .tab_stop(live)
             .map(|button| {
                 button
                     .flex()
@@ -316,7 +319,7 @@ impl SearchSuggestion {
                             .child(text)
                     })),
             );
-        if let Some(handler) = self.on_click {
+        if let Some(handler) = self.on_click.filter(|_| live) {
             row = row.on_click(move |event, window, cx| handler(event, window, cx));
         }
         row.into_any_element()
@@ -416,6 +419,7 @@ impl RenderOnce for SearchView {
         .clamp(0., 1.);
         let visible = self.expanded || fade > 0.001 || expand > 0.001;
         let rows = self.suggestions.len();
+        let live = self.expanded;
         let list = |suggestions: Vec<SearchSuggestion>| {
             div()
                 .id((id.clone(), "results"))
@@ -424,7 +428,10 @@ impl RenderOnce for SearchView {
                 .w_full()
                 .overflow_y_scroll()
                 .children(suggestions.into_iter().enumerate().map(|(ix, s)| {
-                    s.render(ElementId::NamedInteger("suggestion".into(), ix as u64))
+                    s.render(
+                        ElementId::NamedInteger("suggestion".into(), ix as u64),
+                        live,
+                    )
                 }))
         };
         let mut root = match self.layout {
