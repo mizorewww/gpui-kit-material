@@ -20,6 +20,7 @@ pub use standard_button_group::{ButtonGroup, EXPANDED_RATIO, standard_group_gap}
 #[cfg(all(test, feature = "gpui-fast"))]
 mod a11y_tests;
 mod app_bar;
+mod avatar;
 mod button_group;
 #[cfg(test)]
 mod color_guard_tests;
@@ -86,6 +87,7 @@ pub use app_bar::{
     BOTTOM_APP_BAR_HEIGHT, BottomAppBar, TOP_APP_BAR_HEIGHT, TopAppBar, TopAppBarVariant,
     collapsed_title_alpha,
 };
+pub use avatar::{AVATAR_SIZE, Avatar, AvatarContent, monogram_initials};
 pub use button_group::ConnectedButtonGroup;
 pub use caption::{Caption, CaptionButton, CaptionButtons, CaptionLabels, title_bar_control};
 pub use carousel::{
