@@ -41,14 +41,3 @@ GPU timing patch: while profiler tracing is enabled, `attach_gpu_timing` adds a
 command-buffer completion handler that reports `GPUStartTime`, `GPUEndTime`,
 status and the CPU commit time through `gpui::profiler::record_gpu_execution`.
 Rendering and presentation are unchanged.
-
-## Off-main-thread drawable acquisition
-
-`src/drawable_prefetch.rs` (added) keeps at most one `CAMetalDrawable`
-acquired by a renderer-owned thread. `src/metal_renderer.rs`
-`draw_with_status` takes it without blocking; only when none is ready (live
-resize, stale size, failed acquisition) does it wait, and that wait is still
-reported through `record_presentation_wait`. `drawable_ready_or_wake` and
-`set_drawable_waker` let the platform window skip a frame until a drawable is
-ready. `src/gpui_apple.rs` declares the module and re-exports `DrawableWaker`.
-Identical in `gpui-fast-apple`.

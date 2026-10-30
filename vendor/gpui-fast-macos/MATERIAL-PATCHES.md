@@ -29,27 +29,3 @@ CVDisplayLink stays subscribed as the throttle and synchronized path.
 Disabling synchronization permits demand-driven requests between display
 ticks; it does not guarantee any target FPS. Platform/UI acceptance and
 performance are verified separately.
-
-## Off-main-thread drawable acquisition
-
-- `src/window.rs`: `step` asks the renderer `drawable_ready_or_wake()` and skips
-  the frame request while no prefetched drawable is ready; `start_display_link`
-  passes the frame source's thread-safe waker to the renderer
-  (`set_drawable_waker`). Transactional presents (live resize, activation)
-  pause prefetching and acquire synchronously as before.
-- `src/display_link.rs`: `WindowFrameSource::waker`, a `Send + Sync` closure that
-  merges one request into the existing main-thread dispatch source.
-
-See `src/drawable_prefetch.rs` in the matching Apple renderer crate.
-Successful-submission counting is unchanged: only `draw_with_status`
-submissions count.
-
-## Window tab group built only when tabbing is in use
-
-- `src/window.rs`: `tab_bar_visible` returns false without asking for `tabGroup`
-  when the window has no tabbing identifier, was never merged or toggled, and
-  has at most one tabbed window. Asking builds AppKit's window stack controller,
-  which was about 40% of `open_window` in a warm sampled window open.
-  `MacWindowState::tabbing_in_use` records the opening identifier,
-  `set_tabbing_identifier`, `merge_all_windows` and the `toggleTabBar:` and
-  `mergeAllWindows:` actions; once set, behavior is as upstream.

@@ -110,13 +110,8 @@ counts, the lowest FPS over ≥ 250 ms windows, and draw-associated submission
 attempt gaps as a diagnostic. Runs whose rate sits near or below the display
 refresh while VSync reads disabled are marked (`observed_rate_near_or_below_refresh`).
 
-Drawable acquisition runs off the main thread: each vendored Metal renderer
-(`gpui-{pre,fast}-apple`, `src/drawable_prefetch.rs`) keeps one drawable
-acquired ahead by its own thread, and the macOS window skips a frame request
-until one is ready instead of blocking in `nextDrawable` (see the crates'
-`MATERIAL-PATCHES.md`/`MATERIAL-MIGRATION.json`). Any remaining main-thread
-wait (live resize, a stale drawable size, a failed prefetch) is still timed
-and reported separately as `presentation_wait_*`/`drawable_wait`. GPU time
+Drawable acquisition runs on the main thread, as upstream. Its wait is timed and
+reported separately as `presentation_wait_*`/`drawable_wait`. GPU time
 (Metal `GPUStartTime`/`GPUEndTime`, macOS only) is reported per frame under
 `gpu` and never counts toward the CPU budget; other backends report null with
 a reason.
