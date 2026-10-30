@@ -391,7 +391,7 @@ impl RenderOnce for MaterialRadioGroup {
             .skip(skip)
             .selected(selected)
             .select_on_focus(on_select);
-        let entry = roving.entry();
+        let entry = roving.tab_stop(window);
         let radios = self.options.into_iter().enumerate().map(|(index, option)| {
             let on_change = self.on_change.clone();
             MaterialRadio::new(("radio", index), option.label)

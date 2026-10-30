@@ -447,7 +447,6 @@ impl RenderOnce for ConnectedButtonGroup {
             .iter()
             .position(|option| Some(&option.value) == self.value.as_ref());
         let specimen = !self.previews.is_empty();
-        let entry = (!disabled && !specimen).then(|| selected.unwrap_or(0));
         let roving = Roving::new(handles.clone(), Orientation::Both)
             .disabled(disabled)
             .selected(selected)
@@ -457,15 +456,19 @@ impl RenderOnce for ConnectedButtonGroup {
                     on_change,
                 )
             }));
+        let entry = if specimen {
+            None
+        } else {
+            roving.tab_stop(window)
+        };
         let count = self.options.len();
-        let scale = f32::from(window.rem_size()) / 14.;
         let metrics = match self.size {
             Some(size) => Metrics::of(size, self.shape),
             None => Metrics::compact(if self.segmented { 48. } else { 40. }),
         };
         let item_height = match self.height {
             Some(height) => height.to_pixels(window.rem_size()),
-            None => px(metrics.height * scale),
+            None => rem(metrics.height).to_pixels(window.rem_size()),
         };
         let fill = self.full_width;
         let icon_size = rem(metrics.icon);
@@ -523,7 +526,7 @@ impl RenderOnce for ConnectedButtonGroup {
             });
             let content = gpui_base::h_flex()
                 .when(!fill, |content| content.max_w_full().min_w_0())
-                .gap(rems(8. / 14.))
+                .gap(rem(8.))
                 .items_center()
                 // Text-only options center their label; no empty icon slot.
                 .when_some(self.icons.get(&value).cloned(), |content, icon| {
@@ -744,6 +747,8 @@ mod tests {
         selected: usize,
         disabled: bool,
         changes: usize,
+        /// Without a change callback arrows only move focus.
+        manual: bool,
     }
 
     impl Render for RovingHarness {
@@ -757,18 +762,22 @@ mod tests {
                         .track_focus(&self.handles[0])
                         .child("Before"),
                 )
-                .child(
-                    ConnectedButtonGroup::new("roving", "Choices")
+                .child({
+                    let group = ConnectedButtonGroup::new("roving", "Choices")
                         .options([("0", "First"), ("1", "Second"), ("2", "Third")])
                         .focus_handles(self.handles[1..4].iter().cloned())
                         .selected(self.selected.to_string())
-                        .disabled(self.disabled)
-                        .on_change(cx.listener(|this, value: &SharedString, _, cx| {
+                        .disabled(self.disabled);
+                    if self.manual {
+                        group
+                    } else {
+                        group.on_change(cx.listener(|this, value: &SharedString, _, cx| {
                             this.selected = value.parse().unwrap();
                             this.changes += 1;
                             cx.notify();
-                        })),
-                )
+                        }))
+                    }
+                })
                 .child(
                     gpui_base::Button::new("after")
                         .track_focus(&self.handles[4])
@@ -804,6 +813,7 @@ mod tests {
                 selected: 1,
                 disabled,
                 changes: 0,
+                manual: false,
             });
             let (_, cx) =
                 cx.add_window_view(|window, cx| gpui_base::Root::new(controls.clone(), window, cx));
@@ -870,6 +880,52 @@ mod tests {
                 assert_eq!(controls.read(cx).changes, 2);
             });
         }
+    }
+
+    #[gpui::test]
+    fn the_tab_stop_follows_focus_without_a_change_callback(cx: &mut TestAppContext) {
+        cx.update(|cx| {
+            gpui_base::init(cx);
+            crate::components::roving::init(cx);
+            cx.set_reduce_motion(true);
+        });
+        let handles: [gpui::FocusHandle; 5] =
+            cx.update(|cx| std::array::from_fn(|_| cx.focus_handle()));
+        let controls = cx.new(|_| RovingHarness {
+            handles: handles.clone(),
+            selected: 1,
+            disabled: false,
+            changes: 0,
+            manual: true,
+        });
+        let (_, cx) =
+            cx.add_window_view(|window, cx| gpui_base::Root::new(controls.clone(), window, cx));
+        cx.update(|window, cx| {
+            window.activate_window();
+            window.draw(cx).clear(cx);
+            handles[0].focus(window, cx);
+            window.draw(cx).clear(cx);
+        });
+        // Arrows only move focus; Shift+Tab and Tab then leave the group
+        // from wherever focus is, and re-entry lands on the selection.
+        for (key, expected) in [
+            ("tab", 2),
+            ("right", 3),
+            ("shift-tab", 0),
+            ("tab", 2),
+            ("left", 1),
+            ("tab", 4),
+        ] {
+            press_roving_key(cx, key);
+            cx.update(|window, cx| {
+                assert_eq!(
+                    window.focused(cx).as_ref(),
+                    Some(&handles[expected]),
+                    "{key}"
+                )
+            });
+        }
+        cx.update(|_, cx| assert_eq!(controls.read(cx).changes, 0));
     }
 
     struct FullWidthHarness {

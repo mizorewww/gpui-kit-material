@@ -44,7 +44,7 @@ fn item_and_menu_heights_follow_the_kit() {
     assert_eq!(item_height(MenuStyle::Baseline, d, false, true), 56. + 17.);
     // The kit's baseline menu: 12 items of 56 inside 8dp padding.
     let baseline = vec![(false, vec![(false, false); 12])];
-    assert_eq!(menu_height(MenuStyle::Baseline, d, &baseline), 688.);
+    assert_eq!(menu_height(MenuStyle::Baseline, d, baseline), 688.);
     // Three Expressive groups of four, the first labelled: 2dp gaps.
     let groups = vec![
         (true, vec![(false, false); 4]),
@@ -52,22 +52,41 @@ fn item_and_menu_heights_follow_the_kit() {
         (false, vec![(false, false); 4]),
     ];
     assert_eq!(
-        menu_height(MenuStyle::Vibrant, d, &groups),
+        menu_height(MenuStyle::Vibrant, d, groups),
         3. * (4. + 4. * 48.) + 32. + 2. * 2.
     );
 }
 
 #[test]
+fn a_menu_measures_its_groups_without_collecting_them() {
+    let menu = MaterialMenu::new("menu")
+        .style(MenuStyle::Vibrant)
+        .group(
+            MenuGroup::new()
+                .label("Group")
+                .items((0..4).map(|_| MaterialMenuItem::new("Item"))),
+        )
+        .group(MenuGroup::new().items((0..4).map(|_| MaterialMenuItem::new("Item"))));
+    assert_eq!(
+        menu.natural_height(),
+        2. * (4. + 4. * 48.) + 32. + 2.,
+        "two groups, the first labelled, 2dp apart"
+    );
+}
+
+#[test]
 fn keyboard_navigation_skips_disabled_items_and_wraps() {
-    let enabled = [true, false, true, true];
-    assert_eq!(next_index(&enabled, None, Some(1), false), Some(0));
-    assert_eq!(next_index(&enabled, Some(0), Some(1), false), Some(2));
-    assert_eq!(next_index(&enabled, Some(3), Some(1), false), Some(0));
-    assert_eq!(next_index(&enabled, Some(0), Some(-1), false), Some(3));
-    assert_eq!(next_index(&enabled, Some(2), Some(-1), false), Some(0));
-    assert_eq!(next_index(&enabled, None, None, true), Some(0));
-    assert_eq!(next_index(&enabled, None, None, false), Some(3));
-    assert_eq!(next_index(&[false, false], None, Some(1), false), None);
+    use super::super::roving::{Direction, target};
+    // Menus rove with the shared roving helper; `skip` marks disabled items.
+    let skip = [false, true, false, false];
+    assert_eq!(target(&skip, None, Direction::Next), Some(0));
+    assert_eq!(target(&skip, Some(0), Direction::Next), Some(2));
+    assert_eq!(target(&skip, Some(3), Direction::Next), Some(0));
+    assert_eq!(target(&skip, Some(0), Direction::Previous), Some(3));
+    assert_eq!(target(&skip, Some(2), Direction::Previous), Some(0));
+    assert_eq!(target(&skip, None, Direction::First), Some(0));
+    assert_eq!(target(&skip, None, Direction::Last), Some(3));
+    assert_eq!(target(&[true, true], None, Direction::Next), None);
 }
 
 #[test]

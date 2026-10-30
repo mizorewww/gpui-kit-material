@@ -475,7 +475,10 @@ impl RenderOnce for TextField {
             },
         );
         let live_hover = preview.is_none() && !disabled && !focused;
-        let group: SharedString = format!("text-field-{id:?}").into();
+        // Group hover resolves to the nearest painting ancestor of this name,
+        // so a static name stays scoped to this field without formatting one
+        // per frame.
+        let group = SharedString::new_static("material-text-field");
 
         let mut container = div()
             .id(id.clone())
@@ -695,10 +698,12 @@ impl RenderOnce for TextField {
                         .pb(rem(input_bottom))
                         .child(input_row),
                 )
-                .children(
-                    self.trailing
-                        .map(|icon| icon_slot(icon, mix(rest.trailing, active.trailing))),
-                ),
+                .children(self.trailing.map(|icon| {
+                    icon_slot(icon, mix(rest.trailing, active.trailing)).when(live_hover, |this| {
+                        let ink = hover_paint.trailing;
+                        this.group_hover(group.clone(), move |s| s.text_color(ink))
+                    })
+                })),
         );
 
         if let Some(label) = self.label.clone() {
@@ -716,7 +721,9 @@ impl RenderOnce for TextField {
                     .text_size(rem(size))
                     .line_height(rem(line))
                     .text_color(label_color)
-                    .when(live_hover && !self.error, |this| {
+                    // An error field's label hovers to on-error-container,
+                    // as its hovered preview paints.
+                    .when(live_hover, |this| {
                         let ink = hover_paint.label;
                         this.group_hover(group.clone(), move |s| s.text_color(ink))
                     })

@@ -159,6 +159,7 @@ fn chip_paint(kind: ChipKind, style: ChipStyle, selected: bool, disabled: bool) 
 
 type ClickHandler = Rc<dyn Fn(&ClickEvent, &mut Window, &mut App)>;
 type RemoveHandler = Rc<dyn Fn(&mut Window, &mut App)>;
+type ToggleHandler = Rc<dyn Fn(&bool, &mut Window, &mut App)>;
 
 /// What every chip carries; each public chip sets the parts it offers.
 struct ChipBase {
@@ -175,6 +176,9 @@ struct ChipBase {
     trailing: Option<Icon>,
     remove: Option<(SharedString, RemoveHandler)>,
     on_click: Option<ClickHandler>,
+    /// Called with the next selection; resolved at render so it sees the
+    /// final `selected` whatever the builder order.
+    on_toggle: Option<ToggleHandler>,
 }
 
 impl ChipBase {
@@ -193,6 +197,7 @@ impl ChipBase {
             trailing: None,
             remove: None,
             on_click: None,
+            on_toggle: None,
         }
     }
 
@@ -339,7 +344,9 @@ impl ChipBase {
                         // The chip's own click must not see a press that
                         // belongs to the remove icon.
                         .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
-                        .on_mouse_up(MouseButton::Left, move |_, window, cx| {
+                        // A click pairs the press with its release, so a
+                        // drag that ends over the icon removes nothing.
+                        .on_click(move |_, window, cx| {
                             cx.stop_propagation();
                             on_press(window, cx);
                         })
@@ -347,7 +354,11 @@ impl ChipBase {
                 .into_any_element()
         });
         let label = self.label;
-        let on_click = self.on_click;
+        let next = !self.selected;
+        let on_click = self.on_toggle.map(|toggle| -> ClickHandler {
+            Rc::new(move |_, window, cx| toggle(&next, window, cx))
+        });
+        let on_click = on_click.or(self.on_click);
         let id = self.id;
         RingedButton::new(id, RingPlacement::Outer(Corners::all(RADIUS_SMALL)))
             .track_focus(&focus)
@@ -496,8 +507,7 @@ impl FilterChip {
     }
     /// Called with the chip's next selection when it is activated.
     pub fn on_toggle(mut self, handler: impl Fn(&bool, &mut Window, &mut App) + 'static) -> Self {
-        let next = !self.0.selected;
-        self.0.on_click = Some(Rc::new(move |_, window, cx| handler(&next, window, cx)));
+        self.0.on_toggle = Some(Rc::new(handler));
         self
     }
 }
@@ -649,12 +659,14 @@ mod tests {
                 )
                 .child(
                     div().debug_selector(|| "filter-chip".into()).child(
+                        // The toggle comes before `selected` so the next
+                        // value must be resolved at render.
                         FilterChip::new("filter-chip", "Plain")
-                            .selected(self.selected)
                             .on_toggle(cx.listener(|this, next: &bool, _, cx| {
                                 this.selected = *next;
                                 cx.notify();
-                            })),
+                            }))
+                            .selected(self.selected),
                     ),
                 )
                 .child(
@@ -721,6 +733,9 @@ mod tests {
         let selected = cx.debug_bounds("filter-chip").unwrap();
         // The 16dp edge becomes 8dp, plus the 18dp check and its 8dp gap.
         assert_eq!(selected.size.width - rest.size.width, px(18. + 8. - 8.));
+        cx.simulate_click(selected.center(), Modifiers::default());
+        draw(cx);
+        view.read_with(cx, |h, _| assert!(!h.selected, "a second click clears it"));
     }
 
     #[gpui::test]
@@ -746,5 +761,27 @@ mod tests {
         );
         draw(cx);
         view.read_with(cx, |h, _| assert_eq!((h.removed, h.clicks), (1, 1)));
+    }
+
+    #[gpui::test]
+    fn a_press_released_over_the_remove_icon_removes_nothing(cx: &mut TestAppContext) {
+        cx.update(|cx| {
+            gpui_base::init(cx);
+            cx.set_reduce_motion(true);
+        });
+        let (view, cx) = cx.add_window_view(|_, _| ChipHarness {
+            selected: false,
+            removed: 0,
+            clicks: 0,
+        });
+        draw(cx);
+        let remove = cx.debug_bounds("chip-remove").unwrap().center();
+        let chip = cx.debug_bounds("input-chip").unwrap();
+        let label = point(chip.left() + px(14.), chip.center().y);
+        cx.simulate_mouse_down(label, MouseButton::Left, Modifiers::default());
+        cx.simulate_mouse_move(remove, Some(MouseButton::Left), Modifiers::default());
+        cx.simulate_mouse_up(remove, MouseButton::Left, Modifiers::default());
+        draw(cx);
+        view.read_with(cx, |h, _| assert_eq!(h.removed, 0));
     }
 }

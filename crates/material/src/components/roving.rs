@@ -8,8 +8,13 @@
 //! roving focus"), and Kit's `TabBar` has no arrow-key navigation either. This
 //! module is that one missing behavior:
 //!
-//! - one tab stop per widget ([`Roving::entry`]): the selection when it can
-//!   take focus, otherwise the first item that can;
+//! - one tab stop per widget ([`Roving::tab_stop`]): the focused item while
+//!   focus is inside the widget, otherwise the selection when it can take
+//!   focus, otherwise the first item that can. GPUI's Tab and Shift+Tab pass
+//!   over handles marked `tab_stop(false)` (`gpui/src/tab_stop.rs`,
+//!   `next_inner`/`prev_inner`), so the stop must follow focus: a stop left
+//!   on the selection would pull Shift+Tab back into the widget after an
+//!   arrow moved focus past it;
 //! - arrow keys along the widget's [`Orientation`] move focus with wrapping,
 //!   and Home/End go to the ends, skipping items that cannot take focus;
 //! - optionally the selection follows focus (radio groups, auto-activating
@@ -134,6 +139,18 @@ pub(crate) fn entry(selected: Option<usize>, skip: &[bool]) -> Option<usize> {
         .or_else(|| skip.iter().position(|skip| !skip))
 }
 
+/// The item that holds a widget's one tab stop while `focused` holds focus:
+/// the focused item when it can take focus, otherwise [`entry`].
+pub(crate) fn stop(
+    focused: Option<usize>,
+    selected: Option<usize>,
+    skip: &[bool],
+) -> Option<usize> {
+    focused
+        .filter(|index| !skip.get(*index).copied().unwrap_or(true))
+        .or_else(|| entry(selected, skip))
+}
+
 /// Called with the index of the item keyboard movement newly focuses.
 pub(crate) type Select = Rc<dyn Fn(usize, &mut Window, &mut App)>;
 
@@ -202,9 +219,11 @@ impl Roving {
         self
     }
 
-    /// The item that takes the widget's tab stop.
-    pub(crate) fn entry(&self) -> Option<usize> {
-        entry(self.selected, &self.skip)
+    /// The item that takes the widget's tab stop this frame (see [`stop`]).
+    /// Focus changes refresh the window, so the stop follows focus.
+    pub(crate) fn tab_stop(&self, window: &Window) -> Option<usize> {
+        let focused = self.focus.iter().position(|focus| focus.is_focused(window));
+        stop(focused, self.selected, &self.skip)
     }
 
     pub(crate) fn navigate(&self, direction: Direction, window: &mut Window, cx: &mut App) {
@@ -353,11 +372,21 @@ mod tests {
     }
 
     #[test]
+    fn the_tab_stop_follows_a_focusable_focused_item() {
+        assert_eq!(stop(Some(2), Some(0), &[false; 3]), Some(2));
+        assert_eq!(stop(Some(1), Some(0), &[false, true, false]), Some(0));
+        assert_eq!(stop(None, Some(1), &[false; 3]), Some(1));
+        assert_eq!(stop(Some(0), None, &[true]), None);
+    }
+
+    #[test]
     fn each_orientation_has_its_own_key_context() {
         assert_eq!(Orientation::Row.context(), ROW_CONTEXT);
         assert_eq!(Orientation::Column.context(), COLUMN_CONTEXT);
         assert_eq!(Orientation::Both.context(), BOTH_CONTEXT);
     }
+
+    actions!(roving_harness, [TabNext, TabPrev]);
 
     struct Harness {
         focus: Rc<[FocusHandle]>,
@@ -366,10 +395,12 @@ mod tests {
         selected: Option<usize>,
         follow: bool,
         picked: Rc<RefCell<Vec<usize>>>,
+        before: FocusHandle,
+        after: FocusHandle,
     }
 
     impl Render for Harness {
-        fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
             let picked = self.picked.clone();
             let entity = cx.entity().downgrade();
             let select: Option<Select> = self.follow.then(|| {
@@ -387,15 +418,31 @@ mod tests {
                 .skip(self.skip.clone())
                 .selected(self.selected)
                 .select_on_focus(select);
-            let entry = roving.entry();
-            roving
-                .install(div().id("group"))
-                .children(self.focus.iter().enumerate().map(|(index, focus)| {
+            let entry = roving.tab_stop(window);
+            div()
+                .key_context("RovingHarness")
+                .on_action(|_: &TabNext, window, cx| window.focus_next(cx))
+                .on_action(|_: &TabPrev, window, cx| window.focus_prev(cx))
+                .child(
                     div()
-                        .id(index)
+                        .id("before")
                         .size(px(20.))
-                        .track_focus(&focus.clone().tab_stop(entry == Some(index)))
-                }))
+                        .track_focus(&self.before.clone().tab_stop(true)),
+                )
+                .child(roving.install(div().id("group")).children(
+                    self.focus.iter().enumerate().map(|(index, focus)| {
+                        div()
+                            .id(index)
+                            .size(px(20.))
+                            .track_focus(&focus.clone().tab_stop(entry == Some(index)))
+                    }),
+                ))
+                .child(
+                    div()
+                        .id("after")
+                        .size(px(20.))
+                        .track_focus(&self.after.clone().tab_stop(true)),
+                )
         }
     }
 
@@ -412,13 +459,21 @@ mod tests {
         skip: Vec<bool>,
         follow: bool,
     ) -> Rig<'_> {
-        cx.update(init);
+        cx.update(|cx| {
+            init(cx);
+            cx.bind_keys([
+                KeyBinding::new("tab", TabNext, Some("RovingHarness")),
+                KeyBinding::new("shift-tab", TabPrev, Some("RovingHarness")),
+            ]);
+        });
         let picked = Rc::new(RefCell::new(Vec::new()));
         let focus: Rc<[FocusHandle]> =
             cx.update(|cx| (0..skip.len()).map(|_| cx.focus_handle()).collect());
         let (view, cx) = cx.add_window_view({
             let (focus, picked) = (focus.clone(), picked.clone());
-            move |_, _| Harness {
+            move |_, cx| Harness {
+                before: cx.focus_handle(),
+                after: cx.focus_handle(),
                 focus,
                 orientation,
                 skip,
@@ -482,6 +537,37 @@ mod tests {
         let roving = Roving::new(focus, Orientation::Row)
             .selected(Some(0))
             .disabled(true);
-        assert_eq!(roving.entry(), None);
+        assert_eq!(entry(roving.selected, &roving.skip), None);
+    }
+
+    #[gpui::test]
+    fn tab_and_shift_tab_leave_after_arrowing_in_manual_mode(cx: &mut gpui::TestAppContext) {
+        let (view, focus, _, cx) = harness(cx, Orientation::Row, vec![false; 3], false);
+        view.update(cx, |view, _| view.selected = Some(0));
+        let (before, after) =
+            view.read_with(cx, |view, _| (view.before.clone(), view.after.clone()));
+        cx.update(|window, cx| before.focus(window, cx));
+        cx.run_until_parked();
+        cx.simulate_keystrokes("tab");
+        assert_eq!(focused(&focus, cx), Some(0), "Tab enters on the selection");
+        cx.simulate_keystrokes("right right");
+        assert_eq!(focused(&focus, cx), Some(2));
+        cx.simulate_keystrokes("shift-tab");
+        assert!(
+            cx.update(|window, _| before.is_focused(window)),
+            "Shift+Tab leaves the widget backward"
+        );
+        cx.simulate_keystrokes("tab");
+        assert_eq!(
+            focused(&focus, cx),
+            Some(0),
+            "the stop returns to the selection"
+        );
+        cx.simulate_keystrokes("right");
+        cx.simulate_keystrokes("tab");
+        assert!(
+            cx.update(|window, _| after.is_focused(window)),
+            "Tab leaves the widget forward"
+        );
     }
 }

@@ -19,6 +19,7 @@
 //! motion back on close, retargeting from wherever it is.
 use super::InteractionPreview;
 use super::focus::{RingPlacement, RingedButton};
+use super::roving::{Direction, target};
 use super::text_field::{TextField, TextFieldVariant, type_style};
 use crate::{
     color::ColorRole,
@@ -348,34 +349,34 @@ pub(crate) fn item_height(
     }
 }
 
-/// A whole menu's height in design px.
-pub(crate) fn menu_height(
-    style: MenuStyle,
-    density: MenuDensity,
-    groups: &[(bool, Vec<(bool, bool)>)],
-) -> f32 {
-    let items = |items: &Vec<(bool, bool)>| -> f32 {
-        items
-            .iter()
-            .map(|&(supporting, divider)| item_height(style, density, supporting, divider))
-            .sum()
-    };
-    if style.expressive() {
-        let groups_px: f32 = groups
-            .iter()
-            .map(|(label, list)| {
-                2. * EXPRESSIVE_INSET_Y + if *label { GROUP_LABEL } else { 0. } + items(list)
-            })
+/// A whole menu's height in design px: one `(labelled, items)` entry per
+/// group, one `(supporting, divider)` entry per item.
+pub(crate) fn menu_height<G, I>(style: MenuStyle, density: MenuDensity, groups: G) -> f32
+where
+    G: IntoIterator<Item = (bool, I)>,
+    I: IntoIterator<Item = (bool, bool)>,
+{
+    let expressive = style.expressive();
+    let mut count = 0usize;
+    let mut total = 0.;
+    for (label, items) in groups {
+        count += 1;
+        let items: f32 = items
+            .into_iter()
+            .map(|(supporting, divider)| item_height(style, density, supporting, divider))
             .sum();
-        groups_px + GROUP_GAP * groups.len().saturating_sub(1) as f32
+        let inset = if expressive {
+            2. * EXPRESSIVE_INSET_Y
+        } else {
+            0.
+        };
+        total += inset + if label { GROUP_LABEL } else { 0. } + items;
+    }
+    let between = count.saturating_sub(1) as f32;
+    if expressive {
+        total + GROUP_GAP * between
     } else {
-        let dividers = BASELINE_DIVIDER * groups.len().saturating_sub(1) as f32;
-        2. * BASELINE_PADDING
-            + groups
-                .iter()
-                .map(|(label, list)| if *label { GROUP_LABEL } else { 0. } + items(list))
-                .sum::<f32>()
-            + dividers
+        2. * BASELINE_PADDING + total + BASELINE_DIVIDER * between
     }
 }
 
@@ -467,72 +468,21 @@ impl MaterialMenu {
         self
     }
 
-    fn shape(&self) -> (f32, String) {
-        let groups: Vec<(bool, Vec<(bool, bool)>)> = self
-            .groups
-            .iter()
-            .map(|g| {
-                (
-                    g.label.is_some(),
-                    g.items
-                        .iter()
-                        .map(|i| (i.supporting.is_some(), i.divider))
-                        .collect(),
-                )
-            })
-            .collect();
-        (
-            menu_height(self.style, self.density, &groups),
-            String::new(),
-        )
-    }
-
     /// The menu's natural height in design px.
     pub fn natural_height(&self) -> f32 {
-        self.shape().0
-    }
-}
-
-/// Move focus among `enabled` item handles: `step` ±1 wraps, `None` jumps
-/// to the first (`first`) or last enabled item.
-pub(crate) fn next_index(
-    enabled: &[bool],
-    current: Option<usize>,
-    step: Option<isize>,
-    first: bool,
-) -> Option<usize> {
-    let count = enabled.len();
-    if count == 0 || !enabled.iter().any(|e| *e) {
-        return None;
-    }
-    let scan = |start: usize, forward: bool| {
-        (0..count)
-            .map(|k| {
-                if forward {
-                    (start + k) % count
-                } else {
-                    (start + count - k) % count
-                }
-            })
-            .find(|&ix| enabled[ix])
-    };
-    match (step, current) {
-        (None, _) if first => scan(0, true),
-        (None, _) => scan(count - 1, false),
-        (Some(step), None) => {
-            if step > 0 {
-                scan(0, true)
-            } else {
-                scan(count - 1, false)
-            }
-        }
-        (Some(step), Some(current)) => {
-            if step > 0 {
-                scan((current + 1) % count, true)
-            } else {
-                scan((current + count - 1) % count, false)
-            }
-        }
+        menu_height(
+            self.style,
+            self.density,
+            self.groups.iter().map(|group| {
+                (
+                    group.label.is_some(),
+                    group
+                        .items
+                        .iter()
+                        .map(|item| (item.supporting.is_some(), item.divider)),
+                )
+            }),
+        )
     }
 }
 
@@ -557,12 +507,11 @@ impl RenderOnce for MaterialMenu {
             .clone()
             .unwrap_or_else(|| state.read(cx).root.clone());
         let handles = state.read(cx).items.clone();
-        let enabled: Rc<Vec<bool>> = Rc::new(
-            self.groups
-                .iter()
-                .flat_map(|g| g.items.iter().map(|i| !i.disabled && i.preview.is_none()))
-                .collect(),
-        );
+        let skip: Rc<[bool]> = self
+            .groups
+            .iter()
+            .flat_map(|g| g.items.iter().map(|i| i.disabled || i.preview.is_some()))
+            .collect();
         // Enter and Space activate the focused item (the popover's content
         // context reserves them, so the menu answers them itself).
         let activators: Rc<Vec<Option<(Handler, bool)>>> = Rc::new(
@@ -600,10 +549,10 @@ impl RenderOnce for MaterialMenu {
         };
         let navigate = {
             let handles = handles.clone();
-            let enabled = enabled.clone();
-            move |step: Option<isize>, first: bool, window: &mut Window, cx: &mut App| {
+            let skip = skip.clone();
+            move |direction: Direction, window: &mut Window, cx: &mut App| {
                 let current = handles.iter().position(|h| h.is_focused(window));
-                if let Some(ix) = next_index(&enabled, current, step, first) {
+                if let Some(ix) = target(&skip, current, direction) {
                     handles[ix].focus(window, cx);
                 }
             }
@@ -620,15 +569,15 @@ impl RenderOnce for MaterialMenu {
             let mut items = Vec::with_capacity(group.items.len());
             for item in group.items {
                 items.push(render_item(
-                    ElementId::NamedChild(
-                        self.id.clone().into(),
-                        SharedString::from(format!("item-{index}")),
-                    ),
+                    // Scoped by the menu container's own id below, so a
+                    // static name is unique without formatting per frame.
+                    ("material-menu-item", index),
                     item,
                     style,
                     density,
                     handles.get(index).cloned(),
                     on_activate.clone(),
+                    window.rem_size(),
                 ));
                 index += 1;
             }
@@ -690,10 +639,10 @@ impl RenderOnce for MaterialMenu {
             .role(Role::Menu)
             .key_context(MENU_CONTEXT)
             .track_focus(&root_focus)
-            .on_action(move |_: &SelectUp, window, cx| nav_up(Some(-1), false, window, cx))
-            .on_action(move |_: &SelectDown, window, cx| nav_down(Some(1), false, window, cx))
-            .on_action(move |_: &SelectFirst, window, cx| nav_first(None, true, window, cx))
-            .on_action(move |_: &SelectLast, window, cx| nav_last(None, false, window, cx))
+            .on_action(move |_: &SelectUp, window, cx| nav_up(Direction::Previous, window, cx))
+            .on_action(move |_: &SelectDown, window, cx| nav_down(Direction::Next, window, cx))
+            .on_action(move |_: &SelectFirst, window, cx| nav_first(Direction::First, window, cx))
+            .on_action(move |_: &SelectLast, window, cx| nav_last(Direction::Last, window, cx))
             .on_action(move |_: &Confirm, window, cx| activate(window, cx))
             .on_action(move |_: &Cancel, window, cx| {
                 if let Some(dismiss) = on_dismiss.as_ref() {
@@ -750,6 +699,7 @@ fn render_item(
     density: MenuDensity,
     focus: Option<FocusHandle>,
     on_activate: Option<Notify>,
+    rem_size: Pixels,
 ) -> AnyElement {
     let expressive = style.expressive();
     let paint = item_paint(style, item.selected);
@@ -767,7 +717,8 @@ fn render_item(
     } else {
         0.
     };
-    let corners = Corners::all(px(radius * 14. / 14.));
+    // The ring and ripple share the item container's rem-sized corners.
+    let corners = Corners::all(rem(radius).to_pixels(rem_size));
     let content_height = item_height(style, density, item.supporting.is_some(), false)
         - if expressive {
             2. * EXPRESSIVE_INSET_Y

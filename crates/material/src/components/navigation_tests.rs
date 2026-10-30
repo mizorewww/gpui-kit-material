@@ -72,6 +72,8 @@ struct BarHarness {
     rail: bool,
     expanded: bool,
     disabled: Option<usize>,
+    /// Optional focusable neighbours before and after the bar or rail.
+    edges: Option<[FocusHandle; 2]>,
 }
 
 impl Render for BarHarness {
@@ -86,7 +88,16 @@ impl Render for BarHarness {
             this.changes += 1;
             cx.notify();
         });
-        if self.rail {
+        let edge = |edge: usize| {
+            self.edges.as_ref().map(|edges| {
+                div()
+                    .id(("edge", edge))
+                    .size(px(10.))
+                    .track_focus(&edges[edge])
+            })
+        };
+        let (before, after) = (edge(0), edge(1));
+        let widget = if self.rail {
             div()
                 .h(px(600.))
                 .child(
@@ -108,7 +119,8 @@ impl Render for BarHarness {
                         .on_change(change),
                 )
                 .into_any_element()
-        }
+        };
+        div().children(before).child(widget).children(after)
     }
 }
 
@@ -123,6 +135,7 @@ fn harness(cx: &mut TestAppContext, rail: bool) -> (Entity<BarHarness>, &mut Vis
         rail,
         expanded: false,
         disabled: None,
+        edges: None,
     })
 }
 
@@ -247,6 +260,49 @@ fn arrows_skip_disabled_items(cx: &mut TestAppContext) {
     let at = pill(cx, "d1").center();
     cx.simulate_click(at, Modifiers::default());
     cx.update(|_, cx| assert_eq!(view.read(cx).selected.as_ref(), "d2"));
+}
+
+fn tab_leaves_after_arrowing(cx: &mut TestAppContext, rail: bool) {
+    let (view, cx) = harness(cx, rail);
+    let edges: [FocusHandle; 2] = cx.update(|_, cx| {
+        [
+            cx.focus_handle().tab_stop(true),
+            cx.focus_handle().tab_stop(true),
+        ]
+    });
+    view.update(cx, |view, _| view.edges = Some(edges.clone()));
+    settle(cx);
+    let arrows = if rail { "down down" } else { "right right" };
+    let is_focused = |edge: &FocusHandle, cx: &mut VisualTestContext| {
+        cx.update(|window, _| edge.is_focused(window))
+    };
+    cx.update(|window, cx| edges[0].focus(window, cx));
+    draw(cx);
+    cx.update(|window, cx| window.focus_next(cx));
+    draw(cx);
+    cx.simulate_keystrokes(arrows);
+    draw(cx);
+    cx.update(|_, cx| assert_eq!(view.read(cx).changes, 0, "arrows only move focus"));
+    cx.update(|window, cx| window.focus_prev(cx));
+    draw(cx);
+    assert!(is_focused(&edges[0], cx), "Shift+Tab leaves backward");
+    cx.update(|window, cx| window.focus_next(cx));
+    draw(cx);
+    cx.simulate_keystrokes(arrows);
+    draw(cx);
+    cx.update(|window, cx| window.focus_next(cx));
+    draw(cx);
+    assert!(is_focused(&edges[1], cx), "Tab leaves forward");
+}
+
+#[gpui::test]
+fn tab_leaves_the_bar_after_arrowing(cx: &mut TestAppContext) {
+    tab_leaves_after_arrowing(cx, false);
+}
+
+#[gpui::test]
+fn tab_leaves_the_rail_after_arrowing(cx: &mut TestAppContext) {
+    tab_leaves_after_arrowing(cx, true);
 }
 
 #[gpui::test]

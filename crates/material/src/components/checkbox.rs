@@ -204,6 +204,21 @@ impl MaterialCheckbox {
 
 const CHECKBOX_GROUP: &str = "material-checkbox";
 
+/// The mark's last shape (0 check … 1 dash) and which of two morph
+/// channels animates it; flipping the channel restarts the morph at its
+/// target.
+#[derive(Clone, Copy, PartialEq)]
+struct MarkShape {
+    shape: f32,
+    channel: bool,
+}
+
+#[cfg(test)]
+thread_local! {
+    /// The last rendered (draw, morph) amounts.
+    static MARK: std::cell::Cell<(f32, f32)> = const { std::cell::Cell::new((0., 0.)) };
+}
+
 impl RenderOnce for MaterialCheckbox {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let focus = self.focus.clone().unwrap_or_else(|| {
@@ -222,19 +237,37 @@ impl RenderOnce for MaterialCheckbox {
         let selected = self.state != CheckboxState::Unchecked;
         // An unchecking mark keeps the shape it had, so it retracts rather
         // than morphing on its way out.
-        let shape = window.use_keyed_state((self.id.clone(), "shape"), cx, |_, _| 0_f32);
+        let shape = window.use_keyed_state((self.id.clone(), "shape"), cx, |_, _| MarkShape {
+            shape: 0.,
+            channel: false,
+        });
+        let previous = *shape.read(cx);
         let shape_target = match self.state {
             CheckboxState::Checked => 0.,
             CheckboxState::Indeterminate => 1.,
-            CheckboxState::Unchecked => *shape.read(cx),
+            CheckboxState::Unchecked => previous.shape,
         };
-        if *shape.read(cx) != shape_target {
-            shape.update(cx, |shape, _| *shape = shape_target);
-        }
         let target = if selected { 1. } else { 0. };
         let (fill, draw, morph) = if preview.is_some() {
             (target, target, shape_target)
         } else {
+            let draw = motion::selection_value((self.id.clone(), "mark"), target, window, cx);
+            // A mark drawing in from nothing takes its new shape at once:
+            // only a visible mark morphs between the check and the dash.
+            // Switching to the other morph channel starts it at its target.
+            let channel = if selected && previous.shape != shape_target && draw <= 1e-3 {
+                !previous.channel
+            } else {
+                previous.channel
+            };
+            let next = MarkShape {
+                shape: shape_target,
+                channel,
+            };
+            if next != previous {
+                shape.update(cx, |shape, _| *shape = next);
+            }
+            let morph_key = if channel { "morph-b" } else { "morph-a" };
             (
                 motion::token_value(
                     (self.id.clone(), "fill"),
@@ -243,10 +276,12 @@ impl RenderOnce for MaterialCheckbox {
                     window,
                     cx,
                 ),
-                motion::selection_value((self.id.clone(), "mark"), target, window, cx),
-                motion::selection_value((self.id.clone(), "morph"), shape_target, window, cx),
+                draw,
+                motion::selection_value((self.id.clone(), morph_key), shape_target, window, cx),
             )
         };
+        #[cfg(test)]
+        MARK.with(|mark| mark.set((draw, morph)));
         let fill = fill.clamp(0., 1.);
         let paint = checkbox_paint(selected, enabled, self.error);
         let active = keyboard_focus
@@ -464,5 +499,51 @@ mod tests {
                 [CheckboxState::Checked, CheckboxState::Unchecked]
             )
         });
+    }
+
+    #[gpui::test]
+    fn a_mark_drawing_in_from_nothing_does_not_morph(cx: &mut TestAppContext) {
+        cx.update(|cx| {
+            gpui_base::init(cx);
+            cx.set_reduce_motion(false);
+        });
+        let (view, cx) = cx.add_window_view(|_, _| Harness {
+            state: CheckboxState::Indeterminate,
+            changes: Vec::new(),
+        });
+        let settle = |cx: &mut VisualTestContext| {
+            draw(cx);
+            cx.executor()
+                .advance_clock(std::time::Duration::from_secs(2));
+            draw(cx);
+            draw(cx);
+        };
+        let set = |state, cx: &mut VisualTestContext| {
+            view.update(cx, |view, cx| {
+                view.state = state;
+                cx.notify();
+            })
+        };
+        settle(cx);
+        set(CheckboxState::Unchecked, cx);
+        settle(cx);
+        assert_eq!(MARK.with(|mark| mark.get()).0, 0., "retracted");
+        set(CheckboxState::Checked, cx);
+        draw(cx);
+        cx.executor()
+            .advance_clock(std::time::Duration::from_millis(40));
+        draw(cx);
+        let (drawn, morph) = MARK.with(|mark| mark.get());
+        assert!(drawn > 0. && drawn < 1., "mid-draw at {drawn}");
+        assert_eq!(morph, 0., "the check draws in as a check");
+        // A visible mark still morphs from the check to the dash.
+        settle(cx);
+        set(CheckboxState::Indeterminate, cx);
+        draw(cx);
+        cx.executor()
+            .advance_clock(std::time::Duration::from_millis(40));
+        draw(cx);
+        let (_, morph) = MARK.with(|mark| mark.get());
+        assert!(morph > 0. && morph < 1., "morphing at {morph}");
     }
 }

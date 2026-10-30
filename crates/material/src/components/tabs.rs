@@ -292,7 +292,11 @@ impl RenderOnce for MaterialTabs {
             .selected(selected)
             .select_on_focus(select)
             .reveal(scrollable.then(|| scroll.clone()));
-        let entry = if specimen { None } else { roving.entry() };
+        let entry = if specimen {
+            None
+        } else {
+            roving.tab_stop(window)
+        };
 
         // The sliding indicator, once this tab row has been measured.
         let measured = {
