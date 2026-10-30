@@ -67,22 +67,21 @@
 
 ## Performance and delivery
 
-- Performance must clearly beat web implementations. Targets are anchored to
-  GPUI Fast's published results (sidebar scrolling 0.79 ms CPU, unchanged
-  window 0.19 ms) and measured on release builds with raw per-frame timings,
-  maxima, hardware/build context and independent review:
+- Performance must clearly beat web implementations, measured on release builds
+  on an idle machine with raw per-frame timings, maxima, hardware/build context
+  and independent review. A profile taken during builds is not evidence.
   - Steady-state frames (scrolling, hover, running animations, typing): main
     thread CPU work (render, layout, prepaint, paint, scene submission) p95
-    <= 1 ms and max <= 2 ms. Time blocked waiting for a drawable is reported
-    separately and must not occur on the main thread.
-  - Idle windows draw nothing; a forced redraw of an unchanged page <= 0.3 ms.
-  - First frame (window open to first presented frame) <= 16 ms CPU; switching
-    Gallery pages <= 8 ms. GPU time p95 <= 2 ms, reported separately.
-  - Continuous Gallery scrolling with vertical sync off sustains >= 500 newly
-    drawn frames/s (successful submissions only, verified movement); with
-    vertical sync on, no missed refreshes at 120 Hz.
-  - WASM: the same steady-state budgets x2; track main-thread frame time
-    against md3.io in Chrome for equivalent pages and keep it >= 5x lower.
+    <= 1 ms and max <= 2 ms.
+  - A Material list costs at most 2x the instructions per frame of an equivalent
+    Kit list. Material components and Gallery composition are the first place to
+    optimize; engine patches need evidence that the engine is the cause.
+  - Idle windows draw nothing; no missed refreshes at 120 Hz with vertical sync
+    on. Report GPU time separately.
+  - First frame at most 20% above Kit's stories baseline on the same machine, and
+    Gallery page switches <= 8 ms.
+  - WASM: the same steady-state budgets x2; keep main-thread frame time >= 5x
+    below md3.io in Chrome for interactions with real main-thread work.
   Averages alone never establish a target; incomplete timing stays unverified.
 - Notify the narrowest owning view, avoid render-time notification loops and
   virtualize long collections. Measure before introducing caches and identify
