@@ -213,6 +213,12 @@ impl RenderOnce for MaterialSwitch {
         let forced = |state| enabled && preview == Some(state);
         let keyboard_focus = forced(InteractionPreview::Focused)
             || (live && focus.is_focused(window) && window.last_input_was_keyboard());
+        // The release handlers are only installed while live, so a press
+        // that outlives a switch to disabled or a preview ends here rather
+        // than sticking once it is live again.
+        if !live && *press_state.read(cx) {
+            press_state.update(cx, |pressed, _| *pressed = false);
+        }
         let pressed = forced(InteractionPreview::Pressed) || (live && *press_state.read(cx));
         let icon = self.icons.shows(self.checked);
         // Position and size follow separate fast spatial springs, so a press
@@ -426,16 +432,47 @@ mod tests {
         assert_eq!(ICON, 16.);
     }
 
-    struct PressHarness(SwitchIcons, bool);
+    struct PressHarness(SwitchIcons, bool, bool);
     impl Render for PressHarness {
         fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
             window.set_rem_size(px(14.));
             div().p(px(20.)).child(
                 MaterialSwitch::new("press-switch", "Wi-Fi")
                     .checked(self.1)
+                    .disabled(self.2)
                     .icons(self.0),
             )
         }
+    }
+
+    #[gpui::test]
+    fn a_press_ended_while_disabled_does_not_stick(cx: &mut TestAppContext) {
+        cx.update(|cx| {
+            gpui_base::init(cx);
+            cx.set_reduce_motion(true);
+        });
+        let (view, cx) = cx.add_window_view(|_, _| PressHarness(SwitchIcons::None, true, false));
+        draw(cx);
+        let rest = cx.debug_bounds("switch-handle").unwrap();
+        cx.simulate_mouse_move(rest.center(), None, Modifiers::default());
+        cx.simulate_mouse_down(rest.center(), MouseButton::Left, Modifiers::default());
+        draw(cx);
+        let set_disabled = |disabled, cx: &mut VisualTestContext| {
+            view.update(cx, |view, cx| {
+                view.2 = disabled;
+                cx.notify();
+            });
+            draw(cx);
+        };
+        set_disabled(true, cx);
+        cx.simulate_mouse_up(rest.center(), MouseButton::Left, Modifiers::default());
+        draw(cx);
+        set_disabled(false, cx);
+        assert_eq!(
+            cx.debug_bounds("switch-handle").unwrap().size,
+            size(px(24.), px(24.)),
+            "the handle is back at rest"
+        );
     }
 
     #[gpui::test]
@@ -444,7 +481,7 @@ mod tests {
             gpui_base::init(cx);
             cx.set_reduce_motion(true);
         });
-        let (_, cx) = cx.add_window_view(|_, _| PressHarness(SwitchIcons::None, true));
+        let (_, cx) = cx.add_window_view(|_, _| PressHarness(SwitchIcons::None, true, false));
         draw(cx);
         let rest = cx.debug_bounds("switch-handle").unwrap();
         assert_eq!(rest.size, size(px(24.), px(24.)));
@@ -469,13 +506,13 @@ mod tests {
             gpui_base::init(cx);
             cx.set_reduce_motion(true);
         });
-        let (_, cx) = cx.add_window_view(|_, _| PressHarness(SwitchIcons::Both, false));
+        let (_, cx) = cx.add_window_view(|_, _| PressHarness(SwitchIcons::Both, false, false));
         draw(cx);
         assert_eq!(
             cx.debug_bounds("switch-handle").unwrap().size,
             size(px(24.), px(24.))
         );
-        let (_, cx) = cx.add_window_view(|_, _| PressHarness(SwitchIcons::Selected, false));
+        let (_, cx) = cx.add_window_view(|_, _| PressHarness(SwitchIcons::Selected, false, false));
         draw(cx);
         assert_eq!(
             cx.debug_bounds("switch-handle").unwrap().size,
