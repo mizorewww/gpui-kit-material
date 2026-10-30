@@ -4,7 +4,7 @@ use anyhow::{Context as _, Result, bail, ensure};
 use gpui::{App, Entity, Global, ListOffset, ListState, Pixels, Window, px, size};
 use std::{cell::Cell, path::PathBuf, process::Command, rc::Rc, time::Duration};
 
-pub const USAGE: &str = "gallery [--capture output.png --section <page id>\n  --width 960 --height 900 --scale 1 --dark --reduced-motion --settle-ms 800\n  --active --disabled --selected --loading --no-ripple --offset-y 0 --settings --fps --vsync on|off]\n\nPage ids, in gallery order:\n  color typography shape motion elevation app-bars badges buttons cards\n  carousel checkboxes chips date-time-pickers dialogs dividers lists\n  loading-progress menu navigation radio-button search sheets sliders\n  snackbar switch tabs text-fields toolbars tooltips";
+pub const USAGE: &str = "gallery [--capture output.png --section <page id>\n  --width 960 --height 900 --scale 1 --dark --reduced-motion --settle-ms 800\n  --active --disabled --selected --loading --no-ripple --offset-y 0 --settings --fps --vsync on|off]\n\nPage ids, in gallery order:\n  color typography shape motion elevation examples app-bars badges buttons\n  cards carousel checkboxes chips date-time-pickers dialogs dividers lists\n  loading-progress menu navigation radio-button search sheets sliders\n  snackbar switch tabs text-fields toolbars tooltips";
 
 #[derive(Clone)]
 pub struct CaptureOptions {

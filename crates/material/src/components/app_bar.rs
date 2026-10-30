@@ -166,15 +166,18 @@ pub(crate) struct BarPaint {
     pub search: Rgba,
 }
 
-/// `scrolled` is the effects amount, 0 flat and 1 scrolled-under.
+/// `scrolled` is the effects amount, 0 flat and 1 scrolled-under, for a bar
+/// on the default surface.
+#[cfg(test)]
 pub(crate) fn bar_paint(scrolled: f32) -> BarPaint {
+    bar_paint_on(ColorRole::SURFACE, scrolled)
+}
+
+/// The bar paint for a bar whose flat container is `flat`.
+pub(crate) fn bar_paint_on(flat: ColorRole, scrolled: f32) -> BarPaint {
     let scrolled = scrolled.clamp(0., 1.);
     BarPaint {
-        container: blend(
-            color(ColorRole::SURFACE),
-            color(ColorRole::SURFACE_CONTAINER),
-            scrolled,
-        ),
+        container: blend(color(flat), color(ColorRole::SURFACE_CONTAINER), scrolled),
         search: blend(
             color(ColorRole::SURFACE_CONTAINER),
             color(ColorRole::SURFACE_CONTAINER_HIGHEST),
@@ -204,6 +207,7 @@ pub struct TopAppBar {
     actions: Vec<AnyElement>,
     scroll_offset: f32,
     scrolled_under: Option<bool>,
+    container: ColorRole,
     search_placeholder: SharedString,
     on_search: Option<ClickHandler>,
     preview: Option<InteractionPreview>,
@@ -222,6 +226,7 @@ impl TopAppBar {
             actions: Vec::new(),
             scroll_offset: 0.,
             scrolled_under: None,
+            container: ColorRole::SURFACE,
             search_placeholder: SharedString::default(),
             on_search: None,
             preview: None,
@@ -272,6 +277,13 @@ impl TopAppBar {
     }
     fn is_scrolled_under(&self) -> bool {
         self.scrolled_under.unwrap_or(self.scroll_offset > 0.)
+    }
+    /// The flat container role (surface by default), e.g. the
+    /// surface-container-lowest of the content pane a bar heads. Scrolled
+    /// under, the bar still fades to surface-container.
+    pub fn container(mut self, role: ColorRole) -> Self {
+        self.container = role;
+        self
     }
     pub fn scroll_offset(mut self, offset: f32) -> Self {
         self.scroll_offset = offset.max(0.);
@@ -347,7 +359,7 @@ impl RenderOnce for TopAppBar {
             window,
             cx,
         );
-        let paint = bar_paint(scrolled);
+        let paint = bar_paint_on(self.container, scrolled);
         let f = variant.collapse_fraction(subtitle, self.scroll_offset);
         #[cfg(test)]
         PAINTED.with(|painted| {
