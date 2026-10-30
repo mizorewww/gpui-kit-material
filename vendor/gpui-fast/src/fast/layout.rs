@@ -935,6 +935,7 @@ pub(crate) fn release_unclaimed_nodes(engine: &mut TaffyLayoutEngine) {
         if !retention.robbed_parents.is_empty() {
             retention.robbed_parents.remove(&id);
         }
+        engine.mirrored.remove(&id);
         remove_node(&mut engine.taffy, id);
         retention.stats.nodes_freed += 1;
     }

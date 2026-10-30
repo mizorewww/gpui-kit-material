@@ -45,6 +45,7 @@ pub use visual_test_context::*;
 use crate::InspectorElementRegistry;
 use crate::asset_cache::CachedLoad;
 use crate::{
+    LayoutDirection,
     Action, ActionBuildError, ActionRegistry, ActivationPolicy, ActivityGuard, Any, AnyView,
     AnyWindowHandle, AppContext, AppLifecyclePhase, Arena, ArenaBox, Asset, AssetSource,
     BackgroundExecutor, Bounds, ClipboardItem, ClipboardReadError, CursorStyle, DispatchPhase,
@@ -852,6 +853,7 @@ pub struct App {
     pub(crate) this: Weak<AppCell>,
     pub(crate) platform: Rc<dyn Platform>,
     text_system: Arc<TextSystem>,
+    layout_direction: LayoutDirection,
 
     pub(crate) actions: Rc<ActionRegistry>,
     pub(crate) active_drag: Option<AnyDrag>,
@@ -984,6 +986,7 @@ impl App {
                 this: this.clone(),
                 platform: platform.clone(),
                 text_system,
+                layout_direction: LayoutDirection::default(),
                 text_rendering_mode: Rc::new(Cell::new(TextRenderingMode::default())),
                 mode: GpuiMode::Production,
                 actions: Rc::new(ActionRegistry::default()),
@@ -1520,6 +1523,24 @@ impl App {
                 }),
             ),
         )
+    }
+
+    /// The direction new windows start in.
+    pub fn layout_direction(&self) -> LayoutDirection {
+        self.layout_direction
+    }
+
+    /// Set the application's direction. Open windows follow, redrawing, unless
+    /// they called [`Window::set_layout_direction`].
+    pub fn set_layout_direction(&mut self, direction: LayoutDirection) {
+        self.layout_direction = direction;
+        for window in self.windows() {
+            window
+                .update(self, |_, window, _| {
+                    window.follow_app_layout_direction(direction)
+                })
+                .ok();
+        }
     }
 
     /// Returns handles to all open windows in the application.
