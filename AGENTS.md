@@ -57,6 +57,10 @@
   option), built from this library's own components. Every preview is the real,
   working component: clicks, keyboard, menus, dialogs and animations work. The
   Figma kit's spec boards may appear as a secondary view of a component page.
+- No horizontal scrolling for content in the Gallery. Spec boards, previews and
+  configuration panels reflow to the available width (wrap columns into
+  labelled rows or groups, stack sections) so every specimen is fully visible
+  at any supported window width; nothing may be clipped or hidden off-screen.
 
 ## Performance and delivery
 
