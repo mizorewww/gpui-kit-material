@@ -225,7 +225,7 @@ pub static CATALOG: &[Entry] = &[
         Actions,
         "A FAB with a label, for a clearer primary action.",
         slice("buttons", extended_fab_rows),
-        None,
+        Some(&playgrounds::extended_fab::PLAYGROUND),
     ),
     // Selection & input
     component(
