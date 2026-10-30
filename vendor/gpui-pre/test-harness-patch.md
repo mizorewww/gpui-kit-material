@@ -11,4 +11,4 @@ Test-only; no runtime behavior changes.
 - `src/style.rs`: three tests used `#[perf]` from Zed's unpublished
   `util_macros`; they run as ordinary `#[test]`s with unchanged assertions.
 - `Cargo.toml.orig` is not retained; `Cargo.toml` is the normalized published
-  manifest plus the additions in `line-layout-options-patch.md`.
+  manifest.

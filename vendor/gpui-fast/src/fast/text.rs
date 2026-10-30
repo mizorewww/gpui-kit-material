@@ -685,16 +685,11 @@ pub(crate) fn carry_over_line_layouts(previous: &mut FrameCache, current: &mut F
         &mut previous.wrapped_lines_by_hash,
         &mut current.wrapped_lines_by_hash,
     );
-    carry_over(&mut previous.detailed_lines, &mut current.detailed_lines);
     carry_over(&mut previous.lines, &mut current.lines);
     carry_over(&mut previous.lines_by_hash, &mut current.lines_by_hash);
 
     // The used lists index what this frame laid out, which is what a view
     // reused next frame looks its lines up by.
-    mem::swap(
-        &mut previous.used_detailed_lines,
-        &mut current.used_detailed_lines,
-    );
     mem::swap(&mut previous.used_lines, &mut current.used_lines);
     mem::swap(
         &mut previous.used_wrapped_lines,
@@ -708,7 +703,6 @@ pub(crate) fn carry_over_line_layouts(previous: &mut FrameCache, current: &mut F
         &mut previous.used_wrapped_lines_by_hash,
         &mut current.used_wrapped_lines_by_hash,
     );
-    current.used_detailed_lines.clear();
     current.used_lines.clear();
     current.used_wrapped_lines.clear();
     current.used_lines_by_hash.clear();
@@ -721,8 +715,6 @@ impl LineLayoutIndex {
     pub(crate) fn shifted(&self, from: &Self, to: &Self) -> Self {
         LineLayoutIndex {
             font_generation: to.font_generation,
-            detailed_lines_index: self.detailed_lines_index - from.detailed_lines_index
-                + to.detailed_lines_index,
             lines_index: self.lines_index - from.lines_index + to.lines_index,
             wrapped_lines_index: self.wrapped_lines_index - from.wrapped_lines_index
                 + to.wrapped_lines_index,
@@ -1030,14 +1022,12 @@ impl PartialEq for LineLayoutIndex {
     fn eq(&self, other: &Self) -> bool {
         let LineLayoutIndex {
             font_generation,
-            detailed_lines_index,
             lines_index,
             wrapped_lines_index,
             lines_by_hash_index,
             wrapped_lines_by_hash_index,
         } = self;
         *font_generation == other.font_generation
-            && *detailed_lines_index == other.detailed_lines_index
             && *lines_index == other.lines_index
             && *wrapped_lines_index == other.wrapped_lines_index
             && *lines_by_hash_index == other.lines_by_hash_index
@@ -1049,7 +1039,6 @@ impl std::fmt::Debug for LineLayoutIndex {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let LineLayoutIndex {
             font_generation,
-            detailed_lines_index,
             lines_index,
             wrapped_lines_index,
             lines_by_hash_index,
@@ -1057,7 +1046,6 @@ impl std::fmt::Debug for LineLayoutIndex {
         } = self;
         f.debug_struct("LineLayoutIndex")
             .field("font_generation", font_generation)
-            .field("detailed_lines_index", detailed_lines_index)
             .field("lines_index", lines_index)
             .field("wrapped_lines_index", wrapped_lines_index)
             .field("lines_by_hash_index", lines_by_hash_index)

@@ -3,14 +3,12 @@ mod font_fallbacks;
 mod font_features;
 mod line;
 mod line_layout;
-mod line_layout_options;
 mod line_wrapper;
 
 pub use font_fallbacks::*;
 pub use font_features::*;
 pub use line::*;
 pub use line_layout::*;
-pub use line_layout_options::*;
 pub use line_wrapper::*;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -726,113 +724,6 @@ impl WindowTextSystem {
             text,
             decoration_runs,
         }
-    }
-
-    /// Shape a single paragraph without losing the platform's cluster metadata.
-    ///
-    /// Unlike the legacy API this returns an error on unsupported backends.
-    /// It does not yet wrap, truncate, force cell widths, or apply tracking.
-    /// The original text and painted geometry remain shared with the metadata.
-    pub fn shape_line_with_options(
-        &self,
-        text: SharedString,
-        font_size: Pixels,
-        runs: &[TextRun],
-        options: LineLayoutOptions,
-    ) -> Result<DetailedShapedLine> {
-        let layout = self.layout_line_with_options(&text, font_size, runs, options)?;
-        let mut decoration_runs = SmallVec::<[DecorationRun; 32]>::new();
-        for run in runs {
-            if let Some(last) = decoration_runs.last_mut()
-                && last.color == run.color
-                && last.underline == run.underline
-                && last.strikethrough == run.strikethrough
-                && last.background_color == run.background_color
-            {
-                last.len += run.len as u32;
-            } else {
-                decoration_runs.push(DecorationRun {
-                    len: run.len as u32,
-                    color: run.color,
-                    background_color: run.background_color,
-                    underline: run.underline,
-                    strikethrough: run.strikethrough,
-                });
-            }
-        }
-        Ok(DetailedShapedLine {
-            line: ShapedLine {
-                layout: layout.layout.clone(),
-                text,
-                decoration_runs,
-            },
-            layout,
-        })
-    }
-
-    /// Layout a single paragraph with a requested base direction and reliable
-    /// source-to-glyph clusters. Legacy and metadata caches never alias.
-    /// Explicit direction is a bidi paragraph property, not text alignment.
-    pub fn layout_line_with_options(
-        &self,
-        text: &str,
-        font_size: Pixels,
-        runs: &[TextRun],
-        options: LineLayoutOptions,
-    ) -> Result<Arc<DetailedLineLayout>> {
-        anyhow::ensure!(
-            !text.contains(['\n', '\r', '\u{2028}', '\u{2029}']),
-            "paragraph layout requires one line"
-        );
-        anyhow::ensure!(
-            f32::from(font_size).is_finite() && font_size > px(0.),
-            "invalid font size"
-        );
-        let mut end = 0_usize;
-        for run in runs {
-            end = end
-                .checked_add(run.len)
-                .ok_or_else(|| anyhow::anyhow!("text run length overflow"))?;
-            anyhow::ensure!(
-                end <= text.len() && text.is_char_boundary(end),
-                "invalid text run boundary"
-            );
-        }
-        anyhow::ensure!(
-            end == text.len(),
-            "text runs must cover the complete paragraph"
-        );
-        let mut font_runs: SmallVec<[FontRun; 1]> = SmallVec::new();
-        let mut previous: Option<&TextRun> = None;
-        for run in runs {
-            if run.len == 0 {
-                continue;
-            }
-            let font_id = self.resolve_font(&run.font);
-            let same_decoration = previous.is_some_and(|last| {
-                last.color == run.color
-                    && last.underline == run.underline
-                    && last.strikethrough == run.strikethrough
-            });
-            if let Some(last) = font_runs.last_mut()
-                && last.font_id == font_id
-                && same_decoration
-            {
-                last.len += run.len;
-            } else {
-                font_runs.push(FontRun {
-                    len: run.len,
-                    font_id,
-                });
-            }
-            previous = Some(run);
-        }
-        self.line_layout_cache.layout_line_with_options(
-            &SharedString::new(text),
-            font_size,
-            &font_runs,
-            options,
-        )
     }
 
     /// Shape the given line using a caller-provided content hash as the cache key.

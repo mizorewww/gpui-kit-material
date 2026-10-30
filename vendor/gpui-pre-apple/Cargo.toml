@@ -288,9 +288,6 @@ priority = -1
 level = "allow"
 priority = 0
 
-[dependencies.unicode-bidi]
-version = "0.3.18"
-
 [[test]]
-name = "detailed_layout"
-path = "tests/detailed_layout.rs"
+name = "font_fallback"
+path = "tests/font_fallback.rs"

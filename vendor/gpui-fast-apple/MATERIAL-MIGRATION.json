@@ -64,18 +64,18 @@
     {
       "path": "src/text_system.rs",
       "status": "merged",
-      "local_sha256": "cc5586100bea8fb616755a14c7d3be3a38fa27760bd5b59d8275949dbfcdd9d5"
+      "local_sha256": "9c35f0318e0fb39b0887b64903440c08fad8651dbb5776f8a794f08f380a070b"
     },
     {
-      "path": "tests/detailed_layout.rs",
+      "path": "tests/font_fallback.rs",
       "status": "added",
-      "local_sha256": "3759e317a8566b16c91438ce335946f6edd1b83a5d2d5eb3f58387a0ce7d2d05"
+      "local_sha256": "4ca77731fbd3a6e716a2c0eac5a59b2e60ad845c5d39fe5bbad96b4cc6c81eb2"
     }
   ],
   "conflicts": [],
   "validation": "source migration only; no build/tests",
   "manifest_changes": [
-    "unicode-bidi 0.3.18; detailed_layout test"
+    "font_fallback test"
   ],
   "archive_verification": {
     "files": 48,
@@ -106,8 +106,8 @@
     "modified": {
       "Cargo.toml": {
         "upstream_sha256": "31751839a9fec38c5c4b7bce8d897ba046afdedb1a480dd07f0f30b87d6bf867",
-        "local_sha256": "fce71bb4ae183b90f7d0f80a5045dd4e8387052bfb8a6ba5b6aa819ab47e640f",
-        "reason": "unicode-bidi 0.3.18 and the detailed_layout [[test]], as vendor/gpui-pre-apple (manifest_changes)."
+        "local_sha256": "f6772be0d17bd9836238039104989fda84d223db69b3e57be5391ef7c8f3e271",
+        "reason": "The font_fallback [[test]], as vendor/gpui-pre-apple (manifest_changes)."
       },
       "src/fast/layers/raster.rs": {
         "upstream_sha256": "3893062c508aca573d8317ca89633979f608a8c6d21687b2a218c2ab9eac8a62",
@@ -131,8 +131,8 @@
       },
       "src/text_system.rs": {
         "upstream_sha256": "31ae84947cdb3f47314a04a68d9efbcecbe6e5d11e903e969487c235ad0b8b58",
-        "local_sha256": "cc5586100bea8fb616755a14c7d3be3a38fa27760bd5b59d8275949dbfcdd9d5",
-        "reason": "Merged from vendor/gpui-pre-apple: detailed layout, fonts without 'm', fallback cascade rebuild, sbix detection (migrated)."
+        "local_sha256": "9c35f0318e0fb39b0887b64903440c08fad8651dbb5776f8a794f08f380a070b",
+        "reason": "Merged from vendor/gpui-pre-apple: fonts without 'm', fallback cascade rebuild, sbix detection (migrated)."
       },
       "src/gpui_apple.rs": {
         "upstream_sha256": "868b4a245f9d24ef1831dad36132ce90fd2ac96a7edbdac6597dc04ae246bb21",
@@ -141,13 +141,13 @@
       }
     },
     "added": {
-      "tests/detailed_layout.rs": {
-        "sha256": "3759e317a8566b16c91438ce335946f6edd1b83a5d2d5eb3f58387a0ce7d2d05",
-        "reason": "Added: identical to vendor/gpui-pre-apple (migrated)."
-      },
       "src/drawable_prefetch.rs": {
         "sha256": "4acaa95afa5363c84098321747e4ac59be5b4cac6c91e171a968aa0efc0ba17b",
         "reason": "Added: per-renderer drawable prefetch thread holding at most one acquired CAMetalDrawable, with a thread-safe window waker (Material presentation patch)."
+      },
+      "tests/font_fallback.rs": {
+        "sha256": "4ca77731fbd3a6e716a2c0eac5a59b2e60ad845c5d39fe5bbad96b4cc6c81eb2",
+        "reason": "Added: identical to vendor/gpui-pre-apple (VENDORED.md)."
       }
     },
     "removed": {

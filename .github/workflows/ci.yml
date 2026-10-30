@@ -75,13 +75,13 @@ jobs:
           RUSTFLAGS: -D warnings
           CARGO_TARGET_DIR: target/deny-warnings
         run: cargo check --locked --workspace --all-targets
-      - name: Vendored text layout regression tests
+      - name: Vendored text regression tests
         if: runner.os == 'macOS'
         run: |
-          cargo test --locked -p gpui-pre --test line_layout_options
+          cargo test --locked -p gpui-pre-apple --test font_fallback
           cargo test --locked -p gpui-pre --lib text_system
           cargo test --locked -p gpui-kit-material -p gpui-fast --features gpui-kit-material/gpui-fast,gpui-kit-material/frame-profiler --lib
-          cargo test --locked -p gpui-kit-material -p gpui-fast --features gpui-kit-material/gpui-fast,gpui-kit-material/frame-profiler --test line_layout_options
+          cargo test --locked -p gpui-fast-apple --test font_fallback
 
   wasm:
     runs-on: ubuntu-latest

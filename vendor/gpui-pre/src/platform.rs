@@ -1586,17 +1586,6 @@ pub trait PlatformTextSystem: Send + Sync {
     ) -> Result<(Size<DevicePixels>, Vec<u8>)>;
     /// Layout a line of text with the given font runs.
     fn layout_line(&self, text: &str, font_size: Pixels, runs: &[FontRun]) -> LineLayout;
-    /// Layout a single paragraph with explicit direction and reliable clusters.
-    /// The opt-in API must not silently fall back to legacy glyph-only layout.
-    fn layout_line_with_options(
-        &self,
-        _text: &str,
-        _font_size: Pixels,
-        _runs: &[FontRun],
-        _options: crate::LineLayoutOptions,
-    ) -> Result<crate::DetailedLineLayout> {
-        anyhow::bail!("this text backend does not support paragraph layout with cluster metadata")
-    }
     /// Returns the recommended text rendering mode for the given font and size.
     fn recommended_rendering_mode(&self, _font_id: FontId, _font_size: Pixels)
     -> TextRenderingMode;

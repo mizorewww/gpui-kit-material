@@ -280,7 +280,7 @@ into `conformance/reference/`. Figma kit token fixtures (`figma-*.json`) come fr
 ## Vendored engine tests
 
 ```sh
-cargo test -p gpui-pre --test line_layout_options
+cargo test -p gpui-pre-apple --test font_fallback
 cargo test -p gpui-pre --lib text_system
 cargo test -p gpui-kit-material -p gpui-fast --features gpui-kit-material/gpui-fast,gpui-kit-material/frame-profiler --lib
 ```

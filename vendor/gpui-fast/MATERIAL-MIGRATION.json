@@ -177,7 +177,7 @@
     "src/window.rs": "d3f00c28cc47446f6c73be67d00830446e0e3a9a7fadefdf54fff9e5ccadee0b"
   },
   "patch_base": "gpui-pre 0.3.10 published archive plus this workspace compatibility patches",
-  "patch_contract": "Preserve raw touch observers and extended hitboxes through Fast retained/scroll replay; preserve full CPU scopes, repeat playback, detailed text and font invalidation. Runtime validation is required.",
+  "patch_contract": "Preserve raw touch observers and extended hitboxes through Fast retained/scroll replay; preserve full CPU scopes, repeat playback and font invalidation. Runtime validation is required.",
   "additional_test_fixtures": {
     "tests/fonts/README.md": {
       "sha256": "675824dd97a1d09a1a105d186a7b96a05016009d5d14621d6f5298612b3fbc6d",
@@ -231,11 +231,6 @@
   "local_changes": {
     "scope": "Every file that differs from the extracted published archive (Cargo's .cargo-ok extraction marker excluded); MATERIAL-MIGRATION.json itself is provenance.",
     "modified": {
-      "Cargo.toml": {
-        "upstream_sha256": "1f8d49e1f08e320cf393fcacb2ac402044ddb7aaf8dffc4572e31aa3d5a9e7ea",
-        "local_sha256": "79f414781c446fda6edb8ba461ef303e4a8d27074d8e9441d52baab63ced140b",
-        "reason": "unicode-segmentation =1.13.3 and the line_layout_options [[test]], as vendor/gpui-pre/line-layout-options-patch.md."
-      },
       "src/app.rs": {
         "upstream_sha256": "2d698e066335022335d3b3f4611f66e55e192fedeee56b1960ebea3f0a62eb23",
         "local_sha256": "e38caf2c7bbc8823be4d8bc9ea97f92cb28cca2012a12989c2f4dc379858522a",
@@ -308,13 +303,13 @@
       },
       "src/fast/text.rs": {
         "upstream_sha256": "e386a393269aee9189cb87c2a1f40f40fb4716b2cd98e6a394e052b318177814",
-        "local_sha256": "bf9df6e2acfc6666f947841b28cc1e0d8b6ef0c05228835502e60588d0f9a519",
-        "reason": "Text measurement inputs carry the font generation and drop stale held layouts; frame carry-over of the detailed-line cache (font invalidation and line-layout options)."
+        "local_sha256": "28faf38f3ee8ba8850656779a1682d60b6a0fc87759cba40f8c157ca06f62337",
+        "reason": "Text measurement inputs carry the font generation and drop stale held layouts (font invalidation)."
       },
       "src/platform.rs": {
         "upstream_sha256": "7f95c2fe68fc225cb45451888355c4df2589632d7bde0d61fce554972f4825ca",
-        "local_sha256": "3ae945bd294796af2f003dc08c0dd53e5b4d13694c706bbda3f4915c0936d2d9",
-        "reason": "VsyncStatus, vsync_status/set_vsync, has_periodic_frame_source, successful_frame_submissions (vendor/gpui-pre/frame-submission-patch.md); layout_line_with_options (line-layout-options-patch.md); declares frame_submission (frame-submission-patch.md)."
+        "local_sha256": "59463a5dfdc0d4e9f60171bbc506ecfaeb8ff18caa6a068af983a76af4648678",
+        "reason": "VsyncStatus, vsync_status/set_vsync, has_periodic_frame_source, successful_frame_submissions (vendor/gpui-pre/frame-submission-patch.md); declares frame_submission."
       },
       "src/platform/test/window.rs": {
         "upstream_sha256": "3b359c9e7943ccb065096c718756b32400dac3394bfd9ab6f361dda8163e97bd",
@@ -348,13 +343,8 @@
       },
       "src/text_system.rs": {
         "upstream_sha256": "e07554d460982d07546b4d67d9cd02162853b27a9cab7f53a9266626fff27346",
-        "local_sha256": "bf1ba1916bbc8ee9fe32df256009da273ed725f3c5784dded292e8ac419d2739",
-        "reason": "Detailed layout entry points and em_width/em_advance fallback (line-layout-options-patch.md); add_fonts invalidates Fast text caches after the platform installs the fonts instead of before, and exposes font_generation() to the Fast retention checks."
-      },
-      "src/text_system/line_layout.rs": {
-        "upstream_sha256": "757c2672c0831f9f848845c6ac74dece3c6e0401613b1e00325129cbf1548c08",
-        "local_sha256": "a6dacb5437ee9e3cc63c0e3f62d38ecb57c3d9b42971862749b501a2d91d0c39",
-        "reason": "Separate detailed-layout frame cache with index, reuse and truncation; fields pub(crate) for Fast's text-cache carry-over (line-layout-options-patch.md)."
+        "local_sha256": "6df6572db38de75b6b48c2556976d3fea3346c0add7321dcf00f883040770600",
+        "reason": "em_width/em_advance fallback (vendor/gpui-pre/em-fallback-patch.md); add_fonts invalidates Fast text caches after the platform installs the fonts instead of before, and exposes font_generation."
       },
       "src/window.rs": {
         "upstream_sha256": "d3f00c28cc47446f6c73be67d00830446e0e3a9a7fadefdf54fff9e5ccadee0b",
@@ -376,10 +366,6 @@
         "sha256": "e5d9be99b8866fb9a498b4e622b8f75798f249760342cb36aaac655b52594458",
         "reason": "Added: FrameSubmissionCounter and dxgi_present_succeeded, backend accounting tested on every host (vendor/gpui-pre/frame-submission-patch.md)."
       },
-      "src/text_system/line_layout_options.rs": {
-        "sha256": "c6c61dd6adc811245cfaeba129034910b53955c50f5eda40ccd25b8b37a8a57f",
-        "reason": "Added: identical to vendor/gpui-pre (line-layout-options-patch.md)."
-      },
       "tests/fonts/README.md": {
         "sha256": "675824dd97a1d09a1a105d186a7b96a05016009d5d14621d6f5298612b3fbc6d",
         "reason": "Added: test-font provenance, identical to vendor/gpui-pre (additional_test_fixtures)."
@@ -399,10 +385,6 @@
       "tests/fonts/lilex/OFL.txt": {
         "sha256": "a356708a399e3f54b937ec7d9b722c26dabba21365b60f95c56eb7ebca0dee40",
         "reason": "Added: font license, identical to vendor/gpui-pre."
-      },
-      "tests/line_layout_options.rs": {
-        "sha256": "e5a6ffc9852b81db571127695b6f11bb7de66adc9655e374bdf6dbcef19701b2",
-        "reason": "Added: identical to vendor/gpui-pre (line-layout-options-patch.md)."
       }
     },
     "removed": {
@@ -411,6 +393,6 @@
         "reason": "Package-level lockfile not retained; the workspace Cargo.lock owns resolution."
       }
     },
-    "unchanged_file_count": 143
+    "unchanged_file_count": 145
   }
 }

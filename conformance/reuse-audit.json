@@ -159,7 +159,7 @@
       "upstream_paths": [
         "Cargo.toml"
       ],
-      "action": "Keep required detailed text, original-hitbox extension, passive touch and DPR fixes until the selected runtime supplies equivalent behavior.",
+      "action": "Keep the original-hitbox extension, passive touch and DPR fixes until the selected runtime supplies equivalent behavior.",
       "conditions": "Kit still depends on unpatched gpui-pre 0.3.10. Inspect actual runtime source and repeat regressions; do not remove entire vendor trees based on package names."
     },
     {
@@ -373,7 +373,7 @@
         "Cargo.toml"
       ],
       "action": "Keep the vendored gpui-fast 0.1.12 (default backend) with the gpui-pre compatibility patches carried forward; see its MATERIAL-MIGRATION.json.",
-      "conditions": "Preserves raw touch observers and extended hitboxes through retained/scroll replay, full CPU profiler scopes, repeat playback, detailed text and font invalidation. Kit selects unpatched crates.io gpui-fast; remove only after each patch has an upstream equivalent and the regressions pass."
+      "conditions": "Preserves raw touch observers and extended hitboxes through retained/scroll replay, full CPU profiler scopes, repeat playback and font invalidation. Kit selects unpatched crates.io gpui-fast; remove only after each patch has an upstream equivalent and the regressions pass."
     },
     {
       "id": "vendor-gpui-fast-apple",
@@ -385,7 +385,7 @@
       "upstream_paths": [
         "Cargo.toml"
       ],
-      "action": "Keep merged detailed-layout text system, OpenType and Metal presentation patches; see its MATERIAL-MIGRATION.json.",
+      "action": "Keep the merged text system, OpenType and Metal presentation patches; see its MATERIAL-MIGRATION.json.",
       "conditions": "draw_with_status reports real command-buffer submission and drains autoreleased Metal objects per draw. Required for frame-submission evidence; verify against the published crate before removal."
     },
     {
