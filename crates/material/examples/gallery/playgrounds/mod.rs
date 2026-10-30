@@ -2,6 +2,7 @@
 //! exports a `PLAYGROUND` static that `super::catalog` points its entry at.
 //! See `super::playground` for the API.
 pub mod button;
+pub mod button_group;
 pub mod extended_fab;
 pub mod fab;
 pub mod fab_menu;

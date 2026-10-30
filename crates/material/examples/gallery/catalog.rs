@@ -193,7 +193,7 @@ pub static CATALOG: &[Entry] = &[
         Actions,
         "Related actions with shared shapes and flexible selection.",
         slice("buttons", button_group_rows),
-        None,
+        Some(&playgrounds::button_group::PLAYGROUND),
     ),
     component(
         "split-button",

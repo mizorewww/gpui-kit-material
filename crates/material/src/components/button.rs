@@ -213,6 +213,10 @@ impl ButtonSize {
             Self::ExtraLarge => "xl",
         }
     }
+    /// The container height in design px.
+    pub(crate) fn height(self) -> f32 {
+        self.geometry().height
+    }
     fn icon_size(self) -> f32 {
         match self {
             Self::ExtraSmall | Self::Small => 20.,
