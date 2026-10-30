@@ -69,6 +69,7 @@ pub enum StatusKind {
 }
 
 /// Former name of [`StatusKind`]: these are status labels, not M3 badges.
+#[deprecated(note = "status labels are not M3 badges: use `StatusKind` with `status_chip`")]
 pub type BadgeKind = StatusKind;
 
 /// A status label chip: a tinted pill with an optional status icon. Icon,
@@ -111,6 +112,9 @@ pub fn status_chip(kind: StatusKind) -> Div {
 const STATUS_ICON: Rems = rem(16.);
 
 /// A status label; same as [`status_chip`], kept under its earlier name.
+#[deprecated(
+    note = "a status chip, not an M3 badge: use `status_chip` (M3 badges are `small_badge` and `large_badge`)"
+)]
 pub fn badge(kind: StatusKind) -> Div {
     status_chip(kind)
 }
@@ -137,6 +141,7 @@ pub fn outlined_status_chip(
 
 /// An outlined status label; same as [`outlined_status_chip`], kept under its
 /// earlier name.
+#[deprecated(note = "a status chip, not an M3 badge: use `outlined_status_chip`")]
 pub fn outlined_badge(id: impl Into<ElementId>, label: impl Into<SharedString>) -> Stateful<Div> {
     outlined_status_chip(id, label)
 }
