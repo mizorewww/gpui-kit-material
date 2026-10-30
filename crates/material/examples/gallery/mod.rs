@@ -67,6 +67,12 @@ fn caption_labels() -> CaptionLabels {
 /// Fixed height keeps the native traffic lights centered at every text scale.
 const TITLE_BAR: Pixels = px(56.);
 
+/// The title bar grows with the text scale, so its 40dp controls and their
+/// labels keep their room up to 200%.
+fn title_bar_height(window: &Window) -> Pixels {
+    TITLE_BAR.max(TITLE_BAR * (f32::from(window.rem_size()) / BASE_PX))
+}
+
 /// The settings whose change starts a theme transition.
 type ThemeKey = (
     PaletteId,
@@ -74,6 +80,7 @@ type ThemeKey = (
     ThemeMode,
     Contrast,
     SharedString,
+    Option<gpui_kit_material::color::dynamic::SeedScheme>,
 );
 fn theme_key(shared: &GalleryShared) -> ThemeKey {
     (
@@ -82,6 +89,7 @@ fn theme_key(shared: &GalleryShared) -> ThemeKey {
         shared.reference_mode,
         shared.contrast,
         shared.scale.clone(),
+        shared.seed,
     )
 }
 
@@ -306,8 +314,9 @@ impl Gallery {
             let hint = Rc::new(Cell::new(PaneHint::default()));
             let panel = cx.new(|cx| PanelView::new(state.clone(), hint.clone(), cx));
             let dependents = (self.lead.downgrade(), panel.downgrade());
+            let shared = self.shared.clone();
             let preview =
-                cx.new(|cx| PreviewView::new(state.clone(), hint.clone(), dependents, cx));
+                cx.new(|cx| PreviewView::new(state.clone(), shared, hint.clone(), dependents, cx));
             self.entries[entry].views = Some(PlaygroundViews {
                 preview,
                 panel,
@@ -711,7 +720,7 @@ impl Render for GalleryWindow {
                     .on_click(|_, window, cx| settings::open(window, cx))
                     .into_any_element()
             });
-        let mut bar = TitleBar::new("title-bar", TITLE_BAR, caption_labels());
+        let mut bar = TitleBar::new("title-bar", title_bar_height(window), caption_labels());
         if let Some(caption) = self.caption {
             bar = bar.caption(caption);
         }
@@ -732,10 +741,7 @@ impl Render for GalleryWindow {
                     .when_some(self.fps.clone().filter(|_| !compact), |bar, fps| {
                         bar.child(fps)
                     })
-                    .child(spec::RemScaled::new(
-                        top_bar::chrome_rem(window),
-                        settings.into_any_element(),
-                    )),
+                    .child(settings),
             )
             // Not `cached`: a dirty cached view always renders again, and every
             // preview animation frame dirties the views around the preview. As
@@ -908,10 +914,11 @@ mod window_tests {
                 mode.right() <= settings.left(),
                 "{width} at {text_scale}: {mode:?} collides with {settings:?}"
             );
-            // The controls stay inside the fixed bar at any text scale.
+            // The bar grows, so the controls fit it at any text scale.
+            let bar = super::TITLE_BAR * text_scale;
             for control in [mode, settings] {
                 assert!(
-                    control.top() >= px(0.) && control.bottom() <= super::TITLE_BAR,
+                    control.top() >= px(0.) && control.bottom() <= bar,
                     "{width} at {text_scale}: {control:?}"
                 );
             }
@@ -1019,5 +1026,95 @@ mod window_tests {
         cx.update(|cx| gallery.update(cx, |_, cx| cx.notify()));
         draw(window.into(), cx);
         assert_eq!(cx.read(|cx| gallery.read(cx).renders.get()), rendered + 1);
+    }
+
+    #[gpui::test]
+    fn only_the_app_bars_collapse_notifies_the_example_app(cx: &mut TestAppContext) {
+        cx.update(|cx| {
+            gpui_kit::init(cx);
+            gpui_kit_material::init(cx);
+        });
+        let mut parts = None;
+        let window = cx.open_window(size(px(1280.), px(900.)), |window, cx| {
+            let gallery = cx.new(|cx| Gallery::new(window, cx));
+            let top_bar = cx.new(|cx| top_bar::TopBar::new(gallery.clone(), window, cx));
+            parts = Some(gallery.clone());
+            GalleryWindow {
+                gallery,
+                top_bar,
+                fps: None,
+                caption: None,
+            }
+        });
+        let gallery = parts.unwrap();
+        let entry = super::catalog::position("examples").unwrap();
+        cx.update(|cx| gallery.update(cx, |gallery, cx| gallery.navigate(entry, cx)));
+        for _ in 0..4 {
+            draw(window.into(), cx);
+        }
+        let mut cx = gpui::VisualTestContext::from_window(window.into(), cx);
+        // A screen with a collapsing app bar; Home has none.
+        cx.update(|window, cx| {
+            let entry = gallery.read(cx).current;
+            let state = gallery.read(cx).entries[entry].playground.clone().unwrap();
+            state.update(cx, |state, cx| {
+                state.set_value(
+                    "screen",
+                    super::Value::Choice(super::pages::examples::app::Body::Library.index()),
+                    window,
+                    cx,
+                )
+            });
+        });
+        for _ in 0..3 {
+            cx.update(|window, cx| {
+                window.refresh();
+                window.draw(cx).clear(cx);
+            });
+            cx.run_until_parked();
+        }
+        let at = cx.debug_bounds("example-scroll").unwrap().center();
+        // Entering the device is a hover change of its own.
+        cx.simulate_mouse_move(at, None, gpui::Modifiers::none());
+        cx.update(|window, cx| window.draw(cx).clear(cx));
+        cx.run_until_parked();
+        cx.update(|window, cx| window.draw(cx).clear(cx));
+        cx.run_until_parked();
+        let wheel = |cx: &mut gpui::VisualTestContext, by: f32| {
+            cx.simulate_event(gpui::ScrollEvent {
+                position: at,
+                delta: gpui::ScrollDelta::Pixels(gpui::point(px(0.), px(by))),
+                modifiers: gpui::Modifiers::none(),
+                touch_phase: gpui::TouchPhase::Moved,
+                ..Default::default()
+            });
+            cx.update(|window, cx| window.draw(cx).clear(cx));
+            cx.run_until_parked();
+        };
+        let app = cx.update(|_, cx| {
+            let entry = gallery.read(cx).current;
+            let state = gallery.read(cx).entries[entry].playground.clone().unwrap();
+            state
+                .read(cx)
+                .local_entity::<super::pages::examples::app::ExamplesApp>("example-app")
+                .unwrap()
+        });
+        let notified = std::rc::Rc::new(std::cell::Cell::new(0));
+        let _watch = cx.update(|_, cx| {
+            let notified = notified.clone();
+            cx.observe(&app, move |_, _| notified.set(notified.get() + 1))
+        });
+        wheel(&mut cx, -8.);
+        assert_eq!(notified.get(), 1, "the bar collapses as it scrolls");
+        wheel(&mut cx, -600.);
+        let collapsed = notified.get();
+        for _ in 0..3 {
+            wheel(&mut cx, -8.);
+        }
+        assert_eq!(
+            notified.get(),
+            collapsed,
+            "past that the app is not notified"
+        );
     }
 }

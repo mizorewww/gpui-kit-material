@@ -189,3 +189,48 @@ mod tests {
         assert_eq!(spoken(&plain), plain);
     }
 }
+
+#[cfg(test)]
+mod tracking_tests {
+    use super::*;
+    use core::prelude::v1::test;
+    use gpui::{Context, Render, TestAppContext, Window};
+
+    struct Tracked;
+    impl Render for Tracked {
+        fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+            let line = |name: &'static str, spacing: f32| {
+                div().flex().child(
+                    div()
+                        .debug_selector(move || name.into())
+                        .text_size(px(14.))
+                        .letter_spacing(px(spacing))
+                        .child("Label"),
+                )
+            };
+            div()
+                .flex()
+                .flex_col()
+                .child(line("plain", 0.))
+                .child(line("tracked", 2.))
+        }
+    }
+
+    #[gpui::test]
+    fn letter_spacing_widens_a_line_once_per_character(cx: &mut TestAppContext) {
+        let (_, cx) = cx.add_window_view(|_, _| Tracked);
+        cx.update(|window, cx| {
+            window.refresh();
+            window.draw(cx).clear(cx);
+        });
+        let width = |cx: &mut gpui::VisualTestContext, name| {
+            f32::from(cx.debug_bounds(name).unwrap().size.width)
+        };
+        let (plain, tracked) = (width(cx, "plain"), width(cx, "tracked"));
+        // Layout rounds to whole device pixels.
+        assert!(
+            (tracked - plain - 10.).abs() <= 1.,
+            "five characters at 2px: {plain} and {tracked}"
+        );
+    }
+}

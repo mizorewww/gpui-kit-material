@@ -481,6 +481,9 @@ pub struct TextStyle {
 
     /// The number of lines to display before truncating the text
     pub line_clamp: Option<usize>,
+
+    /// Extra space after each character (CSS `letter-spacing`), in pixels or rems.
+    pub letter_spacing: AbsoluteLength,
 }
 
 impl Default for TextStyle {
@@ -502,6 +505,7 @@ impl Default for TextStyle {
             text_overflow: None,
             text_align: TextAlign::default(),
             line_clamp: None,
+            letter_spacing: AbsoluteLength::Pixels(px(0.)),
         }
     }
 }
@@ -704,10 +708,16 @@ impl Style {
         }
 
         let rem_size = window.rem_size();
+        let rtl = window.layout_direction().is_rtl();
         let corner_radii = self
             .corner_radii
             .to_pixels(rem_size)
             .clamp_radii_for_quad_size(bounds.size);
+        let corner_radii = if rtl {
+            corner_radii.flip_x()
+        } else {
+            corner_radii
+        };
 
         window.paint_drop_shadows(bounds, corner_radii, &self.box_shadow);
 
@@ -744,6 +754,11 @@ impl Style {
 
         if self.is_border_visible() {
             let border_widths = self.border_widths.to_pixels(rem_size);
+            let border_widths = if rtl {
+                border_widths.flip_x()
+            } else {
+                border_widths
+            };
             let mut background = self.border_color.unwrap_or_default();
             background.a = 0.;
             window.paint_quad(quad(
@@ -1526,5 +1541,17 @@ mod tests {
             Some(FontWeight::SEMIBOLD),
             style.text_style().unwrap().font_weight
         );
+    }
+}
+
+impl TextAlign {
+    /// This alignment where it paints: left is the start of the line and right
+    /// its end, so right-to-left layout exchanges them.
+    pub fn in_direction(self, direction: crate::LayoutDirection) -> Self {
+        match (self, direction.is_rtl()) {
+            (Self::Left, true) => Self::Right,
+            (Self::Right, true) => Self::Left,
+            (align, _) => align,
+        }
     }
 }

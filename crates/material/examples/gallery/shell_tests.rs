@@ -904,3 +904,105 @@ mod examples {
         }
     }
 }
+
+#[gpui::test]
+fn the_preview_controls_stay_in_the_card(cx: &mut TestAppContext) {
+    use gpui_kit_material::color::themes::ThemeMode;
+    let (window, mut cx) = open(cx);
+    go(&window, &mut cx, "button");
+    let shared = window.update(&mut cx, |g, _, _| g.shared.clone()).unwrap();
+    let applied = window
+        .update(&mut cx, |g, _, _| g.applied_theme.clone())
+        .unwrap();
+    let app_paint = gpui_kit_material::theme::scheme();
+    cx.update(|_, cx| {
+        shared.update(cx, |s, cx| {
+            s.preview_mode = Some(ThemeMode::Dark);
+            s.preview_rtl = true;
+            cx.notify();
+        })
+    });
+    settle(&window, &mut cx);
+    window
+        .update(&mut cx, |g, _, cx| {
+            assert_eq!(g.applied_theme, applied, "the application keeps its theme");
+            assert_eq!(g.applied_theme, super::theme_key(g.shared.read(cx)));
+            assert!(g.shared.read(cx).preview_scheme().is_some());
+        })
+        .unwrap();
+    assert_eq!(
+        gpui_kit_material::theme::scheme(),
+        app_paint,
+        "nothing leaks out of the preview's scope"
+    );
+    // The RTL switch mirrors the preview's content inside its canvas.
+    assert!(cx.debug_bounds("preview-canvas").is_some());
+    cx.update(|_, cx| {
+        shared.update(cx, |s, cx| {
+            s.preview_mode = None;
+            s.preview_rtl = false;
+            cx.notify();
+        })
+    });
+    settle(&window, &mut cx);
+    assert!(
+        window
+            .update(&mut cx, |g, _, cx| g
+                .shared
+                .read(cx)
+                .preview_scheme()
+                .is_none())
+            .unwrap(),
+        "with nothing set the preview follows the application"
+    );
+}
+
+/// The preview's scope is its view's, so a preview in its own theme, mode or
+/// direction still keeps an animation frame to itself.
+#[gpui::test]
+fn a_scoped_preview_keeps_a_frame_to_itself(cx: &mut TestAppContext) {
+    use gpui_kit_material::color::themes::ThemeMode;
+    let (window, mut cx) = open(cx);
+    go(&window, &mut cx, "button");
+    let (preview, lead, shared) = window
+        .update(&mut cx, |g, _, _| {
+            let views = g.entries[g.current].views.clone().unwrap();
+            (views.preview, g.lead.clone(), g.shared.clone())
+        })
+        .unwrap();
+    for (mode, rtl) in [
+        (None, false),
+        (None, true),
+        (Some(ThemeMode::Dark), false),
+        (Some(ThemeMode::Dark), true),
+    ] {
+        cx.update(|_, cx| {
+            shared.update(cx, |s, cx| {
+                s.preview_mode = mode;
+                s.preview_rtl = rtl;
+                cx.notify();
+            })
+        });
+        settle(&window, &mut cx);
+        // `settle` refreshes the window, building every view: not this.
+        let frame = |cx: &mut VisualTestContext| {
+            cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear(cx))
+                .unwrap();
+            cx.run_until_parked();
+        };
+        // The first notification after a refresh still draws the lead row once.
+        cx.update(|_, cx| cx.notify(preview.entity_id()));
+        frame(&mut cx);
+        frame(&mut cx);
+        let rendered = cx.read(|cx| lead.read(cx).renders.get());
+        for _ in 0..3 {
+            cx.update(|_, cx| cx.notify(preview.entity_id()));
+            frame(&mut cx);
+        }
+        assert_eq!(
+            cx.read(|cx| lead.read(cx).renders.get()),
+            rendered,
+            "mode {mode:?}, rtl {rtl}"
+        );
+    }
+}

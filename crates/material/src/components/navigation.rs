@@ -271,6 +271,7 @@ pub(crate) fn type_role<E: Styled>(element: E, role: TypeRole) -> E {
     element
         .font_family(scale.font_family)
         .text_size(scale.font_size)
+        .letter_spacing(scale.letter_spacing)
         .line_height(scale.line_height)
         .font_weight(FontWeight(scale.font_weight as f32))
 }
@@ -602,6 +603,7 @@ pub(crate) fn destinations(
     let skip: Rc<[bool]> = items.iter().map(NavItem::is_disabled).collect();
     // Arrows only move focus; Enter or Space activates.
     let roving = Roving::new(handles.clone(), orientation)
+        .rtl(crate::scope::is_rtl(window))
         .skip(skip)
         .selected(selected);
     let entry = if specimen {

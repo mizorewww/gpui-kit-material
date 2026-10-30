@@ -2,6 +2,8 @@
 //! Reference playground: <https://md3.io/components/switch/>.
 use super::InteractionPreview;
 use super::button::ButtonFocusRing;
+use super::labeled::{ControlLabel, LabelPosition, required_label};
+use super::ripple::Ripple;
 use crate::{
     color::ColorRole,
     icons::IconName,
@@ -20,6 +22,10 @@ use std::rc::Rc;
 pub struct MaterialSwitch {
     id: ElementId,
     label: SharedString,
+    show_label: bool,
+    supporting: Option<SharedString>,
+    label_position: LabelPosition,
+    required: bool,
     checked: bool,
     disabled: bool,
     error: bool,
@@ -57,6 +63,10 @@ impl MaterialSwitch {
         Self {
             id: id.into(),
             label: label.into(),
+            show_label: false,
+            supporting: None,
+            label_position: LabelPosition::Start,
+            required: false,
             checked: false,
             disabled: false,
             error: false,
@@ -72,6 +82,28 @@ impl MaterialSwitch {
     /// [`InteractionPreview`].
     pub fn preview_state(mut self, state: InteractionPreview) -> Self {
         self.preview = Some(state);
+        self
+    }
+    /// Show the label beside the switch, filling the available width.
+    /// Pressing it toggles the switch.
+    pub fn show_label(mut self, show: bool) -> Self {
+        self.show_label = show;
+        self
+    }
+    /// Supporting text under a visible label.
+    pub fn supporting_text(mut self, text: impl Into<SharedString>) -> Self {
+        self.supporting = Some(text.into());
+        self
+    }
+    /// Which side a visible label sits on (default start).
+    pub fn label_position(mut self, position: LabelPosition) -> Self {
+        self.label_position = position;
+        self
+    }
+    /// Mark the choice as required: the label and accessible name gain the
+    /// required mark. Enforcing it belongs to the form that owns the value.
+    pub fn required(mut self, required: bool) -> Self {
+        self.required = required;
         self
     }
     pub fn checked(mut self, checked: bool) -> Self {
@@ -241,6 +273,8 @@ impl RenderOnce for MaterialSwitch {
             .read(cx)
             .clone();
         let press_state = window.use_keyed_state((self.id.clone(), "pressed"), cx, |_, _| false);
+        let touch_press =
+            window.use_keyed_state((self.id.clone(), "touch-pressed"), cx, |_, _| false);
         let preview = self.preview;
         let disabled = self.disabled || preview.is_some_and(|p| p.is_disabled());
         let enabled = !disabled;
@@ -254,7 +288,8 @@ impl RenderOnce for MaterialSwitch {
         if !live && *press_state.read(cx) {
             press_state.update(cx, |pressed, _| *pressed = false);
         }
-        let pressed = forced(InteractionPreview::Pressed) || (live && *press_state.read(cx));
+        let pressed = forced(InteractionPreview::Pressed)
+            || (live && (*press_state.read(cx) || *touch_press.read(cx)));
         let icon = self.icons.shows(self.checked);
         // Position and size follow separate fast spatial springs, so a press
         // during a toggle retargets only the size, from where it is.
@@ -301,12 +336,39 @@ impl RenderOnce for MaterialSwitch {
         } else {
             IconName::Close
         };
+        let ripple_id = self.id.clone();
+        // The layer rides on the handle; a press anywhere on the track ripples.
+        let ripple_reach = Edges {
+            top: rem(0.),
+            bottom: rem(0.),
+            left: rem(layer_origin.0.max(0.)),
+            right: rem((TRACK_WIDTH - 2. * TRACK_OUTLINE - layer_origin.0 - STATE_LAYER).max(0.)),
+        };
         let action = self.on_change;
+        let label = required_label(&self.label, self.required);
+        let visible_label = self.show_label.then(|| {
+            let next = !self.checked;
+            let activate = action.clone().filter(|_| live).map(|action| {
+                Rc::new(move |window: &mut Window, cx: &mut App| action(&next, window, cx))
+                    as Rc<dyn Fn(&mut Window, &mut App)>
+            });
+            ControlLabel {
+                id: self.id.clone(),
+                label: label.clone(),
+                supporting: self.supporting.clone(),
+                position: self.label_position,
+                error: self.error,
+                disabled,
+                fill: true,
+                gap: 16.,
+                activate,
+            }
+        });
         let release = press_state.clone();
         let release_out = press_state.clone();
         let switch = gpui_base::Switch::new(self.id)
             .track_focus(&focus)
-            .accessibility_label(self.label)
+            .accessibility_label(label)
             .checked(self.checked)
             .disabled(disabled)
             .tab_stop(preview.is_none())
@@ -339,54 +401,68 @@ impl RenderOnce for MaterialSwitch {
             .border_color(paint.outline)
             .bg(paint.track)
             .child(
-                div()
-                    .id("state-layer")
-                    .absolute()
-                    .left(rem(layer_origin.0))
-                    .top(rem(layer_origin.1))
-                    .size(rem(STATE_LAYER))
-                    .flex()
-                    .items_center()
-                    .justify_center()
-                    .rounded_full()
-                    .when(keyboard_focus, |layer| layer.bg(focused))
-                    .when(forced(InteractionPreview::Hovered), |layer| layer.bg(hover))
-                    .when(pressed, |layer| layer.bg(press))
-                    .when(live && !pressed && !keyboard_focus, |layer| {
-                        layer.group_hover(SWITCH_GROUP, move |style| style.bg(hover))
-                    })
-                    .child(
-                        div()
-                            .id("handle")
-                            .when(cfg!(test), |handle| {
-                                handle.debug_selector(|| "switch-handle".into())
-                            })
-                            .flex()
-                            .flex_shrink_0()
-                            .items_center()
-                            .justify_center()
-                            .size(rem(size))
-                            .rounded_full()
-                            .bg(if active_handle {
-                                paint.handle_active
-                            } else {
-                                paint.handle
-                            })
-                            .when(live, |handle| {
-                                let active = paint.handle_active;
-                                // A cursor gives the handle the hitbox its
-                                // group hover needs.
-                                handle
-                                    .cursor_pointer()
-                                    .group_hover(SWITCH_GROUP, move |style| style.bg(active))
-                            })
-                            .when(icon, |handle| {
-                                handle.child(glyph.icon().size(rem(ICON)).color(paint.icon))
-                            }),
-                    ),
+                Ripple::new(
+                    (ripple_id, "ripple"),
+                    div()
+                        .id("state-layer")
+                        .absolute()
+                        .left(rem(layer_origin.0))
+                        .top(rem(layer_origin.1))
+                        .size(rem(STATE_LAYER))
+                        .flex()
+                        .items_center()
+                        .justify_center()
+                        .rounded_full()
+                        .when(keyboard_focus, |layer| layer.bg(focused))
+                        .when(forced(InteractionPreview::Hovered), |layer| layer.bg(hover))
+                        .when(pressed, |layer| layer.bg(press))
+                        .when(live && !pressed && !keyboard_focus, |layer| {
+                            layer.group_hover(SWITCH_GROUP, move |style| style.bg(hover))
+                        })
+                        .child(
+                            div()
+                                .id("handle")
+                                .when(cfg!(test), |handle| {
+                                    handle.debug_selector(|| "switch-handle".into())
+                                })
+                                .flex()
+                                .flex_shrink_0()
+                                .items_center()
+                                .justify_center()
+                                .size(rem(size))
+                                .rounded_full()
+                                .bg(if active_handle {
+                                    paint.handle_active
+                                } else {
+                                    paint.handle
+                                })
+                                .when(live, |handle| {
+                                    let active = paint.handle_active;
+                                    // A cursor gives the handle the hitbox its
+                                    // group hover needs.
+                                    handle
+                                        .cursor_pointer()
+                                        .group_hover(SWITCH_GROUP, move |style| style.bg(active))
+                                })
+                                .when(icon, |handle| {
+                                    handle.child(glyph.icon().size(rem(ICON)).color(paint.icon))
+                                }),
+                        ),
+                )
+                .round()
+                .centered()
+                .ink(paint.layer)
+                .hit_extension(ripple_reach)
+                .touch_pressed(&touch_press)
+                .disabled(!enabled)
+                .specimen(preview.is_some()),
             );
-        ButtonFocusRing::new(switch, focus, enabled, rem(TRACK_HEIGHT / 2.))
-            .forced(forced(InteractionPreview::Focused))
+        let ringed = ButtonFocusRing::new(switch, focus, enabled, rem(TRACK_HEIGHT / 2.))
+            .forced(forced(InteractionPreview::Focused));
+        match visible_label {
+            Some(label) => label.row(ringed).into_any_element(),
+            None => ringed.into_any_element(),
+        }
     }
 }
 

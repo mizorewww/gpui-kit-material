@@ -101,11 +101,6 @@ pub static PLAYGROUND: Playground = Playground {
                     label: "Drag handle",
                     default: true,
                 },
-                Control::Switch {
-                    id: "rtl",
-                    label: "Right to left",
-                    default: false,
-                },
             ],
         },
     ],
@@ -246,7 +241,6 @@ fn list_detail(
     let mut scaffold = PaneScaffold::list_detail("playground-list-detail", &navigator)
         .size_class(Some(size_class))
         .rule(pane_rule(config))
-        .rtl(config.bool("rtl"))
         .pane(PaneRole::Secondary, "Inbox", list_pane)
         .pane(PaneRole::Primary, "Message", detail_pane);
     if config.bool("extra") {
@@ -316,7 +310,6 @@ fn supporting(
     let mut scaffold = PaneScaffold::supporting_pane("playground-supporting", &navigator)
         .size_class(Some(size_class))
         .rule(pane_rule(config))
-        .rtl(config.bool("rtl"))
         .pane(
             PaneRole::Primary,
             "Article",

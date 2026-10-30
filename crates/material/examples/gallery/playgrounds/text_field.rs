@@ -194,34 +194,25 @@ fn preview(
     cx: &mut Context<PlaygroundState>,
 ) -> AnyElement {
     let kind = config.option("type");
-    let read_only = config.bool("read_only");
-    let disabled = config.bool("disabled");
     let mut field = if kind == "multiline" {
-        let input = preview.textarea("value", window, cx);
-        if preview.changed("textarea-mode", (read_only, disabled)) {
-            input.update(cx, |input, cx| {
-                input.set_readonly(read_only, cx);
-                input.set_disabled(disabled, cx);
-            });
-        }
-        TextField::multi_line("playground-text-field", &input)
+        TextField::multi_line(
+            "playground-text-field",
+            &preview.textarea("value", window, cx),
+        )
     } else {
-        let input = preview.input("value", window, cx);
-        let masked = kind == "password";
-        if preview.changed("input-mode", (masked, read_only, disabled)) {
-            input.update(cx, |input, cx| {
-                input.set_masked(masked, window, cx);
-                input.set_readonly(read_only, cx);
-                input.set_disabled(disabled, cx);
-            });
-        }
-        TextField::new("playground-text-field", &input)
+        TextField::new("playground-text-field", &preview.input("value", window, cx)).input_type(
+            match kind {
+                "password" => TextFieldInputType::Password,
+                "email" => TextFieldInputType::Email,
+                "number" => TextFieldInputType::Number,
+                "tel" => TextFieldInputType::Tel,
+                "url" => TextFieldInputType::Url,
+                _ => TextFieldInputType::Text,
+            },
+        )
     };
     let label = config.text("label");
-    let label: SharedString = match (config.bool("required"), label.is_empty()) {
-        (true, false) => format!("{label}*").into(),
-        _ => label,
-    };
+    let disabled = config.bool("disabled");
     field = field
         .variant(if config.option("variant") == "outlined" {
             TextFieldVariant::Outlined
@@ -235,6 +226,8 @@ fn preview(
         })
         .error(config.bool("error"))
         .disabled(disabled)
+        .read_only(config.bool("read_only"))
+        .required(config.bool("required"))
         .w(rem(280.));
     if !label.is_empty() {
         field = field.label(label);
@@ -305,6 +298,37 @@ mod tests {
         cx.simulate_input("Hi");
         settle(cx);
         assert_eq!(config(&state, cx).text("value"), "Hi");
+        // Read only rejects typing; number filters it, on the real field.
+        set(&state, cx, "read_only", Value::Bool(true));
+        cx.simulate_input("x");
+        settle(cx);
+        assert_eq!(config(&state, cx).text("value"), "Hi", "read only");
+        set(&state, cx, "read_only", Value::Bool(false));
+        let number = PLAYGROUND
+            .sections
+            .iter()
+            .flat_map(|section| section.controls)
+            .find_map(|control| match control {
+                Control::Select {
+                    id: "type",
+                    options,
+                    ..
+                }
+                | Control::Segmented {
+                    id: "type",
+                    options,
+                    ..
+                } => options.iter().position(|option| *option == "number"),
+                _ => None,
+            })
+            .expect("the type control offers number");
+        set(&state, cx, "value", Value::Text(SharedString::default()));
+        set(&state, cx, "type", Value::Choice(number));
+        cx.simulate_input("1a2");
+        settle(cx);
+        assert_eq!(config(&state, cx).text("value"), "12", "number filters");
+        cx.update(|window, cx| state.update(cx, |state, cx| state.reset(window, cx)));
+        settle(cx);
         every_scenario_renders(&state, cx, "playground-text-field");
         cx.update(|window, cx| state.update(cx, |state, cx| state.reset(window, cx)));
         settle(cx);

@@ -164,12 +164,13 @@ fn state_value(state: CheckboxState) -> Value {
 /// Shared row options.
 #[derive(Clone, Copy)]
 struct RowStyle {
-    start: bool,
+    position: LabelPosition,
+    required: bool,
     error: bool,
     disabled: bool,
 }
 
-/// A labelled checkbox row; clicking the label activates the checkbox.
+/// A labelled checkbox row.
 fn row(
     id: &'static str,
     label: SharedString,
@@ -177,52 +178,21 @@ fn row(
     style: RowStyle,
     on_change: impl Fn(&CheckboxState, &mut Window, &mut App) + 'static,
 ) -> Div {
-    let on_change = std::rc::Rc::new(on_change);
-    let next = if state == CheckboxState::Checked {
-        CheckboxState::Unchecked
-    } else {
-        CheckboxState::Checked
-    };
-    let text_role = if style.error {
-        ColorRole::ERROR
-    } else {
-        ColorRole::ON_SURFACE
-    };
-    let ink = color(text_role);
-    let ink = if style.disabled {
-        ink.opacity(0.38)
-    } else {
-        ink
-    };
-    let label_click = on_change.clone();
-    let text = div()
-        .id((id, 1usize))
-        .when(!style.disabled, |text| text.cursor_pointer())
-        .on_click(move |_, window, cx| {
-            if !style.disabled {
-                label_click(&next, window, cx)
-            }
-        })
-        .child(
-            accessible_text((id, 2usize), label.clone())
-                .map(|text| type_role(text, TypeRole::BodyLarge))
-                .text_color(ink),
-        );
-    let checkbox = div().debug_selector(move || id.into()).child(
-        MaterialCheckbox::new(id, label)
-            .state(state)
-            .error(style.error)
-            .disabled(style.disabled)
-            .on_change(move |next, window, cx| on_change(next, window, cx)),
-    );
+    // Hugging the row, so the selector's center is on the control or its label.
     div()
         .flex()
-        .items_center()
-        .when(style.start, |row| {
-            row.flex_row_reverse().justify_between().gap(rem(16.))
-        })
-        .child(checkbox)
-        .child(text)
+        .self_start()
+        .debug_selector(move || id.into())
+        .child(
+            MaterialCheckbox::new(id, label)
+                .show_label(true)
+                .label_position(style.position)
+                .required(style.required)
+                .state(state)
+                .error(style.error)
+                .disabled(style.disabled)
+                .on_change(on_change),
+        )
 }
 
 const CHILD_IDS: [&str; 4] = [
@@ -241,20 +211,21 @@ fn preview(
     let set = &SETS[config.choice("options")];
     let wanted = STATES[config.choice("state")];
     let style = RowStyle {
-        start: config.option("position") == "start",
+        position: if config.option("position") == "start" {
+            LabelPosition::Start
+        } else {
+            LabelPosition::End
+        },
+        required: config.bool("required"),
         error: config.bool("error"),
         disabled: config.bool("disabled"),
     };
     let label = config.text("label");
-    let label: SharedString = if config.bool("required") {
-        format!("{label}*").into()
-    } else {
-        label
-    };
     let set_state = std::rc::Rc::new(preview.setter("state", cx));
     if !config.bool("parent") {
         let set_state = set_state.clone();
         return div()
+            .flex()
             .debug_selector(|| "playground-checkbox".into())
             .child(row(
                 "checkbox-parent",
@@ -314,7 +285,10 @@ fn preview(
             CHILD_IDS[index],
             SharedString::new_static(name),
             state,
-            style,
+            RowStyle {
+                required: false,
+                ..style
+            },
             move |next, window, cx| {
                 let on = *next == CheckboxState::Checked;
                 let derived = children.update(cx, |children, cx| {

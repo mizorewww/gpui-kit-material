@@ -42,7 +42,8 @@
 //! `Control::Text`, `changed` to apply a configuration change to such an
 //! editor once, and `local` for other preview-only state. Configuration
 //! survives navigation: each page keeps its [`PlaygroundState`].
-use super::shell::{LeadView, panes_stacked};
+use super::page::GalleryShared;
+use super::shell::{LeadView, panes_stacked, preview_canvas};
 use super::spec::type_role;
 use gpui::{prelude::*, *};
 use gpui_base::input::{InputEvent, InputState, TextareaState};
@@ -1082,23 +1083,33 @@ impl RenderOnce for CompactSelect {
 /// with it, so this view publishes the hint in a cell and is its invalidation
 /// owner: a hint that changed draws the lead row and the panel again, in the
 /// next frame.
+///
+/// The preview's scope (its own theme, mode and direction) is this view's too,
+/// not the lead row's. A preview built again on its own would otherwise leave
+/// the scope, which only applies while it is being drawn through.
 pub struct PreviewView {
     state: Entity<PlaygroundState>,
+    shared: Entity<GalleryShared>,
     hint: Rc<Cell<PaneHint>>,
     dependents: (WeakEntity<LeadView>, WeakEntity<PanelView>),
-    _observe: Subscription,
+    _observe: [Subscription; 2],
 }
 
 impl PreviewView {
     pub fn new(
         state: Entity<PlaygroundState>,
+        shared: Entity<GalleryShared>,
         hint: Rc<Cell<PaneHint>>,
         dependents: (WeakEntity<LeadView>, WeakEntity<PanelView>),
         cx: &mut Context<Self>,
     ) -> Self {
-        let observe = cx.observe(&state, |_, _, cx| cx.notify());
+        let observe = [
+            cx.observe(&state, |_, _, cx| cx.notify()),
+            cx.observe(&shared, |_, _, cx| cx.notify()),
+        ];
         Self {
             state,
+            shared,
             hint,
             dependents,
             _observe: observe,
@@ -1108,8 +1119,12 @@ impl PreviewView {
 
 impl Render for PreviewView {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let (preview, hint) = self.state.update(cx, |state, cx| {
-            (state.render_preview(window, cx), state.pane_hint())
+        let scope = self.shared.read(cx).preview_scope().resolve(window, cx);
+        let state = self.state.clone();
+        let (preview, hint) = scope.build(window, cx, |window, cx| {
+            state.update(cx, |state, cx| {
+                (state.render_preview(window, cx), state.pane_hint())
+            })
         });
         if self.hint.replace(hint) != hint {
             let (lead, panel) = self.dependents.clone();
@@ -1118,7 +1133,11 @@ impl Render for PreviewView {
                 let _ = panel.update(cx, |_, cx| cx.notify());
             });
         }
-        preview
+        let stacked = panes_stacked(window, hint);
+        let canvas = scope.build(window, cx, |window, _| {
+            preview_canvas(stacked, false, window, preview)
+        });
+        scope.child(canvas)
     }
 }
 

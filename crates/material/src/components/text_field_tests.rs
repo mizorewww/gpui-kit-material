@@ -262,3 +262,20 @@ fn a_disabled_field_takes_no_focus_or_text(cx: &mut TestAppContext) {
         assert!(!state.focus_handle(cx).is_focused(window));
     });
 }
+
+#[test]
+fn input_types_filter_partial_values() {
+    use TextFieldInputType as T;
+    for ok in ["", "-", "+", "1", "-1.5", ".5", "1.", "1e", "1e-", "1E+3"] {
+        assert!(T::Number.accepts(ok), "{ok:?} is a number so far");
+    }
+    for bad in ["a", "1.2.3", "1e2e3", "e5", "--1", "1 2"] {
+        assert!(!T::Number.accepts(bad), "{bad:?} is not a number");
+    }
+    assert!(T::Tel.accepts("+1 (555) 010-9999#*"));
+    assert!(!T::Tel.accepts("555x"));
+    assert!(T::Email.accepts("a@b.c") && !T::Email.accepts("a b"));
+    assert!(T::Url.accepts("https://a.b/c") && !T::Url.accepts("a b"));
+    assert!(T::Text.accepts("anything at all"));
+    assert!(T::Password.masked() && !T::Text.masked());
+}

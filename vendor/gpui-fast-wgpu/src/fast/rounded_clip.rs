@@ -363,7 +363,9 @@ fn fast_clip_subpixel(color: SubpixelSpriteFragmentOutput, position: vec2<f32>) 
     source
 }
 
-#[cfg(test)]
+// Local patch: these need the dev-dependency on `naga`, which the published
+// package's manifest drops. See `MATERIAL-PATCHES.md`.
+#[cfg(any())]
 mod tests {
     use super::shader;
 

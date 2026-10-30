@@ -79,6 +79,7 @@ pub(crate) struct Rebuild {
     text_style_stack: TextStyleStack,
     element_offset: Point<Pixels>,
     rem_size: Pixels,
+    layout_direction: crate::LayoutDirection,
     /// The style it is laid out at, when it is a cached view.
     cached_style: Option<StyleRefinement>,
 }
@@ -114,6 +115,7 @@ impl Window {
             text_style_stack: self.text_style_stack.clone(),
             element_offset: self.element_offset(),
             rem_size: self.rem_size(),
+            layout_direction: self.layout_direction(),
             cached_style: cached_style.cloned(),
         })
     }
@@ -246,6 +248,7 @@ struct Inherited {
     content_mask_stack: Vec<ContentMask<Pixels>>,
     element_offset_stack: Vec<Point<Pixels>>,
     rem_size_override_stack: SmallVec<[Pixels; 8]>,
+    layout_direction: crate::LayoutDirection,
     element_opacity: f32,
 }
 
@@ -281,6 +284,7 @@ impl Window {
                 &mut self.rem_size_override_stack,
                 SmallVec::from_slice(&[rebuild.rem_size]),
             ),
+            layout_direction: mem::replace(&mut self.layout_direction, rebuild.layout_direction),
             element_opacity: mem::replace(&mut self.element_opacity, opacity),
         }
     }
@@ -290,6 +294,7 @@ impl Window {
         self.text_style_stack = inherited.text_style_stack;
         self.content_mask_stack = inherited.content_mask_stack;
         self.element_offset_stack = inherited.element_offset_stack;
+        self.layout_direction = inherited.layout_direction;
         self.rem_size_override_stack = inherited.rem_size_override_stack;
         self.element_opacity = inherited.element_opacity;
     }

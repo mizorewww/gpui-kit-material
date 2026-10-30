@@ -14,6 +14,7 @@
 //! retarget from wherever they are when focus changes again and honor reduced
 //! motion through [`crate::motion`].
 use super::InteractionPreview;
+use super::labeled::required_label;
 use crate::{
     color::ColorRole,
     motion::{self, MotionToken},
@@ -95,6 +96,63 @@ impl TextFieldVariant {
     }
 }
 
+/// What a single-line field edits: md3.io's type options. The type masks a
+/// password and filters what can be typed; platforms without a soft keyboard
+/// have nothing further to switch.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+pub enum TextFieldInputType {
+    #[default]
+    Text,
+    Password,
+    Email,
+    Number,
+    Tel,
+    Url,
+}
+
+impl TextFieldInputType {
+    pub const ALL: [Self; 6] = [
+        Self::Text,
+        Self::Password,
+        Self::Email,
+        Self::Number,
+        Self::Tel,
+        Self::Url,
+    ];
+    /// Whether the value is painted as bullets and kept off the clipboard.
+    pub const fn masked(self) -> bool {
+        matches!(self, Self::Password)
+    }
+    /// Whether `text` is an acceptable value or the start of one. Partial
+    /// input passes ("-", "1.", "1e-"), so completeness stays the form's check.
+    pub fn accepts(self, text: &str) -> bool {
+        match self {
+            Self::Text | Self::Password => true,
+            Self::Email | Self::Url => !text.chars().any(char::is_whitespace),
+            Self::Tel => text
+                .chars()
+                .all(|c| c.is_ascii_digit() || "+-().#* ".contains(c)),
+            Self::Number => {
+                let body = text.strip_prefix(['-', '+']).unwrap_or(text);
+                let (mantissa, exponent) = match body.split_once(['e', 'E']) {
+                    Some((mantissa, exponent)) => (mantissa, Some(exponent)),
+                    None => (body, None),
+                };
+                let digits = |part: &str| part.chars().all(|c| c.is_ascii_digit());
+                let mantissa_ok = match mantissa.split_once('.') {
+                    Some((whole, fraction)) => digits(whole) && digits(fraction),
+                    None => digits(mantissa),
+                };
+                let exponent_ok = exponent.is_none_or(|exponent| {
+                    !mantissa.is_empty()
+                        && digits(exponent.strip_prefix(['-', '+']).unwrap_or(exponent))
+                });
+                mantissa_ok && exponent_ok
+            }
+        }
+    }
+}
+
 enum FieldInput {
     Single(Entity<InputState>),
     Multi(Entity<TextareaState>),
@@ -119,6 +177,9 @@ pub struct TextField {
     max_length: Option<usize>,
     error: bool,
     disabled: bool,
+    read_only: bool,
+    required: bool,
+    input_type: Option<TextFieldInputType>,
     float_label: bool,
     preview: Option<InteractionPreview>,
     style: StyleRefinement,
@@ -157,6 +218,9 @@ impl TextField {
             max_length: None,
             error: false,
             disabled: false,
+            read_only: false,
+            required: false,
+            input_type: None,
             float_label: false,
             preview: None,
             style: StyleRefinement::default(),
@@ -231,6 +295,24 @@ impl TextField {
     }
     pub fn disabled(mut self, disabled: bool) -> Self {
         self.disabled = disabled;
+        self
+    }
+    /// The value can be focused, selected and copied but not edited. The
+    /// field keeps its enabled appearance.
+    pub fn read_only(mut self, read_only: bool) -> Self {
+        self.read_only = read_only;
+        self
+    }
+    /// Mark the field as required: the label and accessible name gain the
+    /// required mark. Enforcing it belongs to the form that owns the value.
+    pub fn required(mut self, required: bool) -> Self {
+        self.required = required;
+        self
+    }
+    /// Mask and filter a single-line field for this type. This replaces the
+    /// state's validator; leave it unset to keep a caller's own.
+    pub fn input_type(mut self, input_type: TextFieldInputType) -> Self {
+        self.input_type = Some(input_type);
         self
     }
     /// Render a static specimen in one forced interaction state (Enabled,
@@ -420,6 +502,7 @@ pub(crate) fn type_style<E: Styled>(element: E, role: TypeRole) -> E {
     element
         .font_family(scale.font_family)
         .text_size(scale.font_size)
+        .letter_spacing(scale.letter_spacing)
         .line_height(scale.line_height)
         .font_weight(FontWeight(scale.font_weight as f32))
 }
@@ -445,12 +528,38 @@ fn label_width(text: &SharedString, window: &Window) -> f32 {
         .text_system()
         .shape_line(text.clone(), size, &[run], None);
     // Back to design px at the base rem, so it composes with `rem()`.
-    line.width.as_f32() / rem.as_f32() * 14.
+    let tracking = scale.letter_spacing.0 * text.chars().count() as f32;
+    (line.width.as_f32() / rem.as_f32() + tracking) * 14.
+}
+
+/// Bring a live input into line with `input_type`, once per change of type.
+fn apply_input_type(
+    id: &ElementId,
+    state: &Entity<InputState>,
+    input_type: TextFieldInputType,
+    window: &mut Window,
+    cx: &mut App,
+) {
+    let applied = window.use_keyed_state((id.clone(), "input-type"), cx, |_, _| None);
+    if *applied.read(cx) == Some(input_type) {
+        return;
+    }
+    applied.update(cx, |applied, _| *applied = Some(input_type));
+    state.update(cx, |state, cx| {
+        state.set_masked(input_type.masked(), window, cx);
+        state.set_validator(move |text, _| input_type.accepts(text), cx);
+    });
 }
 
 impl RenderOnce for TextField {
-    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
+    fn render(mut self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let id = self.id.clone();
+        if self.required {
+            self.label = self.label.map(|label| required_label(&label, true));
+        }
+        if let (FieldInput::Single(state), Some(input_type)) = (&self.input, self.input_type) {
+            apply_input_type(&id, state, input_type, window, cx);
+        }
         let (value, focus) = match &self.input {
             FieldInput::Single(state) => (read_value(state, cx), Some(focus_handle(state, cx))),
             FieldInput::Multi(state) => (read_value(state, cx), Some(focus_handle(state, cx))),
@@ -651,11 +760,15 @@ impl RenderOnce for TextField {
             FieldInput::Multi(state) => state.update(cx, |s, _| s.set_caret_color(caret)),
             FieldInput::Static(_) => {}
         }
+        // Kit's editors align physically; they do not mirror with layout.
+        let rtl = crate::scope::is_rtl(window);
         let editor: AnyElement = match &self.input {
             FieldInput::Single(state) => Input::new(state)
                 .appearance(false)
                 .with_size(Size::XSmall)
                 .disabled(disabled)
+                .readonly(self.read_only)
+                .when(rtl, |this| this.text_right())
                 .when_some(self.label.clone(), |this, label| this.aria_label(label))
                 .p_0()
                 .h(rem(24.))
@@ -666,6 +779,8 @@ impl RenderOnce for TextField {
                 .appearance(false)
                 .with_size(Size::XSmall)
                 .disabled(disabled)
+                .readonly(self.read_only)
+                .when(rtl, |this| this.text_right())
                 .when_some(self.label.clone(), |this, label| this.aria_label(label))
                 .p_0()
                 // Kit insets multi-line text by the XSmall input padding.
@@ -678,7 +793,11 @@ impl RenderOnce for TextField {
                 .min_w_0()
                 .overflow_hidden()
                 .whitespace_nowrap()
-                .child(value.clone())
+                .child(if self.input_type.is_some_and(TextFieldInputType::masked) {
+                    SharedString::from("\u{2022}".repeat(value.chars().count()))
+                } else {
+                    value.clone()
+                })
                 .into_any_element(),
         };
         let placeholder = self.placeholder.clone().filter(|_| show_placeholder);

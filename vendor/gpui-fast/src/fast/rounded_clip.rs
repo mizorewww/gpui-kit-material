@@ -182,6 +182,17 @@ pub(crate) fn paint_children(
     cx: &mut App,
     paint: impl FnOnce(&mut Window, &mut App),
 ) {
+    // The element paints mirrored in right-to-left layout, so its clip does too.
+    let mirrored;
+    let style = if window.layout_direction().is_rtl() {
+        let mut flipped = style.clone();
+        flipped.corner_radii = flipped.corner_radii.flip_x();
+        flipped.border_widths = flipped.border_widths.flip_x();
+        mirrored = flipped;
+        &mirrored
+    } else {
+        style
+    };
     let Some(shape) = Shape::for_style(style, bounds, window.rem_size(), window.scale_factor())
     else {
         return paint(window, cx);

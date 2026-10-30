@@ -3,7 +3,8 @@
 //! The compatibility names below select Google symbols; the full catalog and
 //! variable axes are available through [`Symbol`], [`SymbolIcon`] and [`Axes`].
 use gpui::{
-    AbsoluteLength, App, AssetSource, Hsla, IntoElement, RenderOnce, SharedString, Styled, Window,
+    AbsoluteLength, App, AssetSource, Hsla, IntoElement, RenderOnce, SharedString, Styled,
+    Transformation, Window, size,
 };
 pub use gpui_material_symbols::{Asset, Axes, Icon as SymbolIcon, MaterialSymbols, Style, Symbol};
 use std::{borrow::Cow, collections::HashMap, sync::OnceLock};
@@ -93,6 +94,56 @@ impl<F: AssetSource> AssetSource for Assets<F> {
 #[derive(IntoElement, Clone)]
 pub struct Icon {
     inner: gpui_kit::component::Icon,
+    /// Mirrors under right-to-left layout.
+    directional: bool,
+    rotation: Option<gpui::Radians>,
+}
+
+/// Symbols that point along the reading direction, so they mirror with it.
+/// The Material guidance flips arrows and navigation marks; clocks, media
+/// controls and most objects keep their shape.
+fn points_along_reading(name: &str) -> bool {
+    matches!(
+        name,
+        "arrow_back"
+            | "arrow_back_ios"
+            | "arrow_back_ios_new"
+            | "arrow_forward"
+            | "arrow_forward_ios"
+            | "arrow_left_alt"
+            | "arrow_right_alt"
+            | "chevron_backward"
+            | "chevron_forward"
+            | "chevron_left"
+            | "chevron_right"
+            | "east"
+            | "first_page"
+            | "format_indent_decrease"
+            | "format_indent_increase"
+            | "input"
+            | "keyboard_arrow_left"
+            | "keyboard_arrow_right"
+            | "keyboard_tab"
+            | "last_page"
+            | "login"
+            | "logout"
+            | "menu_open"
+            | "navigate_before"
+            | "navigate_next"
+            | "open_in_new"
+            | "output"
+            | "read_more"
+            | "redo"
+            | "reply"
+            | "reply_all"
+            | "send"
+            | "short_text"
+            | "subject"
+            | "toc"
+            | "trending_flat"
+            | "undo"
+            | "west"
+    )
 }
 impl Icon {
     pub fn new(path: impl Into<SharedString>) -> Self {
@@ -100,6 +151,8 @@ impl Icon {
             inner: gpui_kit::component::Icon::default()
                 .path(path)
                 .size(crate::tokens::layout::ICON_SLOT),
+            directional: false,
+            rotation: None,
         }
     }
     pub fn size(mut self, size: impl Into<AbsoluteLength>) -> Self {
@@ -112,13 +165,21 @@ impl Icon {
     }
     /// Rotate by radians, using Kit's SVG transformation.
     pub fn rotate(mut self, radians: f32) -> Self {
+        self.rotation = Some(gpui::radians(radians));
         self.inner = self.inner.rotate(gpui::radians(radians));
+        self
+    }
+    /// Mirror under right-to-left layout. Symbols that point along the reading
+    /// direction already do; use this for a caller's own asset, or `false` to
+    /// keep a symbol as drawn.
+    pub fn directional(mut self, directional: bool) -> Self {
+        self.directional = directional;
         self
     }
 }
 impl From<IconName> for Icon {
     fn from(name: IconName) -> Self {
-        Self::new(name.path())
+        Self::new(name.path()).directional(points_along_reading(name.symbol().name()))
     }
 }
 impl From<Symbol> for Icon {
@@ -129,12 +190,22 @@ impl From<Symbol> for Icon {
 impl From<SymbolIcon> for Icon {
     fn from(icon: SymbolIcon) -> Self {
         Self {
+            directional: points_along_reading(icon.symbol().name()),
             inner: icon.component().size(crate::tokens::layout::ICON_SLOT),
+            rotation: None,
         }
     }
 }
 impl RenderOnce for Icon {
-    fn render(self, _: &mut Window, _: &mut App) -> impl IntoElement {
+    fn render(self, window: &mut Window, _: &mut App) -> impl IntoElement {
+        if self.directional && window.layout_direction().is_rtl() {
+            let flip = Transformation::scale(size(-1., 1.));
+            let flip = match self.rotation {
+                Some(rotation) => flip.with_rotation(rotation),
+                None => flip,
+            };
+            return self.inner.transform(flip);
+        }
         self.inner
     }
 }
@@ -142,6 +213,17 @@ impl RenderOnce for Icon {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn only_symbols_along_the_reading_direction_mirror() {
+        for name in ["arrow_back", "chevron_right", "send", "undo"] {
+            assert!(points_along_reading(name), "{name} points along reading");
+            assert!(Symbol::named(name).is_some(), "{name} is a real symbol");
+        }
+        for name in ["check", "search", "close", "schedule"] {
+            assert!(!points_along_reading(name), "{name} keeps its shape");
+        }
+        assert!(Icon::from(IconName::Check).rotate(1.).rotation.is_some());
+    }
     #[test]
     fn compatibility_symbols_and_kit_paths_load_from_google_catalog() {
         let assets = Assets::new();
