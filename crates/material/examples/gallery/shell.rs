@@ -9,6 +9,7 @@ use super::playground::CompactSelect;
 use super::spec::type_role;
 use super::*;
 use gpui_kit_material::icons::Symbol;
+use gpui_kit_material::scope::{LayoutDirection, Scope};
 use std::sync::OnceLock;
 
 /// The widest the page content grows, in design px.
@@ -577,9 +578,11 @@ impl Gallery {
         let tab = self.entries[self.current].tab;
         let shared = self.shared.read(cx);
         let theme = shared
-            .reference_theme
+            .preview_theme
+            .or(shared.reference_theme)
             .and_then(|theme| THEMES.iter().position(|(id, _)| *id == theme));
-        let dark = shared.reference_mode == ThemeMode::Dark;
+        let dark = shared.preview_mode.unwrap_or(shared.reference_mode) == ThemeMode::Dark;
+        let rtl = shared.preview_rtl;
         let update_shared = |f: fn(&mut GalleryShared, usize)| {
             let shared = self.shared.clone();
             move |value: usize, cx: &mut App| {
@@ -590,16 +593,16 @@ impl Gallery {
             }
         };
         let select_theme = update_shared(|shared, index| {
-            shared.reference_theme = Some(THEMES[index].0);
+            shared.preview_theme = Some(THEMES[index].0);
         });
         let select_mode = update_shared(|shared, dark| {
-            shared.reference_mode = if dark == 1 {
+            shared.preview_mode = Some(if dark == 1 {
                 ThemeMode::Dark
             } else {
                 ThemeMode::Light
-            };
-            shared.reference_theme.get_or_insert(ThemeId::Baseline);
+            });
         });
+        let select_rtl = update_shared(|shared, on| shared.preview_rtl = on == 1);
         div()
             .flex()
             .flex_wrap()
@@ -675,6 +678,19 @@ impl Gallery {
                             .on_change(move |value: &SharedString, _, cx| {
                                 select_mode(usize::from(value == "dark"), cx)
                             }),
+                    )
+                    .child(
+                        div()
+                            .debug_selector(|| "preview-rtl".into())
+                            .w(rem(88.))
+                            .child(
+                                MaterialSwitch::new("preview-rtl", "RTL")
+                                    .show_label(true)
+                                    .checked(rtl)
+                                    .on_change(move |on: &bool, _, cx| {
+                                        select_rtl(usize::from(*on), cx)
+                                    }),
+                            ),
                     ),
             )
     }
@@ -687,10 +703,23 @@ impl Gallery {
             f32::from(window.viewport_size().height) * BASE_PX / f32::from(window.rem_size());
         let mut pane = (design_height - f32::from(TITLE_BAR) - LEAD_HEADER - 24.).max(MIN_PANE);
         let playground = self.entries[self.current].playground.clone();
-        let canvas = match &playground {
+        // The preview is its own scope: theme, mode and direction stop at the card.
+        let scope = {
+            let shared = self.shared.read(cx);
+            let mut scope = Scope::new("preview-scope");
+            if let Some(scheme) = shared.preview_scheme() {
+                scope = scope.scheme(scheme);
+            }
+            if shared.preview_rtl {
+                scope = scope.direction(LayoutDirection::Rtl);
+            }
+            scope
+        }
+        .resolve(window, cx);
+        let canvas = scope.build(window, cx, |window, cx| match &playground {
             Some(state) => state.update(cx, |state, cx| state.render_preview(window, cx)),
             None => self.render_demos(window, cx),
-        };
+        });
         let hint = playground
             .as_ref()
             .map_or_else(Default::default, |state| state.read(cx).pane_hint());
@@ -705,34 +734,37 @@ impl Gallery {
             .when(!stacked, |card| card.flex_1().min_h(rem(pane)))
             .child(self.render_card_header(cx))
             .child(
-                div()
-                    .id("preview-canvas")
-                    .debug_selector(|| "preview-canvas".into())
-                    .when(!stacked, |canvas| canvas.flex_grow(1.).flex_shrink_0())
-                    .min_h(rem(COMPACT_CANVAS))
-                    .bg(canvas_background())
-                    .flex()
-                    .flex_col()
-                    .when(!fallback, |canvas| canvas.items_center().justify_center())
-                    .p(rem(layout.canvas_padding()))
-                    .child(
-                        div()
-                            .debug_selector(|| "preview-content".into())
-                            .w_full()
-                            .flex()
-                            .flex_col()
-                            .when(!fallback, |content| content.items_center())
-                            .when(cfg!(test), |content| {
-                                content.on_children_prepainted(|children, _, _| {
-                                    #[cfg(test)]
-                                    PREVIEW_DRAWN
-                                        .with(|drawn| drawn.set(children.first().copied()));
-                                    #[cfg(not(test))]
-                                    let _ = children;
+                // The canvas paints in the preview's scheme too.
+                scope.child(scope.build(window, cx, |_, _| {
+                    div()
+                        .id("preview-canvas")
+                        .debug_selector(|| "preview-canvas".into())
+                        .when(!stacked, |canvas| canvas.flex_grow(1.).flex_shrink_0())
+                        .min_h(rem(COMPACT_CANVAS))
+                        .bg(canvas_background())
+                        .flex()
+                        .flex_col()
+                        .when(!fallback, |canvas| canvas.items_center().justify_center())
+                        .p(rem(layout.canvas_padding()))
+                        .child(
+                            div()
+                                .debug_selector(|| "preview-content".into())
+                                .w_full()
+                                .flex()
+                                .flex_col()
+                                .when(!fallback, |content| content.items_center())
+                                .when(cfg!(test), |content| {
+                                    content.on_children_prepainted(|children, _, _| {
+                                        #[cfg(test)]
+                                        PREVIEW_DRAWN
+                                            .with(|drawn| drawn.set(children.first().copied()));
+                                        #[cfg(not(test))]
+                                        let _ = children;
+                                    })
                                 })
-                            })
-                            .child(canvas),
-                    ),
+                                .child(canvas),
+                        )
+                })),
             );
         let config_card = self.render_config_card(playground, stacked, pane, window, cx);
         div()

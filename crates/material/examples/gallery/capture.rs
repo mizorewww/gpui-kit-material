@@ -4,10 +4,11 @@ use super::playground::Value;
 use super::{Gallery, Tab, page::CaptureState};
 use anyhow::{Context as _, Result, bail, ensure};
 use gpui::{App, Entity, Global, ListOffset, ListState, Pixels, Window, px, size};
+use gpui_kit_material::color::themes::ThemeMode;
 use gpui_kit_material::components::Caption;
 use std::{cell::Cell, path::PathBuf, process::Command, rc::Rc, time::Duration};
 
-pub const USAGE: &str = "gallery [--capture output.png --section <page id> --tab preview|specs\n  --scenario <name> --set <control>=<value> ...\n  --width 1280 --height 900 --scale 1 --dark --reduced-motion --settle-ms 800\n  --active --disabled --selected --loading --no-ripple --offset-y 0 --settings --fps --vsync on|off --caption windows|linux --drawer]\n\nPage ids, in navigation order:\n  overview button icon-button button-group split-button fab fab-menu\n  extended-fab checkbox switch radio-buttons chips slider text-field select\n  search date-picker time-picker navigation-rail navigation-bar drawer tabs menu\n  top-app-bar bottom-app-bar toolbar card list carousel divider dialog\n  bottom-sheet side-sheet badge avatar progress loading-indicator snackbar\n  tooltip\n  color typography shape motion elevation examples\n\nDesign-kit page ids open the first page showing that kit page on its Specs tab:\n  app-bars avatars badges buttons cards checkboxes date-time-pickers dialogs dividers\n  lists loading-progress navigation radio-button sheets sliders text-fields\n  toolbars tooltips\n\n--tab defaults to preview (specs for a kit page id). --scenario and --set\nconfigure the page's playground, e.g. --set variant=tonal --set disabled=true.";
+pub const USAGE: &str = "gallery [--capture output.png --section <page id> --tab preview|specs\n  --scenario <name> --set <control>=<value> ...\n  --width 1280 --height 900 --scale 1 --dark --rtl --preview-dark --reduced-motion --settle-ms 800\n  --active --disabled --selected --loading --no-ripple --offset-y 0 --settings --fps --vsync on|off --caption windows|linux --drawer]\n\nPage ids, in navigation order:\n  overview button icon-button button-group split-button fab fab-menu\n  extended-fab checkbox switch radio-buttons chips slider text-field select\n  search date-picker time-picker navigation-rail navigation-bar drawer tabs menu\n  top-app-bar bottom-app-bar toolbar card list carousel divider dialog\n  bottom-sheet side-sheet badge avatar progress loading-indicator snackbar\n  tooltip\n  color typography shape motion elevation examples\n\nDesign-kit page ids open the first page showing that kit page on its Specs tab:\n  app-bars avatars badges buttons cards checkboxes date-time-pickers dialogs dividers\n  lists loading-progress navigation radio-button sheets sliders text-fields\n  toolbars tooltips\n\n--tab defaults to preview (specs for a kit page id). --scenario and --set\nconfigure the page's playground, e.g. --set variant=tonal --set disabled=true.";
 
 #[derive(Clone)]
 pub struct CaptureOptions {
@@ -20,6 +21,8 @@ pub struct CaptureOptions {
     height: f32,
     scale: f32,
     dark: bool,
+    rtl: bool,
+    preview_dark: bool,
     reduced_motion: bool,
     settle_ms: u64,
     active: bool,
@@ -53,6 +56,8 @@ impl CaptureOptions {
             height: 900.,
             scale: 1.,
             dark: false,
+            rtl: false,
+            preview_dark: false,
             reduced_motion: false,
             settle_ms: 800,
             active: false,
@@ -116,6 +121,8 @@ impl CaptureOptions {
                     })
                 }
                 "--dark" => options.dark = true,
+                "--rtl" => options.rtl = true,
+                "--preview-dark" => options.preview_dark = true,
                 "--reduced-motion" => options.reduced_motion = true,
                 "--active" => options.active = true,
                 "--disabled" => options.disabled = true,
@@ -234,6 +241,12 @@ pub(super) fn install(view: &Entity<Gallery>, window: &mut Window, cx: &mut App)
             },
             cx,
         );
+        gallery.shared.update(cx, |shared, _| {
+            shared.preview_rtl = options.rtl;
+            if options.preview_dark {
+                shared.preview_mode = Some(ThemeMode::Dark);
+            }
+        });
         gallery.configure(options.scenario, &options.values, window, cx);
         gallery.set_drawer_open(options.drawer, cx);
     });

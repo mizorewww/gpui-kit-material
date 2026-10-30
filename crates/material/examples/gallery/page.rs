@@ -39,6 +39,12 @@ pub struct GalleryShared {
     /// `None` paints `palette` instead of a reference theme.
     pub reference_theme: Option<ThemeId>,
     pub reference_mode: ThemeMode,
+    /// The live preview's own theme and mode (md3.io's preview controls). `None`
+    /// follows the application.
+    pub preview_theme: Option<ThemeId>,
+    pub preview_mode: Option<ThemeMode>,
+    /// Lays the live preview out right to left.
+    pub preview_rtl: bool,
     pub contrast: Contrast,
     /// The text scale, as the option value ("1", "1.25", …).
     pub scale: SharedString,
@@ -53,6 +59,9 @@ impl Default for GalleryShared {
             palette: PaletteId::Paper,
             reference_theme: Some(ThemeId::Baseline),
             reference_mode: ThemeMode::Light,
+            preview_theme: None,
+            preview_mode: None,
+            preview_rtl: false,
             contrast: Contrast::Standard,
             scale: "1".into(),
             motion_scheme: motion::MotionScheme::Expressive,
@@ -67,6 +76,20 @@ impl GalleryShared {
             || gpui_kit_material::color::Scheme::from_palette(self.palette),
             |id| id.scheme(self.reference_mode, self.contrast),
         )
+    }
+    /// The preview's scheme, when it differs from the application's.
+    pub fn preview_scheme(&self) -> Option<gpui_kit_material::color::Scheme> {
+        if self.preview_theme.is_none() && self.preview_mode.is_none() {
+            return None;
+        }
+        let theme = self
+            .preview_theme
+            .or(self.reference_theme)
+            .unwrap_or(ThemeId::Baseline);
+        Some(theme.scheme(
+            self.preview_mode.unwrap_or(self.reference_mode),
+            self.contrast,
+        ))
     }
     pub fn text_scale(&self) -> f32 {
         self.scale.parse().unwrap_or(1.)
