@@ -448,23 +448,35 @@ impl Element for ButtonRipple {
                 _ => {}
             }
         });
-        let release_on_long_press = self.state.downgrade();
-        window.on_mouse_event(move |event: &LongPressEvent, phase, _, cx| {
-            if phase == DispatchPhase::Capture
-                && matches!(event.phase, TouchPhase::Ended | TouchPhase::Cancelled)
-            {
-                release_held(&release_on_long_press, cx);
-            }
-        });
-        let release_on_scroll = self.state.downgrade();
-        window.on_mouse_event(move |_: &ScrollEvent, phase, _, cx| {
-            if phase == DispatchPhase::Capture
-                && let Some(state) = release_on_scroll.upgrade()
-                && state.read(cx).touch_held
-            {
-                state.update(cx, |state, cx| state.release(cx));
-            }
-        });
+        // What only ends a press is installed while one is held, as a press draws
+        // the ripple again. A list's held rows carry every listener on every frame,
+        // and every wheel event calls every wheel listener. A press these outrun
+        // still ends: a pan keeps scrolling and a mouse button comes up.
+        if self.state.read(cx).holds_press() {
+            let release_on_long_press = self.state.downgrade();
+            window.on_mouse_event(move |event: &LongPressEvent, phase, _, cx| {
+                if phase == DispatchPhase::Capture
+                    && matches!(event.phase, TouchPhase::Ended | TouchPhase::Cancelled)
+                {
+                    release_held(&release_on_long_press, cx);
+                }
+            });
+            let release_on_scroll = self.state.downgrade();
+            window.on_mouse_event(move |_: &ScrollEvent, phase, _, cx| {
+                if phase == DispatchPhase::Capture
+                    && let Some(state) = release_on_scroll.upgrade()
+                    && state.read(cx).touch_held
+                {
+                    state.update(cx, |state, cx| state.release(cx));
+                }
+            });
+            let release_on_exit = self.state.downgrade();
+            window.on_mouse_event(move |_: &MouseExitEvent, phase, _, cx| {
+                if phase == DispatchPhase::Capture {
+                    release_held(&release_on_exit, cx);
+                }
+            });
+        }
         let hitbox = hitbox.clone();
         window.on_mouse_event(move |event: &MouseDownEvent, phase, window, cx| {
             // Every pointer button starts a wave, matching the reference's
@@ -481,12 +493,6 @@ impl Element for ButtonRipple {
         });
         let state = self.state.downgrade();
         window.on_mouse_event(move |_: &MouseUpEvent, phase, _, cx| {
-            if phase == DispatchPhase::Capture {
-                release_held(&state, cx);
-            }
-        });
-        let state = self.state.downgrade();
-        window.on_mouse_event(move |_: &MouseExitEvent, phase, _, cx| {
             if phase == DispatchPhase::Capture {
                 release_held(&state, cx);
             }
