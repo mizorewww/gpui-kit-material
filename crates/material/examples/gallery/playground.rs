@@ -534,9 +534,11 @@ impl PlaygroundState {
                     ..
                 } => {
                     let slider = cx.new(|_| {
+                        // Raise the maximum first: setting a minimum above
+                        // the default maximum (100) would clamp min > max.
                         SliderState::new()
-                            .min(min)
                             .max(max)
+                            .min(min)
                             .step(step)
                             .default_value(default)
                     });
