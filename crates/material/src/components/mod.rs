@@ -16,7 +16,8 @@ mod standard_button_group;
 pub use icon_button::{IconButton, IconButtonVariant};
 pub use split_button::{SplitButton, SplitButtonPart};
 pub use standard_button_group::{ButtonGroup, EXPANDED_RATIO, standard_group_gap};
-#[cfg(test)]
+// Forced accessibility trees in tests (GPUI_A11Y_ACTIVE) exist only in GPUI Fast.
+#[cfg(all(test, feature = "gpui-fast"))]
 mod a11y_tests;
 mod app_bar;
 mod button_group;
