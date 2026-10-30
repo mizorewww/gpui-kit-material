@@ -31,7 +31,18 @@ pub fn provide_symbol_asset(file_name: &str, bytes: Vec<u8>) -> Result<(), wasm_
 #[wasm_bindgen::prelude::wasm_bindgen]
 pub fn run() {
     gpui_kit::platform::web_init();
-    gallery::run(gpui_kit::platform::single_threaded_web(), |cx| {
+    // The Gallery's fonts have no CJK, and a phone's IME types it: draw those
+    // characters with the browser's fonts, as it does for emoji by default.
+    let platform = std::rc::Rc::new(
+        gpui_kit::web::WebPlatform::new_with_backend_and_font_fallback(
+            false,
+            gpui_kit::web::WebBackendPreference::Auto,
+            gpui_kit::web::CanvasFontFallback::EmojiAndCjk,
+        ),
+    );
+    let http_client = std::sync::Arc::new(platform.fetch_http_client());
+    let application = gpui::Application::with_platform(platform).with_http_client(http_client);
+    gallery::run(application, |cx| {
         motion_preference::install(cx);
         frame_counters::install(cx);
     });

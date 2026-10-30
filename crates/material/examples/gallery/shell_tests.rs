@@ -1015,3 +1015,31 @@ fn a_scoped_preview_keeps_a_frame_to_itself(cx: &mut TestAppContext) {
         );
     }
 }
+
+/// A keyboard shrinks the page, and the field being edited stays above it.
+#[gpui::test]
+fn the_caret_stays_above_an_on_screen_keyboard(cx: &mut TestAppContext) {
+    let (window, mut cx) = open(cx);
+    cx.simulate_resize(size(px(390.), px(844.)));
+    settle(&window, &mut cx);
+    go(&window, &mut cx, "text-field");
+    let field = bounds(&mut cx, "preview-content").center();
+    click(&window, &mut cx, field);
+    let caret = |window: &WindowHandle<Gallery>, cx: &mut VisualTestContext| {
+        window
+            .update(cx, |_, window, cx| {
+                window.focused_input_selection_bounds(cx)
+            })
+            .unwrap()
+            .expect("the field is being edited")
+    };
+    assert!(caret(&window, &mut cx).bottom() < px(844.));
+    let visible = px(440.);
+    assert!(
+        caret(&window, &mut cx).bottom() > visible,
+        "the keyboard would cover the field"
+    );
+    cx.simulate_resize(size(px(390.), visible));
+    settle(&window, &mut cx);
+    assert!(caret(&window, &mut cx).bottom() <= visible);
+}

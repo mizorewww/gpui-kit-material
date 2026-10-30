@@ -169,10 +169,11 @@ function watchEngineFailures() {
 }
 
 // Phones drop the WebGL context of a page under memory pressure, and nothing draws after.
+// The event doesn't bubble, and the canvas appears only as graphics setup proceeds.
 function watchContextLoss() {
-  document.querySelector("canvas")?.addEventListener("webglcontextlost", () => {
+  document.addEventListener("webglcontextlost", () => {
     fail("The gallery stopped drawing", CONTEXT_LOST);
-  });
+  }, true);
 }
 
 // Keep the splash up until the engine has really submitted a frame.
@@ -221,8 +222,8 @@ try {
     ]);
     await module.default({ module_or_path: wasm });
     showIndeterminate("Starting…");
-    module.run();
     watchContextLoss();
+    module.run();
     removeSplashAfterFirstFrame(module);
     loadSymbolsInBackground(module);
   }

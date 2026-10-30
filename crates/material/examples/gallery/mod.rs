@@ -579,10 +579,7 @@ impl Render for Gallery {
         // An on-screen keyboard shrinks the page; keep the caret above it.
         let height = window.viewport_size().height;
         if std::mem::replace(&mut self.last_height, height) > height {
-            let view = cx.weak_entity();
-            window.on_next_frame(move |window, cx| {
-                let _ = view.update(cx, |this, cx| this.reveal_caret(window, cx));
-            });
+            cx.defer_in(window, |this, window, cx| this.reveal_caret(window, cx));
         }
         if let Some((row, reverse)) = self.pending_focus.take() {
             let view = cx.weak_entity();
