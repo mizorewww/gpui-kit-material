@@ -468,31 +468,31 @@ pub static CATALOG: &[Entry] = &[
         "color",
         "Color",
         Styles,
-        "Reference themes, modes, contrast levels and the color roles they assign.",
+        "Every color role in each theme, light and dark, with contrast checks.",
     ),
     document(
         "typography",
         "Typography",
         Styles,
-        "The type scale and text scaling that keep text legible.",
+        "The 15 type scale roles as live samples you can edit.",
     ),
     document(
         "shape",
         "Shape",
         Styles,
-        "The corner radius scale and expressive shapes.",
+        "The corner scale: make your components squarer or rounder.",
     ),
     document(
         "motion",
         "Motion",
         Styles,
-        "Spring tokens for spatial and effects motion.",
+        "Spring tokens for spatial and effects motion: play and compare them.",
     ),
     document(
         "elevation",
         "Elevation",
         Styles,
-        "Surface levels, tonal color and shadows.",
+        "Shadow levels and tonal surfaces.",
     ),
     // Examples
     document(

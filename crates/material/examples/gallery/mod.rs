@@ -26,6 +26,8 @@ mod shell;
 #[cfg(test)]
 mod shell_tests;
 pub(crate) mod spec;
+#[cfg(test)]
+mod styles_tests;
 mod top_bar;
 
 use gpui::{prelude::*, *};
