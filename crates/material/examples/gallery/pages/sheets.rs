@@ -137,6 +137,38 @@ impl Page {
                         .border_1()
                         .border_color(color(ColorRole::OUTLINE_VARIANT))
                         .bg(color(ColorRole::SURFACE_CONTAINER_LOWEST))
+                        // The screen the sheets open over: a hint and some
+                        // content that standard sheets leave interactive.
+                        .child(
+                            div()
+                                .flex()
+                                .flex_col()
+                                .py(rem(8.))
+                                .child(
+                                    div()
+                                        .py(rem(8.))
+                                        .child(body("Open a sheet with the buttons above.")),
+                                )
+                                .children(
+                                    [
+                                        ("Photos", "12 new items"),
+                                        ("Documents", "Shared with you"),
+                                        ("Music", "3 playlists"),
+                                        ("Downloads", "Updated today"),
+                                    ]
+                                    .into_iter()
+                                    .enumerate()
+                                    .map(
+                                        |(ix, (label, supporting))| {
+                                            ListItem::new(("sheet-content", ix), label)
+                                                .supporting(supporting)
+                                                .leading(ListLeading::Monogram(
+                                                    label[..1].to_owned().into(),
+                                                ))
+                                        },
+                                    ),
+                                ),
+                        )
                         .child(
                             MaterialSideSheet::new("live-side")
                                 .open(self.side)

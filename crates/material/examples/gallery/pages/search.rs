@@ -245,7 +245,34 @@ impl Page {
                         .layout(SearchViewLayout::FullScreen)
                         .expanded(open)
                         .suggestions(self.suggestions(&query, true, cx)),
-                ),
+                )
+                // The app screen the bar sits on, until the view opens over
+                // it: a hint and the catalog the search covers.
+                .when(!open, |screen| {
+                    screen.child(
+                        div()
+                            .flex()
+                            .flex_col()
+                            .pt(rem(8.))
+                            .child(
+                                div().px(rem(16.)).pb(rem(8.)).child(
+                                    accessible_text(
+                                        "full-screen-hint",
+                                        "Focus the bar to search the components below",
+                                    )
+                                    .map(|text| spec::type_role(text, TypeRole::BodyMedium))
+                                    .text_color(color(ColorRole::ON_SURFACE_VARIANT)),
+                                ),
+                            )
+                            .children(SUGGESTIONS.into_iter().take(4).enumerate().map(
+                                |(ix, (label, supporting))| {
+                                    ListItem::new(("full-screen-content", ix), label)
+                                        .supporting(supporting)
+                                        .leading(ListLeading::Icon(symbol("category", false)))
+                                },
+                            )),
+                    )
+                }),
         )
         .into_any_element()
     }
