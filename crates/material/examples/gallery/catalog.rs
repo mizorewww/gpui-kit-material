@@ -258,7 +258,7 @@ pub static CATALOG: &[Entry] = &[
         SelectionInput,
         "Compact elements for input, filtering, and suggestions.",
         spec("chips"),
-        None,
+        Some(&playgrounds::chips::PLAYGROUND),
     ),
     component(
         "slider",

@@ -3,6 +3,7 @@
 //! See `super::playground` for the API.
 pub mod button;
 pub mod checkbox;
+pub mod chips;
 pub mod radio;
 pub mod select;
 pub mod switch;
