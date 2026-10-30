@@ -2,8 +2,11 @@
 //! exports a `PLAYGROUND` static that `super::catalog` points its entry at.
 //! See `super::playground` for the API.
 pub mod button;
+pub mod icon_button;
 pub mod switch;
 pub mod text_field;
+#[cfg(test)]
+mod test_support;
 
 /// The common imports of playground modules.
 pub mod prelude {

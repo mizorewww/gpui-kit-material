@@ -185,7 +185,7 @@ pub static CATALOG: &[Entry] = &[
         Actions,
         "Compact actions, with a shape for every state.",
         slice("buttons", icon_button_rows),
-        None,
+        Some(&playgrounds::icon_button::PLAYGROUND),
     ),
     component(
         "button-group",
