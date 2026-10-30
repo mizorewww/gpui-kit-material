@@ -89,6 +89,7 @@ pub struct RingedButton {
     /// Hover and press state-layer backgrounds, installed as live styles or
     /// painted directly for a forced preview.
     layers: Option<(Rgba, Rgba)>,
+    ripple: Option<Rgba>,
     preview: Option<InteractionPreview>,
 }
 
@@ -102,6 +103,7 @@ impl RingedButton {
             placement,
             disabled: false,
             layers: None,
+            ripple: None,
             preview: None,
         }
     }
@@ -116,6 +118,13 @@ impl RingedButton {
     /// the pointer hover and active styles; a preview paints the one it forces.
     pub(crate) fn state_layers(mut self, hover: Rgba, press: Rgba) -> Self {
         self.layers = Some((hover, press));
+        self
+    }
+
+    /// Press feedback: the shared ripple, in this content color, clipped to the
+    /// button's corners.
+    pub(crate) fn ripple(mut self, ink: Rgba) -> Self {
+        self.ripple = Some(ink);
         self
     }
 
@@ -215,13 +224,25 @@ impl RenderOnce for RingedButton {
             button = button.tab_stop(false);
         }
         let forced = self.preview == Some(InteractionPreview::Focused);
+        let corners = match self.placement {
+            RingPlacement::Outer(corners) | RingPlacement::Inner(corners) => corners,
+        };
+        let content = match self.ripple {
+            Some(ink) => super::Ripple::new(
+                ElementId::NamedChild(self.id.clone().into(), "ripple".into()),
+                button,
+            )
+            .ink(ink)
+            .corners(corners)
+            .disabled(!enabled)
+            .specimen(self.preview.is_some())
+            .into_any_element(),
+            None => button.into_any_element(),
+        };
+        let ring = ButtonFocusRing::with_corners(content, focus, enabled, corners);
         let ring = match self.placement {
-            RingPlacement::Outer(corners) => {
-                ButtonFocusRing::with_corners(button, focus, enabled, corners)
-            }
-            RingPlacement::Inner(corners) => {
-                ButtonFocusRing::with_corners(button, focus, enabled, corners).inward()
-            }
+            RingPlacement::Outer(_) => ring,
+            RingPlacement::Inner(_) => ring.inward(),
         }
         .forced(forced);
         #[cfg(test)]

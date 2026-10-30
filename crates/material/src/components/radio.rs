@@ -7,6 +7,7 @@
 //! at once.
 use super::InteractionPreview;
 use super::button::ButtonFocusRing;
+use super::ripple::Ripple;
 use super::roving::{self, Orientation, Roving, index_handles};
 use crate::{
     color::ColorRole,
@@ -278,6 +279,13 @@ impl RenderOnce for MaterialRadio {
                     .group_active(RADIO_GROUP_STYLE, move |style| style.bg(press))
             })
             .child(ring);
+        let layer = Ripple::new((self.id.clone(), "ripple"), layer)
+            .round()
+            .centered()
+            .hit_extension(Edges::all(rem((TARGET - STATE_LAYER) / 2.)))
+            .ink(paint.ink_active)
+            .disabled(!enabled)
+            .specimen(preview.is_some());
         let ringed = ButtonFocusRing::new(layer, focus.clone(), enabled, rem(STATE_LAYER / 2.))
             .forced(forced(InteractionPreview::Focused));
         let label_color = if enabled {

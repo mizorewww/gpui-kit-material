@@ -27,6 +27,8 @@ mod loading_tests;
 mod preview_tests;
 mod ripple;
 pub(crate) use ripple::ButtonRipple;
+#[cfg(test)]
+pub(crate) use ripple::waves_painted;
 mod ripple_clip;
 mod shadow;
 #[cfg(test)]

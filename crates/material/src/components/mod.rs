@@ -78,6 +78,9 @@ mod navigation_drawer;
 mod preview;
 mod progress;
 mod radio;
+mod ripple;
+#[cfg(test)]
+mod ripple_tests;
 mod roving;
 mod search;
 mod sheets;
@@ -142,6 +145,7 @@ pub use progress::{
     progress_with_label, sample_circular_progress, spinner, spinner_with_playback,
 };
 pub use radio::{MaterialRadio, MaterialRadioGroup};
+pub use ripple::Ripple;
 pub use sheets::{BottomSheetDetent, MaterialBottomSheet, MaterialSideSheet, SideSheetEdge};
 pub use tabs::{MaterialTabs, TabItem, TabsVariant};
 pub use text::{

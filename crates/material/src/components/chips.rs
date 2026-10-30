@@ -403,6 +403,7 @@ impl ChipBase {
                 })
             })
             .state_layers(hover, press)
+            .ripple(paint.layer)
             .disabled(disabled)
             .when_some(preview, |button, preview| button.preview_state(preview))
     }

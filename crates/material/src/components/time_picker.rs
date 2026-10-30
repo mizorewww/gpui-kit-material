@@ -33,6 +33,7 @@
 use super::InteractionPreview;
 use super::button::ButtonFocusRing;
 use super::date_parts::Activate;
+use super::ripple::Ripple;
 use super::text_field::type_style;
 use super::{ButtonVariant, IconButton, material_button};
 use crate::{
@@ -893,6 +894,7 @@ impl RenderOnce for TimeSelector {
             .use_keyed_state((self.id.clone(), "focus"), cx, |_, cx| cx.focus_handle())
             .read(cx)
             .clone();
+        let ripple_id = ElementId::NamedChild(self.id.clone().into(), "ripple".into());
         let mut button = gpui_base::Button::new(self.id)
             .accessibility_label(self.label)
             .disabled(disabled)
@@ -930,6 +932,11 @@ impl RenderOnce for TimeSelector {
             button = button.on_click(move |_, window, cx| f(window, cx));
         }
         let button = button.track_focus(&focus).tab_stop(preview.is_none());
+        let button = Ripple::new(ripple_id, button)
+            .corners(Corners::all(rem(8.).to_pixels(window.rem_size())))
+            .ink(ink)
+            .disabled(disabled)
+            .specimen(preview.is_some());
         ButtonFocusRing::new(button, focus, !disabled, rem(8.))
             .forced(!disabled && preview == Some(InteractionPreview::Focused))
     }
@@ -1050,6 +1057,9 @@ impl RenderOnce for PeriodSelector {
                 button = button.on_click(move |_, window, cx| f(pm, window, cx));
             }
             let button = button.track_focus(&focus).tab_stop(!specimen);
+            let button = Ripple::new(if pm { "pm-ripple" } else { "am-ripple" }, button)
+                .ink(ink)
+                .specimen(specimen);
             ButtonFocusRing::new(button, focus, true, rem(0.))
                 .inward()
                 .forced(forced == Some(InteractionPreview::Focused))

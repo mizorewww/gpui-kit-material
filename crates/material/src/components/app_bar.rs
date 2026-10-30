@@ -444,6 +444,7 @@ impl RenderOnce for TopAppBar {
                             state::hovered(paint.search, ink),
                             state::pressed(paint.search, ink),
                         )
+                        .ripple(ink)
                         .when_some(preview, |field, preview| field.preview_state(preview)),
                     )
                 } else {

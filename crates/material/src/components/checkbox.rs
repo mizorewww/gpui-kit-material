@@ -9,7 +9,9 @@
 //! Enter), focus and the checkbox role with its mixed state.
 use super::InteractionPreview;
 use super::button::ButtonFocusRing;
+use super::labeled::{ControlLabel, LabelPosition, required_label};
 use super::radio::selection_paint;
+use super::ripple::Ripple;
 use crate::{
     color::ColorRole,
     motion::{self, MotionToken},
@@ -84,6 +86,8 @@ struct CheckboxPaint {
     hover: Rgba,
     focus: Rgba,
     press: Rgba,
+    /// The ripple's content color, as the state layers use.
+    ripple: Rgba,
 }
 
 /// M3 checkbox colors: primary (error) container with an on-primary
@@ -108,6 +112,7 @@ fn checkbox_paint(selected: bool, enabled: bool, error: bool) -> CheckboxPaint {
             hover: layers.hover,
             focus: layers.focus,
             press: layers.press,
+            ripple: outline.ink_active,
         };
     }
     CheckboxPaint {
@@ -122,6 +127,11 @@ fn checkbox_paint(selected: bool, enabled: bool, error: bool) -> CheckboxPaint {
         hover: layers.hover,
         focus: layers.focus,
         press: layers.press,
+        ripple: if selected {
+            color(accent)
+        } else {
+            outline.ink_active
+        },
     }
 }
 
@@ -385,6 +395,13 @@ impl RenderOnce for MaterialCheckbox {
                     .group_active(CHECKBOX_GROUP, move |style| style.bg(press))
             })
             .child(container);
+        let layer = Ripple::new((self.id.clone(), "ripple"), layer)
+            .round()
+            .centered()
+            .hit_extension(Edges::all(rem((TARGET - STATE_LAYER) / 2.)))
+            .ink(paint.ripple)
+            .disabled(!enabled)
+            .specimen(preview.is_some());
         let ringed = ButtonFocusRing::new(layer, focus.clone(), enabled, rem(STATE_LAYER / 2.))
             .forced(forced(InteractionPreview::Focused));
         let on_change = self.on_change;

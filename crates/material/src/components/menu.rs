@@ -871,6 +871,7 @@ fn render_item(
             state::layer(under, layer, state::HOVER),
             state::layer(under, layer, state::PRESS),
         )
+        .ripple(layer)
         .disabled(disabled)
         .accessibility_label(item.label.clone())
         .map(|b| {

@@ -865,6 +865,29 @@ impl RenderOnce for ConnectedButtonGroup {
                     })
                     .into_any_element()
                 };
+                let (start, end) = (paint.left_radius, paint.right_radius);
+                let option = super::Ripple::new(
+                    ElementId::NamedInteger("option-ripple".into(), index as u64),
+                    option,
+                )
+                .corners(if vertical {
+                    Corners {
+                        top_left: start,
+                        top_right: start,
+                        bottom_right: end,
+                        bottom_left: end,
+                    }
+                } else {
+                    Corners {
+                        top_left: start,
+                        top_right: end,
+                        bottom_right: end,
+                        bottom_left: start,
+                    }
+                })
+                .ink(paint.foreground)
+                .disabled(option_disabled)
+                .specimen(preview.is_some());
                 let ring = focus_ring(
                     option,
                     &focus,

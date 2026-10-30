@@ -5,6 +5,10 @@ use std::time::Duration;
 
 const MOTION: Duration = Duration::from_millis(400);
 const LIFETIME: Duration = Duration::from_millis(450);
+/// How long a held touch can go without an end before its wave is released. GPUI
+/// reports a tap's end and a pan's scroll publicly, but not a system cancel of a
+/// still finger; this keeps that wave from staying on screen.
+const TOUCH_HOLD_LIMIT: Duration = Duration::from_secs(5);
 #[derive(Clone)]
 struct Wave {
     id: u64,
@@ -25,6 +29,11 @@ struct RippleState {
     /// The owning button's ripple id, the parent of every wave id.
     parent: Option<std::sync::Arc<ElementId>>,
     waves: Vec<Wave>,
+    /// Whether a touch holds the current wave, and which touch, for its timeout.
+    touch_held: bool,
+    touch_generation: u64,
+    /// Mirrors a held touch for press feedback beyond the wave.
+    touch_pressed: Option<WeakEntity<bool>>,
 }
 /// The expansion clock id of `key` for one expansion generation.
 fn expansion_key(key: &ElementId, generation: u64) -> ElementId {
@@ -58,7 +67,44 @@ impl RippleState {
         });
         cx.notify();
     }
+    /// A touch came down: start its wave, and bound how long it can hold.
+    fn touch_press(
+        &mut self,
+        bounds: Bounds<Pixels>,
+        position: Point<Pixels>,
+        cx: &mut Context<Self>,
+    ) {
+        self.press(bounds, position, cx);
+        self.touch_held = true;
+        self.touch_generation += 1;
+        let generation = self.touch_generation;
+        self.mirror_touch(true, cx);
+        let timer = cx.background_executor().timer(TOUCH_HOLD_LIMIT);
+        cx.spawn(async move |this, cx| {
+            timer.await;
+            let _ = this.update(cx, |state, cx| {
+                if state.touch_held && state.touch_generation == generation {
+                    state.release(cx);
+                }
+            });
+        })
+        .detach();
+    }
+    fn mirror_touch(&self, on: bool, cx: &mut Context<Self>) {
+        if let Some(pressed) = &self.touch_pressed {
+            let _ = pressed.update(cx, |pressed, cx| {
+                if *pressed != on {
+                    *pressed = on;
+                    cx.notify();
+                }
+            });
+        }
+    }
     fn release(&mut self, cx: &mut Context<Self>) {
+        if self.touch_held {
+            self.touch_held = false;
+            self.mirror_touch(false, cx);
+        }
         let ids: Vec<_> = self
             .waves
             .iter_mut()
@@ -85,6 +131,22 @@ impl RippleState {
         .detach();
     }
 }
+#[cfg(test)]
+thread_local! {
+    static WAVES_PAINTED: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
+/// How many wave paints this thread has made, for tests across components.
+#[cfg(test)]
+pub(crate) fn waves_painted() -> usize {
+    WAVES_PAINTED.with(|painted| painted.get())
+}
+
+/// Where a press at `position` starts its wave.
+fn wave_origin(bounds: Bounds<Pixels>, position: Point<Pixels>, centered: bool) -> Point<Pixels> {
+    if centered { bounds.center() } else { position }
+}
+
 struct PaintedWave {
     center: Point<Pixels>,
     radius: Pixels,
@@ -100,6 +162,8 @@ pub(crate) struct ButtonRipple {
     color: Rgba,
     waves: Vec<PaintedWave>,
     target: Option<super::hit_target::SharedTarget>,
+    centered: bool,
+    extension: Edges<Rems>,
 }
 impl ButtonRipple {
     #[allow(clippy::too_many_arguments)]
@@ -182,7 +246,31 @@ impl ButtonRipple {
             color,
             waves,
             target: None,
+            centered: false,
+            extension: Edges::all(rems(0.)),
         }
+    }
+
+    /// Start every wave at the center, as selection controls do.
+    pub(crate) fn centered(mut self) -> Self {
+        self.centered = true;
+        self
+    }
+
+    /// Also start waves for presses this far outside the ripple's own
+    /// bounds, for a control whose target is larger than its state layer.
+    pub(crate) fn hit_extension(mut self, extension: Edges<Rems>) -> Self {
+        self.extension = extension;
+        self
+    }
+
+    /// Mirror a held touch into `pressed`, for press feedback beyond the
+    /// wave. Mouse presses stay with the caller's own handlers.
+    pub(crate) fn touch_pressed(self, pressed: Entity<bool>, cx: &mut App) -> Self {
+        let pressed = pressed.downgrade();
+        self.state
+            .update(cx, |state, _| state.touch_pressed = Some(pressed));
+        self
     }
 
     pub(super) fn hit_target(mut self, target: super::hit_target::SharedTarget) -> Self {
@@ -229,6 +317,20 @@ impl Element for ButtonRipple {
         // Base has just resolved interaction styles and its complete content
         // mask, including focus/hover border or overflow overrides. Reuse that
         // result rather than reconstructing a second target from render styles.
+        let rem_size = window.rem_size();
+        let extended = (self.extension != Edges::all(rems(0.))).then(|| {
+            let edges = self.extension.map(|edge| edge.to_pixels(rem_size));
+            Bounds::new(
+                bounds.origin - point(edges.left, edges.top),
+                size(
+                    bounds.size.width + edges.left + edges.right,
+                    bounds.size.height + edges.top + edges.bottom,
+                ),
+            )
+        });
+        if let Some(extended) = extended {
+            return window.insert_hitbox(extended, HitboxBehavior::Normal);
+        }
         self.target
             .as_ref()
             .and_then(|target| target.get())
@@ -260,6 +362,7 @@ impl Element for ButtonRipple {
             ),
         );
         let radius = self.radius.to_pixels(window.rem_size());
+        let radius = if rtl { radius.flip_x() } else { radius };
         for wave in &self.waves {
             if wave.opacity > 0.
                 && let Some(path) = super::ripple_clip::paint_path(
@@ -272,7 +375,10 @@ impl Element for ButtonRipple {
                 let mut color = self.color;
                 color.a *= wave.opacity;
                 #[cfg(test)]
-                tests::record_paint(color, radius, border);
+                {
+                    tests::record_paint(color, radius, border);
+                    WAVES_PAINTED.with(|painted| painted.set(painted.get() + 1));
+                }
                 window.paint_path(path, color);
             }
         }
@@ -280,16 +386,38 @@ impl Element for ButtonRipple {
         let enabled = self.enabled;
         let touch_hitbox = hitbox.clone();
         let touch_state = self.state.downgrade();
-        window.observe_touch_event(move |event, window, cx| match event.phase {
-            TouchPhase::Started
-                if enabled && touch_hitbox.is_hovered_at(event.position, window) =>
-            {
-                let _ = touch_state.update(cx, |state, cx| state.press(bounds, event.position, cx));
+        let centered = self.centered;
+        // GPUI offers each new touch as an unclaimed drag. Observing the offer
+        // without claiming it leaves tap and scroll recognition untouched. A tap
+        // ends in the mouse-up below, a pan in the scroll below, and a claimed drag
+        // here.
+        window.on_mouse_event(move |event: &TouchDragEvent, phase, window, cx| {
+            if phase != DispatchPhase::Bubble {
+                return;
             }
-            TouchPhase::Ended | TouchPhase::Cancelled => {
-                let _ = touch_state.update(cx, |state, cx| state.release(cx));
+            match event.phase {
+                TouchPhase::Started => {
+                    if enabled && !window.default_prevented() && touch_hitbox.is_hovered(window) {
+                        let position = wave_origin(bounds, event.start_position, centered);
+                        let _ = touch_state
+                            .update(cx, |state, cx| state.touch_press(bounds, position, cx));
+                    }
+                }
+                TouchPhase::Ended | TouchPhase::Cancelled => {
+                    let _ = touch_state.update(cx, |state, cx| state.release(cx));
+                }
+                _ => {}
             }
-            _ => {}
+        });
+        let release_on_scroll = self.state.downgrade();
+        window.on_mouse_event(move |_: &ScrollEvent, phase, _, cx| {
+            if phase == DispatchPhase::Capture {
+                let _ = release_on_scroll.update(cx, |state, cx| {
+                    if state.touch_held {
+                        state.release(cx);
+                    }
+                });
+            }
         });
         let hitbox = hitbox.clone();
         window.on_mouse_event(move |event: &MouseDownEvent, phase, window, cx| {
@@ -298,10 +426,11 @@ impl Element for ButtonRipple {
             if enabled
                 && phase == DispatchPhase::Bubble
                 && !window.default_prevented()
-                && hitbox.is_hovered_at(event.position, window)
+                && hitbox.is_hovered(window)
                 && !window.last_input_was_touch()
             {
-                let _ = state.update(cx, |state, cx| state.press(bounds, event.position, cx));
+                let position = wave_origin(bounds, event.position, centered);
+                let _ = state.update(cx, |state, cx| state.press(bounds, position, cx));
             }
         });
         let state = self.state.downgrade();
