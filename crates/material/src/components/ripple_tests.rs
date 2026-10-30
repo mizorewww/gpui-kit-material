@@ -244,3 +244,48 @@ fn a_long_press_ending_releases_the_wave(cx: &mut TestAppContext) {
     draw(cx);
     assert!(!pressed(&view, cx));
 }
+
+struct IdleRipple;
+impl Render for IdleRipple {
+    fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        window.set_rem_size(px(14.));
+        div()
+            .size_full()
+            .child(Ripple::new("idle", div().size(px(40.))).into_any_element())
+    }
+}
+
+/// Every ripple hears every wheel, release and exit in the window. Updating an
+/// entity marks what read it as changed, so one with nothing to end must not
+/// write: a scrolling list would render all the rows it holds on each frame.
+#[gpui::test]
+fn an_idle_ripple_writes_nothing_when_drawn_or_on_global_events(cx: &mut TestAppContext) {
+    use crate::components::button::ripple_writes;
+    cx.update(gpui_base::init);
+    let (_, cx) = cx.add_window_view(|_, _| IdleRipple);
+    let at = point(px(20.), px(20.));
+    let away = point(px(300.), px(300.));
+    draw(cx);
+    let settled = ripple_writes();
+    draw(cx);
+    cx.simulate_event(ScrollEvent {
+        position: at,
+        delta: ScrollDelta::Pixels(point(px(0.), px(-8.))),
+        ..Default::default()
+    });
+    cx.simulate_mouse_up(away, MouseButton::Left, Modifiers::default());
+    cx.simulate_event(gpui::MouseExitEvent {
+        position: away,
+        pressed_button: None,
+        modifiers: Modifiers::default(),
+    });
+    draw(cx);
+    assert_eq!(ripple_writes(), settled, "nothing to reconcile or release");
+    // The control: a held press still writes, and its release ends it.
+    cx.simulate_mouse_down(at, MouseButton::Left, Modifiers::default());
+    draw(cx);
+    let pressed = ripple_writes();
+    assert!(pressed > settled, "a press reconciles its wave");
+    cx.simulate_mouse_up(at, MouseButton::Left, Modifiers::default());
+    assert!(ripple_writes() > pressed, "a held press is released");
+}

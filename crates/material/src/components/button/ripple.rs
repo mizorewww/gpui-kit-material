@@ -100,7 +100,13 @@ impl RippleState {
             });
         }
     }
+    /// Whether [`Self::release`] has anything to end.
+    fn holds_press(&self) -> bool {
+        self.touch_held || self.waves.iter().any(|wave| !wave.released)
+    }
     fn release(&mut self, cx: &mut Context<Self>) {
+        #[cfg(test)]
+        RIPPLE_WRITES.with(|writes| writes.set(writes.get() + 1));
         if self.touch_held {
             self.touch_held = false;
             self.mirror_touch(false, cx);
@@ -131,9 +137,31 @@ impl RippleState {
         .detach();
     }
 }
+/// Ends the press `state` holds, if any. An idle ripple is only read: updating
+/// an entity marks what read it as changed, so a global event that updated every
+/// ripple would render every row of a scrolling list again each wheel event.
+fn release_held(state: &WeakEntity<RippleState>, cx: &mut App) {
+    let Some(state) = state.upgrade() else {
+        return;
+    };
+    if state.read(cx).holds_press() {
+        state.update(cx, |state, cx| state.release(cx));
+    }
+}
 #[cfg(test)]
 thread_local! {
     static WAVES_PAINTED: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
+#[cfg(test)]
+thread_local! {
+    static RIPPLE_WRITES: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
+/// How many times this thread's ripples wrote their state outside a press.
+#[cfg(test)]
+pub(crate) fn ripple_writes() -> usize {
+    RIPPLE_WRITES.with(|writes| writes.get())
 }
 
 /// How many wave paints this thread has made, for tests across components.
@@ -181,30 +209,41 @@ impl ButtonRipple {
         let state =
             window.use_keyed_state((id.clone(), "ripple"), cx, |_, _| RippleState::default());
         let reduced_motion = cx.reduce_motion();
-        // One update reconciles mounting and media; idle buttons allocate nothing.
-        let count = state.update(cx, |state, _| {
-            if !mounted {
-                state.waves.clear();
-            }
-            if state.parent.is_none() {
-                state.parent = Some(std::sync::Arc::new((id.clone(), "ripple-wave").into()));
-            }
-            for wave in &mut state.waves {
-                if wave.reduced_motion && !reduced_motion {
-                    wave.expansion_generation += 1;
-                    wave.expansion = expansion_key(&wave.key, wave.expansion_generation);
+        // One update reconciles mounting and media; an idle, initialized ripple
+        // is only read, so drawing it writes nothing and allocates nothing.
+        let settled = {
+            let state = state.read(cx);
+            state.parent.is_some() && state.waves.is_empty()
+        };
+        let count = if settled {
+            0
+        } else {
+            state.update(cx, |state, _| {
+                #[cfg(test)]
+                RIPPLE_WRITES.with(|writes| writes.set(writes.get() + 1));
+                if !mounted {
+                    state.waves.clear();
                 }
-                wave.reduced_motion = reduced_motion;
-                if wave.released && wave.fade_duration.is_none() {
-                    wave.fade_duration = Some(if reduced_motion {
-                        Duration::ZERO
-                    } else {
-                        MOTION
-                    });
+                if state.parent.is_none() {
+                    state.parent = Some(std::sync::Arc::new((id.clone(), "ripple-wave").into()));
                 }
-            }
-            state.waves.len()
-        });
+                for wave in &mut state.waves {
+                    if wave.reduced_motion && !reduced_motion {
+                        wave.expansion_generation += 1;
+                        wave.expansion = expansion_key(&wave.key, wave.expansion_generation);
+                    }
+                    wave.reduced_motion = reduced_motion;
+                    if wave.released && wave.fade_duration.is_none() {
+                        wave.fade_duration = Some(if reduced_motion {
+                            Duration::ZERO
+                        } else {
+                            MOTION
+                        });
+                    }
+                }
+                state.waves.len()
+            })
+        };
         let mut waves = Vec::new();
         if count > 0 {
             let easing = Easing::cubic_bezier(0.4, 0., 0.2, 1.).expect("valid ripple easing");
@@ -405,9 +444,7 @@ impl Element for ButtonRipple {
                             .update(cx, |state, cx| state.touch_press(bounds, position, cx));
                     }
                 }
-                TouchPhase::Ended | TouchPhase::Cancelled => {
-                    let _ = touch_state.update(cx, |state, cx| state.release(cx));
-                }
+                TouchPhase::Ended | TouchPhase::Cancelled => release_held(&touch_state, cx),
                 _ => {}
             }
         });
@@ -416,17 +453,16 @@ impl Element for ButtonRipple {
             if phase == DispatchPhase::Capture
                 && matches!(event.phase, TouchPhase::Ended | TouchPhase::Cancelled)
             {
-                let _ = release_on_long_press.update(cx, |state, cx| state.release(cx));
+                release_held(&release_on_long_press, cx);
             }
         });
         let release_on_scroll = self.state.downgrade();
         window.on_mouse_event(move |_: &ScrollEvent, phase, _, cx| {
-            if phase == DispatchPhase::Capture {
-                let _ = release_on_scroll.update(cx, |state, cx| {
-                    if state.touch_held {
-                        state.release(cx);
-                    }
-                });
+            if phase == DispatchPhase::Capture
+                && let Some(state) = release_on_scroll.upgrade()
+                && state.read(cx).touch_held
+            {
+                state.update(cx, |state, cx| state.release(cx));
             }
         });
         let hitbox = hitbox.clone();
@@ -446,13 +482,13 @@ impl Element for ButtonRipple {
         let state = self.state.downgrade();
         window.on_mouse_event(move |_: &MouseUpEvent, phase, _, cx| {
             if phase == DispatchPhase::Capture {
-                let _ = state.update(cx, |state, cx| state.release(cx));
+                release_held(&state, cx);
             }
         });
         let state = self.state.downgrade();
         window.on_mouse_event(move |_: &MouseExitEvent, phase, _, cx| {
             if phase == DispatchPhase::Capture {
-                let _ = state.update(cx, |state, cx| state.release(cx));
+                release_held(&state, cx);
             }
         });
     }
