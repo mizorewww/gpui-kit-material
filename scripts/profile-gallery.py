@@ -496,6 +496,29 @@ def bench_profile(args, destination):
     return 1 if failed else 2
 
 
+def interaction_frames(data):
+    """A gallery-interactions-v1 report as the frames `gallery_targets` judges.
+    The first drawing scope after each page switch is that switch's cost, not a
+    steady-state frame; `page_switch_ns` reports it."""
+    scopes = data["all_scopes"]
+    switch_frames = set()
+    for label, at in data["marks_ns"]:
+        if label.startswith("switch:"):
+            first = next((i for i, s in enumerate(scopes)
+                          if s["start_ns"] >= at and s["draw_count"]), None)
+            if first is not None:
+                switch_frames.add(first)
+    initial = [s for s in scopes if s["source"] == "InitialDraw"]
+    steady = [s for i, s in enumerate(scopes)
+              if s["source"] != "InitialDraw" and i not in switch_frames]
+    presented = [s for s in steady if s["present_count"]]
+    frames = [{"gpu_time_ns": s["gpu_time_ns"]} for s in presented]
+    if frames and presented:
+        frames[0]["cpu_frame_ns"] = presented[0]["cpu_elapsed_ns"]
+    return {"cpu_scopes": initial + steady, "frames": frames,
+            "page_switch_ns": data["page_switch_ns"], "schema": data["schema"]}
+
+
 def summarize(paths):
     """Print target verdicts for existing engine_bench reports or Gallery frames.json."""
     reports = {}
@@ -508,6 +531,8 @@ def summarize(paths):
                 else f"{key}-{'on' if data['requested_vsync'] else 'off'}"
             reports[key] = data
         else:
+            if data.get("schema") == "gallery-interactions-v1":
+                data = interaction_frames(data)
             table = gallery_targets(data)
             print(f"{path}:")
             print_targets(table)

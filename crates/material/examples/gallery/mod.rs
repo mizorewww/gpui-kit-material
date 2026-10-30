@@ -10,6 +10,8 @@
 #[cfg(not(target_family = "wasm"))]
 pub mod capture;
 #[cfg(all(not(target_family = "wasm"), feature = "frame-profiler"))]
+mod interactions;
+#[cfg(all(not(target_family = "wasm"), feature = "frame-profiler"))]
 mod performance;
 #[cfg(all(not(target_family = "wasm"), feature = "frame-profiler"))]
 mod scroll_performance;
@@ -638,7 +640,13 @@ impl Render for GalleryWindow {
 
 pub fn run(application: gpui::Application, initialize: impl FnOnce(&mut App) + 'static) {
     #[cfg(all(not(target_family = "wasm"), feature = "frame-profiler"))]
-    let profiling = performance::prepare();
+    let interactions = interactions::prepare();
+    #[cfg(all(not(target_family = "wasm"), feature = "frame-profiler"))]
+    let profiling = if interactions.is_some() {
+        None
+    } else {
+        performance::prepare()
+    };
     let application = application.with_assets(Assets::new());
     application.run(move |cx: &mut App| {
         #[cfg(target_family = "wasm")]
@@ -685,6 +693,15 @@ pub fn run(application: gpui::Application, initialize: impl FnOnce(&mut App) + '
             },
         )
         .unwrap();
+        #[cfg(all(not(target_family = "wasm"), feature = "frame-profiler"))]
+        if let Some(interactions) = interactions {
+            _window
+                .update(cx, |_, window, cx| {
+                    let gallery = _content.read(cx).gallery.clone();
+                    interactions.install(gallery, window, cx);
+                })
+                .unwrap();
+        }
         #[cfg(all(not(target_family = "wasm"), feature = "frame-profiler"))]
         if let Some(profiling) = profiling {
             _window

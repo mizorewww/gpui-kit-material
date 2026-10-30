@@ -38,6 +38,9 @@ mod bench {
     /// Startup frames are excluded from steady-state statistics but kept raw.
     const SETTLE: Duration = Duration::from_millis(750);
 
+    /// When the first frame's submission returned, and the thread's CPU clock.
+    type FirstFrameMark = Option<(Instant, Option<u64>)>;
+
     #[derive(Clone, Copy, PartialEq, Eq, Debug)]
     enum Scenario {
         Scroll,
@@ -192,13 +195,13 @@ mod bench {
                         .child("Tonal")
                         .into_any_element(),
                     1 => MaterialSwitch::new(("board-switch", id), "Switch")
-                        .checked(row % 2 == 0)
+                        .checked(row.is_multiple_of(2))
                         .into_any_element(),
                     2 => MaterialCheckbox::new(("board-check", id), "Check")
                         .checked(row % 2 == 1)
                         .into_any_element(),
                     _ => FilterChip::new(("board-chip", id), "Chip")
-                        .selected(row % 2 == 0)
+                        .selected(row.is_multiple_of(2))
                         .into_any_element(),
                 };
                 div()
@@ -235,7 +238,7 @@ mod bench {
         }
 
         fn row(index: usize) -> AnyElement {
-            let even = index % 2 == 0;
+            let even = index.is_multiple_of(2);
             div()
                 .flex()
                 .flex_row()
@@ -433,8 +436,7 @@ mod bench {
                 let cpu_at_open_returned = thread_cpu_ns();
                 // The first platform frame presents the window's first frame; a
                 // callback scheduled from inside it runs after that submission.
-                let after_first_frame: Rc<Cell<Option<(Instant, Option<u64>)>>> =
-                    Rc::new(Cell::new(None));
+                let after_first_frame: Rc<Cell<FirstFrameMark>> = Rc::new(Cell::new(None));
                 let settle_counters: Rc<std::cell::RefCell<Value>> =
                     Rc::new(std::cell::RefCell::new(Value::Null));
                 window
@@ -604,7 +606,7 @@ mod bench {
                         "engine_bench: {}",
                         serde_json::to_string(&report["summary"]).unwrap()
                     );
-                    let _ = cx.update(|cx| cx.quit());
+                    cx.update(|cx| cx.quit());
                 })
                 .detach();
                 };
@@ -626,7 +628,7 @@ mod bench {
                     );
                     cx.spawn(async move |cx| {
                         cx.background_executor().timer(open_delay).await;
-                        let _ = cx.update(open);
+                        cx.update(open);
                     })
                     .detach();
                 }
