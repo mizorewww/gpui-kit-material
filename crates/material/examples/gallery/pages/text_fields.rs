@@ -43,8 +43,6 @@ const BOARDS: [(TextFieldVariant, bool, bool); 8] = [
     (TextFieldVariant::Outlined, false, false),
     (TextFieldVariant::Outlined, true, false),
 ];
-/// Row-label gutter + five 210dp columns + gaps + board padding.
-const BOARD_WIDTH: f32 = 88. + 5. * 210. + 4. * 16. + 2. * 20. + 2.;
 
 pub struct Page {
     name: Entity<InputState>,
@@ -258,20 +256,12 @@ fn specimen_board(
                 field
             })
     });
-    div()
-        .id(("text-field-board-scroll", index))
-        .w_full()
-        .overflow_x_scroll()
-        .child(
-            div().w(rem(BOARD_WIDTH)).child(
-                board(("text-field-board", index))
-                    .caption(caption)
-                    .columns(5)
-                    .column_width(210.)
-                    .column_labels(STATE_NAMES)
-                    .row_labels(CONFIGS.map(|(label, ..)| label))
-                    .cells(cells),
-            ),
-        )
+    board(("text-field-board", index))
+        .caption(caption)
+        .columns(5)
+        .column_width(210.)
+        .column_labels(STATE_NAMES)
+        .row_labels(CONFIGS.map(|(label, ..)| label))
+        .cells(cells)
         .into_any_element()
 }

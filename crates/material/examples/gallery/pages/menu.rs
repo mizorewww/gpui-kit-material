@@ -42,15 +42,6 @@ fn variant_menu(id: impl Into<ElementId>, style: MenuStyle, groups: usize) -> Ma
     menu
 }
 
-fn scrolling(id: &'static str, width: f32, content: impl IntoElement) -> AnyElement {
-    div()
-        .id(id)
-        .w_full()
-        .overflow_x_scroll()
-        .child(div().w(rem(width)).child(content))
-        .into_any_element()
-}
-
 impl GalleryPage for Page {
     const INFO: PageInfo = PageInfo {
         id: "menu",
@@ -89,61 +80,55 @@ impl GalleryPage for Page {
 
     fn render_row(&mut self, row: usize, _: &mut Window, cx: &mut Context<Self>) -> AnyElement {
         match row {
-            0 => scrolling(
-                "menu-variants-scroll",
-                6. * 208. + 5. * 16. + 2. * 20. + 2.,
-                board("menu-variants")
-                    .caption("Basic variants")
-                    .columns(6)
-                    .column_width(208.)
-                    .column_labels([
-                        "Standard",
-                        "Standard · 2 groups",
-                        "Standard · 3 groups",
-                        "Vibrant",
-                        "Vibrant · 2 groups",
-                        "Vibrant · 3 groups",
-                    ])
-                    .cells(
-                        [MenuStyle::Standard, MenuStyle::Vibrant]
-                            .into_iter()
-                            .flat_map(|style| {
-                                (1..=3).map(move |groups| {
-                                    div().h(rem(3. * 196. + 8.)).child(variant_menu(
-                                        ("variant-menu", groups + 3 * (style as usize)),
-                                        style,
-                                        groups,
-                                    ))
-                                })
-                            }),
-                    ),
-            ),
+            0 => board("menu-variants")
+                .caption("Basic variants")
+                .columns(6)
+                .column_width(208.)
+                .column_labels([
+                    "Standard",
+                    "Standard · 2 groups",
+                    "Standard · 3 groups",
+                    "Vibrant",
+                    "Vibrant · 2 groups",
+                    "Vibrant · 3 groups",
+                ])
+                .cells(
+                    [MenuStyle::Standard, MenuStyle::Vibrant]
+                        .into_iter()
+                        .flat_map(|style| {
+                            (1..=3).map(move |groups| {
+                                div().h(rem(3. * 196. + 8.)).child(variant_menu(
+                                    ("variant-menu", groups + 3 * (style as usize)),
+                                    style,
+                                    groups,
+                                ))
+                            })
+                        }),
+                )
+                .into_any_element(),
             1 => expressive_blocks(),
             2 => item_content_board(),
-            3 => scrolling(
-                "menu-baseline-scroll",
-                3. * 200. + 2. * 16. + 2. * 20. + 2.,
-                board("menu-baseline")
-                    .caption("Baseline menu")
-                    .columns(3)
-                    .column_width(200.)
-                    .column_labels(["Density 0", "Density −2", "Density −4"])
-                    .cells(
-                        MenuDensity::ALL
-                            .into_iter()
-                            .enumerate()
-                            .map(|(ix, density)| {
-                                div().h(rem(700.)).child(
-                                    MaterialMenu::new(("baseline-menu", ix))
-                                        .style(MenuStyle::Baseline)
-                                        .density(density)
-                                        .items((0..12).map(|item| {
-                                            MaterialMenuItem::new("Menu item").selected(item == 9)
-                                        })),
-                                )
-                            }),
-                    ),
-            ),
+            3 => board("menu-baseline")
+                .caption("Baseline menu")
+                .columns(3)
+                .column_width(200.)
+                .column_labels(["Density 0", "Density −2", "Density −4"])
+                .cells(
+                    MenuDensity::ALL
+                        .into_iter()
+                        .enumerate()
+                        .map(|(ix, density)| {
+                            div().h(rem(700.)).child(
+                                MaterialMenu::new(("baseline-menu", ix))
+                                    .style(MenuStyle::Baseline)
+                                    .density(density)
+                                    .items((0..12).map(|item| {
+                                        MaterialMenuItem::new("Menu item").selected(item == 9)
+                                    })),
+                            )
+                        }),
+                )
+                .into_any_element(),
             4 => baseline_blocks(),
             5 => self.live_menus(cx),
             _ => self.live_dropdowns(cx),
@@ -347,22 +332,19 @@ fn expressive_blocks() -> AnyElement {
                         )
                 })
         });
-    scrolling(
-        "menu-blocks-scroll",
-        88. + 4. * 228. + 3. * 16. + 2. * 20. + 2.,
-        board("menu-expressive-blocks")
-            .caption("Building blocks · menu item")
-            .columns(4)
-            .column_width(228.)
-            .column_labels([
-                "Standard",
-                "Standard selected",
-                "Vibrant",
-                "Vibrant selected",
-            ])
-            .row_labels(STATES.map(InteractionPreview::name))
-            .cells(cells),
-    )
+    board("menu-expressive-blocks")
+        .caption("Building blocks · menu item")
+        .columns(4)
+        .column_width(228.)
+        .column_labels([
+            "Standard",
+            "Standard selected",
+            "Vibrant",
+            "Vibrant selected",
+        ])
+        .row_labels(STATES.map(InteractionPreview::name))
+        .cells(cells)
+        .into_any_element()
 }
 
 /// Leading and trailing elements, supporting text and dividers.
@@ -395,16 +377,13 @@ fn item_content_board() -> AnyElement {
             )
             .item(MaterialMenuItem::new("Label").leading(star(20., false))),
     ];
-    scrolling(
-        "menu-content-scroll",
-        3. * 228. + 2. * 16. + 2. * 20. + 2.,
-        board("menu-item-content")
-            .caption("Building blocks · elements")
-            .columns(3)
-            .column_width(228.)
-            .column_labels(["Trailing text", "Supporting text", "Divider"])
-            .cells(menus),
-    )
+    board("menu-item-content")
+        .caption("Building blocks · elements")
+        .columns(3)
+        .column_width(228.)
+        .column_labels(["Trailing text", "Supporting text", "Divider"])
+        .cells(menus)
+        .into_any_element()
 }
 
 /// Baseline item building blocks in each state.
@@ -424,17 +403,14 @@ fn baseline_blocks() -> AnyElement {
                 )
         })
     });
-    scrolling(
-        "menu-baseline-blocks-scroll",
-        88. + 2. * 200. + 16. + 2. * 20. + 2.,
-        board("menu-baseline-blocks")
-            .caption("Baseline building blocks · menu list item")
-            .columns(2)
-            .column_width(200.)
-            .column_labels(["Unselected", "Selected"])
-            .row_labels(STATES.map(InteractionPreview::name))
-            .cells(cells),
-    )
+    board("menu-baseline-blocks")
+        .caption("Baseline building blocks · menu list item")
+        .columns(2)
+        .column_width(200.)
+        .column_labels(["Unselected", "Selected"])
+        .row_labels(STATES.map(InteractionPreview::name))
+        .cells(cells)
+        .into_any_element()
 }
 
 /// Record a command in the page's status line.

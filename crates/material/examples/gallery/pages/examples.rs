@@ -236,11 +236,14 @@ impl Page {
         } else {
             RAIL_COLLAPSED_WIDTH
         };
+        // The kit's 905dp window, narrowed to fit the page: the Gallery
+        // never scrolls sideways, and the screens' panes reflow.
+        let web_width = parts::WEB_WIDTH.min(spec::content_width(window) - 2.);
         let c = Ctx {
             k,
             web: true,
             // The pane keeps a 16dp margin to the window's trailing edge.
-            width: parts::WEB_WIDTH - rail - 16.,
+            width: web_width - rail - 16.,
         };
         let content = if body == Messaging {
             self.body(body, c, window, cx)
@@ -278,7 +281,7 @@ impl Page {
                 )
                 .into_any_element()
         };
-        parts::browser(parts::eid("browser", k, 0), content).into_any_element()
+        parts::browser(parts::eid("browser", k, 0), web_width, content).into_any_element()
     }
 
     /// The expanded screens' navigation rail: a menu button that expands
@@ -434,13 +437,7 @@ impl GalleryPage for Page {
         spec::demo(
             ("example", row),
             screen.caption,
-            div()
-                .id(("example-scroll", row))
-                .w_full()
-                .flex()
-                .overflow_x_scroll()
-                .restrict_scroll_to_axis()
-                .child(frame),
+            div().w_full().flex().child(frame),
         )
         .into_any_element()
     }

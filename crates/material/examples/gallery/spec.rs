@@ -171,20 +171,30 @@ pub fn board_outline() -> Rgba {
 const BOARD_RADIUS: f32 = 5.;
 const BOARD_PADDING: f32 = 20.;
 const CELL_GAP: f32 = 16.;
-const SIDE_GUTTER: f32 = 72.;
+/// Wide enough for side labels like "Center-aligned hero" to wrap between
+/// words rather than inside one.
+const SIDE_GUTTER: f32 = 96.;
 
 /// A dashed specimen board, or one band of a board split across rows.
 ///
 /// Cells fill rows of `columns` in a grid whose columns are as wide as
 /// their widest specimen, with spare width spread around them (or are
-/// `column_width` design px when set). Specimens never overlap or wrap; a
-/// band wider than its row scrolls horizontally inside the row. `caption` appears centered above the top band;
-/// `column_labels` title the columns inside the top band; `row_labels` title
-/// each cell row at its leading edge (e.g. interaction states); `side_label`
-/// sits outside the band's leading edge, level with its first cell row (the
-/// kit's "Round"/"Square"). Give every band of one board the same columns,
-/// widths and labels layout, and if any band has a side label, give each a
-/// side label (possibly empty).
+/// `column_width` design px when set). Specimens never overlap or wrap.
+///
+/// Boards never scroll sideways: when the columns do not fit the row, the
+/// board wraps them into stacked groups of adjacent columns, each with its
+/// own column labels and row labels (see [`wrap_columns`]). Measured column
+/// widths are remembered per board (see `MEASURES`); a board drawn for the
+/// first time shows one group, clipped, for that frame only.
+///
+/// `caption` appears centered above the top band; `column_labels` title the
+/// columns inside the top band and inside every group of a wrapped band;
+/// `row_labels` title each cell row at its leading edge (e.g. interaction
+/// states); `side_label` sits outside the band's leading edge, level with
+/// its first cell row (the kit's "Round"/"Square"). Give every band of one
+/// board the same columns, widths and labels, and if any band has a side
+/// label, give each a side label (possibly empty).
+#[derive(gpui::IntoElement)]
 pub struct Board {
     id: ElementId,
     band: Band,
@@ -259,18 +269,97 @@ impl Board {
 
 const ROW_LABEL_WIDTH: f32 = 88.;
 
-impl IntoElement for Board {
-    type Element = AnyElement;
-    fn into_element(self) -> AnyElement {
+/// Measured board geometry, in px, keyed by each board's global element id.
+#[derive(Clone, Default)]
+struct Measure {
+    /// The max-content width of each column, then of the row labels.
+    columns: Vec<f32>,
+    /// The width the band's frame may take.
+    available: f32,
+}
+
+thread_local! {
+    /// Measured board geometry. Each board records its columns and room on
+    /// every prepaint and owns its entry's invalidation: when a new
+    /// measurement changes the board's column groups (first draw, window
+    /// resize, text scale or font changes), it re-renders the view that drew
+    /// it once. Entries are a few floats per board; the map is cleared if it
+    /// ever grows past `MEASURE_LIMIT` boards.
+    static MEASURES: std::cell::RefCell<std::collections::HashMap<GlobalElementId, Measure>> =
+        Default::default();
+}
+const MEASURE_LIMIT: usize = 4096;
+
+/// Split columns of `widths` px into runs of adjacent columns that each fit
+/// `available` px, given `lead` px before each run's first column (row
+/// labels) and `gap` px between columns. Every run holds at least one
+/// column; a column wider than `available` gets a run of its own.
+pub fn wrap_columns(
+    widths: &[f32],
+    lead: f32,
+    gap: f32,
+    available: f32,
+) -> Vec<std::ops::Range<usize>> {
+    let mut runs = Vec::new();
+    let mut start = 0;
+    let mut used = lead;
+    for (index, width) in widths.iter().enumerate() {
+        let needed = if index == start { *width } else { gap + width };
+        // Half a pixel of slack absorbs layout rounding.
+        if index > start && used + needed > available + 0.5 {
+            runs.push(start..index);
+            start = index;
+            used = lead + width;
+        } else {
+            used += needed;
+        }
+    }
+    if start < widths.len() || runs.is_empty() {
+        runs.push(start..widths.len());
+    }
+    runs
+}
+
+impl RenderOnce for Board {
+    fn render(self, window: &mut Window, _: &mut App) -> impl IntoElement {
         let band = self.band;
         let radius = rem(BOARD_RADIUS);
         let width = self.column_width;
         let labelled_rows = !self.row_labels.is_empty();
-        let columns = self.columns + usize::from(labelled_rows);
-        // One grid per band: every column is as wide as its widest specimen
-        // (max-content) with spare width spread around the columns, so
-        // specimens never overlap or wrap; a band wider than the page
-        // scrolls horizontally instead.
+        let columns = self.columns;
+        let rem_size = window.rem_size();
+        let to_px = |design: f32| f32::from(rem(design).to_pixels(rem_size));
+        let gap = to_px(CELL_GAP);
+        // The row-label column: at least `ROW_LABEL_WIDTH`, wider for a
+        // longer label (labels never break inside a word).
+        let min_label = to_px(ROW_LABEL_WIDTH);
+        let lead_of = move |label: f32| {
+            if labelled_rows {
+                label.max(min_label) + gap
+            } else {
+                0.
+            }
+        };
+        // The frame's padding and dashed border around the grid.
+        let chrome = 2. * to_px(BOARD_PADDING) + 2.;
+        let key = window.with_global_id(self.id.clone(), |id, _| id.clone());
+        let view = window.current_view();
+        let measured = MEASURES.with(|measures| measures.borrow().get(&key).cloned());
+        // Fixed column widths need no measurement (row labels still do).
+        let fixed = width.map(|width| vec![to_px(width); columns]);
+        let measured = measured.filter(|measure| measure.columns.len() == columns + 1);
+        let groups = match &measured {
+            Some(measure) => {
+                let widths = fixed.as_deref().unwrap_or(&measure.columns[..columns]);
+                let lead = lead_of(measure.columns[columns]);
+                wrap_columns(widths, lead, gap, measure.available - chrome)
+            }
+            None => std::iter::once(0..columns).collect(),
+        };
+        let wrapped = groups.len() > 1;
+        // Until the board is measured, keep its first frame inside its row.
+        let unmeasured = measured.is_none();
+
         let cell = move |content: AnyElement| {
             div()
                 .flex()
@@ -278,68 +367,117 @@ impl IntoElement for Board {
                 .justify_center()
                 .when_some(width, |cell, width| cell.w(rem(width)))
                 .child(content)
+                .into_any_element()
         };
         let row_label = |label: Option<AnyElement>| {
             div()
-                .w(rem(ROW_LABEL_WIDTH))
+                .min_w(rem(ROW_LABEL_WIDTH))
+                .whitespace_nowrap()
                 .flex()
                 .items_center()
                 .children(label)
                 .into_any_element()
         };
-        let mut items: Vec<AnyElement> = Vec::new();
-        if band.has_top() && !self.column_labels.is_empty() {
-            if labelled_rows {
-                items.push(row_label(None));
+        let show_column_labels = !self.column_labels.is_empty() && (band.has_top() || wrapped);
+        let column_labels = self.column_labels;
+        let row_labels = self.row_labels;
+        let mut cells: Vec<Option<AnyElement>> = self.cells.into_iter().map(Some).collect();
+        let rows = cells.len().div_ceil(columns);
+
+        // Column widths measured this frame, max over every cell.
+        let frame_widths = std::rc::Rc::new(std::cell::RefCell::new(vec![0f32; columns + 1]));
+        let mut grids: Vec<AnyElement> = Vec::with_capacity(groups.len());
+        for (group_index, group) in groups.iter().enumerate() {
+            let span = group.len();
+            let grid_columns = span + usize::from(labelled_rows);
+            let mut items: Vec<AnyElement> = Vec::new();
+            // Which board column each grid item measures, if any.
+            let mut item_columns: Vec<Option<usize>> = Vec::new();
+            if show_column_labels {
+                if labelled_rows {
+                    items.push(row_label(None));
+                    item_columns.push(None);
+                }
+                for column in group.clone() {
+                    let label = column_labels.get(column).cloned().unwrap_or_default();
+                    items.push(cell(
+                        small_label(("column-label", column), label)
+                            .whitespace_normal()
+                            .text_center()
+                            .into_any_element(),
+                    ));
+                    item_columns.push(Some(column));
+                }
             }
-            items.extend(
-                self.column_labels
-                    .into_iter()
-                    .enumerate()
-                    .map(|(index, label)| {
-                        cell(
-                            small_label(("column-label", index), label)
-                                .whitespace_normal()
-                                .text_center()
-                                .into_any_element(),
-                        )
-                        .into_any_element()
-                    }),
+            for row in 0..rows {
+                if labelled_rows {
+                    let label = row_labels.get(row).map(|label| {
+                        small_label(("row-label", group_index * rows + row), label.clone())
+                            .into_any_element()
+                    });
+                    items.push(row_label(label));
+                    item_columns.push(Some(columns));
+                }
+                for column in group.clone() {
+                    match cells.get_mut(row * columns + column).and_then(Option::take) {
+                        Some(content) => {
+                            items.push(cell(content));
+                            item_columns.push(Some(column));
+                        }
+                        // Keep the next row's label in the first column.
+                        None => {
+                            items.push(div().into_any_element());
+                            item_columns.push(None);
+                        }
+                    }
+                }
+            }
+            let widths = frame_widths.clone();
+            let grid = div()
+                .w_full()
+                .grid()
+                .grid_cols_max_content(grid_columns as u16)
+                // Spare width goes around content-sized columns; it never
+                // widens one column to match the widest. Wrapped groups pack
+                // from the leading edge so their labels and columns line up.
+                .map(|grid| {
+                    if wrapped && labelled_rows {
+                        grid.justify_start()
+                    } else {
+                        grid.justify_around()
+                    }
+                })
+                .items_center()
+                .gap_x(rem(CELL_GAP))
+                .gap_y(rem(CELL_GAP))
+                .on_children_prepainted(move |bounds, _, _| {
+                    let mut widths = widths.borrow_mut();
+                    for (bounds, column) in bounds.iter().zip(&item_columns) {
+                        if let Some(column) = column {
+                            let width = f32::from(bounds.size.width);
+                            widths[*column] = widths[*column].max(width);
+                        }
+                    }
+                })
+                .children(items);
+            grids.push(
+                div()
+                    .w_full()
+                    .when(group_index > 0, |group| {
+                        group
+                            .mt(rem(CELL_GAP))
+                            .pt(rem(CELL_GAP * 1.5))
+                            .border_t_1()
+                            .border_dashed()
+                            .border_color(board_outline().opacity(0.6))
+                    })
+                    .child(grid)
+                    .into_any_element(),
             );
         }
-        let mut row_labels = self.row_labels.into_iter();
-        let mut cells = self.cells.into_iter().peekable();
-        let mut index: usize = 0;
-        while cells.peek().is_some() {
-            if labelled_rows {
-                let label = row_labels
-                    .next()
-                    .map(|label| small_label(("row-label", index), label).into_any_element());
-                items.push(row_label(label));
-            }
-            let mut taken = 0;
-            for content in cells.by_ref().take(self.columns) {
-                items.push(cell(content).into_any_element());
-                taken += 1;
-            }
-            // Keep the next row's label in the first column.
-            items.extend((taken..self.columns).map(|_| div().into_any_element()));
-            index += 1;
-        }
-        let grid = div()
-            .w_full()
-            .grid()
-            .grid_cols_max_content(columns as u16)
-            // Spare width goes around content-sized columns; it never
-            // widens one column to match the widest.
-            .justify_around()
-            .items_center()
-            .gap_x(rem(CELL_GAP))
-            .gap_y(rem(CELL_GAP))
-            .children(items);
-        // The band is at least as wide as its row, fixed column widths or
-        // not, so spare width spreads around the columns; wider content
-        // widens the band, which then scrolls inside its row.
+
+        // The band is at least as wide as its row, so spare width spreads
+        // around the columns.
         let frame = div()
             .flex_shrink_0()
             .min_w(relative(1.))
@@ -364,7 +502,9 @@ impl IntoElement for Board {
             .when(band.has_bottom(), |frame| {
                 frame.border_b_1().rounded_b(radius)
             })
-            .child(grid);
+            .children(grids);
+        let has_side_label = self.side_label.is_some();
+        let rendered = groups;
         let caption = self.caption.filter(|_| band.has_top());
         div()
             .id(self.id)
@@ -395,22 +535,52 @@ impl IntoElement for Board {
                                 } else {
                                     CELL_GAP / 2.
                                 }))
-                                .child(small_label("side-label", label)),
+                                .pr(rem(8.))
+                                .child(small_label("side-label", label).whitespace_normal()),
                         )
                     })
                     .child(
                         div()
-                            .id("board-scroll")
                             .flex_1()
                             .min_w_0()
                             .flex()
                             .flex_row()
-                            .overflow_x_scroll()
-                            .restrict_scroll_to_axis()
+                            .when(unmeasured, |holder| holder.overflow_hidden())
                             .child(frame),
-                    ),
+                    )
+                    // Runs after the grids' listeners: record this frame's
+                    // measurements and regroup on the next frame if they
+                    // change the groups.
+                    .on_children_prepainted(move |bounds, _, cx| {
+                        let holder = bounds.get(usize::from(has_side_label));
+                        let Some(holder) = holder else { return };
+                        let available = f32::from(holder.size.width);
+                        let mut widths = frame_widths.borrow().clone();
+                        if let Some(fixed) = &fixed {
+                            widths[..columns].copy_from_slice(fixed);
+                        }
+                        let lead = lead_of(widths[columns]);
+                        let regrouped =
+                            wrap_columns(&widths[..columns], lead, gap, available - chrome);
+                        let changed = regrouped != rendered;
+                        MEASURES.with(|measures| {
+                            let mut measures = measures.borrow_mut();
+                            if measures.len() >= MEASURE_LIMIT && !measures.contains_key(&key) {
+                                measures.clear();
+                            }
+                            measures.insert(
+                                key.clone(),
+                                Measure {
+                                    columns: widths,
+                                    available,
+                                },
+                            );
+                        });
+                        if changed {
+                            cx.defer(move |cx| cx.notify(view));
+                        }
+                    }),
             )
-            .into_any_element()
     }
 }
 
@@ -454,7 +624,25 @@ pub fn demo(
 
 #[cfg(test)]
 mod tests {
-    use super::Band;
+    use super::{Band, wrap_columns};
+    use core::prelude::v1::test;
+
+    #[test]
+    fn columns_wrap_into_runs_that_fit() {
+        // Everything fits: one run.
+        assert_eq!(wrap_columns(&[50., 50., 50.], 10., 10., 200.), [0..3]);
+        // 10 + 50 + 10 + 50 = 120; the third column needs 180 > 150.
+        assert_eq!(wrap_columns(&[50., 50., 50.], 10., 10., 150.), [0..2, 2..3]);
+        // Each run repeats the lead.
+        assert_eq!(wrap_columns(&[40.; 5], 20., 10., 110.), [0..2, 2..4, 4..5]);
+        // A column wider than the room still gets a run of its own.
+        assert_eq!(
+            wrap_columns(&[30., 500., 30.], 0., 10., 100.),
+            [0..1, 1..2, 2..3]
+        );
+        // No columns: one empty run.
+        assert_eq!(wrap_columns(&[], 0., 10., 100.), [0..0]);
+    }
     #[test]
     fn bands_continue_one_outline() {
         assert_eq!(Band::of(0, 1), Band::Whole);
@@ -465,5 +653,62 @@ mod tests {
         assert_eq!(Band::Middle.row_gap(), 0.);
         assert_eq!(Band::Bottom.row_gap(), 0.);
         assert!(Band::Top.row_gap() > 0.);
+    }
+
+    use super::board;
+    use gpui::{prelude::*, *};
+
+    /// A board of measured (not fixed) columns in a narrow window.
+    struct Narrow;
+    impl Render for Narrow {
+        fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+            div().w(px(420.)).child(
+                board("narrow-board")
+                    .columns(5)
+                    .column_labels(["A", "B", "C", "D", "E"])
+                    .row_labels(["Row"])
+                    .cells((0..5).map(|index| {
+                        div()
+                            .debug_selector(move || format!("cell-{index}"))
+                            .w(px(120.))
+                            .h(px(20.))
+                    })),
+            )
+        }
+    }
+
+    #[gpui::test]
+    fn boards_wrap_columns_instead_of_overflowing(cx: &mut gpui::TestAppContext) {
+        cx.update(|cx| {
+            gpui_kit::init(cx);
+            gpui_kit_material::init(cx);
+        });
+        let window = cx.open_window(size(px(800.), px(600.)), |_, _| Narrow);
+        let mut cx = gpui::VisualTestContext::from_window(window.into(), cx);
+        // The first frame measures; the board regroups on the next.
+        for _ in 0..3 {
+            cx.update_window(window.into(), |_, window, cx| {
+                window.refresh();
+                window.draw(cx).clear(cx);
+            })
+            .unwrap();
+            cx.run_until_parked();
+        }
+        let cells: Vec<_> = (0..5)
+            .map(|index| {
+                cx.debug_bounds(Box::leak(format!("cell-{index}").into_boxed_str()))
+                    .unwrap()
+            })
+            .collect();
+        for cell in &cells {
+            assert!(
+                cell.right() <= px(420.),
+                "a column overflows the board: {cell:?}"
+            );
+        }
+        assert!(
+            cells[4].top() > cells[0].bottom(),
+            "the last column wrapped below the first"
+        );
     }
 }

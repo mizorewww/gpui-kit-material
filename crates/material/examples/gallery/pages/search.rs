@@ -274,17 +274,14 @@ fn bar_board() -> AnyElement {
             bar
         })
     });
-    scrolling_board(
-        "search-bar-board",
-        88. + 3. * 360. + 2. * 16. + 2. * 20. + 2.,
-        board("search-bars")
-            .caption("Search bar")
-            .columns(3)
-            .column_width(360.)
-            .column_labels(states.map(InteractionPreview::name))
-            .row_labels(["Icons", "Avatar"])
-            .cells(cells),
-    )
+    board("search-bars")
+        .caption("Search bar")
+        .columns(3)
+        .column_width(360.)
+        .column_labels(states.map(InteractionPreview::name))
+        .row_labels(["Icons", "Avatar"])
+        .cells(cells)
+        .into_any_element()
 }
 
 fn layout_board(layout: SearchViewLayout) -> AnyElement {
@@ -322,36 +319,19 @@ fn layout_board(layout: SearchViewLayout) -> AnyElement {
                 .when(full, |this| this.h(rem(56. + 3. * 64.)))
                 .child(view)
         });
-    scrolling_board(
-        if full {
-            "search-full-board"
-        } else {
-            "search-docked-board"
-        },
-        2. * width + 16. + 2. * 20. + 2.,
-        board(if full {
-            "search-full-layouts"
-        } else {
-            "search-docked-layouts"
-        })
-        .caption(if full {
-            "Search full-screen layout"
-        } else {
-            "Search docked layout"
-        })
-        .columns(2)
-        .column_width(width)
-        .column_labels(["Input text", "Supporting text"])
-        .cells(cells),
-    )
-}
-
-/// A board at its natural width, scrolling horizontally in narrow windows.
-fn scrolling_board(id: &'static str, width: f32, board: impl IntoElement) -> AnyElement {
-    div()
-        .id(id)
-        .w_full()
-        .overflow_x_scroll()
-        .child(div().w(rem(width)).child(board))
-        .into_any_element()
+    board(if full {
+        "search-full-layouts"
+    } else {
+        "search-docked-layouts"
+    })
+    .caption(if full {
+        "Search full-screen layout"
+    } else {
+        "Search docked layout"
+    })
+    .columns(2)
+    .column_width(width)
+    .column_labels(["Input text", "Supporting text"])
+    .cells(cells)
+    .into_any_element()
 }

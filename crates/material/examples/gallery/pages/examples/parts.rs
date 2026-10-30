@@ -137,13 +137,14 @@ pub fn phone(
     )
 }
 
-/// A 905×680 browser window: the browser bar over `body`.
-pub fn browser(id: impl Into<ElementId>, body: impl IntoElement) -> Stateful<Div> {
+/// A browser window `width` design px wide (the kit's is 905×680): the
+/// browser bar over `body`.
+pub fn browser(id: impl Into<ElementId>, width: f32, body: impl IntoElement) -> Stateful<Div> {
     stroke(
         id.into(),
         18.,
         div()
-            .w(rem(WEB_WIDTH))
+            .w(rem(width))
             .h(rem(WEB_HEIGHT))
             .flex()
             .flex_col()

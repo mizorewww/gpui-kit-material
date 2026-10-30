@@ -151,16 +151,9 @@ impl Page {
                 ))
                 .child(group_line(
                     "filter-group-label",
-                    "Filter chips · single row",
-                    // A single row scrolls instead of wrapping.
-                    div()
-                        .id("filter-scroll")
-                        .flex()
-                        .gap(rem(8.))
-                        .flex_1()
-                        .min_w_0()
-                        .overflow_x_scroll()
-                        .children(filters),
+                    "Filter chips",
+                    // The Gallery never scrolls sideways: the row wraps.
+                    spec::demo_row().gap(rem(8.)).children(filters),
                 ))
                 .child(group_line(
                     "suggestion-group-label",
