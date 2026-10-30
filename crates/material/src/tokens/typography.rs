@@ -1,20 +1,24 @@
 //! Type scale in rems. 14px is 1rem at the 100% text scale.
 //!
-//! Metrics come from m3e.kyralabs.dev: kyra-labs/m3exp-web
-//! (<https://github.com/kyra-labs/m3exp-web>) at
-//! `3b1e0047c0021eab7b4c0128fa1bec95c76ca746`,
-//! `packages/m3e-tokens/src/generated/tokens.css`
-//! (`--m3e-sys-typescale-*`, 1rem = 16px there), generated from Compose
-//! Material3 1.5.0-beta01 `tokens/TypeScaleTokens.kt` @ androidx
-//! `19991f2c0858aadfcb442ce02b2c8e4743c96898`. The emphasized styles come from
-//! the same file (upstream still marks them provisional). Fixture:
-//! `crates/material/tests/fixtures/m3e-typography.json`
-//! (`scripts/extract-m3e-tokens.py`).
+//! Reference priority is Figma Material 3 Design Kit > md3.io >
+//! m3e.kyralabs.dev, per value, and the kit defines the whole type family:
+//! sizes, line heights, weights, tracking, typefaces and the emphasized
+//! styles all come from its local text styles `M3/<group>/<size>` and
+//! `M3/<group>/<size>-emphasized` (Styles page, file key
+//! `ozddDB2Z1v51f1IFZlUuJ2`), which are bound to its `Typescale` and
+//! `Font theme` variable collections (mode Baseline). Fixture:
+//! `crates/material/tests/fixtures/figma-typography.json`.
 //!
-//! The default family stays Roboto, the face the gallery bundles: m3e's
-//! Google Sans Flex is its own decision (D1) over Compose's
-//! `FontFamily.SansSerif`, and applications can resolve [`TypefaceRole`] to
-//! any family.
+//! The kit's Baseline font theme sets both the brand and plain faces to
+//! Roboto, with Regular/Medium/SemiBold as its regular/medium/bold weights
+//! (so the emphasized title-medium, title-small and label styles are 600).
+//! md3.io agrees on every baseline metric but puts title-medium and
+//! title-small on the brand face (`tests/fixtures/md3-typography.json`);
+//! m3e's tracking,
+//! 700 emphasized weights and Google Sans Flex
+//! (`tests/fixtures/m3e-typography.json`) are outranked and kept only as
+//! secondary evidence. Applications can resolve [`TypefaceRole`] to any
+//! family.
 use gpui::{Rems, rems};
 
 /// The px size of 1rem at the 100% text scale.
@@ -144,8 +148,9 @@ impl TypeRole {
         }
     }
 
-    /// m3e's `--m3e-sys-typescale-*-font`: display, headline and title-large
-    /// use the brand face; title-medium, title-small, body and label the plain.
+    /// The kit's `Static/<Role>/Font` variables: display, headline and
+    /// title-large use the brand face; title-medium, title-small, body and
+    /// label the plain.
     pub const fn typeface(self) -> TypefaceRole {
         match self {
             Self::TitleMedium
@@ -163,17 +168,17 @@ impl TypeRole {
     /// The role's metrics (size, line height and tracking in px at 100%).
     pub const fn scale(self) -> TypeScale {
         let (size, height, tracking, weight) = match self {
-            Self::DisplayLarge => (57.0, 64.0, -0.2, 400),
+            Self::DisplayLarge => (57.0, 64.0, -0.25, 400),
             Self::DisplayMedium => (45.0, 52.0, 0.0, 400),
             Self::DisplaySmall => (36.0, 44.0, 0.0, 400),
             Self::HeadlineLarge => (32.0, 40.0, 0.0, 400),
             Self::HeadlineMedium => (28.0, 36.0, 0.0, 400),
             Self::HeadlineSmall => (24.0, 32.0, 0.0, 400),
             Self::TitleLarge => (22.0, 28.0, 0.0, 400),
-            Self::TitleMedium => (16.0, 24.0, 0.2, 500),
+            Self::TitleMedium => (16.0, 24.0, 0.15, 500),
             Self::TitleSmall => (14.0, 20.0, 0.1, 500),
             Self::BodyLarge => (16.0, 24.0, 0.5, 400),
-            Self::BodyMedium => (14.0, 20.0, 0.2, 400),
+            Self::BodyMedium => (14.0, 20.0, 0.25, 400),
             Self::BodySmall => (12.0, 16.0, 0.4, 400),
             Self::LabelLarge => (14.0, 20.0, 0.1, 500),
             Self::LabelMedium => (12.0, 16.0, 0.5, 500),
@@ -182,29 +187,14 @@ impl TypeRole {
         self.metrics(size, height, tracking, weight)
     }
 
-    /// The role's M3 Expressive emphasized style: the same size and line
-    /// height with a heavier weight and, for some roles, different tracking.
+    /// The role's M3 Expressive emphasized style (the kit's
+    /// `M3/<group>/<size>-emphasized`): the same face, size, line height and
+    /// tracking with the `Weight-emphasized` weight, Medium (500) for regular
+    /// roles and SemiBold (600) for medium ones.
     pub const fn emphasized(self) -> TypeScale {
         let base = self.scale();
-        let (tracking, weight) = match self {
-            Self::DisplayLarge
-            | Self::DisplayMedium
-            | Self::DisplaySmall
-            | Self::HeadlineLarge
-            | Self::HeadlineMedium
-            | Self::HeadlineSmall
-            | Self::TitleLarge => (0.0, 500),
-            Self::TitleMedium => (0.15, 700),
-            Self::TitleSmall => (0.1, 700),
-            Self::BodyLarge => (0.15, 500),
-            Self::BodyMedium => (0.25, 500),
-            Self::BodySmall => (0.4, 500),
-            Self::LabelLarge => (0.1, 700),
-            Self::LabelMedium | Self::LabelSmall => (0.5, 700),
-        };
         TypeScale {
-            letter_spacing: rem(tracking),
-            font_weight: weight,
+            font_weight: if base.font_weight == 400 { 500 } else { 600 },
             ..base
         }
     }
@@ -243,13 +233,12 @@ mod tests {
     }
 
     #[test]
-    fn all_roles_match_the_pinned_m3e_type_scale() {
+    fn all_roles_match_the_figma_kit_text_styles() {
         let fixture: serde_json::Value =
-            serde_json::from_str(include_str!("../../tests/fixtures/m3e-typography.json")).unwrap();
-        assert_eq!(
-            fixture["source_commit"],
-            "3b1e0047c0021eab7b4c0128fa1bec95c76ca746"
-        );
+            serde_json::from_str(include_str!("../../tests/fixtures/figma-typography.json"))
+                .unwrap();
+        assert_eq!(fixture["font_theme"]["brand"], "Roboto");
+        assert_eq!(fixture["font_theme"]["plain"], "Roboto");
         for (key, style) in [
             ("roles", TypeRole::scale as fn(TypeRole) -> TypeScale),
             ("emphasized", TypeRole::emphasized),
@@ -273,8 +262,11 @@ mod tests {
             },
             "{name} typeface"
         );
-        // Roboto stands in for m3e's Google Sans Flex (see the module docs).
-        assert_eq!(scale.font_family, "Roboto");
+        assert_eq!(
+            scale.font_family,
+            expected["font_family"].as_str().unwrap(),
+            "{name} family"
+        );
         assert_eq!(
             scale.font_weight,
             expected["font_weight"].as_u64().unwrap() as u16

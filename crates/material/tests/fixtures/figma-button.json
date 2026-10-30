@@ -1,0 +1,302 @@
+{
+  "reference": "Google Material 3 Design Kit (Figma Community)",
+  "figma_file": "Material 3 Design Kit (Community), file key ozddDB2Z1v51f1IFZlUuJ2",
+  "figma_page": "Buttons",
+  "extraction": "Figma Plugin API over the Buttons page component sets: sizes from Button (57994:2227) Type=Round State=Enabled (Content frame height, State-layer auto-layout padding [top, right, bottom, left] and item spacing, Icon width, label text style), Type=Square / State=Pressed Content corner radius, and Button - outline (58650:10213) stroke weight; disabled colors from each set at Type=Round, Size=Medium, State=Disabled (container fill variable, content variable times State-layer and node opacity, Content stroke)",
+  "unit": "design px",
+  "sizes": {
+    "XSmall": {
+      "node": "57994:2326",
+      "container_height": 32,
+      "touch_target_height": 48,
+      "padding": [
+        6,
+        12,
+        6,
+        12
+      ],
+      "icon_label_gap": 4,
+      "icon_size": 20,
+      "label_style": "M3/label/large",
+      "shape_square": 12,
+      "shape_pressed": 8,
+      "shape_round": 100,
+      "outline_width": 1
+    },
+    "Small": {
+      "node": "57994:2324",
+      "container_height": 40,
+      "touch_target_height": 48,
+      "padding": [
+        10,
+        16,
+        10,
+        16
+      ],
+      "icon_label_gap": 8,
+      "icon_size": 20,
+      "label_style": "M3/label/large",
+      "shape_square": 12,
+      "shape_pressed": 8,
+      "shape_round": 100,
+      "outline_width": 1
+    },
+    "Medium": {
+      "node": "57994:2322",
+      "container_height": 56,
+      "touch_target_height": 56,
+      "padding": [
+        16,
+        24,
+        16,
+        24
+      ],
+      "icon_label_gap": 8,
+      "icon_size": 24,
+      "label_style": "M3/title/medium",
+      "shape_square": 16,
+      "shape_pressed": 12,
+      "shape_round": 100,
+      "outline_width": 1
+    },
+    "Large": {
+      "node": "57994:2320",
+      "container_height": 96,
+      "touch_target_height": 96,
+      "padding": [
+        32,
+        48,
+        32,
+        48
+      ],
+      "icon_label_gap": 12,
+      "icon_size": 32,
+      "label_style": "M3/headline/small",
+      "shape_square": 28,
+      "shape_pressed": 16,
+      "shape_round": 100,
+      "outline_width": 2
+    },
+    "XLarge": {
+      "node": "57994:2318",
+      "container_height": 136,
+      "touch_target_height": 136,
+      "padding": [
+        48,
+        64,
+        48,
+        64
+      ],
+      "icon_label_gap": 16,
+      "icon_size": 40,
+      "label_style": "M3/headline/large",
+      "shape_square": 28,
+      "shape_pressed": 16,
+      "shape_round": 100,
+      "outline_width": 2
+    }
+  },
+  "disabled": {
+    "filled": {
+      "set": "Button (57994:2227)",
+      "variant": "Type=Round, Size=Medium, State=Disabled",
+      "node": "58651:12647",
+      "container": {
+        "variable": "State Layers/On Surface/Opacity-10",
+        "opacity": 0.1
+      },
+      "content": {
+        "variable": "Schemes/On Surface",
+        "opacity": 0.38,
+        "icon_opacity": 0.38
+      },
+      "outline": null
+    },
+    "text": {
+      "set": "Button - text (58650:8094)",
+      "variant": "Type=Round, Size=Medium, State=Disabled",
+      "node": "58650:8529",
+      "container": {
+        "variable": "State Layers/On Surface/Opacity-10",
+        "opacity": 0.1
+      },
+      "content": {
+        "variable": "Schemes/On Surface",
+        "opacity": 0.38,
+        "icon_opacity": 0.38
+      },
+      "outline": null
+    },
+    "elevated": {
+      "set": "Button - elevated (58650:9294)",
+      "variant": "Type=Round, Size=Medium, State=Disabled",
+      "node": "58650:9729",
+      "container": {
+        "variable": "State Layers/On Surface/Opacity-10",
+        "opacity": 0.1
+      },
+      "content": {
+        "variable": "Schemes/On Surface",
+        "opacity": 0.38,
+        "icon_opacity": 0.38
+      },
+      "outline": null
+    },
+    "outlined": {
+      "set": "Button - outline (58650:10213)",
+      "variant": "Type=Round, Size=Medium, State=Disabled",
+      "node": "58650:10716",
+      "container": {
+        "variable": "State Layers/On Surface/Opacity-10",
+        "opacity": 0.1
+      },
+      "content": {
+        "variable": "Schemes/On Surface",
+        "opacity": 0.38,
+        "icon_opacity": 0.38
+      },
+      "outline": {
+        "variable": "Schemes/Outline Variant",
+        "width": 1
+      }
+    },
+    "tonal": {
+      "set": "Button - tonal (58651:11237)",
+      "variant": "Type=Round, Size=Medium, State=Disabled",
+      "node": "58651:11672",
+      "container": {
+        "variable": "State Layers/On Surface/Opacity-10",
+        "opacity": 0.1
+      },
+      "content": {
+        "variable": "Schemes/On Surface",
+        "opacity": 0.38,
+        "icon_opacity": 0.38
+      },
+      "outline": null
+    },
+    "toggle-filled-unselected": {
+      "set": "Toggle button (57994:2328)",
+      "variant": "Type=Round, Size=Medium, State=Disabled, Selected=False",
+      "node": "58653:20204",
+      "container": {
+        "variable": "State Layers/On Surface/Opacity-10",
+        "opacity": 0.1
+      },
+      "content": {
+        "variable": "Schemes/On Surface",
+        "opacity": 0.38,
+        "icon_opacity": 0.38
+      },
+      "outline": null
+    },
+    "toggle-filled-selected": {
+      "set": "Toggle button (57994:2328)",
+      "variant": "Type=Round, Size=Medium, State=Disabled, Selected=True",
+      "node": "58653:20684",
+      "container": {
+        "variable": "State Layers/On Surface/Opacity-10",
+        "opacity": 0.1
+      },
+      "content": {
+        "variable": "Schemes/On Surface",
+        "opacity": 0.38,
+        "icon_opacity": 0.38
+      },
+      "outline": null
+    },
+    "toggle-elevated-unselected": {
+      "set": "Toggle button - elevated (58653:13968)",
+      "variant": "Type=Round, Size=Medium, State=Disabled, Selected=False",
+      "node": "58653:14793",
+      "container": {
+        "variable": "State Layers/On Surface/Opacity-10",
+        "opacity": 0.1
+      },
+      "content": {
+        "variable": "Schemes/On Surface",
+        "opacity": 0.38,
+        "icon_opacity": 0.38
+      },
+      "outline": null
+    },
+    "toggle-elevated-selected": {
+      "set": "Toggle button - elevated (58653:13968)",
+      "variant": "Type=Round, Size=Medium, State=Disabled, Selected=True",
+      "node": "58653:15273",
+      "container": {
+        "variable": "State Layers/On Surface/Opacity-10",
+        "opacity": 0.1
+      },
+      "content": {
+        "variable": "Schemes/On Surface",
+        "opacity": 0.38,
+        "icon_opacity": 0.38
+      },
+      "outline": null
+    },
+    "toggle-outlined-unselected": {
+      "set": "Toggle button - outline (58653:16237)",
+      "variant": "Type=Round, Size=Medium, State=Disabled, Selected=False",
+      "node": "58653:16672",
+      "container": {
+        "variable": "State Layers/On Surface/Opacity-10",
+        "opacity": 0.1
+      },
+      "content": {
+        "variable": "Schemes/On Surface",
+        "opacity": 0.38,
+        "icon_opacity": 0.38
+      },
+      "outline": {
+        "variable": "Schemes/Outline Variant",
+        "width": 1
+      }
+    },
+    "toggle-outlined-selected": {
+      "set": "Toggle button - outline (58653:16237)",
+      "variant": "Type=Round, Size=Medium, State=Disabled, Selected=True",
+      "node": "58653:17152",
+      "container": {
+        "variable": "State Layers/On Surface/Opacity-10",
+        "opacity": 0.1
+      },
+      "content": {
+        "variable": "Schemes/On Surface",
+        "opacity": 0.38,
+        "icon_opacity": 0.38
+      },
+      "outline": null
+    },
+    "toggle-tonal-unselected": {
+      "set": "Toggle button - tonal (58653:17539)",
+      "variant": "Type=Round, Size=Medium, State=Disabled, Selected=False",
+      "node": "58653:17974",
+      "container": {
+        "variable": "State Layers/On Surface/Opacity-10",
+        "opacity": 0.1
+      },
+      "content": {
+        "variable": "Schemes/On Surface",
+        "opacity": 0.38,
+        "icon_opacity": 0.38
+      },
+      "outline": null
+    },
+    "toggle-tonal-selected": {
+      "set": "Toggle button - tonal (58653:17539)",
+      "variant": "Type=Round, Size=Medium, State=Disabled, Selected=True",
+      "node": "58653:18454",
+      "container": {
+        "variable": "State Layers/On Surface/Opacity-10",
+        "opacity": 0.1
+      },
+      "content": {
+        "variable": "Schemes/On Surface",
+        "opacity": 0.38,
+        "icon_opacity": 0.38
+      },
+      "outline": null
+    }
+  }
+}

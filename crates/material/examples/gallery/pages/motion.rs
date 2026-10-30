@@ -26,16 +26,18 @@ const BALL: f32 = 24.;
 const PLOT_WIDTH: f32 = 160.;
 const PLOT_HEIGHT: f32 = 64.;
 
-/// "Damping 0.8 · stiffness 380 · 350ms".
+/// "Damping 0.9 · stiffness 1400 · 229ms" for a Standard spring, or
+/// "Sampled curve · 425ms" for an Expressive md3.io curve.
 pub(crate) fn describe(scheme: MotionScheme, token: MotionToken) -> String {
     let curve = scheme.resolve(token);
-    let spring = curve.spring();
-    format!(
-        "Damping {} · stiffness {} · {}ms",
-        spring.damping,
-        spring.stiffness,
-        curve.duration().as_millis()
-    )
+    let millis = curve.duration().as_millis();
+    match curve.spring() {
+        Some(spring) => format!(
+            "Damping {} · stiffness {} · {millis}ms",
+            spring.damping, spring.stiffness
+        ),
+        None => format!("Sampled curve · {millis}ms"),
+    }
 }
 
 /// A spring's 0 → 1 position over its duration, as a plot. The y range
@@ -261,10 +263,11 @@ mod tests {
     use core::prelude::v1::test;
 
     #[test]
-    fn each_token_describes_its_scheme_spring() {
+    fn each_token_describes_its_scheme_curve() {
         let expressive = describe(MotionScheme::Expressive, MotionToken::FastSpatial);
         let standard = describe(MotionScheme::Standard, MotionToken::FastSpatial);
-        assert!(expressive.starts_with("Damping "), "{expressive}");
+        assert_eq!(expressive, "Sampled curve · 425ms");
+        assert!(standard.starts_with("Damping "), "{standard}");
         assert_ne!(expressive, standard, "the schemes' spatial springs differ");
         assert!(describe(MotionScheme::Expressive, MotionToken::SlowEffects).ends_with("ms"));
     }

@@ -27,7 +27,12 @@ script's docstring (`--help`) and [docs/DEVELOPMENT.md](../docs/DEVELOPMENT.md).
 | `subset-conformance-emoji.py` | `fonts/conformance/notocoloremoji/NotoColorEmoji-Probe.ttf` (probe-sequence subset of the hash-pinned download) |
 | `convert-conformance-emoji-sbix.py` | `NotoColorEmoji-Probe-sbix.ttf`: the probe subset's CBDT strikes repackaged as sbix for CoreText |
 
-## m3e.kyralabs.dev (primary reference)
+## m3e.kyralabs.dev (third-priority reference)
+
+Reference priority is Figma M3 Design Kit > md3.io > m3e.kyralabs.dev per
+value; the Figma fixtures (`figma-*.json`) are extracted with the Figma Plugin
+API and record their node, style and variable ids. m3e values are used only
+where neither defines them (today: the Standard motion scheme).
 
 m3e token values are read from source, not captured: `extract-m3e-tokens.py`
 parses the generated CSS custom properties that m3exp-web commits
@@ -52,8 +57,8 @@ drivers cannot simply be pointed at m3e:
   checkout.
 
 Behavioral m3e captures (state-layer/elevation tweens, ripple, focus ring)
-therefore need new m3e-specific samplers; until they exist the
-`conformance/reference/button-*.json` files remain md3.io secondary evidence
+would need new m3e-specific samplers; md3.io outranks m3e, so the
+`conformance/reference/button-*.json` md3.io captures remain the timing source
 (see `reference_policy.token_sources` in `conformance/md3.json`).
 
 Font scripts run under `uv` with `fonttools==4.60.1` (see each docstring).

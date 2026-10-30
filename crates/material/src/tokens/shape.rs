@@ -1,12 +1,13 @@
 //! Corner radii and the connected-group corner rule.
 use gpui::{Pixels, Styled, px};
 
-// The M3 / M3 Expressive corner scale: m3e's `--m3e-sys-shape-corner-value-*`
-// (kyra-labs/m3exp-web 3b1e0047c0021eab7b4c0128fa1bec95c76ca746,
-// packages/m3e-tokens/src/generated/tokens.css, from Compose ShapeTokens.kt
-// @ androidx 19991f2c L28-L81); md3.io agrees. Fixture:
-// tests/fixtures/m3e-sys-tokens.json. Corners are dp-sized geometry and do
-// not follow the text scale.
+// The M3 / M3 Expressive corner scale. Reference priority is Figma kit >
+// md3.io > m3e.kyralabs.dev; the Figma Material 3 Design Kit defines it as
+// its `Shape` variable collection (`Corner/*`, VariableCollectionId:55064:15586,
+// mode Baseline, file key ozddDB2Z1v51f1IFZlUuJ2). Fixture:
+// tests/fixtures/figma-sys-tokens.json (`shape_corner_px`). md3.io and m3e
+// (tests/fixtures/m3e-sys-tokens.json) agree on every finite step. Corners are
+// dp-sized geometry and do not follow the text scale.
 
 /// M3 corner none (0).
 pub const RADIUS_NONE: Pixels = px(0.);
@@ -26,8 +27,9 @@ pub const RADIUS_EXTRA_LARGE: Pixels = px(28.);
 pub const RADIUS_EXTRA_LARGE_INCREASED: Pixels = px(32.);
 /// M3 Expressive corner extra-extra-large (48).
 pub const RADIUS_EXTRA_EXTRA_LARGE: Pixels = px(48.);
-/// M3 corner full: large enough to round any control into a pill.
-pub const RADIUS_FULL: Pixels = px(999.);
+/// M3 corner full: the kit's `Corner/Full` (1000), large enough to round any
+/// control into a pill.
+pub const RADIUS_FULL: Pixels = px(1000.);
 
 /// Alias of [`RADIUS_FULL`].
 pub const RADIUS_PILL: Pixels = RADIUS_FULL;
@@ -103,7 +105,8 @@ mod tests {
             assert_eq!(radius, px(expected));
         }
         let fixture: serde_json::Value =
-            serde_json::from_str(include_str!("../../tests/fixtures/m3e-sys-tokens.json")).unwrap();
+            serde_json::from_str(include_str!("../../tests/fixtures/figma-sys-tokens.json"))
+                .unwrap();
         let reference = &fixture["shape_corner_px"];
         for (radius, name) in [
             (RADIUS_NONE, "none"),
@@ -115,6 +118,7 @@ mod tests {
             (RADIUS_EXTRA_LARGE, "extra-large"),
             (RADIUS_EXTRA_LARGE_INCREASED, "extra-large-increased"),
             (RADIUS_EXTRA_EXTRA_LARGE, "extra-extra-large"),
+            (RADIUS_FULL, "full"),
         ] {
             assert_eq!(
                 radius,
@@ -122,8 +126,6 @@ mod tests {
                 "{name}"
             );
         }
-        // m3e's full corner is infinite; 999px rounds any control into a pill.
-        assert_eq!(reference["full"], "infinity");
         assert_eq!(FIELD_RADIUS, px(4.), "M3 text fields use extra-small");
         assert_eq!(RADIUS_CARD, px(12.), "M3 cards use medium");
     }

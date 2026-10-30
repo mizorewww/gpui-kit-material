@@ -1,0 +1,262 @@
+{
+  "reference": "Google Material 3 Design Kit (Figma Community)",
+  "figma_file": "Material 3 Design Kit (Community), file key ozddDB2Z1v51f1IFZlUuJ2",
+  "extraction": "Figma Plugin API: figma.variables (Shape and M3 collections), figma.getLocalEffectStylesAsync(), and the Buttons page component sets",
+  "shape_corner_px": {
+    "source": "Shape variable collection (VariableCollectionId:55064:15586, mode Baseline), variables Corner/*",
+    "none": 0,
+    "extra-small": 4,
+    "small": 8,
+    "medium": 12,
+    "large": 16,
+    "large-increased": 20,
+    "extra-large": 28,
+    "extra-large-increased": 32,
+    "extra-extra-large": 48,
+    "full": 1000
+  },
+  "state_layer_opacity": {
+    "source": "M3 variable collection (VariableCollectionId:54778:406), State Layers/<role>/Opacity-08|10|16: every role defines exactly these three opacities. Buttons page (Button 57994:2227, Type=Round, Size=Medium): State=Hovered paints State-layer at Opacity-08, State=Focused at Opacity-10, State=Pressed a Ripple at Opacity-10 over the hover layer; dragged uses the remaining Opacity-16.",
+    "defined_opacities": [
+      0.08,
+      0.1,
+      0.16
+    ],
+    "hover": 0.08,
+    "focus": 0.1,
+    "pressed": 0.1,
+    "dragged": 0.16
+  },
+  "disabled": {
+    "source": "Buttons page, every Button*/Toggle button* COMPONENT_SET (e.g. Button 57994:2227), State=Disabled: content on-surface under a 0.38 layer opacity, container State Layers/On Surface/Opacity-10",
+    "content_opacity": 0.38,
+    "button_container_opacity": 0.1
+  },
+  "elevation": {
+    "source": "Local effect styles M3/Elevation Light/1-5 and M3/Elevation Dark/1-5; both themes share geometry and opacities and differ only in layer order",
+    "light": {
+      "1": {
+        "figma_style": "M3/Elevation Light/1",
+        "figma_style_id": "S:8982d712daabc8fb1adcc42636a022dc96d68c76,",
+        "layers": [
+          {
+            "x": 0,
+            "y": 1,
+            "blur": 3,
+            "spread": 1,
+            "color": "#000000",
+            "opacity": 0.15
+          },
+          {
+            "x": 0,
+            "y": 1,
+            "blur": 2,
+            "spread": 0,
+            "color": "#000000",
+            "opacity": 0.3
+          }
+        ]
+      },
+      "2": {
+        "figma_style": "M3/Elevation Light/2",
+        "figma_style_id": "S:daa4b49d52a20885d9e6f5148236b8ad2c799eb8,",
+        "layers": [
+          {
+            "x": 0,
+            "y": 2,
+            "blur": 6,
+            "spread": 2,
+            "color": "#000000",
+            "opacity": 0.15
+          },
+          {
+            "x": 0,
+            "y": 1,
+            "blur": 2,
+            "spread": 0,
+            "color": "#000000",
+            "opacity": 0.3
+          }
+        ]
+      },
+      "3": {
+        "figma_style": "M3/Elevation Light/3",
+        "figma_style_id": "S:0f99f2c53b766d9c71aa2e946ff014217b613512,",
+        "layers": [
+          {
+            "x": 0,
+            "y": 1,
+            "blur": 3,
+            "spread": 0,
+            "color": "#000000",
+            "opacity": 0.3
+          },
+          {
+            "x": 0,
+            "y": 4,
+            "blur": 8,
+            "spread": 3,
+            "color": "#000000",
+            "opacity": 0.15
+          }
+        ]
+      },
+      "4": {
+        "figma_style": "M3/Elevation Light/4",
+        "figma_style_id": "S:0cfb69c758ef14684f83514e7b38401730329bb1,",
+        "layers": [
+          {
+            "x": 0,
+            "y": 2,
+            "blur": 3,
+            "spread": 0,
+            "color": "#000000",
+            "opacity": 0.3
+          },
+          {
+            "x": 0,
+            "y": 6,
+            "blur": 10,
+            "spread": 4,
+            "color": "#000000",
+            "opacity": 0.15
+          }
+        ]
+      },
+      "5": {
+        "figma_style": "M3/Elevation Light/5",
+        "figma_style_id": "S:3677e138bdc8524ed05d5404a388b64ace772213,",
+        "layers": [
+          {
+            "x": 0,
+            "y": 4,
+            "blur": 4,
+            "spread": 0,
+            "color": "#000000",
+            "opacity": 0.3
+          },
+          {
+            "x": 0,
+            "y": 8,
+            "blur": 12,
+            "spread": 6,
+            "color": "#000000",
+            "opacity": 0.15
+          }
+        ]
+      }
+    },
+    "dark": {
+      "1": {
+        "figma_style": "M3/Elevation Dark/1",
+        "figma_style_id": "S:9a64c4357aacab60132281da4845ec5b01e0c4dc,",
+        "layers": [
+          {
+            "x": 0,
+            "y": 1,
+            "blur": 2,
+            "spread": 0,
+            "color": "#000000",
+            "opacity": 0.3
+          },
+          {
+            "x": 0,
+            "y": 1,
+            "blur": 3,
+            "spread": 1,
+            "color": "#000000",
+            "opacity": 0.15
+          }
+        ]
+      },
+      "2": {
+        "figma_style": "M3/Elevation Dark/2",
+        "figma_style_id": "S:862883628773daa2ff81bad80ab161d4dd824efc,",
+        "layers": [
+          {
+            "x": 0,
+            "y": 1,
+            "blur": 2,
+            "spread": 0,
+            "color": "#000000",
+            "opacity": 0.3
+          },
+          {
+            "x": 0,
+            "y": 2,
+            "blur": 6,
+            "spread": 2,
+            "color": "#000000",
+            "opacity": 0.15
+          }
+        ]
+      },
+      "3": {
+        "figma_style": "M3/Elevation Dark/3",
+        "figma_style_id": "S:4f0c526fc6324207f40ff98856424e8839251c06,",
+        "layers": [
+          {
+            "x": 0,
+            "y": 1,
+            "blur": 3,
+            "spread": 0,
+            "color": "#000000",
+            "opacity": 0.3
+          },
+          {
+            "x": 0,
+            "y": 4,
+            "blur": 8,
+            "spread": 3,
+            "color": "#000000",
+            "opacity": 0.15
+          }
+        ]
+      },
+      "4": {
+        "figma_style": "M3/Elevation Dark/4",
+        "figma_style_id": "S:9c4109ae881443e039d9755d8ee0bf41f073c444,",
+        "layers": [
+          {
+            "x": 0,
+            "y": 2,
+            "blur": 3,
+            "spread": 0,
+            "color": "#000000",
+            "opacity": 0.3
+          },
+          {
+            "x": 0,
+            "y": 6,
+            "blur": 10,
+            "spread": 4,
+            "color": "#000000",
+            "opacity": 0.15
+          }
+        ]
+      },
+      "5": {
+        "figma_style": "M3/Elevation Dark/5",
+        "figma_style_id": "S:8eb0a02d3311ed29d4726f02ac80fcbb62d0b9aa,",
+        "layers": [
+          {
+            "x": 0,
+            "y": 4,
+            "blur": 4,
+            "spread": 0,
+            "color": "#000000",
+            "opacity": 0.3
+          },
+          {
+            "x": 0,
+            "y": 8,
+            "blur": 12,
+            "spread": 6,
+            "color": "#000000",
+            "opacity": 0.15
+          }
+        ]
+      }
+    }
+  }
+}

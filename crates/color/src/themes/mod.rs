@@ -1,6 +1,16 @@
-//! Exact md3.io preset colors, including medium/high contrast overrides.
-//! Generated from browser-resolved Sass at c910072f3fc5b660276731d8a935d7186f288364.
-//! These presets are not a dynamic HCT color generator. See LICENSE-material.
+//! Exact preset colors, including medium/high contrast overrides.
+//!
+//! Reference priority is Figma Material 3 Design Kit > md3.io >
+//! m3e.kyralabs.dev, per value. The kit's `M3` variable collection
+//! (`Schemes/*`, file key `ozddDB2Z1v51f1IFZlUuJ2`, collection
+//! `VariableCollectionId:54778:406`, modes Light/Dark × standard/medium/high
+//! contrast) defines the baseline scheme, so [`ThemeId::Baseline`] takes every
+//! role the kit defines from it (fixture
+//! `tests/fixtures/figma-baseline-colors.json`). The kit defines no other md3.io
+//! theme and no info/success/warning roles; those come from md3.io's
+//! browser-resolved Sass at c910072f3fc5b660276731d8a935d7186f288364 (fixture
+//! `tests/fixtures/md3-colors.json`). These presets are not a dynamic HCT color
+//! generator. See LICENSE-material.
 use crate::{ColorRole, Scheme};
 mod data;
 
@@ -226,6 +236,60 @@ mod tests {
     use super::*;
     use crate::{Color, scheme::ROLE_COUNT};
 
+    fn mode_and_contrast(row: &serde_json::Value) -> (ThemeMode, Contrast) {
+        let mode = match row["mode"].as_str().unwrap() {
+            "light" => ThemeMode::Light,
+            "dark" => ThemeMode::Dark,
+            _ => panic!("invalid mode"),
+        };
+        let contrast = match row["contrast"].as_str().unwrap() {
+            "standard" => Contrast::Standard,
+            "medium" => Contrast::Medium,
+            "high" => Contrast::High,
+            _ => panic!("invalid contrast"),
+        };
+        (mode, contrast)
+    }
+
+    fn hex(value: &serde_json::Value) -> Color {
+        Color::hex(u32::from_str_radix(&value.as_str().unwrap()[1..], 16).unwrap())
+    }
+
+    fn figma_baseline() -> serde_json::Value {
+        serde_json::from_str(include_str!(
+            "../../tests/fixtures/figma-baseline-colors.json"
+        ))
+        .unwrap()
+    }
+
+    #[test]
+    fn baseline_matches_the_figma_kit_variables_in_every_mode() {
+        let reference = figma_baseline();
+        let rows = reference["rows"].as_array().unwrap();
+        assert_eq!(rows.len(), 6);
+        let mut defined = 0;
+        for row in rows {
+            assert_eq!(row["theme"], "baseline");
+            let (mode, contrast) = mode_and_contrast(row);
+            let scheme = ThemeId::Baseline.scheme(mode, contrast);
+            assert_eq!(scheme.is_dark(), mode == ThemeMode::Dark);
+            for (role, name) in REFERENCE_ROLES.into_iter().zip(REFERENCE_ROLE_NAMES) {
+                let Some(expected) = row["colors"].get(name) else {
+                    continue;
+                };
+                defined += 1;
+                assert_eq!(
+                    scheme.get(role),
+                    hex(expected),
+                    "Figma {} {role:?}",
+                    row["figma_mode"]
+                );
+            }
+        }
+        // Every reference role except info/success/warning and their on-roles.
+        assert_eq!(defined, 6 * 46);
+    }
+
     #[test]
     fn every_reference_configuration_matches_browser_resolved_css() {
         let reference: serde_json::Value =
@@ -233,6 +297,7 @@ mod tests {
         let rows = reference["rows"].as_array().unwrap();
         assert_eq!(rows.len(), 120);
         assert_eq!(REFERENCE_ROLES.len(), 52);
+        let figma = figma_baseline();
         let mut seen = std::collections::BTreeSet::new();
         for row in rows {
             let name = row["theme"].as_str().unwrap();
@@ -240,23 +305,24 @@ mod tests {
             let contrast_name = row["contrast"].as_str().unwrap();
             assert!(seen.insert((name, mode_name, contrast_name)));
             let id = ALL.into_iter().find(|id| id.name() == name).unwrap();
-            let mode = match mode_name {
-                "light" => ThemeMode::Light,
-                "dark" => ThemeMode::Dark,
-                _ => panic!("invalid mode"),
-            };
-            let contrast = match contrast_name {
-                "standard" => Contrast::Standard,
-                "medium" => Contrast::Medium,
-                "high" => Contrast::High,
-                _ => panic!("invalid contrast"),
-            };
+            let (mode, contrast) = mode_and_contrast(row);
             let scheme = id.scheme(mode, contrast);
             assert_eq!(scheme.is_dark(), mode == ThemeMode::Dark);
             assert_eq!(row["colors"].as_object().unwrap().len(), 52);
+            // The Figma kit outranks md3.io for every baseline role it defines.
+            let kit = (id == ThemeId::Baseline).then(|| {
+                figma["rows"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .find(|kit| kit["mode"] == mode_name && kit["contrast"] == contrast_name)
+                    .unwrap()
+            });
             for (role, name) in REFERENCE_ROLES.into_iter().zip(REFERENCE_ROLE_NAMES) {
-                let expected = row["colors"][name].as_str().unwrap();
-                let expected = Color::hex(u32::from_str_radix(&expected[1..], 16).unwrap());
+                if kit.is_some_and(|kit| kit["colors"].get(name).is_some()) {
+                    continue;
+                }
+                let expected = hex(&row["colors"][name]);
                 assert_eq!(
                     scheme.get(role),
                     expected,
