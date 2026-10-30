@@ -282,7 +282,7 @@ pub static CATALOG: &[Entry] = &[
         SelectionInput,
         "Choose one option from a menu that opens from a field.",
         spec("menu"),
-        None,
+        Some(&playgrounds::select::PLAYGROUND),
     ),
     component(
         "search",
