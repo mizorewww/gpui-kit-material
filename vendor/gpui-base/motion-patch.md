@@ -5,7 +5,7 @@ This directory contains `crates/base` from Longbridge GPUI Kit Git revision
 The upstream package declares version `0.8.1`, but this checkout is **not** the
 published crates.io `0.8.1` source. `SOURCE.json` records every upstream file's
 SHA-256, the normalized manifests, and the original and patched SHA-256 of
-each of the six local patch files. `.cargo_vcs_info.json` is a locally written
+each local patch file. `.cargo_vcs_info.json` is a locally written
 marker identifying the Git checkout actually vendored here.
 
 The root and example manifests expand workspace-inherited values from that
@@ -39,6 +39,13 @@ The local compatibility surface is restricted to:
 - `src/text_selection.rs`: `Hitbox` literals add `additional_bounds: None`,
   required by the GPUI `Hitbox` field patch
   (`vendor/gpui-pre/hitbox-extension-patch.md`). No behavior change.
+- `src/input/base/state.rs`: `InputBaseState::set_caret_color(Option<Hsla>)`,
+  a caller caret colour that wins over the projected editor style. Kit's
+  `Input`/`Textarea` re-project the whole style from the Component theme on
+  every render, so a field whose caret follows its own state (Material's
+  error caret) had no way to paint it. `None` restores the projected caret;
+  nothing else in the style changes. Test:
+  `a_caller_caret_color_wins_over_the_projected_style`.
 
 These patches require source unification for both the Kit Git dependency and
 any registry Base dependency in the consuming workspace. Cargo patches are not

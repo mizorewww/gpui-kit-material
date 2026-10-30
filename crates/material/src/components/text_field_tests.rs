@@ -33,6 +33,7 @@ fn filled_and_outlined_paint_m3_roles_in_every_state() {
     assert_eq!(focused.indicator, color(C::PRIMARY));
     assert_eq!(focused.indicator_width, 3.);
     assert_eq!(focused.label, color(C::PRIMARY));
+    assert_eq!(focused.caret, color(C::PRIMARY), "the caret is primary");
     assert_eq!(focused.container.a, 0., "outlined fields have no container");
 
     let outlined = field_paint(TextFieldVariant::Outlined, rest);
@@ -49,6 +50,11 @@ fn filled_and_outlined_paint_m3_roles_in_every_state() {
     assert_eq!(error.label, color(C::ERROR));
     assert_eq!(error.trailing, color(C::ERROR));
     assert_eq!(error.supporting, color(C::ERROR));
+    assert_eq!(
+        error.caret,
+        color(C::ERROR),
+        "an error field's caret is error"
+    );
     let error_hover = field_paint(
         TextFieldVariant::Filled,
         FieldState {

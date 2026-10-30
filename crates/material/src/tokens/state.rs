@@ -18,6 +18,9 @@ pub const DRAG: f32 = 0.16;
 /// Disabled containers and content: on-surface at 12% and 38%.
 pub const DISABLED_CONTAINER: f32 = 0.12;
 pub const DISABLED_CONTENT: f32 = 0.38;
+/// The text selection highlight: primary at 40% (Compose Material 3
+/// `TextSelectionColors.kt`, `TextSelectionBackgroundOpacity = 0.4f`).
+pub const TEXT_SELECTION: f32 = 0.40;
 
 /// Composite a state layer of `content` at `opacity` over `container`
 /// (source-over alpha compositing).
