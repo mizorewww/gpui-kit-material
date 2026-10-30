@@ -202,6 +202,14 @@ pub(crate) fn thumbnail(id: &'static str) -> AnyElement {
                     .map(|(name, label, selected)| nav_destination(name, label, selected)),
             )
             .into_any_element(),
+        "navigation-suite" => div()
+            .w(rem(300.))
+            .child(
+                NavigationBar::new(key("suite"), "Destinations")
+                    .items(nav_items())
+                    .selected("home"),
+            )
+            .into_any_element(),
         "navigation-bar" => div()
             .w(rem(300.))
             .child(

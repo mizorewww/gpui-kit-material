@@ -334,6 +334,14 @@ pub static CATALOG: &[Entry] = &[
         Some(&playgrounds::navigation_drawer::PLAYGROUND),
     ),
     component(
+        "navigation-suite",
+        "Navigation suite",
+        Navigation,
+        "One set of destinations as a bar, rail or drawer, by window width.",
+        None,
+        Some(&playgrounds::navigation_suite::PLAYGROUND),
+    ),
+    component(
         "tabs",
         "Tabs",
         Navigation,

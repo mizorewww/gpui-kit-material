@@ -130,6 +130,10 @@ mod adaptive;
 pub use adaptive::{
     SizedContent, WindowHeightClass, WindowSizeClass, WindowWidthClass, sized_content,
 };
+mod navigation_suite;
+pub use navigation_suite::{
+    NavigationSuite, NavigationSuiteType, SUITE_PRIMARY_ACTION_PADDING, navigation_suite_type,
+};
 pub use preview::InteractionPreview;
 pub use progress::{
     CircularProgress, CircularProgressFrame, CircularProgressPlayback, LINEAR_INDETERMINATE_MS,
