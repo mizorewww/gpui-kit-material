@@ -69,6 +69,7 @@ mod list;
 mod loading_indicator;
 mod menu;
 mod navigation;
+mod navigation_drawer;
 mod preview;
 mod progress;
 mod radio;
@@ -115,9 +116,10 @@ pub use menu::{
     ExposedDropdown, MaterialMenu, MaterialMenuItem, MenuDensity, MenuGroup, MenuPopup, MenuStyle,
 };
 pub use navigation::{
-    NavBadge, NavIcon, NavItem, NavItemLayout, NavigationBar, NavigationItem, NavigationRail,
-    RAIL_COLLAPSED_WIDTH, RAIL_EXPANDED_WIDTH, RailAlignment, navigation_scrim,
+    MEDIUM_WIDTH, NavBadge, NavIcon, NavItem, NavItemLayout, NavigationBar, NavigationItem,
+    NavigationRail, RAIL_COLLAPSED_WIDTH, RAIL_EXPANDED_WIDTH, RailAlignment, navigation_scrim,
 };
+pub use navigation_drawer::{DRAWER_WIDTH, DrawerPosition, NavigationDrawer};
 pub use preview::InteractionPreview;
 pub use progress::{
     CircularProgress, CircularProgressFrame, CircularProgressPlayback, LINEAR_INDETERMINATE_MS,
