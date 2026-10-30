@@ -519,19 +519,9 @@ mod tests {
             gpui_kit_material::init(cx);
         });
         let window = cx.open_window(size(px(1280.), px(900.)), super::super::super::Gallery::new);
-        let index = super::super::PAGES
-            .iter()
-            .position(|page| page.info.id == Page::INFO.id)
-            .unwrap();
         let (page, first) = window
-            .update(cx, |gallery, _, _| {
-                (
-                    gallery.pages[index]
-                        .any_entity()
-                        .downcast::<Page>()
-                        .unwrap(),
-                    gallery.headers[index] + 1,
-                )
+            .update(cx, |gallery, window, cx| {
+                gallery.show_page::<Page>(window, cx)
             })
             .unwrap();
         (window, page, first)

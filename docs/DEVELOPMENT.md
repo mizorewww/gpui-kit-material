@@ -37,12 +37,17 @@ The native gallery can save a GPU-rendered frame in a reproducible state:
 
 ```sh
 cargo run -p gpui-kit-material --example gallery -- \
-  --capture /tmp/material-toggles.png --section toggles \
-  --width 1280 --height 720 --selected --reduced-motion --settle-ms 0
+  --capture /tmp/material-button.png --section button \
+  --set variant=tonal --set size=L --width 1280 --height 900 --reduced-motion
 ```
 
-`--help` lists theme, text scale, state (`--active`, `--disabled`,
-`--no-ripple`, `--selected`, `--loading`) and scroll options. A JSON sidecar
+`--section` takes a page id (`button`, `text-field`, `color`, …) or a
+design-kit page id (`buttons`, `text-fields`, …, which opens that page's
+Specs tab). `--tab preview|specs` picks the component card's tab;
+`--scenario <name>` and repeated `--set <control>=<value>` configure the
+page's playground. `--help` lists the ids, theme, text scale, state
+(`--active`, `--disabled`, `--no-ripple`, `--selected`, `--loading`) and
+scroll options. A JSON sidecar
 records revision, dirty state, requested and actual viewport, device scale,
 theme and motion settings. The OS may constrain the window, so compare actual
 dimensions. A nonzero exit means the capture failed; an existing file is not

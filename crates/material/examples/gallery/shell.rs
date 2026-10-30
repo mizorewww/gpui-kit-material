@@ -1,84 +1,199 @@
-//! The Gallery shell: maps list rows to pages, frames each row as a slice of
-//! its page's panel, and owns navigation and keyboard traversal across
-//! virtual rows. The shared GPUI list measures only the viewport; Kit
-//! Component List requires precomputed sizes, while MessageScroller imposes
-//! log/tail semantics inappropriate for this page.
+//! The Gallery shell: the navigation, the current page's rows (md3.io's
+//! page header, the Live preview | Specs card beside the configuration
+//! card, overview cards, spec boards) and keyboard traversal across the
+//! virtual rows. The GPUI list measures only the viewport; Kit Component
+//! List requires precomputed sizes, while MessageScroller imposes log/tail
+//! semantics inappropriate for these pages.
+use super::catalog::{CATALOG, Group, Kind};
+use super::spec::type_role;
 use super::*;
+use std::sync::OnceLock;
+
+/// The widest the page content grows, in design px.
+const CONTENT_MAX_WIDTH: f32 = 1240.;
+const GUTTER: f32 = 40.;
+const GUTTER_COMPACT: f32 = 12.;
+const NAV_WIDTH: f32 = 248.;
+const CARD_RADIUS: f32 = 16.;
+const CONFIG_WIDTH: f32 = 340.;
+/// The card header: tabs, theme select and mode.
+const CARD_HEADER: f32 = 72.;
+const MIN_PANE: f32 = 460.;
+/// The height of the page header above the panes, in design px.
+const LEAD_HEADER: f32 = 196.;
+const COMPACT_CANVAS: f32 = 320.;
+/// A spec card's side padding.
+const SPEC_PADDING: f32 = 32.;
+const SPEC_PADDING_COMPACT: f32 = 16.;
+
+/// md3.io's theme order, with the select's labels.
+pub(crate) const THEMES: [(ThemeId, &str); 20] = [
+    (ThemeId::Baseline, "Baseline"),
+    (ThemeId::Neutral, "Neutral"),
+    (ThemeId::Vibrant, "Vibrant"),
+    (ThemeId::Expressive, "Expressive"),
+    (ThemeId::Fidelity, "Fidelity"),
+    (ThemeId::Content, "Content"),
+    (ThemeId::Monochrome, "Monochrome"),
+    (ThemeId::Rainbow, "Rainbow"),
+    (ThemeId::FruitSalad, "Fruit salad"),
+    (ThemeId::Ocean, "Ocean"),
+    (ThemeId::Forest, "Forest"),
+    (ThemeId::Spring, "Spring"),
+    (ThemeId::Sunset, "Sunset"),
+    (ThemeId::Autumn, "Autumn"),
+    (ThemeId::Desert, "Desert"),
+    (ThemeId::Summer, "Summer"),
+    (ThemeId::Brownbeige, "Brownbeige"),
+    (ThemeId::Sageivory, "Sageivory"),
+    (ThemeId::Tealcaramel, "Tealcaramel"),
+    (ThemeId::Highcontrast, "Highcontrast"),
+];
+
+fn card_background() -> Rgba {
+    color(ColorRole::SURFACE_CONTAINER_LOW)
+}
+fn canvas_background() -> Rgba {
+    color(ColorRole::SURFACE)
+}
+fn outline() -> Rgba {
+    color(ColorRole::OUTLINE_VARIANT)
+}
+
+/// The width inside a spec card, in design px.
+pub(super) fn spec_content_width(window: &Window) -> f32 {
+    let compact = is_compact(window);
+    let (nav, gutter, padding) = if compact {
+        (0., GUTTER_COMPACT, SPEC_PADDING_COMPACT)
+    } else {
+        (NAV_WIDTH, GUTTER, SPEC_PADDING)
+    };
+    (design_width(window) - nav - 2. * gutter).min(CONTENT_MAX_WIDTH) - 2. * (padding + 1.)
+}
+
+/// The component groups the overview lists, in navigation order.
+pub(super) fn overview_groups() -> impl Iterator<Item = Group> {
+    let mut last = None;
+    CATALOG.iter().filter_map(move |entry| {
+        let group = entry.group;
+        let new = matches!(entry.kind, Kind::Component { .. }) && last != Some(group);
+        last = Some(group);
+        new.then_some(group)
+    })
+}
+
+/// "ACTIONS / BUTTON" per entry, built once.
+fn breadcrumb(entry: usize) -> SharedString {
+    static CRUMBS: OnceLock<Vec<SharedString>> = OnceLock::new();
+    CRUMBS.get_or_init(|| {
+        CATALOG
+            .iter()
+            .map(|entry| {
+                let group = match entry.kind {
+                    Kind::Overview => "Explore the library",
+                    _ => entry.group.title(),
+                };
+                if matches!(entry.kind, Kind::Overview) {
+                    group.to_uppercase().into()
+                } else {
+                    format!("{} / {}", group, entry.title).to_uppercase().into()
+                }
+            })
+            .collect()
+    })[entry]
+        .clone()
+}
+
+/// A full-width card with md3.io's outline.
+fn card() -> Div {
+    div()
+        .flex()
+        .flex_col()
+        .bg(card_background())
+        .border_1()
+        .border_color(outline())
+        .rounded(rem(CARD_RADIUS))
+        .overflow_hidden()
+}
 
 impl Gallery {
-    /// The page holding list row `row`, and the row's index in that page
-    /// (0 is the header).
-    pub(super) fn locate(&self, row: usize) -> (usize, usize) {
-        let page = self.headers.partition_point(|header| *header <= row) - 1;
-        (page, row - self.headers[page])
-    }
-
     pub(super) fn row_count(&self) -> usize {
-        self.row_focus.len()
+        self.rows.len()
     }
 
-    /// Splice the list where a page's body row count changed (e.g. a
-    /// window-width-dependent grid), keeping every other row's measurement.
-    pub(super) fn sync_row_counts(&mut self, window: &Window, cx: &mut Context<Self>) {
-        for index in 0..self.pages.len() {
-            let count = self.pages[index].row_count(window, cx);
-            let previous = self.counts[index];
-            if count == previous {
-                continue;
-            }
-            let start = self.headers[index] + 1;
-            let top = self.list.logical_scroll_top();
-            let handles: Vec<_> = (0..count).map(|_| cx.focus_handle()).collect();
-            self.row_focus
-                .splice(start..start + previous, handles.iter().cloned());
-            self.list
-                .splice_focusable(start..start + previous, handles.into_iter().map(Some));
-            self.counts[index] = count;
-            for later in index + 1..self.pages.len() {
-                self.headers[later] = self.headers[later] + count - previous;
-                self.page_rows[later].set_header(self.headers[later]);
-            }
-            // Keep the reader on the same content when rows above change.
-            if top.item_ix >= start + previous {
-                self.list.scroll_to(ListOffset {
-                    item_ix: top.item_ix + count - previous,
-                    offset_in_item: top.offset_in_item,
-                });
-            } else if top.item_ix >= start {
-                self.list.scroll_to(ListOffset {
-                    item_ix: start + (top.item_ix - start).min(count.saturating_sub(1)),
-                    offset_in_item: top.offset_in_item,
-                });
-            }
-        }
+    /// Entries whose title contains the search query, in catalog order.
+    pub(crate) fn matches(&self) -> impl Iterator<Item = usize> + '_ {
+        let query = self.query.trim().to_lowercase();
+        CATALOG
+            .iter()
+            .enumerate()
+            .filter(move |(_, entry)| {
+                query.is_empty() || entry.title.to_lowercase().contains(&query)
+            })
+            .map(|(index, _)| index)
     }
 
-    /// Let pages forward controlled changes to playbacks of unmounted rows.
+    /// Let the shown page forward controlled changes to playbacks of
+    /// unmounted rows.
     pub(super) fn after_layout(&self, rendered: &[usize], cx: &mut App) {
+        let Some(built) = self
+            .current_page()
+            .and_then(|index| self.pages[index].as_ref())
+        else {
+            return;
+        };
         // Run after list prepaint, when measurements are current. Fast can
         // carry visible rows without calling the builder; current intersection
-        // protects those too. Builder membership includes focused offscreen rows.
+        // protects those too. A preview's live demos are mounted in its card.
         let viewport = self.list.viewport_bounds();
-        for (index, page) in self.pages.iter().enumerate() {
-            let rows = &self.page_rows[index];
-            let visible = |row: usize| {
-                let global = rows.global(row);
+        let demos = self.preview_demos(cx);
+        let visible = |row: usize| {
+            if demos.as_ref().is_some_and(|demos| demos.contains(&row)) {
+                return true;
+            }
+            built.rows.global(row).is_some_and(|global| {
                 rendered.contains(&global)
                     || self.list.bounds_for_item(global).is_some_and(|bounds| {
                         let overlap = bounds.intersect(&viewport);
                         overlap.size.width > px(0.) && overlap.size.height > px(0.)
                     })
-            };
-            page.after_layout(&visible, cx);
+            })
+        };
+        built.page.after_layout(&visible, cx);
+    }
+
+    /// The spec page rows a playground-less component shows in its preview:
+    /// the slice's live demos, else its first row.
+    pub(super) fn preview_demos(&self, cx: &App) -> Option<Vec<usize>> {
+        let entry = &self.entries[self.current];
+        if !matches!(
+            CATALOG[self.current].kind,
+            Kind::Component { playground: None }
+        ) || entry.tab != Tab::Preview
+        {
+            return None;
         }
+        let built = self.pages[self.current_page()?].as_ref()?;
+        let slice = entry.slice.as_ref()?;
+        let demos: Vec<usize> = slice
+            .iter()
+            .copied()
+            .filter(|row| built.page.interactive(*row, cx))
+            .collect();
+        Some(if demos.is_empty() {
+            slice.first().copied().into_iter().collect()
+        } else {
+            demos
+        })
     }
 
     pub(super) fn interactive_row(&self, row: usize, cx: &App) -> bool {
-        let (page, local) = self.locate(row);
-        if local == 0 {
-            self.pages[page].info().guideline.is_some()
-        } else {
-            self.pages[page].interactive(local - 1, cx)
+        match self.rows[row] {
+            Row::Lead | Row::Group(_) => true,
+            Row::Spec(local) => self
+                .current_page()
+                .and_then(|index| self.pages[index].as_ref())
+                .is_some_and(|built| built.page.interactive(local, cx)),
         }
     }
 
@@ -92,14 +207,67 @@ impl Gallery {
         }
     }
 
-    pub(super) fn scroll_to_section(&self, page: usize) {
+    #[cfg_attr(target_family = "wasm", allow(dead_code))]
+    pub(super) fn scroll_to_top(&self) {
         self.list.scroll_to(ListOffset {
-            item_ix: self.headers[page],
+            item_ix: 0,
             offset_in_item: px(0.),
         });
     }
 
     pub(super) fn render_navigation(&self, compact: bool, cx: &mut Context<Self>) -> Stateful<Div> {
+        let searching = !self.query.trim().is_empty();
+        let section = CATALOG[self.current].group.section();
+        let mut groups: Vec<AnyElement> = Vec::new();
+        let mut items: Vec<AnyElement> = Vec::new();
+        let mut group = None;
+        let flush =
+            |group: Option<Group>, items: &mut Vec<AnyElement>, groups: &mut Vec<AnyElement>| {
+                if let Some(group) = group
+                    && !items.is_empty()
+                {
+                    groups.push(
+                        gpui_base::v_flex()
+                            .gap(rem(2.))
+                            .child(
+                                div().px(rem(16.)).pt(rem(12.)).pb(rem(6.)).child(
+                                    accessible_text(("nav-group", group as usize), group.title())
+                                        .role(Role::Heading)
+                                        .map(|text| type_role(text, TypeRole::TitleSmall))
+                                        .text_color(color(ColorRole::ON_SURFACE_VARIANT)),
+                                ),
+                            )
+                            .when(compact, |column| column.flex_row().flex_wrap())
+                            .children(items.drain(..))
+                            .into_any_element(),
+                    );
+                }
+            };
+        for index in self.matches() {
+            let entry = &CATALOG[index];
+            if !searching && entry.group.section() != section {
+                continue;
+            }
+            if group != Some(entry.group) {
+                flush(group, &mut items, &mut groups);
+                group = Some(entry.group);
+            }
+            items.push(self.nav_item(index, compact, cx).into_any_element());
+        }
+        flush(group, &mut items, &mut groups);
+        if groups.is_empty() {
+            groups.push(
+                div()
+                    .px(rem(16.))
+                    .pt(rem(16.))
+                    .child(
+                        accessible_text("nav-empty", "No matching pages")
+                            .map(|text| type_role(text, TypeRole::BodyMedium))
+                            .text_color(color(ColorRole::ON_SURFACE_VARIANT)),
+                    )
+                    .into_any_element(),
+            );
+        }
         div()
             .id("gallery-navigation")
             .role(Role::Navigation)
@@ -110,44 +278,52 @@ impl Gallery {
             .min_h_0()
             .overflow_y_scroll()
             .track_scroll(&self.navigation_scroll)
-            .bg(color(ColorRole::SURFACE_CONTAINER_LOW))
-            .when(compact, |nav| nav.w_full().max_h(rem(160.)).border_b_1())
-            .when(!compact, |nav| nav.w(rem(176.)).h_full().border_r_1())
-            .border_color(color(ColorRole::OUTLINE_VARIANT))
+            .bg(spec::page_background())
+            .when(compact, |nav| nav.w_full().max_h(rem(180.)).border_b_1())
+            .when(!compact, |nav| nav.w(rem(NAV_WIDTH)).h_full().border_r_1())
+            .border_color(outline())
             .child(
                 gpui_base::v_flex()
-                    .p(rem(12.))
-                    .pt(rem(32.))
-                    .gap(rem(12.))
-                    .child(
-                        accessible_text("gallery-navigation-title", "Browse components")
-                            .text_size(TEXT_AUX),
-                    )
-                    .child(
-                        gpui_base::v_flex()
-                            .gap(rem(4.))
-                            .when(compact, |items| items.flex_row().flex_wrap())
-                            .children(pages::PAGES.iter().enumerate().map(|(index, entry)| {
-                                MaterialButton::new(("navigate", index))
-                                    .variant(ButtonVariant::Tonal)
-                                    .button_size(ButtonSize::ExtraSmall)
-                                    .toggle(true)
-                                    .selected(self.selected_section == index)
-                                    .toggle_on_click(false)
-                                    .child(entry.info.title)
-                                    .when(!compact, |button| button.w_full().justify_start())
-                                    .on_click(cx.listener(move |this, _, _, cx| {
-                                        this.selected_section = index;
-                                        this.scroll_to_section(index);
-                                        cx.notify();
-                                    }))
-                                    .reveal_handle(
-                                        ("reveal-navigation", index),
-                                        &self.navigation_scroll,
-                                    )
-                            })),
-                    ),
+                    .px(rem(12.))
+                    .py(rem(12.))
+                    .gap(rem(4.))
+                    .children(groups),
             )
+    }
+
+    fn nav_item(&self, index: usize, compact: bool, cx: &mut Context<Self>) -> impl IntoElement {
+        let entry = &CATALOG[index];
+        let selected = index == self.current;
+        let on_surface = color(ColorRole::ON_SURFACE);
+        FocusRing::new(
+            ("nav-ring", index),
+            gpui_base::Button::new(("navigate", index))
+                .role(Role::Link)
+                .accessibility_label(entry.title)
+                .selected(selected)
+                .debug_selector(move || format!("nav-{}", entry.id))
+                .flex()
+                .items_center()
+                .justify_start()
+                .h(rem(36.))
+                .px(rem(16.))
+                .rounded_full()
+                .cursor_pointer()
+                .when(!compact, |item| item.w_full())
+                .map(|item| type_role(item, TypeRole::LabelLarge))
+                .when(selected, |item| {
+                    item.bg(color(ColorRole::SECONDARY_CONTAINER))
+                        .text_color(color(ColorRole::ON_SECONDARY_CONTAINER))
+                })
+                .when(!selected, |item| {
+                    item.font_weight(FontWeight::NORMAL)
+                        .text_color(color(ColorRole::ON_SURFACE_VARIANT))
+                        .hover(move |style| style.bg(on_surface.opacity(0.08)))
+                })
+                .child(entry.title)
+                .on_click(cx.listener(move |this, _, _, cx| this.navigate(index, cx)))
+                .reveal_handle(("reveal-navigation", index), &self.navigation_scroll),
+        )
     }
 
     pub(super) fn render_row(
@@ -156,33 +332,14 @@ impl Gallery {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> AnyElement {
-        let (page, local) = self.locate(index);
-        let first = local == 0;
-        let last = local == self.counts[page];
-        let (content, gap) = if first {
-            (
-                spec::page_header(self.pages[page].info()).into_any_element(),
-                0.,
-            )
-        } else {
-            (
-                self.pages[page].render_row(local - 1, window, cx),
-                self.pages[page].row_gap(local - 1, cx),
-            )
-        };
         let compact = is_compact(window);
-        let padding = if compact {
-            spec::PANEL_PADDING_COMPACT
-        } else {
-            spec::PANEL_PADDING
+        let gutter = if compact { GUTTER_COMPACT } else { GUTTER };
+        let content = match self.rows[index] {
+            Row::Lead => self.render_lead(window, cx),
+            Row::Spec(row) => self.render_spec_row(index, row, window, cx),
+            Row::Group(group) => self.render_overview_group(group, cx),
         };
-        let page_gap = if compact {
-            spec::PAGE_GAP_COMPACT
-        } else {
-            spec::PAGE_GAP
-        };
-        let radius = rem(spec::PANEL_RADIUS);
-        let row = div()
+        div()
             .id(("gallery-row", index))
             .when(index == 0, |row| {
                 row.debug_selector(|| "gallery-first-row".into())
@@ -190,31 +347,394 @@ impl Gallery {
             .track_focus(&self.row_focus[index])
             .tab_stop(false)
             .w_full()
-            .max_w(rem(spec::PAGE_MAX_WIDTH))
-            .px(rem(page_gap))
-            .when(first, |row| row.pt(rem(page_gap)))
-            .when(last, |row| row.pb(rem(page_gap)))
+            .px(rem(gutter))
+            .when(index == 0, |row| row.pt(rem(24.)))
+            .when(index + 1 == self.rows.len(), |row| row.pb(rem(40.)))
+            .child(div().w_full().max_w(rem(CONTENT_MAX_WIDTH)).child(content))
+            .into_any_element()
+    }
+
+    /// md3.io's page header: breadcrumb, title and description.
+    fn render_header(&self) -> impl IntoElement {
+        let entry = &CATALOG[self.current];
+        let id = entry.id;
+        gpui_base::v_flex()
+            .debug_selector(move || format!("page-{id}"))
+            .gap(rem(8.))
+            .pb(rem(24.))
+            .child(
+                accessible_text("breadcrumb", breadcrumb(self.current))
+                    .map(|text| type_role(text, TypeRole::LabelMedium))
+                    .text_color(color(ColorRole::ON_SURFACE_VARIANT)),
+            )
+            .child(
+                accessible_text("page-title", entry.title)
+                    .role(Role::Heading)
+                    .map(|text| type_role(text, TypeRole::DisplaySmall))
+                    .font_weight(FontWeight::MEDIUM)
+                    .text_color(color(ColorRole::ON_SURFACE)),
+            )
+            .child(
+                accessible_text("page-description", entry.description)
+                    .whitespace_normal()
+                    .map(|text| type_role(text, TypeRole::BodyLarge))
+                    .text_color(color(ColorRole::ON_SURFACE_VARIANT)),
+            )
+    }
+
+    fn render_lead(&mut self, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
+        let header = self.render_header().into_any_element();
+        let body = match CATALOG[self.current].kind {
+            Kind::Overview | Kind::Document => None,
+            Kind::Component { .. } => Some(match self.entries[self.current].tab {
+                Tab::Preview => self.render_panes(window, cx),
+                Tab::Specs => card()
+                    .rounded_b(px(0.))
+                    .border_b_0()
+                    .child(self.render_card_header(cx))
+                    .into_any_element(),
+            }),
+        };
+        gpui_base::v_flex()
+            .w_full()
+            .child(header)
+            .children(body)
+            .into_any_element()
+    }
+
+    /// The card's header: the Live preview | Specs tabs, the theme select
+    /// and the light/dark segmented control.
+    fn render_card_header(&self, cx: &mut Context<Self>) -> impl IntoElement {
+        let tab = self.entries[self.current].tab;
+        let shared = self.shared.read(cx);
+        let theme = shared
+            .reference_theme
+            .and_then(|theme| THEMES.iter().position(|(id, _)| *id == theme));
+        let dark = shared.reference_mode == ThemeMode::Dark;
+        let update_shared = |f: fn(&mut GalleryShared, usize)| {
+            let shared = self.shared.clone();
+            move |value: usize, cx: &mut App| {
+                shared.update(cx, |shared, cx| {
+                    f(shared, value);
+                    cx.notify();
+                })
+            }
+        };
+        let select_theme = update_shared(|shared, index| {
+            shared.reference_theme = Some(THEMES[index].0);
+        });
+        let select_mode = update_shared(|shared, dark| {
+            shared.reference_mode = if dark == 1 {
+                ThemeMode::Dark
+            } else {
+                ThemeMode::Light
+            };
+            shared.reference_theme.get_or_insert(ThemeId::Baseline);
+        });
+        div()
+            .flex()
+            .flex_wrap()
+            .items_center()
+            .gap(rem(8.))
+            .min_h(rem(CARD_HEADER))
+            .px(rem(16.))
+            .py(rem(8.))
+            .border_b_1()
+            .border_color(outline())
             .child(
                 div()
-                    .when(first, |panel| {
-                        let id = self.pages[page].info().id;
-                        panel.debug_selector(move || format!("page-{id}"))
-                    })
-                    .w_full()
-                    .bg(spec::panel_background())
-                    .px(rem(padding))
-                    .pt(rem(gap))
-                    .when(first, |panel| panel.rounded_t(radius).overflow_hidden())
-                    .when(last, |panel| panel.rounded_b(radius).pb(rem(padding)))
-                    .child(content),
+                    .w(rem(232.))
+                    .debug_selector(|| "card-tabs".into())
+                    .child(
+                        MaterialTabs::new("view-tabs", "Playground view")
+                            .items([
+                                TabItem::new("preview", "Live preview"),
+                                TabItem::new("specs", "Specs"),
+                            ])
+                            .selected(if tab == Tab::Specs {
+                                "specs"
+                            } else {
+                                "preview"
+                            })
+                            .on_change(cx.listener(|this, value: &SharedString, _, cx| {
+                                let tab = if value == "specs" {
+                                    Tab::Specs
+                                } else {
+                                    Tab::Preview
+                                };
+                                this.set_tab(tab, cx);
+                            })),
+                    ),
+            )
+            .child(div().flex_1())
+            .child(
+                ExposedDropdown::new("preview-theme", "Theme")
+                    .variant(TextFieldVariant::Outlined)
+                    .options(THEMES.map(|(_, label)| label))
+                    .selected(theme)
+                    .open(self.theme_menu_open)
+                    .width(140.)
+                    .on_open_change(cx.listener(|this, open: &bool, _, cx| {
+                        this.theme_menu_open = *open;
+                        cx.notify();
+                    }))
+                    .on_select(cx.listener(move |this, index: &usize, _, cx| {
+                        this.theme_menu_open = false;
+                        select_theme(*index, cx);
+                        cx.notify();
+                    })),
+            )
+            .child(
+                ConnectedButtonGroup::new("preview-mode", "Preview mode")
+                    .options([("light", "Light"), ("dark", "Dark")])
+                    .selected(if dark { "dark" } else { "light" })
+                    .on_change(move |value: &SharedString, _, cx| {
+                        select_mode(usize::from(value == "dark"), cx)
+                    }),
+            )
+    }
+
+    /// The preview card beside the configuration card.
+    fn render_panes(&mut self, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
+        let compact = is_compact(window);
+        let design_height =
+            f32::from(window.viewport_size().height) * BASE_PX / f32::from(window.rem_size());
+        let pane = (design_height - f32::from(TITLE_BAR) - LEAD_HEADER - 24.).max(MIN_PANE);
+        let playground = self.entries[self.current].playground.clone();
+        let canvas = match &playground {
+            Some(state) => state.update(cx, |state, cx| state.render_preview(window, cx)),
+            None => self.render_demos(window, cx),
+        };
+        let fallback = playground.is_none();
+        let preview_card = card()
+            .flex_1()
+            .min_w_0()
+            .when(!compact, |card| card.h(rem(pane)))
+            .child(self.render_card_header(cx))
+            .child(
+                div()
+                    .id("preview-canvas")
+                    .debug_selector(|| "preview-canvas".into())
+                    .flex_1()
+                    .min_h(rem(COMPACT_CANVAS))
+                    .bg(canvas_background())
+                    .flex()
+                    .flex_col()
+                    .when(!fallback, |canvas| canvas.items_center().justify_center())
+                    .when(fallback, |canvas| canvas.overflow_y_scroll().p(rem(24.)))
+                    .p(rem(24.))
+                    .child(canvas),
             );
-        // List item roots are positioned directly at the list's left edge.
-        // A real flex parent centers the panel.
+        let config_card = self.render_config_card(playground, compact, pane, window, cx);
         div()
             .w_full()
             .flex()
-            .justify_center()
-            .child(row)
+            .gap(rem(24.))
+            .when(compact, |panes| panes.flex_col())
+            .child(preview_card)
+            .child(config_card)
+            .into_any_element()
+    }
+
+    /// The live demos of a component without a playground yet.
+    fn render_demos(&mut self, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
+        let demos = self.preview_demos(cx).unwrap_or_default();
+        let Some(built) = self
+            .current_page()
+            .and_then(|index| self.pages[index].as_ref())
+        else {
+            return div().into_any_element();
+        };
+        gpui_base::v_flex()
+            .w_full()
+            .gap(rem(24.))
+            .children(
+                demos
+                    .into_iter()
+                    .map(|row| built.page.render_row(row, window, cx)),
+            )
+            .into_any_element()
+    }
+
+    fn render_config_card(
+        &mut self,
+        playground: Option<Entity<PlaygroundState>>,
+        compact: bool,
+        pane: f32,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> impl IntoElement {
+        let header = div()
+            .flex()
+            .items_center()
+            .justify_between()
+            .h(rem(56.))
+            .px(rem(20.))
+            .border_b_1()
+            .border_color(outline())
+            .child(
+                accessible_text("configuration-title", "Configuration")
+                    .role(Role::Heading)
+                    .map(|text| type_role(text, TypeRole::TitleSmall))
+                    .text_color(color(ColorRole::ON_SURFACE)),
+            )
+            .when_some(playground.clone(), |header, state| {
+                header.child(
+                    MaterialButton::new("configuration-reset")
+                        .variant(ButtonVariant::Text)
+                        .button_size(ButtonSize::ExtraSmall)
+                        .debug_selector(|| "configuration-reset".into())
+                        .child("Reset")
+                        .on_click(move |_, window, cx| {
+                            state.update(cx, |state, cx| state.reset(window, cx))
+                        }),
+                )
+            });
+        let body = match &playground {
+            Some(state) => {
+                let scroll = state.read(cx).scroll.clone();
+                let panel = state.update(cx, |state, cx| state.render_panel(window, cx));
+                div()
+                    .id("configuration-body")
+                    .flex_1()
+                    .min_h_0()
+                    .when(!compact, |body| body.overflow_y_scroll().track_scroll(&scroll))
+                    .child(panel)
+                    .into_any_element()
+            }
+            None => div()
+                .p(rem(20.))
+                .child(
+                    accessible_text(
+                        "configuration-pending",
+                        "This playground's configuration is on its way. The preview shows the component's live demos; Specs shows every variant and state.",
+                    )
+                    .whitespace_normal()
+                    .map(|text| type_role(text, TypeRole::BodyMedium))
+                    .text_color(color(ColorRole::ON_SURFACE_VARIANT)),
+                )
+                .into_any_element(),
+        };
+        card()
+            .debug_selector(|| "configuration-card".into())
+            .flex_shrink_0()
+            .when(!compact, |card| card.w(rem(CONFIG_WIDTH)).h(rem(pane)))
+            .child(header)
+            .child(body)
+    }
+
+    /// A spec page row framed as a slice of its card.
+    fn render_spec_row(
+        &mut self,
+        index: usize,
+        row: usize,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> AnyElement {
+        let Some(built) = self
+            .current_page()
+            .and_then(|page| self.pages[page].as_ref())
+        else {
+            return div().into_any_element();
+        };
+        let content = built.page.render_row(row, window, cx);
+        let first = index == 1;
+        let last = index + 1 == self.rows.len();
+        // Component Specs continue the card the lead row opened; a document
+        // page's card starts with its first row.
+        let opens_card = first && matches!(CATALOG[self.current].kind, Kind::Document);
+        let gap = if first {
+            32.
+        } else {
+            built.page.row_gap(row, cx)
+        };
+        let compact = is_compact(window);
+        let radius = rem(CARD_RADIUS);
+        div()
+            .when(first, |panel| {
+                let id = CATALOG[self.current].id;
+                panel.debug_selector(move || format!("specs-{id}"))
+            })
+            .w_full()
+            .bg(card_background())
+            .border_l_1()
+            .border_r_1()
+            .border_color(outline())
+            .px(rem(if compact {
+                SPEC_PADDING_COMPACT
+            } else {
+                SPEC_PADDING
+            }))
+            .pt(rem(gap))
+            .when(opens_card, |panel| panel.border_t_1().rounded_t(radius))
+            .when(last, |panel| {
+                panel.border_b_1().rounded_b(radius).pb(rem(32.))
+            })
+            .child(content)
+            .into_any_element()
+    }
+
+    fn render_overview_group(&self, group: Group, cx: &mut Context<Self>) -> AnyElement {
+        gpui_base::v_flex()
+            .gap(rem(12.))
+            .pb(rem(32.))
+            .child(
+                accessible_text(
+                    ("overview-group", group as usize),
+                    group.title().to_uppercase(),
+                )
+                .role(Role::Heading)
+                .map(|text| type_role(text, TypeRole::LabelLarge))
+                .text_color(color(ColorRole::ON_SURFACE_VARIANT)),
+            )
+            .child(
+                div().flex().flex_wrap().gap(rem(16.)).children(
+                    CATALOG
+                        .iter()
+                        .enumerate()
+                        .filter(|(_, entry)| {
+                            entry.group == group && matches!(entry.kind, Kind::Component { .. })
+                        })
+                        .map(|(index, entry)| {
+                            let on_surface = color(ColorRole::ON_SURFACE);
+                            FocusRing::new(
+                                ("overview-ring", index),
+                                gpui_base::Button::new(("overview-card", index))
+                                    .role(Role::Link)
+                                    .accessibility_label(entry.title)
+                                    .debug_selector(move || format!("overview-{}", entry.id))
+                                    .w(rem(272.))
+                                    .min_h(rem(112.))
+                                    .flex()
+                                    .flex_col()
+                                    .gap(rem(6.))
+                                    .p(rem(20.))
+                                    .bg(card_background())
+                                    .border_1()
+                                    .border_color(outline())
+                                    .rounded(rem(CARD_RADIUS))
+                                    .cursor_pointer()
+                                    .hover(move |style| style.bg(on_surface.opacity(0.08)))
+                                    .child(
+                                        div()
+                                            .map(|text| type_role(text, TypeRole::TitleMedium))
+                                            .text_color(color(ColorRole::ON_SURFACE))
+                                            .child(entry.title),
+                                    )
+                                    .child(
+                                        div()
+                                            .whitespace_normal()
+                                            .map(|text| type_role(text, TypeRole::BodyMedium))
+                                            .text_color(color(ColorRole::ON_SURFACE_VARIANT))
+                                            .child(entry.description),
+                                    )
+                                    .on_click(
+                                        cx.listener(move |this, _, _, cx| this.navigate(index, cx)),
+                                    ),
+                            )
+                        }),
+                ),
+            )
             .into_any_element()
     }
 
@@ -227,7 +747,10 @@ impl Gallery {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        let target = &self.row_focus[row];
+        let Some(target) = self.row_focus.get(row) else {
+            return;
+        };
+        let target = target.clone();
         let original = window.focused(cx);
         let mut visited = Vec::new();
         loop {
@@ -300,6 +823,15 @@ impl Gallery {
             None => (0..self.row_count()).find(|row| self.interactive_row(*row, cx)),
         };
         if let Some(target) = target {
+            // Moving focus into the next row is only needed when it is not
+            // mounted; a mounted neighbour already took focus above.
+            let mounted = self
+                .row_focus
+                .get(target)
+                .is_some_and(|focus| focus.contains_focused(window, cx));
+            if mounted {
+                return;
+            }
             if let Some(previous) = previous {
                 previous.focus(window, cx);
             }
