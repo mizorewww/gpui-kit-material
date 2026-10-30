@@ -166,6 +166,7 @@ fn preview(
     let switch = MaterialSwitch::new("playground-switch", accessible)
         .checked(checked)
         .icons(ICONS[config.choice("icons")])
+        .error(error)
         .disabled(disabled)
         .on_change(preview.on_bool("checked", cx));
     let switch = div()
@@ -182,4 +183,25 @@ fn preview(
         .child(text)
         .child(switch)
         .into_any_element()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::super::testing::*;
+    use super::*;
+    use core::prelude::v1::test;
+
+    #[gpui::test]
+    fn every_scenario_renders_and_the_switch_writes_back(cx: &mut TestAppContext) {
+        let (state, cx) = open(cx, &PLAYGROUND);
+        every_scenario_renders(&state, cx, "playground-switch");
+        scenario(&state, cx, "Camera access");
+        assert!(config(&state, cx).bool("checked"));
+        click(cx, "playground-switch");
+        assert!(!config(&state, cx).bool("checked"));
+        // The error state renders on the real switch.
+        set(&state, cx, "error", Value::Bool(true));
+        click(cx, "playground-switch");
+        assert!(config(&state, cx).bool("checked"));
+    }
 }

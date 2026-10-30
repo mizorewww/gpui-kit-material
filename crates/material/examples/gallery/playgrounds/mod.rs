@@ -5,6 +5,9 @@ pub mod button;
 pub mod switch;
 pub mod text_field;
 
+#[cfg(test)]
+mod testing;
+
 /// The common imports of playground modules.
 pub mod prelude {
     #[allow(unused_imports)]
