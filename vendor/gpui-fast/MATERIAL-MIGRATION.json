@@ -253,8 +253,8 @@
       },
       "src/elements/div.rs": {
         "upstream_sha256": "fa6378a65d066a46670dea1b65d305c25e2e7f06c1ced9f7a4175e1adb1aa8dc",
-        "local_sha256": "f3f5d129b649d91191b494942e58e25bd687815dfaa6518622f3e3b004dbfb7a",
-        "reason": "hitbox_extension builder and contains_pointer hit testing (vendor/gpui-pre/hitbox-extension-patch.md)."
+        "local_sha256": "d10032c2a9506c1217741368be365a3491f8728d3bd3bc4cf1f06d3355b6a13e",
+        "reason": "hitbox_extension builder and contains_pointer hit testing (vendor/gpui-pre/hitbox-extension-patch.md). Material performance patch: the scroll-wheel listener ignores a wheel that cannot move the offset (already at that end, incl. a vertical wheel mapped onto a horizontal-only box): no notify, retained-subtree invalidation or note_scrolled, which repainted the enclosing scroll layer on every wheel event. scroll_max factored out of clamp_scroll_position."
       },
       "src/fast/composition.rs": {
         "upstream_sha256": "0d60427202a86fdfde3bc75ee90cae144d0822363deb4f7d879b4523c528a880",
@@ -360,6 +360,11 @@
         "upstream_sha256": "d3f00c28cc47446f6c73be67d00830446e0e3a9a7fadefdf54fff9e5ccadee0b",
         "local_sha256": "70ce7305427ed2923b2cf3cb7b02761b5f7fa353fe69283981a4dfd7bbd9d62e",
         "reason": "Same GPUI window patches as vendor/gpui-pre (hitbox extension, touch observers, CPU frame scope, submission stats/vsync/throttle retry, present outcome); touch-observer storage and FrameDirtyAccumulator made pub(crate) for Fast layer reuse."
+      },
+      "src/tab_stop.rs": {
+        "upstream_sha256": "0c14aec0196ad632601015e166dfcd3df72228292646120bbc3857c3631cd680",
+        "local_sha256": "62a51ab7de3043ee2f4ffe5f8d9eddf8019021a64c4d633b99bde3cf693f9a10",
+        "reason": "Material performance patch: TabStopMap records only its insertion history while painting and builds the tab order and focus lookup lazily on the first query (Tab navigation, a11y dump); query results unchanged. Replaying a reused view's or composited layer's tab stops no longer updates a SumTree per insertion."
       }
     },
     "added": {
@@ -402,6 +407,6 @@
         "reason": "Package-level lockfile not retained; the workspace Cargo.lock owns resolution."
       }
     },
-    "unchanged_file_count": 144
+    "unchanged_file_count": 143
   }
 }

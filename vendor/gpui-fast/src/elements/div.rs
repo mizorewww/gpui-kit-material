@@ -2536,6 +2536,34 @@ impl Interactivity {
             || window.is_inspector_picking(cx)
     }
 
+    /// How far the content of a box at `bounds` scrolls on each axis.
+    fn scroll_max(&self, bounds: Bounds<Pixels>, style: &Style, window: &Window) -> Point<Pixels> {
+        fn round_to_two_decimals(pixels: Pixels) -> Pixels {
+            const ROUNDING_FACTOR: f32 = 100.0;
+            (pixels * ROUNDING_FACTOR).round() / ROUNDING_FACTOR
+        }
+        let rem_size = window.rem_size();
+        // Taffy lays the box out with the padding snapped to the device pixel
+        // grid (`to_taffy`); recomputed unsnapped, e.g. py_1 at a fractional
+        // rem size, it exceeds `bounds` and leaves the box scrollable by the
+        // sub-pixel difference.
+        let padding = style
+            .padding
+            .to_pixels(bounds.size.into(), rem_size)
+            .map(|edge| window.pixel_snap(*edge));
+        let padding_size = size(padding.left + padding.right, padding.top + padding.bottom);
+        // The floating point values produced by Taffy and ours often vary
+        // slightly after ~5 decimal places. This can lead to cases where after
+        // subtracting these, the container becomes scrollable for less than
+        // 0.00000x pixels. As we generally don't benefit from a precision that
+        // high for the maximum scroll, we round the scroll max to 2 decimal
+        // places here.
+        let padded_content_size = self.content_size + padding_size;
+        Point::from(padded_content_size - bounds.size)
+            .map(round_to_two_decimals)
+            .max(&Default::default())
+    }
+
     fn clamp_scroll_position(
         &self,
         bounds: Bounds<Pixels>,
@@ -2543,11 +2571,6 @@ impl Interactivity {
         window: &mut Window,
         _cx: &mut App,
     ) -> Point<Pixels> {
-        fn round_to_two_decimals(pixels: Pixels) -> Pixels {
-            const ROUNDING_FACTOR: f32 = 100.0;
-            (pixels * ROUNDING_FACTOR).round() / ROUNDING_FACTOR
-        }
-
         if let Some(scroll_offset) = self.scroll_offset.as_ref() {
             let mut scroll_to_bottom = false;
             let mut tracked_scroll_handle = self
@@ -2559,26 +2582,7 @@ impl Interactivity {
                 scroll_to_bottom = mem::take(&mut scroll_handle_state.scroll_to_bottom);
             }
 
-            let rem_size = window.rem_size();
-            // Taffy lays the box out with the padding snapped to the device pixel
-            // grid (`to_taffy`); recomputed unsnapped, e.g. py_1 at a fractional
-            // rem size, it exceeds `bounds` and leaves the box scrollable by the
-            // sub-pixel difference.
-            let padding = style
-                .padding
-                .to_pixels(bounds.size.into(), rem_size)
-                .map(|edge| window.pixel_snap(*edge));
-            let padding_size = size(padding.left + padding.right, padding.top + padding.bottom);
-            // The floating point values produced by Taffy and ours often vary
-            // slightly after ~5 decimal places. This can lead to cases where after
-            // subtracting these, the container becomes scrollable for less than
-            // 0.00000x pixels. As we generally don't benefit from a precision that
-            // high for the maximum scroll, we round the scroll max to 2 decimal
-            // places here.
-            let padded_content_size = self.content_size + padding_size;
-            let scroll_max = Point::from(padded_content_size - bounds.size)
-                .map(round_to_two_decimals)
-                .max(&Default::default());
+            let scroll_max = self.scroll_max(bounds, style, window);
             // Clamp scroll offset in case scroll max is smaller now (e.g., if children
             // were removed or the bounds became larger).
             let mut scroll_offset = scroll_offset.borrow_mut();
@@ -3456,6 +3460,13 @@ impl Interactivity {
             let allow_concurrent_scroll = style.allow_concurrent_scroll;
             let restrict_scroll_to_axis = style.restrict_scroll_to_axis;
             let line_height = window.line_height();
+            // Material patch: a wheel that cannot move the content (already at
+            // the end it points to, e.g. a vertical wheel mapped onto a
+            // horizontal-only box) changes nothing: it must not notify the
+            // view or mark the box scrolled, which repainted every scroll
+            // layer holding the box on each wheel event. The offset is still
+            // stored unclamped otherwise, and prepaint clamps it as upstream.
+            let scroll_max = self.scroll_max(hitbox.bounds, style, window);
             let hitbox = hitbox.clone();
             let current_view = window.current_view();
             let subtrees = crate::fast::retained::enclosing_retained_subtrees(window);
@@ -3499,6 +3510,14 @@ impl Interactivity {
                         } else {
                             delta_x = Pixels::ZERO;
                         }
+                    }
+                    let moves = |old: Pixels, delta: Pixels, max: Pixels| {
+                        !delta.is_zero() && (old + delta).clamp(-max, px(0.)) != old
+                    };
+                    if !moves(old_scroll_offset.x, delta_x, scroll_max.x)
+                        && !moves(old_scroll_offset.y, delta_y, scroll_max.y)
+                    {
+                        return;
                     }
                     scroll_offset.y += delta_y;
                     scroll_offset.x += delta_x;
