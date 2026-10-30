@@ -10,6 +10,7 @@
 use super::prelude::*;
 use gpui_base::input::{InputEvent, InputState};
 
+mod layout_grid;
 mod parts;
 mod screens;
 
@@ -414,12 +415,13 @@ impl GalleryPage for Page {
         }
     }
 
+    /// Every screen, then the kit's layout breakpoints.
     fn row_count(&self, _: &Window) -> usize {
-        COUNT
+        COUNT + 1
     }
 
-    fn interactive(&self, _: usize) -> bool {
-        true
+    fn interactive(&self, row: usize) -> bool {
+        row < COUNT
     }
 
     fn render_row(
@@ -428,6 +430,9 @@ impl GalleryPage for Page {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> AnyElement {
+        if row == COUNT {
+            return layout_grid::layout_grid();
+        }
         let screen = SCREENS[row];
         let frame = if screen.web {
             self.web_screen(row, window, cx)
