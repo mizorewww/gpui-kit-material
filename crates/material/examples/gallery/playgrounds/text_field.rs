@@ -1,0 +1,278 @@
+//! Text field playground: md3.io's Text field configuration on the real
+//! `TextField`, editing a Kit input bound two-way to the Value control.
+//!
+//! md3.io's Density option is not offered: the M3 text field here has one
+//! 56dp density. Input types other than password and multiline have no
+//! browser keyboard to select on the desktop, so they edit plain text.
+use super::prelude::*;
+
+const INPUT_TYPES: &[&str] = &[
+    "text",
+    "password",
+    "email",
+    "number",
+    "tel",
+    "url",
+    "search",
+    "multiline",
+];
+
+pub static PLAYGROUND: Playground = Playground {
+    scenarios: &[
+        Scenario {
+            name: "Amount",
+            values: &[
+                ("type", Set::Option("number")),
+                ("label", Set::Text("Amount")),
+                ("prefix", Set::Text("$")),
+                ("suffix", Set::Text("USD")),
+                ("placeholder", Set::Text("0.00")),
+            ],
+        },
+        Scenario {
+            name: "Password",
+            values: &[
+                ("type", Set::Option("password")),
+                ("label", Set::Text("Password")),
+                ("value", Set::Text("hunter2")),
+                ("trailing", Set::Option("visibility")),
+                ("trailing_label", Set::Text("Show password")),
+                ("supporting", Set::Text("At least 8 characters")),
+                ("required", Set::Bool(true)),
+            ],
+        },
+        Scenario {
+            name: "Email",
+            values: &[
+                ("type", Set::Option("email")),
+                ("variant", Set::Option("outlined")),
+                ("leading", Set::Option("mail")),
+                ("label", Set::Text("Email")),
+                ("value", Set::Text("not-an-email")),
+                ("supporting", Set::Text("Enter a valid email address")),
+                ("error", Set::Bool(true)),
+            ],
+        },
+        Scenario {
+            name: "Search",
+            values: &[
+                ("type", Set::Option("search")),
+                ("leading", Set::Option("search")),
+                ("trailing", Set::Option("cancel")),
+                ("trailing_label", Set::Text("Clear")),
+                ("label", Set::Text("Search")),
+                ("value", Set::Text("Material")),
+            ],
+        },
+        Scenario {
+            name: "Message",
+            values: &[
+                ("type", Set::Option("multiline")),
+                ("variant", Set::Option("outlined")),
+                ("label", Set::Text("Message")),
+                ("supporting", Set::Text("Say hello")),
+                ("max_length", Set::Number(120.)),
+            ],
+        },
+    ],
+    sections: &[
+        Section {
+            title: "Appearance",
+            controls: &[
+                Control::Segmented {
+                    id: "variant",
+                    label: "Variant",
+                    options: &["filled", "outlined"],
+                    default: 0,
+                },
+                Control::Icon {
+                    id: "leading",
+                    label: "Icon",
+                    icons: &["", "search", "person", "mail", "calendar_today"],
+                    default: 0,
+                },
+                Control::Icon {
+                    id: "trailing",
+                    label: "Trailing icon",
+                    icons: &["", "cancel", "visibility", "info", "error"],
+                    default: 0,
+                },
+                Control::Text {
+                    id: "trailing_label",
+                    label: "Trailing icon label",
+                    default: "Clear",
+                },
+            ],
+        },
+        Section {
+            title: "Content",
+            controls: &[
+                Control::Select {
+                    id: "type",
+                    label: "Input type",
+                    options: INPUT_TYPES,
+                    default: 0,
+                },
+                Control::Text {
+                    id: "label",
+                    label: "Label",
+                    default: "Label",
+                },
+                Control::Text {
+                    id: "value",
+                    label: "Value",
+                    default: "",
+                },
+                Control::Text {
+                    id: "placeholder",
+                    label: "Placeholder",
+                    default: "",
+                },
+                Control::Text {
+                    id: "prefix",
+                    label: "Prefix",
+                    default: "",
+                },
+                Control::Text {
+                    id: "suffix",
+                    label: "Suffix",
+                    default: "",
+                },
+                Control::Text {
+                    id: "supporting",
+                    label: "Supporting text",
+                    default: "",
+                },
+                Control::Slider {
+                    id: "max_length",
+                    label: "Maximum length",
+                    min: 0.,
+                    max: 200.,
+                    step: 1.,
+                    default: 0.,
+                },
+            ],
+        },
+        Section {
+            title: "Behavior",
+            controls: &[
+                Control::Switch {
+                    id: "error",
+                    label: "Error",
+                    default: false,
+                },
+                Control::Switch {
+                    id: "required",
+                    label: "Required",
+                    default: false,
+                },
+                Control::Switch {
+                    id: "read_only",
+                    label: "Read only",
+                    default: false,
+                },
+                Control::Switch {
+                    id: "disabled",
+                    label: "Disabled",
+                    default: false,
+                },
+            ],
+        },
+    ],
+    preview,
+};
+
+fn preview(
+    config: &Config,
+    preview: &mut Preview,
+    window: &mut Window,
+    cx: &mut Context<PlaygroundState>,
+) -> AnyElement {
+    let kind = config.option("type");
+    let read_only = config.bool("read_only");
+    let disabled = config.bool("disabled");
+    let mut field = if kind == "multiline" {
+        let input = preview.textarea("value", window, cx);
+        if preview.changed("textarea-mode", (read_only, disabled)) {
+            input.update(cx, |input, cx| {
+                input.set_readonly(read_only, cx);
+                input.set_disabled(disabled, cx);
+            });
+        }
+        TextField::multi_line("playground-text-field", &input)
+    } else {
+        let input = preview.input("value", window, cx);
+        let masked = kind == "password";
+        if preview.changed("input-mode", (masked, read_only, disabled)) {
+            input.update(cx, |input, cx| {
+                input.set_masked(masked, window, cx);
+                input.set_readonly(read_only, cx);
+                input.set_disabled(disabled, cx);
+            });
+        }
+        TextField::new("playground-text-field", &input)
+    };
+    let label = config.text("label");
+    let label: SharedString = match (config.bool("required"), label.is_empty()) {
+        (true, false) => format!("{label}*").into(),
+        _ => label,
+    };
+    field = field
+        .variant(if config.option("variant") == "outlined" {
+            TextFieldVariant::Outlined
+        } else {
+            TextFieldVariant::Filled
+        })
+        .error(config.bool("error"))
+        .disabled(disabled)
+        .w(rem(280.));
+    if !label.is_empty() {
+        field = field.label(label);
+    }
+    for (id, apply) in [
+        (
+            "placeholder",
+            TextField::placeholder as fn(TextField, SharedString) -> TextField,
+        ),
+        ("prefix", TextField::prefix),
+        ("suffix", TextField::suffix),
+        ("supporting", TextField::supporting_text),
+    ] {
+        let text = config.text(id);
+        if !text.is_empty() {
+            field = apply(field, text);
+        }
+    }
+    let max_length = config.number("max_length") as usize;
+    if max_length > 0 {
+        field = field.max_length(max_length);
+    }
+    let leading = config.option("leading");
+    if !leading.is_empty() {
+        field = field.leading_icon(symbol(leading, 24.));
+    }
+    let trailing = config.option("trailing");
+    if !trailing.is_empty() {
+        let label = config.text("trailing_label");
+        let label = if label.is_empty() {
+            SharedString::new_static(trailing)
+        } else {
+            label
+        };
+        // A clear icon clears the value; the others are decorative actions.
+        let clear = preview.setter("value", cx);
+        field = field.trailing_icon(
+            IconButton::new("playground-trailing", symbol(trailing, 24.), label)
+                .disabled(disabled)
+                .on_click(move |_, window, cx| {
+                    if trailing == "cancel" {
+                        clear(Value::Text(SharedString::default()), window, cx);
+                    }
+                }),
+        );
+    }
+    div()
+        .debug_selector(|| "playground-text-field".into())
+        .child(field)
+        .into_any_element()
+}
