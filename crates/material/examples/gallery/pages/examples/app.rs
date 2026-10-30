@@ -109,6 +109,9 @@ impl Device {
 /// short for it scrolls the page instead of shrinking it further. Width has
 /// no such floor, since the page never scrolls sideways.
 const MIN_HEIGHT_SCALE: f32 = 0.6;
+/// What a window with no size yet, in its first frame, scales to: drawing icons at
+/// a zero rem is an error.
+const MIN_SCALE: f32 = 0.05;
 /// Stack the panes when that is the only way for a device to stay above this.
 const COMFORTABLE_SCALE: f32 = 0.65;
 
@@ -123,7 +126,7 @@ pub struct Fit {
 fn scale_in((width, height): (f32, f32), (outer_width, outer_height): (f32, f32)) -> f32 {
     (width / outer_width)
         .min((height / outer_height).max(MIN_HEIGHT_SCALE))
-        .min(1.)
+        .clamp(MIN_SCALE, 1.)
 }
 
 /// Fit a device of `outer` size into the canvas, given its area with the panes
