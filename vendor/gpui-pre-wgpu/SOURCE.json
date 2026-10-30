@@ -1,0 +1,33 @@
+{
+  "package": "gpui-pre-wgpu",
+  "version": "0.3.10",
+  "source": "crates.io published archive",
+  "archive_url": "https://static.crates.io/crates/gpui-pre-wgpu/gpui-pre-wgpu-0.3.10.crate",
+  "archive_sha256": "ce693915768aae38bf788f245af75aae78e3e1179245860fc80ce831d0a8f74e",
+  "upstream_files": {
+    "Cargo.lock": "6860adeeb63a67d4c0f201aae8fe1853bebf020ac968ec4a2f45262cd48c6f9e",
+    "Cargo.toml": "94edaff5cb08d7ddce224f4ddb37c3028f6af72c16cade092860657f5f7558a7",
+    "Cargo.toml.orig": "190e71c5774efbcfa986132b0c4b1e6a1ab7e7cbe8ab75d14c3319bd22b5b529",
+    "LICENSE-APACHE": "752daf2fb234ca4a1fa372c073fe127f44b7b90fd2529ae44273a64f9d53da7a",
+    "benches/layout_line.rs": "635fda3c820ce35cdd7ac2e9c72f9aae3eba4cc9fd7c9e6325cc08fd2065f8ae",
+    "src/cosmic_text_system.rs": "d2aa5ba630e17613676715ea8c24ccce1a27bfa10a2c78bb68f91e1e120b9566",
+    "src/gpui_wgpu.rs": "b51033ac07d187c89c4079f208d3a557c6fff309b1cd403927ce8974e795afa0",
+    "src/shaders.wgsl": "bf22f0bd45bdc2da6fc88e5c678e03549941d270d6d85f5a2d1044f875f75729",
+    "src/shaders_storage.wgsl": "5e7935445569ec610b2f7ab520c6d2b3ad8613248fc4465072e8dfae941017ca",
+    "src/shaders_subpixel.wgsl": "d48e5dbb6dd3b278bf34e748c01d6c60bf30e400cacc074c576e0e6b0869d59b",
+    "src/shaders_webgl.wgsl": "d0e1f65206d720604371f2936fb1c64d9e58def4f7ec39a70b9edc3640f27b3d",
+    "src/wgpu_atlas.rs": "5696934d4d3631acfbc98c6b7c22174f9d02f4aac420b939e9e4da66e40c7e9b",
+    "src/wgpu_context.rs": "402c6cac59e4bf14e7cc36445990473f8789e76fb35d3ad6e5889f728b48ab71",
+    "src/wgpu_renderer.rs": "accdb28e2d1cfcbd12714e8460b335886a694fe199d5fce629e3e28850f1adbf"
+  },
+  "local_patches": [],
+  "modified_files": {},
+  "added_files": {},
+  "removed_files": {},
+  "unchanged_file_count": 14,
+  "provenance_files": [
+    "SOURCE.json"
+  ],
+  "verification": "Archive taken from ~/.cargo/registry/cache; its SHA-256 equals the Cargo.lock crates.io checksum. upstream_files are hashes of the extracted archive entries. Recompute: extract the .crate and compare with sha256 of each vendor file.",
+  "validation": "source archive identity verified; runtime checks pending on Linux/Windows hardware"
+}
