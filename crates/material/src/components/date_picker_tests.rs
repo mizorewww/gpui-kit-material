@@ -279,3 +279,17 @@ fn chevrons_and_set_value_respect_the_years(cx: &mut TestAppContext) {
     let (_, cx) = cx.add_window_view(|_, _| Harness(state.clone()));
     draw(cx);
 }
+
+#[test]
+fn dates_format_and_parse_in_every_format() {
+    let d = NaiveDate::from_ymd_opt(2025, 8, 17).unwrap();
+    assert_eq!(DateFormat::MonthDayYear.format(d), "08/17/2025");
+    assert_eq!(DateFormat::DayMonthYear.format(d), "17/08/2025");
+    assert_eq!(DateFormat::YearMonthDay.format(d), "2025 08 17");
+    for format in DateFormat::ALL {
+        assert_eq!(format.parse(&format.format(d)), Some(d));
+    }
+    assert_eq!(DateFormat::MonthDayYear.parse("17/08/2025"), None);
+    assert_eq!(DateFormat::YearMonthDay.parse("2025/08/17"), None);
+    assert_eq!(DateFormat::DayMonthYear.parse("not a date"), None);
+}

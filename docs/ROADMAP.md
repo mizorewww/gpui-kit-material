@@ -17,19 +17,19 @@ is still `unreviewed`).
 | --- | --- | --- |
 | Color roles and reference themes | Implemented | Full M3 role set; Figma baseline scheme, md3.io for the other 19 themes. |
 | Dynamic color | Missing | HCT, tonal palettes and seed schemes with contrast levels. |
-| Scoped theme | Missing | `theme::color` reads one thread-local scheme, so a theme cannot apply to a subtree (a Gallery preview, or per window). |
+| Scoped theme | Implemented, with limits | `scope::Scope` gives a subtree (or a window's content) its own animated scheme through render, paint, Material's deferred draws and Kit's theme. Kit's `Root` overlays, Kit tooltips, Kit's scrollbar styles and what Kit paints in its own deferred draws stay on the application theme (`src/scope.rs`). |
 | Motion | Implemented | Expressive and Standard schemes, selectable per app. |
 | Shape | Partial | Corner scale, press morph and the 8 loading-indicator shapes. The Expressive shape library (35 shapes) and general morphing are missing. |
-| Typography | Partial | 15 roles and emphasized styles, Roboto 400/500/600. Letter spacing is recorded but not painted: GPUI 0.3.10 exposes no tracking. |
+| Typography | Implemented, with limits | 15 roles and emphasized styles, Roboto 400/500/600. Letter spacing paints on text elements through a fork patch (`vendor/gpui-pre/letter-spacing-patch.md`); Kit's editors shape their own lines and do not apply it, and ligatures stay on. |
 | Icons | Implemented | Material Symbols at the pinned revision; six approximate Kit translations await review. |
-| RTL | Missing | Only `MaterialButton` and `MaterialDivider` take a direction. No mirrored layout elsewhere, and no inherited direction. |
+| RTL | Implemented, with limits | Direction is inherited (application, window, `Scope`) and layout mirrors in the engine (`vendor/gpui-pre/layout-direction-patch.md`), with icons, painted bars, pointer math and arrow keys handled per component. Needs a review pass with a real RTL locale and committed captures. |
 
 ## Components
 
 | Group | Implemented | Missing |
 | --- | --- | --- |
 | Actions | button, toggle button, icon button, button group, connected group (`segmented()`), split button, FAB, extended FAB, FAB menu | Figma segmented density -3 |
-| Selection | checkbox, switch, radio, assist/filter/input/suggestion chips, slider | chip group type |
+| Selection | checkbox, switch, radio, assist/filter/input/suggestion chips, chip set, slider | |
 | Text input | text field, select, search bar and view, date picker, time picker | |
 | Navigation | navigation rail, bar and drawer, tabs, menu, top app bar, bottom app bar, docked and floating toolbar | navigation suite; XR app bar, rail, bar, toolbar |
 | Containment | card, list, carousel, divider, dialog, bottom sheet, side sheet | Figma stacked and horizontal card layouts, list and scrollable-list dialogs, multi-aspect carousel; XR dialog |
@@ -43,14 +43,8 @@ indicator has a contained form, and it is implemented.
 
 Details and evidence are in [COVERAGE.md](COVERAGE.md). The cross-cutting ones:
 
-- **Gallery-only options.** Some md3.io options exist only in the playground,
-  not as component API: visible labels and `required` on checkbox and switch,
-  read-only, required and input types on text field, snackbar duration and
-  position, FAB position, search expand/collapse behavior, date format, chip
-  set behavior.
-- **Ripple.** Only buttons, navigation, tabs, cards and toolbars ripple.
-  Selection controls, chips, lists, menus and pickers have state layers only.
-- **Touch.** Raw touch handling exists in the button only.
+- **Touch.** Press feedback comes from the shared ripple. Controls that take a held
+  state beyond the wave have it only where listed in COVERAGE.md (the switch).
 - **Evidence.** No component has committed light/dark captures against the Figma
   kit, independent approval, or per-component performance results.
 

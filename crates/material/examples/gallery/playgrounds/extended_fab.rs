@@ -2,7 +2,7 @@
 //! size, width, position, lowered elevation, icon, text, icon position,
 //! collapsed, disabled) on the real `ExtendedFab`. Activating the preview
 //! collapses or expands it, as scrolling would in an app.
-use super::fab::{COLOR_OPTIONS, COLORS, POSITIONS, stage};
+use super::fab::{COLOR_OPTIONS, COLORS, POSITIONS, position, stage};
 use super::prelude::*;
 
 pub static PLAYGROUND: Playground = Playground {
@@ -167,6 +167,8 @@ fn preview(
         .size([FabSize::Regular, FabSize::Medium, FabSize::Large][config.choice("size")])
         .fluid(fluid)
         .lowered(config.bool("lowered"))
+        .position(position(config.option("position")))
+        .debug_name("playground-extended-fab")
         .icon_position(if config.option("icon_position") == "end" {
             ButtonIconPosition::Trailing
         } else {
@@ -179,16 +181,7 @@ fn preview(
                 collapse(&!collapsed, window, cx)
             }
         });
-    stage(
-        config.option("position"),
-        div()
-            .flex()
-            .when(fluid, |slot| slot.w_full())
-            .debug_selector(|| "playground-extended-fab".into())
-            .child(fab),
-    )
-    .debug_selector(|| "playground-stage".into())
-    .into_any_element()
+    stage(fab).into_any_element()
 }
 
 #[cfg(test)]

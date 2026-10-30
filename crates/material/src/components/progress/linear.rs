@@ -247,6 +247,10 @@ pub(super) fn track_pieces(width: f32, active: &[(f32, f32)]) -> Vec<(f32, f32)>
 fn paint_bar(bounds: Bounds<Pixels>, active: Active, paint: BarPaint, window: &mut Window) {
     let width = f32::from(bounds.size.width);
     let x0 = f32::from(bounds.origin.x);
+    // Painted, so it does not mirror with layout: the bar fills from the start.
+    let rtl = crate::scope::is_rtl(window);
+    let at = |x: f32| if rtl { x0 + width - x } else { x0 + x };
+    let span = |a: f32, b: f32| if rtl { (at(b), at(a)) } else { (at(a), at(b)) };
     let cy = f32::from(bounds.center().y);
     let t = paint.thickness;
     let intervals: Vec<(f32, f32)> = match active {
@@ -257,7 +261,8 @@ fn paint_bar(bounds: Bounds<Pixels>, active: Active, paint: BarPaint, window: &m
             .collect(),
     };
     for (a, b) in clip_pieces(track_pieces(width, &intervals), width * paint.buffer) {
-        rounded_bar(window, x0 + a, x0 + b, cy, t, paint.track);
+        let (left, right) = span(a, b);
+        rounded_bar(window, left, right, cy, t, paint.track);
     }
     if let Active::Measured(amount) = active
         && paint.stop
@@ -267,7 +272,7 @@ fn paint_bar(bounds: Bounds<Pixels>, active: Active, paint: BarPaint, window: &m
         let size = STOP_SIZE.min(t);
         dot(
             window,
-            point(px(x0 + width - t / 2.), px(cy)),
+            point(px(at(width - t / 2.)), px(cy)),
             size,
             paint.ink,
         );
@@ -277,7 +282,8 @@ fn paint_bar(bounds: Bounds<Pixels>, active: Active, paint: BarPaint, window: &m
             continue;
         }
         if paint.amplitude <= 0.01 {
-            rounded_bar(window, x0 + a, x0 + b, cy, t, paint.ink);
+            let (left, right) = span(a, b);
+            rounded_bar(window, left, right, cy, t, paint.ink);
             continue;
         }
         // The wave's centerline, inset by the round caps.
@@ -285,7 +291,7 @@ fn paint_bar(bounds: Bounds<Pixels>, active: Active, paint: BarPaint, window: &m
         if to <= from {
             dot(
                 window,
-                point(px(x0 + (a + b) / 2.), px(cy)),
+                point(px(at((a + b) / 2.)), px(cy)),
                 t.min(b - a),
                 paint.ink,
             );
@@ -297,7 +303,7 @@ fn paint_bar(bounds: Bounds<Pixels>, active: Active, paint: BarPaint, window: &m
         let points: Vec<Point<Pixels>> = (0..=steps)
             .map(|i| {
                 let x = from + (to - from) * i as f32 / steps as f32;
-                point(px(x0 + x), px(y(x)))
+                point(px(at(x)), px(y(x)))
             })
             .collect();
         stroke_polyline(window, &points, t, paint.ink);

@@ -202,26 +202,6 @@ impl ChipsState {
         }
     }
 
-    /// Toggle chip `index` to `on` under the selection rules.
-    fn select(&mut self, index: usize, on: bool, multiple: bool, required: bool) {
-        if !on {
-            let others = self
-                .selected
-                .iter()
-                .enumerate()
-                .any(|(i, s)| *s && i != index);
-            if required && !others {
-                return;
-            }
-            self.selected[index] = false;
-            return;
-        }
-        if !multiple {
-            self.selected.iter_mut().for_each(|s| *s = false);
-        }
-        self.selected[index] = true;
-    }
-
     /// Move the chip at display position `from` to position `to`.
     fn reorder(&mut self, from: usize, to: usize) {
         if from >= self.order.len() || to >= self.order.len() || from == to {
@@ -245,23 +225,9 @@ struct ChipLook {
     disabled: bool,
 }
 
-/// The dragged chip: its display position and look.
-#[derive(Clone)]
-struct DraggedChip {
-    from: usize,
-    look: ChipLook,
-}
-
-impl Render for DraggedChip {
-    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
-        chip(
-            ("dragged-chip", self.from),
-            &self.look,
-            true,
-            None,
-            None,
-            None,
-        )
+impl ChipLook {
+    fn dragged(&self, position: usize) -> AnyElement {
+        chip(("dragged-chip", position), self, true, None, None, None)
     }
 }
 
@@ -361,7 +327,10 @@ fn preview(
         state.update(cx, |state, _| *state = ChipsState::new(set.len()));
     }
     let snapshot = state.read(cx).clone();
-    let (multiple, required) = (config.bool("multiple"), config.bool("required"));
+    let rules = ChipSelection {
+        multiple: config.bool("multiple"),
+        required: config.bool("required"),
+    };
     let disabled = config.bool("disabled");
     let draggable = config.bool("draggable") && !disabled;
     let menu = config.bool("menu") && kind == "filter";
@@ -396,7 +365,9 @@ fn preview(
             let toggle: Option<Toggle> = (kind != "assist" && !menu).then(|| {
                 let state = state.clone();
                 Rc::new(move |on: bool, _: &mut Window, cx: &mut App| {
-                    notify(&state, cx, &|s| s.select(index, on, multiple, required))
+                    notify(&state, cx, &|s| {
+                        rules.apply(&mut s.selected, index, on);
+                    })
                 }) as Toggle
             });
             let remove = (kind == "input").then(|| {
@@ -438,43 +409,23 @@ fn preview(
             } else {
                 element
             };
-            let dropper = state.clone();
-            div()
-                .id(("chip-slot", index))
+            let slot = div()
                 .debug_selector(move || CHIP_IDS[position].into())
-                .when(draggable, |slot| {
-                    slot.cursor_grab()
-                        .on_drag(
-                            DraggedChip {
-                                from: position,
-                                look: look.clone(),
-                            },
-                            |dragged, _, _, cx| cx.new(|_| dragged.clone()),
-                        )
-                        .drag_over::<DraggedChip>(|style, _, _, _| style.opacity(0.6))
-                        .on_drop(move |dragged: &DraggedChip, _, cx| {
-                            let from = dragged.from;
-                            notify(&dropper, cx, &|s| s.reorder(from, position))
-                        })
-                })
-                .child(element)
+                .child(element);
+            ChipSetItem::new(slot).drag_preview(move |_, _| look.dragged(position))
+        });
+    let reorder = state.clone();
+    let set = ChipSet::new("chip-set", config.text("group_label"))
+        .vertical(config.bool("vertical"))
+        .max_w(rem(360.))
+        .justify_center()
+        .items(chips)
+        .when(draggable, |set| {
+            set.on_reorder(move |from, to, _, cx| notify(&reorder, cx, &|s| s.reorder(from, to)))
         });
     div()
         .debug_selector(|| "playground-chips".into())
-        .id("chip-set")
-        .role(Role::Group)
-        .aria_label(config.text("group_label"))
-        .max_w(rem(360.))
-        .flex()
-        .gap(rem(8.))
-        .map(|set| {
-            if config.bool("vertical") {
-                set.flex_col().items_start()
-            } else {
-                set.flex_wrap().justify_center()
-            }
-        })
-        .children(chips)
+        .child(set)
         .into_any_element()
 }
 
@@ -485,16 +436,8 @@ mod tests {
     use core::prelude::v1::test;
 
     #[test]
-    fn selection_follows_the_multiple_and_required_rules() {
+    fn reordering_moves_a_chip_and_ignores_out_of_range() {
         let mut state = ChipsState::new(3);
-        state.select(0, true, false, false);
-        state.select(1, true, false, false);
-        assert_eq!(state.selected, [false, true, false], "single selection");
-        state.select(1, false, false, true);
-        assert_eq!(state.selected, [false, true, false], "the last one stays");
-        state.select(2, true, true, true);
-        state.select(1, false, true, true);
-        assert_eq!(state.selected, [false, false, true]);
         state.reorder(2, 0);
         assert_eq!(state.order, [2, 0, 1]);
         state.reorder(0, 9);

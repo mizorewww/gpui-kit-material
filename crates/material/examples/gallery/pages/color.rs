@@ -8,8 +8,7 @@ use super::prelude::*;
 use gpui_base::input::{InputEvent, InputState};
 use gpui_kit_material::color::dynamic::{SeedScheme, SpecVersion, Variant};
 use gpui_kit_material::color::palette::ALL as PALETTES;
-use gpui_kit_material::color::{Scheme, themes};
-use gpui_kit_material::theme;
+use gpui_kit_material::color::themes;
 
 pub struct Page {
     page: PageCx,
@@ -22,12 +21,8 @@ pub struct Page {
     pub(crate) input: Entity<InputState>,
     /// The hex field holds text that is not a color.
     pub(crate) invalid: bool,
-    /// The mode and contrast the painted seed scheme was generated for.
-    applied: (ThemeMode, Contrast),
     /// The choice a change of means someone picked another theme.
     reference: (Option<ThemeId>, PaletteId),
-    /// A next-frame callback is pending for the theme transition.
-    driving: bool,
     _subscriptions: [Subscription; 2],
 }
 
@@ -288,59 +283,33 @@ fn hex_text(seed: u32) -> SharedString {
 }
 
 impl Page {
-    fn seed_scheme(&self, mode: ThemeMode, contrast: Contrast) -> Scheme {
-        SeedScheme::new(self.seed)
-            .variant(self.variant)
-            .spec(self.spec)
-            .dark(mode == ThemeMode::Dark)
-            .contrast(contrast_level(contrast))
-            .scheme()
-    }
-
-    /// Paint the seed, regenerating it for the current mode and contrast.
-    pub(crate) fn apply_seed(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+    /// Paint the seed. The Gallery derives its target from the shared state, so
+    /// it regenerates the seed for its mode and contrast and runs the transition.
+    pub(crate) fn apply_seed(&mut self, cx: &mut Context<Self>) {
         self.active = true;
-        // The mode and contrast controls pick the baseline when no reference
-        // theme is set; settling that now keeps it from reading as a new choice.
+        let seed = SeedScheme::new(self.seed)
+            .variant(self.variant)
+            .spec(self.spec);
         self.page.shared.update(cx, |shared, cx| {
-            if shared.reference_theme.is_none() {
-                shared.reference_theme = Some(ThemeId::Baseline);
-                cx.notify();
-            }
+            // The mode and contrast controls pick the baseline when no reference
+            // theme is set; settling that now keeps it from reading as a new choice.
+            shared.reference_theme.get_or_insert(ThemeId::Baseline);
+            shared.seed = Some(seed);
+            cx.notify();
         });
         let shared = self.page.shared.read(cx);
-        self.applied = (shared.reference_mode, shared.contrast);
         self.reference = (shared.reference_theme, shared.palette);
-        let scheme = self.seed_scheme(self.applied.0, self.applied.1);
-        theme::set_scheme_override(Some(scheme));
-        self.drive_theme(window, cx);
         cx.notify();
     }
 
     /// Paint the Gallery's reference theme or palette again.
-    pub(crate) fn clear_seed(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+    pub(crate) fn clear_seed(&mut self, cx: &mut Context<Self>) {
         self.active = false;
-        theme::set_scheme_override(None);
-        self.drive_theme(window, cx);
+        self.page.shared.update(cx, |shared, cx| {
+            shared.seed = None;
+            cx.notify();
+        });
         cx.notify();
-    }
-
-    /// Advance the transition. The Gallery only advances when one of its own
-    /// settings changes, and a seed is not one.
-    fn drive_theme(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let shared = self.page.shared.read(cx);
-        let (target, scale) = (shared.target_scheme(), shared.text_scale());
-        let running = theme::advance_component_theme(target, scale, window, cx);
-        if running && !self.driving {
-            self.driving = true;
-            let page = cx.weak_entity();
-            window.on_next_frame(move |window, cx| {
-                let _ = page.update(cx, |this, cx| {
-                    this.driving = false;
-                    this.drive_theme(window, cx);
-                });
-            });
-        }
     }
 
     pub(crate) fn choose_preset(&mut self, seed: u32, window: &mut Window, cx: &mut Context<Self>) {
@@ -349,17 +318,17 @@ impl Page {
         // `set_value` emits no change event, so this does not apply twice.
         self.input
             .update(cx, |input, cx| input.set_value(hex_text(seed), window, cx));
-        self.apply_seed(window, cx);
+        self.apply_seed(cx);
     }
 
-    fn hex_changed(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+    fn hex_changed(&mut self, cx: &mut Context<Self>) {
         let text = self.input.read(cx).value();
         match SeedScheme::parse_hex(&text) {
             Some(seed) => {
                 self.invalid = false;
                 if seed != self.seed || !self.active {
                     self.seed = seed;
-                    self.apply_seed(window, cx);
+                    self.apply_seed(cx);
                 } else {
                     cx.notify();
                 }
@@ -371,17 +340,14 @@ impl Page {
         }
     }
 
-    /// Follow the Gallery's other theme controls while a seed is painted.
-    fn shared_changed(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+    /// Picking another theme or palette anywhere in the Gallery ends the seed.
+    fn shared_changed(&mut self, cx: &mut Context<Self>) {
         let shared = self.page.shared.read(cx);
         let reference = (shared.reference_theme, shared.palette);
-        let settings = (shared.reference_mode, shared.contrast);
         if !self.active {
             self.reference = reference;
         } else if reference != self.reference {
-            self.clear_seed(window, cx);
-        } else if settings != self.applied {
-            self.apply_seed(window, cx);
+            self.clear_seed(cx);
         }
     }
 
@@ -460,12 +426,12 @@ impl Page {
                         .options(VARIANTS.map(|(id, label, _)| (id, label)))
                         .selected(if self.active { selected_variant } else { "" })
                         .full_width()
-                        .on_change(cx.listener(|this, id: &SharedString, window, cx| {
+                        .on_change(cx.listener(|this, id: &SharedString, _, cx| {
                             if let Some((_, _, variant)) =
                                 VARIANTS.iter().find(|(key, _, _)| *key == id.as_ref())
                             {
                                 this.variant = *variant;
-                                this.apply_seed(window, cx);
+                                this.apply_seed(cx);
                             }
                         }))
                         .reveal("reveal-seed-variant", &list),
@@ -474,12 +440,12 @@ impl Page {
                     ConnectedButtonGroup::new("seed-spec", "Seed color spec")
                         .options(SPECS.map(|(id, label, _)| (id, label)))
                         .selected(selected_spec)
-                        .on_change(cx.listener(|this, id: &SharedString, window, cx| {
+                        .on_change(cx.listener(|this, id: &SharedString, _, cx| {
                             if let Some((_, _, spec)) =
                                 SPECS.iter().find(|(key, _, _)| *key == id.as_ref())
                             {
                                 this.spec = *spec;
-                                this.apply_seed(window, cx);
+                                this.apply_seed(cx);
                             }
                         }))
                         .reveal("reveal-seed-spec", &list),
@@ -490,9 +456,7 @@ impl Page {
                         material_button("seed-clear", ButtonVariant::Outlined)
                             .child("Use reference theme")
                             .disabled(!self.active)
-                            .on_click(
-                                cx.listener(|this, _, window, cx| this.clear_seed(window, cx)),
-                            )
+                            .on_click(cx.listener(|this, _, _, cx| this.clear_seed(cx)))
                             .reveal("reveal-seed-clear", &list),
                     ),
                 ),
@@ -516,17 +480,14 @@ impl GalleryPage for Page {
                 .default_value(hex_text(DEFAULT_SEED))
         });
         let subscriptions = [
-            cx.subscribe_in(&input, window, |this, _, event: &InputEvent, window, cx| {
+            cx.subscribe(&input, |this, _, event: &InputEvent, cx| {
                 if matches!(event, InputEvent::Change) {
-                    this.hex_changed(window, cx);
+                    this.hex_changed(cx);
                 }
             }),
-            cx.observe_in(&page.shared, window, |this, _, window, cx| {
-                this.shared_changed(window, cx);
-            }),
+            cx.observe(&page.shared, |this, _, cx| this.shared_changed(cx)),
         ];
         let shared = page.shared.read(cx);
-        let applied = (shared.reference_mode, shared.contrast);
         let reference = (shared.reference_theme, shared.palette);
         Self {
             page,
@@ -536,9 +497,7 @@ impl GalleryPage for Page {
             active: false,
             input,
             invalid: false,
-            applied,
             reference,
-            driving: false,
             _subscriptions: subscriptions,
         }
     }
@@ -595,7 +554,7 @@ impl GalleryPage for Page {
             move |value: &SharedString, window: &mut Window, cx: &mut App| {
                 let _ = page.update(cx, |this, cx| {
                     if this.active {
-                        this.clear_seed(window, cx);
+                        this.clear_seed(cx);
                     }
                 });
                 update(value, window, cx);
@@ -720,9 +679,11 @@ mod tests {
     use super::*;
     use core::prelude::v1::test;
     use gpui_kit_material::color::Color;
+    use gpui_kit_material::theme;
 
     /// A page in a window, as the Gallery builds it, with motion off so a theme
-    /// change is painted at once.
+    /// change is painted at once. The observer stands in for the Gallery, which
+    /// owns the theme and paints the shared state's target.
     fn open(
         cx: &mut gpui::TestAppContext,
     ) -> (Entity<Page>, Entity<GalleryShared>, VisualTestContext) {
@@ -735,6 +696,12 @@ mod tests {
         let page_shared = shared.clone();
         let (page, cx) = cx.add_window_view(move |window, cx| {
             let list = ListState::new(0, ListAlignment::Top, px(100.));
+            cx.observe_in(&page_shared, window, |_: &mut Page, shared, window, cx| {
+                let shared = shared.read(cx);
+                let (scheme, scale) = (shared.target_scheme(), shared.text_scale());
+                theme::advance_component_theme(scheme, scale, window, cx);
+            })
+            .detach();
             Page::new(
                 PageCx {
                     shared: page_shared,
@@ -827,7 +794,7 @@ mod tests {
             page.update(cx, |page, cx| {
                 page.variant = Variant::Vibrant;
                 page.spec = SpecVersion::Spec2025;
-                page.apply_seed(window, cx);
+                page.apply_seed(cx);
             });
         });
         let expected = SeedScheme::new(DEFAULT_SEED)
@@ -850,11 +817,11 @@ mod tests {
 
         // So does the page's own button, with nothing else to trigger a repaint.
         cx.update(|window, cx| {
-            page.update(cx, |page, cx| page.apply_seed(window, cx));
+            page.update(cx, |page, cx| page.apply_seed(cx));
         });
         assert_eq!(theme::scheme(), expected);
         cx.update(|window, cx| {
-            page.update(cx, |page, cx| page.clear_seed(window, cx));
+            page.update(cx, |page, cx| page.clear_seed(cx));
         });
         assert_eq!(theme::scheme(), forest);
     }

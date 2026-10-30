@@ -541,6 +541,8 @@ impl TextSystem {
         let wrapper = wrappers
             .pop()
             .unwrap_or_else(|| LineWrapper::new(font_id, font_size, self.clone()));
+        let mut wrapper = wrapper;
+        wrapper.letter_spacing = px(0.);
 
         LineWrapperHandle {
             wrapper: Some(wrapper),
@@ -914,6 +916,19 @@ impl WindowTextSystem {
         wrap_width: Option<Pixels>,
         line_clamp: Option<usize>,
     ) -> Result<SmallVec<[WrappedLine; 1]>> {
+        self.shape_text_spaced(text, font_size, runs, wrap_width, line_clamp, px(0.))
+    }
+
+    /// [`Self::shape_text`] with `letter_spacing` after each character.
+    pub fn shape_text_spaced(
+        &self,
+        text: SharedString,
+        font_size: Pixels,
+        runs: &[TextRun],
+        wrap_width: Option<Pixels>,
+        line_clamp: Option<usize>,
+        letter_spacing: Pixels,
+    ) -> Result<SmallVec<[WrappedLine; 1]>> {
         let mut runs = runs.iter().filter(|run| run.len > 0).cloned().peekable();
         let mut font_runs = self.font_runs_pool.lock().pop().unwrap_or_default();
 
@@ -974,12 +989,13 @@ impl WindowTextSystem {
                 run_start += run_len_within_line;
             }
 
-            let layout = self.line_layout_cache.layout_wrapped_line(
+            let layout = self.line_layout_cache.layout_wrapped_line_spaced(
                 &line_text,
                 font_size,
                 &font_runs,
                 wrap_width,
                 max_wrap_lines.map(|max| max.saturating_sub(wrapped_lines)),
+                letter_spacing,
             );
             wrapped_lines += layout.wrap_boundaries.len();
 

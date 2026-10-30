@@ -50,6 +50,7 @@ fn typed<E: Styled>(element: E, role: TypeRole) -> E {
     element
         .font_family(scale.font_family)
         .text_size(scale.font_size)
+        .letter_spacing(scale.letter_spacing)
         .line_height(scale.line_height)
         .font_weight(FontWeight(scale.font_weight as f32))
 }
@@ -530,7 +531,7 @@ impl RenderOnce for MaterialTooltip {
             .relative()
             .flex_shrink_0()
             .child(wrapper)
-            .child(deferred(positioner).with_priority(200))
+            .child(deferred(crate::scope::current_scope(positioner)).with_priority(200))
             .into_any_element()
     }
 }

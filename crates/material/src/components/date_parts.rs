@@ -19,6 +19,7 @@
 //! picker keeps its height while the month changes.
 use super::InteractionPreview;
 use super::button::ButtonFocusRing;
+use super::ripple::Ripple;
 use super::text_field::type_style;
 use crate::{
     color::ColorRole,
@@ -329,6 +330,10 @@ impl RenderOnce for CalendarDay {
                     .active(move |s| s.bg(press))
             })
             .child(self.label.clone());
+        let container = Ripple::new((self.id.clone(), "ripple"), container)
+            .round()
+            .ink(paint.layer)
+            .disabled(!live);
         let ring = ButtonFocusRing::resolved(container, keyboard, rem(DAY_CONTAINER / 2.))
             .forced(forced(InteractionPreview::Focused));
         let on_click = self.on_click.filter(|_| live);
@@ -467,6 +472,10 @@ impl RenderOnce for YearChip {
                     .active(move |s| s.bg(press))
             })
             .child(self.label.clone());
+        let pill = Ripple::new((self.id.clone(), "ripple"), pill)
+            .round()
+            .ink(layer)
+            .disabled(!live);
         let ring = ButtonFocusRing::resolved(pill, self.cursor && live, rem(YEAR_PILL.1 / 2.))
             .forced(forced(InteractionPreview::Focused));
         let on_click = self.on_click.filter(|_| live);
@@ -566,6 +575,7 @@ impl RenderOnce for PickerMenuButton {
         };
         let ink = color(ColorRole::ON_SURFACE_VARIANT);
         let clear = Rgba { a: 0., ..ink };
+        let ripple_id = ElementId::NamedChild(self.id.clone().into(), "ripple".into());
         let mut button = gpui_base::Button::new(self.id.clone())
             .accessibility_label(self.accessible.unwrap_or_else(|| self.label.clone()))
             .disabled(disabled)
@@ -610,6 +620,11 @@ impl RenderOnce for PickerMenuButton {
             None => button,
         };
         let button = button.track_focus(&focus).tab_stop(preview.is_none());
+        let button = Ripple::new(ripple_id, button)
+            .round()
+            .ink(ink)
+            .disabled(!enabled)
+            .specimen(preview.is_some());
         ButtonFocusRing::new(button, focus, enabled, rem(20.))
             .forced(enabled && preview == Some(InteractionPreview::Focused))
     }
@@ -706,6 +721,9 @@ impl RenderOnce for PickerListItem {
                     }),
             )
             .child(self.label.clone());
+        let row = Ripple::new((self.id.clone(), "ripple"), row)
+            .ink(ink)
+            .disabled(!live);
         let ring = ButtonFocusRing::resolved(row, self.cursor && live, rem(0.))
             .inward()
             .forced(preview == Some(InteractionPreview::Focused));

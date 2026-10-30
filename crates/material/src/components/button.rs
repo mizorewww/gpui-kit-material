@@ -27,6 +27,8 @@ mod loading_tests;
 mod preview_tests;
 mod ripple;
 pub(crate) use ripple::ButtonRipple;
+#[cfg(test)]
+pub(crate) use ripple::waves_painted;
 mod ripple_clip;
 mod shadow;
 #[cfg(test)]
@@ -1255,6 +1257,11 @@ fn ripple_ink(painted: &Style, fg: Rgba) -> (Rgba, bool) {
 impl RenderOnce for MaterialButton {
     fn render(mut self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         use gpui_base::StyledExt;
+        // Layout already mirrors under an inherited right-to-left direction, so
+        // the logical order stays the left-to-right one here.
+        if crate::scope::is_rtl(window) {
+            self.direction = ButtonDirection::Ltr;
+        }
         let loading = self.loading.as_ref().is_some_and(|(visible, _)| *visible);
         let show_progress = loading || self.progress_visible();
         self.disabled |= loading;
@@ -1374,6 +1381,7 @@ impl RenderOnce for MaterialButton {
             .text_color(fg)
             .font_family(ty.font_family)
             .text_size(ty.font_size)
+            .letter_spacing(ty.letter_spacing)
             .line_height(ty.line_height)
             .font_weight(FontWeight(ty.font_weight as f32))
             .when(

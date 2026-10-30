@@ -97,7 +97,6 @@ pub struct PaneScaffold<K: Clone + PartialEq + 'static> {
     order: [PaneRole; 3],
     rule: PaneRule,
     size_class: Option<WindowSizeClass>,
-    rtl: bool,
     panes: [Option<(SharedString, AnyElement)>; 3],
     preferred_widths: [Option<f32>; 3],
     handle: Option<SharedString>,
@@ -116,7 +115,6 @@ impl<K: Clone + PartialEq + 'static> PaneScaffold<K> {
             order,
             rule: PaneRule::default(),
             size_class: None,
-            rtl: false,
             panes: [None, None, None],
             preferred_widths: [None; 3],
             handle: None,
@@ -165,12 +163,6 @@ impl<K: Clone + PartialEq + 'static> PaneScaffold<K> {
         self
     }
 
-    /// Mirror the pane order for a right-to-left language.
-    pub fn rtl(mut self, rtl: bool) -> Self {
-        self.rtl = rtl;
-        self
-    }
-
     /// Show a drag handle between two panes; `label` is its accessible name.
     /// It takes a drag, the arrows, Home, End, and Enter for the next anchor.
     pub fn drag_handle(mut self, label: impl Into<SharedString>) -> Self {
@@ -209,17 +201,11 @@ impl<K: Clone + PartialEq + 'static> RenderOnce for PaneScaffold<K> {
             order,
             rule,
             size_class,
-            rtl,
             panes,
             preferred_widths,
             handle,
             anchors,
         } = self;
-        let order = if rtl {
-            [order[2], order[1], order[0]]
-        } else {
-            order
-        };
         let builder_id = id.clone();
         div()
             .id(id)
@@ -470,7 +456,13 @@ fn drag_handle(
 ) -> AnyElement {
     let width = f32::from(bounds.size.width);
     let origin = bounds.origin.x;
-    let local = move |x: Pixels| f32::from(x - origin).clamp(0., width.max(0.));
+    // The panes are laid out in reading order and the layout mirrors them, so a
+    // pointer and the arrows are the only things that have to be turned around.
+    let rtl = crate::scope::is_rtl(window);
+    let local = move |x: Pixels| {
+        let x = f32::from(x - origin).clamp(0., width.max(0.));
+        if rtl { width.max(0.) - x } else { x }
+    };
     let (dragged, focus) = {
         let state = state.read(cx);
         (state.dragging.is_some(), state.handle_focus.clone())
@@ -485,11 +477,12 @@ fn drag_handle(
         let state = state.clone();
         let anchors = anchors.clone();
         move |event: &KeyDownEvent, _: &mut Window, cx: &mut App| {
-            let position = match event.keystroke.key.as_str() {
-                "left" => previous_pane_anchor(&anchors, width, offset),
-                "right" | "enter" => next_pane_anchor(&anchors, width, offset),
-                "home" => Some(0.),
-                "end" => Some(width),
+            let key = event.keystroke.key.as_str();
+            let position = match (key, crate::scope::horizontal_arrow(key, rtl)) {
+                (_, Some(-1)) => previous_pane_anchor(&anchors, width, offset),
+                (_, Some(_)) | ("enter", _) => next_pane_anchor(&anchors, width, offset),
+                ("home", _) => Some(0.),
+                ("end", _) => Some(width),
                 _ => None,
             };
             if let Some(position) = position {
@@ -772,15 +765,22 @@ mod tests {
         fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
             window.set_rem_size(px(BASE_PX));
             let scaffold = PaneScaffold::list_detail("layout", &self.navigator)
-                .rtl(self.rtl)
                 .pane(PaneRole::Secondary, "Inbox", div().child("List"))
                 .pane(PaneRole::Primary, "Message", div().child("Detail"))
                 .pane(PaneRole::Tertiary, "Notes", div().child("Notes"));
-            div().w(px(self.width)).h(px(800.)).child(if self.handle {
+            let scaffold = if self.handle {
                 scaffold.drag_handle("Resize panes")
             } else {
                 scaffold
-            })
+            };
+            let mut scope = crate::scope::Scope::new("direction");
+            if self.rtl {
+                scope = scope.direction(LayoutDirection::Rtl);
+            }
+            div()
+                .w(px(self.width))
+                .h(px(800.))
+                .child(scope.child(scaffold))
         }
     }
 
@@ -900,6 +900,53 @@ mod tests {
         let detail = cx.debug_bounds("pane-primary").unwrap();
         assert!(list.left() > detail.left(), "the list is on the right");
         assert_eq!(list.right(), px(1000.));
+    }
+
+    #[gpui::test]
+    fn right_to_left_turns_the_handles_pointer_and_arrows_around(cx: &mut gpui::TestAppContext) {
+        let (view, cx) = open(cx, 1000., true);
+        cx.update(|_, cx| {
+            view.update(cx, |view, _| {
+                view.handle = true;
+                view.rtl = true;
+            })
+        });
+        draw(cx);
+        let handle = cx.debug_bounds("pane-drag-handle").unwrap().center();
+        assert_eq!(handle.x, px(1000. - 372.));
+        // Dragging toward the end of the reading direction, here leftward,
+        // widens the first pane; it settles on the nearest anchor.
+        cx.simulate_mouse_down(handle, MouseButton::Left, Modifiers::none());
+        draw(cx);
+        let target = point(px(480.), handle.y);
+        cx.simulate_mouse_move(target, MouseButton::Left, Modifiers::none());
+        draw(cx);
+        assert_eq!(
+            cx.debug_bounds("pane-drag-handle").unwrap().center().x,
+            px(480.),
+            "the handle stays under the pointer"
+        );
+        cx.simulate_mouse_up(target, MouseButton::Left, Modifiers::none());
+        draw(cx);
+        assert_eq!(
+            cx.debug_bounds("pane-drag-handle").unwrap().center().x,
+            px(500.)
+        );
+        // Focus by press, then: left moves on in reading order, to the 75% anchor.
+        let handle = cx.debug_bounds("pane-drag-handle").unwrap().center();
+        cx.simulate_click(handle, Modifiers::none());
+        draw(cx);
+        assert_eq!(
+            cx.debug_bounds("pane-drag-handle").unwrap().center().x,
+            px(240.)
+        );
+        cx.simulate_keystrokes("right");
+        draw(cx);
+        assert_eq!(
+            cx.debug_bounds("pane-drag-handle").unwrap().center().x,
+            px(500.),
+            "right goes back toward the start"
+        );
     }
 
     #[gpui::test]

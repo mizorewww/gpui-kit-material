@@ -4,22 +4,80 @@
 //! it is toward the new target on the slow effects spring, and a further
 //! change retargets from the current paint. Reduced motion paints the
 //! target at once.
+//!
+//! There is one way to choose what is painted: the view that owns the theme
+//! passes the scheme as the target of [`advance_component_theme`], and a subtree
+//! that paints differently is a [`crate::scope::Scope`]. A control below that view
+//! changes the state the view derives its target from.
 use crate::color::{Color, ColorRole, PaletteId, Scheme, ThemePreferences};
 use crate::motion::{self, MotionToken};
 use gpui::{App, Global, Hsla, Pixels, Rgba, Window, WindowAppearance};
 use gpui_kit::component::{Theme as ComponentTheme, ThemeMode as ComponentThemeMode};
-use std::cell::{Cell, RefCell};
+use std::cell::RefCell;
 #[cfg(not(target_family = "wasm"))]
 use std::time::Instant;
 #[cfg(target_family = "wasm")]
 use web_time::Instant;
 
-struct Paint {
+/// A painted scheme and its transition: the application's, or a scope's.
+pub(crate) struct Paint {
     target: Option<Scheme>,
     from: Scheme,
-    current: Scheme,
+    pub(crate) current: Scheme,
     started: Instant,
     motion: motion::MotionCurve,
+}
+
+impl Paint {
+    /// A paint resting on `scheme`, with no transition to run.
+    pub(crate) fn at(scheme: Scheme) -> Self {
+        Self {
+            target: Some(scheme),
+            from: scheme,
+            current: scheme,
+            started: Instant::now(),
+            motion: motion::curve(MotionToken::SlowEffects),
+        }
+    }
+
+    /// Step toward `target`, retargeting from the current paint if it changed.
+    /// Returns whether the paint changed and whether it still runs.
+    pub(crate) fn advance(
+        &mut self,
+        target: Scheme,
+        now: Instant,
+        reduce_motion: bool,
+        effects: motion::MotionCurve,
+    ) -> (bool, bool) {
+        if self.target.is_none() {
+            self.target = Some(target);
+            self.current = target;
+            self.from = target;
+            self.started = now;
+            self.motion = effects;
+            return (true, false);
+        }
+        if self.target != Some(target) {
+            self.from = self.current;
+            self.target = Some(target);
+            self.started = now;
+            self.motion = effects;
+        }
+        if reduce_motion {
+            let changed = self.current != target;
+            self.current = target;
+            self.from = target;
+            self.started = now;
+            return (changed, false);
+        }
+        let t = (now.duration_since(self.started).as_secs_f32()
+            / self.motion.duration().as_secs_f32())
+        .min(1.);
+        let next = self.from.blend(&target, self.motion.ease()(t));
+        let changed = next != self.current;
+        self.current = next;
+        (changed, self.from != target && t < 1.)
+    }
 }
 
 thread_local! {
@@ -33,19 +91,32 @@ thread_local! {
         started: Instant::now(),
         motion: motion::MotionScheme::Expressive.resolve(MotionToken::SlowEffects),
     });
-    static SCHEME_OVERRIDE: Cell<Option<Scheme>> = const { Cell::new(None) };
+    // The scheme of the scope being drawn (`crate::scope`), if any. Only a scope's
+    // phases set it, and they restore it before returning.
+    static SCOPED: RefCell<Option<Scheme>> = const { RefCell::new(None) };
 }
 
-/// Paint `scheme` in place of whatever target the application root passes to
-/// [`advance_component_theme`] or [`apply_scheme`], until cleared with `None`.
-///
-/// This is for a scheme chooser below the view that owns the theme, such as a
-/// seed-color control on a settings page. It takes effect on the next advance;
-/// the caller must also advance or refresh, because the root has no reason to.
-/// An application whose root owns the choice should pass the scheme as its
-/// target instead.
-pub fn set_scheme_override(scheme: Option<Scheme>) {
-    SCHEME_OVERRIDE.set(scheme);
+/// Set the scoped scheme, returning the one it replaces.
+pub(crate) fn replace_scoped_scheme(scheme: Option<Scheme>) -> Option<Scheme> {
+    SCOPED.with(|scoped| scoped.replace(scheme))
+}
+
+/// `role` in the scope being drawn, or else in the application's paint.
+fn painted_role(role: ColorRole) -> Color {
+    SCOPED
+        .with(|scoped| scoped.borrow().as_ref().map(|scheme| scheme.get(role)))
+        .unwrap_or_else(|| PAINT.with(|paint| paint.borrow().current.get(role)))
+}
+
+/// Write `scheme` into a Kit theme, for a scope's projection.
+pub(crate) fn project_scheme(theme: &mut ComponentTheme, scheme: Scheme) {
+    theme.mode = if scheme.is_dark() {
+        ComponentThemeMode::Dark
+    } else {
+        ComponentThemeMode::Light
+    };
+    let scale = f32::from(theme.font_size) / crate::tokens::typography::BASE_PX;
+    write_component_projection(theme, scheme, scale);
 }
 
 /// Convert a kit color to GPUI's.
@@ -58,9 +129,10 @@ pub fn rgba(color: Color) -> Rgba {
     }
 }
 
-/// The current paint of a role.
+/// The current paint of a role: the scheme of the [`crate::scope::Scope`] being
+/// drawn, or else the application's.
 pub fn color(role: ColorRole) -> Rgba {
-    rgba(PAINT.with(|paint| paint.borrow().current.get(role)))
+    rgba(painted_role(role))
 }
 
 /// Convert a GPUI color to the kit's.
@@ -80,14 +152,17 @@ pub fn blend(from: Rgba, to: Rgba, t: f32) -> Rgba {
 }
 
 /// The current paint as a whole, e.g. to mirror it into another toolkit's theme.
+/// Inside a [`crate::scope::Scope`], its scheme.
 pub fn scheme() -> Scheme {
-    PAINT.with(|paint| paint.borrow().current)
+    SCOPED
+        .with(|scoped| *scoped.borrow())
+        .unwrap_or_else(|| PAINT.with(|paint| paint.borrow().current))
 }
 
 /// Whether the painted scheme is a dark one. Mid-transition this follows
 /// whichever palette the paint is closer to.
 pub fn is_dark() -> bool {
-    PAINT.with(|paint| paint.borrow().current.is_dark())
+    scheme().is_dark()
 }
 
 /// Whether the system currently asks for a dark appearance.
@@ -140,40 +215,13 @@ pub fn apply_scheme(target: Scheme, window: &mut Window, cx: &mut App) -> bool {
 
 // Both the Base-only renderer and the Component pre-frame driver use one sampler.
 fn advance_paint(target: Scheme, cx: &App) -> (bool, bool) {
-    let target = SCHEME_OVERRIDE.get().unwrap_or(target);
     let reduce_motion = cx.reduce_motion();
     let effects = motion::curve(MotionToken::SlowEffects);
+    let now = cx.background_executor().now();
     PAINT.with(|paint| {
-        let mut paint = paint.borrow_mut();
-        let now = cx.background_executor().now();
-        if paint.target.is_none() {
-            paint.target = Some(target);
-            paint.current = target;
-            paint.from = target;
-            paint.started = now;
-            paint.motion = effects;
-            return (true, false);
-        }
-        if paint.target != Some(target) {
-            paint.from = paint.current;
-            paint.target = Some(target);
-            paint.started = now;
-            paint.motion = effects;
-        }
-        if reduce_motion {
-            let changed = paint.current != target;
-            paint.current = target;
-            paint.from = target;
-            paint.started = now;
-            return (changed, false);
-        }
-        let t = (now.duration_since(paint.started).as_secs_f32()
-            / paint.motion.duration().as_secs_f32())
-        .min(1.);
-        let next = paint.from.blend(&target, paint.motion.ease()(t));
-        let changed = next != paint.current;
-        paint.current = next;
-        (changed, paint.from != target && t < 1.)
+        paint
+            .borrow_mut()
+            .advance(target, now, reduce_motion, effects)
     })
 }
 
@@ -373,21 +421,6 @@ mod tests {
     use super::*;
     use gpui::{Context, IntoElement, Render, TestAppContext, div};
     use std::time::Duration;
-
-    #[gpui::test]
-    fn an_override_wins_over_the_target_until_cleared(cx: &mut TestAppContext) {
-        let chosen = Scheme::from_palette(PaletteId::Ink);
-        let target = Scheme::from_palette(PaletteId::Paper);
-        cx.update(|cx| {
-            cx.set_reduce_motion(true);
-            set_scheme_override(Some(chosen));
-            advance_paint(target, cx);
-            assert_eq!(scheme(), chosen);
-            set_scheme_override(None);
-            advance_paint(target, cx);
-            assert_eq!(scheme(), target);
-        });
-    }
 
     #[test]
     fn component_projection_keeps_unowned_tokens_and_uses_one_rem_baseline() {

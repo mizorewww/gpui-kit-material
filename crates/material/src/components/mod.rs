@@ -7,7 +7,7 @@ pub use button::{
     MaterialButton, material_button,
 };
 mod fab;
-pub use fab::{ExtendedFab, Fab, FabColor};
+pub use fab::{ExtendedFab, Fab, FabColor, FabPosition};
 mod fab_menu;
 pub use fab_menu::{FabMenu, FabMenuAlign, FabMenuColor, FabMenuItem, FabMenuPresentation};
 mod icon_button;
@@ -41,7 +41,7 @@ pub use search::{
     SearchViewLayout, SearchViewStyle,
 };
 pub use slider::{MaterialSlider, SliderAppearance, SliderColor, SliderSize};
-pub use snackbar::{SNACKBAR_CLOSE_ICON, Snackbar};
+pub use snackbar::{SNACKBAR_CLOSE_ICON, Snackbar, SnackbarDuration, SnackbarPosition};
 pub use switch::{MaterialSwitch, SwitchIcons};
 mod caption;
 mod carousel;
@@ -54,7 +54,7 @@ pub use date_parts::{
     first_of_month, month_weeks, week_days,
 };
 pub use date_picker::{
-    DATE_INPUT_PICKER_WIDTH, DATE_PICKER_WIDTH, DateInputMode, DateMatcher, DatePicker,
+    DATE_INPUT_PICKER_WIDTH, DATE_PICKER_WIDTH, DateFormat, DateInputMode, DateMatcher, DatePicker,
     DatePickerEvent, DatePickerLabels, DatePickerState, DatePickerVariant, DatePickerView,
     DateSelection, PickerDialog, today,
 };
@@ -63,11 +63,13 @@ pub use time_picker::{
     TimePickerEvent, TimePickerLabels, TimePickerState, TimeSelector, TimeUnit,
 };
 mod checkbox;
+mod chip_set;
 mod chips;
 mod choice;
 mod dialog;
 mod feedback;
 mod focus;
+mod labeled;
 mod list;
 mod loading_indicator;
 mod menu;
@@ -76,6 +78,9 @@ mod navigation_drawer;
 mod preview;
 mod progress;
 mod radio;
+mod ripple;
+#[cfg(test)]
+mod ripple_tests;
 mod roving;
 mod search;
 mod sheets;
@@ -98,6 +103,7 @@ pub use carousel::{
     MaterialCarousel,
 };
 pub use checkbox::{CheckboxState, MaterialCheckbox};
+pub use chip_set::{ChipSelection, ChipSet, ChipSetItem};
 pub use chips::{AssistChip, CHIP_HEIGHT, ChipStyle, FilterChip, InputChip, SuggestionChip, chip};
 pub use choice::{ChoiceGroup, ChoiceTile, Tint, choice_radio, tinted_icon};
 pub use dialog::{
@@ -111,6 +117,7 @@ pub use feedback::{
 #[allow(deprecated)]
 pub use feedback::{BadgeKind, badge, outlined_badge};
 pub use focus::{FocusRing, RevealFocus, RingedButton, contain_scroll};
+pub use labeled::{LabelPosition, required_label};
 pub use list::{
     LIST_SEGMENT_GAP, LIST_SEGMENT_INNER_RADIUS, LIST_SEGMENT_RADIUS, ListDensity, ListItem,
     ListLeading, ListLines, ListTrailing, list_subheader, segmented_list,
@@ -168,6 +175,7 @@ pub use progress::{
     progress_with_label, sample_circular_progress, spinner, spinner_with_playback,
 };
 pub use radio::{MaterialRadio, MaterialRadioGroup};
+pub use ripple::Ripple;
 pub use sheets::{BottomSheetDetent, MaterialBottomSheet, MaterialSideSheet, SideSheetEdge};
 pub use tabs::{MaterialTabs, TabItem, TabsVariant};
 pub use text::{
@@ -175,7 +183,8 @@ pub use text::{
     semantic_label, supporting_info,
 };
 pub use text_field::{
-    TEXT_FIELD_HEIGHT, TEXT_FIELD_WIDTH, TextField, TextFieldDensity, TextFieldVariant,
+    TEXT_FIELD_HEIGHT, TEXT_FIELD_WIDTH, TextField, TextFieldDensity, TextFieldInputType,
+    TextFieldVariant,
 };
 pub use tile::{
     TileGroup, TileScale, disclosure_chevron, list_tile, tile, tile_chevron, tile_info,

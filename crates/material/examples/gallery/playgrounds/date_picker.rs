@@ -28,6 +28,7 @@ const MONTHS: [&str; 12] = [
 ];
 const WEEKDAYS: [&str; 7] = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const FORMATS: [&str; 3] = ["MM/DD/YYYY", "DD/MM/YYYY", "YYYY MM DD"];
+const DATE_FORMATS: [DateFormat; 3] = DateFormat::ALL;
 
 pub static PLAYGROUND: Playground = Playground {
     scenarios: &[
@@ -167,42 +168,16 @@ fn to_iso(date: Option<NaiveDate>) -> SharedString {
         .unwrap_or_default()
 }
 
-/// `date` in format `format` (an index into [`FORMATS`]).
-fn format_date(format: usize, d: NaiveDate) -> SharedString {
-    match format {
-        0 => format!("{:02}/{:02}/{}", d.month(), d.day(), d.year()),
-        1 => format!("{:02}/{:02}/{}", d.day(), d.month(), d.year()),
-        _ => format!("{} {:02} {:02}", d.year(), d.month(), d.day()),
-    }
-    .into()
-}
-
-/// Parse `text` written in format `format`.
-fn parse_date(format: usize, text: &str) -> Option<NaiveDate> {
-    let separator = if format == 2 { ' ' } else { '/' };
-    let parts: Vec<u32> = text
-        .split(separator)
-        .map(|p| p.trim().parse::<u32>().ok())
-        .collect::<Option<_>>()?;
-    let [a, b, c] = parts[..] else {
-        return None;
-    };
-    let (y, m, d) = match format {
-        0 => (c, a, b),
-        1 => (c, b, a),
-        _ => (a, b, c),
-    };
-    if y < 1000 {
-        return None;
-    }
-    NaiveDate::from_ymd_opt(y as i32, m, d)
-}
-
 /// English date picker strings in date format `format`.
-fn labels(range: bool, format: usize) -> DatePickerLabels {
+fn labels(range: bool, format: DateFormat) -> DatePickerLabels {
     let s = SharedString::new_static;
     let short = |d: NaiveDate| format!("{} {}", short_month(d.month()), d.day());
-    let hint = SharedString::new_static(FORMATS[format]);
+    let hint = SharedString::new_static(
+        FORMATS[DATE_FORMATS
+            .iter()
+            .position(|f| *f == format)
+            .unwrap_or_default()],
+    );
     DatePickerLabels {
         title: if range {
             s("Select dates")
@@ -267,8 +242,8 @@ fn labels(range: bool, format: usize) -> DatePickerLabels {
             .into()
         }),
         number: Rc::new(|n| n.to_string().into()),
-        format_input: Rc::new(move |d| format_date(format, d)),
-        parse_input: Rc::new(move |text| parse_date(format, text)),
+        format_input: Rc::new(move |d| format.format(d)),
+        parse_input: Rc::new(move |text| format.parse(text)),
     }
 }
 
@@ -283,7 +258,7 @@ struct Picker {
 #[derive(Clone, Copy, Hash, PartialEq)]
 struct Build {
     range: bool,
-    format: usize,
+    format: DateFormat,
     view: usize,
     input: bool,
     docked: bool,
@@ -314,13 +289,6 @@ fn write_back(
     state.set_value("date", Value::Text(to_iso(start)), window, cx);
     if !value.is_single() {
         state.set_value("range_end", Value::Text(to_iso(end)), window, cx);
-    }
-}
-
-fn complete(value: DateSelection) -> bool {
-    match value {
-        DateSelection::Single(d) => d.is_some(),
-        DateSelection::Range(a, b) => a.is_some() && b.is_some(),
     }
 }
 
@@ -360,7 +328,7 @@ fn build(
             if let Some((start, end)) = inputs {
                 if let Some(d) = value.start() {
                     start.update(cx, |input, cx| {
-                        input.set_value(format_date(build.format, d), window, cx)
+                        input.set_value(build.format.format(d), window, cx)
                     });
                 }
                 state = state.input_mode().with_inputs(start, end, cx);
@@ -372,8 +340,7 @@ fn build(
         &state,
         window,
         move |playground: &mut PlaygroundState, _, event: &DatePickerEvent, window, cx| {
-            let DatePickerEvent::Change(value) = *event;
-            if playground.config.bool("close") && complete(value) {
+            if let DatePickerEvent::Dismiss(value) = *event {
                 write_back(playground, value, window, cx);
                 picker.update(cx, |picker, cx| {
                     picker.open = false;
@@ -393,7 +360,7 @@ fn preview(
     cx: &mut Context<PlaygroundState>,
 ) -> AnyElement {
     let range = config.bool("range");
-    let format = config.choice("format");
+    let format = DATE_FORMATS[config.choice("format")];
     let variant = config.option("variant");
     let disabled = config.bool("disabled");
     let limits = config
@@ -434,13 +401,17 @@ fn preview(
     let open = picker.read(cx).open && !disabled;
 
     let shown: SharedString = match value {
-        DateSelection::Single(Some(d)) => format_date(format, d),
+        DateSelection::Single(Some(d)) => format.format(d),
         DateSelection::Range(Some(a), b) => match b {
-            Some(b) => format!("{} – {}", format_date(format, a), format_date(format, b)).into(),
-            None => format_date(format, a),
+            Some(b) => format!("{} – {}", format.format(a), format.format(b)).into(),
+            None => format.format(a),
         },
         _ => SharedString::default(),
     };
+    if preview.changed("close-on-selection", config.bool("close")) {
+        let close = config.bool("close");
+        state.update(cx, |state, _| state.set_close_on_selection(close));
+    }
     // Opening focuses the picker's grid, so the keyboard takes over.
     let grid = state.read(cx).focus_handle().clone();
     let toggle = {
@@ -472,7 +443,7 @@ fn preview(
                 .variant(TextFieldVariant::Outlined)
                 .label(config.text("label"))
                 .float_label(open)
-                .supporting_text(FORMATS[format])
+                .supporting_text(FORMATS[config.choice("format")])
                 .disabled(disabled)
                 .trailing_icon(
                     IconButton::new(
@@ -560,15 +531,8 @@ mod tests {
     use core::prelude::v1::test;
 
     #[test]
-    fn dates_format_and_parse_in_every_format() {
+    fn iso_controls_round_trip() {
         let d = NaiveDate::from_ymd_opt(2025, 8, 17).unwrap();
-        assert_eq!(format_date(0, d), "08/17/2025");
-        assert_eq!(format_date(1, d), "17/08/2025");
-        assert_eq!(format_date(2, d), "2025 08 17");
-        for format in 0..3 {
-            assert_eq!(parse_date(format, &format_date(format, d)), Some(d));
-        }
-        assert_eq!(parse_date(0, "17/08/2025"), None, "no 17th month");
         assert_eq!(iso("2025-08-17"), Some(d));
         assert_eq!(to_iso(Some(d)), "2025-08-17");
     }

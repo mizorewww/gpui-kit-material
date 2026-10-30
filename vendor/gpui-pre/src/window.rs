@@ -5,6 +5,7 @@ use crate::Inspector;
 #[cfg(feature = "profiler")]
 use crate::profiler;
 use crate::{
+    LayoutDirection,
     Action, AnyDrag, AnyElement, AnyImageCache, AnyTooltip, AnyView, App, AppContext, Arena, Asset,
     AsyncWindowContext, AtlasTile, AvailableSpace, Background, BorderStyle, Bounds, BoxShadow,
     Capslock, Context, Corners, CursorHideMode, CursorStyle, Decorations, DevicePixels,
@@ -1275,6 +1276,12 @@ pub struct Window {
     /// This is used by `with_rem_size` to allow rendering an element tree with
     /// a given rem size.
     rem_size_override_stack: SmallVec<[Pixels; 8]>,
+    /// The direction being laid out and painted: the window's, or a subtree's
+    /// while it draws.
+    layout_direction: LayoutDirection,
+    /// Whether [`Window::set_layout_direction`] chose it, so the application
+    /// default no longer applies.
+    layout_direction_is_own: bool,
     pub(crate) viewport_size: Size<Pixels>,
     layout_engine: Option<TaffyLayoutEngine>,
     pub(crate) root: Option<AnyView>,
@@ -2195,6 +2202,8 @@ impl Window {
             text_rendering_mode: cx.text_rendering_mode.clone(),
             rem_size: px(16.),
             rem_size_override_stack: SmallVec::new(),
+            layout_direction: cx.layout_direction(),
+            layout_direction_is_own: false,
             viewport_size: content_size,
             layout_engine: Some(TaffyLayoutEngine::new()),
             root: None,
@@ -3180,6 +3189,34 @@ impl Window {
         self.refresh();
     }
 
+    /// The direction being laid out and painted here.
+    pub fn layout_direction(&self) -> LayoutDirection {
+        self.layout_direction
+    }
+
+    /// Set this window's direction, overriding the application's. Redraws.
+    pub fn set_layout_direction(&mut self, direction: LayoutDirection) {
+        self.layout_direction_is_own = true;
+        if self.layout_direction != direction {
+            self.layout_direction = direction;
+            self.refresh();
+        }
+    }
+
+    /// Run `f` with `direction` in effect, for one drawing phase of a subtree.
+    /// An element overriding direction wraps its request_layout, prepaint and
+    /// paint.
+    pub fn with_layout_direction<R>(
+        &mut self,
+        direction: LayoutDirection,
+        f: impl FnOnce(&mut Self) -> R,
+    ) -> R {
+        let previous = mem::replace(&mut self.layout_direction, direction);
+        let result = f(self);
+        self.layout_direction = previous;
+        result
+    }
+
     /// The size of an em for the base font of the application. Adjusting this value allows the
     /// UI to scale, just like zooming a web page.
     pub fn rem_size(&self) -> Pixels {
@@ -3503,6 +3540,9 @@ impl Window {
     /// the contents of the new [`Scene`], use [`Self::present`].
     #[profiling::function]
     pub fn draw(&mut self, cx: &mut App) -> ArenaClearNeeded {
+        if !self.layout_direction_is_own {
+            self.layout_direction = cx.layout_direction();
+        }
         // Drain every draw in profiler builds so a previous frame's
         // first-invalidation timestamp can't be attributed to this one.
         #[cfg(feature = "profiler")]
@@ -5354,12 +5394,11 @@ impl Window {
         let rem_size = self.rem_size();
         let scale_factor = self.scale_factor();
 
-        self.layout_engine.as_mut().unwrap().request_layout(
-            style,
-            rem_size,
-            scale_factor,
-            &cx.layout_id_buffer,
-        )
+        let mirrored = self.layout_direction.is_rtl();
+        let layout_engine = self.layout_engine.as_mut().unwrap();
+        let id = layout_engine.request_layout(style, rem_size, scale_factor, &cx.layout_id_buffer);
+        layout_engine.set_mirrored(id, mirrored);
+        id
     }
 
     /// Add a node to the layout tree for the current frame. Instead of taking a `Style` and children,
