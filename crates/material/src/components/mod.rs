@@ -99,8 +99,8 @@ pub use choice::{ChoiceGroup, ChoiceTile, Tint, choice_radio, tinted_icon};
 pub use dialog::{DIALOG_WIDTH, MaterialDialog, SCRIM_OPACITY};
 pub use feedback::{
     BADGE_CONTAINER, BADGE_LABEL, CARD_PADDING, CardState, CardSurface, CardVariant,
-    LARGE_BADGE_PADDING, LARGE_BADGE_SIZE, NoticeKind, SMALL_BADGE_SIZE, StatusKind, card,
-    card_surface, large_badge, notice_banner, outlined_status_chip, small_badge, status_chip,
+    LARGE_BADGE_PADDING, LARGE_BADGE_SIZE, MaterialCard, NoticeKind, SMALL_BADGE_SIZE, StatusKind,
+    card, card_surface, large_badge, notice_banner, outlined_status_chip, small_badge, status_chip,
 };
 #[allow(deprecated)]
 pub use feedback::{BadgeKind, badge, outlined_badge};

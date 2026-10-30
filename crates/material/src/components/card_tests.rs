@@ -237,3 +237,70 @@ fn content_uses_on_surface_and_preserves_explicit_text_override(cx: &mut TestApp
     assert_eq!(pair[0], default);
     assert_eq!(pair[1], gpui::Hsla::from(gpui::rgb(0x00ff00)));
 }
+
+struct ActionCard {
+    clicks: std::rc::Rc<std::cell::Cell<usize>>,
+}
+impl Render for ActionCard {
+    fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        window.set_rem_size(px(14.));
+        let clicks = self.clicks.clone();
+        div().p(px(40.)).child(
+            super::MaterialCard::new("action-card", CardVariant::Elevated)
+                .accessibility_label("Open")
+                .draggable(true)
+                .on_click(move |_, _, _| clicks.set(clicks.get() + 1))
+                .w(px(100.))
+                .child(
+                    div()
+                        .h(px(60.))
+                        .debug_selector(|| "action-card-body".into()),
+                ),
+        )
+    }
+}
+
+#[gpui::test]
+fn a_material_card_clicks_drags_and_springs_home(cx: &mut TestAppContext) {
+    use gpui::{Modifiers, MouseButton, point};
+    let clicks = std::rc::Rc::new(std::cell::Cell::new(0));
+    let probe = clicks.clone();
+    let (_, cx) = cx.add_window_view(move |_, _| ActionCard { clicks: probe });
+    cx.run_until_parked();
+    super::tests::redraw(cx);
+    let home = cx.debug_bounds("action-card-body").unwrap();
+    // A click acts.
+    cx.simulate_click(home.center(), Modifiers::none());
+    super::tests::redraw(cx);
+    cx.run_until_parked();
+    assert_eq!(clicks.get(), 1);
+
+    // A press that travels carries the card with the pointer and is no click.
+    let start = home.center();
+    cx.simulate_mouse_down(start, MouseButton::Left, Modifiers::none());
+    super::tests::redraw(cx);
+    let to = start + point(px(30.), px(20.));
+    cx.simulate_mouse_move(to, Some(MouseButton::Left), Modifiers::none());
+    super::tests::redraw(cx);
+    let carried = cx.debug_bounds("action-card-body").unwrap();
+    assert_eq!(carried.origin - home.origin, point(px(30.), px(20.)));
+    cx.simulate_mouse_up(to, MouseButton::Left, Modifiers::none());
+    super::tests::redraw(cx);
+    cx.run_until_parked();
+    assert_eq!(clicks.get(), 1, "a drag is not a click");
+
+    // Released, it springs back to its place.
+    cx.executor()
+        .advance_clock(std::time::Duration::from_secs(2));
+    super::tests::redraw(cx);
+    super::tests::redraw(cx);
+    assert_eq!(
+        cx.debug_bounds("action-card-body").unwrap().origin,
+        home.origin
+    );
+    // And it clicks again afterwards.
+    cx.simulate_click(home.center(), Modifiers::none());
+    super::tests::redraw(cx);
+    cx.run_until_parked();
+    assert_eq!(clicks.get(), 2);
+}
