@@ -313,8 +313,8 @@
       },
       "src/platform.rs": {
         "upstream_sha256": "7f95c2fe68fc225cb45451888355c4df2589632d7bde0d61fce554972f4825ca",
-        "local_sha256": "8f61a3b5496db874994fbf7b7556be0dc413165ce4e453a71c8b6db68988bc6a",
-        "reason": "VsyncStatus, vsync_status/set_vsync, has_periodic_frame_source, successful_frame_submissions (vendor/gpui-pre/frame-submission-patch.md); layout_line_with_options (line-layout-options-patch.md)."
+        "local_sha256": "3ae945bd294796af2f003dc08c0dd53e5b4d13694c706bbda3f4915c0936d2d9",
+        "reason": "VsyncStatus, vsync_status/set_vsync, has_periodic_frame_source, successful_frame_submissions (vendor/gpui-pre/frame-submission-patch.md); layout_line_with_options (line-layout-options-patch.md); declares frame_submission (frame-submission-patch.md)."
       },
       "src/platform/test/window.rs": {
         "upstream_sha256": "3b359c9e7943ccb065096c718756b32400dac3394bfd9ab6f361dda8163e97bd",
@@ -371,6 +371,10 @@
       "examples/image/exif-orientation-rotate-180.jpg": {
         "sha256": "cb6c28e3e6065d62790ba38662d14f3f1510180375cacba18547720e8b48d9d5",
         "reason": "Added: fixture included by a src/platform.rs test; identical to the published gpui-pre 0.3.10 archive file, absent from the gpui-fast archive."
+      },
+      "src/platform/frame_submission.rs": {
+        "sha256": "e5d9be99b8866fb9a498b4e622b8f75798f249760342cb36aaac655b52594458",
+        "reason": "Added: FrameSubmissionCounter and dxgi_present_succeeded, backend accounting tested on every host (vendor/gpui-pre/frame-submission-patch.md)."
       },
       "src/text_system/line_layout_options.rs": {
         "sha256": "c6c61dd6adc811245cfaeba129034910b53955c50f5eda40ccd25b8b37a8a57f",

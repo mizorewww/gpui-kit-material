@@ -1,5 +1,6 @@
 // Modified by Longbridge for gpui-fast.
 mod app_menu;
+mod frame_submission;
 mod keyboard;
 mod keystroke;
 mod platform_info;
@@ -81,6 +82,7 @@ use strum::EnumIter;
 use uuid::Uuid;
 
 pub use app_menu::*;
+pub use frame_submission::*;
 pub use keyboard::*;
 pub use keystroke::*;
 
