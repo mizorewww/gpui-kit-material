@@ -7,7 +7,7 @@
 //! repeats an animation, and the card itself is the one link and keyboard
 //! stop. The grid computes its column count from the content width, so it
 //! reflows instead of scrolling sideways.
-use super::catalog::{CATALOG, Group, Kind};
+use super::catalog::{CATALOG, Group};
 use super::playground::symbol;
 use super::spec::{self, type_role};
 use super::*;
@@ -557,9 +557,7 @@ impl Gallery {
         let entries: Vec<usize> = CATALOG
             .iter()
             .enumerate()
-            .filter(|(_, entry)| {
-                entry.group == group && matches!(entry.kind, Kind::Component { .. })
-            })
+            .filter(|(_, entry)| entry.group == group && super::shell::overview_entry(entry))
             .map(|(index, _)| index)
             .collect();
         let rows = entries.chunks(columns).map(|chunk| {

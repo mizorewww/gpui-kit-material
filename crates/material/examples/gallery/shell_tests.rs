@@ -609,3 +609,246 @@ fn compact_search_shows_its_results_in_the_drawer(cx: &mut TestAppContext) {
         })
         .unwrap();
 }
+
+mod examples {
+    use super::super::pages::examples::app::{Body, Device, ExamplesApp};
+    use super::super::playground::Value;
+    use super::*;
+    use gpui::{Entity, ListOffset};
+
+    fn set(
+        window: &WindowHandle<Gallery>,
+        cx: &mut VisualTestContext,
+        id: &'static str,
+        value: usize,
+    ) {
+        window
+            .update(cx, |g, window, cx| {
+                let state = g.entries[g.current].playground.clone().unwrap();
+                state.update(cx, |state, cx| {
+                    state.set_value(id, Value::Choice(value), window, cx)
+                });
+            })
+            .unwrap();
+        settle(window, cx);
+    }
+
+    fn app(window: &WindowHandle<Gallery>, cx: &mut VisualTestContext) -> Entity<ExamplesApp> {
+        window
+            .update(cx, |g, _, cx| {
+                g.entries[g.current]
+                    .playground
+                    .clone()
+                    .unwrap()
+                    .read(cx)
+                    .local_entity::<ExamplesApp>("example-app")
+                    .expect("the preview built the app")
+            })
+            .unwrap()
+    }
+
+    fn screen(window: &WindowHandle<Gallery>, cx: &mut VisualTestContext) -> &'static str {
+        config(window, cx).option("screen")
+    }
+
+    fn top(window: &WindowHandle<Gallery>, cx: &mut VisualTestContext) {
+        window
+            .update(cx, |g, _, cx| {
+                g.list.scroll_to(ListOffset {
+                    item_ix: 0,
+                    offset_in_item: px(0.),
+                });
+                cx.notify();
+            })
+            .unwrap();
+        settle(window, cx);
+    }
+
+    /// One device at a time, on every screen, inside the canvas at every
+    /// width, with the page holding a single row: nothing scrolls sideways
+    /// and the page has no row per screen to scroll past.
+    #[gpui::test]
+    fn one_device_fits_the_canvas_at_every_width(cx: &mut TestAppContext) {
+        let (window, mut cx) = open(cx);
+        go(&window, &mut cx, "examples");
+        window
+            .update(&mut cx, |g, _, _| assert_eq!(g.rows, [Row::Lead]))
+            .unwrap();
+        for (width, _) in WIDTHS {
+            resize(&window, &mut cx, width);
+            for device in Device::ALL {
+                set(&window, &mut cx, "device", device.index());
+                for body in Body::ALL {
+                    set(&window, &mut cx, "screen", body.index());
+                    top(&window, &mut cx);
+                    let canvas = bounds(&mut cx, "preview-canvas");
+                    let frame = bounds(&mut cx, "example-device");
+                    let label = format!("{device:?} {body:?} at {width}");
+                    assert!(
+                        frame.left() >= canvas.left() && frame.right() <= canvas.right(),
+                        "{label}: {frame:?} in {canvas:?}"
+                    );
+                    assert!(
+                        frame.top() >= canvas.top() && frame.bottom() <= canvas.bottom(),
+                        "{label}: {frame:?} in {canvas:?}"
+                    );
+                    // The whole device scales: its aspect ratio is its own.
+                    let (outer_width, outer_height) = device.outer();
+                    let ratio = f32::from(frame.size.width) / f32::from(frame.size.height);
+                    assert!(
+                        (ratio - outer_width / outer_height).abs() < 0.01,
+                        "{label}: {frame:?}"
+                    );
+                }
+            }
+        }
+    }
+
+    #[gpui::test]
+    fn a_device_keeps_its_real_size_where_there_is_room(cx: &mut TestAppContext) {
+        let (window, mut cx) = open(cx);
+        go(&window, &mut cx, "examples");
+        cx.simulate_resize(size(px(1600.), px(1200.)));
+        settle(&window, &mut cx);
+        let frame = bounds(&mut cx, "example-device");
+        assert_eq!(frame.size, size(px(428.), px(933.)));
+    }
+
+    /// A press lands on what is painted, at the scaled size: the phone's
+    /// navigation bar switches the app, and the panel follows.
+    #[gpui::test]
+    fn a_scaled_navigation_bar_takes_real_presses(cx: &mut TestAppContext) {
+        let (window, mut cx) = open(cx);
+        go(&window, &mut cx, "examples");
+        // Narrow enough to scale the phone, tall enough to show all of it.
+        cx.simulate_resize(size(px(400.), px(1500.)));
+        settle(&window, &mut cx);
+        let frame = bounds(&mut cx, "example-device");
+        let scale = f32::from(frame.size.width) / Device::Phone.outer().0;
+        assert!(scale < 1., "a 400px window scales the phone");
+        // The second of four destinations, in the bar above the gesture bar.
+        let press = point(
+            frame.left() + px((8. + 412. * 1.5 / 4.) * scale),
+            frame.bottom() - px((8. + 24. + 40.) * scale),
+        );
+        click(&window, &mut cx, press);
+        assert_eq!(screen(&window, &mut cx), "Library");
+    }
+
+    #[gpui::test]
+    fn the_panel_and_the_app_move_each_other_and_keep_a_history(cx: &mut TestAppContext) {
+        let (window, mut cx) = open(cx);
+        go(&window, &mut cx, "examples");
+        let app = app(&window, &mut cx);
+        let run = |window: &WindowHandle<Gallery>,
+                   cx: &mut VisualTestContext,
+                   f: fn(&mut ExamplesApp, &mut gpui::Window, &mut gpui::Context<ExamplesApp>)| {
+            window
+                .update(cx, |_, window, cx| {
+                    app.update(cx, |app, cx| f(app, window, cx))
+                })
+                .unwrap();
+            settle(window, cx);
+        };
+        run(&window, &mut cx, |app, window, cx| {
+            app.go(Body::Library, window, cx)
+        });
+        assert_eq!(screen(&window, &mut cx), "Library");
+        // A panel change is a navigation as well.
+        set(&window, &mut cx, "screen", Body::Messaging.index());
+        run(&window, &mut cx, |app, window, cx| app.go_back(window, cx));
+        assert_eq!(screen(&window, &mut cx), "Library");
+        run(&window, &mut cx, |app, window, cx| app.go_back(window, cx));
+        assert_eq!(screen(&window, &mut cx), "Home");
+        run(&window, &mut cx, |app, window, cx| {
+            app.go_forward(window, cx)
+        });
+        assert_eq!(screen(&window, &mut cx), "Library");
+        run(&window, &mut cx, |app, window, cx| {
+            app.go_forward(window, cx)
+        });
+        assert_eq!(screen(&window, &mut cx), "Messaging");
+        // With nothing to go back to, Back lands on Home.
+        run(&window, &mut cx, |app, window, cx| app.go_back(window, cx));
+        run(&window, &mut cx, |app, window, cx| app.go_back(window, cx));
+        run(&window, &mut cx, |app, window, cx| app.go_back(window, cx));
+        assert_eq!(screen(&window, &mut cx), "Home");
+    }
+
+    #[gpui::test]
+    fn messages_send_to_their_conversation_and_clear(cx: &mut TestAppContext) {
+        let (window, mut cx) = open(cx);
+        go(&window, &mut cx, "examples");
+        let app = app(&window, &mut cx);
+        for message in ["One", "  ", "Two"] {
+            window
+                .update(&mut cx, |_, window, cx| {
+                    app.update(cx, |app, cx| {
+                        app.message
+                            .update(cx, |input, cx| input.set_value(message, window, cx));
+                        app.send(window, cx);
+                    })
+                })
+                .unwrap();
+        }
+        window
+            .update(&mut cx, |_, _, cx| {
+                app.update(cx, |app, cx| {
+                    // Blank messages are not sent; a suggestion sends itself.
+                    assert_eq!(app.sent[0], ["One", "Two"]);
+                    assert_eq!(app.message.read(cx).value(), "");
+                    app.conversation = 1;
+                    app.send_text("Great!", cx);
+                    assert_eq!(app.sent[1], ["Great!"]);
+                    assert_eq!(app.sent[0].len(), 2);
+                })
+            })
+            .unwrap();
+    }
+
+    #[gpui::test]
+    fn the_player_plays_pauses_and_changes_track(cx: &mut TestAppContext) {
+        let (window, mut cx) = open(cx);
+        go(&window, &mut cx, "examples");
+        let app = app(&window, &mut cx);
+        window
+            .update(&mut cx, |_, _, cx| {
+                app.update(cx, |app, cx| {
+                    assert!(!app.playing);
+                    app.play(0, cx);
+                    assert!(app.playing);
+                    app.play(0, cx);
+                    assert!(!app.playing);
+                    // Another track starts from its beginning.
+                    app.play(1, cx);
+                    assert!(app.playing);
+                    assert_eq!((app.track, app.position), (1, 0.));
+                    app.next_track(cx);
+                    app.next_track(cx);
+                    assert_eq!(app.track, 0);
+                    app.play(0, cx);
+                })
+            })
+            .unwrap();
+    }
+
+    #[gpui::test]
+    fn every_screen_draws_on_every_device_with_a_snackbar_up(cx: &mut TestAppContext) {
+        let (window, mut cx) = open(cx);
+        go(&window, &mut cx, "examples");
+        let app = app(&window, &mut cx);
+        window
+            .update(&mut cx, |_, _, cx| {
+                app.update(cx, |app, cx| app.say("Saved", cx))
+            })
+            .unwrap();
+        for device in Device::ALL {
+            set(&window, &mut cx, "device", device.index());
+            for body in Body::ALL {
+                set(&window, &mut cx, "screen", body.index());
+                top(&window, &mut cx);
+                assert!(cx.debug_bounds("example-snackbar").is_some(), "{body:?}");
+            }
+        }
+    }
+}

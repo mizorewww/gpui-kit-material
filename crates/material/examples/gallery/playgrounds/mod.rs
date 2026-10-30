@@ -14,6 +14,7 @@ pub mod chips;
 pub mod date_picker;
 pub mod dialog;
 pub mod divider;
+pub mod examples;
 pub mod extended_fab;
 pub mod fab;
 pub mod fab_menu;

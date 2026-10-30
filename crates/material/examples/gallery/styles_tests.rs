@@ -181,7 +181,7 @@ fn examples_keep_their_state_across_navigation(cx: &mut TestAppContext) {
         .update(&mut cx, |g, _, cx| g.navigate(examples_entry, cx))
         .unwrap();
     settle(&window, &mut cx);
-    assert!(cx.debug_bounds("specs-examples").is_some());
+    assert!(cx.debug_bounds("example-device").is_some());
     let first = window
         .update(&mut cx, |g, window, cx| {
             g.show_page::<examples::Page>(window, cx).0.entity_id()
@@ -202,5 +202,4 @@ fn examples_keep_their_state_across_navigation(cx: &mut TestAppContext) {
         })
         .unwrap();
     assert_eq!(first, again);
-    assert!(cx.debug_bounds("specs-examples").is_some());
 }

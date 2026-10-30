@@ -4,14 +4,12 @@
 //! interactive here is a crate component; the rest is sample content.
 use super::super::prelude::*;
 use gpui_kit_material::icons::{Icon, Style, Symbol};
-use std::{cell::RefCell, collections::HashMap};
+use std::{cell::RefCell, collections::HashMap, sync::Arc};
 
-/// The kit's phone frame width and the web frame's size, in dp.
-pub const PHONE_WIDTH: f32 = 412.;
-pub const WEB_WIDTH: f32 = 905.;
-pub const WEB_HEIGHT: f32 = 680.;
+use super::app::Device;
+
 /// The kit draws every example frame inside an 8dp outline-variant stroke.
-const FRAME_STROKE: f32 = 8.;
+pub const FRAME_STROKE: f32 = 8.;
 
 thread_local! {
     static PATHS: RefCell<HashMap<(&'static str, bool), SharedString>> =
@@ -103,6 +101,7 @@ pub fn art(glyph: f32) -> Div {
 fn stroke(id: ElementId, radius: f32, screen: Div) -> Stateful<Div> {
     div()
         .id(id)
+        .debug_selector(|| "example-device".into())
         .flex_shrink_0()
         .p(rem(FRAME_STROKE))
         .rounded(rem(radius + FRAME_STROKE))
@@ -110,21 +109,23 @@ fn stroke(id: ElementId, radius: f32, screen: Div) -> Stateful<Div> {
         .child(screen.rounded(rem(radius)).overflow_hidden())
 }
 
-/// A 412dp phone: status bar, the screen's content and the gesture bar
-/// (`gesture` is its background, matching the navigation bar above it).
-/// `edge_to_edge` content starts under the status bar (a hero image).
+/// A phone: status bar, the screen's content and the gesture bar (`gesture`
+/// is its background, matching the navigation bar above it). `edge_to_edge`
+/// content starts under the status bar (a hero image).
 pub fn phone(
     id: impl Into<ElementId>,
     content: impl IntoElement,
     gesture: ColorRole,
     edge_to_edge: bool,
 ) -> Stateful<Div> {
+    let (width, height) = Device::Phone.screen();
     stroke(
         id.into(),
         28.,
         div()
             .relative()
-            .w(rem(PHONE_WIDTH))
+            .w(rem(width))
+            .h(rem(height))
             .flex()
             .flex_col()
             .bg(color(ColorRole::SURFACE))
@@ -137,21 +138,64 @@ pub fn phone(
     )
 }
 
-/// A browser window `width` design px wide (the kit's is 905×680): the
-/// browser bar over `body`.
-pub fn browser(id: impl Into<ElementId>, width: f32, body: impl IntoElement) -> Stateful<Div> {
+/// A tablet: a status bar and the gesture bar around `body`.
+pub fn tablet(id: impl Into<ElementId>, body: impl IntoElement) -> Stateful<Div> {
+    let (width, height) = Device::Tablet.screen();
     stroke(
         id.into(),
         18.,
         div()
             .w(rem(width))
-            .h(rem(WEB_HEIGHT))
+            .h(rem(height))
             .flex()
             .flex_col()
             .bg(color(ColorRole::SURFACE))
-            .child(browser_bar())
+            .child(tablet_status_bar())
+            .child(div().flex_1().min_h_0().flex().child(body))
+            .child(gesture_bar(ColorRole::SURFACE)),
+    )
+}
+
+/// A browser window: `bar` over `body`.
+pub fn browser(
+    id: impl Into<ElementId>,
+    (width, height): (f32, f32),
+    bar: impl IntoElement,
+    body: impl IntoElement,
+) -> Stateful<Div> {
+    stroke(
+        id.into(),
+        18.,
+        div()
+            .w(rem(width))
+            .h(rem(height))
+            .flex()
+            .flex_col()
+            .bg(color(ColorRole::SURFACE))
+            .child(bar)
             .child(div().flex_1().min_h_0().flex().child(body)),
     )
+}
+
+/// A tablet's status bar: the time and the system icons at its corners.
+fn tablet_status_bar() -> Div {
+    let ink = color(ColorRole::ON_SURFACE);
+    div()
+        .flex_shrink_0()
+        .h(rem(36.))
+        .px(rem(24.))
+        .flex()
+        .items_center()
+        .justify_between()
+        .child(text(TypeRole::BodyMedium, ColorRole::ON_SURFACE, "9:30"))
+        .child(
+            div()
+                .flex()
+                .items_center()
+                .gap(rem(2.))
+                .child(filled("signal_wifi_4_bar").size(rem(17.)).color(ink))
+                .child(filled("battery_full").size(rem(17.)).color(ink)),
+        )
 }
 
 /// The kit's Android status bar: time, camera cutout and system icons.
@@ -206,91 +250,15 @@ fn gesture_bar(background: ColorRole) -> Div {
         )
 }
 
-/// The kit's browser bar: navigation glyphs, the address field, the
-/// profile monogram and the overflow glyph. Decoration, not controls.
-fn browser_bar() -> Div {
-    let glyph = |name: &'static str| {
-        icon(name)
-            .size(rem(20.))
-            .color(color(ColorRole::ON_SURFACE_VARIANT))
-    };
-    div()
-        .flex_shrink_0()
-        .h(rem(68.))
-        .px(rem(16.))
-        .flex()
-        .items_center()
-        .gap(rem(16.))
-        .border_b_1()
-        .border_color(color(ColorRole::OUTLINE_VARIANT))
-        .child(
-            div()
-                .flex()
-                .gap(rem(12.))
-                .child(glyph("arrow_back"))
-                .child(glyph("arrow_forward"))
-                .child(glyph("refresh")),
-        )
-        .child(
-            div()
-                .flex_1()
-                .h(rem(36.))
-                .px(rem(16.))
-                .rounded_full()
-                .bg(color(ColorRole::SURFACE_CONTAINER))
-                .flex()
-                .items_center()
-                .justify_between()
-                .child(
-                    div()
-                        .flex()
-                        .items_center()
-                        .gap(rem(8.))
-                        .child(
-                            filled("lock")
-                                .size(rem(15.))
-                                .color(color(ColorRole::ON_SURFACE_VARIANT)),
-                        )
-                        .child(text(
-                            TypeRole::BodyLarge,
-                            ColorRole::ON_SURFACE,
-                            "www.url.com",
-                        )),
-                )
-                .child(glyph("star")),
-        )
-        .child(
-            div()
-                .size(rem(28.))
-                .rounded_full()
-                .bg(color(ColorRole::OUTLINE))
-                .flex()
-                .items_center()
-                .justify_center()
-                .child(text(TypeRole::TitleSmall, ColorRole::SURFACE, "M")),
-        )
-        .child(glyph("more_vert"))
-}
-
-/// An app bar icon button; `lead` paints the navigation icon's on-surface
-/// ink.
-pub fn bar_button(
-    id: ElementId,
-    name: &'static str,
-    label: &'static str,
-    lead: bool,
-) -> ToolbarButton {
-    let button = ToolbarButton::icon(id, nav_icon(name), label);
-    if lead {
-        button.ink(ColorRole::ON_SURFACE)
-    } else {
-        button
-    }
-}
-
 /// A section's title row: a title-large heading and a standard arrow icon
 /// button, `inset` from the sides.
-pub fn section_header(id: ElementId, title: &'static str, action: &'static str, inset: f32) -> Div {
+pub fn section_header(
+    id: ElementId,
+    title: &'static str,
+    action: &'static str,
+    inset: f32,
+    on_click: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
+) -> Div {
     div()
         .flex_shrink_0()
         .h(rem(48.))
@@ -298,7 +266,28 @@ pub fn section_header(id: ElementId, title: &'static str, action: &'static str, 
         .flex()
         .items_center()
         .child(text(TypeRole::TitleLarge, ColorRole::ON_SURFACE, title))
-        .child(IconButton::new(id, icon("arrow_forward"), action))
+        .child(IconButton::new(id, icon("arrow_forward"), action).on_click(on_click))
+}
+
+/// Makes sample content a control: a press acts, hover and press dim it, and
+/// the keyboard reaches it with a focus ring.
+pub fn pressable(
+    id: ElementId,
+    label: &'static str,
+    content: impl IntoElement,
+    on_click: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
+) -> impl IntoElement {
+    FocusRing::new(
+        ElementId::NamedChild(Arc::new(id.clone()), "ring".into()),
+        gpui_base::Button::new(id)
+            .accessibility_label(label)
+            .size_full()
+            .cursor_pointer()
+            .hover(|style| style.opacity(0.92))
+            .active(|style| style.opacity(0.8))
+            .child(content)
+            .on_click(on_click),
+    )
 }
 
 /// A horizontally scrolling row of `children`, `inset` at the leading edge.
@@ -315,46 +304,65 @@ pub fn scroll_row(id: ElementId, inset: f32, gap: f32) -> Stateful<Div> {
 
 /// A 96dp artwork tile with a label under it: round (an artist) with a
 /// centered label, or rounded-square (an album) with a leading label.
-pub fn tile(round: bool, label: &'static str) -> Div {
-    div()
-        .w(rem(96.))
-        .flex_shrink_0()
-        .flex()
-        .flex_col()
-        .gap(rem(if round { 8. } else { 4. }))
-        .child(
-            art(56.)
-                .size(rem(96.))
-                .when(round, |art| art.rounded_full())
-                .when(!round, |art| art.rounded(rem(16.))),
-        )
-        .child(
-            line(TypeRole::LabelLarge, ColorRole::ON_SURFACE, label)
-                .when(round, |label| label.text_center()),
-        )
+pub fn tile(
+    id: ElementId,
+    round: bool,
+    label: &'static str,
+    on_click: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
+) -> Div {
+    div().w(rem(96.)).flex_shrink_0().child(pressable(
+        id,
+        label,
+        div()
+            .w_full()
+            .flex()
+            .flex_col()
+            .gap(rem(if round { 8. } else { 4. }))
+            .child(
+                art(56.)
+                    .size(rem(96.))
+                    .when(round, |art| art.rounded_full())
+                    .when(!round, |art| art.rounded(rem(16.))),
+            )
+            .child(
+                line(TypeRole::LabelLarge, ColorRole::ON_SURFACE, label)
+                    .when(round, |label| label.text_center()),
+            ),
+        on_click,
+    ))
 }
 
 /// A filled media card: artwork over a title and description.
-pub fn media_card(title: &'static str, description: &'static str) -> CardSurface {
-    CardSurface::new(CardVariant::Filled)
-        .w(rem(132.))
-        .flex_shrink_0()
-        .rounded(rem(12.))
-        .p(rem(8.))
-        .gap(rem(8.))
-        .child(art(56.).w_full().h(rem(119.)).rounded(rem(8.)))
-        .child(
-            div()
-                .flex()
-                .flex_col()
-                .pr(rem(8.))
-                .child(line(TypeRole::TitleSmall, ColorRole::ON_SURFACE, title))
-                .child(line(
-                    TypeRole::BodySmall,
-                    ColorRole::ON_SURFACE_VARIANT,
-                    description,
-                )),
-        )
+pub fn media_card(
+    id: ElementId,
+    title: &'static str,
+    description: &'static str,
+    on_click: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
+) -> impl IntoElement {
+    div().w(rem(132.)).flex_shrink_0().child(pressable(
+        id,
+        title,
+        CardSurface::new(CardVariant::Filled)
+            .interactive()
+            .w_full()
+            .rounded(rem(12.))
+            .p(rem(8.))
+            .gap(rem(8.))
+            .child(art(56.).w_full().h(rem(119.)).rounded(rem(8.)))
+            .child(
+                div()
+                    .flex()
+                    .flex_col()
+                    .pr(rem(8.))
+                    .child(line(TypeRole::TitleSmall, ColorRole::ON_SURFACE, title))
+                    .child(line(
+                        TypeRole::BodySmall,
+                        ColorRole::ON_SURFACE_VARIANT,
+                        description,
+                    )),
+            ),
+        on_click,
+    ))
 }
 
 /// A feature item: 120dp artwork beside a title, a two-line description and
@@ -364,7 +372,9 @@ pub fn feature_item(
     title: &'static str,
     description: &'static str,
     meta: &'static str,
-    play: &'static str,
+    play_symbol: &'static str,
+    play_label: &'static str,
+    on_play: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
 ) -> Div {
     div()
         .w_full()
@@ -415,7 +425,9 @@ pub fn feature_item(
                                     meta,
                                 )),
                         )
-                        .child(IconButton::new(id, filled("play_arrow"), play)),
+                        .child(
+                            IconButton::new(id, filled(play_symbol), play_label).on_click(on_play),
+                        ),
                 ),
         )
 }
@@ -500,6 +512,20 @@ mod tests {
             "menu_open",
             "edit_note",
             "checklist",
+            "send",
+            "check",
+            "home",
+            "library_music",
+            "photo_library",
+            "reviews",
+            "share",
+            "playlist_add",
+            "flag",
+            "person",
+            "logout",
+            "event_available",
+            "grid_view",
+            "chevron_right",
         ] {
             assert!(Symbol::named(name).is_some(), "{name}");
         }
