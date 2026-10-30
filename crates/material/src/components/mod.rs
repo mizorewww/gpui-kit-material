@@ -68,6 +68,7 @@ mod choice;
 mod dialog;
 mod feedback;
 mod focus;
+mod labeled;
 mod list;
 mod loading_indicator;
 mod menu;
@@ -111,6 +112,7 @@ pub use feedback::{
 #[allow(deprecated)]
 pub use feedback::{BadgeKind, badge, outlined_badge};
 pub use focus::{FocusRing, RevealFocus, RingedButton, contain_scroll};
+pub use labeled::{LabelPosition, required_label};
 pub use list::{
     LIST_SEGMENT_GAP, LIST_SEGMENT_INNER_RADIUS, LIST_SEGMENT_RADIUS, ListDensity, ListItem,
     ListLeading, ListLines, ListTrailing, list_subheader, segmented_list,

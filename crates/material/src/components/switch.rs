@@ -20,6 +20,10 @@ use std::rc::Rc;
 pub struct MaterialSwitch {
     id: ElementId,
     label: SharedString,
+    show_label: bool,
+    supporting: Option<SharedString>,
+    label_position: LabelPosition,
+    required: bool,
     checked: bool,
     disabled: bool,
     error: bool,
@@ -57,6 +61,10 @@ impl MaterialSwitch {
         Self {
             id: id.into(),
             label: label.into(),
+            show_label: false,
+            supporting: None,
+            label_position: LabelPosition::Start,
+            required: false,
             checked: false,
             disabled: false,
             error: false,
@@ -72,6 +80,28 @@ impl MaterialSwitch {
     /// [`InteractionPreview`].
     pub fn preview_state(mut self, state: InteractionPreview) -> Self {
         self.preview = Some(state);
+        self
+    }
+    /// Show the label beside the switch, filling the available width.
+    /// Pressing it toggles the switch.
+    pub fn show_label(mut self, show: bool) -> Self {
+        self.show_label = show;
+        self
+    }
+    /// Supporting text under a visible label.
+    pub fn supporting_text(mut self, text: impl Into<SharedString>) -> Self {
+        self.supporting = Some(text.into());
+        self
+    }
+    /// Which side a visible label sits on (default start).
+    pub fn label_position(mut self, position: LabelPosition) -> Self {
+        self.label_position = position;
+        self
+    }
+    /// Mark the choice as required: the label and accessible name gain the
+    /// required mark. Enforcing it belongs to the form that owns the value.
+    pub fn required(mut self, required: bool) -> Self {
+        self.required = required;
         self
     }
     pub fn checked(mut self, checked: bool) -> Self {
@@ -306,7 +336,7 @@ impl RenderOnce for MaterialSwitch {
         let release_out = press_state.clone();
         let switch = gpui_base::Switch::new(self.id)
             .track_focus(&focus)
-            .accessibility_label(self.label)
+            .accessibility_label(label)
             .checked(self.checked)
             .disabled(disabled)
             .tab_stop(preview.is_none())

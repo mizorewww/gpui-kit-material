@@ -134,6 +134,9 @@ pub struct MaterialCheckbox {
     id: ElementId,
     label: SharedString,
     state: CheckboxState,
+    show_label: bool,
+    label_position: LabelPosition,
+    required: bool,
     error: bool,
     disabled: bool,
     preview: Option<InteractionPreview>,
@@ -149,6 +152,9 @@ impl MaterialCheckbox {
             id: id.into(),
             label: label.into(),
             state: CheckboxState::Unchecked,
+            show_label: false,
+            label_position: LabelPosition::End,
+            required: false,
             error: false,
             disabled: false,
             preview: None,
@@ -167,6 +173,22 @@ impl MaterialCheckbox {
         } else {
             CheckboxState::Unchecked
         })
+    }
+    /// Show the label beside the checkbox. Pressing it activates the checkbox.
+    pub fn show_label(mut self, show: bool) -> Self {
+        self.show_label = show;
+        self
+    }
+    /// Which side a visible label sits on (default end).
+    pub fn label_position(mut self, position: LabelPosition) -> Self {
+        self.label_position = position;
+        self
+    }
+    /// Mark the choice as required: the label and accessible name gain the
+    /// required mark. Enforcing it belongs to the form that owns the value.
+    pub fn required(mut self, required: bool) -> Self {
+        self.required = required;
+        self
     }
     /// Paint the error colors, e.g. for a required choice left unchecked.
     pub fn error(mut self, error: bool) -> Self {
@@ -366,9 +388,36 @@ impl RenderOnce for MaterialCheckbox {
         let ringed = ButtonFocusRing::new(layer, focus.clone(), enabled, rem(STATE_LAYER / 2.))
             .forced(forced(InteractionPreview::Focused));
         let on_change = self.on_change;
-        gpui_base::Checkbox::new(self.id)
+        let label = required_label(&self.label, self.required);
+        let visible_label = self.show_label.then(|| {
+            let next = if self.state == CheckboxState::Checked {
+                CheckboxState::Unchecked
+            } else {
+                CheckboxState::Checked
+            };
+            let activate = on_change.clone().filter(|_| live).map(|on_change| {
+                Rc::new(move |window: &mut Window, cx: &mut App| on_change(&next, window, cx))
+                    as Rc<dyn Fn(&mut Window, &mut App)>
+            });
+            ControlLabel {
+                id: self.id.clone(),
+                label: label.clone(),
+                supporting: None,
+                position: self.label_position,
+                error: self.error,
+                disabled,
+                fill: false,
+                gap: if self.label_position == LabelPosition::Start {
+                    16.
+                } else {
+                    0.
+                },
+                activate,
+            }
+        });
+        let checkbox = gpui_base::Checkbox::new(self.id)
             .track_focus(&focus)
-            .accessibility_label(self.label)
+            .accessibility_label(label)
             .state(self.state)
             .disabled(disabled)
             .tab_stop(self.tab_stop && preview.is_none())
@@ -382,7 +431,11 @@ impl RenderOnce for MaterialCheckbox {
             .justify_center()
             .size(rem(TARGET))
             .when(live, |checkbox| checkbox.cursor_pointer())
-            .child(ringed)
+            .child(ringed);
+        match visible_label {
+            Some(label) => label.row(checkbox).into_any_element(),
+            None => checkbox.into_any_element(),
+        }
     }
 }
 
@@ -498,6 +551,64 @@ mod tests {
                 h.changes,
                 [CheckboxState::Checked, CheckboxState::Unchecked]
             )
+        });
+    }
+
+    struct LabeledHarness {
+        position: LabelPosition,
+        disabled: bool,
+        changes: Vec<CheckboxState>,
+    }
+    impl Render for LabeledHarness {
+        fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+            window.set_rem_size(px(14.));
+            div().flex().w(px(400.)).child(
+                MaterialCheckbox::new("box", "Accept")
+                    .show_label(true)
+                    .label_position(self.position)
+                    .required(true)
+                    .disabled(self.disabled)
+                    .on_change(cx.listener(|this, next: &CheckboxState, _, cx| {
+                        this.changes.push(*next);
+                        cx.notify();
+                    })),
+            )
+        }
+    }
+
+    #[gpui::test]
+    fn a_visible_label_activates_and_follows_its_position(cx: &mut TestAppContext) {
+        cx.update(|cx| {
+            gpui_base::init(cx);
+            cx.set_reduce_motion(true);
+        });
+        let (view, cx) = cx.add_window_view(|_, _| LabeledHarness {
+            position: LabelPosition::End,
+            disabled: false,
+            changes: Vec::new(),
+        });
+        draw(cx);
+        let control = cx.debug_bounds("checkbox-container").unwrap();
+        let text = cx.debug_bounds("control-label").unwrap();
+        assert!(text.left() > control.right(), "the label follows at end");
+        cx.simulate_click(text.center(), Modifiers::default());
+        draw(cx);
+        view.read_with(cx, |h, _| {
+            assert_eq!(h.changes, [CheckboxState::Checked]);
+        });
+        view.update(cx, |view, cx| {
+            view.position = LabelPosition::Start;
+            view.disabled = true;
+            cx.notify();
+        });
+        draw(cx);
+        let control = cx.debug_bounds("checkbox-container").unwrap();
+        let text = cx.debug_bounds("control-label").unwrap();
+        assert!(text.right() < control.left(), "the label leads at start");
+        cx.simulate_click(text.center(), Modifiers::default());
+        draw(cx);
+        view.read_with(cx, |h, _| {
+            assert_eq!(h.changes.len(), 1, "a disabled label does not activate");
         });
     }
 
