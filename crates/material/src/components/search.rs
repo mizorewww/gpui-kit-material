@@ -137,7 +137,10 @@ impl RenderOnce for SearchField {
         let container = color(SEARCH_CONTAINER);
         let preview = self.preview;
         let layer = preview.map_or(0., InteractionPreview::layer_opacity);
-        let group: SharedString = format!("search-bar-{:?}", self.id).into();
+        // Group hover resolves to the nearest painting ancestor of this name,
+        // so a static name stays scoped to this bar without formatting one
+        // per frame.
+        let group = SharedString::new_static("material-search-bar");
         let focus = match &self.input {
             BarInput::Live(state) => Some(state.read(cx).focus_handle(cx)),
             BarInput::Static(..) => None,

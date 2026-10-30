@@ -44,7 +44,7 @@ fn item_and_menu_heights_follow_the_kit() {
     assert_eq!(item_height(MenuStyle::Baseline, d, false, true), 56. + 17.);
     // The kit's baseline menu: 12 items of 56 inside 8dp padding.
     let baseline = vec![(false, vec![(false, false); 12])];
-    assert_eq!(menu_height(MenuStyle::Baseline, d, &baseline), 688.);
+    assert_eq!(menu_height(MenuStyle::Baseline, d, baseline), 688.);
     // Three Expressive groups of four, the first labelled: 2dp gaps.
     let groups = vec![
         (true, vec![(false, false); 4]),
@@ -52,8 +52,25 @@ fn item_and_menu_heights_follow_the_kit() {
         (false, vec![(false, false); 4]),
     ];
     assert_eq!(
-        menu_height(MenuStyle::Vibrant, d, &groups),
+        menu_height(MenuStyle::Vibrant, d, groups),
         3. * (4. + 4. * 48.) + 32. + 2. * 2.
+    );
+}
+
+#[test]
+fn a_menu_measures_its_groups_without_collecting_them() {
+    let menu = MaterialMenu::new("menu")
+        .style(MenuStyle::Vibrant)
+        .group(
+            MenuGroup::new()
+                .label("Group")
+                .items((0..4).map(|_| MaterialMenuItem::new("Item"))),
+        )
+        .group(MenuGroup::new().items((0..4).map(|_| MaterialMenuItem::new("Item"))));
+    assert_eq!(
+        menu.natural_height(),
+        2. * (4. + 4. * 48.) + 32. + 2.,
+        "two groups, the first labelled, 2dp apart"
     );
 }
 

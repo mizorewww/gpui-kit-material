@@ -475,7 +475,10 @@ impl RenderOnce for TextField {
             },
         );
         let live_hover = preview.is_none() && !disabled && !focused;
-        let group: SharedString = format!("text-field-{id:?}").into();
+        // Group hover resolves to the nearest painting ancestor of this name,
+        // so a static name stays scoped to this field without formatting one
+        // per frame.
+        let group = SharedString::new_static("material-text-field");
 
         let mut container = div()
             .id(id.clone())

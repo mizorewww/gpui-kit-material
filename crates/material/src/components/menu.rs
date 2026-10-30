@@ -349,34 +349,34 @@ pub(crate) fn item_height(
     }
 }
 
-/// A whole menu's height in design px.
-pub(crate) fn menu_height(
-    style: MenuStyle,
-    density: MenuDensity,
-    groups: &[(bool, Vec<(bool, bool)>)],
-) -> f32 {
-    let items = |items: &Vec<(bool, bool)>| -> f32 {
-        items
-            .iter()
-            .map(|&(supporting, divider)| item_height(style, density, supporting, divider))
-            .sum()
-    };
-    if style.expressive() {
-        let groups_px: f32 = groups
-            .iter()
-            .map(|(label, list)| {
-                2. * EXPRESSIVE_INSET_Y + if *label { GROUP_LABEL } else { 0. } + items(list)
-            })
+/// A whole menu's height in design px: one `(labelled, items)` entry per
+/// group, one `(supporting, divider)` entry per item.
+pub(crate) fn menu_height<G, I>(style: MenuStyle, density: MenuDensity, groups: G) -> f32
+where
+    G: IntoIterator<Item = (bool, I)>,
+    I: IntoIterator<Item = (bool, bool)>,
+{
+    let expressive = style.expressive();
+    let mut count = 0usize;
+    let mut total = 0.;
+    for (label, items) in groups {
+        count += 1;
+        let items: f32 = items
+            .into_iter()
+            .map(|(supporting, divider)| item_height(style, density, supporting, divider))
             .sum();
-        groups_px + GROUP_GAP * groups.len().saturating_sub(1) as f32
+        let inset = if expressive {
+            2. * EXPRESSIVE_INSET_Y
+        } else {
+            0.
+        };
+        total += inset + if label { GROUP_LABEL } else { 0. } + items;
+    }
+    let between = count.saturating_sub(1) as f32;
+    if expressive {
+        total + GROUP_GAP * between
     } else {
-        let dividers = BASELINE_DIVIDER * groups.len().saturating_sub(1) as f32;
-        2. * BASELINE_PADDING
-            + groups
-                .iter()
-                .map(|(label, list)| if *label { GROUP_LABEL } else { 0. } + items(list))
-                .sum::<f32>()
-            + dividers
+        2. * BASELINE_PADDING + total + BASELINE_DIVIDER * between
     }
 }
 
@@ -468,29 +468,21 @@ impl MaterialMenu {
         self
     }
 
-    fn shape(&self) -> (f32, String) {
-        let groups: Vec<(bool, Vec<(bool, bool)>)> = self
-            .groups
-            .iter()
-            .map(|g| {
-                (
-                    g.label.is_some(),
-                    g.items
-                        .iter()
-                        .map(|i| (i.supporting.is_some(), i.divider))
-                        .collect(),
-                )
-            })
-            .collect();
-        (
-            menu_height(self.style, self.density, &groups),
-            String::new(),
-        )
-    }
-
     /// The menu's natural height in design px.
     pub fn natural_height(&self) -> f32 {
-        self.shape().0
+        menu_height(
+            self.style,
+            self.density,
+            self.groups.iter().map(|group| {
+                (
+                    group.label.is_some(),
+                    group
+                        .items
+                        .iter()
+                        .map(|item| (item.supporting.is_some(), item.divider)),
+                )
+            }),
+        )
     }
 }
 
@@ -577,10 +569,9 @@ impl RenderOnce for MaterialMenu {
             let mut items = Vec::with_capacity(group.items.len());
             for item in group.items {
                 items.push(render_item(
-                    ElementId::NamedChild(
-                        self.id.clone().into(),
-                        SharedString::from(format!("item-{index}")),
-                    ),
+                    // Scoped by the menu container's own id below, so a
+                    // static name is unique without formatting per frame.
+                    ("material-menu-item", index),
                     item,
                     style,
                     density,
