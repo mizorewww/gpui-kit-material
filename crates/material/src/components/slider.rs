@@ -568,7 +568,7 @@ impl RenderOnce for MaterialSlider {
         };
         let steps = (self.stops && step > 0. && max > min)
             .then(|| ((max - min) / step).round() as usize)
-            .filter(|&n| n >= 1 && n <= 200);
+            .filter(|n| (1..=200).contains(n));
 
         let metrics = self.size.metrics();
         let target_width = if pressed {
