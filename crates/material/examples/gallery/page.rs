@@ -214,6 +214,12 @@ pub trait GalleryPage: Sized + 'static {
     /// not: keep playback clocks and keyed animations alive offscreen.
     /// Never notify from here.
     fn prepare(&mut self, _window: &mut Window, _cx: &mut Context<Self>) {}
+    /// Whether [`Self::prepare`] does anything. Running it updates the page
+    /// entity, which marks what read the page as changed, so a page without
+    /// one must not pay for that on every Gallery render.
+    const PREPARES: bool = false;
+    /// Whether [`Self::after_layout`] does anything, for the same reason.
+    const OBSERVES_LAYOUT: bool = false;
     /// Runs after the list's prepaint with which body rows are on screen,
     /// to forward controlled changes to playbacks of unmounted rows.
     fn after_layout(&mut self, _visible: &dyn Fn(usize) -> bool, _cx: &mut Context<Self>) {}
@@ -228,6 +234,7 @@ pub(super) trait AnyPage {
     fn render_row(&self, row: usize, window: &mut Window, cx: &mut App) -> AnyElement;
     fn prepare(&self, window: &mut Window, cx: &mut App);
     fn after_layout(&self, visible: &dyn Fn(usize) -> bool, cx: &mut App);
+    fn observes_layout(&self) -> bool;
     fn apply_capture(&self, state: CaptureState, cx: &mut App);
     /// Re-render the Gallery when page `index` (in `PAGES`) changes while shown.
     fn observe(&self, index: usize, cx: &mut Context<super::Gallery>) -> Subscription;
@@ -249,7 +256,12 @@ impl<P: GalleryPage> AnyPage for Entity<P> {
         self.update(cx, |page, cx| page.render_row(row, window, cx))
     }
     fn prepare(&self, window: &mut Window, cx: &mut App) {
-        self.update(cx, |page, cx| page.prepare(window, cx))
+        if P::PREPARES {
+            self.update(cx, |page, cx| page.prepare(window, cx))
+        }
+    }
+    fn observes_layout(&self) -> bool {
+        P::OBSERVES_LAYOUT
     }
     fn after_layout(&self, visible: &dyn Fn(usize) -> bool, cx: &mut App) {
         self.update(cx, |page, cx| page.after_layout(visible, cx))
@@ -260,6 +272,7 @@ impl<P: GalleryPage> AnyPage for Entity<P> {
     fn observe(&self, index: usize, cx: &mut Context<super::Gallery>) -> Subscription {
         cx.observe(self, move |gallery, _, cx| {
             if gallery.shows_page(index) {
+                gallery.counted.set(None);
                 cx.notify()
             }
         })
@@ -273,11 +286,11 @@ impl<P: GalleryPage> AnyPage for Entity<P> {
 /// One registry entry: a page's static info and its constructor.
 pub struct PageEntry {
     pub info: &'static PageInfo,
-    pub(super) build: fn(PageCx, &mut Window, &mut App) -> Box<dyn AnyPage>,
+    pub(super) build: fn(PageCx, &mut Window, &mut App) -> Rc<dyn AnyPage>,
 }
 
-fn build<P: GalleryPage>(page: PageCx, window: &mut Window, cx: &mut App) -> Box<dyn AnyPage> {
-    Box::new(cx.new(|cx| P::new(page, window, cx)))
+fn build<P: GalleryPage>(page: PageCx, window: &mut Window, cx: &mut App) -> Rc<dyn AnyPage> {
+    Rc::new(cx.new(|cx| P::new(page, window, cx)))
 }
 
 /// The registry entry of page `P`.

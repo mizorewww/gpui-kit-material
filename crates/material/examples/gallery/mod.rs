@@ -117,7 +117,7 @@ pub(crate) enum Row {
 
 /// A built design-kit page.
 struct BuiltPage {
-    page: Box<dyn AnyPage>,
+    page: Rc<dyn AnyPage>,
     rows: PageRows,
     _observer: Subscription,
 }
@@ -147,6 +147,14 @@ struct EntryState {
     slice: Option<Rc<[usize]>>,
 }
 
+/// What a page's row count may depend on, besides the page itself.
+#[derive(Clone, Copy, PartialEq)]
+struct Counted {
+    entry: usize,
+    viewport: Size<Pixels>,
+    rem: Pixels,
+}
+
 /// Which rows the content list holds: rebuilt only when this changes.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct Layout {
@@ -170,6 +178,9 @@ pub(crate) struct Gallery {
     lead_scroll: ScrollHandle,
     rows: Vec<Row>,
     layout: Option<Layout>,
+    /// What the last check of the shown page's row count saw: see
+    /// [`Self::layout_stale`]. Interior, as the check runs while drawing.
+    counted: Cell<Option<Counted>>,
     row_focus: Vec<FocusHandle>,
     navigation_focus: FocusHandle,
     navigation_scroll: ScrollHandle,
@@ -187,9 +198,14 @@ pub(crate) struct Gallery {
     /// The lead row (header and the preview and configuration cards) as a
     /// view: see [`shell::LeadView`].
     lead: Entity<shell::LeadView>,
+    /// The content list as a view: see [`shell::ContentView`].
+    content: Entity<shell::ContentView>,
     _subscriptions: Vec<Subscription>,
     #[cfg(test)]
     renders: std::cell::Cell<usize>,
+    /// How many times the shown page's row count was checked.
+    #[cfg(test)]
+    recounts: std::cell::Cell<usize>,
 }
 
 impl Gallery {
@@ -211,9 +227,11 @@ impl Gallery {
             ];
         let applied_theme = theme_key(shared.read(cx));
         let gallery = cx.entity();
+        let content = cx.new(|cx| shell::ContentView::new(gallery.clone(), cx));
         let lead = cx.new(|cx| shell::LeadView::new(gallery, cx));
         Gallery {
             lead,
+            content,
             shared,
             applied_theme,
             pages: (0..pages::PAGES.len()).map(|_| None).collect(),
@@ -226,6 +244,7 @@ impl Gallery {
             lead_scroll: ScrollHandle::new(),
             rows: Vec::new(),
             layout: None,
+            counted: Cell::new(None),
             row_focus: Vec::new(),
             navigation_focus: cx.focus_handle(),
             navigation_scroll: ScrollHandle::new(),
@@ -240,6 +259,8 @@ impl Gallery {
             _subscriptions: subscriptions,
             #[cfg(test)]
             renders: Default::default(),
+            #[cfg(test)]
+            recounts: Default::default(),
         }
     }
 
@@ -407,6 +428,80 @@ impl Gallery {
         }
     }
 
+    /// Whether [`Self::sync_layout`] has anything to do. This only reads, so that
+    /// a frame with nothing to do does not write the Gallery while drawing.
+    ///
+    /// The page itself is read only if its row count can have changed: since it
+    /// was last counted the page notified, or the window or text scale changed.
+    /// Rows write their page as they are built, so reading it on every frame
+    /// would make each scroll that mounts a row look like a change to the view
+    /// holding the list, which renders all its visible rows for that.
+    fn layout_stale(&self, window: &Window, cx: &App) -> bool {
+        let entry = self.current;
+        let counted = Counted {
+            entry,
+            viewport: window.viewport_size(),
+            rem: window.rem_size(),
+        };
+        if self.counted.get() == Some(counted)
+            && self.layout.is_some_and(|layout| {
+                layout.entry == entry && layout.tab == self.entries[entry].tab
+            })
+        {
+            return false;
+        }
+        self.counted.set(Some(counted));
+        #[cfg(test)]
+        self.recounts.set(self.recounts.get() + 1);
+        let info = &catalog::CATALOG[entry];
+        let state = &self.entries[entry];
+        if self
+            .current_page()
+            .is_some_and(|index| self.pages[index].is_none())
+            || (matches!(
+                info.kind,
+                catalog::Kind::Component {
+                    playground: Some(_)
+                }
+            ) && state.playground.is_none())
+        {
+            return true;
+        }
+        let with_specs = match info.kind {
+            catalog::Kind::Overview => false,
+            catalog::Kind::Document => true,
+            catalog::Kind::Component { .. } => state.tab == Tab::Specs,
+        };
+        let spec_rows = match info.spec {
+            None => 0,
+            Some(spec) if spec.rows.is_some() => match &state.slice {
+                Some(slice) => slice.len(),
+                None => return true,
+            },
+            Some(_) => {
+                let count = self.current_page().map_or(0, |index| {
+                    self.pages[index]
+                        .as_ref()
+                        .map_or(0, |built| built.page.row_count(window, cx))
+                });
+                if state
+                    .slice
+                    .as_ref()
+                    .is_none_or(|slice| slice.len() != count)
+                {
+                    return true;
+                }
+                count
+            }
+        };
+        self.layout
+            != Some(Layout {
+                entry,
+                tab: state.tab,
+                spec_rows: if with_specs { spec_rows } else { 0 },
+            })
+    }
+
     /// Rebuild the content list when the page, tab or row count changed.
     fn sync_layout(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let entry = self.current;
@@ -563,17 +658,6 @@ impl Render for Gallery {
             (shared.motion_scheme, shared.snackbar)
         };
         gpui_kit_material::motion::set_motion_scheme(motion_scheme);
-        self.sync_layout(window, cx);
-        // The shown page keeps playbacks and keyed animations alive even
-        // while none of its rows is mounted.
-        if let Some(built) = self
-            .current_page()
-            .and_then(|index| self.pages[index].as_ref())
-        {
-            #[cfg(all(not(target_family = "wasm"), feature = "instruction-bench"))]
-            instr_bench::note(instr_bench::Count::Prepare);
-            built.page.prepare(window, cx);
-        }
         if self.last_rem != window.rem_size() {
             self.last_rem = window.rem_size();
             self.list.remeasure();
@@ -595,60 +679,6 @@ impl Render for Gallery {
         self.drawer_open &= compact;
         let navigation = (!compact).then(|| self.render_navigation(cx));
         let drawer = compact.then(|| self.render_drawer(window, cx));
-        let view = cx.weak_entity();
-        let sync_view = view.clone();
-        // Reused across frames: the builder records this frame's rows.
-        self.rendered_rows.borrow_mut().clear();
-        let rendered_rows = self.rendered_rows.clone();
-        let list_rows = rendered_rows.clone();
-        let lead_only = self.shows_lead_only();
-        let lead_row = lead_only.then(|| self.render_row(0, window, cx));
-        let content = div()
-            .id("gallery-content")
-            .flex_1()
-            .min_w_0()
-            .min_h_0()
-            .h_full()
-            .bg(spec::page_background())
-            .text_color(color(ColorRole::ON_SURFACE))
-            .font_family("Roboto")
-            .when_some(lead_row, |content, row| {
-                content.child(
-                    div()
-                        .id("gallery-lead-scroll")
-                        .size_full()
-                        .overflow_y_scroll()
-                        .track_scroll(&self.lead_scroll)
-                        .child(row),
-                )
-            })
-            .when(!lead_only, |content| {
-                content.child(
-                    gpui::list(self.list.clone(), move |index, window, cx| {
-                        #[cfg(all(not(target_family = "wasm"), feature = "instruction-bench"))]
-                        instr_bench::note(instr_bench::Count::Row);
-                        list_rows.borrow_mut().push(index);
-                        view.update(cx, |this, cx| this.render_row(index, window, cx))
-                            .unwrap_or_else(|_| div().into_any_element())
-                    })
-                    .size_full(),
-                )
-            })
-            .child(
-                gpui::canvas(
-                    move |_, _, cx| {
-                        #[cfg(all(not(target_family = "wasm"), feature = "instruction-bench"))]
-                        instr_bench::note(instr_bench::Count::AfterLayout);
-                        let _ = sync_view.update(cx, |this, cx| {
-                            this.after_layout(&rendered_rows.borrow(), cx);
-                        });
-                    },
-                    |_, _, _, _| {},
-                )
-                .absolute()
-                .w(px(0.))
-                .h(px(0.)),
-            );
         gpui_base::v_flex()
             .id("gallery")
             .on_action(cx.listener(|this, _: &gpui_base::RootTab, window, cx| {
@@ -671,7 +701,7 @@ impl Render for Gallery {
                     .min_w_0()
                     .flex_row()
                     .children(navigation)
-                    .child(content),
+                    .child(self.content.clone()),
             )
             .children(drawer)
             .when(snackbar, |root| {
@@ -1013,6 +1043,124 @@ mod window_tests {
         draw(window.into(), cx);
         let after = counts(cx);
         assert!(after.0 > settled.0 && after.1 > settled.1);
+    }
+
+    /// A wheel event notifies the view holding what it scrolls. That must be the
+    /// content view: the Gallery holds the navigation, whose rebuild on each frame
+    /// of a scroll would cost more than the scroll does.
+    #[gpui::test]
+    fn scrolling_the_content_renders_neither_the_gallery_nor_the_navigation(
+        cx: &mut TestAppContext,
+    ) {
+        cx.update(|cx| {
+            gpui_kit::init(cx);
+            gpui_kit_material::init(cx);
+        });
+        let mut parts = None;
+        let window = cx.open_window(size(px(1280.), px(800.)), |window, cx| {
+            let gallery = cx.new(|cx| Gallery::new(window, cx));
+            let top_bar = cx.new(|cx| top_bar::TopBar::new(gallery.clone(), window, cx));
+            parts = Some(gallery.clone());
+            GalleryWindow {
+                gallery,
+                top_bar,
+                fps: None,
+                caption: None,
+            }
+        });
+        let gallery = parts.unwrap();
+        // Rows that build through their page, and a page without a list.
+        for (id, tab) in [
+            ("divider", super::Tab::Specs),
+            ("button", super::Tab::Preview),
+        ] {
+            let entry = super::catalog::position(id).unwrap();
+            cx.update(|cx| {
+                gallery.update(cx, |gallery, cx| {
+                    gallery.navigate(entry, cx);
+                    gallery.set_tab(tab, cx);
+                })
+            });
+            for _ in 0..6 {
+                draw(window.into(), cx);
+            }
+            let rendered = cx.read(|cx| gallery.read(cx).renders.get());
+            let mut visual = gpui::VisualTestContext::from_window(window.into(), cx);
+            for _ in 0..4 {
+                visual.simulate_event(gpui::ScrollEvent {
+                    position: gpui::point(px(800.), px(500.)),
+                    delta: gpui::ScrollDelta::Pixels(gpui::point(px(0.), px(-8.))),
+                    ..Default::default()
+                });
+                visual.update(|window, cx| window.draw(cx).clear(cx));
+                visual.run_until_parked();
+            }
+            assert_eq!(
+                cx.read(|cx| gallery.read(cx).renders.get()),
+                rendered,
+                "scrolling {id} rendered the Gallery"
+            );
+        }
+    }
+
+    /// A page's row count can depend on its state. It is not read on every frame,
+    /// so a page's notification has to reach the list.
+    #[gpui::test]
+    fn a_page_notification_recounts_its_rows(cx: &mut TestAppContext) {
+        cx.update(|cx| {
+            gpui_kit::init(cx);
+            gpui_kit_material::init(cx);
+        });
+        let mut parts = None;
+        let window = cx.open_window(size(px(1280.), px(800.)), |window, cx| {
+            let gallery = cx.new(|cx| Gallery::new(window, cx));
+            let top_bar = cx.new(|cx| top_bar::TopBar::new(gallery.clone(), window, cx));
+            parts = Some(gallery.clone());
+            GalleryWindow {
+                gallery,
+                top_bar,
+                fps: None,
+                caption: None,
+            }
+        });
+        let gallery = parts.unwrap();
+        let entry = super::catalog::position("divider").unwrap();
+        cx.update(|cx| {
+            gallery.update(cx, |gallery, cx| {
+                gallery.navigate(entry, cx);
+                gallery.set_tab(super::Tab::Specs, cx);
+            })
+        });
+        for _ in 0..4 {
+            draw(window.into(), cx);
+        }
+        let settled = cx.read(|cx| gallery.read(cx).recounts.get());
+        let mut visual = gpui::VisualTestContext::from_window(window.into(), cx);
+        for _ in 0..3 {
+            visual.simulate_event(gpui::ScrollEvent {
+                position: gpui::point(px(800.), px(500.)),
+                delta: gpui::ScrollDelta::Pixels(gpui::point(px(0.), px(-8.))),
+                ..Default::default()
+            });
+            visual.update(|window, cx| window.draw(cx).clear(cx));
+            visual.run_until_parked();
+        }
+        assert_eq!(
+            cx.read(|cx| gallery.read(cx).recounts.get()),
+            settled,
+            "a scroll changes nothing a row count depends on"
+        );
+        let page = cx.read(|cx| {
+            let gallery = gallery.read(cx);
+            let index = gallery.current_page().unwrap();
+            gallery.pages[index].as_ref().unwrap().page.any_entity()
+        });
+        cx.update(|cx| cx.notify(page.entity_id()));
+        draw(window.into(), cx);
+        assert!(
+            cx.read(|cx| gallery.read(cx).recounts.get()) > settled,
+            "the next frame counts the page's rows again"
+        );
     }
 
     #[gpui::test]
