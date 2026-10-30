@@ -190,7 +190,7 @@ impl LineLayout {
         (left, right)
     }
 
-    pub(crate) fn compute_wrap_boundaries(
+    fn compute_wrap_boundaries(
         &self,
         text: &str,
         wrap_width: Pixels,
@@ -206,10 +206,6 @@ impl LineLayout {
         };
         let mut last_boundary_x = px(0.);
         let mut prev_ch = '\0';
-        let mut prev_prev_ch = '\0';
-        // The previous glyph, for a forced break that takes it down with the
-        // punctuation that may not start a line.
-        let mut prev_glyph: Option<(WrapBoundary, Pixels)> = None;
         let mut glyphs = self
             .runs
             .iter()
@@ -217,23 +213,16 @@ impl LineLayout {
             .flat_map(move |(run_ix, run)| {
                 run.glyphs.iter().enumerate().map(move |(glyph_ix, glyph)| {
                     let character = text[glyph.index..].chars().next().unwrap();
-                    // A word joiner shapes to no glyph of its own, so look at
-                    // the text just before this glyph, not at the last glyph.
-                    let joined = text[..glyph.index]
-                        .chars()
-                        .next_back()
-                        .is_some_and(crate::text_system::line_break::is_glue);
                     (
                         WrapBoundary { run_ix, glyph_ix },
                         character,
-                        joined,
                         glyph.position.x,
                     )
                 })
             })
             .peekable();
 
-        while let Some((boundary, ch, joined, x)) = glyphs.next() {
+        while let Some((boundary, ch, x)) = glyphs.next() {
             if ch == '\n' {
                 continue;
             }
@@ -246,11 +235,7 @@ impl LineLayout {
                     last_candidate_x = x;
                 }
             } else {
-                if ch != ' '
-                    && first_non_whitespace_ix.is_some()
-                    && !joined
-                    && crate::text_system::line_break::allows_break_between(prev_ch, ch)
-                {
+                if ch != ' ' && first_non_whitespace_ix.is_some() {
                     last_candidate_ix = Some(boundary);
                     last_candidate_x = x;
                 }
@@ -260,18 +245,8 @@ impl LineLayout {
                 first_non_whitespace_ix = Some(boundary);
             }
 
-            let next_x = glyphs.peek().map_or(self.width, |(_, _, _, x)| *x);
+            let next_x = glyphs.peek().map_or(self.width, |(_, _, x)| *x);
             let width = next_x - last_boundary_x;
-            let carry = prev_glyph.filter(|(previous, _)| {
-                *previous > last_boundary
-                    && !joined
-                    && crate::text_system::line_break::forced_break_carries_previous(
-                        prev_prev_ch,
-                        prev_ch,
-                        ch,
-                    )
-            });
-            prev_glyph = Some((boundary, x));
 
             if width > wrap_width && boundary > last_boundary {
                 // When used line_clamp, we should limit the number of lines.
@@ -284,16 +259,12 @@ impl LineLayout {
                 if let Some(last_candidate_ix) = last_candidate_ix.take() {
                     last_boundary = last_candidate_ix;
                     last_boundary_x = last_candidate_x;
-                } else if let Some((previous, previous_x)) = carry {
-                    last_boundary = previous;
-                    last_boundary_x = previous_x;
                 } else {
                     last_boundary = boundary;
                     last_boundary_x = x;
                 }
                 boundaries.push(last_boundary);
             }
-            prev_prev_ch = prev_ch;
             prev_ch = ch;
         }
 

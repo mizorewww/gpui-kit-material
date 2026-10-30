@@ -353,8 +353,8 @@
       },
       "src/text_system/line_layout.rs": {
         "upstream_sha256": "757c2672c0831f9f848845c6ac74dece3c6e0401613b1e00325129cbf1548c08",
-        "local_sha256": "ee912eee802d43af20489e6c83c3d081c9ac0e21ee5f9ac51257db92478a750d",
-        "reason": "Separate detailed-layout frame cache with index, reuse and truncation; fields pub(crate) for Fast's text-cache carry-over (line-layout-options-patch.md). No break beside no-break spaces and word joiners; a forced break carries the previous character down with punctuation (vendor/gpui-pre/cjk-line-break-patch.md)."
+        "local_sha256": "a6dacb5437ee9e3cc63c0e3f62d38ecb57c3d9b42971862749b501a2d91d0c39",
+        "reason": "Separate detailed-layout frame cache with index, reuse and truncation; fields pub(crate) for Fast's text-cache carry-over (line-layout-options-patch.md)."
       },
       "src/window.rs": {
         "upstream_sha256": "d3f00c28cc47446f6c73be67d00830446e0e3a9a7fadefdf54fff9e5ccadee0b",
@@ -365,16 +365,6 @@
         "upstream_sha256": "0c14aec0196ad632601015e166dfcd3df72228292646120bbc3857c3631cd680",
         "local_sha256": "62a51ab7de3043ee2f4ffe5f8d9eddf8019021a64c4d633b99bde3cf693f9a10",
         "reason": "Material performance patch: TabStopMap records only its insertion history while painting and builds the tab order and focus lookup lazily on the first query (Tab navigation, a11y dump); query results unchanged. Replaying a reused view's or composited layer's tab stops no longer updates a SumTree per insertion."
-      },
-      "src/fast/line_break.rs": {
-        "upstream_sha256": "09da7204a25f0ad3276a5fcf82ebb48f35de4170e613f90411e272ee02debc7c",
-        "local_sha256": "007236eab7ff56a47705f281e507b2d598161bbe6ff411976d582affd7dff7cb",
-        "reason": "No break beside no-break spaces and word joiners; a forced break carries the previous character down with punctuation (vendor/gpui-pre/cjk-line-break-patch.md)."
-      },
-      "src/text_system/line_wrapper.rs": {
-        "upstream_sha256": "4c0ce82fba13490ec6494245971a6a4a322fc55ca2944c60e708fdbcd5dcee8e",
-        "local_sha256": "edb69b85f10b9137082fa47ba8107a18bb4b8ae3e0b2fcda182c00a93b102bf7",
-        "reason": "No break beside no-break spaces and word joiners; a forced break carries the previous character down with punctuation (vendor/gpui-pre/cjk-line-break-patch.md)."
       }
     },
     "added": {
@@ -421,6 +411,6 @@
         "reason": "Package-level lockfile not retained; the workspace Cargo.lock owns resolution."
       }
     },
-    "unchanged_file_count": 141
+    "unchanged_file_count": 143
   }
 }

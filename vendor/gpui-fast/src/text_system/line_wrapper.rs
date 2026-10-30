@@ -64,10 +64,6 @@ impl LineWrapper {
         let mut last_wrap_ix = 0;
         let mut prev_c = '\0';
         let mut fast_prev_char = '\0';
-        let mut fast_prev_prev_char = '\0';
-        // Start and width of the previous character, for a forced break that
-        // takes it down with the punctuation that may not start a line.
-        let mut fast_prev_start: Option<(usize, Pixels)> = None;
         let mut index = 0;
         let mut candidates = fragments
             .iter()
@@ -78,7 +74,6 @@ impl LineWrapper {
                 let ix = index;
                 index += candidate.len_utf8();
                 let mut new_prev_c = prev_c;
-                let mut forced_carry = None;
                 let item_width = match candidate {
                     WrapBoundaryCandidate::Char { character: c } => {
                         if c == '\n' {
@@ -106,14 +101,6 @@ impl LineWrapper {
                         }
 
                         new_prev_c = c;
-                        if crate::fast::line_break::forced_break_carries_previous(
-                            fast_prev_prev_char,
-                            fast_prev_char,
-                            c,
-                        ) {
-                            forced_carry = fast_prev_start;
-                        }
-                        fast_prev_prev_char = fast_prev_char;
                         fast_prev_char = c;
 
                         self.width_for_char(c)
@@ -134,26 +121,18 @@ impl LineWrapper {
                         // An element is no punctuation: the text after it
                         // may break as if it started the line.
                         fast_prev_char = '\0';
-                        fast_prev_prev_char = '\0';
 
                         element_width
                     }
                 };
 
                 width += item_width;
-                fast_prev_start = matches!(candidate, WrapBoundaryCandidate::Char { .. })
-                    .then_some((ix, item_width));
                 if width > wrap_width && ix > last_wrap_ix {
                     let wrap_at_candidate =
                         last_candidate_ix > 0 && width - last_candidate_width <= wrap_width;
-                    let forced_carry = forced_carry.filter(|(previous_ix, _)| {
-                        !wrap_at_candidate && *previous_ix > last_wrap_ix
-                    });
 
                     let carried_width = if wrap_at_candidate {
                         width - last_candidate_width
-                    } else if let Some((_, previous_width)) = forced_carry {
-                        previous_width + item_width
                     } else {
                         item_width
                     };
@@ -199,9 +178,6 @@ impl LineWrapper {
                     if wrap_at_candidate {
                         last_wrap_ix = last_candidate_ix;
                         width -= last_candidate_width;
-                    } else if let Some((previous_ix, previous_width)) = forced_carry {
-                        last_wrap_ix = previous_ix;
-                        width = previous_width + item_width;
                     } else {
                         last_wrap_ix = ix;
                         width = item_width;
@@ -426,8 +402,6 @@ impl LineWrapper {
         let mut last_candidate_width = px(0.);
         let mut last_wrap_ix = 0usize;
         let mut prev_c = '\0';
-        let mut fast_prev_prev_char = '\0';
-        let mut fast_prev_start: Option<(usize, Pixels)> = None;
         let mut indent: Option<u32> = None;
         let mut truncate_ix = 0usize;
 
@@ -457,8 +431,6 @@ impl LineWrapper {
                 last_candidate_width = px(0.);
                 last_wrap_ix = ix + 1;
                 prev_c = '\0';
-                fast_prev_prev_char = '\0';
-                fast_prev_start = None;
                 indent = None;
                 truncate_ix = ix + 1;
                 continue;
@@ -483,18 +455,6 @@ impl LineWrapper {
                 first_non_whitespace_ix = Some(ix);
             }
 
-            let forced_carry = fast_prev_start
-                .filter(|(previous_ix, _)| *previous_ix > last_wrap_ix)
-                .filter(|_| {
-                    crate::fast::line_break::forced_break_carries_previous(
-                        fast_prev_prev_char,
-                        prev_c,
-                        c,
-                    )
-                });
-            fast_prev_start = Some((ix, char_width));
-            fast_prev_prev_char = prev_c;
-
             width += char_width;
 
             if line < max_lines - 1 {
@@ -508,9 +468,6 @@ impl LineWrapper {
                         last_wrap_ix = last_candidate_ix;
                         width -= last_candidate_width;
                         last_candidate_ix = 0;
-                    } else if let Some((previous_ix, previous_width)) = forced_carry {
-                        last_wrap_ix = previous_ix;
-                        width = previous_width + char_width;
                     } else {
                         last_wrap_ix = ix;
                         width = char_width;
