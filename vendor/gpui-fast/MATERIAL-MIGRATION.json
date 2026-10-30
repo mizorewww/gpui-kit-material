@@ -373,7 +373,7 @@
       },
       "src/fast/layout.rs": {
         "upstream_sha256": "0e4562a18d24c5ca37eeb9ecb057e2db13c62116ed4bd91008adda39b57123af",
-        "local_sha256": "a6cac13c591db2efcf084dc1350fc856b4763ab90c089f888d1ee92b39ab2288",
+        "local_sha256": "8b9d847f0fe6e9275b504df7212cf5473bef19b07b41be58177193620cf87b7b",
         "reason": "Forgets released nodes in the mirrored set (vendor/gpui-pre/layout-direction-patch.md)."
       },
       "src/fast/rounded_clip.rs": {

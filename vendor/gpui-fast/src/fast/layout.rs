@@ -982,14 +982,11 @@ pub(crate) fn request_layout(
     let rem_size = window.rem_size();
     let scale_factor = window.scale_factor();
     let key = crate::fast::layout_key::layout_key(window);
-    request_retained_layout(
-        window.layout_engine.as_mut().unwrap(),
-        key,
-        style,
-        rem_size,
-        scale_factor,
-        children,
-    )
+    let mirrored = window.layout_direction().is_rtl();
+    let engine = window.layout_engine.as_mut().unwrap();
+    let id = request_retained_layout(engine, key, style, rem_size, scale_factor, children);
+    engine.set_mirrored(id, mirrored);
+    id
 }
 
 /// Adds a node to the layout tree, reusing the one retained under `key`
