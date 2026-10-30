@@ -198,29 +198,29 @@ fn vertices(shape: LoadingShape) -> Vec<Vertex> {
         LoadingShape::SoftBurst => star(10, 0.69, 0.096, 0.096, -FRAC_PI_2),
         LoadingShape::Cookie9Sided => star(9, 0.8, 0.5, 0.5, -FRAC_PI_2),
         LoadingShape::Pentagon => regular(5, 0.31, -FRAC_PI_2),
-        // A capsule: a 2 x 1.3 rectangle with fully rounded ends, on the
+        // A capsule: a 2 x 1.56 rectangle with fully rounded ends, on the
         // rising diagonal.
         LoadingShape::Pill => transformed(
             vec![
                 Vertex {
                     x: 1.,
-                    y: 0.65,
-                    rounding: 0.649,
+                    y: 0.78,
+                    rounding: 0.779,
                 },
                 Vertex {
                     x: -1.,
-                    y: 0.65,
-                    rounding: 0.649,
+                    y: 0.78,
+                    rounding: 0.779,
                 },
                 Vertex {
                     x: -1.,
-                    y: -0.65,
-                    rounding: 0.649,
+                    y: -0.78,
+                    rounding: 0.779,
                 },
                 Vertex {
                     x: 1.,
-                    y: -0.65,
-                    rounding: 0.649,
+                    y: -0.78,
+                    rounding: 0.779,
                 },
             ],
             1.,
