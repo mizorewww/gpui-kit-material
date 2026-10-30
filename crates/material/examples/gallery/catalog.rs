@@ -453,7 +453,7 @@ pub static CATALOG: &[Entry] = &[
         Communication,
         "Brief updates about app processes at the bottom of the screen.",
         spec("snackbar"),
-        None,
+        Some(&playgrounds::snackbar::PLAYGROUND),
     ),
     component(
         "tooltip",
