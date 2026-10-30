@@ -266,7 +266,7 @@ pub static CATALOG: &[Entry] = &[
         SelectionInput,
         "Choose a value or a range along a track.",
         spec("sliders"),
-        None,
+        Some(&playgrounds::slider::PLAYGROUND),
     ),
     component(
         "text-field",

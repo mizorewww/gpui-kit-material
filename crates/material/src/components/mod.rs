@@ -37,7 +37,7 @@ pub use search::{
     SEARCH_BAR_HEIGHT, SEARCH_SUGGESTION_HEIGHT, SearchField, SearchSuggestion, SearchView,
     SearchViewLayout,
 };
-pub use slider::{MaterialSlider, SliderAppearance, SliderSize};
+pub use slider::{MaterialSlider, SliderAppearance, SliderColor, SliderSize};
 pub use snackbar::{SNACKBAR_CLOSE_ICON, Snackbar};
 pub use switch::{MaterialSwitch, SwitchIcons};
 mod caption;
