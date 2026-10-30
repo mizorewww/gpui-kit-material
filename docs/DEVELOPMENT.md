@@ -31,6 +31,37 @@ bindings stay out of Git. Check canvas allocation at 1×/1.25×/1.5×/2× DPR
 python3 scripts/check-gallery-dpr.py http://127.0.0.1:8080 /tmp/material-gallery-dpr
 ```
 
+The page shows a splash until the engine submits its first frame, and an error
+message when neither WebGPU nor WebGL2 is available or startup fails. Fonts for
+text are embedded in the module. The Outlined and Rounded icon fonts, the symbol
+styles the Gallery draws, are downloaded next to it and passed in through
+`provide_symbol_asset`, which keeps the module under the 25 MiB per-file hosting
+limit. `--release` also strips names and runs Binaryen's `wasm-opt` when it is on
+`PATH` (`brew install binaryen`); publishing needs it to stay under that limit.
+
+## Publishing the site
+
+`scripts/build-site.sh` writes the static site to `target/site`: this README and
+the docs at `/`, the release Gallery at `/gallery/` with content-hashed assets, and
+`cargo doc` output for the two library crates at `/api/`. It also writes `_headers`
+(immutable hashed assets, revalidated HTML) and fails on a broken internal link or
+heading anchor. Links to repository files that are not published go to GitHub. It
+needs [`uv`](https://docs.astral.sh/uv/) for the Markdown dependency; pass
+`--skip-wasm` to reuse the bindings already in `crates/gallery-web/www/wasm`.
+
+```sh
+./scripts/build-site.sh
+python3 -m http.server 8080 --bind 127.0.0.1 --directory target/site  # local preview
+cf auth login                                                         # once
+./scripts/deploy-site.sh
+```
+
+`scripts/deploy-site.sh` publishes `target/site` to <https://material.mizore.blog>
+and checks the live URLs. Deployment is manual: CI holds no Cloudflare credentials.
+The site is an assets-only Worker configured in `deploy/site/`, because the `cf` CLI
+no longer uploads to classic Pages projects. `cf deploy` creates the DNS record for
+that hostname and changes nothing else in the zone.
+
 ## Frame capture
 
 The native gallery can save a GPU-rendered frame in a reproducible state:

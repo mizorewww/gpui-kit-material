@@ -4,4 +4,6 @@
 __pycache__/
 *.pyc
 .DS_Store
+/deploy/site/node_modules
 .cloudflare/
+.playwright-cli/

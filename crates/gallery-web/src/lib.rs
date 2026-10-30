@@ -10,6 +10,21 @@ mod gallery;
 #[cfg(target_family = "wasm")]
 mod motion_preference;
 
+/// Supplies one symbol asset by its file name. The page downloads the styles the
+/// Gallery draws instead of embedding the 52 MB pack of every style in the module,
+/// and must call this before `run`.
+#[cfg(target_family = "wasm")]
+#[wasm_bindgen::prelude::wasm_bindgen]
+pub fn provide_symbol_asset(file_name: &str, bytes: Vec<u8>) -> Result<(), wasm_bindgen::JsError> {
+    use gpui_kit_material::icons::Asset;
+    Asset::ALL
+        .into_iter()
+        .find(|asset| asset.file_name() == file_name)
+        .ok_or_else(|| wasm_bindgen::JsError::new(&format!("unknown asset {file_name}")))?
+        .provide(bytes)
+        .map_err(|error| wasm_bindgen::JsError::new(&format!("{error:?}")))
+}
+
 #[cfg(target_family = "wasm")]
 #[wasm_bindgen::prelude::wasm_bindgen]
 pub fn run() {
