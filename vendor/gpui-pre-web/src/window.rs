@@ -1034,7 +1034,11 @@ impl PlatformWindow for WebWindow {
         self.inner.state.borrow().renderer.gpu_specs()
     }
 
-    fn update_ime_position(&self, _bounds: Bounds<Pixels>) {}
+    fn update_ime_position(&self, bounds: Bounds<Pixels>) {
+        self.inner
+            .ime_mirror
+            .set_position(f32::from(bounds.left()), f32::from(bounds.bottom()));
+    }
 
     fn request_decorations(&self, _decorations: WindowDecorations) {}
 
