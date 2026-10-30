@@ -538,29 +538,23 @@ mod tests {
 
     struct Harness;
     impl Render for Harness {
-        fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
             window.set_rem_size(px(14.));
-            let mut node = accesskit::Node::new(accesskit::Role::GenericContainer);
-            RenderOnce::render(
-                Progress::new("probe")
-                    .accessibility_label("Loading")
-                    .indeterminate(true),
-                window,
-                cx,
-            )
-            .into_element()
-            .write_a11y_info(&mut node);
-            assert_eq!(node.label(), Some("Loading"));
-            div().flex().items_start().child(
-                div()
-                    .debug_selector(|| "loading".into())
-                    .child(LoadingIndicator::new("li", "Loading").contained(true)),
-            )
+            div()
+                .flex()
+                .items_start()
+                .child(
+                    div()
+                        .debug_selector(|| "loading".into())
+                        .child(LoadingIndicator::new("li", "Loading").contained(true)),
+                )
+                .child(LoadingIndicator::new("li-measured", "Uploading").progress(Some(0.4)))
         }
     }
 
     #[gpui::test]
     fn the_indicator_is_a_48dp_progress_node(cx: &mut gpui::TestAppContext) {
+        cx.update(|cx| cx.set_reduce_motion(true));
         let (_, cx) = cx.add_window_view(|_, _| Harness);
         cx.update(|window, cx| {
             window.refresh();
@@ -568,5 +562,16 @@ mod tests {
         });
         let bounds = cx.debug_bounds("loading").unwrap();
         assert_eq!(bounds.size, size(px(48.), px(48.)));
+        // The rendered LoadingIndicator itself carries the progress role and
+        // the caller's label, indeterminate or measured.
+        cx.update(|window, _| {
+            for (id, label) in [("li", "Loading"), ("li-measured", "Uploading")] {
+                let node = gpui_base::test_support::find(window, &[], &ElementId::from(id))
+                    .unwrap_or_else(|| panic!("{id} was not rendered"));
+                assert_eq!(node.role(), Some(Role::ProgressIndicator), "{id}");
+                assert_eq!(node.label(), Some(label), "{id}");
+                assert_eq!(node.bounds().size, size(px(48.), px(48.)), "{id}");
+            }
+        });
     }
 }
