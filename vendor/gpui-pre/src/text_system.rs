@@ -1,6 +1,7 @@
 mod font_fallbacks;
 mod font_features;
 mod line;
+pub(crate) mod line_break;
 mod line_layout;
 mod line_layout_options;
 mod line_wrapper;

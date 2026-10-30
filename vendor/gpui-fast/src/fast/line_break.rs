@@ -17,10 +17,33 @@
 /// space between them, in text that otherwise breaks between any two
 /// characters.
 pub(crate) fn allows_break_between(prev: char, c: char) -> bool {
-    !never_starts_line(c)
+    !is_glue(prev)
+        && !is_glue(c)
+        && !never_starts_line(c)
         && !never_ends_line(prev)
         && !(prev == '—' && c == '—')
         && !(is_cjk(prev) && closes_cjk_text(c))
+}
+
+/// No-break spaces and word joiners (UAX #14 classes GL and WJ) hold the
+/// characters on either side together: `11\u{a0}分\u{a0}39\u{a0}秒` never breaks
+/// inside, while the text around it still may.
+pub(crate) fn is_glue(c: char) -> bool {
+    matches!(
+        c,
+        '\u{00A0}' | '\u{2007}' | '\u{202F}' | '\u{2060}' | '\u{FEFF}'
+    )
+}
+
+/// Whether a line that overflows at `c` with no allowed break left should take
+/// `prev` down too. The forced break would otherwise leave `c` opening a line
+/// (`llama.cpp` / `，`). It stays where it is when moving `prev` would not help,
+/// because `prev` may not start a line either, or when glue is involved.
+pub(crate) fn forced_break_carries_previous(prev_prev: char, prev: char, c: char) -> bool {
+    !is_glue(prev)
+        && !is_glue(c)
+        && !allows_break_between(prev, c)
+        && allows_break_between(prev_prev, prev)
 }
 
 /// ASCII punctuation that, written right after CJK text, closes it like its
@@ -101,7 +124,7 @@ fn never_ends_line(c: char) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::{allows_break_between, never_ends_line, never_starts_line};
+    use super::{allows_break_between, is_glue, never_ends_line, never_starts_line};
     use crate::{
         Boundary, FontId, GlyphId, IndentAdjustment, LineFragment, LineLayout, LineWrapper, Pixels,
         ShapedGlyph, ShapedRun, TestAppContext, TestDispatcher, TextRun, TextSystem,
@@ -366,5 +389,174 @@ mod tests {
             wrapped_lines("好，，，，，，", 35.),
             ["好，，", "，，，", "，"]
         );
+    }
+
+    #[test]
+    fn glue_forbids_a_break_on_either_side() {
+        for glue in ['\u{a0}', '\u{2007}', '\u{202f}', '\u{2060}', '\u{feff}'] {
+            assert!(is_glue(glue));
+            assert!(!allows_break_between(glue, '分'));
+            assert!(!allows_break_between('分', glue));
+        }
+        assert!(!is_glue(' '));
+        assert!(allows_break_between('分', '秒'));
+    }
+
+    #[test]
+    fn wrapping_never_breaks_inside_no_break_spaces() {
+        let (mut wrapper, text_system) = wrapper();
+        let one = width_of(&text_system, &wrapper, "中");
+        let glued = "11\u{a0}分\u{a0}39\u{a0}秒";
+        let second = "1\u{a0}分\u{a0}26\u{a0}秒";
+        let text = format!("预计剩余 {glued}，数据分块到达，上一块于 {second}前到达");
+        let spans = [
+            (text.find(glued).unwrap(), glued.len()),
+            (text.find(second).unwrap(), second.len()),
+        ];
+        // Wide enough for each glued span: lines break around it, never inside.
+        for columns in 10..40 {
+            let width = one * columns as f32 + one / 2.;
+            for ix in wrap(&mut wrapper, &text, width) {
+                assert!(
+                    spans
+                        .iter()
+                        .all(|(from, len)| ix <= *from || ix >= from + len),
+                    "{columns} columns: break inside a glued span at {ix}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn a_shaped_line_keeps_text_joined_by_glyphless_word_joiners() {
+        // CoreText shapes a word joiner (U+2060) to no glyph, so the glyph
+        // before 计 is 预; the joiner sits only in the text between them.
+        let text = "数据·预\u{2060}计\u{2060}剩\u{2060}余";
+        let glyphs: Vec<_> = text
+            .char_indices()
+            .filter(|(_, character)| *character != '\u{2060}')
+            .enumerate()
+            .map(|(column, (index, _))| ShapedGlyph {
+                id: GlyphId(0),
+                position: point(px(16. * column as f32), px(0.)),
+                index,
+                is_emoji: false,
+            })
+            .collect();
+        let width = px(16. * glyphs.len() as f32);
+        let layout = LineLayout {
+            font_size: px(16.),
+            width,
+            ascent: px(12.),
+            descent: px(4.),
+            runs: vec![ShapedRun {
+                font_id: FontId(0),
+                glyphs,
+            }],
+            len: text.len(),
+        };
+        let joined: Vec<_> = ["计", "剩", "余"]
+            .iter()
+            .map(|character| text.find(character).unwrap())
+            .collect();
+        for wrap_width in 64..112 {
+            for boundary in layout.compute_wrap_boundaries(text, px(wrap_width as f32), None) {
+                let index = layout.runs[boundary.run_ix].glyphs[boundary.glyph_ix].index;
+                assert!(
+                    !joined.contains(&index),
+                    "break inside joined text at {index}, width {wrap_width}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn a_forced_break_carries_the_character_before_closing_punctuation() {
+        // No allowed break exists in `abc，`, so the comma takes `c` down with it.
+        assert_eq!(wrapped_lines("abc，", 35.), ["ab", "c，"]);
+        // Moving a character that may not start a line either would not help.
+        assert_eq!(wrapped_lines("，。、", 25.), ["，。", "、"]);
+
+        let (mut wrapper, text_system) = wrapper();
+        let fits = "abc";
+        let width = width_of(&text_system, &wrapper, fits) + px(1.);
+        assert_eq!(wrap(&mut wrapper, "abc，", width), [2]);
+    }
+
+    #[cfg(target_os = "macos")]
+    fn shaped_boundaries(
+        text_system: &WindowTextSystem,
+        text: &str,
+        run: &TextRun,
+        width: f32,
+    ) -> Vec<usize> {
+        let lines = text_system
+            .shape_text(
+                text.to_owned().into(),
+                px(16.),
+                std::slice::from_ref(run),
+                Some(px(width)),
+                None,
+            )
+            .unwrap();
+        let layout = &lines[0].layout;
+        layout
+            .wrap_boundaries()
+            .iter()
+            .map(|boundary| {
+                layout.unwrapped_layout.runs[boundary.run_ix].glyphs[boundary.glyph_ix].index
+            })
+            .collect()
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn core_text_never_opens_a_line_with_closing_punctuation() {
+        let cx = TestAppContext::build(TestDispatcher::new(0), None);
+        let text_system = WindowTextSystem::new(cx.text_system().clone());
+        let text = "缺少识别组件 llama.cpp，安装后重新检查。你好（世界）、再见！好的，谢谢。";
+        let run = TextRun {
+            len: text.len(),
+            font: font("PingFang SC"),
+            ..Default::default()
+        };
+        // From two glyphs per line up: narrower lines must force breaks anywhere.
+        for width in 40..240 {
+            for index in shaped_boundaries(&text_system, text, &run, width as f32) {
+                let next = text[index..].chars().next().unwrap();
+                assert!(
+                    !never_starts_line(next),
+                    "line starts with {next:?} at width {width}"
+                );
+            }
+        }
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn core_text_keeps_glued_text_together() {
+        let cx = TestAppContext::build(TestDispatcher::new(0), None);
+        let text_system = WindowTextSystem::new(cx.text_system().clone());
+        let glued = "11\u{a0}分\u{a0}39\u{a0}秒";
+        // Word joiners (zero width, no glyph) hold the CJK label together.
+        let text = format!(
+            "360.0 MB / 1.56 GB · 速度 1.8 MB/s · 预\u{2060}计\u{2060}剩\u{2060}余\u{a0}{glued}\u{a0}· 数据分块到达，上一块于 1\u{a0}分\u{a0}26\u{a0}秒前到达"
+        );
+        let start = text.find("预").unwrap();
+        let end = text.find(" 数据").unwrap();
+        let run = TextRun {
+            len: text.len(),
+            font: font("PingFang SC"),
+            ..Default::default()
+        };
+        // Wide enough for the glued span: lines break around it, never inside.
+        for width in 200..480 {
+            for index in shaped_boundaries(&text_system, &text, &run, width as f32) {
+                assert!(
+                    index <= start || index > end,
+                    "break inside a glued span at {index}, width {width}"
+                );
+            }
+        }
     }
 }
