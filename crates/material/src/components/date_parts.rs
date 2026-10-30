@@ -147,6 +147,34 @@ pub(crate) fn day_paint(selected: f32, today: bool, range: bool, adjacent: bool)
     }
 }
 
+/// The M3 disabled paint of a day: a selected day keeps an on-surface 12%
+/// container, its label and today's outline turn on-surface 38%. Fading
+/// the enabled paint instead leaves a dark on-primary label on a dim
+/// primary container, unreadable in dark themes.
+pub(crate) fn disabled_day_paint(paint: DayPaint, selected: f32) -> DayPaint {
+    let on_surface = color(ColorRole::ON_SURFACE);
+    let content = state::disabled(on_surface);
+    DayPaint {
+        fill: on_surface.opacity(state::DISABLED_CONTAINER * selected.clamp(0., 1.)),
+        ink: content,
+        layer: paint.layer,
+        outline: paint.outline.map(|_| content),
+    }
+}
+
+/// The M3 disabled colors of a year: (container, label).
+pub(crate) fn disabled_year_paint(selected: bool) -> (Rgba, Rgba) {
+    let on_surface = color(ColorRole::ON_SURFACE);
+    (
+        on_surface.opacity(if selected {
+            state::DISABLED_CONTAINER
+        } else {
+            0.
+        }),
+        state::disabled(on_surface),
+    )
+}
+
 /// One day of a calendar grid (`.Building Blocks/Local M3 calendar cell`).
 #[derive(gpui::IntoElement)]
 pub struct CalendarDay {
@@ -252,6 +280,11 @@ impl RenderOnce for CalendarDay {
         };
         let range = self.range != DayRange::None;
         let paint = day_paint(selected, self.today, range && !self.selected, self.adjacent);
+        let paint = if disabled {
+            disabled_day_paint(paint, selected)
+        } else {
+            paint
+        };
         let forced = |state: InteractionPreview| !disabled && preview == Some(state);
         let hover = state::hovered(paint.fill, paint.layer);
         let press = state::pressed(paint.fill, paint.layer);
@@ -311,7 +344,6 @@ impl RenderOnce for CalendarDay {
             .aria_label(self.accessible.unwrap_or(self.label))
             .aria_selected(self.selected || range)
             .when(self.cursor, |cell| cell.aria_active_descendant())
-            .when(disabled, |cell| cell.opacity(state::DISABLED_CONTENT))
             .when(range, |cell| {
                 let (left, width) = match self.range {
                     DayRange::Start => (half, half),
@@ -325,7 +357,8 @@ impl RenderOnce for CalendarDay {
                         .left(rem(left))
                         .w(rem(width))
                         .h(rem(DAY_CONTAINER))
-                        .bg(band),
+                        .bg(band)
+                        .when(disabled, |band| band.opacity(state::DISABLED_CONTENT)),
                 )
             })
             .child(ring)
@@ -406,6 +439,11 @@ impl RenderOnce for YearChip {
                 TypeRole::BodyLarge,
             )
         };
+        let (fill, ink) = if disabled {
+            disabled_year_paint(self.selected)
+        } else {
+            (fill, ink)
+        };
         let hover = state::hovered(fill, layer);
         let press = state::pressed(fill, layer);
         let focus = state::layer(fill, layer, state::FOCUS);
@@ -443,7 +481,6 @@ impl RenderOnce for YearChip {
             .aria_label(self.label)
             .aria_selected(self.selected)
             .when(self.cursor, |cell| cell.aria_active_descendant())
-            .when(disabled, |cell| cell.opacity(state::DISABLED_CONTENT))
             .child(ring)
             .when_some(on_click, |cell, f| {
                 cell.on_click(move |_, window, cx| f(window, cx))
