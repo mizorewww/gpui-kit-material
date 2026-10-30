@@ -1,7 +1,7 @@
 {
   "schema": "material-kit-reuse-audit-v1",
   "scope": "read-only source audit; deletion candidates are conditional, not executed replacements or visual/performance PASS",
-  "implementation_commit": "43b0a484bd7a91092e824413b122ba02fd7b6f51",
+  "implementation_commit": "45de656278b1c86685574ea4397c0fb306445c5c",
   "upstream": {
     "repository": "https://github.com/longbridge/gpui-kit",
     "commit": "bb85882e1faab845d9e7be33b69a152879a90f69",
@@ -92,15 +92,28 @@
       "disposition": "retain-pending-equivalence",
       "priority": "P0",
       "local_paths": [
-        "vendor/gpui-base/src/button.rs",
-        "vendor/gpui-base/src/toggle.rs",
         "vendor/gpui-base/src/a11y_disabled.rs",
-        "vendor/gpui-base/src/motion.rs"
+        "vendor/gpui-base/src/button.rs",
+        "vendor/gpui-base/src/dialog.rs",
+        "vendor/gpui-base/src/input/base/state.rs",
+        "vendor/gpui-base/src/lib.rs",
+        "vendor/gpui-base/src/motion.rs",
+        "vendor/gpui-base/src/slider.rs",
+        "vendor/gpui-base/src/text_selection.rs",
+        "vendor/gpui-base/src/toggle.rs",
+        "vendor/gpui-base/src/toolbar.rs"
       ],
       "upstream_paths": [
+        "crates/base/src/a11y_disabled.rs",
         "crates/base/src/button.rs",
+        "crates/base/src/dialog.rs",
+        "crates/base/src/input/base/state.rs",
+        "crates/base/src/lib.rs",
+        "crates/base/src/motion.rs",
+        "crates/base/src/slider.rs",
+        "crates/base/src/text_selection.rs",
         "crates/base/src/toggle.rs",
-        "crates/base/src/motion.rs"
+        "crates/base/src/toolbar.rs"
       ],
       "action": "Keep narrow busy/focus/transition fixes while aligning the Git Base dependency.",
       "conditions": "Same 0.8.1 version is not equivalence; upstream lacks the patched busy, focusable/disabled focus and reversal/reduced-motion behavior."
@@ -179,16 +192,17 @@
     },
     {
       "id": "search-field",
-      "disposition": "thin-adapter",
+      "disposition": "done",
       "priority": "P0",
       "local_paths": [
-        "crates/material/src/components/controls.rs"
+        "crates/material/src/components/search.rs"
       ],
       "upstream_paths": [
         "crates/component/src/input/input.rs"
       ],
       "action": "Replace manual input slot composition with Component Input prefix/suffix/appearance(false), retaining Material container styling.",
-      "conditions": "Use the same InputState; validate internal padding, prefix/suffix spacing, focus and accessibility. Existing code does not duplicate IME/editing."
+      "conditions": "Use the same InputState; validate internal padding, prefix/suffix spacing, focus and accessibility. Existing code does not duplicate IME/editing.",
+      "status": "SearchField renders Component Input (Size and Sizable from gpui_kit::component) with Base InputState; Material owns only the bar container, icons and state layer."
     },
     {
       "id": "status-labels",
@@ -236,7 +250,7 @@
       "disposition": "reuse-behavior",
       "priority": "P1",
       "local_paths": [
-        "crates/material/src/components/feedback.rs"
+        "crates/material/src/components/snackbar.rs"
       ],
       "upstream_paths": [
         "crates/component/src/notification.rs",
@@ -251,7 +265,8 @@
       "priority": "P1",
       "local_paths": [
         "crates/material/src/components/button.rs",
-        "crates/material/src/components/controls.rs"
+        "crates/material/src/components/switch.rs",
+        "crates/material/src/components/slider.rs"
       ],
       "upstream_paths": [
         "crates/component/src/button/button.rs",
@@ -266,7 +281,7 @@
       "disposition": "retain-until-nonmodal-hook",
       "priority": "P1",
       "local_paths": [
-        "crates/material/src/components/controls.rs"
+        "crates/material/src/components/sheets.rs"
       ],
       "upstream_paths": [
         "crates/component/src/sheet.rs",
@@ -411,10 +426,465 @@
       ],
       "action": "Keep the same presentation patches for the upstream comparison backend (--no-default-features); see MATERIAL-PATCHES.md and SOURCE.json.",
       "conditions": "Needed so gpui-pre and gpui-fast measurements use the same submission accounting; Symbols must patch it too so one engine is shared."
+    },
+    {
+      "id": "icon-button",
+      "disposition": "retain-material-renderer",
+      "priority": "P1",
+      "local_paths": [
+        "crates/material/src/components/icon_button.rs"
+      ],
+      "upstream_paths": [
+        "crates/component/src/button/button.rs"
+      ],
+      "action": "Keep the Material renderer and the Kit or Base behavior it composes; adopt further Kit hooks when they can carry the Material contract.",
+      "conditions": "Replacing it requires equal controlled state, keyboard, focus, accessibility, motion, layout, WASM support and performance.",
+      "status": "Delegates to MaterialButton. Component Button has no Material shape morph, widths or ripple."
+    },
+    {
+      "id": "button-group",
+      "disposition": "retain-material-renderer",
+      "priority": "P1",
+      "local_paths": [
+        "crates/material/src/components/standard_button_group.rs",
+        "crates/material/src/components/button_group.rs"
+      ],
+      "upstream_paths": [
+        "crates/component/src/button/button_group.rs",
+        "crates/base/src/toggle_group.rs"
+      ],
+      "action": "Keep the Material renderer and the Kit or Base behavior it composes; adopt further Kit hooks when they can carry the Material contract.",
+      "conditions": "Replacing it requires equal controlled state, keyboard, focus, accessibility, motion, layout, WASM support and performance.",
+      "status": "Component ButtonGroup offers compact/outline/multiple but no M3 connected shapes, width morph or density tokens; ConnectedButtonGroup uses local roving focus (roving.rs)."
+    },
+    {
+      "id": "split-button",
+      "disposition": "retain-material-renderer",
+      "priority": "P1",
+      "local_paths": [
+        "crates/material/src/components/split_button.rs"
+      ],
+      "upstream_paths": [],
+      "action": "Keep the Material renderer and the Kit or Base behavior it composes; adopt further Kit hooks when they can carry the Material contract.",
+      "conditions": "Replacing it requires equal controlled state, keyboard, focus, accessibility, motion, layout, WASM support and performance.",
+      "status": "No Kit equivalent. Composed from MaterialButton."
+    },
+    {
+      "id": "fab",
+      "disposition": "retain-material-renderer",
+      "priority": "P1",
+      "local_paths": [
+        "crates/material/src/components/fab.rs"
+      ],
+      "upstream_paths": [],
+      "action": "Keep the Material renderer and the Kit or Base behavior it composes; adopt further Kit hooks when they can carry the Material contract.",
+      "conditions": "Replacing it requires equal controlled state, keyboard, focus, accessibility, motion, layout, WASM support and performance.",
+      "status": "No Kit equivalent. Composed from MaterialButton."
+    },
+    {
+      "id": "fab-menu",
+      "disposition": "retain-material-renderer",
+      "priority": "P1",
+      "local_paths": [
+        "crates/material/src/components/fab_menu.rs"
+      ],
+      "upstream_paths": [
+        "crates/base/src/motion.rs"
+      ],
+      "action": "Keep the Material renderer and the Kit or Base behavior it composes; adopt further Kit hooks when they can carry the Material contract.",
+      "conditions": "Replacing it requires equal controlled state, keyboard, focus, accessibility, motion, layout, WASM support and performance.",
+      "status": "No Kit equivalent. Uses Base Transition for its staggered entry."
+    },
+    {
+      "id": "checkbox",
+      "disposition": "retain-material-renderer",
+      "priority": "P1",
+      "local_paths": [
+        "crates/material/src/components/checkbox.rs"
+      ],
+      "upstream_paths": [
+        "crates/component/src/checkbox.rs",
+        "crates/base/src/checkbox.rs"
+      ],
+      "action": "Keep the Material renderer and the Kit or Base behavior it composes; adopt further Kit hooks when they can carry the Material contract.",
+      "conditions": "Replacing it requires equal controlled state, keyboard, focus, accessibility, motion, layout, WASM support and performance.",
+      "status": "Component Checkbox has no error state or Material state layer; the local renderer keeps Base CheckboxState."
+    },
+    {
+      "id": "switch",
+      "disposition": "retain-material-renderer",
+      "priority": "P1",
+      "local_paths": [
+        "crates/material/src/components/switch.rs"
+      ],
+      "upstream_paths": [
+        "crates/component/src/switch.rs",
+        "crates/base/src/switch.rs"
+      ],
+      "action": "Keep the Material renderer and the Kit or Base behavior it composes; adopt further Kit hooks when they can carry the Material contract.",
+      "conditions": "Replacing it requires equal controlled state, keyboard, focus, accessibility, motion, layout, WASM support and performance.",
+      "status": "Component Switch exposes checked/color/label only: no M3 thumb morph, icons or error state. Reuses Base Switch."
+    },
+    {
+      "id": "radio",
+      "disposition": "retain-material-renderer",
+      "priority": "P1",
+      "local_paths": [
+        "crates/material/src/components/radio.rs"
+      ],
+      "upstream_paths": [
+        "crates/component/src/radio.rs",
+        "crates/base/src/radio.rs",
+        "crates/base/src/radio_group.rs"
+      ],
+      "action": "Keep the Material renderer and the Kit or Base behavior it composes; adopt further Kit hooks when they can carry the Material contract.",
+      "conditions": "Replacing it requires equal controlled state, keyboard, focus, accessibility, motion, layout, WASM support and performance.",
+      "status": "Component Radio has no Material state layer or motion. Reuses Base Radio and RadioGroup."
+    },
+    {
+      "id": "chips",
+      "disposition": "retain-material-renderer",
+      "priority": "P1",
+      "local_paths": [
+        "crates/material/src/components/chips.rs"
+      ],
+      "upstream_paths": [
+        "crates/component/src/tag.rs"
+      ],
+      "action": "Keep the Material renderer and the Kit or Base behavior it composes; adopt further Kit hooks when they can carry the Material contract.",
+      "conditions": "Replacing it requires equal controlled state, keyboard, focus, accessibility, motion, layout, WASM support and performance.",
+      "status": "Component Tag is a static label (variant, outline, rounding): no assist, filter, input or suggestion behavior."
+    },
+    {
+      "id": "slider",
+      "disposition": "retain-material-renderer",
+      "priority": "P1",
+      "local_paths": [
+        "crates/material/src/components/slider.rs"
+      ],
+      "upstream_paths": [
+        "crates/component/src/slider.rs",
+        "crates/base/src/slider.rs"
+      ],
+      "action": "Keep the Material renderer and the Kit or Base behavior it composes; adopt further Kit hooks when they can carry the Material contract.",
+      "conditions": "Replacing it requires equal controlled state, keyboard, focus, accessibility, motion, layout, WASM support and performance.",
+      "status": "Component Slider has no Expressive track, stops, value indicator or inset icon. Reuses Base slider behavior through local patches (vendor/gpui-base/SOURCE.json)."
+    },
+    {
+      "id": "text-field",
+      "disposition": "thin-adapter",
+      "priority": "P1",
+      "local_paths": [
+        "crates/material/src/components/text_field.rs"
+      ],
+      "upstream_paths": [
+        "crates/component/src/input/input.rs",
+        "crates/base/src/input/mod.rs"
+      ],
+      "action": "Keep the Material renderer and the Kit or Base behavior it composes; adopt further Kit hooks when they can carry the Material contract.",
+      "conditions": "Replacing it requires equal controlled state, keyboard, focus, accessibility, motion, layout, WASM support and performance.",
+      "status": "Adapter over Component Input and Textarea and Base InputState: reused for editing, Material owns the label, container and supporting text."
+    },
+    {
+      "id": "select",
+      "disposition": "retain-material-renderer",
+      "priority": "P1",
+      "local_paths": [
+        "crates/material/src/components/menu.rs"
+      ],
+      "upstream_paths": [
+        "crates/component/src/select.rs",
+        "crates/base/src/select.rs"
+      ],
+      "action": "Keep the Material renderer and the Kit or Base behavior it composes; adopt further Kit hooks when they can carry the Material contract.",
+      "conditions": "Replacing it requires equal controlled state, keyboard, focus, accessibility, motion, layout, WASM support and performance.",
+      "status": "ExposedDropdown composes Material menus; Component Select has no filled/outlined M3 field or Material menu presentation."
+    },
+    {
+      "id": "date-picker",
+      "disposition": "retain-material-renderer",
+      "priority": "P1",
+      "local_paths": [
+        "crates/material/src/components/date_picker.rs",
+        "crates/material/src/components/date_parts.rs"
+      ],
+      "upstream_paths": [
+        "crates/component/src/time/date_picker.rs",
+        "crates/base/src/calendar.rs",
+        "crates/base/src/date_picker.rs"
+      ],
+      "action": "Keep the Material renderer and the Kit or Base behavior it composes; adopt further Kit hooks when they can carry the Material contract.",
+      "conditions": "Replacing it requires equal controlled state, keyboard, focus, accessibility, motion, layout, WASM support and performance.",
+      "status": "Reuses Base Calendar and Dialog behavior; the M3 docked, modal and full-screen layouts are local."
+    },
+    {
+      "id": "time-picker",
+      "disposition": "retain-material-renderer",
+      "priority": "P1",
+      "local_paths": [
+        "crates/material/src/components/time_picker.rs"
+      ],
+      "upstream_paths": [
+        "crates/component/src/time",
+        "crates/base/src/time_field.rs"
+      ],
+      "action": "Keep the Material renderer and the Kit or Base behavior it composes; adopt further Kit hooks when they can carry the Material contract.",
+      "conditions": "Replacing it requires equal controlled state, keyboard, focus, accessibility, motion, layout, WASM support and performance.",
+      "status": "Reuses Base TimeField. Kit has no clock dial or period selector."
+    },
+    {
+      "id": "navigation-rail-bar",
+      "disposition": "retain-material-renderer",
+      "priority": "P1",
+      "local_paths": [
+        "crates/material/src/components/navigation.rs"
+      ],
+      "upstream_paths": [
+        "crates/component/src/tab",
+        "crates/component/src/sidebar",
+        "crates/base/src/tabs.rs"
+      ],
+      "action": "Keep the Material renderer and the Kit or Base behavior it composes; adopt further Kit hooks when they can carry the Material contract.",
+      "conditions": "Replacing it requires equal controlled state, keyboard, focus, accessibility, motion, layout, WASM support and performance.",
+      "status": "Reuses Base Tabs for roving selection. Component Sidebar and tabs have no M3 active indicator or expansion motion."
+    },
+    {
+      "id": "navigation-drawer",
+      "disposition": "retain-material-renderer",
+      "priority": "P1",
+      "local_paths": [
+        "crates/material/src/components/navigation_drawer.rs"
+      ],
+      "upstream_paths": [
+        "crates/component/src/sidebar",
+        "crates/component/src/sheet.rs"
+      ],
+      "action": "Keep the Material renderer and the Kit or Base behavior it composes; adopt further Kit hooks when they can carry the Material contract.",
+      "conditions": "Replacing it requires equal controlled state, keyboard, focus, accessibility, motion, layout, WASM support and performance.",
+      "status": "Component Sidebar has no M3 drawer item shape, ripple or modal scrim contract."
+    },
+    {
+      "id": "tabs",
+      "disposition": "retain-material-renderer",
+      "priority": "P1",
+      "local_paths": [
+        "crates/material/src/components/tabs.rs"
+      ],
+      "upstream_paths": [
+        "crates/component/src/tab",
+        "crates/base/src/tabs.rs"
+      ],
+      "action": "Keep the Material renderer and the Kit or Base behavior it composes; adopt further Kit hooks when they can carry the Material contract.",
+      "conditions": "Replacing it requires equal controlled state, keyboard, focus, accessibility, motion, layout, WASM support and performance.",
+      "status": "Component tab variants (pill, outline, segmented, underline) have no M3 primary and secondary indicators or motion."
+    },
+    {
+      "id": "menu",
+      "disposition": "retain-material-renderer",
+      "priority": "P1",
+      "local_paths": [
+        "crates/material/src/components/menu.rs"
+      ],
+      "upstream_paths": [
+        "crates/component/src/menu",
+        "crates/component/src/popover.rs",
+        "crates/base/src/popup.rs"
+      ],
+      "action": "Keep the Material renderer and the Kit or Base behavior it composes; adopt further Kit hooks when they can carry the Material contract.",
+      "conditions": "Replacing it requires equal controlled state, keyboard, focus, accessibility, motion, layout, WASM support and performance.",
+      "status": "Reuses Component Popover and Base actions; the Component menu builder has no Expressive groups, density or vibrant colors."
+    },
+    {
+      "id": "app-bars",
+      "disposition": "retain-material-renderer",
+      "priority": "P1",
+      "local_paths": [
+        "crates/material/src/components/app_bar.rs"
+      ],
+      "upstream_paths": [
+        "crates/component/src/title_bar.rs",
+        "crates/component/src/status_bar.rs"
+      ],
+      "action": "Keep the Material renderer and the Kit or Base behavior it composes; adopt further Kit hooks when they can carry the Material contract.",
+      "conditions": "Replacing it requires equal controlled state, keyboard, focus, accessibility, motion, layout, WASM support and performance.",
+      "status": "No Kit M3 app bar; the Component title bar is window chrome, covered by titlebar-caption."
+    },
+    {
+      "id": "toolbar",
+      "disposition": "retain-material-renderer",
+      "priority": "P1",
+      "local_paths": [
+        "crates/material/src/components/toolbar.rs"
+      ],
+      "upstream_paths": [
+        "crates/component/src/toolbar.rs",
+        "crates/base/src/toolbar.rs"
+      ],
+      "action": "Keep the Material renderer and the Kit or Base behavior it composes; adopt further Kit hooks when they can carry the Material contract.",
+      "conditions": "Replacing it requires equal controlled state, keyboard, focus, accessibility, motion, layout, WASM support and performance.",
+      "status": "Reuses Base Toolbar (local axis patch). Component Toolbar has no docked, floating or vibrant M3 forms."
+    },
+    {
+      "id": "card",
+      "disposition": "retain-material-renderer",
+      "priority": "P1",
+      "local_paths": [
+        "crates/material/src/components/feedback.rs"
+      ],
+      "upstream_paths": [],
+      "action": "Keep the Material renderer and the Kit or Base behavior it composes; adopt further Kit hooks when they can carry the Material contract.",
+      "conditions": "Replacing it requires equal controlled state, keyboard, focus, accessibility, motion, layout, WASM support and performance.",
+      "status": "No Kit card. Local surface over GPUI; see business-groups for GroupBox."
+    },
+    {
+      "id": "list",
+      "disposition": "retain-material-renderer",
+      "priority": "P1",
+      "local_paths": [
+        "crates/material/src/components/list.rs"
+      ],
+      "upstream_paths": [
+        "crates/component/src/list",
+        "crates/component/src/virtual_list.rs"
+      ],
+      "action": "Keep the Material renderer and the Kit or Base behavior it composes; adopt further Kit hooks when they can carry the Material contract.",
+      "conditions": "Replacing it requires equal controlled state, keyboard, focus, accessibility, motion, layout, WASM support and performance.",
+      "status": "Component List is a searchable, delegate-driven picker; ListItem is an M3 row with leading and trailing slots that callers place in any list."
+    },
+    {
+      "id": "carousel",
+      "disposition": "retain-material-renderer",
+      "priority": "P1",
+      "local_paths": [
+        "crates/material/src/components/carousel.rs"
+      ],
+      "upstream_paths": [
+        "crates/component/src/carousel"
+      ],
+      "action": "Keep the Material renderer and the Kit or Base behavior it composes; adopt further Kit hooks when they can carry the Material contract.",
+      "conditions": "Replacing it requires equal controlled state, keyboard, focus, accessibility, motion, layout, WASM support and performance.",
+      "status": "Component Carousel offers axis, looping and selected index but no M3 keyline strategies or item masking."
+    },
+    {
+      "id": "dialog",
+      "disposition": "retain-material-renderer",
+      "priority": "P1",
+      "local_paths": [
+        "crates/material/src/components/dialog.rs"
+      ],
+      "upstream_paths": [
+        "crates/component/src/dialog",
+        "crates/base/src/dialog.rs"
+      ],
+      "action": "Keep the Material renderer and the Kit or Base behavior it composes; adopt further Kit hooks when they can carry the Material contract.",
+      "conditions": "Replacing it requires equal controlled state, keyboard, focus, accessibility, motion, layout, WASM support and performance.",
+      "status": "Reuses Base Dialog (local accessibility_label patch) for focus and dismissal; Material owns layout, size and animation."
+    },
+    {
+      "id": "sheets",
+      "disposition": "retain-material-renderer",
+      "priority": "P1",
+      "local_paths": [
+        "crates/material/src/components/sheets.rs"
+      ],
+      "upstream_paths": [
+        "crates/component/src/sheet.rs",
+        "crates/base/src/sheet.rs"
+      ],
+      "action": "Keep the Material renderer and the Kit or Base behavior it composes; adopt further Kit hooks when they can carry the Material contract.",
+      "conditions": "Replacing it requires equal controlled state, keyboard, focus, accessibility, motion, layout, WASM support and performance.",
+      "status": "Modal forms reuse Base Sheet; the standard, non-modal forms and bottom-sheet detents are local (see standard-side-sheet)."
+    },
+    {
+      "id": "badge",
+      "disposition": "retain-material-renderer",
+      "priority": "P1",
+      "local_paths": [
+        "crates/material/src/components/badge.rs"
+      ],
+      "upstream_paths": [
+        "crates/component/src/badge.rs"
+      ],
+      "action": "Keep the Material renderer and the Kit or Base behavior it composes; adopt further Kit hooks when they can carry the Material contract.",
+      "conditions": "Replacing it requires equal controlled state, keyboard, focus, accessibility, motion, layout, WASM support and performance.",
+      "status": "Component Badge has count, dot and icon but no M3 sizes, color roles or anchoring. Status chips are separate (status-labels)."
+    },
+    {
+      "id": "avatar",
+      "disposition": "retain-material-renderer",
+      "priority": "P1",
+      "local_paths": [
+        "crates/material/src/components/avatar.rs"
+      ],
+      "upstream_paths": [
+        "crates/component/src/avatar",
+        "crates/base/src/avatar.rs"
+      ],
+      "action": "Keep the Material renderer and the Kit or Base behavior it composes; adopt further Kit hooks when they can carry the Material contract.",
+      "conditions": "Replacing it requires equal controlled state, keyboard, focus, accessibility, motion, layout, WASM support and performance.",
+      "status": "Component Avatar has name, source and placeholder but no Figma kit monogram, icon or state geometry."
+    },
+    {
+      "id": "loading-indicator",
+      "disposition": "retain-material-renderer",
+      "priority": "P1",
+      "local_paths": [
+        "crates/material/src/components/loading_indicator.rs"
+      ],
+      "upstream_paths": [
+        "crates/component/src/spinner.rs",
+        "crates/base/src/progress.rs"
+      ],
+      "action": "Keep the Material renderer and the Kit or Base behavior it composes; adopt further Kit hooks when they can carry the Material contract.",
+      "conditions": "Replacing it requires equal controlled state, keyboard, focus, accessibility, motion, layout, WASM support and performance.",
+      "status": "No Kit shape-morphing indicator. Base Progress supplies its accessibility value."
+    },
+    {
+      "id": "tooltip",
+      "disposition": "retain-material-renderer",
+      "priority": "P1",
+      "local_paths": [
+        "crates/material/src/components/tooltip.rs"
+      ],
+      "upstream_paths": [
+        "crates/component/src/tooltip.rs",
+        "crates/base/src/tooltip.rs",
+        "crates/base/src/positioner.rs"
+      ],
+      "action": "Keep the Material renderer and the Kit or Base behavior it composes; adopt further Kit hooks when they can carry the Material contract.",
+      "conditions": "Replacing it requires equal controlled state, keyboard, focus, accessibility, motion, layout, WASM support and performance.",
+      "status": "Reuses Base Tooltip and Positioner for delay and placement; the Component tooltip has no rich M3 form."
+    },
+    {
+      "id": "search-view",
+      "disposition": "retain-material-renderer",
+      "priority": "P1",
+      "local_paths": [
+        "crates/material/src/components/search.rs"
+      ],
+      "upstream_paths": [
+        "crates/component/src/input/input.rs"
+      ],
+      "action": "Keep the Material renderer and the Kit or Base behavior it composes; adopt further Kit hooks when they can carry the Material contract.",
+      "conditions": "Replacing it requires equal controlled state, keyboard, focus, accessibility, motion, layout, WASM support and performance.",
+      "status": "SearchView docked and full-screen layouts are local; no Kit equivalent. The bar reuses Component Input (search-field)."
+    },
+    {
+      "id": "vendor-gpui-kit",
+      "disposition": "retain-pending-equivalence",
+      "priority": "P0",
+      "local_paths": [
+        "vendor/gpui-kit"
+      ],
+      "upstream_paths": [
+        "Cargo.toml"
+      ],
+      "action": "Keep the facade source unchanged with a normalized manifest that disables implicit WASM threading; drop it when upstream defaults match.",
+      "conditions": "Single-threaded WASM builds without cross-origin isolation, and one Base and GPUI identity across Material, Kit and Symbols. Hashes are in vendor/gpui-kit/SOURCE.json."
     }
   ],
   "runtime_migration_status": "pending",
   "component_conformance_status": "unreviewed",
   "performance_status": "unverified",
-  "review_scope": "Three independent source audits cover components; facade/theme/icons/gallery; runtime patches/motion/performance. No runtime migration or deletion was executed in this audit."
+  "review_scope": "Three independent source audits cover components; facade/theme/icons/gallery; runtime patches/motion/performance. No runtime migration or deletion was executed in this audit. Entries added at implementation_commit (components newer than the original audit, vendor-gpui-kit) come from one source read of the imports and the public Component builders and have not been independently reviewed."
 }

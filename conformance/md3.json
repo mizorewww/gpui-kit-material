@@ -498,7 +498,7 @@
       }
     },
     {
-      "id": "radios",
+      "id": "radio-button",
       "reference": "https://md3.io/components/radios/",
       "status": "unreviewed",
       "cases": [],
@@ -606,7 +606,7 @@
       }
     },
     {
-      "id": "datepicker",
+      "id": "date-picker",
       "reference": "https://md3.io/components/datepicker/",
       "status": "unreviewed",
       "cases": [],
@@ -624,7 +624,7 @@
       }
     },
     {
-      "id": "timepicker",
+      "id": "time-picker",
       "reference": "https://md3.io/components/timepicker/",
       "status": "unreviewed",
       "cases": [],
@@ -678,7 +678,7 @@
       }
     },
     {
-      "id": "drawer",
+      "id": "navigation-drawer",
       "reference": "https://md3.io/components/drawer/",
       "status": "unreviewed",
       "cases": [],
@@ -783,6 +783,24 @@
         "url": "https://m3e.kyralabs.dev/components/docked-toolbar/",
         "status": "unreviewed",
         "variant_mapping": "requires audit"
+      }
+    },
+    {
+      "id": "docked-toolbar",
+      "reference": "https://m3e.kyralabs.dev/components/docked-toolbar/",
+      "status": "unreviewed",
+      "cases": [],
+      "reviews": [],
+      "performance": {
+        "status": "unverified",
+        "evidence": [],
+        "reviews": []
+      },
+      "alignment_reference": {
+        "site": "https://m3e.kyralabs.dev/",
+        "url": "https://m3e.kyralabs.dev/components/docked-toolbar/",
+        "status": "unreviewed",
+        "variant_mapping": "requires complete variant audit"
       }
     },
     {
@@ -944,6 +962,24 @@
       "alignment_reference": {
         "site": "https://m3e.kyralabs.dev/",
         "url": "https://m3e.kyralabs.dev/components/badge/",
+        "status": "unreviewed",
+        "variant_mapping": "requires complete variant audit"
+      }
+    },
+    {
+      "id": "avatar",
+      "reference": "Figma Material 3 Design Kit, Avatars page",
+      "status": "unreviewed",
+      "cases": [],
+      "reviews": [],
+      "performance": {
+        "status": "unverified",
+        "evidence": [],
+        "reviews": []
+      },
+      "alignment_reference": {
+        "site": "figma-m3-design-kit",
+        "url": "Figma Material 3 Design Kit, Avatars page",
         "status": "unreviewed",
         "variant_mapping": "requires complete variant audit"
       }
@@ -1159,7 +1195,7 @@
       }
     }
   ],
-  "objective": "Reproduce the complete union of https://m3e.kyralabs.dev/ and https://md3.io/ components, styles and animations on desktop and WASM galleries, with m3e.kyralabs.dev authoritative for overlapping components; use https://gpui-kit.com/ for gallery organization. Exact visual and animation parity, independent subagent approval for every component, whole-gallery CPU frames <= 2 ms and continuous vertical-scrolling rendering throughput >= 500 FPS, atomic commits and frequent GitHub progress pushes are required. Material icons must come from the gpui-material-symbols repository, pinned by Git revision for default builds; its sibling checkout may be used explicitly for development and improved as needed. Build on Longbridge gpui-kit and its gpui-component layer, reusing existing controls and infrastructure before implementing Material-specific differences.",
+  "objective": "Reproduce every component of Google's Figma Material 3 Design Kit plus the union of https://md3.io/ and https://m3e.kyralabs.dev/ components, styles and animations on desktop and WASM galleries, with priority Figma kit > md3.io > m3e.kyralabs.dev per value; use https://gpui-kit.com/ for gallery organization. Exact visual and animation parity, independent subagent approval for every component, whole-gallery CPU frames <= 2 ms and continuous vertical-scrolling rendering throughput >= 500 FPS, atomic commits and frequent GitHub progress pushes are required. Material icons must come from the gpui-material-symbols repository, pinned by Git revision for default builds; its sibling checkout may be used explicitly for development and improved as needed. Build on Longbridge gpui-kit and its gpui-component layer, reusing existing controls and infrastructure before implementing Material-specific differences.",
   "reference_policy": {
     "priority": [
       "figma-m3-design-kit",
