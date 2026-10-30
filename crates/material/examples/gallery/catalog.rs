@@ -250,7 +250,7 @@ pub static CATALOG: &[Entry] = &[
         SelectionInput,
         "Pick exactly one option from a set.",
         spec("radio-button"),
-        None,
+        Some(&playgrounds::radio::PLAYGROUND),
     ),
     component(
         "chips",
