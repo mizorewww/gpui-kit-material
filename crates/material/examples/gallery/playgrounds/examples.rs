@@ -79,7 +79,12 @@ fn preview(
         app,
         shown,
     });
-    if view.read(cx).shown != shown {
+    // Not `view.read`: what this render reads, it must render again for, and the
+    // device's own notifications are what this view keeps from the Gallery.
+    if preview.changed(
+        "example-shown",
+        (device.index(), body.index(), fit.scale.to_bits()),
+    ) {
         view.update(cx, |view, cx| {
             view.shown = shown;
             cx.notify();
@@ -98,7 +103,7 @@ fn preview(
 }
 
 /// What the device view shows.
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy)]
 struct DeviceShown {
     device: Device,
     body: Body,

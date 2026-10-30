@@ -1354,7 +1354,7 @@ impl RenderOnce for MenuPopup {
             .when(side_offset > 0., |content| content.mt(rem(side_offset)))
             .child(surface)
             .children(cascade);
-        let surface = std::cell::RefCell::new(Some(content.into_any_element()));
+        let surface = std::cell::RefCell::new(Some(crate::scope::current_scope(content)));
         let open = self.open;
         let measure = trigger_height;
         // Material buttons block the mouse for the elements under them, so

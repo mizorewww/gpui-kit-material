@@ -225,6 +225,7 @@ fn preview(
     if !config.bool("parent") {
         let set_state = set_state.clone();
         return div()
+            .flex()
             .debug_selector(|| "playground-checkbox".into())
             .child(row(
                 "checkbox-parent",

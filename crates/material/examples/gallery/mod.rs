@@ -879,7 +879,7 @@ mod window_tests {
     }
 
     #[gpui::test]
-    fn scrolling_an_example_device_does_not_render_the_gallery(cx: &mut TestAppContext) {
+    fn only_the_app_bars_collapse_notifies_the_example_app(cx: &mut TestAppContext) {
         cx.update(|cx| {
             gpui_kit::init(cx);
             gpui_kit_material::init(cx);
@@ -897,29 +897,74 @@ mod window_tests {
             }
         });
         let gallery = parts.unwrap();
-        let entry = catalog::position("examples").unwrap();
+        let entry = super::catalog::position("examples").unwrap();
         cx.update(|cx| gallery.update(cx, |gallery, cx| gallery.navigate(entry, cx)));
         for _ in 0..4 {
             draw(window.into(), cx);
         }
         let mut cx = gpui::VisualTestContext::from_window(window.into(), cx);
-        let at = cx.debug_bounds("example-scroll").unwrap().center();
-        let rendered = cx.read(|cx| gallery.read(cx).renders.get());
+        // A screen with a collapsing app bar; Home has none.
+        cx.update(|window, cx| {
+            let entry = gallery.read(cx).current;
+            let state = gallery.read(cx).entries[entry].playground.clone().unwrap();
+            state.update(cx, |state, cx| {
+                state.set_value(
+                    "screen",
+                    super::Value::Choice(super::pages::examples::app::Body::Library.index()),
+                    window,
+                    cx,
+                )
+            });
+        });
         for _ in 0..3 {
+            cx.update(|window, cx| {
+                window.refresh();
+                window.draw(cx).clear(cx);
+            });
+            cx.run_until_parked();
+        }
+        let at = cx.debug_bounds("example-scroll").unwrap().center();
+        // Entering the device is a hover change of its own.
+        cx.simulate_mouse_move(at, None, gpui::Modifiers::none());
+        cx.update(|window, cx| window.draw(cx).clear(cx));
+        cx.run_until_parked();
+        cx.update(|window, cx| window.draw(cx).clear(cx));
+        cx.run_until_parked();
+        let wheel = |cx: &mut gpui::VisualTestContext, by: f32| {
             cx.simulate_event(gpui::ScrollEvent {
                 position: at,
-                delta: gpui::ScrollDelta::Pixels(point(px(0.), px(-8.))),
+                delta: gpui::ScrollDelta::Pixels(gpui::point(px(0.), px(by))),
                 modifiers: gpui::Modifiers::none(),
                 touch_phase: gpui::TouchPhase::Moved,
                 ..Default::default()
             });
             cx.update(|window, cx| window.draw(cx).clear(cx));
             cx.run_until_parked();
+        };
+        let app = cx.update(|_, cx| {
+            let entry = gallery.read(cx).current;
+            let state = gallery.read(cx).entries[entry].playground.clone().unwrap();
+            state
+                .read(cx)
+                .local_entity::<super::pages::examples::app::ExamplesApp>("example-app")
+                .unwrap()
+        });
+        let notified = std::rc::Rc::new(std::cell::Cell::new(0));
+        let _watch = cx.update(|_, cx| {
+            let notified = notified.clone();
+            cx.observe(&app, move |_, _| notified.set(notified.get() + 1))
+        });
+        wheel(&mut cx, -8.);
+        assert_eq!(notified.get(), 1, "the bar collapses as it scrolls");
+        wheel(&mut cx, -600.);
+        let collapsed = notified.get();
+        for _ in 0..3 {
+            wheel(&mut cx, -8.);
         }
         assert_eq!(
-            cx.read(|cx| gallery.read(cx).renders.get()),
-            rendered,
-            "the device is its own notify scope"
+            notified.get(),
+            collapsed,
+            "past that the app is not notified"
         );
     }
 }
