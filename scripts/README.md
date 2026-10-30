@@ -22,10 +22,37 @@ script's docstring (`--help`) and [docs/DEVELOPMENT.md](../docs/DEVELOPMENT.md).
 | `check-gallery-dpr.py` | Validates WASM canvas backing size across DPR/viewport changes of a served gallery |
 | `build-gallery-web.sh` | Builds the WASM gallery (`--fast`, `--upstream`, `--release`) into `crates/gallery-web/www/wasm` |
 | `profile-gallery.py` | Builds and records a native Gallery CPU frame profile with provenance (frame-budget/FPS gates) |
-| `build-reference-fonts.py` | Gallery `fonts/roboto/Roboto-{Regular,Medium}.ttf` from the pinned md3.io WOFF2, hash-checked against `SOURCES.json` |
+| `figma/figma.py` | `figma-*.json` token fixtures and page specs from the Figma kit (below) |
+| `build-reference-fonts.py` | Gallery `fonts/roboto/Roboto-{Regular,Medium,SemiBold}.ttf` from the pinned md3.io WOFF2, hash-checked against `SOURCES.json` |
 | `freeze-conformance-fonts.py` | Static Noto Arabic/Hebrew/Emoji instances under `fonts/conformance/`, recorded in its `SOURCES.json` |
 | `subset-conformance-emoji.py` | `fonts/conformance/notocoloremoji/NotoColorEmoji-Probe.ttf` (probe-sequence subset of the hash-pinned download) |
 | `convert-conformance-emoji-sbix.py` | `NotoColorEmoji-Probe-sbix.ttf`: the probe subset's CBDT strikes repackaged as sbix for CoreText |
+
+## Figma kit (first-priority reference)
+
+`figma/figma.py` runs the read-only Plugin API queries in `figma/queries/` in a
+Figma editor tab through the Playwright CLI. It needs `npx`, Chrome with the
+Playwright extension, and the Material 3 Design Kit (or your copy) open:
+
+```sh
+export PLAYWRIGHT_MCP_EXTENSION_TOKEN=...   # shown by the extension
+export FIGMA_FILE_KEY=ozddDB2Z1v51f1IFZlUuJ2
+
+python3 scripts/figma/figma.py attach
+python3 scripts/figma/figma.py tokens --check            # compare with the fixtures
+python3 scripts/figma/figma.py tokens                    # regenerate them
+python3 scripts/figma/figma.py tokens --from-raw DIR     # offline, from saved query results
+python3 scripts/figma/figma.py inspect "Buttons" "Button - tonal" --depth 6
+python3 scripts/figma/figma.py export "Buttons" /tmp/buttons
+```
+
+`tokens` regenerates `crates/color/tests/fixtures/figma-baseline-colors.json` and
+`crates/material/tests/fixtures/figma-{typography,sys-tokens,button}.json`, keeping
+the raw query results in `--raw-dir`. The key comes from `--file-key` or
+`FIGMA_FILE_KEY` and is checked against the open tab, so nothing reads the wrong
+file; a copy of the kit has its own key, which the fixtures then cite.
+`FIGMA_PW_SESSION` names the Playwright session (default `figma`). The extension
+token is read only from the environment and is never stored.
 
 ## m3e.kyralabs.dev (third-priority reference)
 
