@@ -33,7 +33,8 @@ use crate::{
     },
 };
 use gpui::{prelude::*, *};
-use gpui_base::Placement;
+use gpui_base::{Align, Placement};
+use std::time::Duration;
 
 /// The plain tooltip's maximum width before it wraps.
 pub const PLAIN_TOOLTIP_MAX_WIDTH: f32 = 200.;
@@ -71,7 +72,30 @@ pub struct MaterialTooltip {
     content: Content,
     trigger: Option<AnyElement>,
     placement: Placement,
+    align: Align,
+    timing: TipTiming,
     forced: Option<bool>,
+}
+
+/// How a tooltip responds to input: which inputs show it and its delays
+/// (`None` uses Base's application-wide [`gpui_base::TooltipDefaults`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct TipTiming {
+    on_hover: bool,
+    on_focus: bool,
+    show_delay: Option<Duration>,
+    hide_delay: Option<Duration>,
+}
+
+impl Default for TipTiming {
+    fn default() -> Self {
+        Self {
+            on_hover: true,
+            on_focus: true,
+            show_delay: None,
+            hide_delay: None,
+        }
+    }
 }
 
 impl MaterialTooltip {
@@ -82,6 +106,8 @@ impl MaterialTooltip {
             content: Content::Plain(text.into()),
             trigger: None,
             placement: Placement::Top,
+            align: Align::Center,
+            timing: TipTiming::default(),
             forced: None,
         }
     }
@@ -96,6 +122,8 @@ impl MaterialTooltip {
             },
             trigger: None,
             placement: Placement::Bottom,
+            align: Align::Center,
+            timing: TipTiming::default(),
             forced: None,
         }
     }
@@ -122,6 +150,34 @@ impl MaterialTooltip {
     /// The preferred side; it flips when the tooltip does not fit.
     pub fn placement(mut self, placement: Placement) -> Self {
         self.placement = placement;
+        self
+    }
+    /// How the tooltip lines up with its trigger along the placement side:
+    /// centered (default), or flush with the trigger's start or end edge.
+    pub fn align(mut self, align: Align) -> Self {
+        self.align = align;
+        self
+    }
+    /// Whether hovering the trigger shows the tooltip (default true).
+    pub fn show_on_hover(mut self, show: bool) -> Self {
+        self.timing.on_hover = show;
+        self
+    }
+    /// Whether keyboard focus in the trigger shows the tooltip (default
+    /// true).
+    pub fn show_on_focus(mut self, show: bool) -> Self {
+        self.timing.on_focus = show;
+        self
+    }
+    /// The hover delay before showing (default: Base's show delay).
+    pub fn show_delay(mut self, delay: Duration) -> Self {
+        self.timing.show_delay = Some(delay);
+        self
+    }
+    /// The grace period before hiding once input leaves (default: Base's
+    /// grace period).
+    pub fn hide_delay(mut self, delay: Duration) -> Self {
+        self.timing.hide_delay = Some(delay);
         self
     }
     /// Keep the tooltip shown (or hidden) regardless of input, e.g. for a
@@ -209,6 +265,9 @@ struct TipState {
     keyboard_focus: bool,
     visible: bool,
     epoch: usize,
+    timing: TipTiming,
+    /// Whether the pointer is over the trigger, shown or not.
+    pointer_over: bool,
     bounds: Option<Bounds<Pixels>>,
     focus: Option<FocusHandle>,
     seen_focus: Option<FocusHandle>,
@@ -256,14 +315,21 @@ fn update_tip(
         (tip.visible, tip.wanted(), tip.keyboard_focus, tip.epoch)
     });
     let defaults = gpui_base::TooltipDefaults::global(cx);
+    let timing = state.read(cx).timing;
     let (delay, show) = match tip_change(visible, wanted, keyboard) {
         TipChange::ShowNow => {
             state.update(cx, |tip, _| tip.visible = true);
             window.refresh();
             return;
         }
-        TipChange::ShowAfterDelay => (defaults.show_delay(), true),
-        TipChange::HideAfterGrace => (defaults.grace_period(), false),
+        TipChange::ShowAfterDelay => (
+            timing.show_delay.unwrap_or_else(|| defaults.show_delay()),
+            true,
+        ),
+        TipChange::HideAfterGrace => (
+            timing.hide_delay.unwrap_or_else(|| defaults.grace_period()),
+            false,
+        ),
         TipChange::Keep => return,
     };
     let state = state.downgrade();
@@ -290,11 +356,24 @@ impl RenderOnce for MaterialTooltip {
         let description = self.description();
         let interactive = self.interactive();
         let placement = self.placement;
+        let align = self.align;
+        let timing = self.timing;
         let id = self.id;
         let state = window.use_keyed_state((id.clone(), "tooltip"), cx, |_, cx| TipState {
             focus: Some(cx.focus_handle()),
             ..TipState::default()
         });
+        if state.read(cx).timing != timing {
+            state.update(cx, |tip, _| tip.timing = timing);
+            // Input that no longer shows the tooltip stops holding it.
+            let changed = state.clone();
+            window.defer(cx, move |window, cx| {
+                update_tip(&changed, window, cx, |tip| {
+                    tip.trigger_hovered = tip.pointer_over && timing.on_hover;
+                    tip.keyboard_focus &= timing.on_focus;
+                });
+            });
+        }
         let focus = state
             .read(cx)
             .focus
@@ -308,7 +387,8 @@ impl RenderOnce for MaterialTooltip {
             let observed = state.clone();
             let container_focus = focus.clone();
             window.defer(cx, move |window, cx| {
-                let keyboard = container_focus.contains_focused(window, cx)
+                let keyboard = timing.on_focus
+                    && container_focus.contains_focused(window, cx)
                     && window.last_input_was_keyboard();
                 observed.update(cx, |tip, _| tip.seen_focus = focused);
                 if keyboard != observed.read(cx).keyboard_focus {
@@ -347,7 +427,8 @@ impl RenderOnce for MaterialTooltip {
             .on_hover(move |hovered, window, cx| {
                 let hovered = *hovered;
                 update_tip(&hover_state, window, cx, |tip| {
-                    tip.trigger_hovered = hovered
+                    tip.pointer_over = hovered;
+                    tip.trigger_hovered = hovered && tip.timing.on_hover;
                 });
             })
             .on_key_down(move |event, window, cx| {
@@ -436,6 +517,7 @@ impl RenderOnce for MaterialTooltip {
             });
         let positioner = gpui_base::Positioner::side(bounds)
             .placement(placement)
+            .align(align)
             .offset(rem(TOOLTIP_OFFSET).to_pixels(window.rem_size()))
             .on_position(move |resolved| placed.set(resolved.placement))
             .child(tip);
@@ -526,6 +608,71 @@ mod tests {
         draw(cx);
         draw(cx);
         assert!(!tooltip_shown(cx), "hidden after the grace period");
+    }
+
+    struct OptionsHarness {
+        hover: bool,
+        align: Align,
+    }
+    impl Render for OptionsHarness {
+        fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+            window.set_rem_size(px(16.));
+            div().p(px(100.)).child(
+                MaterialTooltip::plain("tip", "Save to favorites")
+                    .align(self.align)
+                    .show_on_hover(self.hover)
+                    .show_delay(Duration::from_millis(50))
+                    .hide_delay(Duration::from_millis(20))
+                    .trigger(div().debug_selector(|| "trigger".into()).size(px(40.))),
+            )
+        }
+    }
+
+    #[gpui::test]
+    fn options_set_the_delays_alignment_and_hover_response(cx: &mut TestAppContext) {
+        cx.update(|cx| {
+            gpui_base::init(cx);
+            cx.set_reduce_motion(true);
+            gpui_base::TooltipDefaults::new()
+                .with_show_delay(Duration::from_secs(5))
+                .install(cx);
+        });
+        let (view, cx) = cx.add_window_view(|_, _| OptionsHarness {
+            hover: false,
+            align: Align::Start,
+        });
+        draw(cx);
+        let trigger = cx.debug_bounds("trigger").unwrap();
+        cx.simulate_mouse_move(trigger.center(), None, Modifiers::default());
+        cx.executor().advance_clock(Duration::from_millis(200));
+        draw(cx);
+        assert!(!tooltip_shown(cx), "hover does not show it");
+        view.update(cx, |h, cx| {
+            h.hover = true;
+            cx.notify();
+        });
+        draw(cx);
+        cx.simulate_mouse_move(
+            trigger.center() + point(px(1.), px(1.)),
+            None,
+            Modifiers::default(),
+        );
+        draw(cx);
+        // The tooltip's own show delay replaces the 5s default.
+        cx.executor().advance_clock(Duration::from_millis(50));
+        draw(cx);
+        draw(cx);
+        assert!(tooltip_shown(cx), "shown after its own delay");
+        let popup = cx.debug_bounds("tooltip-popup").unwrap();
+        assert_eq!(popup.left(), trigger.left(), "start-aligned");
+        cx.simulate_mouse_move(point(px(5.), px(5.)), None, Modifiers::default());
+        draw(cx);
+        cx.executor().advance_clock(Duration::from_millis(20));
+        draw(cx);
+        cx.executor().advance_clock(Duration::from_secs(1));
+        draw(cx);
+        draw(cx);
+        assert!(!tooltip_shown(cx), "hidden after its own hide delay");
     }
 
     /// A trigger against the window's top edge: a top tooltip flips below.

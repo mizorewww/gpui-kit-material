@@ -366,6 +366,7 @@ pub struct LoadingIndicator {
     label: SharedString,
     progress: Option<f32>,
     contained: bool,
+    size: f32,
     shape: Option<LoadingShape>,
     playback: Option<RepeatAnimationPlayback>,
 }
@@ -377,6 +378,7 @@ impl LoadingIndicator {
             label: label.into(),
             progress: None,
             contained: false,
+            size: LOADING_INDICATOR_SIZE,
             shape: None,
             playback: None,
         }
@@ -385,6 +387,15 @@ impl LoadingIndicator {
     /// Show the round primary-container container behind the shape.
     pub fn contained(mut self, contained: bool) -> Self {
         self.contained = contained;
+        self
+    }
+
+    /// The container's size in design px (48 by default); the shape scales
+    /// with it.
+    pub fn size(mut self, size: f32) -> Self {
+        if size.is_finite() && size > 0. {
+            self.size = size;
+        }
         self
     }
 
@@ -436,7 +447,7 @@ impl RenderOnce for LoadingIndicator {
             .indeterminate(measured.is_none())
             .value(measured.unwrap_or(0.) * 100.)
             .flex_shrink_0()
-            .size(rem(LOADING_INDICATOR_SIZE))
+            .size(rem(self.size))
             .rounded_full()
             .when(self.contained, |root| {
                 root.bg(color(ColorRole::PRIMARY_CONTAINER))
@@ -549,6 +560,11 @@ mod tests {
                         .child(LoadingIndicator::new("li", "Loading").contained(true)),
                 )
                 .child(LoadingIndicator::new("li-measured", "Uploading").progress(Some(0.4)))
+                .child(
+                    div()
+                        .debug_selector(|| "loading-large".into())
+                        .child(LoadingIndicator::new("li-large", "Loading").size(96.)),
+                )
         }
     }
 
@@ -562,6 +578,8 @@ mod tests {
         });
         let bounds = cx.debug_bounds("loading").unwrap();
         assert_eq!(bounds.size, size(px(48.), px(48.)));
+        let large = cx.debug_bounds("loading-large").unwrap();
+        assert_eq!(large.size, size(px(96.), px(96.)), "a sized container");
         // The rendered LoadingIndicator itself carries the progress role and
         // the caller's label, indeterminate or measured.
         cx.update(|window, _| {

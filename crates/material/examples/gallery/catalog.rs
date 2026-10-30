@@ -429,7 +429,7 @@ pub static CATALOG: &[Entry] = &[
         Communication,
         "Notifications and counts on navigation items and icons.",
         spec("badges"),
-        None,
+        Some(&playgrounds::badge::PLAYGROUND),
     ),
     component(
         "progress",
@@ -437,7 +437,7 @@ pub static CATALOG: &[Entry] = &[
         Communication,
         "Show the status of ongoing work, linear or circular.",
         spec("loading-progress"),
-        None,
+        Some(&playgrounds::progress::PLAYGROUND),
     ),
     component(
         "loading-indicator",
@@ -445,7 +445,7 @@ pub static CATALOG: &[Entry] = &[
         Communication,
         "Show that content is on its way, for short waits.",
         spec("loading-progress"),
-        None,
+        Some(&playgrounds::loading_indicator::PLAYGROUND),
     ),
     component(
         "snackbar",
@@ -453,7 +453,7 @@ pub static CATALOG: &[Entry] = &[
         Communication,
         "Brief updates about app processes at the bottom of the screen.",
         spec("snackbar"),
-        None,
+        Some(&playgrounds::snackbar::PLAYGROUND),
     ),
     component(
         "tooltip",
@@ -461,38 +461,38 @@ pub static CATALOG: &[Entry] = &[
         Communication,
         "Brief labels or messages that appear on hover or focus.",
         spec("tooltips"),
-        None,
+        Some(&playgrounds::tooltip::PLAYGROUND),
     ),
     // Styles
     document(
         "color",
         "Color",
         Styles,
-        "Reference themes, modes, contrast levels and the color roles they assign.",
+        "Every color role in each theme, light and dark, with contrast checks.",
     ),
     document(
         "typography",
         "Typography",
         Styles,
-        "The type scale and text scaling that keep text legible.",
+        "The 15 type scale roles as live samples you can edit.",
     ),
     document(
         "shape",
         "Shape",
         Styles,
-        "The corner radius scale and expressive shapes.",
+        "The corner scale: make your components squarer or rounder.",
     ),
     document(
         "motion",
         "Motion",
         Styles,
-        "Spring tokens for spatial and effects motion.",
+        "Spring tokens for spatial and effects motion: play and compare them.",
     ),
     document(
         "elevation",
         "Elevation",
         Styles,
-        "Surface levels, tonal color and shadows.",
+        "Shadow levels and tonal surfaces.",
     ),
     // Examples
     document(

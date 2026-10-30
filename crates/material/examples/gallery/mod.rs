@@ -16,6 +16,7 @@ mod scroll_performance;
 
 pub(crate) mod catalog;
 mod fps;
+mod overview;
 pub(crate) mod page;
 mod pages;
 pub(crate) mod playground;
@@ -25,6 +26,8 @@ mod shell;
 #[cfg(test)]
 mod shell_tests;
 pub(crate) mod spec;
+#[cfg(test)]
+mod styles_tests;
 mod top_bar;
 
 use gpui::{prelude::*, *};

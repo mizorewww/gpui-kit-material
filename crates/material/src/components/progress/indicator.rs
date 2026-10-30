@@ -4,10 +4,12 @@
 //! Reference: <https://m3e.kyralabs.dev/components/progress/>.
 use super::{
     circular::{CircularProgressFrame, circular_indeterminate_frame},
-    linear::{PROGRESS_THICK_THICKNESS, PROGRESS_THICKNESS, ProgressShape, wave_amplitude},
+    linear::{
+        PROGRESS_THICK_THICKNESS, PROGRESS_THICKNESS, ProgressShape, progress_colors,
+        wave_amplitude,
+    },
     paint::{dot, stroke_polyline},
 };
-use crate::{color::ColorRole, theme::color};
 use gpui::{prelude::*, *};
 use gpui_base::Progress;
 use std::{f32::consts::TAU, time::Duration};
@@ -43,6 +45,8 @@ pub struct CircularProgress {
     thickness: Pixels,
     shape: ProgressShape,
     show_track: Option<bool>,
+    size: Option<f32>,
+    disabled: bool,
     playback: Option<RepeatAnimationPlayback>,
 }
 
@@ -55,6 +59,8 @@ impl CircularProgress {
             thickness: PROGRESS_THICKNESS,
             shape: ProgressShape::Flat,
             show_track: None,
+            size: None,
+            disabled: false,
             playback: None,
         }
     }
@@ -66,6 +72,25 @@ impl CircularProgress {
 
     pub fn thick(mut self) -> Self {
         self.thickness = PROGRESS_THICK_THICKNESS;
+        self
+    }
+
+    /// The track and indicator thickness (4dp by default).
+    pub fn thickness(mut self, thickness: Pixels) -> Self {
+        self.thickness = thickness;
+        self
+    }
+
+    /// The indicator box in design px, overriding the kit's size for the
+    /// shape and thickness ([`circular_progress_size`]).
+    pub fn size(mut self, size: f32) -> Self {
+        self.size = Some(size);
+        self
+    }
+
+    /// A disabled indicator paints in on-surface at 38% over a 12% track.
+    pub fn disabled(mut self, disabled: bool) -> Self {
+        self.disabled = disabled;
         self
     }
 
@@ -173,7 +198,11 @@ fn ring_canvas(frame: CircularProgressFrame, paint: RingPaint, wavy: bool) -> im
 impl RenderOnce for CircularProgress {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let wavy = self.shape == ProgressShape::Wavy;
-        let box_size = circular_progress_size(self.shape, self.thickness);
+        let box_size = self
+            .size
+            .filter(|size| size.is_finite() && *size > 0.)
+            .unwrap_or_else(|| circular_progress_size(self.shape, self.thickness));
+        let (ink, track) = progress_colors(false, self.disabled);
         let target = self
             .value
             .map(|v| if v.is_finite() { v.clamp(0., 1.) } else { 0. });
@@ -182,8 +211,8 @@ impl RenderOnce for CircularProgress {
             amplitude: 0.,
             phase: 0.,
             show_track: self.show_track.unwrap_or(target.is_some()),
-            ink: color(ColorRole::PRIMARY),
-            track: color(ColorRole::SECONDARY_CONTAINER),
+            ink,
+            track,
         };
         let root = Progress::new(self.id.clone())
             .accessibility_label(self.label)

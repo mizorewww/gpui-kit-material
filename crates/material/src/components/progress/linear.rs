@@ -78,7 +78,30 @@ pub struct LinearProgress {
     thickness: Pixels,
     shape: ProgressShape,
     muted: bool,
+    disabled: bool,
+    stop_indicator: bool,
+    buffer: Option<f32>,
     playback: Option<RepeatAnimationPlayback>,
+}
+
+/// Disabled indicators: on-surface at 38%, the track at 12%.
+pub(super) const DISABLED_INK: f32 = 0.38;
+pub(super) const DISABLED_TRACK: f32 = 0.12;
+
+/// The (indicator, track) colors.
+pub(super) fn progress_colors(muted: bool, disabled: bool) -> (Rgba, Rgba) {
+    if disabled {
+        let ink = color(ColorRole::ON_SURFACE);
+        return (ink.opacity(DISABLED_INK), ink.opacity(DISABLED_TRACK));
+    }
+    (
+        color(if muted {
+            ColorRole::OUTLINE
+        } else {
+            ColorRole::PRIMARY
+        }),
+        color(ColorRole::SECONDARY_CONTAINER),
+    )
 }
 
 impl LinearProgress {
@@ -94,6 +117,9 @@ impl LinearProgress {
             thickness: PROGRESS_THICKNESS,
             shape: ProgressShape::Flat,
             muted: false,
+            disabled: false,
+            stop_indicator: true,
+            buffer: None,
             playback: None,
         }
     }
@@ -135,6 +161,27 @@ impl LinearProgress {
         self
     }
 
+    /// A disabled indicator paints in on-surface at 38% over a 12% track.
+    pub fn disabled(mut self, disabled: bool) -> Self {
+        self.disabled = disabled;
+        self
+    }
+
+    /// Whether a determinate indicator shows the stop dot at the track's
+    /// end (default true; M3 requires it when the track's contrast is
+    /// below 3:1).
+    pub fn stop_indicator(mut self, show: bool) -> Self {
+        self.stop_indicator = show;
+        self
+    }
+
+    /// A determinate indicator's buffer (0-1): the track ends there, as
+    /// content loads ahead of playback. Never less than the value.
+    pub fn buffer(mut self, buffer: Option<f32>) -> Self {
+        self.buffer = buffer;
+        self
+    }
+
     /// A caller-owned clock that survives virtual unmounting.
     pub fn playback(mut self, playback: RepeatAnimationPlayback) -> Self {
         self.playback = Some(playback);
@@ -152,6 +199,20 @@ struct BarPaint {
     phase: f32,
     ink: Rgba,
     track: Rgba,
+    stop: bool,
+    /// Where a determinate track ends, as a fraction.
+    buffer: f32,
+}
+
+/// The track pieces up to `end` px.
+pub(super) fn clip_pieces(pieces: Vec<(f32, f32)>, end: f32) -> Vec<(f32, f32)> {
+    pieces
+        .into_iter()
+        .filter_map(|(a, b)| {
+            let b = b.min(end);
+            (b - a > 0.5).then_some((a, b))
+        })
+        .collect()
 }
 
 /// The active intervals of one frame, in fractions of the track.
@@ -195,10 +256,11 @@ fn paint_bar(bounds: Bounds<Pixels>, active: Active, paint: BarPaint, window: &m
             .map(|&(tail, head)| (width * tail, width * head))
             .collect(),
     };
-    for (a, b) in track_pieces(width, &intervals) {
+    for (a, b) in clip_pieces(track_pieces(width, &intervals), width * paint.buffer) {
         rounded_bar(window, x0 + a, x0 + b, cy, t, paint.track);
     }
     if let Active::Measured(amount) = active
+        && paint.stop
         && amount < 0.995
     {
         // The stop dot sits centered in the track's rounded end.
@@ -277,17 +339,20 @@ impl RenderOnce for LinearProgress {
         let target = self
             .value
             .map(|v| if v.is_finite() { v.clamp(0., 1.) } else { 0. });
+        let (ink, track) = progress_colors(self.muted, self.disabled);
+        let buffer = match (target, self.buffer) {
+            (Some(target), Some(buffer)) if buffer.is_finite() => buffer.clamp(target, 1.),
+            _ => 1.,
+        };
         let mut paint = BarPaint {
             thickness,
             amplitude: 0.,
             wavelength: DETERMINATE_WAVELENGTH,
             phase: 0.,
-            ink: color(if self.muted {
-                ColorRole::OUTLINE
-            } else {
-                ColorRole::PRIMARY
-            }),
-            track: color(ColorRole::SECONDARY_CONTAINER),
+            ink,
+            track,
+            stop: self.stop_indicator,
+            buffer,
         };
         let root = Progress::new(self.id.clone())
             .when_some(self.label, |p, label| p.accessibility_label(label))
@@ -408,6 +473,20 @@ mod linear_tests {
         // A line shorter than the gap only clears its own length.
         assert_eq!(track_pieces(100., &[(0., 2.)]), vec![(4., 100.)]);
         assert!(track_pieces(100., &[(0., 100.)]).is_empty());
+    }
+
+    #[test]
+    fn a_buffer_ends_the_track_and_disabled_dims_both_parts() {
+        let pieces = track_pieces(300., &[(0., 90.)]);
+        assert_eq!(clip_pieces(pieces.clone(), 300.), vec![(94., 300.)]);
+        assert_eq!(clip_pieces(pieces.clone(), 210.), vec![(94., 210.)]);
+        // A buffer at the value leaves no track.
+        assert!(clip_pieces(pieces, 90.).is_empty());
+        let (ink, track) = progress_colors(false, true);
+        let on_surface = color(ColorRole::ON_SURFACE);
+        assert_eq!(ink, on_surface.opacity(DISABLED_INK));
+        assert_eq!(track, on_surface.opacity(DISABLED_TRACK));
+        assert_eq!(progress_colors(true, false).0, color(ColorRole::OUTLINE));
     }
 
     #[test]

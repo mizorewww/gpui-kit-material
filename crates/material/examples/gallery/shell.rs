@@ -337,7 +337,7 @@ impl Gallery {
         let content = match self.rows[index] {
             Row::Lead => self.render_lead(window, cx),
             Row::Spec(row) => self.render_spec_row(index, row, window, cx),
-            Row::Group(group) => self.render_overview_group(group, cx),
+            Row::Group(group) => self.render_overview_group(group, window, cx),
         };
         div()
             .id(("gallery-row", index))
@@ -671,70 +671,6 @@ impl Gallery {
                 panel.border_b_1().rounded_b(radius).pb(rem(32.))
             })
             .child(content)
-            .into_any_element()
-    }
-
-    fn render_overview_group(&self, group: Group, cx: &mut Context<Self>) -> AnyElement {
-        gpui_base::v_flex()
-            .gap(rem(12.))
-            .pb(rem(32.))
-            .child(
-                accessible_text(
-                    ("overview-group", group as usize),
-                    group.title().to_uppercase(),
-                )
-                .role(Role::Heading)
-                .map(|text| type_role(text, TypeRole::LabelLarge))
-                .text_color(color(ColorRole::ON_SURFACE_VARIANT)),
-            )
-            .child(
-                div().flex().flex_wrap().gap(rem(16.)).children(
-                    CATALOG
-                        .iter()
-                        .enumerate()
-                        .filter(|(_, entry)| {
-                            entry.group == group && matches!(entry.kind, Kind::Component { .. })
-                        })
-                        .map(|(index, entry)| {
-                            let on_surface = color(ColorRole::ON_SURFACE);
-                            FocusRing::new(
-                                ("overview-ring", index),
-                                gpui_base::Button::new(("overview-card", index))
-                                    .role(Role::Link)
-                                    .accessibility_label(entry.title)
-                                    .debug_selector(move || format!("overview-{}", entry.id))
-                                    .w(rem(272.))
-                                    .min_h(rem(112.))
-                                    .flex()
-                                    .flex_col()
-                                    .gap(rem(6.))
-                                    .p(rem(20.))
-                                    .bg(card_background())
-                                    .border_1()
-                                    .border_color(outline())
-                                    .rounded(rem(CARD_RADIUS))
-                                    .cursor_pointer()
-                                    .hover(move |style| style.bg(on_surface.opacity(0.08)))
-                                    .child(
-                                        div()
-                                            .map(|text| type_role(text, TypeRole::TitleMedium))
-                                            .text_color(color(ColorRole::ON_SURFACE))
-                                            .child(entry.title),
-                                    )
-                                    .child(
-                                        div()
-                                            .whitespace_normal()
-                                            .map(|text| type_role(text, TypeRole::BodyMedium))
-                                            .text_color(color(ColorRole::ON_SURFACE_VARIANT))
-                                            .child(entry.description),
-                                    )
-                                    .on_click(
-                                        cx.listener(move |this, _, _, cx| this.navigate(index, cx)),
-                                    ),
-                            )
-                        }),
-                ),
-            )
             .into_any_element()
     }
 

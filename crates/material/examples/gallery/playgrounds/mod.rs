@@ -1,9 +1,16 @@
 //! Component playgrounds, one module per md3.io component page. Each
 //! exports a `PLAYGROUND` static that `super::catalog` points its entry at.
 //! See `super::playground` for the API.
+pub mod badge;
 pub mod button;
+pub mod loading_indicator;
+pub mod progress;
+pub mod snackbar;
 pub mod switch;
+#[cfg(test)]
+mod test_support;
 pub mod text_field;
+pub mod tooltip;
 
 /// The common imports of playground modules.
 pub mod prelude {
