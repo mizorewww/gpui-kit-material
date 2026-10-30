@@ -20,6 +20,8 @@ pub use standard_button_group::{ButtonGroup, EXPANDED_RATIO, standard_group_gap}
 #[cfg(all(test, feature = "gpui-fast"))]
 mod a11y_tests;
 mod app_bar;
+mod badge;
+pub use badge::{Badge, BadgeColor, BadgePosition, badge_label};
 mod button_group;
 #[cfg(test)]
 mod color_guard_tests;

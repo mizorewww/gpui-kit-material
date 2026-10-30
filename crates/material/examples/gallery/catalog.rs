@@ -429,7 +429,7 @@ pub static CATALOG: &[Entry] = &[
         Communication,
         "Notifications and counts on navigation items and icons.",
         spec("badges"),
-        None,
+        Some(&playgrounds::badge::PLAYGROUND),
     ),
     component(
         "progress",
