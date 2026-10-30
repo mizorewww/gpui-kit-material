@@ -159,7 +159,7 @@
       "upstream_paths": [
         "Cargo.toml"
       ],
-      "action": "Keep the original-hitbox extension, passive touch and DPR fixes until the selected runtime supplies equivalent behavior.",
+      "action": "Keep the original-hitbox extension and passive touch fixes until the selected runtime supplies equivalent behavior.",
       "conditions": "Kit still depends on unpatched gpui-pre 0.3.10. Inspect actual runtime source and repeat regressions; do not remove entire vendor trees based on package names."
     },
     {
@@ -398,8 +398,8 @@
       "upstream_paths": [
         "Cargo.toml"
       ],
-      "action": "Keep the canvas-size/DPR patches merged from gpui-pre-web; see its MATERIAL-MIGRATION.json.",
-      "conditions": "Backing-store sizing across DPR and viewport changes is validated by scripts/check-gallery-dpr.py; repeat that check before replacing."
+      "action": "Keep the submission counting merged from gpui-pre-web; see its MATERIAL-MIGRATION.json. The canvas-size patch is gone: upstream's sizing is correct at real device scale factors.",
+      "conditions": "Backing-store sizing at real device scale factors is validated by scripts/check-gallery-dpr.py; repeat that check after any web backend update."
     },
     {
       "id": "vendor-gpui-fast-macos",

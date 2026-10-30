@@ -24,8 +24,10 @@ python3 -m http.server 8080 --bind 127.0.0.1 --directory crates/gallery-web/www
 ```
 
 The single-threaded build needs no cross-origin isolation headers. Generated
-bindings stay out of Git. Check canvas allocation at 1×/1.25×/1.5×/2× DPR
-(requires `agent-browser`; validates allocation only, not pixels):
+bindings stay out of Git. Check canvas allocation at real 1×/1.25×/1.5×/2× device
+scale factors (requires `agent-browser` and Chromium; validates allocation only,
+not pixels). CDP device-metrics emulation reports a device-pixel box that
+disagrees with `devicePixelRatio`, so do not use it to judge canvas size:
 
 ```sh
 python3 scripts/check-gallery-dpr.py http://127.0.0.1:8080 /tmp/material-gallery-dpr

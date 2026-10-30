@@ -30,19 +30,9 @@
   "local_patch_base": "gpui-pre-web 0.3.10",
   "migrated": [
     {
-      "path": "src/canvas_size.rs",
-      "status": "added",
-      "local_sha256": "0c30b53010e38d1e9bb79e744d2936a5e19ce202ade2bbcdde9b8e11087db1c0"
-    },
-    {
-      "path": "src/gpui_web.rs",
-      "status": "merged",
-      "local_sha256": "94847c66838eb4bc59f907e78f368be5744d238f741b9439e3c005ed5f22b2dd"
-    },
-    {
       "path": "src/window.rs",
       "status": "merged",
-      "local_sha256": "28f76320963010d63471a0a23d0e6124442803f71eaf4f22263bec9d43a0c519"
+      "local_sha256": "70865007f6ef795e2d0bdd5fa5a381f0a3ad3bcaa4a0f531784eeeff43f7b4d5"
     }
   ],
   "conflicts": [],
@@ -55,29 +45,19 @@
   "local_changes": {
     "scope": "Every file that differs from the extracted published archive (Cargo's .cargo-ok extraction marker excluded); MATERIAL-MIGRATION.json itself is provenance.",
     "modified": {
-      "src/gpui_web.rs": {
-        "upstream_sha256": "51360d028a5f0e495557732e7e257ccfd5de960a17a9a57487aeaa8562b10979",
-        "local_sha256": "94847c66838eb4bc59f907e78f368be5744d238f741b9439e3c005ed5f22b2dd",
-        "reason": "Declare the canvas_size module (identical to vendor/gpui-pre-web)."
-      },
       "src/window.rs": {
         "upstream_sha256": "eda543e585912fcb012e2a3559d8fb2e9ad7570ba58746747af380d044085cb8",
-        "local_sha256": "28f76320963010d63471a0a23d0e6124442803f71eaf4f22263bec9d43a0c519",
-        "reason": "Resize observer uses canvas_dimensions and reacts to DPR/logical-size changes; successful_frame_submissions from WgpuRenderer::draw (identical to vendor/gpui-pre-web)."
+        "local_sha256": "70865007f6ef795e2d0bdd5fa5a381f0a3ad3bcaa4a0f531784eeeff43f7b4d5",
+        "reason": "successful_frame_submissions, as vendor/gpui-pre-web (MATERIAL-PATCHES.md there)."
       }
     },
-    "added": {
-      "src/canvas_size.rs": {
-        "sha256": "0c30b53010e38d1e9bb79e744d2936a5e19ce202ade2bbcdde9b8e11087db1c0",
-        "reason": "Added: identical to vendor/gpui-pre-web (see its MATERIAL-PATCHES.md): CSS viewport kept separate from backing-store pixels with DPR-consistency fallback."
-      }
-    },
+    "added": {},
     "removed": {
       "Cargo.lock": {
         "upstream_sha256": "304fa06120cd487a62a22e76edffff0a74ac974a1b8ed26bfc43b33323b290ba",
         "reason": "Package-level lockfile not retained; the workspace Cargo.lock owns resolution."
       }
     },
-    "unchanged_file_count": 18
+    "unchanged_file_count": 19
   }
 }

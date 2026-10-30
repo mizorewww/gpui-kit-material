@@ -292,31 +292,32 @@ impl WebWindow {
             let dpr = inner.browser_window.device_pixel_ratio();
             let dpr_f32 = dpr as f32;
 
-            let rect = entry.content_rect();
-            let device_box = if inner.has_device_pixel_support {
-                entry
-                    .device_pixel_content_box_size()
-                    .get(0)
-                    .dyn_into::<web_sys::ResizeObserverSize>()
-                    .ok()
-                    .map(|size| (size.inline_size(), size.block_size()))
-            } else {
-                None
-            };
             let (physical_width, physical_height, logical_width, logical_height) =
-                crate::canvas_size::canvas_dimensions(rect.width(), rect.height(), dpr, device_box);
+                if inner.has_device_pixel_support {
+                    let size: web_sys::ResizeObserverSize = entry
+                        .device_pixel_content_box_size()
+                        .get(0)
+                        .unchecked_into();
+                    let pw = size.inline_size() as u32;
+                    let ph = size.block_size() as u32;
+                    let lw = pw as f64 / dpr;
+                    let lh = ph as f64 / dpr;
+                    (pw, ph, lw as f32, lh as f32)
+                } else {
+                    // Safari fallback: use contentRect (always CSS px).
+                    let rect = entry.content_rect();
+                    let lw = rect.width() as f32;
+                    let lh = rect.height() as f32;
+                    let pw = (lw as f64 * dpr).round() as u32;
+                    let ph = (lh as f64 * dpr).round() as u32;
+                    (pw, ph, lw, lh)
+                };
 
-            let scale_changed =
-                inner.notify_scale.replace(false) || inner.state.borrow().scale_factor != dpr_f32;
+            let scale_changed = inner.notify_scale.replace(false);
             let prev = inner.last_physical_size.get();
             let size_changed = prev != (physical_width, physical_height);
 
-            let logical_size_changed = {
-                let state = inner.state.borrow();
-                state.bounds.size.width != px(logical_width)
-                    || state.bounds.size.height != px(logical_height)
-            };
-            if !scale_changed && !size_changed && !logical_size_changed {
+            if !scale_changed && !size_changed {
                 return;
             }
             inner
