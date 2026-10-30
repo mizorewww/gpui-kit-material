@@ -1,12 +1,23 @@
 //! The motion vocabulary: M3 springs, entrances and retargetable values.
 //!
-//! Both schemes are m3e.kyralabs.dev's analytic springs (kyra-labs/m3exp-web
-//! `3b1e0047c0021eab7b4c0128fa1bec95c76ca746`,
-//! `packages/m3e-tokens/src/generated/tokens.css`, generated from Compose
-//! Material3 1.5.0-beta01 `StandardMotionTokens.kt` / `ExpressiveMotionTokens.kt`
-//! @ androidx `19991f2c0858aadfcb442ce02b2c8e4743c96898`), timed by Compose's
-//! settle estimate. Under reduced motion, spatial tokens finish immediately and
-//! default/slow effects play the fast effects spring (m3e FOUNDATIONS §4).
+//! Reference priority is Figma kit > md3.io > m3e.kyralabs.dev, per value.
+//! The Figma Material 3 Design Kit defines no motion values.
+//!
+//! - Expressive (the default) uses md3.io's sampled CSS curves and durations
+//!   for all six tokens ([`expressive`], floor/material
+//!   c910072f3fc5b660276731d8a935d7186f288364). Under reduced motion it
+//!   follows md3.io's captured policy (`conformance/reference/
+//!   button-states-reduced-motion.json`): spatial tokens finish immediately and
+//!   effects keep their own curve.
+//! - Standard is absent from md3.io, so it uses m3e.kyralabs.dev's analytic
+//!   springs (kyra-labs/m3exp-web `3b1e0047c0021eab7b4c0128fa1bec95c76ca746`,
+//!   `packages/m3e-tokens/src/generated/tokens.css`, generated from Compose
+//!   Material3 1.5.0-beta01 `StandardMotionTokens.kt` @ androidx
+//!   `19991f2c0858aadfcb442ce02b2c8e4743c96898`) timed by Compose's settle
+//!   estimate, and m3e's reduced-motion tokens: spatial tokens finish
+//!   immediately and default/slow effects play the fast effects spring.
+//!   Fixture: `conformance/fixtures/m3e-motion.json`.
+//!
 //! Apply the scheme at the start of a root render, like the theme; helpers
 //! below resolve it on the UI thread.
 use gpui::{prelude::*, *};
@@ -36,23 +47,32 @@ pub enum MotionToken {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum MotionCurve {
     Standard(Spring),
-    Expressive(Spring),
+    Expressive(expressive::SampledSpring),
 }
 
 impl MotionCurve {
-    /// The scheme's spring behind this curve.
-    pub fn spring(self) -> Spring {
+    /// The analytic spring behind this curve: Standard's m3e spring. md3.io
+    /// specifies Expressive as sampled curves, not spring parameters, so an
+    /// Expressive curve has none.
+    pub fn spring(self) -> Option<Spring> {
         match self {
-            Self::Standard(spring) | Self::Expressive(spring) => spring,
+            Self::Standard(spring) => Some(spring),
+            Self::Expressive(_) => None,
         }
     }
 
     pub fn duration(self) -> Duration {
-        self.spring().duration()
+        match self {
+            Self::Standard(spring) => spring.duration(),
+            Self::Expressive(spring) => spring.duration,
+        }
     }
 
     pub fn ease(self) -> impl Fn(f32) -> f32 + Copy + 'static {
-        self.spring().ease()
+        move |progress| match self {
+            Self::Standard(spring) => spring.ease()(progress),
+            Self::Expressive(spring) => spring.position(progress),
+        }
     }
 
     /// Position after `seconds` of a 0 → 1 transition on this curve.
@@ -105,16 +125,21 @@ pub fn curve(token: MotionToken) -> MotionCurve {
     SCHEME.get().resolve(token)
 }
 
-/// The token a transition plays under the current motion preference: m3e
-/// replaces the default and slow effects springs with the fast one under
-/// reduced motion (spatial tokens finish through [`token_policy`]).
-fn effective_token(token: MotionToken, cx: &App) -> MotionToken {
-    match token {
-        MotionToken::DefaultEffects | MotionToken::SlowEffects if cx.reduce_motion() => {
+/// The curve a transition plays under the current scheme and motion
+/// preference. Spatial tokens finish through [`token_policy`] in both
+/// schemes. Standard follows m3e's reduced-motion tokens, which replace the
+/// default and slow effects springs with the fast one; Expressive follows
+/// md3.io, whose effects keep their own curve.
+fn effective_curve(token: MotionToken, cx: &App) -> MotionCurve {
+    let scheme = SCHEME.get();
+    scheme.resolve(match token {
+        MotionToken::DefaultEffects | MotionToken::SlowEffects
+            if scheme == MotionScheme::Standard && cx.reduce_motion() =>
+        {
             MotionToken::FastEffects
         }
         token => token,
-    }
+    })
 }
 
 #[derive(Clone, Copy)]
@@ -175,7 +200,7 @@ impl<T: gpui_base::Interpolate + PartialEq + 'static> TokenTransitionPlayback<T>
     /// Forward actual target/preference changes while unmounted. A channel's
     /// first sample adopts its target; a fresh handle resets its lifecycle.
     pub fn sample(&self, target: T, token: MotionToken, cx: &App) -> gpui_base::MotionValue<T> {
-        let requested = curve(effective_token(token, cx));
+        let requested = effective_curve(token, cx);
         let mut active = self.curve.get().unwrap_or(RunningCurve {
             curve: requested,
             running: false,
@@ -217,9 +242,9 @@ pub fn token_value(
 /// Follow an interpolatable target using the selected Material motion token.
 ///
 /// Each channel ID must retain the same value type.
-/// Effects tokens preserve fades under reduced motion (default and slow
-/// effects on the fast effects spring), matching m3e's reduced-motion
-/// tokens; spatial tokens finish immediately. Interpolation is
+/// Effects tokens preserve fades under reduced motion (Expressive keeps
+/// md3.io's curves; Standard plays default and slow effects on m3e's fast
+/// effects spring); spatial tokens finish immediately. Interpolation is
 /// supplied by the value, so color spaces and compound geometry need not be flattened
 /// into independent scalar clocks. Timing and retargeting belong to GPUI Base.
 pub fn token_transition<T>(
@@ -233,7 +258,7 @@ where
     T: gpui_base::Interpolate + PartialEq + 'static,
 {
     let id = id.into();
-    let requested = curve(effective_token(token, cx));
+    let requested = effective_curve(token, cx);
     let state = window.use_keyed_state((id.clone(), "material-motion-curve"), cx, |_, _| {
         RunningCurve {
             curve: requested,
@@ -254,7 +279,8 @@ where
 pub const ENTER_MS: u64 = 160;
 
 /// A Material 3 spring (damping ratio, stiffness; unit mass). The constants
-/// below are the Standard motion scheme's tokens, which m3e generates from
+/// below are the Standard motion scheme's tokens (md3.io has no Standard
+/// scheme, so m3e is the source), which m3e generates from
 /// Compose `StandardMotionTokens.kt` (L20-L31) and lists in `tokens.css` as
 /// `--m3e-sys-motion-spring-standard-*`. Spatial springs move or reshape
 /// something and may settle with a barely visible overshoot; effects springs
@@ -1027,6 +1053,97 @@ mod tests {
     }
 
     #[test]
+    fn standard_scheme_matches_the_pinned_m3e_springs() {
+        use super::{MotionScheme, MotionToken};
+        let reference: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../conformance/fixtures/m3e-motion.json"
+        ))
+        .unwrap();
+        assert_eq!(
+            reference["source_commit"],
+            "3b1e0047c0021eab7b4c0128fa1bec95c76ca746"
+        );
+        let springs = reference["springs"]["standard"].as_array().unwrap();
+        assert_eq!(springs.len(), 6);
+        let mut seen = std::collections::BTreeSet::new();
+        for entry in springs {
+            let label = entry["token"].as_str().unwrap();
+            assert!(seen.insert(label), "duplicate {label}");
+            let token = match label {
+                "fast-spatial" => MotionToken::FastSpatial,
+                "default-spatial" => MotionToken::DefaultSpatial,
+                "slow-spatial" => MotionToken::SlowSpatial,
+                "fast-effects" => MotionToken::FastEffects,
+                "default-effects" => MotionToken::DefaultEffects,
+                "slow-effects" => MotionToken::SlowEffects,
+                _ => panic!("unexpected reference token {label}"),
+            };
+            let curve = MotionScheme::Standard.resolve(token);
+            let spring = curve.spring().unwrap();
+            let number = |key: &str| entry[key].as_f64().unwrap() as f32;
+            assert_eq!(spring.damping, number("damping_ratio"), "{label} damping");
+            assert_eq!(spring.stiffness, number("stiffness"), "{label} stiffness");
+            assert_eq!(
+                curve.duration().as_millis(),
+                entry["duration_ms"].as_u64().unwrap() as u128,
+                "{label} Compose settle duration"
+            );
+            // Each linear() stop is the spring sampled on a whole millisecond
+            // and rounded to 4 digits.
+            let stops = entry["linear_stops"].as_array().unwrap();
+            assert!(stops.len() >= 2);
+            for stop in stops {
+                let progress = stop[0].as_f64().unwrap() as f32;
+                let expected = stop[1].as_f64().unwrap() as f32;
+                let actual = curve.ease()(progress);
+                assert!(
+                    (actual - expected).abs() < 0.0005,
+                    "{label} at {progress}: {actual} vs m3e {expected}"
+                );
+            }
+        }
+        assert_eq!(
+            reference["reduced_motion"]["default-effects"]["replaced_by"],
+            "fast-effects"
+        );
+        assert_eq!(
+            reference["reduced_motion"]["slow-effects"]["replaced_by"],
+            "fast-effects"
+        );
+    }
+
+    #[gpui::test]
+    fn reduced_motion_follows_each_schemes_source(cx: &mut TestAppContext) {
+        use super::{MotionScheme, MotionToken, effective_curve};
+        cx.update(|cx| {
+            for reduce in [false, true] {
+                cx.set_reduce_motion(reduce);
+                for token in [MotionToken::DefaultEffects, MotionToken::SlowEffects] {
+                    super::set_motion_scheme(MotionScheme::Standard);
+                    // m3e: default/slow effects play the fast effects spring.
+                    assert_eq!(
+                        effective_curve(token, cx),
+                        MotionScheme::Standard.resolve(if reduce {
+                            MotionToken::FastEffects
+                        } else {
+                            token
+                        }),
+                        "Standard {token:?} reduce={reduce}"
+                    );
+                    super::set_motion_scheme(MotionScheme::Expressive);
+                    // md3.io: effects keep their own curve.
+                    assert_eq!(
+                        effective_curve(token, cx),
+                        MotionScheme::Expressive.resolve(token),
+                        "Expressive {token:?} reduce={reduce}"
+                    );
+                }
+            }
+            cx.set_reduce_motion(false);
+        });
+    }
+
+    #[test]
     fn springs_settle_on_their_target() {
         use super::{DEFAULT_EFFECTS, DEFAULT_SPATIAL, FAST_SPATIAL, SLOW_EFFECTS};
         for spring in [FAST_SPATIAL, DEFAULT_SPATIAL, DEFAULT_EFFECTS, SLOW_EFFECTS] {
@@ -1107,13 +1224,13 @@ mod tests {
             window.refresh();
             window.draw(cx).clear(cx);
         });
-        // DefaultEffects is m3e's critically damped 1600 stiffness spring
-        // over its 230ms Compose settle estimate.
+        // Expressive DefaultEffects is md3.io's 250ms sampled curve, whose
+        // midpoint stop is 0.96.
         let expected = super::MotionScheme::Expressive
             .resolve(super::MotionToken::DefaultEffects)
             .position(0.125);
         let midpoint = sample.borrow().clone();
-        assert!((expected - 0.9596).abs() < 0.0001, "{expected}");
+        assert!((expected - 0.96).abs() < 0.00001, "{expected}");
         assert!((midpoint.0[0] - expected).abs() < 0.00001);
         assert!((midpoint.0[1] - (10. + 20. * expected)).abs() < 0.0001);
         cx.update(|window, cx| {
