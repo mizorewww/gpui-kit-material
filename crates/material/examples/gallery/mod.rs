@@ -62,6 +62,12 @@ fn caption_labels() -> CaptionLabels {
 /// Fixed height keeps the native traffic lights centered at every text scale.
 const TITLE_BAR: Pixels = px(56.);
 
+/// The title bar grows with the text scale, so its 40dp controls and their
+/// labels keep their room up to 200%.
+fn title_bar_height(window: &Window) -> Pixels {
+    TITLE_BAR.max(TITLE_BAR * (f32::from(window.rem_size()) / BASE_PX))
+}
+
 /// The settings whose change starts a theme transition.
 type ThemeKey = (
     PaletteId,
@@ -650,7 +656,7 @@ impl Render for GalleryWindow {
                     .on_click(|_, window, cx| settings::open(window, cx))
                     .into_any_element()
             });
-        let mut bar = TitleBar::new("title-bar", TITLE_BAR, caption_labels());
+        let mut bar = TitleBar::new("title-bar", title_bar_height(window), caption_labels());
         if let Some(caption) = self.caption {
             bar = bar.caption(caption);
         }
@@ -671,10 +677,7 @@ impl Render for GalleryWindow {
                     .when_some(self.fps.clone().filter(|_| !compact), |bar, fps| {
                         bar.child(fps)
                     })
-                    .child(spec::RemScaled::new(
-                        top_bar::chrome_rem(window),
-                        settings.into_any_element(),
-                    )),
+                    .child(settings),
             )
             .child(
                 AnyView::from(self.gallery.clone())
@@ -826,10 +829,11 @@ mod window_tests {
                 mode.right() <= settings.left(),
                 "{width} at {text_scale}: {mode:?} collides with {settings:?}"
             );
-            // The controls stay inside the fixed bar at any text scale.
+            // The bar grows, so the controls fit it at any text scale.
+            let bar = super::TITLE_BAR * text_scale;
             for control in [mode, settings] {
                 assert!(
-                    control.top() >= px(0.) && control.bottom() <= super::TITLE_BAR,
+                    control.top() >= px(0.) && control.bottom() <= bar,
                     "{width} at {text_scale}: {control:?}"
                 );
             }

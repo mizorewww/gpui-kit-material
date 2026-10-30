@@ -852,3 +852,85 @@ mod examples {
         }
     }
 }
+
+/// Draw only what is dirty, as the platform does between refreshes.
+fn draw_dirty(window: &WindowHandle<Gallery>, cx: &mut VisualTestContext) {
+    cx.update_window((*window).into(), |_, window, cx| {
+        window.draw(cx).clear(cx);
+    })
+    .unwrap();
+    cx.run_until_parked();
+}
+
+#[gpui::test]
+fn scrolling_an_example_device_does_not_render_the_gallery(cx: &mut TestAppContext) {
+    let (window, mut cx) = open(cx);
+    go(&window, &mut cx, "examples");
+    let at = bounds(&mut cx, "example-scroll").center();
+    let before = window.update(&mut cx, |g, _, _| g.renders.get()).unwrap();
+    for _ in 0..3 {
+        cx.simulate_event(gpui::ScrollEvent {
+            position: at,
+            delta: gpui::ScrollDelta::Pixels(gpui::point(px(0.), px(-8.))),
+            modifiers: Modifiers::none(),
+            touch_phase: gpui::TouchPhase::Moved,
+            ..Default::default()
+        });
+        draw_dirty(&window, &mut cx);
+    }
+    assert_eq!(
+        window.update(&mut cx, |g, _, _| g.renders.get()).unwrap(),
+        before,
+        "the device is its own notify scope"
+    );
+}
+
+#[gpui::test]
+fn the_preview_controls_stay_in_the_card(cx: &mut TestAppContext) {
+    use gpui_kit_material::color::themes::ThemeMode;
+    let (window, mut cx) = open(cx);
+    go(&window, &mut cx, "button");
+    let shared = window.update(&mut cx, |g, _, _| g.shared.clone()).unwrap();
+    let applied = window.update(&mut cx, |g, _, _| g.applied_theme).unwrap();
+    let app_paint = gpui_kit_material::theme::scheme();
+    cx.update(|_, cx| {
+        shared.update(cx, |s, cx| {
+            s.preview_mode = Some(ThemeMode::Dark);
+            s.preview_rtl = true;
+            cx.notify();
+        })
+    });
+    settle(&window, &mut cx);
+    window
+        .update(&mut cx, |g, _, cx| {
+            assert_eq!(g.applied_theme, applied, "the application keeps its theme");
+            assert_eq!(g.applied_theme, super::theme_key(g.shared.read(cx)));
+            assert!(g.shared.read(cx).preview_scheme().is_some());
+        })
+        .unwrap();
+    assert_eq!(
+        gpui_kit_material::theme::scheme(),
+        app_paint,
+        "nothing leaks out of the preview's scope"
+    );
+    // The RTL switch mirrors the preview's content inside its canvas.
+    assert!(cx.debug_bounds("preview-canvas").is_some());
+    cx.update(|_, cx| {
+        shared.update(cx, |s, cx| {
+            s.preview_mode = None;
+            s.preview_rtl = false;
+            cx.notify();
+        })
+    });
+    settle(&window, &mut cx);
+    assert!(
+        window
+            .update(&mut cx, |g, _, cx| g
+                .shared
+                .read(cx)
+                .preview_scheme()
+                .is_none())
+            .unwrap(),
+        "with nothing set the preview follows the application"
+    );
+}

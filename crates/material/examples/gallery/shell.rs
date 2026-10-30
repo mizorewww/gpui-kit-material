@@ -174,7 +174,7 @@ pub(crate) fn preview_area(window: &Window, stacked: bool) -> (f32, f32) {
     let padding = 2. * (layout.canvas_padding() + 1.);
     let rem_scale = BASE_PX / f32::from(window.rem_size());
     let height = f32::from(window.viewport_size().height) * rem_scale
-        - f32::from(TITLE_BAR) * rem_scale
+        - f32::from(TITLE_BAR)
         - CARD_HEADER
         - padding;
     (pane - padding, height)
