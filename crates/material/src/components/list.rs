@@ -466,6 +466,23 @@ impl ListItem {
     }
 }
 
+impl ListItem {
+    /// The row's toggle for assistive technology: a checkbox or switch is
+    /// toggled; a radio is announced through the selected state.
+    fn toggle_state(&self) -> (Option<bool>, bool) {
+        let toggled = match (&self.leading, &self.trailing) {
+            (ListLeading::Checkbox(on) | ListLeading::Switch(on), _)
+            | (_, ListTrailing::Checkbox(on) | ListTrailing::Switch(on)) => Some(*on),
+            _ => None,
+        };
+        let radio = matches!(
+            (&self.leading, &self.trailing),
+            (ListLeading::Radio(true), _) | (_, ListTrailing::Radio(true))
+        );
+        (toggled, radio)
+    }
+}
+
 impl RenderOnce for ListItem {
     fn render(mut self, _: &mut Window, _: &mut App) -> impl IntoElement {
         let preview = self.preview;
@@ -476,6 +493,9 @@ impl RenderOnce for ListItem {
         if !self.selected {
             paint.container = color(self.container);
         }
+        let (toggled, radio) = self.toggle_state();
+        let selected = self.selected || radio;
+        let description = self.supporting.clone();
         let leading = self.leading_element(paint.support, disabled);
         let trailing = self.trailing_element(paint.support, disabled);
         let top_aligned = lines == ListLines::Three;
@@ -605,6 +625,20 @@ impl RenderOnce for ListItem {
                     })
             })
             .accessibility_label(self.headline)
+            // The row announces its state and supporting text, not only the
+            // headline.
+            .map(|button| {
+                button
+                    .aria_selected(selected)
+                    .when_some(toggled, |button, on| {
+                        button.aria_toggled(if on {
+                            gpui::accesskit::Toggled::True
+                        } else {
+                            gpui::accesskit::Toggled::False
+                        })
+                    })
+                    .when_some(description, |button, text| button.aria_description(text))
+            })
             .state_layers(hover, press)
             .disabled(disabled)
             .on_click(move |event, window, cx| on_click(event, window, cx))
