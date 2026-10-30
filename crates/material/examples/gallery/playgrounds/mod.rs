@@ -2,9 +2,13 @@
 //! exports a `PLAYGROUND` static that `super::catalog` points its entry at.
 //! See `super::playground` for the API.
 pub mod badge;
+pub mod badge;
 pub mod button;
+pub mod progress;
 pub mod switch;
 pub mod text_field;
+#[cfg(test)]
+mod test_support;
 #[cfg(test)]
 mod test_support;
 

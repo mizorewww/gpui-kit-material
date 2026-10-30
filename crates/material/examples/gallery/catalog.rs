@@ -437,7 +437,7 @@ pub static CATALOG: &[Entry] = &[
         Communication,
         "Show the status of ongoing work, linear or circular.",
         spec("loading-progress"),
-        None,
+        Some(&playgrounds::progress::PLAYGROUND),
     ),
     component(
         "loading-indicator",
