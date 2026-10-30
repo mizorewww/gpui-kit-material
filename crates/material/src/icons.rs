@@ -82,7 +82,19 @@ impl Default for Assets<()> {
 }
 impl<F: AssetSource> AssetSource for Assets<F> {
     fn load(&self, path: &str) -> gpui::Result<Option<Cow<'static, [u8]>>> {
-        self.inner.load(path)
+        match self.inner.load(path) {
+            // A page that downloads its fonts draws empty icons until they arrive,
+            // not an error for every icon in every frame.
+            Err(error)
+                if matches!(
+                    error.downcast_ref::<gpui_material_symbols::Error>(),
+                    Some(gpui_material_symbols::Error::NotLoaded(_))
+                ) =>
+            {
+                Ok(None)
+            }
+            result => result,
+        }
     }
     fn list(&self, prefix: &str) -> gpui::Result<Vec<SharedString>> {
         self.inner.list(prefix)
