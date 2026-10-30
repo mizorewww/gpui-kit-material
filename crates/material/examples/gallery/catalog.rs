@@ -217,7 +217,7 @@ pub static CATALOG: &[Entry] = &[
         Actions,
         "A FAB that opens into related actions.",
         slice("buttons", fab_menu_rows),
-        None,
+        Some(&playgrounds::fab_menu::PLAYGROUND),
     ),
     component(
         "extended-fab",

@@ -4,6 +4,7 @@
 pub mod button;
 pub mod extended_fab;
 pub mod fab;
+pub mod fab_menu;
 pub mod icon_button;
 pub mod split_button;
 pub mod switch;
