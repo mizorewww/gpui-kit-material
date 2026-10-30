@@ -881,6 +881,37 @@
       ],
       "action": "Keep the facade source unchanged with a normalized manifest that disables implicit WASM threading; drop it when upstream defaults match.",
       "conditions": "Single-threaded WASM builds without cross-origin isolation, and one Base and GPUI identity across Material, Kit and Symbols. Hashes are in vendor/gpui-kit/SOURCE.json."
+    },
+    {
+      "id": "vendor-gpui-linux-backends",
+      "disposition": "retain-pending-equivalence",
+      "priority": "P1",
+      "local_paths": [
+        "vendor/gpui-fast-linux",
+        "vendor/gpui-pre-linux",
+        "vendor/gpui-fast-wgpu",
+        "vendor/gpui-pre-wgpu",
+        "vendor/wgpu"
+      ],
+      "upstream_paths": [
+        "Cargo.toml"
+      ],
+      "action": "Keep present-status submission counting and PresentMode vsync control; see each MATERIAL-PATCHES.md and SOURCE.json.",
+      "conditions": "The published crates report no success signal and discard the present status, so the Gallery FPS counter is otherwise unavailable on Linux. Does not raise frame requests above the display's refresh rate."
+    },
+    {
+      "id": "vendor-gpui-windows-backends",
+      "disposition": "retain-pending-equivalence",
+      "priority": "P1",
+      "local_paths": [
+        "vendor/gpui-fast-windows",
+        "vendor/gpui-pre-windows"
+      ],
+      "upstream_paths": [
+        "Cargo.toml"
+      ],
+      "action": "Keep S_OK submission counting and DXGI sync-interval vsync control; see MATERIAL-PATCHES.md and SOURCE.json.",
+      "conditions": "The published crates report no success signal and treat DXGI_STATUS_OCCLUDED as success, so the Gallery FPS counter is otherwise unavailable on Windows. Does not raise frame requests above the display's refresh rate."
     }
   ],
   "runtime_migration_status": "pending",

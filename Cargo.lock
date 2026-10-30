@@ -2253,8 +2253,6 @@ dependencies = [
 [[package]]
 name = "gpui-fast-linux"
 version = "0.1.12"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8d5a4351392d339049584e06a58460a4907a060e3f46e49b7c130d80ffe36871"
 dependencies = [
  "accesskit",
  "accesskit_unix",
@@ -2392,8 +2390,6 @@ dependencies = [
 [[package]]
 name = "gpui-fast-wgpu"
 version = "0.1.12"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ebf72d3c1fee16dde347707ef306940d39656f80e35d3aaace01075996f12199"
 dependencies = [
  "anyhow",
  "bytemuck",
@@ -2420,8 +2416,6 @@ dependencies = [
 [[package]]
 name = "gpui-fast-windows"
 version = "0.1.12"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6a1a193343ef7faaa18eb9ccc0aadf8ec9571f2791c4419c2ca23aa17198f970"
 dependencies = [
  "accesskit",
  "accesskit_windows",
@@ -2697,8 +2691,6 @@ dependencies = [
 [[package]]
 name = "gpui-pre-linux"
 version = "0.3.10"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7c6ffd2dce7b75cce0bb3382994912f84c2a05389a4a236bb8bd72cb098fc083"
 dependencies = [
  "accesskit",
  "accesskit_unix",
@@ -2947,8 +2939,6 @@ dependencies = [
 [[package]]
 name = "gpui-pre-wgpu"
 version = "0.3.10"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ce693915768aae38bf788f245af75aae78e3e1179245860fc80ce831d0a8f74e"
 dependencies = [
  "anyhow",
  "bytemuck",
@@ -2975,8 +2965,6 @@ dependencies = [
 [[package]]
 name = "gpui-pre-windows"
 version = "0.3.10"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "80670f987b920fba019917b2e222ecf2b377f2a6d77872010c7d284c235837b3"
 dependencies = [
  "accesskit",
  "accesskit_windows",
@@ -7512,8 +7500,6 @@ checksum = "a28ac98ddc8b9274cb41bb4d9d4d5c425b6020c50c46f25559911905610b4a88"
 [[package]]
 name = "wgpu"
 version = "30.0.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "527ccdf43dd5b2e8676eed9984ce00e2bbb0a1b85b70c1969dcb6cd2eb55ab9e"
 dependencies = [
  "arrayvec",
  "bitflags 2.13.2",

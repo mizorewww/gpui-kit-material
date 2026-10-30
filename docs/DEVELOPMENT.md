@@ -205,8 +205,22 @@ queries). Browser reports are never acceptance-eligible.
 
 The gallery FPS counter counts only successfully submitted new draws, sampled
 every 500 ms; skipped submissions, repeated presents and idle time do not count,
-and it is not display refresh or GPU completion. Recorded runs live under
+and it is not display refresh or GPU completion. A backend without a success
+signal shows `FPS: unavailable`. Recorded runs live under
 `conformance/performance/`.
+
+To verify the counter on Linux or Windows, run the gallery on either backend:
+
+```sh
+cargo run -p gpui-kit-material --example gallery
+cargo run -p gpui-kit-material --example gallery --no-default-features --features serde,embedded-symbols
+```
+
+The counter should show a number, not `FPS: unavailable`. It should read `FPS: 0.0`
+when idle and approach the display's refresh rate while you scroll continuously
+(never above it: the display still paces frame requests). Settings shows the real
+vertical sync state; X11 starts on, Wayland and Windows start off, and toggling it
+reconfigures presentation without changing that ceiling.
 
 ## Fonts and reference fixtures
 

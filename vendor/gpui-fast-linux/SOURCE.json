@@ -1,0 +1,85 @@
+{
+  "package": "gpui-fast-linux",
+  "version": "0.1.12",
+  "source": "crates.io published archive",
+  "archive_url": "https://static.crates.io/crates/gpui-fast-linux/gpui-fast-linux-0.1.12.crate",
+  "archive_sha256": "8d5a4351392d339049584e06a58460a4907a060e3f46e49b7c130d80ffe36871",
+  "upstream_files": {
+    "Cargo.lock": "8be50cae60527a69ded1b4b59a56375b039b2625c51257a810d9d88ac09b88f7",
+    "Cargo.toml": "ac12f6f10ca1d1bed43270e51e4000ea0fed2f93fc09699d63fa519812dec58d",
+    "Cargo.toml.orig": "5f9cf39f3c84ec3b299c7bd5007164fdbb6821489fe088d8bc320a8797a9516a",
+    "LICENSE": "5f78a733701db49b73da93addad8cb74f816f3789ef30c3c0e959e943ecd99b4",
+    "README.md": "d2a3bc398f13574112435a1ba9e669a068455ac8c698a828e9db1df5f78479d1",
+    "src/fast/composition/mod.rs": "b689f2cc878f441f820b0e4ad74d03f2870d76e217940389eae78f683dc368ca",
+    "src/fast/composition/occluders.rs": "c4cc00f9eca2c9692adf06b779e35f56ca688b4d0b1fa4316c751e6a0b001303",
+    "src/fast/composition/wayland.rs": "45d76e804a8c307a384f58487ce7a5cd68f176c181165f215646ee7f9cc2e555",
+    "src/fast/composition/x11.rs": "73460bec3081eee24c9a2cc802f74174341396f077c6c5773d105740c9e20ce9",
+    "src/fast/mod.rs": "5b1d5b80b07820c2985108da2aae33c9c4289f57049443eab0e06aa7eaf61d22",
+    "src/fast/x11_scale.rs": "ddd366d524789db23292a4e1268ffa4c089fea2e1a1b91668e4e7d386c3b6801",
+    "src/fast/xim.rs": "aa38f303570250d83470440f43a217789f48973e1a14843ae81faf1f35eaea08",
+    "src/gpui_linux.rs": "b929fa0beef5ac5e7a15e68dfe56947bd3bc5f5f3bbec8ee0d1f2267b7a83eab",
+    "src/linux.rs": "ef5f75119795247d2bee0e6ed6b724052ae48cdcf95d9bf86d2463c44b26d68f",
+    "src/linux/dispatcher.rs": "ad54b0169239a2e8fef273a2eff73b50fe565b954fc423b8a1b430b302822363",
+    "src/linux/display_connection.rs": "f42775d55eb9410f9e9d8ba0285fca4e7c4ea6669c7949910fb768b1d19ad189",
+    "src/linux/headless.rs": "eff630b013ffbf984f050970dc3c6c686bb2d85680bc364934be750a46b15666",
+    "src/linux/headless/window.rs": "b2c15ac54c42a8943a20be86df26e508411f2690aeb3a36f4a88506163dd1503",
+    "src/linux/keyboard.rs": "9d25b21ec5530c3e66e40196a924f12aa89cfe6075b5a769feff65dfcfde0a88",
+    "src/linux/platform.rs": "362e92eddfd63d5489650c628ab9fd413ea8d63f1914adec3f5ce2a809061836",
+    "src/linux/system_notifications.rs": "49030ee41edb842c996d32870c4d9846f12bd8a50f4a6db0bea9dc658329f1b5",
+    "src/linux/text_system.rs": "afc6712696eed6749cc277b800cfb62690af9cbfe275961ad1df1c8d190d4028",
+    "src/linux/wayland.rs": "07d2c8a5a6ebfa65c1da9c6d9ed46fbc03fc43a42204a7a5cecba850b56e7d74",
+    "src/linux/wayland/client.rs": "1beaf55c0805392726ef492a4f81b0c031b81ecc585cd940dd773487222f945e",
+    "src/linux/wayland/clipboard.rs": "7dab6bf97638ed62a6f6ebb7d6f435c6663631ee759a48b69ca4037cbda54df1",
+    "src/linux/wayland/cursor.rs": "1645dc1e70fe9bb766ee65ab78fa6590538a7a52125de4d86dde18a26004c821",
+    "src/linux/wayland/display.rs": "79253d4d1860ea5e36e733e35f820600e51a288c7504c2e731d4b86866dc1113",
+    "src/linux/wayland/layer_shell.rs": "d3b341e348e5f871e6ec0bdb03ea69601f9755a1843cadf46bc07426aee0f9cc",
+    "src/linux/wayland/popup.rs": "d8afee747e08fb9166923d996597627a1d1fe3b502656f7dbd4453d7572f1011",
+    "src/linux/wayland/serial.rs": "e45add908e937b0af6897e1a462357e0fc99dcc0c53c802d912c5659ffedc72c",
+    "src/linux/wayland/window.rs": "2f5e6b1d9ab549788de545fff4a7299dcea1c16169b833de62ab2bfaf68baa7e",
+    "src/linux/x11.rs": "df1e4f889ecaccf9ea9d7cc9f539fa4cdaac463998bbbd8367ff919f49e4ddf3",
+    "src/linux/x11/client.rs": "25b95b43d717811b3309e6b127a9ee0cb94e9565338f1ac1602cfe36cf6ca668",
+    "src/linux/x11/clipboard.rs": "580eb2519d8c38422b3e5baba24a11e6fa5e942392c9a9e74abedfa3fa84c0f3",
+    "src/linux/x11/display.rs": "d625c6aa288b8d302cd86f704a507c947d4b09d3d746d3004ea917fd6dbaaa35",
+    "src/linux/x11/event.rs": "6303b0fd823f7fd7bcdab70ec085b31705f1e82fc254c385a523df309462e5b5",
+    "src/linux/x11/window.rs": "f1c8389e6eb18f176ade2363ac31fac0392d0ae928e5959d679249a7ee3f5a01",
+    "src/linux/x11/xim_handler.rs": "5a1f5b1a6a436a82c6bbbf9222a7470d537c5fac6b06da4e898aca497ee2adf2",
+    "src/linux/xdg_desktop_portal.rs": "2e3a8eb44718dbd31b21fc368ad2f5c2105b340ef04f7e002ee0029adb9f3cc1"
+  },
+  "local_patches": [
+    "src/fast/composition/wayland.rs",
+    "src/fast/composition/x11.rs",
+    "src/linux/wayland/window.rs",
+    "src/linux/x11/window.rs"
+  ],
+  "modified_files": {
+    "src/fast/composition/wayland.rs": {
+      "upstream_sha256": "45d76e804a8c307a384f58487ce7a5cd68f176c181165f215646ee7f9cc2e555",
+      "local_sha256": "b0c6188c433564e726cf5f8c9b7fd5386a3de3ce9f11e3760433bd558ccf4afe",
+      "reason": "A composed frame counts only when every surface presented (MATERIAL-PATCHES.md)."
+    },
+    "src/fast/composition/x11.rs": {
+      "upstream_sha256": "73460bec3081eee24c9a2cc802f74174341396f077c6c5773d105740c9e20ce9",
+      "local_sha256": "a6ddebbf1b83e72e85b05de40f86d2063ac74c24a7808ba951164c1d06347190",
+      "reason": "A composed frame counts only when the base surface and overlay presented (MATERIAL-PATCHES.md)."
+    },
+    "src/linux/wayland/window.rs": {
+      "upstream_sha256": "2f5e6b1d9ab549788de545fff4a7299dcea1c16169b833de62ab2bfaf68baa7e",
+      "local_sha256": "3850e9821f27020ac2632111ba6b8a542c9931a063206823b9efe8cfad253b21",
+      "reason": "successful_frame_submissions, vsync_status, set_vsync; draw moved into draw_frame to record successful presentations (MATERIAL-PATCHES.md)."
+    },
+    "src/linux/x11/window.rs": {
+      "upstream_sha256": "f1c8389e6eb18f176ade2363ac31fac0392d0ae928e5959d679249a7ee3f5a01",
+      "local_sha256": "bf876f14980ce9bfe647bc5c9b8233933d1ada3efede36a18b2a263fd8ec8ceb",
+      "reason": "successful_frame_submissions, vsync_status, set_vsync; draw moved into draw_frame to record successful presentations (MATERIAL-PATCHES.md)."
+    }
+  },
+  "added_files": {},
+  "removed_files": {},
+  "unchanged_file_count": 35,
+  "provenance_files": [
+    "MATERIAL-PATCHES.md",
+    "SOURCE.json"
+  ],
+  "verification": "Archive taken from ~/.cargo/registry/cache; its SHA-256 equals the Cargo.lock crates.io checksum. upstream_files are hashes of the extracted archive entries. Recompute: extract the .crate and compare with sha256 of each vendor file.",
+  "validation": "source archive identity verified; runtime checks pending on Linux/Windows hardware"
+}
