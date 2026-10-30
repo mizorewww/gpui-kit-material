@@ -712,7 +712,7 @@ impl Render for GalleryWindow {
         // with an icon only.
         let compact = shell::ShellLayout::of(window) == shell::ShellLayout::Compact;
         // A phone's cutouts and home indicator: the content stays clear of them
-        // and the bar's color reaches the top edge.
+        // and the bar's color reaches the window's edges.
         let insets = window.insets().effective();
         let settings = title_bar_control(div().debug_selector(|| "gallery-settings-open".into()))
             .child(if compact {
@@ -738,8 +738,6 @@ impl Render for GalleryWindow {
         }
         gpui_base::v_flex()
             .size_full()
-            .pl(insets.left)
-            .pr(insets.right)
             .pb(insets.bottom)
             .bg(spec::page_background())
             .text_color(color(ColorRole::ON_SURFACE))
@@ -749,6 +747,8 @@ impl Render for GalleryWindow {
                     .w_full()
                     .flex_shrink_0()
                     .pt(insets.top)
+                    .pl(insets.left)
+                    .pr(insets.right)
                     .bg(color(ColorRole::SURFACE_CONTAINER_LOW))
                     .child(
                         bar.gap(rem(if compact { 4. } else { 12. }))
@@ -773,6 +773,8 @@ impl Render for GalleryWindow {
                     .flex_1()
                     .min_h_0()
                     .w_full()
+                    .pl(insets.left)
+                    .pr(insets.right)
                     .child(self.gallery.clone()),
             )
     }

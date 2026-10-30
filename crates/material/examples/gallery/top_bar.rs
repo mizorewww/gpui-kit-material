@@ -52,7 +52,7 @@ impl TopBar {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Self {
-        let search = cx.new(|cx| InputState::new(window, cx).placeholder("Search components"));
+        let search = cx.new(|cx| InputState::new(window, cx).placeholder("Search"));
         let shared = gallery.read(cx).shared.clone();
         let subscriptions = vec![
             cx.subscribe_in(&search, window, |this: &mut Self, search, event, _, cx| {
