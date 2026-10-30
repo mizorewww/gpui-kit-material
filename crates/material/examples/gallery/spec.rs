@@ -1,10 +1,9 @@
-//! Design-kit page presentation: the page header, specimen boards and their
-//! captions, modelled on the component pages of Google's Figma "Material 3
-//! Design Kit".
-//!
-//! Every page is one rounded light panel (the kit's section background)
-//! split across virtual rows. A row's content comes from its page module;
-//! the shell supplies the panel slice around it (see `super::page`).
+//! Design-kit page presentation: section headers, specimen boards and
+//! their captions, modelled on the component pages of Google's Figma
+//! "Material 3 Design Kit". The Gallery shows them on each component's
+//! Specs tab and as the body of Styles and Examples pages, one virtual row
+//! per page row; the shell frames each row as a slice of its card (see
+//! `super::page`).
 //!
 //! Boards are dashed specimen frames. A board taller than a comfortable row
 //! is split into bands, one per virtual row: [`Band::Top`], any number of
@@ -14,28 +13,14 @@ use gpui_kit_material::icons::{Icon, Symbol};
 use gpui_kit_material::prelude::*;
 use std::sync::OnceLock;
 
-/// The widest a page panel grows.
-pub const PAGE_MAX_WIDTH: f32 = 1240.;
-/// The kit header's padding inside the panel, and the panel's side padding.
-pub const PANEL_PADDING: f32 = 52.;
-pub const PANEL_PADDING_COMPACT: f32 = 16.;
-/// The kit's section corner radius.
-pub const PANEL_RADIUS: f32 = 28.;
-/// Space around each page panel.
-pub const PAGE_GAP: f32 = 24.;
-pub const PAGE_GAP_COMPACT: f32 = 8.;
 /// The default space above a body row (see `GalleryPage::row_gap`).
 pub const ROW_GAP: f32 = 24.;
-/// The space between the header's divider and the first specimen.
+/// The space between a page's header and its first specimen.
 pub const HEADER_TO_BODY: f32 = 48.;
 
-/// The page background behind the panels, and the panel (the kit's
-/// "Section background").
+/// The Gallery's page background (md3.io's page behind its cards).
 pub fn page_background() -> Rgba {
-    color(ColorRole::SURFACE_DIM)
-}
-pub fn panel_background() -> Rgba {
-    color(ColorRole::SURFACE_CONTAINER_LOW)
+    color(ColorRole::SURFACE)
 }
 
 /// Apply an M3 type role's family, size, line height and weight.
@@ -61,59 +46,6 @@ pub fn star_icon() -> Icon {
         })
         .as_str(),
     ))
-}
-
-/// The Material logo mark of the kit's headers: a circle around a square
-/// holding a "V", stroked in on-surface. Drawn, not an image asset.
-pub fn logo_mark() -> impl IntoElement {
-    let ink = color(ColorRole::ON_SURFACE);
-    div()
-        .relative()
-        .flex_shrink_0()
-        .size(rem(40.))
-        .rounded_full()
-        .border_1()
-        .border_color(ink)
-        .child(
-            div()
-                .absolute()
-                .left(rem(5.))
-                .top(rem(5.))
-                .size(rem(28.))
-                .border_1()
-                .border_color(ink),
-        )
-        .child(
-            canvas(
-                |_, _, _| {},
-                move |bounds, _, window, _| {
-                    let inset = bounds.size.width * (6. / 40.);
-                    let side = bounds.size.width - inset * 2.;
-                    let origin = bounds.origin + point(inset, inset);
-                    let mut path = PathBuilder::stroke(px(1.));
-                    path.move_to(origin);
-                    path.line_to(origin + point(side / 2., side));
-                    path.line_to(origin + point(side, px(0.)));
-                    if let Ok(path) = path.build() {
-                        window.paint_path(path, ink);
-                    }
-                },
-            )
-            .absolute()
-            .inset_0(),
-        )
-}
-
-/// The decorative primary-container shape behind a header's top end.
-fn header_shape() -> impl IntoElement {
-    div()
-        .absolute()
-        .top(rem(-120.))
-        .right(rem(-160.))
-        .w(rem(560.))
-        .h(rem(520.))
-        .rounded_full()
-        .bg(color(ColorRole::PRIMARY_CONTAINER).opacity(0.3))
 }
 
 /// Static description of a page or of a sub-section of one.
@@ -151,54 +83,6 @@ fn guideline_link(id: &'static str, url: &'static str, size: TypeRole) -> impl I
             .child(GUIDELINE_LINK)
             .on_click(move |_, _, cx| cx.open_url(url)),
     )
-}
-
-/// The kit's page header: logo mark, display title, guideline link,
-/// description and a full-width divider. The shell renders it as each
-/// page's first row.
-pub fn page_header(info: &PageInfo) -> impl IntoElement {
-    div()
-        .relative()
-        .w_full()
-        .pt(rem(PANEL_PADDING))
-        .child(header_shape())
-        .child(
-            div()
-                .relative()
-                .flex()
-                .flex_col()
-                .gap(rem(60.))
-                .child(logo_mark())
-                .child(
-                    div()
-                        .flex()
-                        .flex_col()
-                        .items_start()
-                        .gap(rem(24.))
-                        .child(
-                            accessible_text(named("page-title", info.id), info.title)
-                                .role(Role::Heading)
-                                .font_family("Roboto")
-                                .text_size(rem(80.))
-                                .line_height(rem(94.))
-                                .font_weight(FontWeight::NORMAL)
-                                .text_color(color(ColorRole::ON_SURFACE)),
-                        )
-                        .when_some(info.guideline, |column, url| {
-                            column.child(guideline_link(info.id, url, TypeRole::HeadlineSmall))
-                        })
-                        .child(
-                            accessible_text(named("page-description", info.id), info.description)
-                                .max_w(rem(720.))
-                                .whitespace_normal()
-                                .font_family("Roboto")
-                                .text_size(rem(18.))
-                                .line_height(rem(24.))
-                                .text_color(color(ColorRole::ON_SURFACE)),
-                        ),
-                )
-                .child(MaterialDivider::new(named("page-divider", info.id))),
-        )
 }
 
 /// A sub-section header inside a page (e.g. "Icon button" on Buttons): a
@@ -530,17 +414,10 @@ impl IntoElement for Board {
     }
 }
 
-/// The content width inside a page panel, in design px, for pages that lay
+/// The content width inside a spec card, in design px, for pages that lay
 /// out a window-dependent number of columns.
 pub fn content_width(window: &Window) -> f32 {
-    let compact = is_compact(window);
-    let available = design_width(window) - if compact { 0. } else { 176. };
-    let (gap, padding) = if compact {
-        (PAGE_GAP_COMPACT, PANEL_PADDING_COMPACT)
-    } else {
-        (PAGE_GAP, PANEL_PADDING)
-    };
-    available.min(PAGE_MAX_WIDTH) - 2. * (gap + padding)
+    super::shell::spec_content_width(window)
 }
 
 /// A free-form specimen row: wrapped items with the board cell gap, for

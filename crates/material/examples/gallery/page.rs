@@ -1,5 +1,8 @@
 //! The page framework: each design-kit page is a self-contained module with
-//! its own state entity, contributing virtual rows to the one Gallery list.
+//! its own state entity and rows. The Gallery builds a page when it is
+//! first shown and lists only the current page's rows: a component's Specs
+//! tab, a Styles/Examples page body, or (for components without a
+//! playground) the live demos of its preview.
 //!
 //! # Adding a page
 //!
@@ -7,13 +10,13 @@
 //!    [`GalleryPage`]: its [`PageInfo`] (`INFO`), its body row count and a
 //!    `render_row` for each body row. The shell renders the kit header as the
 //!    page's first row and frames all rows in the page's panel.
-//! 2. List it in `pages/mod.rs` (`PAGES`, in Figma order) — the only shared
-//!    file. Navigation, `--section <id>` captures and keyboard traversal
-//!    follow automatically.
+//! 2. List it in `pages/mod.rs` (`PAGES`, in Figma order) and reference it
+//!    from a `catalog::CATALOG` entry's `spec`. Navigation, `--section <id>`
+//!    captures and keyboard traversal follow automatically.
 //!
 //! Pages keep all of their state in their own entity. Listeners created
 //! with `cx.listener` in `render_row` update the page; `cx.notify()` on the
-//! page re-renders the visible Gallery rows. Call [`PageRows::remeasure`]
+//! page re-renders the visible Gallery rows while the page is shown. Call [`PageRows::remeasure`]
 //! for rows whose height a change alters while they may be offscreen.
 //! Gallery-wide settings (theme, text scale, motion scheme, snackbar) live in
 //! [`GalleryShared`], reachable through [`PageCx::shared`].
@@ -24,7 +27,7 @@ use gpui::{prelude::*, *};
 use gpui_kit_material::color::themes::{Contrast, ThemeId, ThemeMode};
 use gpui_kit_material::motion;
 use gpui_kit_material::prelude::PaletteId;
-use std::{cell::Cell, ops::RangeInclusive, rc::Rc};
+use std::{cell::RefCell, ops::RangeInclusive, rc::Rc};
 
 pub use super::spec::PageInfo;
 
@@ -70,32 +73,45 @@ impl GalleryShared {
     }
 }
 
-/// Where a page's rows sit in the Gallery list. The shell keeps the start
-/// current when earlier pages change their row counts.
+/// Where a page's rows sit in the Gallery list. Only the current page's
+/// shown rows are in the list; the shell maps them when it shows the page
+/// (a page's Specs tab may show a slice of its rows).
 #[derive(Clone)]
 pub struct PageRows {
     list: ListState,
-    header: Rc<Cell<usize>>,
+    /// The list index of each page row, `None` while not in the list.
+    shown: Rc<RefCell<Vec<Option<usize>>>>,
 }
 
 impl PageRows {
-    pub(super) fn new(list: ListState, header: usize) -> Self {
+    pub(super) fn new(list: ListState) -> Self {
         Self {
             list,
-            header: Rc::new(Cell::new(header)),
+            shown: Default::default(),
         }
     }
-    pub(super) fn set_header(&self, header: usize) {
-        self.header.set(header);
+    /// Record which list row shows each page row (empty: none).
+    pub(super) fn show(&self, rows: impl IntoIterator<Item = (usize, usize)>) {
+        let mut shown = self.shown.borrow_mut();
+        shown.clear();
+        for (row, index) in rows {
+            if shown.len() <= row {
+                shown.resize(row + 1, None);
+            }
+            shown[row] = Some(index);
+        }
     }
-    /// The list row of body row `row`.
-    pub fn global(&self, row: usize) -> usize {
-        self.header.get() + 1 + row
+    /// The list row of body row `row`, if it is in the list.
+    pub fn global(&self, row: usize) -> Option<usize> {
+        self.shown.borrow().get(row).copied().flatten()
     }
-    /// Invalidate the cached heights of body `rows`.
+    /// Invalidate the cached heights of the shown body `rows`.
     pub fn remeasure(&self, rows: RangeInclusive<usize>) {
-        self.list
-            .remeasure_items(self.global(*rows.start())..self.global(*rows.end()) + 1);
+        for row in rows {
+            if let Some(index) = self.global(row) {
+                self.list.remeasure_items(index..index + 1);
+            }
+        }
     }
     /// The Gallery list, e.g. for `RevealFocus::in_list`.
     pub fn list(&self) -> &ListState {
@@ -141,8 +157,9 @@ pub trait GalleryPage: Sized + 'static {
     fn interactive(&self, _row: usize) -> bool {
         false
     }
-    /// Runs in every Gallery render, mounted or not: keep playback clocks
-    /// and keyed animations alive offscreen. Never notify from here.
+    /// Runs in every Gallery render while the page is shown, mounted or
+    /// not: keep playback clocks and keyed animations alive offscreen.
+    /// Never notify from here.
     fn prepare(&mut self, _window: &mut Window, _cx: &mut Context<Self>) {}
     /// Runs after the list's prepaint with which body rows are on screen,
     /// to forward controlled changes to playbacks of unmounted rows.
@@ -152,7 +169,6 @@ pub trait GalleryPage: Sized + 'static {
 
 /// A page behind its entity, without its type.
 pub(super) trait AnyPage {
-    fn info(&self) -> &'static PageInfo;
     fn row_count(&self, window: &Window, cx: &App) -> usize;
     fn row_gap(&self, row: usize, cx: &App) -> f32;
     fn interactive(&self, row: usize, cx: &App) -> bool;
@@ -160,15 +176,13 @@ pub(super) trait AnyPage {
     fn prepare(&self, window: &mut Window, cx: &mut App);
     fn after_layout(&self, visible: &dyn Fn(usize) -> bool, cx: &mut App);
     fn apply_capture(&self, state: CaptureState, cx: &mut App);
-    fn observe(&self, cx: &mut Context<super::Gallery>) -> Subscription;
+    /// Re-render the Gallery when page `index` (in `PAGES`) changes while shown.
+    fn observe(&self, index: usize, cx: &mut Context<super::Gallery>) -> Subscription;
     #[cfg(test)]
     fn any_entity(&self) -> AnyEntity;
 }
 
 impl<P: GalleryPage> AnyPage for Entity<P> {
-    fn info(&self) -> &'static PageInfo {
-        &P::INFO
-    }
     fn row_count(&self, window: &Window, cx: &App) -> usize {
         self.read(cx).row_count(window)
     }
@@ -190,8 +204,12 @@ impl<P: GalleryPage> AnyPage for Entity<P> {
     fn apply_capture(&self, state: CaptureState, cx: &mut App) {
         self.update(cx, |page, cx| page.apply_capture(state, cx))
     }
-    fn observe(&self, cx: &mut Context<super::Gallery>) -> Subscription {
-        cx.observe(self, |_, _, cx| cx.notify())
+    fn observe(&self, index: usize, cx: &mut Context<super::Gallery>) -> Subscription {
+        cx.observe(self, move |gallery, _, cx| {
+            if gallery.shows_page(index) {
+                cx.notify()
+            }
+        })
     }
     #[cfg(test)]
     fn any_entity(&self) -> AnyEntity {
