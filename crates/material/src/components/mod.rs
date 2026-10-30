@@ -134,7 +134,7 @@ pub use progress::{
     progress_with_label, sample_circular_progress, spinner, spinner_with_playback,
 };
 pub use radio::{MaterialRadio, MaterialRadioGroup};
-pub use sheets::{MaterialBottomSheet, MaterialSideSheet};
+pub use sheets::{BottomSheetDetent, MaterialBottomSheet, MaterialSideSheet, SideSheetEdge};
 pub use tabs::{MaterialTabs, TabItem, TabsVariant};
 pub use text::{
     accessible_text, error_text, info_callout, page_heading, section_heading, section_title,

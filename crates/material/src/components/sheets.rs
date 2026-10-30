@@ -11,13 +11,23 @@
 //! drag handle in a 36dp header; standard bottom sheets float at level 1,
 //! modal ones over the scrim.
 //!
+//! Side sheets dock to either edge ([`SideSheetEdge`]). A bottom sheet's
+//! detent can be controlled ([`BottomSheetDetent`]: hidden, partial or
+//! expanded) and reported back as drags and its handle move it; its width
+//! caps at 640dp or a caller's maximum. Whether the scrim and Escape
+//! dismiss a modal sheet is configurable, and a `contained` modal sheet
+//! presents over its positioned parent instead of the whole window.
+//!
 //! Modal behavior (focus trap, Escape, scrim dismissal) is GPUI Base's
 //! [`gpui_base::Sheet`] host; Material adds focus into and back out of the
 //! sheet and the motion. Sheets enter and leave on the default spatial
 //! spring with fades on the default effects spring; a closed sheet's content
 //! leaves the tree once the close settles, so it offers no tab stops or
 //! accessibility nodes off screen.
-use super::dialog::{OverlayFrame, header_icon_button, modal_focus, overlay_frame, scrim};
+use super::dialog::{
+    OverlayFrame, container_state, header_icon_button, modal_focus, overlay_area, overlay_frame,
+    place_host, scrim, with_container_probe,
+};
 use crate::{
     color::ColorRole,
     icons::{Icon, IconName, Style, Symbol},
@@ -37,6 +47,7 @@ use std::time::Instant;
 use web_time::Instant;
 
 type Handler = Rc<dyn Fn(&mut Window, &mut App)>;
+type DetentHandler = Rc<dyn Fn(BottomSheetDetent, &mut Window, &mut App)>;
 
 /// The modal side sheet's corners and the bottom sheet's top corners.
 const SIDE_SHEET_RADIUS: Pixels = px(16.);
@@ -69,6 +80,15 @@ fn arrow_back() -> Icon {
     ))
 }
 
+/// The edge a side sheet docks to.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum SideSheetEdge {
+    Start,
+    /// The trailing edge (M3's default).
+    #[default]
+    End,
+}
+
 /// Whether a sheet has finished closing: closed, with its reveal settled.
 fn sheet_hidden(open: bool, reveal: f32) -> bool {
     !open && reveal == 0.
@@ -85,6 +105,10 @@ pub struct MaterialSideSheet {
     open: bool,
     modal: bool,
     specimen: bool,
+    edge: SideSheetEdge,
+    contained: bool,
+    dismiss_on_scrim: bool,
+    dismiss_on_escape: bool,
     width: Rems,
     headline: Option<SharedString>,
     label: Option<SharedString>,
@@ -102,6 +126,10 @@ impl MaterialSideSheet {
             open: false,
             modal: false,
             specimen: false,
+            edge: SideSheetEdge::End,
+            contained: false,
+            dismiss_on_scrim: true,
+            dismiss_on_escape: true,
             width: rem(320.),
             headline: None,
             label: None,
@@ -129,6 +157,27 @@ impl MaterialSideSheet {
     /// Render the sheet's surface in place, without motion (a specimen).
     pub fn specimen(mut self, specimen: bool) -> Self {
         self.specimen = specimen;
+        self
+    }
+    /// The edge the sheet docks to (default the trailing edge).
+    pub fn edge(mut self, edge: SideSheetEdge) -> Self {
+        self.edge = edge;
+        self
+    }
+    /// Present the modal sheet over its positioned parent's bounds instead
+    /// of the whole window.
+    pub fn contained(mut self, contained: bool) -> Self {
+        self.contained = contained;
+        self
+    }
+    /// Whether pressing the modal sheet's scrim dismisses it (default true).
+    pub fn dismiss_on_scrim(mut self, dismiss: bool) -> Self {
+        self.dismiss_on_scrim = dismiss;
+        self
+    }
+    /// Whether Escape dismisses the modal sheet (default true).
+    pub fn dismiss_on_escape(mut self, dismiss: bool) -> Self {
+        self.dismiss_on_escape = dismiss;
         self
     }
     /// The title-large headline in the header.
@@ -272,11 +321,14 @@ impl MaterialSideSheet {
             .child(self.body())
     }
 
-    /// The standard container: the surface with a leading divider.
+    /// The standard container: the surface with a divider on the edge
+    /// facing the content.
     fn standard_surface(self) -> Div {
+        let start = self.edge == SideSheetEdge::Start;
         div()
             .size_full()
             .flex()
+            .when(start, |sheet| sheet.flex_row_reverse())
             .bg(color(ColorRole::SURFACE))
             .child(
                 div()
@@ -309,17 +361,40 @@ impl RenderOnce for MaterialSideSheet {
                     .into_any_element()
             };
         }
+        let start = self.edge == SideSheetEdge::Start;
         if self.modal {
             let id = self.id.clone();
             let open = self.open;
+            let container = self.contained.then(|| container_state(&id, window, cx));
             let frame = overlay_frame(&id, open, window, cx);
             let focus = modal_focus(&id, open, window, cx);
             if frame.settled_closed(open) {
-                return div().into_any_element();
+                return with_container_probe(container, div().into_any_element());
             }
+            let Some(area) = overlay_area(container.as_ref(), window, cx) else {
+                return with_container_probe(container, div().into_any_element());
+            };
             let width = self.width.to_pixels(window.rem_size());
             let dismiss = self.on_dismiss.clone().filter(|_| open);
+            let dismissals = Dismissals {
+                escape: dismiss.clone().filter(|_| self.dismiss_on_escape),
+                scrim: dismiss.filter(|_| self.dismiss_on_scrim),
+            };
             let name = self.label.clone().or_else(|| self.headline.clone());
+            let corners = if start {
+                Corners {
+                    top_right: SIDE_SHEET_RADIUS,
+                    bottom_right: SIDE_SHEET_RADIUS,
+                    ..Corners::default()
+                }
+            } else {
+                Corners {
+                    top_left: SIDE_SHEET_RADIUS,
+                    bottom_left: SIDE_SHEET_RADIUS,
+                    ..Corners::default()
+                }
+            };
+            let inset = width * (frame.spatial - 1.);
             let surface = div()
                 .id(id)
                 .role(Role::Dialog)
@@ -327,15 +402,21 @@ impl RenderOnce for MaterialSideSheet {
                 .absolute()
                 .top_0()
                 .bottom_0()
-                .right(width * (frame.spatial - 1.))
+                .map(|surface| {
+                    if start {
+                        surface.left(inset)
+                    } else {
+                        surface.right(inset)
+                    }
+                })
                 .opacity(frame.opacity())
                 .occlude()
-                .child(self.modal_surface(Corners {
-                    top_left: SIDE_SHEET_RADIUS,
-                    bottom_left: SIDE_SHEET_RADIUS,
-                    ..Corners::default()
-                }));
-            return modal_host(focus, frame, dismiss, surface).into_any_element();
+                .child(self.modal_surface(corners));
+            let area = container.is_some().then_some(area);
+            return with_container_probe(
+                container,
+                modal_host(focus, frame, dismissals, area, surface).into_any_element(),
+            );
         }
         let reveal = motion::value(
             (self.id.clone(), "reveal"),
@@ -347,12 +428,19 @@ impl RenderOnce for MaterialSideSheet {
         let width = self.width.to_pixels(window.rem_size());
         let hidden = sheet_hidden(self.open, reveal);
         let id = self.id.clone();
+        let inset = width * (progress - 1.);
         div()
             .id(id)
             .absolute()
             .top_0()
             .bottom_0()
-            .right(width * (progress - 1.))
+            .map(|sheet| {
+                if start {
+                    sheet.left(inset)
+                } else {
+                    sheet.right(inset)
+                }
+            })
             .w(width)
             .opacity(progress)
             // Once the close has settled, the sheet's content leaves the tree,
@@ -363,19 +451,27 @@ impl RenderOnce for MaterialSideSheet {
     }
 }
 
-/// Base's modal sheet host over the window, with the Material scrim.
+/// What dismisses a modal sheet: Escape and the scrim, each optional.
+struct Dismissals {
+    escape: Option<Handler>,
+    scrim: Option<Handler>,
+}
+
+/// Base's modal sheet host over the window (or `area` of it), with the
+/// Material scrim.
 fn modal_host(
     focus: FocusHandle,
     frame: OverlayFrame,
-    dismiss: Option<Handler>,
+    dismissals: Dismissals,
+    area: Option<Bounds<Pixels>>,
     surface: impl IntoElement,
 ) -> impl IntoElement {
-    let escape = dismiss.clone();
     deferred(
         ModalSheetHost {
             focus,
             fade: frame.fade,
-            dismiss: escape,
+            dismissals,
+            area,
             surface: surface.into_any_element(),
         }
         .into_any_element(),
@@ -387,23 +483,41 @@ fn modal_host(
 struct ModalSheetHost {
     focus: FocusHandle,
     fade: f32,
-    dismiss: Option<Handler>,
+    dismissals: Dismissals,
+    area: Option<Bounds<Pixels>>,
     surface: AnyElement,
 }
 
 impl RenderOnce for ModalSheetHost {
     fn render(self, _: &mut Window, cx: &mut App) -> impl IntoElement {
-        let dismiss = self.dismiss;
-        gpui_base::Sheet::new(cx)
+        let Dismissals {
+            escape,
+            scrim: on_scrim,
+        } = self.dismissals;
+        // Base's host closes on Escape and the overlay through one callback;
+        // the scrim dismisses itself so each can be turned off alone. The
+        // scrim still blocks the pointer when it does not dismiss.
+        let overlay = scrim(self.fade).on_mouse_down(MouseButton::Left, move |_, window, cx| {
+            cx.stop_propagation();
+            if let Some(dismiss) = &on_scrim {
+                dismiss(window, cx);
+            }
+        });
+        let host = gpui_base::Sheet::new(cx)
             .focus_handle(self.focus)
-            .overlay_closable(dismiss.is_some())
+            .overlay_interactive(false)
+            .overlay_closable(false)
             .on_close(move |_, window, cx| {
-                if let Some(dismiss) = &dismiss {
+                if let Some(dismiss) = &escape {
                     dismiss(window, cx);
                 }
             })
-            .overlay(scrim(self.fade))
-            .surface(self.surface)
+            .overlay(overlay)
+            .surface(self.surface);
+        match self.area {
+            Some(area) => place_host(host, area),
+            None => host,
+        }
     }
 }
 
@@ -428,8 +542,25 @@ struct BottomSheetState {
     /// the viewport's).
     measured: bool,
     expanded: bool,
+    /// The controlled detent last applied, to apply changes once.
+    applied: Option<BottomSheetDetent>,
+    /// Whether the last press moved the sheet: the handle's click that
+    /// ends a drag does not toggle the detent.
+    dragged: bool,
     drag: Option<Drag>,
     settle: Option<Settle>,
+}
+
+/// A bottom sheet's rest position (md3.io's State).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum BottomSheetDetent {
+    /// Closed.
+    #[default]
+    Hidden,
+    /// Showing its partial height ([`MaterialBottomSheet::partial_height`]);
+    /// without one, the same as expanded.
+    Partial,
+    Expanded,
 }
 
 /// Where a released bottom sheet goes.
@@ -464,11 +595,17 @@ pub(crate) fn snap_target(position: f32, height: f32, partial: Option<f32>) -> S
 pub struct MaterialBottomSheet {
     id: ElementId,
     open: Option<bool>,
+    detent: Option<BottomSheetDetent>,
     modal: bool,
+    contained: bool,
+    dismiss_on_scrim: bool,
+    dismiss_on_escape: bool,
     label: Option<SharedString>,
     drag_handle: Option<SharedString>,
     partial: Option<Rems>,
+    max_width: Rems,
     on_dismiss: Option<Handler>,
+    on_detent_change: Option<DetentHandler>,
     children: Vec<AnyElement>,
 }
 
@@ -477,11 +614,17 @@ impl MaterialBottomSheet {
         Self {
             id: id.into(),
             open: None,
+            detent: None,
             modal: false,
+            contained: false,
+            dismiss_on_scrim: true,
+            dismiss_on_escape: true,
             label: None,
             drag_handle: None,
             partial: None,
+            max_width: rem(BOTTOM_SHEET_MAX_WIDTH),
             on_dismiss: None,
+            on_detent_change: None,
             children: Vec::new(),
         }
     }
@@ -491,8 +634,46 @@ impl MaterialBottomSheet {
         self.open = Some(open);
         self
     }
+    /// Present the sheet at `detent` (controlled): hidden closes it, and a
+    /// change moves it to the partial or expanded detent. Report the
+    /// person's changes with [`Self::on_detent_change`].
+    pub fn detent(mut self, detent: BottomSheetDetent) -> Self {
+        self.detent = Some(detent);
+        self.open = Some(detent != BottomSheetDetent::Hidden);
+        self
+    }
+    /// Called with the detent a drag, the handle or a dismissal moves the
+    /// sheet to.
+    pub fn on_detent_change(
+        mut self,
+        f: impl Fn(BottomSheetDetent, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_detent_change = Some(Rc::new(f));
+        self
+    }
     pub fn modal(mut self, modal: bool) -> Self {
         self.modal = modal;
+        self
+    }
+    /// Present the modal sheet over its positioned parent's bounds instead
+    /// of the whole window.
+    pub fn contained(mut self, contained: bool) -> Self {
+        self.contained = contained;
+        self
+    }
+    /// Whether pressing the modal sheet's scrim dismisses it (default true).
+    pub fn dismiss_on_scrim(mut self, dismiss: bool) -> Self {
+        self.dismiss_on_scrim = dismiss;
+        self
+    }
+    /// Whether Escape dismisses the modal sheet (default true).
+    pub fn dismiss_on_escape(mut self, dismiss: bool) -> Self {
+        self.dismiss_on_escape = dismiss;
+        self
+    }
+    /// The sheet's maximum width (default M3's 640dp).
+    pub fn max_width(mut self, width: Rems) -> Self {
+        self.max_width = width;
         self
     }
     /// The modal sheet's accessible name.
@@ -539,6 +720,7 @@ impl MaterialBottomSheet {
     /// sheet's own background, never from text, sliders or buttons inside.
     fn surface(
         modal: bool,
+        max_width: Rems,
         drag_layer: Option<AnyElement>,
         handle: Option<AnyElement>,
         children: Vec<AnyElement>,
@@ -546,7 +728,7 @@ impl MaterialBottomSheet {
         div()
             .relative()
             .w_full()
-            .max_w(rem(BOTTOM_SHEET_MAX_WIDTH))
+            .max_w(max_width)
             .flex()
             .flex_col()
             .items_center()
@@ -583,6 +765,7 @@ fn settle_progress(elapsed: f32, reduced: bool) -> f32 {
 impl RenderOnce for MaterialBottomSheet {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let modal = self.modal;
+        let max_width = self.max_width;
         let Some(open) = self.open else {
             let handle = self.drag_handle.map(|_| {
                 div()
@@ -601,10 +784,11 @@ impl RenderOnce for MaterialBottomSheet {
                 .flex_col()
                 .justify_end()
                 .items_center()
-                .child(Self::surface(modal, None, handle, self.children).flex_1())
+                .child(Self::surface(modal, max_width, None, handle, self.children).flex_1())
                 .into_any_element();
         };
         let id = self.id.clone();
+        let container = (modal && self.contained).then(|| container_state(&id, window, cx));
         let frame = overlay_frame(&id, open, window, cx);
         let focus = modal.then(|| modal_focus(&id, open, window, cx));
         let state = window.use_keyed_state((id.clone(), "bottom-sheet"), cx, |window, _| {
@@ -612,18 +796,37 @@ impl RenderOnce for MaterialBottomSheet {
                 height: window.viewport_size().height,
                 measured: false,
                 expanded: false,
+                applied: None,
+                dragged: false,
                 drag: None,
                 settle: None,
             }
         });
+        // A controlled detent moves the sheet once per change.
+        if let Some(detent) = self.detent
+            && state.read(cx).applied != Some(detent)
+        {
+            state.update(cx, |state, _| {
+                state.applied = Some(detent);
+                if detent != BottomSheetDetent::Hidden {
+                    state.expanded = detent == BottomSheetDetent::Expanded;
+                    state.drag = None;
+                    state.settle = None;
+                }
+            });
+        }
         if frame.settled_closed(open) {
             state.update(cx, |state, _| {
                 state.expanded = false;
                 state.drag = None;
                 state.settle = None;
             });
-            return div().into_any_element();
+            return with_container_probe(container, div().into_any_element());
         }
+        let Some(area) = overlay_area(container.as_ref(), window, cx) else {
+            return with_container_probe(container, div().into_any_element());
+        };
+        let on_detent = self.on_detent_change.clone();
         let reduced = cx.reduce_motion();
         let partial = self
             .partial
@@ -660,16 +863,34 @@ impl RenderOnce for MaterialBottomSheet {
         // Upward drags stop at the expanded detent.
         let position = (rest + residual).max(0.);
         let offset = position + (1. - frame.spatial) * height;
-        let dismiss = self.on_dismiss.clone().filter(|_| open);
+        let report = on_detent.clone();
+        let dismiss: Option<Handler> = open
+            .then(|| -> Option<Handler> {
+                match (self.on_dismiss.clone(), report) {
+                    (None, None) => None,
+                    (dismiss, report) => Some(Rc::new(move |window: &mut Window, cx: &mut App| {
+                        if let Some(dismiss) = &dismiss {
+                            dismiss(window, cx);
+                        }
+                        if let Some(report) = &report {
+                            report(BottomSheetDetent::Hidden, window, cx);
+                        }
+                    })),
+                }
+            })
+            .flatten();
 
         let handle = self.drag_handle.map(|label| {
             let toggle = state.clone();
+            let press = state.clone();
+            let report = on_detent.clone();
             div()
                 .w_full()
                 .flex()
                 .justify_center()
                 .child(
                     gpui_base::Button::new("drag-handle")
+                        .debug_selector(|| "drag-handle".into())
                         .accessibility_label(label)
                         .w(rem(48.))
                         .h(rem(36.))
@@ -678,13 +899,40 @@ impl RenderOnce for MaterialBottomSheet {
                         .justify_center()
                         .cursor_grab()
                         .child(drag_handle_bar())
+                        // The handle drags the sheet too; the drag layer
+                        // under it does not see presses on the button.
+                        .on_mouse_down(MouseButton::Left, move |event, window, cx| {
+                            let y = f32::from(event.position.y);
+                            press.update(cx, |state, _| {
+                                state.drag = Some(Drag {
+                                    start: y,
+                                    offset: 0.,
+                                    moved: false,
+                                });
+                                state.dragged = false;
+                                state.settle = None;
+                            });
+                            window.refresh();
+                        })
                         .on_click(move |_, window, cx| {
-                            if partial.is_some() {
-                                toggle.update(cx, |state, _| {
+                            if partial.is_some() && !toggle.read(cx).dragged {
+                                let expanded = toggle.update(cx, |state, _| {
                                     state.expanded = !state.expanded;
                                     state.settle = None;
+                                    state.expanded
                                 });
                                 window.refresh();
+                                if let Some(report) = &report {
+                                    report(
+                                        if expanded {
+                                            BottomSheetDetent::Expanded
+                                        } else {
+                                            BottomSheetDetent::Partial
+                                        },
+                                        window,
+                                        cx,
+                                    );
+                                }
                             }
                         }),
                 )
@@ -694,6 +942,7 @@ impl RenderOnce for MaterialBottomSheet {
         let measure = state.clone();
         let tracker = state.clone();
         let release_dismiss = dismiss.clone();
+        let release_report = on_detent.clone();
         let dragging = drag.is_some();
         let starter = state.clone();
         let drag_layer = canvas(
@@ -714,6 +963,7 @@ impl RenderOnce for MaterialBottomSheet {
                             offset: 0.,
                             moved: false,
                         });
+                        state.dragged = false;
                         state.settle = None;
                     });
                     window.refresh();
@@ -742,7 +992,7 @@ impl RenderOnce for MaterialBottomSheet {
             .when(!measured, |sheet| sheet.invisible())
             .occlude()
             .child(
-                Self::surface(modal, Some(drag_layer), handle, self.children).child(
+                Self::surface(modal, max_width, Some(drag_layer), handle, self.children).child(
                     canvas(
                         |_, _, _| {},
                         move |_, _, window, _| {
@@ -767,6 +1017,7 @@ impl RenderOnce for MaterialBottomSheet {
                             );
                             let releasing = tracker.clone();
                             let dismiss = release_dismiss.clone();
+                            let report = release_report.clone();
                             window.on_mouse_event(move |_: &MouseUpEvent, phase, window, cx| {
                                 if phase != DispatchPhase::Bubble {
                                     return;
@@ -779,6 +1030,7 @@ impl RenderOnce for MaterialBottomSheet {
                                 if !drag.moved {
                                     return;
                                 }
+                                releasing.update(cx, |state, _| state.dragged = true);
                                 let position = (rest + drag.offset).max(0.);
                                 let target = snap_target(position, height, partial);
                                 let new_rest = match target {
@@ -799,10 +1051,27 @@ impl RenderOnce for MaterialBottomSheet {
                                         started: Instant::now(),
                                     });
                                 });
-                                if target == SnapTarget::Dismiss
-                                    && let Some(dismiss) = &dismiss
-                                {
-                                    dismiss(window, cx);
+                                match target {
+                                    SnapTarget::Dismiss => {
+                                        if let Some(dismiss) = &dismiss {
+                                            dismiss(window, cx);
+                                        }
+                                    }
+                                    SnapTarget::Expanded | SnapTarget::Partial => {
+                                        if let Some(report) = &report {
+                                            report(
+                                                if target == SnapTarget::Expanded
+                                                    || partial.is_none()
+                                                {
+                                                    BottomSheetDetent::Expanded
+                                                } else {
+                                                    BottomSheetDetent::Partial
+                                                },
+                                                window,
+                                                cx,
+                                            );
+                                        }
+                                    }
                                 }
                             });
                         },
@@ -840,7 +1109,17 @@ impl RenderOnce for MaterialBottomSheet {
             );
 
         match focus {
-            Some(focus) => modal_host(focus, frame, dismiss, sheet).into_any_element(),
+            Some(focus) => {
+                let dismissals = Dismissals {
+                    escape: dismiss.clone().filter(|_| self.dismiss_on_escape),
+                    scrim: dismiss.filter(|_| self.dismiss_on_scrim),
+                };
+                let area = container.is_some().then_some(area);
+                with_container_probe(
+                    container,
+                    modal_host(focus, frame, dismissals, area, sheet).into_any_element(),
+                )
+            }
             None => div()
                 .absolute()
                 .inset_0()
@@ -1121,5 +1400,162 @@ mod tests {
         assert_eq!(body.top(), px(300.), "{body:?}");
         let frames = cx.update(|window, cx| window.simulate_next_frame(cx));
         assert_eq!(frames, 0, "a settled sheet requests nothing");
+    }
+
+    struct EdgeHarness {
+        modal: bool,
+        escape: bool,
+        dismissals: usize,
+    }
+    impl Render for EdgeHarness {
+        fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+            let this = cx.entity().downgrade();
+            div().size_full().pl(px(100.)).child(
+                div()
+                    .relative()
+                    .debug_selector(|| "frame".into())
+                    .w(px(600.))
+                    .h(px(400.))
+                    .child(
+                        MaterialSideSheet::new("edge")
+                            .open(true)
+                            .modal(self.modal)
+                            .edge(SideSheetEdge::Start)
+                            .width(rem(200.))
+                            .contained(true)
+                            .dismiss_on_escape(self.escape)
+                            .on_dismiss(move |_, cx| {
+                                let _ = this.update(cx, |this, cx| {
+                                    this.dismissals += 1;
+                                    cx.notify();
+                                });
+                            })
+                            .child(div().debug_selector(|| "edge-body".into()).size_full()),
+                    ),
+            )
+        }
+    }
+
+    #[gpui::test]
+    fn a_start_sheet_docks_left_and_escape_dismissal_is_optional(cx: &mut TestAppContext) {
+        cx.update(|cx| {
+            gpui_base::init(cx);
+            cx.set_reduce_motion(true);
+        });
+        let (view, cx) = cx.add_window_view(|window, _| {
+            window.set_rem_size(px(crate::tokens::typography::BASE_PX));
+            EdgeHarness {
+                modal: false,
+                escape: false,
+                dismissals: 0,
+            }
+        });
+        draw(cx);
+        let frame = cx.debug_bounds("frame").unwrap();
+        let body = cx.debug_bounds("edge-body").unwrap();
+        assert_eq!(
+            body.right(),
+            frame.left() + px(199.),
+            "the divider faces the content"
+        );
+        // The modal sheet presents over its container, at its start edge.
+        view.update(cx, |v, cx| {
+            v.modal = true;
+            cx.notify();
+        });
+        for _ in 0..3 {
+            draw(cx);
+        }
+        let body = cx.debug_bounds("edge-body").unwrap();
+        assert_eq!(body.left(), frame.left());
+        cx.simulate_keystrokes("escape");
+        draw(cx);
+        assert_eq!(view.read_with(cx, |v, _| v.dismissals), 0, "Escape is off");
+        view.update(cx, |v, cx| {
+            v.escape = true;
+            cx.notify();
+        });
+        draw(cx);
+        cx.simulate_keystrokes("escape");
+        draw(cx);
+        assert_eq!(view.read_with(cx, |v, _| v.dismissals), 1);
+    }
+
+    struct DetentHarness {
+        detent: BottomSheetDetent,
+        reported: Vec<BottomSheetDetent>,
+    }
+    impl Render for DetentHarness {
+        fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+            let this = cx.entity().downgrade();
+            div().relative().size(px(400.)).child(
+                MaterialBottomSheet::new("detent")
+                    .detent(self.detent)
+                    .partial_height(rem(100.))
+                    .max_width(rem(300.))
+                    .drag_handle("Drag handle")
+                    .on_detent_change(move |detent, _, cx| {
+                        let _ = this.update(cx, |this, cx| {
+                            this.reported.push(detent);
+                            this.detent = detent;
+                            cx.notify();
+                        });
+                    })
+                    .child(div().debug_selector(|| "detent-body".into()).h(px(300.))),
+            )
+        }
+    }
+
+    #[gpui::test]
+    fn a_controlled_bottom_sheet_follows_and_reports_its_detent(cx: &mut TestAppContext) {
+        cx.update(|cx| {
+            gpui_base::init(cx);
+            cx.set_reduce_motion(true);
+        });
+        let (view, cx) = cx.add_window_view(|window, _| {
+            window.set_rem_size(px(crate::tokens::typography::BASE_PX));
+            DetentHarness {
+                detent: BottomSheetDetent::Expanded,
+                reported: Vec::new(),
+            }
+        });
+        for _ in 0..3 {
+            draw(cx);
+        }
+        let body = cx.debug_bounds("detent-body").unwrap();
+        assert_eq!(body.bottom(), px(400.), "expanded");
+        assert_eq!(body.size.width, px(300.), "capped at its maximum width");
+        view.update(cx, |v, cx| {
+            v.detent = BottomSheetDetent::Partial;
+            cx.notify();
+        });
+        for _ in 0..3 {
+            draw(cx);
+        }
+        let partial = cx.debug_bounds("detent-body").unwrap();
+        // 100dp of the sheet (its 36dp handle row, then the body) peeks.
+        assert_eq!(partial.top(), px(336.), "{partial:?}");
+        // The handle expands it and reports the change.
+        let handle = cx.debug_bounds("drag-handle").unwrap();
+        cx.simulate_click(handle.center(), Modifiers::default());
+        for _ in 0..3 {
+            draw(cx);
+        }
+        assert_eq!(
+            view.read_with(cx, |v, _| v.reported.clone()),
+            [BottomSheetDetent::Expanded]
+        );
+        assert_eq!(cx.debug_bounds("detent-body").unwrap().bottom(), px(400.));
+        // Hidden closes it.
+        view.update(cx, |v, cx| {
+            v.detent = BottomSheetDetent::Hidden;
+            cx.notify();
+        });
+        cx.executor()
+            .advance_clock(std::time::Duration::from_secs(1));
+        for _ in 0..3 {
+            draw(cx);
+        }
+        assert!(cx.debug_bounds("detent-body").is_none());
     }
 }
