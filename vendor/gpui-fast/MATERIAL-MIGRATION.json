@@ -177,7 +177,7 @@
     "src/window.rs": "d3f00c28cc47446f6c73be67d00830446e0e3a9a7fadefdf54fff9e5ccadee0b"
   },
   "patch_base": "gpui-pre 0.3.10 published archive plus this workspace compatibility patches",
-  "patch_contract": "Preserve raw touch observers and extended hitboxes through Fast retained/scroll replay; preserve full CPU scopes, repeat playback and font invalidation. Runtime validation is required.",
+  "patch_contract": "Preserve raw touch observers and extended hitboxes through Fast retained/scroll replay; preserve full CPU scopes and repeat playback. Runtime validation is required.",
   "additional_test_fixtures": {
     "tests/fonts/README.md": {
       "sha256": "675824dd97a1d09a1a105d186a7b96a05016009d5d14621d6f5298612b3fbc6d",
@@ -266,11 +266,6 @@
         "local_sha256": "7f191273a738c0ec408e93f433322c2780f96788198939d2850cd5c561235fa8",
         "reason": "List hit testing uses Hitbox::contains_pointer (hitbox extension)."
       },
-      "src/fast/layers/mod.rs": {
-        "upstream_sha256": "0e3437497f6eb5ba8d4df09464302a3ed616a9bfc037cda88c4d1d5ee968381c",
-        "local_sha256": "439713d9bf140643873311f8cb4a82084a4621719c6cf78ef1389789fd4a0270",
-        "reason": "Layer reuse is disallowed after a font-generation change (font registration invalidation)."
-      },
       "src/fast/layers/reuse.rs": {
         "upstream_sha256": "8259c4c5b53a8d9818786dbdedc377b8da4a8b1c84baafa65dd89cfb562b3f3f",
         "local_sha256": "3ea103c11235d4ed749428098f5e0f264b5dc979b306ea600d38a8592694fcb1",
@@ -283,28 +278,13 @@
       },
       "src/fast/retained.rs": {
         "upstream_sha256": "e6885ba63fccd9375a0afc80b657463790cc9a39f639676997f8fa293b1beb6b",
-        "local_sha256": "a246a92c3c92f83645324ecad5a465108d2463627e0fc84f6f0aaf71b47ed24e",
-        "reason": "Font-generation change forces a refreshing frame and blocks view/layout retention; PaintIndex gains touch_observers_index (equality and shifting); touch-replay tests."
-      },
-      "src/fast/splice.rs": {
-        "upstream_sha256": "4436ab4f8934aec0e95e73edf69fb3ea36c1b01cb6fe494037cb9923ea221efd",
-        "local_sha256": "12d873c49c9d60155ead908d183083911ab16816deee3072287eee7f347b6aba",
-        "reason": "Layout splicing is refused or invalidated after a font-generation change (font registration invalidation)."
+        "local_sha256": "d56f8384e268ea8c0af9e04eb769f655211328352aef11caf35062a613279005",
+        "reason": "PaintIndex gains touch_observers_index (equality and shifting); touch-replay tests."
       },
       "src/fast/tests/layers_oracle.rs": {
         "upstream_sha256": "ff28ee326fccca43f6d3a04bf7f3d76693ee0d09e6096c3101fabdc1177f35e6",
         "local_sha256": "33764049ae7efa57ecb1ce74af890eff91a4e0f3001555171e765035db21906f",
         "reason": "Oracle hitbox description includes the clipped extension rectangle (hitbox extension, test only)."
-      },
-      "src/fast/tests/retained.rs": {
-        "upstream_sha256": "95fbb8389daf15e227312b07d2794ba109406071a780d3f4d9224e61f722173b",
-        "local_sha256": "54c5fcb2b860bc00a2c96b0688b2de2c35616ff280d9746c54736c487ec481d0",
-        "reason": "Test: font registration rebuilds cached views without an entity notification."
-      },
-      "src/fast/text.rs": {
-        "upstream_sha256": "e386a393269aee9189cb87c2a1f40f40fb4716b2cd98e6a394e052b318177814",
-        "local_sha256": "28faf38f3ee8ba8850656779a1682d60b6a0fc87759cba40f8c157ca06f62337",
-        "reason": "Text measurement inputs carry the font generation and drop stale held layouts (font invalidation)."
       },
       "src/platform.rs": {
         "upstream_sha256": "7f95c2fe68fc225cb45451888355c4df2589632d7bde0d61fce554972f4825ca",
@@ -343,8 +323,8 @@
       },
       "src/text_system.rs": {
         "upstream_sha256": "e07554d460982d07546b4d67d9cd02162853b27a9cab7f53a9266626fff27346",
-        "local_sha256": "6df6572db38de75b6b48c2556976d3fea3346c0add7321dcf00f883040770600",
-        "reason": "em_width/em_advance fallback (vendor/gpui-pre/em-fallback-patch.md); add_fonts invalidates Fast text caches after the platform installs the fonts instead of before, and exposes font_generation."
+        "local_sha256": "33519adfe47d4ea13788023aa6cd1f260953033768bdbdc531a908cfa7ef843d",
+        "reason": "em_width/em_advance fallback (vendor/gpui-pre/em-fallback-patch.md)."
       },
       "src/window.rs": {
         "upstream_sha256": "d3f00c28cc47446f6c73be67d00830446e0e3a9a7fadefdf54fff9e5ccadee0b",
@@ -393,6 +373,6 @@
         "reason": "Package-level lockfile not retained; the workspace Cargo.lock owns resolution."
       }
     },
-    "unchanged_file_count": 145
+    "unchanged_file_count": 149
   }
 }

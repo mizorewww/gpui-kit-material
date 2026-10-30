@@ -300,7 +300,6 @@ impl Window {
     /// it was, and the nested views ask for the layout they had.
     pub(crate) fn splice_layout(&mut self, id: &GlobalElementId, cx: &mut App) -> Option<Splice> {
         if self.refreshing
-            || self.retained_state.font_generation != self.text_system().font_generation()
             || cx.has_active_drag()
             || crate::fast::a11y::stale(&self.a11y)
             || self.is_inspector_picking(cx)
@@ -476,12 +475,10 @@ impl Window {
     /// still stands. Checked once layout is computed, when a gap was laid out
     /// differently.
     pub(crate) fn splice_layout_holds(&self, splice: &Splice) -> bool {
-        self.retained_state.font_generation == self.text_system().font_generation()
-            && self
-                .layout_engine
-                .as_ref()
-                .unwrap()
-                .layouts_unchanged(&splice.held)
+        self.layout_engine
+            .as_ref()
+            .unwrap()
+            .layouts_unchanged(&splice.held)
     }
 
     /// Builds the view last frame's record `record` stands for again, where

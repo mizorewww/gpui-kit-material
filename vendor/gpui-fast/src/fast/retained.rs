@@ -35,13 +35,6 @@ use std::{any::TypeId, cell::RefCell, mem, ops::Range, rc::Rc};
 #[inline(always)]
 pub(crate) fn begin_frame(window: &mut Window, cx: &App) {
     window.fast_layout.phase_times.begin();
-    let generation = window.text_system().font_generation();
-    if window.retained_state.font_generation != generation {
-        // Refresh already invalidates retained/cached views, splices and layers.
-        // A font change can alter both glyphs and layout without an entity write.
-        window.refreshing = true;
-        window.retained_state.font_generation = generation;
-    }
     crate::fast::a11y::new_frame(window);
     window.mark_changed_retained_views_dirty(cx);
 }
@@ -283,7 +276,6 @@ pub(crate) struct RetainedState {
     /// The focus of the input handler last given to the platform window, if
     /// one was. See [`note_restored_input_handler`].
     pub(crate) installed_input_focus: Option<Option<crate::FocusId>>,
-    pub(crate) font_generation: usize,
 }
 
 impl RetainedState {
@@ -303,7 +295,6 @@ impl RetainedState {
             rendering_since: FxHashMap::default(),
             render_writes: FxHashMap::default(),
             installed_input_focus: None,
-            font_generation: cx.text_system().font_generation(),
         }
     }
 
@@ -613,7 +604,6 @@ impl Window {
 
     fn reusable_record(&self, id: &GlobalElementId, cx: &App, cached: bool) -> Option<usize> {
         if self.refreshing
-            || self.retained_state.font_generation != self.text_system().font_generation()
             || cx.has_active_drag()
             || crate::fast::a11y::stale(&self.a11y)
             || self.is_inspector_picking(cx)
@@ -643,8 +633,7 @@ impl Window {
     /// drawn at `bounds` just as it was.
     pub(crate) fn retained_context_matches(&self, previous: usize, bounds: Bounds<Pixels>) -> bool {
         let context = &self.rendered_frame.retained.records[previous].context;
-        self.retained_state.font_generation == self.text_system().font_generation()
-            && !crate::fast::layers::paint::inside_layer(self)
+        !crate::fast::layers::paint::inside_layer(self)
             && context.bounds == bounds
             && context.opacity == self.element_opacity
             && context.content_mask == self.content_mask()
@@ -662,10 +651,7 @@ impl Window {
     ) -> Option<LayoutId> {
         let record = &self.rendered_frame.retained.records[previous];
         let layout = record.layout.as_ref()?;
-        if self.retained_state.font_generation != self.text_system().font_generation()
-            || layout.rem_size != self.rem_size()
-            || layout.text_style != self.text_style()
-        {
+        if layout.rem_size != self.rem_size() || layout.text_style != self.text_style() {
             return None;
         }
         if !self

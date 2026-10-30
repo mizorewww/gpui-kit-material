@@ -373,7 +373,7 @@
         "Cargo.toml"
       ],
       "action": "Keep the vendored gpui-fast 0.1.12 (default backend) with the gpui-pre compatibility patches carried forward; see its MATERIAL-MIGRATION.json.",
-      "conditions": "Preserves raw touch observers and extended hitboxes through retained/scroll replay, full CPU profiler scopes, repeat playback and font invalidation. Kit selects unpatched crates.io gpui-fast; remove only after each patch has an upstream equivalent and the regressions pass."
+      "conditions": "Preserves raw touch observers and extended hitboxes through retained/scroll replay, full CPU profiler scopes and repeat playback. Kit selects unpatched crates.io gpui-fast; remove only after each patch has an upstream equivalent and the regressions pass."
     },
     {
       "id": "vendor-gpui-fast-apple",

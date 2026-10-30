@@ -17,7 +17,7 @@ use smallvec::SmallVec;
 use std::{
     any::Any,
     borrow::Cow,
-    cell::{Cell, RefCell},
+    cell::RefCell,
     cmp,
     hash::{Hash, Hasher},
     mem,
@@ -33,7 +33,6 @@ use std::{
 /// its measurement closure reads them from here, and the next frame's element
 /// at the same place compares its own against them.
 pub(crate) struct TextMeasureInputs {
-    font_generation: Cell<usize>,
     text: SharedString,
     /// The runs the element was given, or none for plain text, which is one
     /// run in the text style: that run is only made when the text has to be
@@ -134,8 +133,7 @@ impl TextMeasureInputs {
             })
         }
         let (style, other_style) = (&*self.text_style, &*other.text_style);
-        if !(self.font_generation.get() == other.font_generation.get()
-            && self.text == other.text
+        if !(self.text == other.text
             && self.font_size == other.font_size
             && self.line_height == other.line_height
             && style.white_space == other_style.white_space
@@ -227,7 +225,6 @@ fn measure_inputs(
             .to_pixels(font_size.into(), window.rem_size()),
     );
     TextMeasureInputs {
-        font_generation: Cell::new(window.text_system().font_generation()),
         text,
         runs,
         text_style,
@@ -380,7 +377,6 @@ fn measure_text(
     cx: &mut App,
 ) -> Size<Pixels> {
     let TextMeasureInputs {
-        font_generation,
         text,
         runs: _,
         text_style,
@@ -389,10 +385,6 @@ fn measure_text(
         layout,
     } = inputs;
     let layout = &*layout.borrow();
-    let current_generation = window.text_system().font_generation();
-    if font_generation.replace(current_generation) != current_generation {
-        *layout.0.borrow_mut() = None;
-    }
     let (font_size, line_height) = (*font_size, *line_height);
     let wrap_width = if text_style.white_space == WhiteSpace::Normal {
         known_dimensions.width.or(match available_space.width {
@@ -1203,54 +1195,6 @@ mod tests {
     use crate::{AppContext as _, AvailableSpace, Size, TestAppContext, TextLayout, px};
     use std::cell::RefCell;
 
-    #[test]
-    fn font_registration_invalidates_carried_and_held_measurements() {
-        let mut cx = TestAppContext::single();
-        let window = cx.add_window(|_, _| crate::Empty);
-        cx.update_window(window.into(), |_, window, cx| {
-            let inputs = super::measure_inputs(
-                &TextLayout::default(),
-                "font generation".into(),
-                Vec::new(),
-                window,
-            );
-            let constraints = Size {
-                width: AvailableSpace::MaxContent,
-                height: AvailableSpace::MaxContent,
-            };
-            let original = measure_text(&inputs, Size::default(), constraints, window, cx);
-            // A sentinel distinguishes remeasurement from merely reusing a
-            // correctly shaped result whose metrics happen to be unchanged.
-            inputs.layout.borrow().0.borrow_mut().as_mut().unwrap().size = Some(Size {
-                width: px(12345.),
-                height: px(54321.),
-            });
-            let before = window.text_system().font_generation();
-            window.text_system().add_fonts(Vec::new()).unwrap();
-            assert_ne!(before, window.text_system().font_generation());
-            let replacement = super::measure_inputs(
-                &TextLayout::default(),
-                "font generation".into(),
-                Vec::new(),
-                window,
-            );
-            assert!(matches!(
-                super::adopt_measurement(&replacement, &inputs),
-                crate::fast::layout::Adopted::No
-            ));
-            let updated = measure_text(&inputs, Size::default(), constraints, window, cx);
-            assert_eq!(
-                updated, original,
-                "old held measurement must be shaped again"
-            );
-            assert_eq!(
-                inputs.font_generation.get(),
-                window.text_system().font_generation()
-            );
-        })
-        .unwrap();
-    }
-
     /// Taffy can measure a retained leaf under other constraints after it has
     /// been laid out: at width zero, say, when a node above it is sized to its
     /// content again. Text it wrapped there must not answer a later probe for
@@ -1268,7 +1212,6 @@ mod tests {
                 .line_height
                 .to_pixels(font_size.into(), window.rem_size());
             let inputs = TextMeasureInputs {
-                font_generation: std::cell::Cell::new(window.text_system().font_generation()),
                 text: "the quick brown fox jumps over the lazy dog".into(),
                 runs: Vec::new(),
                 text_style,
