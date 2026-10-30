@@ -315,7 +315,7 @@ pub static CATALOG: &[Entry] = &[
         Navigation,
         "Move between destinations from the side of the window.",
         spec("navigation"),
-        None,
+        Some(&playgrounds::navigation_rail::PLAYGROUND),
     ),
     component(
         "navigation-bar",
@@ -323,7 +323,15 @@ pub static CATALOG: &[Entry] = &[
         Navigation,
         "Move between destinations along the bottom of the window.",
         spec("navigation"),
-        None,
+        Some(&playgrounds::navigation_bar::PLAYGROUND),
+    ),
+    component(
+        "drawer",
+        "Drawer",
+        Navigation,
+        "Grouped destinations in a side panel, standard or modal.",
+        spec("navigation"),
+        Some(&playgrounds::navigation_drawer::PLAYGROUND),
     ),
     component(
         "tabs",
@@ -331,7 +339,7 @@ pub static CATALOG: &[Entry] = &[
         Navigation,
         "Organize related content across views at the same level.",
         spec("tabs"),
-        None,
+        Some(&playgrounds::tabs::PLAYGROUND),
     ),
     component(
         "menu",
@@ -339,7 +347,7 @@ pub static CATALOG: &[Entry] = &[
         Navigation,
         "A list of choices on a temporary surface.",
         spec("menu"),
-        None,
+        Some(&playgrounds::menu::PLAYGROUND),
     ),
     component(
         "top-app-bar",
@@ -347,7 +355,7 @@ pub static CATALOG: &[Entry] = &[
         Navigation,
         "The title and actions at the top of a screen.",
         spec("app-bars"),
-        None,
+        Some(&playgrounds::top_app_bar::PLAYGROUND),
     ),
     component(
         "bottom-app-bar",
@@ -355,7 +363,7 @@ pub static CATALOG: &[Entry] = &[
         Navigation,
         "Actions along the bottom of a screen.",
         spec("app-bars"),
-        None,
+        Some(&playgrounds::bottom_app_bar::PLAYGROUND),
     ),
     component(
         "toolbar",
@@ -363,7 +371,7 @@ pub static CATALOG: &[Entry] = &[
         Navigation,
         "Frequent actions for the current page, docked or floating.",
         spec("toolbars"),
-        None,
+        Some(&playgrounds::toolbar::PLAYGROUND),
     ),
     // Containment
     component(
@@ -372,7 +380,7 @@ pub static CATALOG: &[Entry] = &[
         Containment,
         "Content and actions about a single subject.",
         spec("cards"),
-        None,
+        Some(&playgrounds::card::PLAYGROUND),
     ),
     component(
         "list",
@@ -380,7 +388,7 @@ pub static CATALOG: &[Entry] = &[
         Containment,
         "Continuous, vertical indexes of text and images.",
         spec("lists"),
-        None,
+        Some(&playgrounds::list::PLAYGROUND),
     ),
     component(
         "carousel",
@@ -388,7 +396,7 @@ pub static CATALOG: &[Entry] = &[
         Containment,
         "A collection of items that scrolls on and off the screen.",
         spec("carousel"),
-        None,
+        Some(&playgrounds::carousel::PLAYGROUND),
     ),
     component(
         "divider",
@@ -396,7 +404,7 @@ pub static CATALOG: &[Entry] = &[
         Containment,
         "A thin line that groups content in lists and containers.",
         spec("dividers"),
-        None,
+        Some(&playgrounds::divider::PLAYGROUND),
     ),
     component(
         "dialog",
@@ -404,7 +412,7 @@ pub static CATALOG: &[Entry] = &[
         Containment,
         "Focus on a decision: content, actions, and dismissal.",
         spec("dialogs"),
-        None,
+        Some(&playgrounds::dialog::PLAYGROUND),
     ),
     component(
         "bottom-sheet",
@@ -412,7 +420,7 @@ pub static CATALOG: &[Entry] = &[
         Containment,
         "Secondary content anchored to the bottom of the screen.",
         spec("sheets"),
-        None,
+        Some(&playgrounds::bottom_sheet::PLAYGROUND),
     ),
     component(
         "side-sheet",
@@ -420,7 +428,7 @@ pub static CATALOG: &[Entry] = &[
         Containment,
         "Secondary content anchored to the side of the screen.",
         spec("sheets"),
-        None,
+        Some(&playgrounds::side_sheet::PLAYGROUND),
     ),
     // Communication
     component(
