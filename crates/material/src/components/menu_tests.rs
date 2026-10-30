@@ -59,15 +59,17 @@ fn item_and_menu_heights_follow_the_kit() {
 
 #[test]
 fn keyboard_navigation_skips_disabled_items_and_wraps() {
-    let enabled = [true, false, true, true];
-    assert_eq!(next_index(&enabled, None, Some(1), false), Some(0));
-    assert_eq!(next_index(&enabled, Some(0), Some(1), false), Some(2));
-    assert_eq!(next_index(&enabled, Some(3), Some(1), false), Some(0));
-    assert_eq!(next_index(&enabled, Some(0), Some(-1), false), Some(3));
-    assert_eq!(next_index(&enabled, Some(2), Some(-1), false), Some(0));
-    assert_eq!(next_index(&enabled, None, None, true), Some(0));
-    assert_eq!(next_index(&enabled, None, None, false), Some(3));
-    assert_eq!(next_index(&[false, false], None, Some(1), false), None);
+    use super::super::roving::{Direction, target};
+    // Menus rove with the shared roving helper; `skip` marks disabled items.
+    let skip = [false, true, false, false];
+    assert_eq!(target(&skip, None, Direction::Next), Some(0));
+    assert_eq!(target(&skip, Some(0), Direction::Next), Some(2));
+    assert_eq!(target(&skip, Some(3), Direction::Next), Some(0));
+    assert_eq!(target(&skip, Some(0), Direction::Previous), Some(3));
+    assert_eq!(target(&skip, Some(2), Direction::Previous), Some(0));
+    assert_eq!(target(&skip, None, Direction::First), Some(0));
+    assert_eq!(target(&skip, None, Direction::Last), Some(3));
+    assert_eq!(target(&[true, true], None, Direction::Next), None);
 }
 
 #[test]

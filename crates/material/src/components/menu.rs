@@ -19,6 +19,7 @@
 //! motion back on close, retargeting from wherever it is.
 use super::InteractionPreview;
 use super::focus::{RingPlacement, RingedButton};
+use super::roving::{Direction, target};
 use super::text_field::{TextField, TextFieldVariant, type_style};
 use crate::{
     color::ColorRole,
@@ -493,49 +494,6 @@ impl MaterialMenu {
     }
 }
 
-/// Move focus among `enabled` item handles: `step` ±1 wraps, `None` jumps
-/// to the first (`first`) or last enabled item.
-pub(crate) fn next_index(
-    enabled: &[bool],
-    current: Option<usize>,
-    step: Option<isize>,
-    first: bool,
-) -> Option<usize> {
-    let count = enabled.len();
-    if count == 0 || !enabled.iter().any(|e| *e) {
-        return None;
-    }
-    let scan = |start: usize, forward: bool| {
-        (0..count)
-            .map(|k| {
-                if forward {
-                    (start + k) % count
-                } else {
-                    (start + count - k) % count
-                }
-            })
-            .find(|&ix| enabled[ix])
-    };
-    match (step, current) {
-        (None, _) if first => scan(0, true),
-        (None, _) => scan(count - 1, false),
-        (Some(step), None) => {
-            if step > 0 {
-                scan(0, true)
-            } else {
-                scan(count - 1, false)
-            }
-        }
-        (Some(step), Some(current)) => {
-            if step > 0 {
-                scan((current + 1) % count, true)
-            } else {
-                scan((current + count - 1) % count, false)
-            }
-        }
-    }
-}
-
 impl RenderOnce for MaterialMenu {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let style = self.style;
@@ -557,12 +515,11 @@ impl RenderOnce for MaterialMenu {
             .clone()
             .unwrap_or_else(|| state.read(cx).root.clone());
         let handles = state.read(cx).items.clone();
-        let enabled: Rc<Vec<bool>> = Rc::new(
-            self.groups
-                .iter()
-                .flat_map(|g| g.items.iter().map(|i| !i.disabled && i.preview.is_none()))
-                .collect(),
-        );
+        let skip: Rc<[bool]> = self
+            .groups
+            .iter()
+            .flat_map(|g| g.items.iter().map(|i| i.disabled || i.preview.is_some()))
+            .collect();
         // Enter and Space activate the focused item (the popover's content
         // context reserves them, so the menu answers them itself).
         let activators: Rc<Vec<Option<(Handler, bool)>>> = Rc::new(
@@ -600,10 +557,10 @@ impl RenderOnce for MaterialMenu {
         };
         let navigate = {
             let handles = handles.clone();
-            let enabled = enabled.clone();
-            move |step: Option<isize>, first: bool, window: &mut Window, cx: &mut App| {
+            let skip = skip.clone();
+            move |direction: Direction, window: &mut Window, cx: &mut App| {
                 let current = handles.iter().position(|h| h.is_focused(window));
-                if let Some(ix) = next_index(&enabled, current, step, first) {
+                if let Some(ix) = target(&skip, current, direction) {
                     handles[ix].focus(window, cx);
                 }
             }
@@ -691,10 +648,10 @@ impl RenderOnce for MaterialMenu {
             .role(Role::Menu)
             .key_context(MENU_CONTEXT)
             .track_focus(&root_focus)
-            .on_action(move |_: &SelectUp, window, cx| nav_up(Some(-1), false, window, cx))
-            .on_action(move |_: &SelectDown, window, cx| nav_down(Some(1), false, window, cx))
-            .on_action(move |_: &SelectFirst, window, cx| nav_first(None, true, window, cx))
-            .on_action(move |_: &SelectLast, window, cx| nav_last(None, false, window, cx))
+            .on_action(move |_: &SelectUp, window, cx| nav_up(Direction::Previous, window, cx))
+            .on_action(move |_: &SelectDown, window, cx| nav_down(Direction::Next, window, cx))
+            .on_action(move |_: &SelectFirst, window, cx| nav_first(Direction::First, window, cx))
+            .on_action(move |_: &SelectLast, window, cx| nav_last(Direction::Last, window, cx))
             .on_action(move |_: &Confirm, window, cx| activate(window, cx))
             .on_action(move |_: &Cancel, window, cx| {
                 if let Some(dismiss) = on_dismiss.as_ref() {
