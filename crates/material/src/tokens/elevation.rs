@@ -99,15 +99,6 @@ pub fn level5() -> Vec<BoxShadow> {
     level(5)
 }
 
-/// Legacy single-layer overlay shadow (0/12/32 at 16% of the shadow role).
-///
-/// This is not an M3 elevation level. It remains only for the existing
-/// snackbar, which a later change moves to [`level3`]; new surfaces should
-/// use a numbered level.
-pub fn popover() -> Vec<BoxShadow> {
-    vec![BoxShadow::new(px(0.), px(12.), shadow_color(0.16)).blur_radius(px(32.))]
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
