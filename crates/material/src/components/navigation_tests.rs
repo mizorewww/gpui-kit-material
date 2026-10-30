@@ -58,6 +58,28 @@ fn layouts_follow_the_m3_item_geometry() {
 }
 
 #[test]
+fn large_badges_trail_labels_beside_icons() {
+    let large = NavBadge::Large("3".into());
+    assert_eq!(trailing_badge(&large, NavItemLayout::Vertical, true), None);
+    assert_eq!(
+        trailing_badge(&large, NavItemLayout::Horizontal, true).as_deref(),
+        Some("3")
+    );
+    assert_eq!(
+        trailing_badge(&large, NavItemLayout::Horizontal, false),
+        None
+    );
+    assert_eq!(
+        trailing_badge(&large, NavItemLayout::Expanded, true).as_deref(),
+        Some("3")
+    );
+    assert_eq!(
+        trailing_badge(&NavBadge::Small, NavItemLayout::Horizontal, true),
+        None
+    );
+}
+
+#[test]
 fn symbol_icons_fill_when_selected() {
     let icon = NavIcon::symbol(Symbol::named("home").unwrap());
     assert_ne!(icon.path(false), icon.path(true));

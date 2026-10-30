@@ -1,6 +1,7 @@
 //! Component playgrounds, one module per md3.io component page. Each
 //! exports a `PLAYGROUND` static that `super::catalog` points its entry at.
 //! See `super::playground` for the API.
+pub mod avatar;
 pub mod badge;
 pub mod button;
 pub mod button_group;

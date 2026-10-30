@@ -432,6 +432,14 @@ pub static CATALOG: &[Entry] = &[
         Some(&playgrounds::badge::PLAYGROUND),
     ),
     component(
+        "avatar",
+        "Avatar",
+        Communication,
+        "A person's picture, initials or placeholder, in a circle.",
+        spec("avatars"),
+        Some(&playgrounds::avatar::PLAYGROUND),
+    ),
+    component(
         "progress",
         "Progress",
         Communication,

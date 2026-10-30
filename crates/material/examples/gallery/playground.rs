@@ -479,6 +479,8 @@ impl Preview<'_> {
 const DEFAULT_SCENARIO: &str = "Default";
 const CUSTOM_SCENARIO: &str = "Custom";
 /// The configuration card's content width in design px.
+// Playground API: previews may size content to the card.
+#[allow(dead_code)]
 pub const PANEL_CONTENT_WIDTH: f32 = 300.;
 
 /// One playground's live state: its configuration, the configuration
@@ -675,13 +677,10 @@ impl PlaygroundState {
     pub fn render_panel(&mut self, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
         let _ = window;
         let custom = 1 + self.playground.scenarios.len();
-        let scenario = ExposedDropdown::new("scenario", "Scenario")
-            .variant(TextFieldVariant::Outlined)
-            .options(self.scenario_names())
-            .selected(Some(self.scenario.unwrap_or(custom)))
+        let scenario = CompactSelect::new("scenario", "Scenario")
+            .options(self.scenario_names().map(SharedString::new_static))
+            .selected(self.scenario.unwrap_or(custom))
             .open(self.open == Some(""))
-            .supporting_text("The options this playground starts with.")
-            .width(PANEL_CONTENT_WIDTH)
             .on_open_change(cx.listener(|this, open: &bool, _, cx| {
                 this.open = open.then_some("");
                 cx.notify();
@@ -691,11 +690,23 @@ impl PlaygroundState {
             }));
         let mut body = div().flex().flex_col().child(
             div()
+                .flex()
+                .flex_col()
+                .gap(rem(6.))
                 .px(rem(20.))
                 .pt(rem(16.))
-                .pb(rem(12.))
+                .pb(rem(16.))
                 .debug_selector(|| "playground-scenario".into())
-                .child(scenario),
+                .child(control_row(control_label("Scenario"), scenario))
+                .child(
+                    accessible_text(
+                        "scenario-supporting",
+                        "The options this playground starts with.",
+                    )
+                    .whitespace_normal()
+                    .map(|text| type_role(text, TypeRole::BodySmall))
+                    .text_color(color(ColorRole::ON_SURFACE_VARIANT)),
+                ),
         );
         for (index, section) in self.playground.sections.iter().enumerate() {
             body = body.child(self.render_section(index, section, cx));
@@ -713,16 +724,18 @@ impl PlaygroundState {
             .id(("playground-section", index))
             .flex()
             .flex_col()
-            .gap(rem(12.))
+            .gap(rem(8.))
             .px(rem(20.))
             .pt(rem(16.))
-            .pb(rem(20.))
+            .pb(rem(16.))
             .border_t_1()
             .border_color(color(ColorRole::OUTLINE_VARIANT))
             .child(
-                accessible_text(("section-title", index), section.title)
+                // md3.io's small uppercase section heading.
+                accessible_text(("section-title", index), section.title.to_uppercase())
                     .role(Role::Heading)
-                    .map(|text| type_role(text, TypeRole::LabelLarge))
+                    .pb(rem(4.))
+                    .map(|text| type_role(text, TypeRole::LabelMedium))
                     .text_color(color(ColorRole::ON_SURFACE_VARIANT)),
             )
             .children(
@@ -733,6 +746,9 @@ impl PlaygroundState {
             )
     }
 
+    /// One md3.io configuration row: the label on the leading side and a
+    /// compact control on the trailing side. A control too wide for the
+    /// card wraps below its label instead of scrolling.
     fn render_control(&self, control: &'static Control, cx: &mut Context<Self>) -> AnyElement {
         let id = control.id();
         let label = control.label();
@@ -742,13 +758,12 @@ impl PlaygroundState {
             .debug_selector(move || format!("playground-control-{id}"));
         match *control {
             Control::Select { options, .. } => row
-                .child(
-                    ExposedDropdown::new("select", label)
-                        .variant(TextFieldVariant::Outlined)
-                        .options(options.iter().copied())
-                        .selected(Some(self.config.choice(id)))
+                .child(control_row(
+                    control_label(label),
+                    CompactSelect::new("select", label)
+                        .options(options.iter().copied().map(SharedString::new_static))
+                        .selected(self.config.choice(id))
                         .open(self.open == Some(id))
-                        .width(PANEL_CONTENT_WIDTH)
                         .on_open_change(cx.listener(move |this, open: &bool, _, cx| {
                             this.open = open.then_some(id);
                             cx.notify();
@@ -758,18 +773,15 @@ impl PlaygroundState {
                             this.set_value(id, Value::Choice(*index), window, cx);
                             cx.notify();
                         })),
-                )
+                ))
                 .into_any_element(),
             Control::Segmented { options, .. } => row
-                .flex()
-                .flex_col()
-                .gap(rem(8.))
-                .child(control_label(label))
-                .child(
+                .child(control_row(
+                    control_label(label),
                     ConnectedButtonGroup::new("segmented", label)
+                        .button_size(ButtonSize::ExtraSmall)
                         .options(options.iter().map(|option| (*option, *option)))
                         .selected(options[self.config.choice(id)])
-                        .full_width()
                         .on_change(cx.listener(move |this, value: &SharedString, window, cx| {
                             if let Some(index) =
                                 options.iter().position(|option| *option == value.as_ref())
@@ -777,76 +789,60 @@ impl PlaygroundState {
                                 this.set_value(id, Value::Choice(index), window, cx);
                             }
                         })),
-                )
+                ))
                 .into_any_element(),
             Control::Icon { icons, .. } => {
                 let selected = self.config.choice(id);
-                row.flex()
-                    .flex_col()
-                    .gap(rem(8.))
-                    .child(control_label(label))
-                    .child(
-                        div()
-                            .id("icon-options")
-                            .role(Role::RadioGroup)
-                            .aria_label(label)
-                            .flex()
-                            .flex_wrap()
-                            .gap(rem(4.))
-                            .children(icons.iter().enumerate().map(|(index, icon)| {
-                                let (name, accessible) = if icon.is_empty() {
-                                    ("block", "None")
-                                } else {
-                                    (*icon, *icon)
-                                };
-                                IconButton::new(
-                                    ("icon-option", index),
-                                    symbol(name, 24.),
-                                    accessible,
-                                )
+                row.child(control_row(
+                    control_label(label),
+                    div()
+                        .id("icon-options")
+                        .role(Role::RadioGroup)
+                        .aria_label(label)
+                        .flex()
+                        .flex_wrap()
+                        .justify_end()
+                        .gap(rem(2.))
+                        .children(icons.iter().enumerate().map(|(index, icon)| {
+                            let (name, accessible) = if icon.is_empty() {
+                                ("block", "None")
+                            } else {
+                                (*icon, *icon)
+                            };
+                            IconButton::new(("icon-option", index), symbol(name, 20.), accessible)
                                 .variant(IconButtonVariant::Standard)
+                                .button_size(ButtonSize::ExtraSmall)
                                 .toggle(true)
                                 .selected(index == selected)
-                                .on_click(cx.listener(
-                                    move |this, _, window, cx| {
-                                        this.set_value(id, Value::Choice(index), window, cx);
-                                    },
-                                ))
-                            })),
-                    )
-                    .into_any_element()
+                                .on_click(cx.listener(move |this, _, window, cx| {
+                                    this.set_value(id, Value::Choice(index), window, cx);
+                                }))
+                        })),
+                ))
+                .into_any_element()
             }
             Control::Switch { .. } => row
-                .flex()
-                .items_center()
-                .justify_between()
-                .min_h(rem(40.))
-                .child(control_label(label))
-                .child(
+                .child(control_row(
+                    control_label(label),
                     MaterialSwitch::new("switch", label)
                         .checked(self.config.bool(id))
                         .on_change(cx.listener(move |this, checked: &bool, window, cx| {
                             this.set_value(id, Value::Bool(*checked), window, cx);
                         })),
-                )
+                ))
                 .into_any_element(),
             Control::Slider { .. } => {
                 let slider = self.sliders[id].clone();
                 let value = self.config.number(id);
                 row.flex()
                     .flex_col()
-                    .gap(rem(4.))
-                    .child(
-                        div()
-                            .flex()
-                            .justify_between()
-                            .child(control_label(label))
-                            .child(
-                                accessible_text("slider-value", format!("{value}"))
-                                    .map(|text| type_role(text, TypeRole::LabelLarge))
-                                    .text_color(color(ColorRole::ON_SURFACE_VARIANT)),
-                            ),
-                    )
+                    .gap(rem(2.))
+                    .child(control_row(
+                        control_label(label),
+                        accessible_text("slider-value", format!("{value}"))
+                            .map(|text| type_role(text, TypeRole::LabelLarge))
+                            .text_color(color(ColorRole::ON_SURFACE_VARIANT)),
+                    ))
                     .child(
                         MaterialSlider::new(&slider, label)
                             .id("slider")
@@ -855,21 +851,187 @@ impl PlaygroundState {
                     .into_any_element()
             }
             Control::Text { .. } => row
-                .child(
-                    TextField::new("text", &self.texts[id])
-                        .variant(TextFieldVariant::Outlined)
-                        .label(label)
-                        .w(rem(PANEL_CONTENT_WIDTH)),
-                )
+                .child(control_row(
+                    control_label(label),
+                    compact_input("text", label, &self.texts[id]),
+                ))
                 .into_any_element(),
         }
     }
 }
 
+/// A configuration row: `label` leading, `control` trailing, vertically
+/// centred at md3.io's 36dp row height; the control wraps below the label
+/// when the two do not fit side by side.
+fn control_row(label: impl IntoElement, control: impl IntoElement) -> Div {
+    div()
+        .w_full()
+        .min_h(rem(36.))
+        .flex()
+        .flex_wrap()
+        .items_center()
+        .justify_between()
+        .gap_x(rem(12.))
+        .gap_y(rem(4.))
+        .child(div().flex_shrink_0().child(label))
+        .child(div().flex_1().min_w_0().flex().justify_end().child(control))
+}
+
 fn control_label(label: &'static str) -> impl IntoElement {
     accessible_text("control-label", label)
-        .map(|text| type_role(text, TypeRole::BodyMedium))
+        .map(|text| type_role(text, TypeRole::LabelLarge))
         .text_color(color(ColorRole::ON_SURFACE))
+}
+
+/// The width of compact selects and inputs in the configuration card.
+pub const COMPACT_CONTROL_WIDTH: f32 = 180.;
+const COMPACT_CONTROL_HEIGHT: f32 = 32.;
+
+/// The compact control frame md3.io's configuration uses: a 32dp outlined
+/// box with an 8dp corner.
+fn compact_frame() -> Div {
+    div()
+        .h(rem(COMPACT_CONTROL_HEIGHT))
+        .px(rem(10.))
+        .flex()
+        .items_center()
+        .gap(rem(4.))
+        .rounded(rem(8.))
+        .border_1()
+        .border_color(color(ColorRole::OUTLINE_VARIANT))
+        .bg(color(ColorRole::SURFACE_CONTAINER_LOWEST))
+        .map(|frame| type_role(frame, TypeRole::BodyMedium))
+        .text_color(color(ColorRole::ON_SURFACE))
+}
+
+/// A compact single-line editor on Kit's input, in the compact frame.
+fn compact_input(
+    id: &'static str,
+    label: &'static str,
+    state: &Entity<InputState>,
+) -> impl IntoElement {
+    use gpui_kit::component::{Sizable as _, Size, input::Input};
+    compact_frame().id(id).w(rem(COMPACT_CONTROL_WIDTH)).child(
+        Input::new(state)
+            .appearance(false)
+            .with_size(Size::XSmall)
+            .aria_label(label)
+            .p_0()
+            .w_full()
+            .text_size(TypeRole::BodyMedium.scale().font_size),
+    )
+}
+
+type IndexHandler = std::rc::Rc<dyn Fn(&usize, &mut Window, &mut App)>;
+type OpenHandler = std::rc::Rc<dyn Fn(&bool, &mut Window, &mut App)>;
+
+/// md3.io's compact select: the current option and an arrow in the compact
+/// frame, opening a Material menu of the options (the library's
+/// [`MenuPopup`], which owns the overlay, focus, keyboard and dismissal).
+#[derive(gpui::IntoElement)]
+pub struct CompactSelect {
+    id: ElementId,
+    label: SharedString,
+    options: Vec<SharedString>,
+    selected: usize,
+    open: bool,
+    width: f32,
+    on_open_change: Option<OpenHandler>,
+    on_select: Option<IndexHandler>,
+}
+
+impl CompactSelect {
+    pub fn new(id: impl Into<ElementId>, label: impl Into<SharedString>) -> Self {
+        Self {
+            id: id.into(),
+            label: label.into(),
+            options: Vec::new(),
+            selected: 0,
+            open: false,
+            width: COMPACT_CONTROL_WIDTH,
+            on_open_change: None,
+            on_select: None,
+        }
+    }
+    pub fn options(mut self, options: impl IntoIterator<Item = SharedString>) -> Self {
+        self.options = options.into_iter().collect();
+        self
+    }
+    pub fn selected(mut self, selected: usize) -> Self {
+        self.selected = selected;
+        self
+    }
+    pub fn open(mut self, open: bool) -> Self {
+        self.open = open;
+        self
+    }
+    pub fn width(mut self, width: f32) -> Self {
+        self.width = width;
+        self
+    }
+    pub fn on_open_change(mut self, f: impl Fn(&bool, &mut Window, &mut App) + 'static) -> Self {
+        self.on_open_change = Some(std::rc::Rc::new(f));
+        self
+    }
+    pub fn on_select(mut self, f: impl Fn(&usize, &mut Window, &mut App) + 'static) -> Self {
+        self.on_select = Some(std::rc::Rc::new(f));
+        self
+    }
+}
+
+impl RenderOnce for CompactSelect {
+    fn render(self, _: &mut Window, _: &mut App) -> impl IntoElement {
+        let value = self.options.get(self.selected).cloned().unwrap_or_default();
+        let open = self.open;
+        let toggle = self.on_open_change.clone();
+        let on_surface = color(ColorRole::ON_SURFACE);
+        let trigger = FocusRing::new(
+            (self.id.clone(), "ring"),
+            gpui_base::Button::new((self.id.clone(), "trigger"))
+                .role(Role::ComboBox)
+                .accessibility_label(self.label.clone())
+                .aria_value(value.clone())
+                .aria_expanded(open)
+                .cursor_pointer()
+                .child(
+                    compact_frame()
+                        .w(rem(self.width))
+                        .hover(move |style| style.bg(on_surface.opacity(0.08)))
+                        .child(div().flex_1().min_w_0().truncate().child(value))
+                        .child(
+                            symbol("arrow_drop_down", 20.)
+                                .color(color(ColorRole::ON_SURFACE_VARIANT)),
+                        ),
+                )
+                .on_click(move |_, window, cx| {
+                    if let Some(toggle) = toggle.as_ref() {
+                        toggle(&!open, window, cx);
+                    }
+                }),
+        );
+        let selected = self.selected;
+        let on_select = self.on_select.clone();
+        let menu = MaterialMenu::new((self.id.clone(), "menu"))
+            .width(self.width)
+            .items(self.options.into_iter().enumerate().map(|(index, option)| {
+                let on_select = on_select.clone();
+                MaterialMenuItem::new(option)
+                    .selected(index == selected)
+                    .on_click(move |_, window, cx| {
+                        if let Some(select) = on_select.as_ref() {
+                            select(&index, window, cx);
+                        }
+                    })
+            }));
+        let change = self.on_open_change;
+        MenuPopup::new(self.id, trigger, menu)
+            .open(open)
+            .on_open_change(move |next, window, cx| {
+                if let Some(change) = change.as_ref() {
+                    change(next, window, cx);
+                }
+            })
+    }
 }
 
 #[cfg(test)]

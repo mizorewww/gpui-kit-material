@@ -183,16 +183,6 @@ fn item_board(
         .into_any_element()
 }
 
-/// A board wider than the page scrolls inside its row.
-fn scrolling(id: &'static str, width: f32, board: AnyElement) -> AnyElement {
-    div()
-        .id(id)
-        .w_full()
-        .overflow_x_scroll()
-        .child(div().w(rem(width)).child(board))
-        .into_any_element()
-}
-
 fn specimen_menu(expanded: bool) -> impl IntoElement {
     div()
         .size(rem(48.))
@@ -434,14 +424,15 @@ impl Page {
         } else {
             RailAlignment::Middle
         };
-        let board = board(("rail-expanded", band))
+        board(("rail-expanded", band))
             .band(Band::of(band, 2))
+            .when(band == 0, |board| {
+                board.caption("Navigation Rail: Expanded")
+            })
             .side_label(if band == 0 { "Top" } else { "Middle" })
             .columns(8)
             .column_width(RAIL_EXPANDED_WIDTH)
-            .when(band == 0, |board| {
-                board.column_labels(["Standard", "", "", "", "Modal", "", "", ""])
-            })
+            .column_labels(["Standard", "", "", "", "Modal", "", "", ""])
             .cells((0..8).map(move |index| {
                 let sections = index % 4 == 3;
                 specimen_rail(
@@ -452,31 +443,7 @@ impl Page {
                     alignment,
                     sections,
                 )
-            }));
-        let scroll = scrolling(
-            if band == 0 {
-                "rail-expanded-scroll-0"
-            } else {
-                "rail-expanded-scroll-1"
-            },
-            72. + 8. * RAIL_EXPANDED_WIDTH + 7. * 16. + 2. * 20. + 48.,
-            board.into_any_element(),
-        );
-        // The caption stays in view above the horizontally scrolling board.
-        div()
-            .w_full()
-            .flex()
-            .flex_col()
-            .when(band == 0, |column| {
-                column.child(
-                    div().w_full().flex().justify_center().pb(rem(12.)).child(
-                        accessible_text("rail-expanded-caption", "Navigation Rail: Expanded")
-                            .map(|text| spec::type_role(text, TypeRole::LabelLarge))
-                            .text_color(color(ColorRole::ON_SURFACE)),
-                    ),
-                )
-            })
-            .child(scroll)
+            }))
             .into_any_element()
     }
 

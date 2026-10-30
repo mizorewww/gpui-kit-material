@@ -274,6 +274,25 @@ pub(crate) fn ripple_corners(radius: Pixels) -> Corners<AbsoluteLength> {
     }
 }
 
+/// The large badge an item draws after its label instead of on its icon.
+///
+/// Items with the icon beside the label (the horizontal bar's and the
+/// expanded rail's) put a large badge after the label, as the kit's nav
+/// item building block does ("Badge label text" trailing the label): on the
+/// icon it would cover the label's first letters. Small badges stay on the
+/// icon, as do badges of items without a visible label.
+pub(crate) fn trailing_badge(
+    badge: &NavBadge,
+    layout: NavItemLayout,
+    show_label: bool,
+) -> Option<SharedString> {
+    match (badge, layout) {
+        (NavBadge::Large(text), NavItemLayout::Expanded) => Some(text.clone()),
+        (NavBadge::Large(text), NavItemLayout::Horizontal) if show_label => Some(text.clone()),
+        _ => None,
+    }
+}
+
 /// A 24dp icon with the item's badge on its top-trailing corner.
 pub(crate) fn badged_icon(icon: Icon, badge: &NavBadge) -> Div {
     let slot = div()
@@ -431,12 +450,7 @@ impl RenderOnce for NavigationItem {
                 Some(InteractionPreview::Pressed) => layer.bg(paint.press),
                 Some(_) => layer,
             });
-        // The expanded rail puts a large badge after the label instead of on
-        // the icon.
-        let trailing = match (&item.badge, self.layout) {
-            (NavBadge::Large(text), NavItemLayout::Expanded) => Some(text.clone()),
-            _ => None,
-        };
+        let trailing = trailing_badge(&item.badge, self.layout, self.show_label);
         let icon = badged_icon(
             Icon::new(item.icon.path(selected)).color(paint.icon),
             if trailing.is_some() {

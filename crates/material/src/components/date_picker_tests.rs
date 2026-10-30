@@ -1,5 +1,7 @@
 use super::*;
-use crate::components::date_parts::{day_paint, month_weeks};
+use crate::components::date_parts::{
+    day_paint, disabled_day_paint, disabled_year_paint, month_weeks,
+};
 use core::prelude::v1::test;
 
 fn d(y: i32, m: u32, day: u32) -> NaiveDate {
@@ -130,6 +132,22 @@ fn day_cells_use_the_kit_roles() {
         adjacent.ink,
         crate::tokens::state::disabled(color(ColorRole::ON_SURFACE))
     );
+}
+
+#[test]
+fn disabled_days_and_years_use_the_m3_disabled_roles() {
+    use crate::tokens::state;
+    let on_surface = color(ColorRole::ON_SURFACE);
+    let selected = disabled_day_paint(day_paint(1., false, false, false), 1.);
+    assert_eq!(selected.fill, on_surface.opacity(state::DISABLED_CONTAINER));
+    assert_eq!(selected.ink, state::disabled(on_surface));
+    let today = disabled_day_paint(day_paint(0., true, false, false), 0.);
+    assert_eq!(today.fill.a, 0.);
+    assert_eq!(today.outline, Some(state::disabled(on_surface)));
+    let (fill, ink) = disabled_year_paint(true);
+    assert_eq!(fill, on_surface.opacity(state::DISABLED_CONTAINER));
+    assert_eq!(ink, state::disabled(on_surface));
+    assert_eq!(disabled_year_paint(false).0.a, 0.);
 }
 
 struct Harness(Entity<DatePickerState>);

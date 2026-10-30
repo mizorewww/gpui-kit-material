@@ -4,6 +4,7 @@
 use super::page::{PageEntry, entry};
 
 pub mod app_bars;
+pub mod avatars;
 pub mod badges;
 pub mod buttons;
 pub mod cards;
@@ -54,6 +55,7 @@ pub static PAGES: &[PageEntry] = &[
     entry::<elevation::Page>(),
     entry::<examples::Page>(),
     entry::<app_bars::Page>(),
+    entry::<avatars::Page>(),
     entry::<badges::Page>(),
     entry::<buttons::Page>(),
     entry::<cards::Page>(),
@@ -97,6 +99,7 @@ mod tests {
                 "Elevation",
                 "Examples",
                 "App bars",
+                "Avatars",
                 "Badges",
                 "Buttons",
                 "Cards",
