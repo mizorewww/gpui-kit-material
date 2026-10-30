@@ -150,12 +150,17 @@ fn action_labels(title: &str) -> (&'static str, &'static str) {
     }
 }
 
+/// The height of a preview's screen, in design px: the canvas grows with its
+/// content, so the screen brings its own height.
+const SCREEN_HEIGHT: f32 = 480.;
+
 /// The preview's screen: the surface a contained overlay presents over.
 pub(super) fn screen(id: &'static str) -> Div {
     div()
         .debug_selector(move || id.into())
         .relative()
-        .size_full()
+        .w_full()
+        .h(rem(SCREEN_HEIGHT))
         .overflow_hidden()
         .bg(color(ColorRole::SURFACE_CONTAINER_LOWEST))
         .border_1()

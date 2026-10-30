@@ -42,10 +42,6 @@ icons! {
     Info => "info";
     LoaderCircle => "progress_activity";
     Warning => "warning";
-    CaptionClose => "close";
-    CaptionMaximize => "crop_square";
-    CaptionMinimize => "remove";
-    CaptionRestore => "filter_none";
 }
 
 /// Register the precomputed mapping for Kit's default internal icon paths.

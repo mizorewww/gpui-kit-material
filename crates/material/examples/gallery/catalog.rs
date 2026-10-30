@@ -511,11 +511,13 @@ pub static CATALOG: &[Entry] = &[
         "Shadow levels and tonal surfaces.",
     ),
     // Examples
-    document(
+    component(
         "examples",
         "Examples",
         Examples,
-        "Complete screens built from the library's components.",
+        "Complete screens built from the library's components: pick a device and a screen, and use the app.",
+        spec("examples"),
+        Some(&playgrounds::examples::PLAYGROUND),
     ),
 ];
 

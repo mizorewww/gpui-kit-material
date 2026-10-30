@@ -219,8 +219,8 @@
     },
     "src/platform.rs": {
       "upstream_sha256": "d5a1f49466edafc882f2646c0d97b7febcec61aa2a3df43f08035a812c9be7b5",
-      "local_sha256": "9df8c00f616d3c61d6ab87f0be5dc02850e211f5a1bc4d37cfa0ce84b4ede994",
-      "reason": "VsyncStatus, vsync_status/set_vsync, has_periodic_frame_source, successful_frame_submissions (frame-submission-patch.md); layout_line_with_options (line-layout-options-patch.md)."
+      "local_sha256": "aa17ce5bd69f9e094ca4c3e8d7e84d589f7170a474b84f67d7e5060e6b921413",
+      "reason": "VsyncStatus, vsync_status/set_vsync, has_periodic_frame_source, successful_frame_submissions (frame-submission-patch.md); layout_line_with_options (line-layout-options-patch.md); declares frame_submission (frame-submission-patch.md)."
     },
     "src/platform/test/window.rs": {
       "upstream_sha256": "3b359c9e7943ccb065096c718756b32400dac3394bfd9ab6f361dda8163e97bd",
@@ -279,6 +279,10 @@
     }
   },
   "added_files": {
+    "src/platform/frame_submission.rs": {
+      "sha256": "e5d9be99b8866fb9a498b4e622b8f75798f249760342cb36aaac655b52594458",
+      "reason": "Added: FrameSubmissionCounter and dxgi_present_succeeded, backend accounting tested on every host (vendor/gpui-pre/frame-submission-patch.md)."
+    },
     "src/text_system/line_layout_options.rs": {
       "sha256": "c6c61dd6adc811245cfaeba129034910b53955c50f5eda40ccd25b8b37a8a57f",
       "reason": "Added: paragraph direction, cluster types and grapheme validation (line-layout-options-patch.md)."

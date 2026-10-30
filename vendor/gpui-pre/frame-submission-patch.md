@@ -36,11 +36,20 @@ window exposes `periodic_frame_source` for
 `test_periodic_source_throttle_waits_and_resumes`.
 
 Backend implementations: `gpui-pre-macos`/`gpui-fast-macos` (Metal display
-sync, demand waker, counts) and `gpui-pre-web`/`gpui-fast-web` (counts only;
-browser-controlled vsync stays `Unsupported`).
+sync, demand waker, counts), `gpui-pre-web`/`gpui-fast-web` (counts only;
+browser-controlled vsync stays `Unsupported`), `gpui-*-linux` through `gpui-*-wgpu`
+and `wgpu` (present-status counts, `PresentMode` control) and `gpui-*-windows`
+(`S_OK` counts, DXGI sync interval). Each has its own `MATERIAL-PATCHES.md`.
+
+`src/platform/frame_submission.rs` (added) holds what those backends share, so
+it is tested on every host: `FrameSubmissionCounter` counts a frame once and only
+when every surface it required presented, and `dxgi_present_succeeded` accepts only
+`S_OK`, because `DXGI_STATUS_OCCLUDED` is a success code that presented nothing.
 
 Regression command:
 
 ```sh
 cargo test -p gpui-pre --lib window::tests
+cargo test -p gpui-pre --lib frame_submission
+cargo test -p gpui-pre-wgpu --lib present_mode # Linux hosts: wgpu is inactive elsewhere
 ```

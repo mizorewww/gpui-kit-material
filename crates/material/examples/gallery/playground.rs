@@ -343,7 +343,18 @@ pub struct PreviewStore {
     textareas: HashMap<&'static str, Entity<TextareaState>>,
     locals: HashMap<&'static str, Box<dyn Any>>,
     memos: HashMap<&'static str, u64>,
+    hint: PaneHint,
     subscriptions: Vec<Subscription>,
+}
+
+/// How a preview asks the shell to arrange the panes, in this frame.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct PaneHint {
+    /// Stack the configuration card under the preview even in a wide window.
+    pub stacked: bool,
+    /// The card height the preview needs, in design px, if it is more than
+    /// the window's.
+    pub height: Option<f32>,
 }
 
 /// What a preview uses to write back to its playground. See the module
@@ -445,6 +456,11 @@ impl Preview<'_> {
         use std::hash::{BuildHasher, BuildHasherDefault, DefaultHasher};
         let hash = BuildHasherDefault::<DefaultHasher>::default().hash_one(value);
         self.store.memos.insert(key, hash) != Some(hash)
+    }
+
+    /// Ask the shell to arrange the panes this way for this frame.
+    pub fn pane_hint(&mut self, hint: PaneHint) {
+        self.store.hint = hint;
     }
 
     /// Preview-only state `T` under `key`, created by `init` on first use.
@@ -660,11 +676,27 @@ impl PlaygroundState {
     /// The preview canvas content.
     pub fn render_preview(&mut self, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
         let preview_fn = self.playground.preview;
+        self.store.hint = PaneHint::default();
         let mut preview = Preview {
             config: &self.config,
             store: &mut self.store,
         };
         preview_fn(&self.config, &mut preview, window, cx)
+    }
+
+    /// The preview-only state under `key`, once the preview has built it.
+    #[cfg(test)]
+    pub fn local_entity<T: 'static>(&self, key: &'static str) -> Option<Entity<T>> {
+        self.store
+            .locals
+            .get(key)
+            .and_then(|local| local.downcast_ref::<Entity<T>>())
+            .cloned()
+    }
+
+    /// The panes' arrangement the last rendered preview asked for.
+    pub fn pane_hint(&self) -> PaneHint {
+        self.store.hint
     }
 
     fn scenario_names(&self) -> impl Iterator<Item = &'static str> + use<> {

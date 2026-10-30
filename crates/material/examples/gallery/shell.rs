@@ -4,17 +4,26 @@
 //! virtual rows. The GPUI list measures only the viewport; Kit Component
 //! List requires precomputed sizes, while MessageScroller imposes log/tail
 //! semantics inappropriate for these pages.
-use super::catalog::{CATALOG, Group, Kind};
+use super::catalog::{self, CATALOG, Group, Kind, TopSection};
 use super::playground::CompactSelect;
 use super::spec::type_role;
 use super::*;
+use gpui_kit_material::icons::Symbol;
 use std::sync::OnceLock;
 
 /// The widest the page content grows, in design px.
 const CONTENT_MAX_WIDTH: f32 = 1240.;
-const GUTTER: f32 = 40.;
-const GUTTER_COMPACT: f32 = 12.;
 const NAV_WIDTH: f32 = 248.;
+/// Below this width the configuration card stacks under the preview.
+const WIDE_WINDOW: f32 = 1200.;
+/// Below this width the navigation becomes a modal drawer. md3.io's top bar
+/// needs a little more than M3's 840dp once a platform's caption buttons
+/// share it, so the drawer takes over at 900.
+const MEDIUM_WINDOW: f32 = 900.;
+/// The modal drawer leaves this much of the window for its scrim, in design
+/// px, as M3 asks of a drawer on a phone.
+const DRAWER_MARGIN: f32 = 56.;
+const PANE_GAP: f32 = 24.;
 const CARD_RADIUS: f32 = 16.;
 const CONFIG_WIDTH: f32 = 340.;
 /// The card header: tabs, theme select and mode.
@@ -23,6 +32,9 @@ const MIN_PANE: f32 = 460.;
 /// The height of the page header above the panes, in design px.
 const LEAD_HEADER: f32 = 196.;
 const COMPACT_CANVAS: f32 = 320.;
+/// The preview canvas's padding.
+const CANVAS_PADDING: f32 = 24.;
+const CANVAS_PADDING_COMPACT: f32 = 12.;
 /// A spec card's side padding.
 const SPEC_PADDING: f32 = 32.;
 const SPEC_PADDING_COMPACT: f32 = 16.;
@@ -51,6 +63,13 @@ pub(crate) const THEMES: [(ThemeId, &str); 20] = [
     (ThemeId::Highcontrast, "Highcontrast"),
 ];
 
+#[cfg(test)]
+thread_local! {
+    /// The bounds the last preview drew, recorded to catch overflow.
+    pub(crate) static PREVIEW_DRAWN: std::cell::Cell<Option<Bounds<Pixels>>> =
+        const { std::cell::Cell::new(None) };
+}
+
 fn card_background() -> Rgba {
     color(ColorRole::SURFACE_CONTAINER_LOW)
 }
@@ -61,15 +80,115 @@ fn outline() -> Rgba {
     color(ColorRole::OUTLINE_VARIANT)
 }
 
+/// How the shell arranges itself at a window width, like md3.io:
+///
+/// - Wide: navigation, then the preview beside the configuration card.
+/// - Medium: navigation, then the configuration card under the preview.
+/// - Compact: the navigation is a modal drawer opened from the top bar, the
+///   top bar's sections collapse into it, and everything stacks full width.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum ShellLayout {
+    Wide,
+    Medium,
+    Compact,
+}
+
+impl ShellLayout {
+    pub(crate) fn of(window: &Window) -> Self {
+        Self::at(design_width(window))
+    }
+
+    pub(crate) fn at(width: f32) -> Self {
+        if width >= WIDE_WINDOW {
+            Self::Wide
+        } else if width >= MEDIUM_WINDOW {
+            Self::Medium
+        } else {
+            Self::Compact
+        }
+    }
+
+    fn navigation_width(self) -> f32 {
+        match self {
+            Self::Wide | Self::Medium => NAV_WIDTH,
+            Self::Compact => 0.,
+        }
+    }
+
+    fn gutter(self) -> f32 {
+        match self {
+            Self::Wide => 40.,
+            Self::Medium => 24.,
+            Self::Compact => 12.,
+        }
+    }
+
+    fn stacked(self) -> bool {
+        self != Self::Wide
+    }
+
+    fn compact(self) -> bool {
+        self == Self::Compact
+    }
+
+    fn spec_padding(self) -> f32 {
+        if self.compact() {
+            SPEC_PADDING_COMPACT
+        } else {
+            SPEC_PADDING
+        }
+    }
+
+    fn canvas_padding(self) -> f32 {
+        if self.compact() {
+            CANVAS_PADDING_COMPACT
+        } else {
+            CANVAS_PADDING
+        }
+    }
+
+    /// The width of the page content between the gutters.
+    fn content_width(self, window_width: f32) -> f32 {
+        (window_width - self.navigation_width() - 2. * self.gutter()).min(CONTENT_MAX_WIDTH)
+    }
+}
+
 /// The width inside a spec card, in design px.
 pub(super) fn spec_content_width(window: &Window) -> f32 {
-    let compact = is_compact(window);
-    let (nav, gutter, padding) = if compact {
-        (0., GUTTER_COMPACT, SPEC_PADDING_COMPACT)
+    let layout = ShellLayout::of(window);
+    layout.content_width(design_width(window)) - 2. * (layout.spec_padding() + 1.)
+}
+
+/// The room a preview has inside its canvas, in design px, with the panes
+/// side by side or `stacked`: its width, and the height that fits the window
+/// once the page has scrolled the card to the top.
+pub(crate) fn preview_area(window: &Window, stacked: bool) -> (f32, f32) {
+    let layout = ShellLayout::of(window);
+    let content = layout.content_width(design_width(window));
+    let pane = if stacked || layout.stacked() {
+        content
     } else {
-        (NAV_WIDTH, GUTTER, SPEC_PADDING)
+        content - CONFIG_WIDTH - PANE_GAP
     };
-    (design_width(window) - nav - 2. * gutter).min(CONTENT_MAX_WIDTH) - 2. * (padding + 1.)
+    let padding = 2. * (layout.canvas_padding() + 1.);
+    let rem_scale = BASE_PX / f32::from(window.rem_size());
+    let height = f32::from(window.viewport_size().height) * rem_scale
+        - f32::from(TITLE_BAR) * rem_scale
+        - CARD_HEADER
+        - padding;
+    (pane - padding, height)
+}
+
+/// The height of a preview card around a canvas with `content` design px of
+/// content.
+pub(crate) fn preview_card_height(content: f32, window: &Window) -> f32 {
+    let padding = 2. * (ShellLayout::of(window).canvas_padding() + 1.);
+    content + CARD_HEADER + padding
+}
+
+/// Whether the overview lists an entry: the components, not Examples.
+pub(super) fn overview_entry(entry: &catalog::Entry) -> bool {
+    matches!(entry.kind, Kind::Component { .. }) && entry.group.section() == TopSection::Components
 }
 
 /// The component groups the overview lists, in navigation order.
@@ -77,7 +196,7 @@ pub(super) fn overview_groups() -> impl Iterator<Item = Group> {
     let mut last = None;
     CATALOG.iter().filter_map(move |entry| {
         let group = entry.group;
-        let new = matches!(entry.kind, Kind::Component { .. }) && last != Some(group);
+        let new = overview_entry(entry) && last != Some(group);
         last = Some(group);
         new.then_some(group)
     })
@@ -94,7 +213,7 @@ fn breadcrumb(entry: usize) -> SharedString {
                     Kind::Overview => "Explore the library",
                     _ => entry.group.title(),
                 };
-                if matches!(entry.kind, Kind::Overview) {
+                if matches!(entry.kind, Kind::Overview) || entry.title == group {
                     group.to_uppercase().into()
                 } else {
                     format!("{} / {}", group, entry.title).to_uppercase().into()
@@ -216,7 +335,57 @@ impl Gallery {
         });
     }
 
-    pub(super) fn render_navigation(&self, compact: bool, cx: &mut Context<Self>) -> Stateful<Div> {
+    /// The modal drawer the compact layout navigates with: every page under
+    /// its group heading, so it also stands in for the collapsed top sections.
+    pub(super) fn render_drawer(
+        &self,
+        window: &Window,
+        cx: &mut Context<Self>,
+    ) -> NavigationDrawer {
+        static ITEMS: OnceLock<Vec<NavItem>> = OnceLock::new();
+        let items = ITEMS.get_or_init(|| {
+            let icon = NavIcon::symbol(Symbol::named("stars").expect("a Material Symbol"));
+            CATALOG
+                .iter()
+                .map(|entry| NavItem::new(entry.id, entry.title, icon.clone()))
+                .collect()
+        });
+        let searching = !self.query.trim().is_empty();
+        let view = cx.weak_entity();
+        let mut drawer = NavigationDrawer::new("gallery-drawer", "Gallery pages")
+            .modal(true)
+            .open(self.drawer_open)
+            .dense(true)
+            .icons(false)
+            .width(DRAWER_WIDTH.min(design_width(window) - DRAWER_MARGIN))
+            .selected(CATALOG[self.current].id)
+            .focus_on_open(!searching)
+            .on_change(cx.listener(|this, id: &SharedString, _, cx| {
+                if let Some(entry) = catalog::position(id) {
+                    this.navigate(entry, cx);
+                }
+                this.set_drawer_open(false, cx);
+            }))
+            .on_dismiss(move |_, cx| {
+                let _ = view.update(cx, |this, cx| this.set_drawer_open(false, cx));
+            });
+        let mut shown = Vec::new();
+        let mut group = None;
+        for index in self.matches() {
+            let entry = &CATALOG[index];
+            if group != Some(entry.group) {
+                group = Some(entry.group);
+                drawer = drawer.section(shown.len(), entry.group.title());
+            }
+            shown.push(items[index].clone());
+        }
+        if shown.is_empty() {
+            drawer = drawer.headline("No matching pages");
+        }
+        drawer.items(shown)
+    }
+
+    pub(super) fn render_navigation(&self, cx: &mut Context<Self>) -> Stateful<Div> {
         let searching = !self.query.trim().is_empty();
         let section = CATALOG[self.current].group.section();
         let mut groups: Vec<AnyElement> = Vec::new();
@@ -238,7 +407,6 @@ impl Gallery {
                                         .text_color(color(ColorRole::ON_SURFACE_VARIANT)),
                                 ),
                             )
-                            .when(compact, |column| column.flex_row().flex_wrap())
                             .children(items.drain(..))
                             .into_any_element(),
                     );
@@ -253,7 +421,7 @@ impl Gallery {
                 flush(group, &mut items, &mut groups);
                 group = Some(entry.group);
             }
-            items.push(self.nav_item(index, compact, cx).into_any_element());
+            items.push(self.nav_item(index, cx).into_any_element());
         }
         flush(group, &mut items, &mut groups);
         if groups.is_empty() {
@@ -280,8 +448,9 @@ impl Gallery {
             .overflow_y_scroll()
             .track_scroll(&self.navigation_scroll)
             .bg(spec::page_background())
-            .when(compact, |nav| nav.w_full().max_h(rem(180.)).border_b_1())
-            .when(!compact, |nav| nav.w(rem(NAV_WIDTH)).h_full().border_r_1())
+            .w(rem(NAV_WIDTH))
+            .h_full()
+            .border_r_1()
             .border_color(outline())
             .child(
                 gpui_base::v_flex()
@@ -292,7 +461,7 @@ impl Gallery {
             )
     }
 
-    fn nav_item(&self, index: usize, compact: bool, cx: &mut Context<Self>) -> impl IntoElement {
+    fn nav_item(&self, index: usize, cx: &mut Context<Self>) -> impl IntoElement {
         let entry = &CATALOG[index];
         let selected = index == self.current;
         let on_surface = color(ColorRole::ON_SURFACE);
@@ -310,7 +479,7 @@ impl Gallery {
                 .px(rem(16.))
                 .rounded_full()
                 .cursor_pointer()
-                .when(!compact, |item| item.w_full())
+                .w_full()
                 .map(|item| type_role(item, TypeRole::LabelLarge))
                 .when(selected, |item| {
                     item.bg(color(ColorRole::SECONDARY_CONTAINER))
@@ -333,8 +502,7 @@ impl Gallery {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> AnyElement {
-        let compact = is_compact(window);
-        let gutter = if compact { GUTTER_COMPACT } else { GUTTER };
+        let gutter = ShellLayout::of(window).gutter();
         let content = match self.rows[index] {
             Row::Lead => self.render_lead(window, cx),
             Row::Spec(row) => self.render_spec_row(index, row, window, cx),
@@ -472,74 +640,106 @@ impl Gallery {
             )
             .child(div().flex_1())
             .child(
-                accessible_text("theme-label", "Theme")
-                    .map(|text| type_role(text, TypeRole::LabelLarge))
-                    .text_color(color(ColorRole::ON_SURFACE)),
-            )
-            .child(
-                CompactSelect::new("preview-theme", "Theme")
-                    .options(THEMES.map(|(_, label)| SharedString::new_static(label)))
-                    .selected(theme.unwrap_or(0))
-                    .open(self.theme_menu_open)
-                    .width(116.)
-                    .on_open_change(cx.listener(|this, open: &bool, _, cx| {
-                        this.theme_menu_open = *open;
-                        cx.notify();
-                    }))
-                    .on_select(cx.listener(move |this, index: &usize, _, cx| {
-                        this.theme_menu_open = false;
-                        select_theme(*index, cx);
-                        cx.notify();
-                    })),
-            )
-            .child(
-                ConnectedButtonGroup::new("preview-mode", "Preview mode")
-                    .button_size(ButtonSize::ExtraSmall)
-                    .options([("light", "Light"), ("dark", "Dark")])
-                    .selected(if dark { "dark" } else { "light" })
-                    .on_change(move |value: &SharedString, _, cx| {
-                        select_mode(usize::from(value == "dark"), cx)
-                    }),
+                // One unit: on a narrow card it wraps under the tabs whole.
+                div()
+                    .flex()
+                    .flex_wrap()
+                    .items_center()
+                    .gap(rem(8.))
+                    .child(
+                        accessible_text("theme-label", "Theme")
+                            .map(|text| type_role(text, TypeRole::LabelLarge))
+                            .text_color(color(ColorRole::ON_SURFACE)),
+                    )
+                    .child(
+                        CompactSelect::new("preview-theme", "Theme")
+                            .options(THEMES.map(|(_, label)| SharedString::new_static(label)))
+                            .selected(theme.unwrap_or(0))
+                            .open(self.theme_menu_open)
+                            .width(116.)
+                            .on_open_change(cx.listener(|this, open: &bool, _, cx| {
+                                this.theme_menu_open = *open;
+                                cx.notify();
+                            }))
+                            .on_select(cx.listener(move |this, index: &usize, _, cx| {
+                                this.theme_menu_open = false;
+                                select_theme(*index, cx);
+                                cx.notify();
+                            })),
+                    )
+                    .child(
+                        ConnectedButtonGroup::new("preview-mode", "Preview mode")
+                            .button_size(ButtonSize::ExtraSmall)
+                            .options([("light", "Light"), ("dark", "Dark")])
+                            .selected(if dark { "dark" } else { "light" })
+                            .on_change(move |value: &SharedString, _, cx| {
+                                select_mode(usize::from(value == "dark"), cx)
+                            }),
+                    ),
             )
     }
 
-    /// The preview card beside the configuration card.
+    /// The preview card beside the configuration card, or above it where
+    /// the window or the preview needs the width.
     fn render_panes(&mut self, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
-        let compact = is_compact(window);
+        let layout = ShellLayout::of(window);
         let design_height =
             f32::from(window.viewport_size().height) * BASE_PX / f32::from(window.rem_size());
-        let pane = (design_height - f32::from(TITLE_BAR) - LEAD_HEADER - 24.).max(MIN_PANE);
+        let mut pane = (design_height - f32::from(TITLE_BAR) - LEAD_HEADER - 24.).max(MIN_PANE);
         let playground = self.entries[self.current].playground.clone();
         let canvas = match &playground {
             Some(state) => state.update(cx, |state, cx| state.render_preview(window, cx)),
             None => self.render_demos(window, cx),
         };
+        let hint = playground
+            .as_ref()
+            .map_or_else(Default::default, |state| state.read(cx).pane_hint());
+        let stacked = layout.stacked() || hint.stacked;
+        if let Some(height) = hint.height {
+            pane = pane.max(height);
+        }
         let fallback = playground.is_none();
         let preview_card = card()
-            .flex_1()
             .min_w_0()
-            .when(!compact, |card| card.h(rem(pane)))
+            // At least the window's pane, and as tall as the preview needs.
+            .when(!stacked, |card| card.flex_1().min_h(rem(pane)))
             .child(self.render_card_header(cx))
             .child(
                 div()
                     .id("preview-canvas")
                     .debug_selector(|| "preview-canvas".into())
-                    .flex_1()
+                    .when(!stacked, |canvas| canvas.flex_grow(1.).flex_shrink_0())
                     .min_h(rem(COMPACT_CANVAS))
                     .bg(canvas_background())
                     .flex()
                     .flex_col()
                     .when(!fallback, |canvas| canvas.items_center().justify_center())
-                    .when(fallback, |canvas| canvas.overflow_y_scroll().p(rem(24.)))
-                    .p(rem(24.))
-                    .child(canvas),
+                    .p(rem(layout.canvas_padding()))
+                    .child(
+                        div()
+                            .debug_selector(|| "preview-content".into())
+                            .w_full()
+                            .flex()
+                            .flex_col()
+                            .when(!fallback, |content| content.items_center())
+                            .when(cfg!(test), |content| {
+                                content.on_children_prepainted(|children, _, _| {
+                                    #[cfg(test)]
+                                    PREVIEW_DRAWN
+                                        .with(|drawn| drawn.set(children.first().copied()));
+                                    #[cfg(not(test))]
+                                    let _ = children;
+                                })
+                            })
+                            .child(canvas),
+                    ),
             );
-        let config_card = self.render_config_card(playground, compact, pane, window, cx);
+        let config_card = self.render_config_card(playground, stacked, pane, window, cx);
         div()
             .w_full()
             .flex()
-            .gap(rem(24.))
-            .when(compact, |panes| panes.flex_col())
+            .gap(rem(PANE_GAP))
+            .when(stacked, |panes| panes.flex_col())
             .child(preview_card)
             .child(config_card)
             .into_any_element()
@@ -568,11 +768,11 @@ impl Gallery {
     fn render_config_card(
         &mut self,
         playground: Option<Entity<PlaygroundState>>,
-        compact: bool,
+        stacked: bool,
         pane: f32,
         window: &mut Window,
         cx: &mut Context<Self>,
-    ) -> impl IntoElement {
+    ) -> AnyElement {
         let header = div()
             .flex()
             .items_center()
@@ -607,7 +807,7 @@ impl Gallery {
                     .id("configuration-body")
                     .flex_1()
                     .min_h_0()
-                    .when(!compact, |body| body.overflow_y_scroll().track_scroll(&scroll))
+                    .when(!stacked, |body| body.overflow_y_scroll().track_scroll(&scroll))
                     .child(panel)
                     .into_any_element()
             }
@@ -624,12 +824,23 @@ impl Gallery {
                 )
                 .into_any_element(),
         };
-        card()
+        let config = card()
             .debug_selector(|| "configuration-card".into())
             .flex_shrink_0()
-            .when(!compact, |card| card.w(rem(CONFIG_WIDTH)).h(rem(pane)))
             .child(header)
-            .child(body)
+            .child(body);
+        if stacked {
+            return config.into_any_element();
+        }
+        // Beside the preview the card takes the row's height, set by the
+        // preview, and scrolls its own controls instead of adding to it.
+        div()
+            .relative()
+            .flex_shrink_0()
+            .w(rem(CONFIG_WIDTH))
+            .min_h(rem(pane))
+            .child(config.absolute().inset_0())
+            .into_any_element()
     }
 
     /// A spec page row framed as a slice of its card.
@@ -657,7 +868,7 @@ impl Gallery {
         } else {
             built.page.row_gap(row, cx)
         };
-        let compact = is_compact(window);
+        let padding = ShellLayout::of(window).spec_padding();
         let radius = rem(CARD_RADIUS);
         div()
             .when(first, |panel| {
@@ -669,11 +880,7 @@ impl Gallery {
             .border_l_1()
             .border_r_1()
             .border_color(outline())
-            .px(rem(if compact {
-                SPEC_PADDING_COMPACT
-            } else {
-                SPEC_PADDING
-            }))
+            .px(rem(padding))
             .pt(rem(gap))
             .when(opens_card, |panel| panel.border_t_1().rounded_t(radius))
             .when(last, |panel| {

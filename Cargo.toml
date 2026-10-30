@@ -1,7 +1,7 @@
 [workspace]
 resolver = "3"
 members = ["crates/color", "crates/material", "crates/gallery-web"]
-exclude = ["vendor/gpui-kit", "vendor/gpui-base", "vendor/gpui-pre", "vendor/gpui-pre-web", "vendor/gpui-pre-apple", "vendor/gpui-fast", "vendor/gpui-fast-web", "vendor/gpui-fast-apple", "vendor/gpui-fast-macos", "vendor/gpui-pre-macos"]
+exclude = ["vendor/gpui-kit", "vendor/gpui-base", "vendor/gpui-pre", "vendor/gpui-pre-web", "vendor/gpui-pre-apple", "vendor/gpui-fast", "vendor/gpui-fast-web", "vendor/gpui-fast-apple", "vendor/gpui-fast-macos", "vendor/gpui-pre-macos", "vendor/gpui-fast-linux", "vendor/gpui-fast-wgpu", "vendor/gpui-fast-windows", "vendor/gpui-pre-linux", "vendor/gpui-pre-wgpu", "vendor/gpui-pre-windows", "vendor/wgpu"]
 
 [workspace.package]
 version = "0.1.0"
@@ -44,6 +44,13 @@ gpui-base = { path = "vendor/gpui-base" }
 gpui-pre = { path = "vendor/gpui-pre" }
 gpui-pre-web = { path = "vendor/gpui-pre-web" }
 gpui-pre-apple = { path = "vendor/gpui-pre-apple" }
+gpui-fast-linux = { path = "vendor/gpui-fast-linux" }
+gpui-fast-wgpu = { path = "vendor/gpui-fast-wgpu" }
+gpui-fast-windows = { path = "vendor/gpui-fast-windows" }
+gpui-pre-linux = { path = "vendor/gpui-pre-linux" }
+gpui-pre-wgpu = { path = "vendor/gpui-pre-wgpu" }
+gpui-pre-windows = { path = "vendor/gpui-pre-windows" }
+wgpu = { path = "vendor/wgpu" }
 
 [patch."https://github.com/longbridge/gpui-kit"]
 gpui-kit = { path = "vendor/gpui-kit" }

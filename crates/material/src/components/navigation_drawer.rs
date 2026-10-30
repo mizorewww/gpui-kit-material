@@ -125,6 +125,7 @@ pub struct NavigationDrawer {
     width: f32,
     icons: bool,
     ripple: bool,
+    focus_on_open: bool,
     on_change: Option<Change>,
     on_dismiss: Option<ClickHandler>,
 }
@@ -146,6 +147,7 @@ impl NavigationDrawer {
             width: DRAWER_WIDTH,
             icons: true,
             ripple: true,
+            focus_on_open: true,
             on_change: None,
             on_dismiss: None,
         }
@@ -202,6 +204,13 @@ impl NavigationDrawer {
     /// Whether presses spread a ripple (on by default).
     pub fn ripple(mut self, ripple: bool) -> Self {
         self.ripple = ripple;
+        self
+    }
+    /// Whether opening a modal drawer moves focus to its selected destination
+    /// (on by default). Turn it off when the drawer opens in response to
+    /// typing elsewhere, such as a search field filtering its destinations.
+    pub fn focus_on_open(mut self, focus: bool) -> Self {
+        self.focus_on_open = focus;
         self
     }
     pub fn on_change(
@@ -431,6 +440,7 @@ impl RenderOnce for NavigationDrawer {
         was_open.update(cx, |was, _| *was = open);
         if modal
             && opened
+            && self.focus_on_open
             && let Some(handle) = list
                 .selected
                 .or(list.entry)
@@ -497,6 +507,7 @@ impl RenderOnce for NavigationDrawer {
             .when(modal, |sheet| {
                 let radius = rem(MODAL_RADIUS);
                 sheet
+                    .occlude()
                     .map(|sheet| {
                         if end {
                             sheet.rounded_l(radius)
@@ -532,6 +543,7 @@ impl RenderOnce for NavigationDrawer {
                 })
                 .absolute()
                 .inset_0()
+                .occlude()
                 .bg(color(ColorRole::SCRIM).opacity(0.32 * visible))
                 .when_some(on_dismiss, |scrim, dismiss| {
                     scrim.on_click(move |event, window, cx| dismiss(event, window, cx))
