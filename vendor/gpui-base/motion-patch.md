@@ -32,10 +32,7 @@ The local compatibility surface is restricted to:
   clock and interruption/reversal history across unmounts (for virtualized
   rows) using the same sampler as `transition_with_status`; it retains no
   view, window or scheduled callback.
-- `src/lib.rs`: public exports `ReducedMotion` and `TransitionPlayback`, and
-  `RootTab`/`RootTabPrev` aliases for the `root::Tab`/`TabPrev` actions (the
-  `root` module is private upstream), so an app can handle Root's focus-cycling
-  keys itself, as the virtualized Gallery does.
+- `src/lib.rs`: public exports `ReducedMotion` and `TransitionPlayback`.
 - `src/text_selection.rs`: `Hitbox` literals add `additional_bounds: None`,
   required by the GPUI `Hitbox` field patch
   (`vendor/gpui-pre/hitbox-extension-patch.md`). No behavior change.

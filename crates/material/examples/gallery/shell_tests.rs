@@ -904,3 +904,31 @@ mod examples {
         }
     }
 }
+
+#[gpui::test]
+fn tab_keys_move_focus_through_the_gallerys_own_bindings(cx: &mut TestAppContext) {
+    let (window, mut visual) = open(cx);
+    draw(&window, &mut visual);
+    window
+        .update(&mut visual, |g, window, cx| {
+            g.navigation_focus.focus(window, cx);
+        })
+        .unwrap();
+    draw(&window, &mut visual);
+    let start = window
+        .update(&mut visual, |_, window, cx| window.focused(cx))
+        .unwrap();
+    visual.simulate_keystrokes("tab");
+    draw(&window, &mut visual);
+    let next = window
+        .update(&mut visual, |_, window, cx| window.focused(cx))
+        .unwrap();
+    assert!(next.is_some());
+    assert_ne!(next, start, "tab moves focus off the navigation container");
+    visual.simulate_keystrokes("tab shift-tab");
+    draw(&window, &mut visual);
+    let back = window
+        .update(&mut visual, |_, window, cx| window.focused(cx))
+        .unwrap();
+    assert_eq!(back, next, "shift-tab undoes tab");
+}

@@ -43,6 +43,24 @@ use std::{
     rc::Rc,
 };
 
+gpui::actions!(gallery, [FocusNext, FocusPrevious]);
+
+/// The Gallery's element nests inside Root, so these bindings win over Root's
+/// focus-cycling keys; a Tab the Gallery does not handle falls through to them.
+const FOCUS_CONTEXT: &str = "Gallery";
+
+fn bind_focus_keys(cx: &mut App) {
+    struct Bound;
+    impl Global for Bound {}
+    if !cx.has_global::<Bound>() {
+        cx.set_global(Bound);
+        cx.bind_keys([
+            KeyBinding::new("tab", FocusNext, Some(FOCUS_CONTEXT)),
+            KeyBinding::new("shift-tab", FocusPrevious, Some(FOCUS_CONTEXT)),
+        ]);
+    }
+}
+
 // Reveal only the newly focused control, not the entire long gallery page.
 pub(crate) trait GalleryReveal: IntoElement + Sized {
     fn reveal(self, id: impl Into<ElementId>, list: &ListState) -> RevealFocus {
@@ -200,6 +218,7 @@ impl Gallery {
                 }),
             ];
         let applied_theme = theme_key(shared.read(cx));
+        bind_focus_keys(cx);
         let gallery = cx.entity();
         let lead = cx.new(|cx| shell::LeadView::new(gallery, cx));
         Gallery {
@@ -632,10 +651,11 @@ impl Render for Gallery {
             );
         gpui_base::v_flex()
             .id("gallery")
-            .on_action(cx.listener(|this, _: &gpui_base::RootTab, window, cx| {
+            .key_context(FOCUS_CONTEXT)
+            .on_action(cx.listener(|this, _: &FocusNext, window, cx| {
                 this.advance_gallery_focus(false, window, cx);
             }))
-            .on_action(cx.listener(|this, _: &gpui_base::RootTabPrev, window, cx| {
+            .on_action(cx.listener(|this, _: &FocusPrevious, window, cx| {
                 this.advance_gallery_focus(true, window, cx);
             }))
             .relative()

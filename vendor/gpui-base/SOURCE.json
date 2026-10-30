@@ -41,8 +41,8 @@
       "upstream_sha256": "39296e195f6dabbb581b8f72ee06809b13fae3b328c4a71b48768dbff5c81c53"
     },
     "src/lib.rs": {
-      "local_sha256": "8f96ea188790fdf5e91939021eab1c1092167dea37067b79ad9e88bec29a5205",
-      "reason": "Public exports ReducedMotion and TransitionPlayback (motion), plus RootTab/RootTabPrev aliases for the otherwise private root::Tab/TabPrev actions (motion-patch.md).",
+      "local_sha256": "1801bc21617235d0d0e5170df8a19fdca5b0ade3e2f7f2323dfca34201e91b8c",
+      "reason": "Public exports ReducedMotion and TransitionPlayback (motion) (motion-patch.md).",
       "upstream_sha256": "7692fadcb738947c529f338208facea785a5172298064eef8fb34365e452e876"
     },
     "src/motion.rs": {
