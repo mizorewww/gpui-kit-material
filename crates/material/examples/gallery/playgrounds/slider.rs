@@ -223,7 +223,7 @@ fn preview(
             if vertical {
                 track.h(rem(240.))
             } else {
-                track.w(rem(360.))
+                track.w_full().max_w(rem(360.))
             }
         })
         .child(material);

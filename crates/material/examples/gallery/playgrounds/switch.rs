@@ -174,7 +174,8 @@ fn preview(
         .child(switch);
     let end = config.option("position") == "end";
     div()
-        .w(rem(320.))
+        .w_full()
+        .max_w(rem(320.))
         .flex()
         .items_center()
         .gap(rem(16.))

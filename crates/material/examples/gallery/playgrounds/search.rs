@@ -267,7 +267,8 @@ fn preview(
             if full_screen {
                 // A phone-sized area for the view to cover.
                 frame
-                    .w(rem(360.))
+                    .w_full()
+                    .max_w(rem(360.))
                     .h(rem(480.))
                     .rounded(rem(16.))
                     .overflow_hidden()
@@ -276,7 +277,7 @@ fn preview(
                     .bg(color(ColorRole::SURFACE_CONTAINER_LOW))
                     .when(!expanded, |frame| frame.p(rem(12.)))
             } else {
-                frame.w(rem(360.)).min_h(rem(56. + 2. + 5. * 64.))
+                frame.w_full().max_w(rem(360.)).min_h(rem(56. + 2. + 5. * 64.))
             }
         })
         .child(view)

@@ -5,6 +5,7 @@
 //! The picker edits a draft: OK writes it to the Time control (24-hour
 //! `HH:MM` or `HH:MM:SS`), Cancel returns it to the control's time. A
 //! configuration change rebuilds the picker state.
+use super::super::shell::{fit_preview, preview_area};
 use super::prelude::*;
 use std::rc::Rc;
 
@@ -172,6 +173,10 @@ struct Build {
 /// The preview's picker state, rebuilt with its configuration.
 struct Picker(Option<Entity<TimePickerState>>);
 
+/// The reference picker's widths, in design px.
+const VERTICAL_WIDTH: f32 = 328.;
+const HORIZONTAL_WIDTH: f32 = 584.;
+
 fn preview(
     config: &Config,
     preview: &mut Preview,
@@ -231,8 +236,11 @@ fn preview(
     };
     let write = preview.setter("time", cx);
     let revert = state.clone();
+    // A narrow window shows the vertical picker, whatever the configuration asks.
+    let horizontal = config.option("orientation") == "horizontal"
+        && preview_area(window, true).0 >= HORIZONTAL_WIDTH;
     let picker = TimePicker::new("playground-time-picker", &state)
-        .orientation(if config.option("orientation") == "horizontal" {
+        .orientation(if horizontal {
             TimeOrientation::Horizontal
         } else {
             TimeOrientation::Vertical
@@ -243,10 +251,15 @@ fn preview(
         .on_cancel(move |window, cx| {
             revert.update(cx, |state, cx| state.set_time(time, window, cx))
         });
-    div()
+    let picker = div()
         .debug_selector(|| "playground-time-picker".into())
         .child(picker)
-        .into_any_element()
+        .into_any_element();
+    if horizontal {
+        picker
+    } else {
+        fit_preview(VERTICAL_WIDTH, picker, window)
+    }
 }
 
 #[cfg(test)]

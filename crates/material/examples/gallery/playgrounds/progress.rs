@@ -173,7 +173,8 @@ fn preview(
     } else {
         div()
             .debug_selector(|| "playground-progress-track".into())
-            .w(rem(LINEAR_WIDTH))
+            .w_full()
+            .max_w(rem(LINEAR_WIDTH))
             .child(
                 LinearProgress::new("playground-progress-linear", label)
                     .value(fraction)
