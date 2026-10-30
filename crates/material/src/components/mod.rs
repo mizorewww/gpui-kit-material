@@ -96,7 +96,9 @@ pub use carousel::{
 pub use checkbox::{CheckboxState, MaterialCheckbox};
 pub use chips::{AssistChip, CHIP_HEIGHT, ChipStyle, FilterChip, InputChip, SuggestionChip, chip};
 pub use choice::{ChoiceGroup, ChoiceTile, Tint, choice_radio, tinted_icon};
-pub use dialog::{DIALOG_WIDTH, MaterialDialog, SCRIM_OPACITY};
+pub use dialog::{
+    DIALOG_WIDTH, DialogActionAlignment, DialogAnimation, DialogSize, MaterialDialog, SCRIM_OPACITY,
+};
 pub use feedback::{
     BADGE_CONTAINER, BADGE_LABEL, CARD_PADDING, CardState, CardSurface, CardVariant,
     LARGE_BADGE_PADDING, LARGE_BADGE_SIZE, MaterialCard, NoticeKind, SMALL_BADGE_SIZE, StatusKind,
