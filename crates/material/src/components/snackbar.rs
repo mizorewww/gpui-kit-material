@@ -12,6 +12,7 @@ use crate::theme::color;
 use crate::tokens::{elevation, shape::*, state, typography::*};
 use gpui::{prelude::*, *};
 use std::rc::Rc;
+use std::time::Duration;
 
 /// M3 snackbars sit at elevation level 3.
 const SNACKBAR_ELEVATION: u8 = 3;
@@ -21,8 +22,56 @@ const BUTTON_HEIGHT: f32 = 40.;
 const CLOSE_BOX: f32 = 48.;
 /// How far a snackbar rises as it enters or sinks as it leaves.
 const TRAVEL: f32 = 12.;
+/// A placed snackbar's distance from the edges of its ancestor.
+const EDGE: f32 = 16.;
 
 type SnackbarHandler = Rc<dyn Fn(&ClickEvent, &mut Window, &mut App)>;
+type DismissHandler = Rc<dyn Fn(&mut Window, &mut App)>;
+
+/// How long an open snackbar stays before asking to be dismissed. md3.io's
+/// short is 4 seconds and its long 10.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+pub enum SnackbarDuration {
+    Short,
+    Long,
+    /// Stays until the caller closes it.
+    #[default]
+    Indefinite,
+    Custom(Duration),
+}
+
+impl SnackbarDuration {
+    pub const SHORT: Duration = Duration::from_secs(4);
+    pub const LONG: Duration = Duration::from_secs(10);
+    /// The time before [`Snackbar::on_dismiss`] runs, if it ever does.
+    pub const fn timeout(self) -> Option<Duration> {
+        match self {
+            Self::Short => Some(Self::SHORT),
+            Self::Long => Some(Self::LONG),
+            Self::Indefinite => None,
+            Self::Custom(duration) => Some(duration),
+        }
+    }
+}
+
+/// Where a placed snackbar sits along the bottom of its positioned ancestor.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+pub enum SnackbarPosition {
+    #[default]
+    Start,
+    Center,
+    End,
+}
+
+/// The auto-dismiss countdown: what it was armed for, a generation that
+/// cancels stale timers, whether the pointer pauses it, and the latest handler.
+#[derive(Default)]
+struct AutoDismiss {
+    armed: Option<(bool, SnackbarDuration, bool)>,
+    generation: u64,
+    hovered: bool,
+    on_dismiss: Option<DismissHandler>,
+}
 
 /// M3 snackbar.
 ///
@@ -31,8 +80,10 @@ type SnackbarHandler = Rc<dyn Fn(&ClickEvent, &mut Window, &mut App)>;
 /// by platforms that treat status as a live region). It rises and fades in
 /// when mounted; with [`Self::open`]`(false)` it sinks and fades out, then
 /// renders nothing, so the caller can keep it mounted until the exit
-/// settles. The caller places it (usually bottom-leading, 16dp from the
-/// window edges) and supplies every string.
+/// settles. The caller supplies every string and places it, or asks for a
+/// [`Self::position`] along the bottom of its positioned ancestor.
+/// [`Self::duration`] asks for dismissal through [`Self::on_dismiss`], which
+/// also answers Escape; the pointer resting on it pauses the countdown.
 #[derive(gpui::IntoElement)]
 pub struct Snackbar {
     id: ElementId,
@@ -41,6 +92,10 @@ pub struct Snackbar {
     close: Option<(SharedString, SnackbarHandler)>,
     longer_action: bool,
     open: bool,
+    duration: SnackbarDuration,
+    position: Option<SnackbarPosition>,
+    on_dismiss: Option<DismissHandler>,
+    selector: Option<SharedString>,
     preview: Option<InteractionPreview>,
 }
 
@@ -53,6 +108,10 @@ impl Snackbar {
             close: None,
             longer_action: false,
             open: true,
+            duration: SnackbarDuration::Indefinite,
+            position: None,
+            on_dismiss: None,
+            selector: None,
             preview: None,
         }
     }
@@ -86,6 +145,32 @@ impl Snackbar {
     /// Controlled visibility: `false` plays the exit, then hides.
     pub fn open(mut self, open: bool) -> Self {
         self.open = open;
+        self
+    }
+
+    /// How long it stays open before [`Self::on_dismiss`] runs.
+    pub fn duration(mut self, duration: SnackbarDuration) -> Self {
+        self.duration = duration;
+        self
+    }
+
+    /// Place it along the bottom of the nearest positioned ancestor, 16dp from
+    /// the edges, instead of leaving placement to the caller.
+    pub fn position(mut self, position: SnackbarPosition) -> Self {
+        self.position = Some(position);
+        self
+    }
+
+    /// Called when the duration runs out or Escape is pressed inside it. The
+    /// caller owns visibility and answers with [`Self::open`]`(false)`.
+    pub fn on_dismiss(mut self, handler: impl Fn(&mut Window, &mut App) + 'static) -> Self {
+        self.on_dismiss = Some(Rc::new(handler));
+        self
+    }
+
+    /// Name the surface for layout tests.
+    pub fn debug_name(mut self, name: impl Into<SharedString>) -> Self {
+        self.selector = Some(name.into());
         self
     }
 
@@ -123,11 +208,58 @@ fn inverse_button(
                 })
         })
         .state_layers(hover, press)
+        .ripple(fg)
         .on_click(move |event, window, cx| handler(event, window, cx));
     match preview {
         Some(state) => button.preview_state(state),
         None => button,
     }
+}
+
+/// Keep the countdown in line with the snackbar. Each show, duration change or
+/// hover end restarts it; anything else leaves a running timer alone.
+fn sync_auto_dismiss(
+    state: &Entity<AutoDismiss>,
+    open: bool,
+    duration: SnackbarDuration,
+    on_dismiss: Option<DismissHandler>,
+    window: &mut Window,
+    cx: &mut App,
+) {
+    let hovered = state.read(cx).hovered;
+    let key = (open, duration, hovered);
+    let restart = state.read(cx).armed != Some(key);
+    let generation = state.update(cx, |state, _| {
+        state.on_dismiss = on_dismiss;
+        if restart {
+            state.armed = Some(key);
+            state.generation += 1;
+        }
+        state.generation
+    });
+    if !restart || !open || hovered {
+        return;
+    }
+    let Some(delay) = duration.timeout() else {
+        return;
+    };
+    let state = state.downgrade();
+    window
+        .spawn(cx, async move |cx| {
+            cx.background_executor().timer(delay).await;
+            let _ = cx.update(|window, cx| {
+                let Some(state) = state.upgrade() else {
+                    return;
+                };
+                let state = state.read(cx);
+                if state.generation == generation
+                    && let Some(on_dismiss) = state.on_dismiss.clone()
+                {
+                    on_dismiss(window, cx);
+                }
+            });
+        })
+        .detach();
 }
 
 /// Whether a closing snackbar has finished leaving.
@@ -147,10 +279,22 @@ impl RenderOnce for Snackbar {
             cx,
         )
         .clamp(0., 1.);
+        let preview = self.preview;
+        let auto_dismiss =
+            window.use_keyed_state(child("auto-dismiss"), cx, |_, _| AutoDismiss::default());
+        if preview.is_none() {
+            sync_auto_dismiss(
+                &auto_dismiss,
+                self.open,
+                self.duration,
+                self.on_dismiss.clone(),
+                window,
+                cx,
+            );
+        }
         if hidden(self.open, shown) {
             return div().id(id).hidden().into_any_element();
         }
-        let preview = self.preview;
         let label = TypeRole::LabelLarge.scale();
         let action = self.action.map(|(text, handler)| {
             inverse_button(child("action"), color(INVERSE_PRIMARY), handler, preview)
@@ -203,7 +347,26 @@ impl RenderOnce for Snackbar {
             .text_color(color(INVERSE_ON_SURFACE))
             .text_size(body.font_size)
             .line_height(body.line_height)
-            .shadow(elevation::level(SNACKBAR_ELEVATION));
+            .shadow(elevation::level(SNACKBAR_ELEVATION))
+            .when_some(self.selector, |surface, name| {
+                surface.debug_selector(move || name.to_string())
+            })
+            .on_hover(move |hovered, _, cx| {
+                let hovered = *hovered;
+                auto_dismiss.update(cx, |auto_dismiss, cx| {
+                    if auto_dismiss.hovered != hovered {
+                        auto_dismiss.hovered = hovered;
+                        cx.notify();
+                    }
+                });
+            })
+            .when_some(self.on_dismiss, |surface, on_dismiss| {
+                surface.on_key_down(move |event, window, cx| {
+                    if event.keystroke.key == "escape" {
+                        on_dismiss(window, cx);
+                    }
+                })
+            });
         let surface = if self.longer_action && has_buttons {
             surface
                 .flex_col()
@@ -237,10 +400,26 @@ impl RenderOnce for Snackbar {
             .relative()
             .top(rem(TRAVEL * (1. - shown)))
             .opacity(shown);
-        if self.open {
+        let surface = if self.open {
             motion::state_enter(child("enter"), surface)
         } else {
             surface.into_any_element()
+        };
+        match self.position {
+            None => surface,
+            Some(position) => div()
+                .absolute()
+                .bottom(rem(EDGE))
+                .left(rem(EDGE))
+                .right(rem(EDGE))
+                .flex()
+                .map(|row| match position {
+                    SnackbarPosition::Start => row.justify_start(),
+                    SnackbarPosition::Center => row.justify_center(),
+                    SnackbarPosition::End => row.justify_end(),
+                })
+                .child(surface)
+                .into_any_element(),
         }
     }
 }

@@ -41,7 +41,7 @@ pub use search::{
     SearchViewLayout, SearchViewStyle,
 };
 pub use slider::{MaterialSlider, SliderAppearance, SliderColor, SliderSize};
-pub use snackbar::{SNACKBAR_CLOSE_ICON, Snackbar};
+pub use snackbar::{SNACKBAR_CLOSE_ICON, Snackbar, SnackbarDuration, SnackbarPosition};
 pub use switch::{MaterialSwitch, SwitchIcons};
 mod caption;
 mod carousel;
