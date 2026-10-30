@@ -336,7 +336,7 @@ impl Gallery {
         let compact = is_compact(window);
         let gutter = if compact { GUTTER_COMPACT } else { GUTTER };
         let content = match self.rows[index] {
-            Row::Lead => self.render_lead(window, cx),
+            Row::Lead => self.lead.clone().into_any_element(),
             Row::Spec(row) => self.render_spec_row(index, row, window, cx),
             Row::Group(group) => self.render_overview_group(group, window, cx),
         };
@@ -356,15 +356,15 @@ impl Gallery {
     }
 
     /// md3.io's page header: breadcrumb, title and description.
-    fn render_header(&self) -> impl IntoElement {
-        let entry = &CATALOG[self.current];
+    fn render_header(current: usize) -> impl IntoElement {
+        let entry = &CATALOG[current];
         let id = entry.id;
         gpui_base::v_flex()
             .debug_selector(move || format!("page-{id}"))
             .gap(rem(8.))
             .pb(rem(24.))
             .child(
-                accessible_text("breadcrumb", breadcrumb(self.current))
+                accessible_text("breadcrumb", breadcrumb(current))
                     .map(|text| type_role(text, TypeRole::LabelMedium))
                     .text_color(color(ColorRole::ON_SURFACE_VARIANT)),
             )
@@ -383,37 +383,42 @@ impl Gallery {
             )
     }
 
-    fn render_lead(&mut self, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
-        let header = self.render_header().into_any_element();
-        let body = match CATALOG[self.current].kind {
-            Kind::Overview | Kind::Document => None,
-            Kind::Component { .. } => Some(match self.entries[self.current].tab {
-                Tab::Preview => self.render_panes(window, cx),
-                Tab::Specs => card()
-                    .rounded_b(px(0.))
-                    .border_b_0()
-                    .child(self.render_card_header(cx))
-                    .into_any_element(),
-            }),
-        };
-        gpui_base::v_flex()
-            .w_full()
-            .child(header)
-            .children(body)
-            .into_any_element()
+    /// What the lead row shows, copied out so that drawing it only reads the
+    /// Gallery. Writing to the Gallery while drawing would change what the
+    /// Gallery and this row depend on and defeat their retained layouts.
+    fn lead_props(&self, gallery: WeakEntity<Gallery>) -> LeadProps {
+        let entry = &self.entries[self.current];
+        LeadProps {
+            current: self.current,
+            tab: entry.tab,
+            shared: self.shared.clone(),
+            theme_menu_open: self.theme_menu_open,
+            playground: entry.playground.clone(),
+            views: entry.views.clone(),
+            gallery,
+        }
+    }
+
+    /// A component without a playground shows its spec page's live demos,
+    /// which only the Gallery can render.
+    fn lead_needs_gallery(&self) -> bool {
+        matches!(CATALOG[self.current].kind, Kind::Component { .. })
+            && self.entries[self.current].tab == Tab::Preview
+            && self.entries[self.current].views.is_none()
     }
 
     /// The card's header: the Live preview | Specs tabs, the theme select
     /// and the light/dark segmented control.
-    fn render_card_header(&self, cx: &mut Context<Self>) -> impl IntoElement {
-        let tab = self.entries[self.current].tab;
-        let shared = self.shared.read(cx);
+    fn render_card_header(props: &LeadProps, cx: &mut App) -> impl IntoElement {
+        let tab = props.tab;
+        let gallery = props.gallery.clone();
+        let shared = props.shared.read(cx);
         let theme = shared
             .reference_theme
             .and_then(|theme| THEMES.iter().position(|(id, _)| *id == theme));
         let dark = shared.reference_mode == ThemeMode::Dark;
         let update_shared = |f: fn(&mut GalleryShared, usize)| {
-            let shared = self.shared.clone();
+            let shared = props.shared.clone();
             move |value: usize, cx: &mut App| {
                 shared.update(cx, |shared, cx| {
                     f(shared, value);
@@ -460,14 +465,17 @@ impl Gallery {
                             } else {
                                 "preview"
                             })
-                            .on_change(cx.listener(|this, value: &SharedString, _, cx| {
-                                let tab = if value == "specs" {
-                                    Tab::Specs
-                                } else {
-                                    Tab::Preview
-                                };
-                                this.set_tab(tab, cx);
-                            })),
+                            .on_change({
+                                let gallery = gallery.clone();
+                                move |value: &SharedString, _, cx| {
+                                    let tab = if value == "specs" {
+                                        Tab::Specs
+                                    } else {
+                                        Tab::Preview
+                                    };
+                                    let _ = gallery.update(cx, |this, cx| this.set_tab(tab, cx));
+                                }
+                            }),
                     ),
             )
             .child(div().flex_1())
@@ -480,17 +488,27 @@ impl Gallery {
                 CompactSelect::new("preview-theme", "Theme")
                     .options(THEMES.map(|(_, label)| SharedString::new_static(label)))
                     .selected(theme.unwrap_or(0))
-                    .open(self.theme_menu_open)
+                    .open(props.theme_menu_open)
                     .width(116.)
-                    .on_open_change(cx.listener(|this, open: &bool, _, cx| {
-                        this.theme_menu_open = *open;
-                        cx.notify();
-                    }))
-                    .on_select(cx.listener(move |this, index: &usize, _, cx| {
-                        this.theme_menu_open = false;
-                        select_theme(*index, cx);
-                        cx.notify();
-                    })),
+                    .on_open_change({
+                        let gallery = gallery.clone();
+                        move |open: &bool, _, cx| {
+                            let _ = gallery.update(cx, |this, cx| {
+                                this.theme_menu_open = *open;
+                                cx.notify();
+                            });
+                        }
+                    })
+                    .on_select({
+                        let gallery = gallery.clone();
+                        move |index: &usize, _, cx| {
+                            let _ = gallery.update(cx, |this, cx| {
+                                this.theme_menu_open = false;
+                                cx.notify();
+                            });
+                            select_theme(*index, cx);
+                        }
+                    }),
             )
             .child(
                 ConnectedButtonGroup::new("preview-mode", "Preview mode")
@@ -504,22 +522,28 @@ impl Gallery {
     }
 
     /// The preview card beside the configuration card.
-    fn render_panes(&mut self, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
+    fn render_panes(
+        props: &LeadProps,
+        demos: Option<AnyElement>,
+        window: &mut Window,
+        cx: &mut App,
+    ) -> AnyElement {
         let compact = is_compact(window);
         let design_height =
             f32::from(window.viewport_size().height) * BASE_PX / f32::from(window.rem_size());
         let pane = (design_height - f32::from(TITLE_BAR) - LEAD_HEADER - 24.).max(MIN_PANE);
-        let playground = self.entries[self.current].playground.clone();
-        let canvas = match &playground {
-            Some(state) => state.update(cx, |state, cx| state.render_preview(window, cx)),
-            None => self.render_demos(window, cx),
+        let playground = props.playground.clone();
+        let canvas = match (&props.views, demos) {
+            (Some(views), _) => views.preview.clone().into_any_element(),
+            (None, Some(demos)) => demos,
+            (None, None) => div().into_any_element(),
         };
         let fallback = playground.is_none();
         let preview_card = card()
             .flex_1()
             .min_w_0()
             .when(!compact, |card| card.h(rem(pane)))
-            .child(self.render_card_header(cx))
+            .child(Self::render_card_header(props, cx))
             .child(
                 div()
                     .id("preview-canvas")
@@ -534,7 +558,7 @@ impl Gallery {
                     .p(rem(24.))
                     .child(canvas),
             );
-        let config_card = self.render_config_card(playground, compact, pane, window, cx);
+        let config_card = Self::render_config_card(playground, props.views.clone(), compact, pane);
         div()
             .w_full()
             .flex()
@@ -546,7 +570,11 @@ impl Gallery {
     }
 
     /// The live demos of a component without a playground yet.
-    fn render_demos(&mut self, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
+    pub(super) fn render_demos(
+        &mut self,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> AnyElement {
         let demos = self.preview_demos(cx).unwrap_or_default();
         let Some(built) = self
             .current_page()
@@ -566,12 +594,10 @@ impl Gallery {
     }
 
     fn render_config_card(
-        &mut self,
         playground: Option<Entity<PlaygroundState>>,
+        views: Option<PlaygroundViews>,
         compact: bool,
         pane: f32,
-        window: &mut Window,
-        cx: &mut Context<Self>,
     ) -> impl IntoElement {
         let header = div()
             .flex()
@@ -599,18 +625,19 @@ impl Gallery {
                         }),
                 )
             });
-        let body = match &playground {
-            Some(state) => {
-                let scroll = state.read(cx).scroll.clone();
-                let panel = state.update(cx, |state, cx| state.render_panel(window, cx));
-                div()
-                    .id("configuration-body")
-                    .flex_1()
-                    .min_h_0()
-                    .when(!compact, |body| body.overflow_y_scroll().track_scroll(&scroll))
-                    .child(panel)
-                    .into_any_element()
-            }
+        let body = match views {
+            // Fixed outer bounds beside the preview, so the panel is cached with
+            // its scroller inside: the preview writes the playground state on
+            // every frame, which only draws a cached view again if notified.
+            Some(PlaygroundViews { panel, .. }) if !compact => AnyView::from(panel)
+                .cached(StyleRefinement::default().flex_1().min_h_0().w_full())
+                .into_any_element(),
+            Some(PlaygroundViews { panel, .. }) => div()
+                .id("configuration-body")
+                .flex_1()
+                .min_h_0()
+                .child(panel)
+                .into_any_element(),
             None => div()
                 .p(rem(20.))
                 .child(
@@ -787,5 +814,72 @@ impl Gallery {
             self.pending_focus = Some((target, reverse));
             cx.notify();
         }
+    }
+}
+
+/// What [`LeadView`] draws: a snapshot of the Gallery's state for this row.
+struct LeadProps {
+    current: usize,
+    tab: Tab,
+    shared: Entity<GalleryShared>,
+    theme_menu_open: bool,
+    playground: Option<Entity<PlaygroundState>>,
+    views: Option<PlaygroundViews>,
+    gallery: WeakEntity<Gallery>,
+}
+
+/// The lead row as its own view. A preview animation, hover or press
+/// notifies the preview view, and the views around it become dirty. They are
+/// spliced, keeping their layout, only if what they depend on did not change,
+/// so this view reads the Gallery and never writes it while drawing. It
+/// renders again when the Gallery notifies (navigation, tab, theme menu), its
+/// invalidation owner.
+pub(super) struct LeadView {
+    gallery: WeakEntity<Gallery>,
+    _observe: Subscription,
+    #[cfg(test)]
+    pub(super) renders: std::cell::Cell<usize>,
+}
+
+impl LeadView {
+    pub(super) fn new(gallery: Entity<Gallery>, cx: &mut Context<Self>) -> Self {
+        let observe = cx.observe(&gallery, |_, _, cx| cx.notify());
+        Self {
+            gallery: gallery.downgrade(),
+            _observe: observe,
+            #[cfg(test)]
+            renders: Default::default(),
+        }
+    }
+}
+
+impl Render for LeadView {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        #[cfg(test)]
+        self.renders.set(self.renders.get() + 1);
+        let Some(gallery) = self.gallery.upgrade() else {
+            return div().into_any_element();
+        };
+        let demos = gallery
+            .read(cx)
+            .lead_needs_gallery()
+            .then(|| gallery.update(cx, |gallery, cx| gallery.render_demos(window, cx)));
+        let props = gallery.read(cx).lead_props(self.gallery.clone());
+        let body = match CATALOG[props.current].kind {
+            Kind::Overview | Kind::Document => None,
+            Kind::Component { .. } => Some(match props.tab {
+                Tab::Preview => Gallery::render_panes(&props, demos, window, cx),
+                Tab::Specs => card()
+                    .rounded_b(px(0.))
+                    .border_b_0()
+                    .child(Gallery::render_card_header(&props, cx))
+                    .into_any_element(),
+            }),
+        };
+        gpui_base::v_flex()
+            .w_full()
+            .child(Gallery::render_header(props.current))
+            .children(body)
+            .into_any_element()
     }
 }

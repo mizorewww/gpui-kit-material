@@ -37,7 +37,7 @@ use gpui_kit_material::icons::Assets;
 use gpui_kit_material::prelude::*;
 use gpui_kit_material::theme;
 use page::{AnyPage, CaptureState, GalleryShared, PageCx, PageRows};
-use playground::{PlaygroundState, Value};
+use playground::{PanelView, PlaygroundState, PreviewView, Value};
 use std::{cell::RefCell, rc::Rc};
 
 // Reveal only the newly focused control, not the entire long gallery page.
@@ -109,12 +109,25 @@ struct BuiltPage {
     _observer: Subscription,
 }
 
+/// A playground's views, held here so drawing the lead row need not read the
+/// state its preview writes.
+#[derive(Clone)]
+struct PlaygroundViews {
+    preview: Entity<PreviewView>,
+    panel: Entity<PanelView>,
+}
+
 /// Per catalog entry state kept across navigation.
 #[derive(Default)]
 struct EntryState {
     tab: Tab,
     scroll: Option<ListOffset>,
+    /// The scroll offset of a page shown without the content list.
+    lead_offset: Point<Pixels>,
     playground: Option<Entity<PlaygroundState>>,
+    /// The playground's preview and configuration views (see
+    /// `playground::PreviewView`), built with the state.
+    views: Option<PlaygroundViews>,
     /// The entry's slice of its spec page, resolved once.
     slice: Option<Rc<[usize]>>,
 }
@@ -138,6 +151,8 @@ pub(crate) struct Gallery {
     /// The navigation filter typed into the top bar's search.
     query: SharedString,
     list: ListState,
+    /// Scrolls a page whose only row is its lead (see [`Self::shows_lead_only`]).
+    lead_scroll: ScrollHandle,
     rows: Vec<Row>,
     layout: Option<Layout>,
     row_focus: Vec<FocusHandle>,
@@ -150,6 +165,9 @@ pub(crate) struct Gallery {
     capture: CaptureState,
     /// The rows the list builder rendered in the current frame.
     rendered_rows: Rc<RefCell<Vec<usize>>>,
+    /// The lead row (header and the preview and configuration cards) as a
+    /// view: see [`shell::LeadView`].
+    lead: Entity<shell::LeadView>,
     _subscriptions: Vec<Subscription>,
     #[cfg(test)]
     renders: std::cell::Cell<usize>,
@@ -173,7 +191,10 @@ impl Gallery {
                 }),
             ];
         let applied_theme = theme_key(shared.read(cx));
+        let gallery = cx.entity();
+        let lead = cx.new(|cx| shell::LeadView::new(gallery, cx));
         Gallery {
+            lead,
             shared,
             applied_theme,
             pages: (0..pages::PAGES.len()).map(|_| None).collect(),
@@ -183,6 +204,7 @@ impl Gallery {
             current: 0,
             query: SharedString::default(),
             list: ListState::new(0, ListAlignment::Top, px(256.)),
+            lead_scroll: ScrollHandle::new(),
             rows: Vec::new(),
             layout: None,
             row_focus: Vec::new(),
@@ -267,13 +289,12 @@ impl Gallery {
             return None;
         };
         if self.entries[entry].playground.is_none() {
+            // The preview and panel views observe the state themselves; the
+            // Gallery does not re-render for a playground change.
             let state = cx.new(|cx| PlaygroundState::new(playground, window, cx));
-            self._subscriptions
-                .push(cx.observe(&state, move |this: &mut Self, _, cx| {
-                    if this.current == entry {
-                        cx.notify();
-                    }
-                }));
+            let preview = cx.new(|cx| PreviewView::new(state.clone(), cx));
+            let panel = cx.new(|cx| PanelView::new(state.clone(), cx));
+            self.entries[entry].views = Some(PlaygroundViews { preview, panel });
             self.entries[entry].playground = Some(state);
         }
         self.entries[entry].playground.clone()
@@ -310,9 +331,21 @@ impl Gallery {
             return;
         }
         self.entries[self.current].scroll = Some(self.list.logical_scroll_top());
+        self.entries[self.current].lead_offset = self.lead_scroll.offset();
         self.current = entry;
+        self.lead_scroll.set_offset(self.entries[entry].lead_offset);
         self.theme_menu_open = false;
         cx.notify();
+    }
+
+    /// Whether the current page is only its lead row: a component's preview
+    /// tab. It is drawn in a plain scrolling element, not the content list.
+    /// A dirty view in a list row cannot be spliced from the views around the
+    /// list, as a row is a separate layout root (`Window::splice_layout`), so
+    /// every animation frame in a preview would build the Gallery, its
+    /// navigation and the row again.
+    pub(crate) fn shows_lead_only(&self) -> bool {
+        self.rows.len() == 1 && matches!(self.rows.first(), Some(Row::Lead))
     }
 
     /// Show `tab` on the current component page.
@@ -517,6 +550,8 @@ impl Render for Gallery {
         self.rendered_rows.borrow_mut().clear();
         let rendered_rows = self.rendered_rows.clone();
         let list_rows = rendered_rows.clone();
+        let lead_only = self.shows_lead_only();
+        let lead_row = lead_only.then(|| self.render_row(0, window, cx));
         let content = div()
             .id("gallery-content")
             .flex_1()
@@ -526,14 +561,26 @@ impl Render for Gallery {
             .bg(spec::page_background())
             .text_color(color(ColorRole::ON_SURFACE))
             .font_family("Roboto")
-            .child(
-                gpui::list(self.list.clone(), move |index, window, cx| {
-                    list_rows.borrow_mut().push(index);
-                    view.update(cx, |this, cx| this.render_row(index, window, cx))
-                        .unwrap_or_else(|_| div().into_any_element())
-                })
-                .size_full(),
-            )
+            .when_some(lead_row, |content, row| {
+                content.child(
+                    div()
+                        .id("gallery-lead-scroll")
+                        .size_full()
+                        .overflow_y_scroll()
+                        .track_scroll(&self.lead_scroll)
+                        .child(row),
+                )
+            })
+            .when(!lead_only, |content| {
+                content.child(
+                    gpui::list(self.list.clone(), move |index, window, cx| {
+                        list_rows.borrow_mut().push(index);
+                        view.update(cx, |this, cx| this.render_row(index, window, cx))
+                            .unwrap_or_else(|_| div().into_any_element())
+                    })
+                    .size_full(),
+                )
+            })
             .child(
                 gpui::canvas(
                     move |_, _, cx| {
@@ -631,9 +678,15 @@ impl Render for GalleryWindow {
                             .on_click(|_, window, cx| settings::open(window, cx)),
                     )),
             )
+            // Not `cached`: a dirty cached view always renders again, and every
+            // preview animation frame dirties the views around the preview. As
+            // a plain view it is reused while clean and spliced while dirty.
             .child(
-                AnyView::from(self.gallery.clone())
-                    .cached(StyleRefinement::default().flex_1().min_h_0().w_full()),
+                div()
+                    .flex_1()
+                    .min_h_0()
+                    .w_full()
+                    .child(self.gallery.clone()),
             )
     }
 }
@@ -731,6 +784,52 @@ mod window_tests {
         cx.update_window(window, |_, window, cx| window.draw(cx).clear(cx))
             .unwrap();
         cx.run_until_parked();
+    }
+
+    #[gpui::test]
+    fn preview_updates_render_neither_the_gallery_nor_the_lead_row(cx: &mut TestAppContext) {
+        cx.update(|cx| {
+            gpui_kit::init(cx);
+            gpui_kit_material::init(cx);
+        });
+        let mut parts = None;
+        let window = cx.open_window(size(px(1280.), px(800.)), |window, cx| {
+            let gallery = cx.new(|cx| Gallery::new(window, cx));
+            let top_bar = cx.new(|cx| top_bar::TopBar::new(gallery.clone(), window, cx));
+            parts = Some(gallery.clone());
+            GalleryWindow {
+                gallery,
+                top_bar,
+                fps: None,
+            }
+        });
+        let gallery = parts.unwrap();
+        let entry = crate::gallery::catalog::position("button").unwrap();
+        cx.update(|cx| gallery.update(cx, |gallery, cx| gallery.navigate(entry, cx)));
+        for _ in 0..3 {
+            draw(window.into(), cx);
+        }
+        let (preview, lead) = cx.read(|cx| {
+            let gallery = gallery.read(cx);
+            let views = gallery.entries[entry].views.clone().unwrap();
+            (views.preview, gallery.lead.clone())
+        });
+        let counts = |cx: &TestAppContext| {
+            cx.read(|cx| (gallery.read(cx).renders.get(), lead.read(cx).renders.get()))
+        };
+        let settled = counts(cx);
+        // What every animation frame of a component in the preview does:
+        // `Window::request_animation_frame` notifies the view, without updating it.
+        for _ in 0..3 {
+            cx.update(|cx| cx.notify(preview.entity_id()));
+            draw(window.into(), cx);
+        }
+        assert_eq!(counts(cx), settled, "a preview frame rebuilt the page");
+        // The lead row still follows the Gallery, its invalidation owner.
+        cx.update(|cx| gallery.update(cx, |_, cx| cx.notify()));
+        draw(window.into(), cx);
+        let after = counts(cx);
+        assert!(after.0 > settled.0 && after.1 > settled.1);
     }
 
     #[gpui::test]

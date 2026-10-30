@@ -1034,6 +1034,69 @@ impl RenderOnce for CompactSelect {
     }
 }
 
+/// The preview canvas as its own view. A running component animation,
+/// hover or press invalidates the view being drawn; rendered inline, that
+/// was the whole Gallery (its content list re-laid out the page's lead row
+/// every animation frame). As a view, only the preview is rebuilt.
+pub struct PreviewView {
+    state: Entity<PlaygroundState>,
+    _observe: Subscription,
+}
+
+impl PreviewView {
+    pub fn new(state: Entity<PlaygroundState>, cx: &mut Context<Self>) -> Self {
+        let observe = cx.observe(&state, |_, _, cx| cx.notify());
+        Self {
+            state,
+            _observe: observe,
+        }
+    }
+}
+
+impl Render for PreviewView {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        self.state
+            .update(cx, |state, cx| state.render_preview(window, cx))
+    }
+}
+
+/// The configuration card's body as its own view, so editing a control or
+/// animating one (a switch, a segmented button) rebuilds only the panel and
+/// the preview that observes the same state.
+pub struct PanelView {
+    state: Entity<PlaygroundState>,
+    _observe: Subscription,
+}
+
+impl PanelView {
+    pub fn new(state: Entity<PlaygroundState>, cx: &mut Context<Self>) -> Self {
+        let observe = cx.observe(&state, |_, _, cx| cx.notify());
+        Self {
+            state,
+            _observe: observe,
+        }
+    }
+}
+
+impl Render for PanelView {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let panel = self
+            .state
+            .update(cx, |state, cx| state.render_panel(window, cx));
+        if is_compact(window) {
+            return panel;
+        }
+        let scroll = self.state.read(cx).scroll.clone();
+        div()
+            .id("configuration-body")
+            .size_full()
+            .overflow_y_scroll()
+            .track_scroll(&scroll)
+            .child(panel)
+            .into_any_element()
+    }
+}
+
 #[cfg(test)]
 impl Render for PlaygroundState {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
