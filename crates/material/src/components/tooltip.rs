@@ -337,6 +337,7 @@ impl RenderOnce for MaterialTooltip {
         let measure = state.clone();
         let wrapper = div()
             .id(id.clone())
+            .relative()
             .track_focus(&focus)
             .tab_stop(false)
             .aria_description(description)
@@ -360,14 +361,21 @@ impl RenderOnce for MaterialTooltip {
             .child(trigger)
             .child(
                 canvas(
-                    move |bounds, _, cx| {
+                    move |bounds, window, cx| {
                         if measure.read(cx).bounds != Some(bounds) {
                             measure.update(cx, |tip, _| tip.bounds = Some(bounds));
+                            // A shown tooltip follows a moved trigger in the
+                            // next frame; settled bounds stop the refreshes.
+                            if shown {
+                                window.refresh();
+                            }
                         }
                     },
                     |_, _, _, _| {},
                 )
                 .absolute()
+                .top_0()
+                .left_0()
                 .size_full(),
             );
 
@@ -481,6 +489,11 @@ mod tests {
         draw(cx);
         draw(cx);
         assert!(tooltip_shown(cx), "shown after the show delay");
+        let popup = cx.debug_bounds("tooltip-popup").unwrap();
+        assert!(
+            popup.bottom() <= trigger.top(),
+            "a plain tooltip sits above"
+        );
         cx.simulate_mouse_move(point(px(5.), px(5.)), None, Modifiers::default());
         draw(cx);
         assert!(tooltip_shown(cx), "kept during the grace period");
