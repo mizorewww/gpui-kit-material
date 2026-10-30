@@ -115,43 +115,27 @@ pub static PLAYGROUND: Playground = Playground {
 };
 
 /// The preview's screen: fills the canvas and floats `child` at
-/// `position` (one of [`POSITIONS`]), 16dp from the edges.
-pub(super) fn stage(position: &str, child: impl IntoElement) -> Div {
-    let (top, left) = match position {
-        "bottom right" => (false, false),
-        "bottom left" => (false, true),
-        "top right" => (true, false),
-        "top left" => (true, true),
-        _ => {
-            return div()
-                .w_full()
-                .flex_1()
-                .flex()
-                .items_center()
-                .justify_center()
-                .child(child);
-        }
-    };
+/// The FAB position for a [`POSITIONS`] option. "right" is the end and "left"
+/// the start, in md3.io's left-to-right wording.
+pub(super) fn position(option: &str) -> FabPosition {
+    match option {
+        "bottom right" => FabPosition::BottomEnd,
+        "bottom left" => FabPosition::BottomStart,
+        "top right" => FabPosition::TopEnd,
+        "top left" => FabPosition::TopStart,
+        _ => FabPosition::Center,
+    }
+}
+
+/// The positioned area a preview FAB places itself in.
+pub(super) fn stage(fab: impl IntoElement) -> Div {
     div()
+        .debug_selector(|| "playground-stage".into())
+        .relative()
         .w_full()
         .flex_1()
-        .flex()
-        .p(rem(16.))
-        .map(|stage| {
-            if top {
-                stage.items_start()
-            } else {
-                stage.items_end()
-            }
-        })
-        .map(|stage| {
-            if left {
-                stage.justify_start()
-            } else {
-                stage.justify_end()
-            }
-        })
-        .child(child)
+        .min_h(rem(160.))
+        .child(fab)
 }
 
 fn preview(
@@ -171,16 +155,10 @@ fn preview(
         .color(COLORS[config.choice("color")])
         .size([FabSize::Regular, FabSize::Medium, FabSize::Large][config.choice("size")])
         .lowered(config.bool("lowered"))
+        .position(position(config.option("position")))
+        .debug_name("playground-fab")
         .disabled(config.bool("disabled"));
-    stage(
-        config.option("position"),
-        div()
-            .flex()
-            .debug_selector(|| "playground-fab".into())
-            .child(fab),
-    )
-    .debug_selector(|| "playground-stage".into())
-    .into_any_element()
+    stage(fab).into_any_element()
 }
 
 #[cfg(test)]

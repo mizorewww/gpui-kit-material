@@ -7,7 +7,7 @@ pub use button::{
     MaterialButton, material_button,
 };
 mod fab;
-pub use fab::{ExtendedFab, Fab, FabColor};
+pub use fab::{ExtendedFab, Fab, FabColor, FabPosition};
 mod fab_menu;
 pub use fab_menu::{FabMenu, FabMenuAlign, FabMenuColor, FabMenuItem, FabMenuPresentation};
 mod icon_button;
