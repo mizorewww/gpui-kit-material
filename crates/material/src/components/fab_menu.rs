@@ -118,8 +118,9 @@ impl FabMenuItem {
 }
 
 impl FabMenuItem {
-    /// The item at a 0 … 1 `expansion` from FAB size to labelled pill.
-    fn button(self, expansion: f32, window: &Window) -> MaterialButton {
+    /// The item at a 0 … 1 `expansion` from FAB size to labelled pill;
+    /// only an `open` menu's items can be activated.
+    fn button(self, expansion: f32, open: bool, window: &Window) -> MaterialButton {
         let label = revealed_label(&self.label, TypeRole::TitleMedium, expansion, window);
         let mut button = MaterialButton::new(self.id)
             .form(Form::FabMenuItem { expansion })
@@ -131,7 +132,7 @@ impl FabMenuItem {
         if let Some(state) = self.preview {
             button = button.preview_state(state);
         }
-        if let Some(callback) = self.on_click {
+        if let Some(callback) = self.on_click.filter(|_| open) {
             button = button.on_click(move |event, window, cx| callback(event, window, cx));
         }
         button
@@ -140,7 +141,7 @@ impl FabMenuItem {
 
 impl RenderOnce for FabMenuItem {
     fn render(self, window: &mut Window, _: &mut App) -> impl IntoElement {
-        self.button(1., window)
+        self.button(1., true, window)
     }
 }
 
@@ -262,7 +263,7 @@ impl RenderOnce for FabMenu {
             any_item = true;
             column = column.child(
                 item.color(self.color)
-                    .button(expansion, window)
+                    .button(expansion, open, window)
                     .tab_stop(open),
             );
         }
@@ -342,10 +343,16 @@ mod tests {
     struct Harness {
         open: bool,
         twin: bool,
+        clicks: usize,
     }
     impl Render for Harness {
-        fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
             window.set_rem_size(px(14.));
+            let click = cx.listener(|this, _: &gpui::ClickEvent, _, cx| {
+                this.clicks += 1;
+                cx.notify();
+            });
+            let click = std::rc::Rc::new(click);
             div()
                 .flex()
                 .items_start()
@@ -355,7 +362,9 @@ mod tests {
                         FabMenu::new("menu", IconName::Check, "Actions")
                             .open(self.open)
                             .items((0..3usize).map(|index| {
+                                let click = click.clone();
                                 FabMenuItem::new(("item", index), IconName::Check, "Action")
+                                    .on_click(move |event, window, cx| click(event, window, cx))
                             })),
                     ),
                 )
@@ -387,6 +396,7 @@ mod tests {
         let (view, cx) = cx.add_window_view(|_, _| Harness {
             open: false,
             twin: false,
+            clicks: 0,
         });
         draw(cx);
         let closed = cx.debug_bounds("menu").unwrap().size;
@@ -423,6 +433,7 @@ mod tests {
         let (view, cx) = cx.add_window_view(|_, _| Harness {
             open: false,
             twin: true,
+            clicks: 0,
         });
         draw(cx);
         view.update(cx, |view, cx| {
@@ -444,5 +455,39 @@ mod tests {
             "{growing:?} of {open:?}"
         );
         assert_eq!(cx.debug_bounds("twin").unwrap().size.height, px(56.));
+    }
+
+    #[gpui::test]
+    fn a_closing_menu_ignores_clicks_on_its_fading_items(cx: &mut TestAppContext) {
+        cx.update(|cx| {
+            gpui_base::init(cx);
+            cx.set_reduce_motion(false);
+        });
+        let (view, cx) = cx.add_window_view(|_, _| Harness {
+            open: true,
+            twin: false,
+            clicks: 0,
+        });
+        draw(cx);
+        cx.executor().advance_clock(Duration::from_secs(2));
+        draw(cx);
+        draw(cx);
+        let menu = cx.debug_bounds("menu").unwrap();
+        let first = gpui::point(menu.right() - px(28.), menu.top() + px(28.));
+        cx.simulate_click(first, gpui::Modifiers::default());
+        draw(cx);
+        view.read_with(cx, |view, _| {
+            assert_eq!(view.clicks, 1, "an open item clicks")
+        });
+        view.update(cx, |view, cx| {
+            view.open = false;
+            cx.notify();
+        });
+        draw(cx);
+        cx.executor().advance_clock(Duration::from_millis(20));
+        draw(cx);
+        cx.simulate_click(first, gpui::Modifiers::default());
+        draw(cx);
+        view.read_with(cx, |view, _| assert_eq!(view.clicks, 1));
     }
 }
