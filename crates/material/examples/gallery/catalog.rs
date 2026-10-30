@@ -298,7 +298,7 @@ pub static CATALOG: &[Entry] = &[
         SelectionInput,
         "Select a date or a range of dates.",
         spec("date-time-pickers"),
-        None,
+        Some(&playgrounds::date_picker::PLAYGROUND),
     ),
     component(
         "time-picker",

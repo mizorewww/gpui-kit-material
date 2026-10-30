@@ -4,6 +4,7 @@
 pub mod button;
 pub mod checkbox;
 pub mod chips;
+pub mod date_picker;
 pub mod radio;
 pub mod search;
 pub mod select;
