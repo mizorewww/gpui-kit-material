@@ -32,7 +32,9 @@ use crate::{
     },
 };
 use gpui::{prelude::*, *};
-use gpui_base::actions::{Cancel, Confirm, SelectDown, SelectFirst, SelectLast, SelectUp};
+use gpui_base::actions::{
+    Cancel, Confirm, SelectDown, SelectFirst, SelectLast, SelectLeft, SelectRight, SelectUp,
+};
 use gpui_kit::component::popover::Popover;
 use std::rc::Rc;
 
@@ -45,6 +47,8 @@ pub(crate) fn init(cx: &mut App) {
         KeyBinding::new("down", SelectDown, Some(MENU_CONTEXT)),
         KeyBinding::new("home", SelectFirst, Some(MENU_CONTEXT)),
         KeyBinding::new("end", SelectLast, Some(MENU_CONTEXT)),
+        KeyBinding::new("right", SelectRight, Some(MENU_CONTEXT)),
+        KeyBinding::new("left", SelectLeft, Some(MENU_CONTEXT)),
         KeyBinding::new("escape", Cancel, Some(MENU_CONTEXT)),
         KeyBinding::new("enter", Confirm { secondary: false }, Some(MENU_CONTEXT)),
         KeyBinding::new("space", Confirm { secondary: false }, Some(MENU_CONTEXT)),
@@ -107,6 +111,17 @@ impl MenuDensity {
             Self::Default => 56.,
             Self::Compact => 48.,
             Self::Dense => 40.,
+        }
+    }
+    /// How much shorter an Expressive item is. The kit defines densities
+    /// for the baseline menu only (8dp per two steps); md3.io offers a
+    /// dense Expressive menu, so Expressive items take half those steps,
+    /// keeping a 44dp item at least 36dp around its 20dp line.
+    const fn expressive_reduction(self) -> f32 {
+        match self {
+            Self::Default => 0.,
+            Self::Compact => 4.,
+            Self::Dense => 8.,
         }
     }
 }
@@ -337,7 +352,7 @@ pub(crate) fn item_height(
             12. + 20. + 16. + 12.
         } else {
             EXPRESSIVE_ITEM
-        };
+        } - density.expressive_reduction();
         content + 2. * EXPRESSIVE_INSET_Y + if divider { EXPRESSIVE_DIVIDER } else { 0. }
     } else {
         let content = if supporting {
@@ -398,6 +413,8 @@ pub struct MaterialMenu {
     focus: Option<FocusHandle>,
     on_dismiss: Option<Notify>,
     on_activate: Option<Notify>,
+    on_collapse: Option<Notify>,
+    focus_item: Option<usize>,
 }
 
 impl MaterialMenu {
@@ -412,13 +429,16 @@ impl MaterialMenu {
             focus: None,
             on_dismiss: None,
             on_activate: None,
+            on_collapse: None,
+            focus_item: None,
         }
     }
     pub fn style(mut self, style: MenuStyle) -> Self {
         self.style = style;
         self
     }
-    /// Baseline item density.
+    /// Item density: the kit's baseline densities, and half those steps for
+    /// Expressive items.
     pub fn density(mut self, density: MenuDensity) -> Self {
         self.density = density;
         self
@@ -467,6 +487,17 @@ impl MaterialMenu {
         self.on_activate = Some(Rc::new(handler));
         self
     }
+    /// Focus the item at flat `index` this frame, e.g. a sub-menu's owner as
+    /// the sub-menu closes.
+    pub(crate) fn focus_item(mut self, index: usize) -> Self {
+        self.focus_item = Some(index);
+        self
+    }
+    /// Left inside the menu, e.g. to close it as a cascading sub-menu.
+    pub fn on_collapse(mut self, handler: impl Fn(&mut Window, &mut App) + 'static) -> Self {
+        self.on_collapse = Some(Rc::new(handler));
+        self
+    }
 
     /// The menu's natural height in design px.
     pub fn natural_height(&self) -> f32 {
@@ -483,6 +514,53 @@ impl MaterialMenu {
                 )
             }),
         )
+    }
+
+    /// The bottom of the item at flat `index` (its row without a divider
+    /// below it), in design px from the menu's top.
+    pub fn item_bottom(&self, index: usize) -> Option<f32> {
+        let item = self.groups.iter().flat_map(|g| &g.items).nth(index)?;
+        let height = item_height(self.style, self.density, item.supporting.is_some(), false);
+        Some(self.item_top(index)? + height)
+    }
+
+    /// The top of the item at flat `index` (its row, with an Expressive
+    /// row's insets), in design px from the menu's top.
+    pub fn item_top(&self, index: usize) -> Option<f32> {
+        let expressive = self.style.expressive();
+        let mut top = if expressive { 0. } else { BASELINE_PADDING };
+        let mut flat = 0;
+        for (group_ix, group) in self.groups.iter().enumerate() {
+            if group_ix > 0 {
+                top += if expressive {
+                    GROUP_GAP
+                } else {
+                    BASELINE_DIVIDER
+                };
+            }
+            if expressive {
+                top += EXPRESSIVE_INSET_Y;
+            }
+            if group.label.is_some() {
+                top += GROUP_LABEL;
+            }
+            for item in &group.items {
+                if flat == index {
+                    return Some(top);
+                }
+                top += item_height(
+                    self.style,
+                    self.density,
+                    item.supporting.is_some(),
+                    item.divider,
+                );
+                flat += 1;
+            }
+            if expressive {
+                top += EXPRESSIVE_INSET_Y;
+            }
+        }
+        None
     }
 }
 
@@ -507,6 +585,9 @@ impl RenderOnce for MaterialMenu {
             .clone()
             .unwrap_or_else(|| state.read(cx).root.clone());
         let handles = state.read(cx).items.clone();
+        if let Some(handle) = self.focus_item.and_then(|ix| handles.get(ix)) {
+            handle.focus(window, cx);
+        }
         let skip: Rc<[bool]> = self
             .groups
             .iter()
@@ -527,6 +608,26 @@ impl RenderOnce for MaterialMenu {
                 })
                 .collect(),
         );
+        // Right opens a focused sub-menu item: it activates the item, whose
+        // handler opens the sub-menu.
+        let expand = {
+            let handles = handles.clone();
+            let activators = activators.clone();
+            move |window: &mut Window, cx: &mut App| {
+                let focused = handles.iter().position(|h| h.is_focused(window));
+                match focused.and_then(|ix| activators.get(ix)) {
+                    Some(Some((handler, true))) => {
+                        let event = ClickEvent::Keyboard(KeyboardClickEvent {
+                            button: KeyboardButton::Enter,
+                            bounds: Bounds::default(),
+                        });
+                        handler(&event, window, cx);
+                    }
+                    _ => cx.propagate(),
+                }
+            }
+        };
+        let on_collapse = self.on_collapse.clone();
         let activate = {
             let handles = handles.clone();
             let activators = activators.clone();
@@ -644,6 +745,14 @@ impl RenderOnce for MaterialMenu {
             .on_action(move |_: &SelectFirst, window, cx| nav_first(Direction::First, window, cx))
             .on_action(move |_: &SelectLast, window, cx| nav_last(Direction::Last, window, cx))
             .on_action(move |_: &Confirm, window, cx| activate(window, cx))
+            .on_action(move |_: &SelectRight, window, cx| expand(window, cx))
+            .on_action(move |_: &SelectLeft, window, cx| {
+                if let Some(collapse) = on_collapse.as_ref() {
+                    collapse(window, cx);
+                } else {
+                    cx.propagate();
+                }
+            })
             .on_action(move |_: &Cancel, window, cx| {
                 if let Some(dismiss) = on_dismiss.as_ref() {
                     dismiss(window, cx);
@@ -898,8 +1007,16 @@ impl RenderOnce for Trigger {
 ///
 /// `open` is controlled: Kit's popover reports pointer toggles, outside
 /// clicks and Escape through `on_open_change`, and an activated item closes
-/// the menu the same way. Keyboard activation of the trigger itself is the
-/// caller's (e.g. its button's click handler).
+/// the menu the same way (unless [`Self::close_on_activate`] is off).
+/// Keyboard activation of the trigger itself is the caller's (e.g. its
+/// button's click handler).
+///
+/// A cascading sub-menu ([`Self::submenu`]) opens beside the item that owns
+/// it, on the side away from the popup's anchor edge, with the same reveal
+/// motion. Right on a sub-menu item activates it (the caller opens the
+/// sub-menu, which takes focus); Left or Escape inside the sub-menu reports
+/// `false` through [`Self::on_submenu_change`] and returns focus to the
+/// parent menu.
 #[derive(gpui::IntoElement)]
 pub struct MenuPopup {
     id: ElementId,
@@ -908,6 +1025,10 @@ pub struct MenuPopup {
     open: bool,
     on_open_change: Option<OpenChange>,
     anchor: Anchor,
+    close_on_activate: bool,
+    submenu: Option<(usize, MaterialMenu)>,
+    submenu_open: bool,
+    on_submenu_change: Option<OpenChange>,
 }
 
 impl MenuPopup {
@@ -919,7 +1040,32 @@ impl MenuPopup {
             open: false,
             on_open_change: None,
             anchor: Anchor::TopLeft,
+            close_on_activate: true,
+            submenu: None,
+            submenu_open: false,
+            on_submenu_change: None,
         }
+    }
+    /// Close the menu when an item (other than a sub-menu) is activated
+    /// (default). Off, the menu stays open, e.g. to toggle several items.
+    pub fn close_on_activate(mut self, close: bool) -> Self {
+        self.close_on_activate = close;
+        self
+    }
+    /// A cascading sub-menu for the main menu's item at flat `index`
+    /// (counting across groups), shown while `open`.
+    pub fn submenu(mut self, index: usize, menu: MaterialMenu, open: bool) -> Self {
+        self.submenu = Some((index, menu));
+        self.submenu_open = open;
+        self
+    }
+    /// Left or Escape inside the open sub-menu reports `false`.
+    pub fn on_submenu_change(
+        mut self,
+        handler: impl Fn(&bool, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_submenu_change = Some(Rc::new(handler));
+        self
     }
     pub fn open(mut self, open: bool) -> Self {
         self.open = open;
@@ -933,11 +1079,69 @@ impl MenuPopup {
         self
     }
     /// The popup's own anchor corner (Kit's convention; default top-left,
-    /// below the trigger).
+    /// below the trigger). `LeftCenter` and `RightCenter` place the menu
+    /// beside the trigger, to its right or left, with their tops aligned
+    /// (M3's "right start" and "left start" placements).
     pub fn anchor(mut self, anchor: Anchor) -> Self {
         self.anchor = anchor;
         self
     }
+}
+
+/// Whether a popup anchored at `anchor` sits above its trigger, so it
+/// reveals from its bottom edge.
+pub(crate) fn opens_upward(anchor: Anchor) -> bool {
+    matches!(
+        anchor,
+        Anchor::BottomLeft | Anchor::BottomCenter | Anchor::BottomRight
+    )
+}
+
+/// Whether a sub-menu cascades to the left: popups anchored on their right
+/// edge (end placements, or beside the trigger's left) open leftward.
+pub(crate) fn cascades_left(anchor: Anchor) -> bool {
+    matches!(
+        anchor,
+        Anchor::TopRight | Anchor::BottomRight | Anchor::RightCenter
+    )
+}
+
+/// The space between a menu and its cascading sub-menu.
+const CASCADE_GAP: f32 = 4.;
+
+/// A menu's revealing frame: `height * shown` tall, its shadow and opacity
+/// following `fade`, revealing from the top (or the bottom when `upward`).
+fn reveal_surface(
+    menu: impl IntoElement,
+    style: MenuStyle,
+    height: f32,
+    (shown, fade): (f32, f32),
+    upward: bool,
+) -> Div {
+    let radius = if style.expressive() {
+        MENU_RADIUS
+    } else {
+        BASELINE_RADIUS
+    };
+    let ring = fade * fade * fade;
+    let shadow: Vec<BoxShadow> = elevation::level(2)
+        .into_iter()
+        .map(|mut s| {
+            s.color.a *= ring;
+            s
+        })
+        .collect();
+    div()
+        .flex()
+        .flex_col()
+        .when(upward, |surface| surface.justify_end())
+        .flex_shrink_0()
+        .h(rem(height * shown.clamp(0., 1.)))
+        .overflow_hidden()
+        .rounded(rem(radius))
+        .shadow(shadow)
+        .opacity(fade)
+        .child(menu)
 }
 
 impl RenderOnce for MenuPopup {
@@ -950,54 +1154,215 @@ impl RenderOnce for MenuPopup {
             })
             .read(cx)
             .clone();
+        // The trigger's height in design px, measured as it prepaints,
+        // places a side popup's top at the trigger's top.
+        let trigger_height = window
+            .use_keyed_state((self.id.clone(), "menu-popup-trigger"), cx, |_, _| {
+                Rc::new(std::cell::Cell::new(0f32))
+            })
+            .read(cx)
+            .clone();
         let style = self.menu.style;
         let height = self.menu.natural_height();
-        let radius = if style.expressive() {
-            MENU_RADIUS
-        } else {
-            BASELINE_RADIUS
-        };
+        let anchor = self.anchor;
+        let upward = opens_upward(anchor);
+        let side = matches!(anchor, Anchor::LeftCenter | Anchor::RightCenter);
         let change = self.on_open_change.clone();
         let close = self.on_open_change.clone();
-        let menu = self
-            .menu
+        let close_on_activate = self.close_on_activate;
+        let close_menu: Notify = Rc::new(move |window: &mut Window, cx: &mut App| {
+            if let Some(close) = close.as_ref() {
+                close(&false, window, cx);
+            }
+        });
+        let submenu_index = self.submenu.as_ref().map(|(index, _)| *index);
+        let submenu_top = submenu_index.and_then(|index| self.menu.item_top(index));
+        let submenu_bottom = submenu_index.and_then(|index| self.menu.item_bottom(index));
+        // The reserved cascade column's height below the trigger.
+        let cascade_height = self.submenu.as_ref().map_or(0., |(_, submenu)| {
+            let first_row = if submenu.style.expressive() {
+                EXPRESSIVE_INSET_Y
+            } else {
+                BASELINE_PADDING
+            };
+            (submenu_top.unwrap_or(0.) - first_row).max(0.) + submenu.natural_height()
+        });
+        // Closing the sub-menu by keyboard returns focus to its owner item.
+        let restore = window
+            .use_keyed_state((self.id.clone(), "menu-submenu-restore"), cx, |_, _| {
+                Rc::new(std::cell::Cell::new(false))
+            })
+            .read(cx)
+            .clone();
+        let mut menu = self.menu;
+        if let Some(index) = submenu_index
+            && restore.replace(false)
+        {
+            menu = menu.focus_item(index);
+        }
+        let menu = menu
             .elevated(false)
             .track_focus(&focus)
             .on_dismiss({
-                let close = close.clone();
-                move |window, cx| {
-                    if let Some(close) = close.as_ref() {
-                        close(&false, window, cx);
-                    }
-                }
+                let close = close_menu.clone();
+                move |window, cx| close(window, cx)
             })
-            .on_activate(move |window, cx| {
-                if let Some(close) = close.as_ref() {
-                    close(&false, window, cx);
+            .on_activate({
+                let close = close_menu.clone();
+                move |window, cx| {
+                    if close_on_activate {
+                        close(window, cx)
+                    }
                 }
             });
         let shown = reveal.clamp(0., 1.);
-        let ring = fade * fade * fade;
-        let shadow: Vec<BoxShadow> = elevation::level(2)
-            .into_iter()
-            .map(|mut s| {
-                s.color.a *= ring;
-                s
+        let surface = reveal_surface(menu, style, height, (shown, fade), upward)
+            .debug_selector(|| "menu-popup-surface".into());
+
+        // The cascading sub-menu, revealed on its own channels.
+        let cascade = self.submenu.map(|(_, submenu)| {
+            let open = self.open && self.submenu_open;
+            let cascade_id = ElementId::from((self.id.clone(), "submenu"));
+            let (sub_reveal, sub_fade) = open_motion(&cascade_id, open, window, cx);
+            let sub_focus = window
+                .use_keyed_state((self.id.clone(), "menu-submenu-focus"), cx, |_, cx| {
+                    cx.focus_handle()
+                })
+                .read(cx)
+                .clone();
+            // The sub-menu takes focus as it opens.
+            let was_open = window
+                .use_keyed_state((self.id.clone(), "menu-submenu-open"), cx, |_, _| {
+                    Rc::new(std::cell::Cell::new(false))
+                })
+                .read(cx)
+                .clone();
+            if open && !was_open.get() {
+                sub_focus.focus(window, cx);
+            }
+            was_open.set(open);
+            let sub_style = submenu.style;
+            let sub_height = submenu.natural_height();
+            let collapse: Notify = {
+                let change = self.on_submenu_change.clone();
+                let parent = focus.clone();
+                let restore = restore.clone();
+                Rc::new(move |window: &mut Window, cx: &mut App| {
+                    parent.focus(window, cx);
+                    restore.set(true);
+                    if let Some(change) = change.as_ref() {
+                        change(&false, window, cx);
+                    }
+                })
+            };
+            let submenu = submenu
+                .elevated(false)
+                .track_focus(&sub_focus)
+                .on_dismiss({
+                    let collapse = collapse.clone();
+                    move |window, cx| collapse(window, cx)
+                })
+                .on_collapse(move |window, cx| collapse(window, cx))
+                .on_activate({
+                    let close = close_menu.clone();
+                    move |window, cx| {
+                        if close_on_activate {
+                            close(window, cx)
+                        }
+                    }
+                });
+            let first_row = if sub_style.expressive() {
+                EXPRESSIVE_INSET_Y
+            } else {
+                BASELINE_PADDING
+            };
+            let visible = popup_visible(open, sub_reveal, sub_fade);
+            // The column is reserved while closed, so opening the sub-menu
+            // never moves the menu Kit anchored. Below the trigger the
+            // sub-menu's first item lines up with its owner and it extends
+            // down; above the trigger its last item lines up with the
+            // owner's bottom and it extends up, within the popup's box.
+            let column = div().flex_shrink_0().flex().flex_col();
+            let column = if upward {
+                let under = (height - submenu_bottom.unwrap_or(height) - first_row).max(0.);
+                column.h(rem(sub_height + under)).pb(rem(under))
+            } else {
+                let top = (submenu_top.unwrap_or(0.) - first_row).max(0.);
+                column.h(rem(top + sub_height)).pt(rem(top))
+            };
+            column.when(!visible, |cascade| cascade.invisible()).child(
+                reveal_surface(
+                    submenu,
+                    sub_style,
+                    sub_height,
+                    (sub_reveal.clamp(0., 1.), sub_fade),
+                    false,
+                )
+                .debug_selector(|| "menu-popup-submenu".into()),
+            )
+        });
+        // Kit centers a side popup on the trigger; the margin moves the
+        // menu's top to the trigger's top.
+        let side_offset = if side {
+            ((height * shown).max(cascade_height) - trigger_height.get()).max(0.)
+        } else {
+            0.
+        };
+        let content = div()
+            .flex()
+            .map(|content| {
+                if upward {
+                    content.items_end()
+                } else {
+                    content.items_start()
+                }
             })
-            .collect();
-        let surface = div()
-            .debug_selector(|| "menu-popup-surface".into())
-            .h(rem(height * shown))
-            .overflow_hidden()
-            .rounded(rem(radius))
-            .shadow(shadow)
-            .opacity(fade)
-            .child(menu);
-        let surface = std::cell::RefCell::new(Some(surface.into_any_element()));
+            .gap(rem(CASCADE_GAP))
+            .when(cascades_left(anchor), |content| content.flex_row_reverse())
+            .when(side_offset > 0., |content| content.mt(rem(side_offset)))
+            .child(surface)
+            .children(cascade);
+        let surface = std::cell::RefCell::new(Some(content.into_any_element()));
         let open = self.open;
+        let measure = trigger_height;
+        // Material buttons block the mouse for the elements under them, so
+        // Kit's popover never sees a press on such a trigger. A window
+        // listener over the trigger's bounds toggles the menu instead (a
+        // press while open closes it before the popover's outside-press
+        // dismissal, which then has nothing to do).
+        let toggle = self.on_open_change.clone();
+        let press = canvas(
+            |_, _, _| {},
+            move |bounds, _, window, _| {
+                let toggle = toggle.clone();
+                window.on_mouse_event(move |event: &MouseDownEvent, phase, window, cx| {
+                    if phase == DispatchPhase::Capture
+                        && event.button == MouseButton::Left
+                        && bounds.contains(&event.position)
+                        && let Some(toggle) = toggle.as_ref()
+                    {
+                        toggle(&!open, window, cx);
+                    }
+                });
+            },
+        )
+        .absolute()
+        .size_full();
+        let trigger = div()
+            .relative()
+            .child(press)
+            .on_children_prepainted(move |bounds, window, _| {
+                if let Some(bounds) = bounds.first() {
+                    measure.set(
+                        f32::from(bounds.size.height) * crate::tokens::typography::BASE_PX
+                            / f32::from(window.rem_size()),
+                    );
+                }
+            })
+            .child(self.trigger);
         Popover::new(self.id.clone())
             .appearance(false)
-            .anchor(self.anchor)
+            .anchor(anchor)
             .offset(rem(4.).to_pixels(window.rem_size()))
             .track_focus(&focus)
             .open(visible)
@@ -1009,7 +1374,7 @@ impl RenderOnce for MenuPopup {
                 }
             })
             .trigger(Trigger {
-                child: self.trigger,
+                child: trigger.into_any_element(),
                 open: self.open,
             })
             .content(move |_, _, _| {

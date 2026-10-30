@@ -333,10 +333,14 @@ impl FabMenu {
             toggle = toggle.preview_state(state);
         }
         if let Some(callback) = self.on_toggle.clone() {
-            // The FAB (a blocking Base button) takes pointer and key
-            // activation itself; the popover's trigger toggle could only
-            // request the same `!open`.
-            toggle = toggle.on_click(move |_, window, cx| callback(&!open, window, cx));
+            // `MenuPopup` toggles on the pointer press over the FAB, so its
+            // click handles only keys (handling the pointer click too would
+            // re-toggle once the press re-rendered `open`).
+            toggle = toggle.on_click(move |event, window, cx| {
+                if matches!(event, ClickEvent::Keyboard(_)) {
+                    callback(&!open, window, cx)
+                }
+            });
         }
         let menu = MaterialMenu::new((self.id.clone(), "fab-menu-list"))
             .style(MenuStyle::Baseline)

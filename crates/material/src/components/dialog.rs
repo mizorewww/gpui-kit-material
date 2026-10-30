@@ -9,16 +9,26 @@
 //! text actions 8dp apart. A full-screen dialog is a surface page with a
 //! close button, title-large headline and a confirming action.
 //!
+//! md3.io's dialog options are available too: a subtitle (body-medium
+//! on-surface-variant, 16dp under the headline), [`DialogSize`]s, a close
+//! button in the header, dividers above and below a scrolling body, the
+//! actions' [`DialogActionAlignment`], the [`DialogAnimation`], and whether
+//! the scrim and Escape dismiss.
+//!
 //! Behavior is GPUI Base's modal [`gpui_base::Dialog`] host: the dialog role,
 //! the focus trap (Tab cycles inside), Escape and scrim dismissal. Material
 //! adds what the host leaves to callers: focus moves into the dialog when it
 //! opens and returns to the previously focused element when it closes, and
-//! the open/close motion. The container rises into place on the default
-//! spatial spring while it and the 32% scrim fade on the default effects
-//! spring; a full-screen dialog slides up from the bottom edge. Reduced
-//! motion finishes the movement immediately and keeps the fades. Closing
-//! plays the same channels in reverse and keeps the host (and its focus
-//! trap) until they settle; the content then leaves the tree.
+//! the open/close motion. By default the container slides into place from
+//! 24dp above on the default spatial spring while it and the 32% scrim fade
+//! on the default effects spring; a full-screen dialog slides up from the
+//! bottom edge. Reduced motion finishes the movement immediately and keeps
+//! the fades. Closing plays the same channels in reverse and keeps the host
+//! (and its focus trap) until they settle; the content then leaves the tree.
+//!
+//! A [`MaterialDialog::contained`] dialog presents over its positioned parent
+//! instead of the whole window (e.g. a device frame in a preview): the host,
+//! scrim and full-screen surface take the parent's bounds.
 use crate::{
     color::ColorRole,
     icons::{Icon, IconName},
@@ -36,13 +46,83 @@ use std::rc::Rc;
 pub const DIALOG_WIDTH: f32 = 312.;
 const DIALOG_MIN_WIDTH: f32 = 280.;
 const DIALOG_MAX_WIDTH: f32 = 560.;
+/// md3.io's large dialog width, for large windows.
+const DIALOG_LARGE_WIDTH: f32 = 720.;
+/// The margin a dialog keeps from its container's edges.
+const DIALOG_MARGIN: f32 = 24.;
 const DIALOG_RADIUS: Pixels = px(28.);
-/// How far a basic dialog rises while it opens, in dp.
+/// How far a basic dialog slides while it opens, in dp.
 const DIALOG_RISE: f32 = 24.;
+/// The scale a scaling dialog opens from.
+const DIALOG_SCALE_FROM: f32 = 0.8;
 /// The scrim's opacity over the content behind a modal surface.
 pub const SCRIM_OPACITY: f32 = 0.32;
 
 type Dismiss = Rc<dyn Fn(&mut Window, &mut App)>;
+
+/// A dialog's size (md3.io): the basic widths, or a full-screen page.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum DialogSize {
+    /// The design kit's basic dialog ([`MaterialDialog::width`], 312dp by
+    /// default).
+    #[default]
+    Small,
+    /// M3's widest basic dialog, 560dp.
+    Medium,
+    /// 720dp, for large windows.
+    Large,
+    /// The container's width less 24dp margins.
+    FullWidth,
+    /// A full-screen dialog: a header with the close button and headline.
+    FullScreen,
+}
+
+impl DialogSize {
+    pub const ALL: [Self; 5] = [
+        Self::Small,
+        Self::Medium,
+        Self::Large,
+        Self::FullWidth,
+        Self::FullScreen,
+    ];
+}
+
+/// How a dialog enters and leaves (md3.io). Every animation fades; reduced
+/// motion keeps only the fade.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum DialogAnimation {
+    /// Grows from 80% around its center. GPUI has no element scale
+    /// transform, so the container's clip grows while its content stays at
+    /// full size.
+    Scale,
+    /// Rises 24dp into place.
+    SlideUp,
+    /// Descends 24dp into place.
+    #[default]
+    SlideDown,
+    /// Fades only.
+    Fade,
+}
+
+impl DialogAnimation {
+    pub const ALL: [Self; 4] = [Self::Scale, Self::SlideUp, Self::SlideDown, Self::Fade];
+}
+
+/// Where a dialog's actions sit in their row (md3.io).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum DialogActionAlignment {
+    /// The trailing edge (M3's default).
+    #[default]
+    End,
+    Start,
+    Center,
+    /// The first action at the start, the last at the end.
+    SpaceBetween,
+}
+
+impl DialogActionAlignment {
+    pub const ALL: [Self; 4] = [Self::End, Self::Start, Self::Center, Self::SpaceBetween];
+}
 
 /// An M3 dialog. Without [`MaterialDialog::modal`] it renders its container
 /// in place (a specimen); with it, it is a modal overlay over the window.
@@ -51,21 +131,30 @@ pub struct MaterialDialog {
     id: ElementId,
     icon: Option<Icon>,
     headline: Option<SharedString>,
+    subtitle: Option<SharedString>,
     label: Option<SharedString>,
     supporting: Option<SharedString>,
     content: Vec<AnyElement>,
     actions: Vec<AnyElement>,
     divider: bool,
+    dividers: bool,
     width: f32,
+    size: DialogSize,
+    animation: DialogAnimation,
+    alignment: DialogActionAlignment,
+    close_label: Option<SharedString>,
     full_screen: Option<FullScreen>,
     modal: Option<bool>,
+    contained: bool,
+    dismiss_on_scrim: bool,
+    dismiss_on_escape: bool,
     on_dismiss: Option<Dismiss>,
 }
 
 /// The full-screen dialog's header: its close button's accessible name and
 /// the confirming action.
 struct FullScreen {
-    close_label: SharedString,
+    close_label: Option<SharedString>,
     confirm: Option<AnyElement>,
 }
 
@@ -75,14 +164,23 @@ impl MaterialDialog {
             id: id.into(),
             icon: None,
             headline: None,
+            subtitle: None,
             label: None,
             supporting: None,
             content: Vec::new(),
             actions: Vec::new(),
             divider: false,
+            dividers: false,
             width: DIALOG_WIDTH,
+            size: DialogSize::Small,
+            animation: DialogAnimation::default(),
+            alignment: DialogActionAlignment::End,
+            close_label: None,
             full_screen: None,
             modal: None,
+            contained: false,
+            dismiss_on_scrim: true,
+            dismiss_on_escape: true,
             on_dismiss: None,
         }
     }
@@ -93,6 +191,11 @@ impl MaterialDialog {
     }
     pub fn headline(mut self, headline: impl Into<SharedString>) -> Self {
         self.headline = Some(headline.into());
+        self
+    }
+    /// A body-medium line 16dp under the headline (md3.io).
+    pub fn subtitle(mut self, subtitle: impl Into<SharedString>) -> Self {
+        self.subtitle = Some(subtitle.into());
         self
     }
     /// The modal dialog's accessible name when it differs from (or there is
@@ -120,9 +223,34 @@ impl MaterialDialog {
         self.divider = divider;
         self
     }
+    /// Outline-variant dividers above and below the body (supporting text
+    /// and content), for a body that scrolls (md3.io's Dividers).
+    pub fn dividers(mut self, dividers: bool) -> Self {
+        self.dividers = dividers;
+        self
+    }
     /// The basic dialog's width in dp, clamped to M3's 280–560dp.
     pub fn width(mut self, width: f32) -> Self {
         self.width = width.clamp(DIALOG_MIN_WIDTH, DIALOG_MAX_WIDTH);
+        self
+    }
+    /// The dialog's size; [`DialogSize::Small`] uses [`Self::width`].
+    pub fn size(mut self, size: DialogSize) -> Self {
+        self.size = size;
+        self
+    }
+    pub fn animation(mut self, animation: DialogAnimation) -> Self {
+        self.animation = animation;
+        self
+    }
+    pub fn action_alignment(mut self, alignment: DialogActionAlignment) -> Self {
+        self.alignment = alignment;
+        self
+    }
+    /// A close button named `label` at the header's trailing edge; it calls
+    /// `on_dismiss`. A full-screen dialog shows it at its leading edge.
+    pub fn close_button(mut self, label: impl Into<SharedString>) -> Self {
+        self.close_label = Some(label.into());
         self
     }
     /// Make this a full-screen dialog. `close_label` names its close button;
@@ -133,7 +261,7 @@ impl MaterialDialog {
         confirm: Option<AnyElement>,
     ) -> Self {
         self.full_screen = Some(FullScreen {
-            close_label: close_label.into(),
+            close_label: Some(close_label.into()),
             confirm,
         });
         self
@@ -143,14 +271,64 @@ impl MaterialDialog {
         self.modal = Some(open);
         self
     }
+    /// Present the modal dialog over its positioned parent's bounds instead
+    /// of the whole window.
+    pub fn contained(mut self, contained: bool) -> Self {
+        self.contained = contained;
+        self
+    }
+    /// Whether pressing the scrim dismisses the dialog (default true).
+    pub fn dismiss_on_scrim(mut self, dismiss: bool) -> Self {
+        self.dismiss_on_scrim = dismiss;
+        self
+    }
+    /// Whether Escape dismisses the dialog (default true).
+    pub fn dismiss_on_escape(mut self, dismiss: bool) -> Self {
+        self.dismiss_on_escape = dismiss;
+        self
+    }
     /// Called when the person dismisses the dialog: Escape, the scrim, or a
-    /// full-screen dialog's close button. The caller closes it.
+    /// close button. The caller closes it.
     pub fn on_dismiss(mut self, f: impl Fn(&mut Window, &mut App) + 'static) -> Self {
         self.on_dismiss = Some(Rc::new(f));
         self
     }
+
+    /// The basic container's width in dp inside a container `available` dp
+    /// wide.
+    fn basic_width(&self, available: f32) -> f32 {
+        let width = match self.size {
+            DialogSize::Small | DialogSize::FullScreen => self.width,
+            DialogSize::Medium => DIALOG_MAX_WIDTH,
+            DialogSize::Large => DIALOG_LARGE_WIDTH,
+            // A specimen has no container: the widest basic dialog.
+            DialogSize::FullWidth if available.is_finite() => available - 2. * DIALOG_MARGIN,
+            DialogSize::FullWidth => DIALOG_MAX_WIDTH,
+        };
+        width.min(available - 2. * DIALOG_MARGIN).max(0.)
+    }
 }
 
+/// The clip a scaling dialog paints at spatial progress `spatial`, for a
+/// container `size`: the clip's size and the container's offset inside it.
+pub(crate) fn scale_clip(size: Size<Pixels>, spatial: f32) -> (Size<Pixels>, Point<Pixels>) {
+    let scale = DIALOG_SCALE_FROM + (1. - DIALOG_SCALE_FROM) * spatial;
+    let clip = size.map(|length| length * scale);
+    let offset = point(
+        (clip.width - size.width) / 2.,
+        (clip.height - size.height) / 2.,
+    );
+    (clip, offset)
+}
+
+/// The vertical offset in dp of a sliding dialog at `spatial`.
+fn slide_offset(animation: DialogAnimation, spatial: f32) -> f32 {
+    match animation {
+        DialogAnimation::SlideUp => DIALOG_RISE * (1. - spatial),
+        DialogAnimation::SlideDown => -DIALOG_RISE * (1. - spatial),
+        DialogAnimation::Scale | DialogAnimation::Fade => 0.,
+    }
+}
 fn typed<E: Styled>(element: E, role: TypeRole) -> E {
     let scale = role.scale();
     element
@@ -270,6 +448,10 @@ pub(crate) fn header_icon_button(
     let clear = Rgba { a: 0., ..ink };
     let id = id.into();
     div()
+        .debug_selector({
+            let selector = id.clone();
+            move || selector.to_string()
+        })
         .size(rem(48.))
         .flex()
         .flex_shrink_0()
@@ -292,9 +474,124 @@ pub(crate) fn header_icon_button(
         ))
 }
 
+/// The window bounds of a contained overlay's positioned parent, as
+/// measured the previous frame.
+pub(crate) struct ContainerBounds(Option<Bounds<Pixels>>);
+
+/// The measured parent bounds of the contained overlay keyed by `id`.
+pub(crate) fn container_state(
+    id: &ElementId,
+    window: &mut Window,
+    cx: &mut App,
+) -> Entity<ContainerBounds> {
+    window.use_keyed_state((id.clone(), "overlay-container"), cx, |_, _| {
+        ContainerBounds(None)
+    })
+}
+
+/// Where an overlay presents: its container's bounds when contained (`None`
+/// until measured), otherwise the window.
+pub(crate) fn overlay_area(
+    container: Option<&Entity<ContainerBounds>>,
+    window: &Window,
+    cx: &App,
+) -> Option<Bounds<Pixels>> {
+    match container {
+        Some(container) => container.read(cx).0,
+        None => Some(Bounds::new(Point::default(), window.viewport_size())),
+    }
+}
+
+/// Lay an overlay host out over `area` instead of the window.
+pub(crate) fn place_host<E: Styled>(host: E, area: Bounds<Pixels>) -> E {
+    host.left(area.origin.x)
+        .top(area.origin.y)
+        .w(area.size.width)
+        .h(area.size.height)
+        // Clip a partially shown sheet to the container.
+        .overflow_hidden()
+}
+
+/// Wrap a contained overlay's host with the probe measuring its parent; the
+/// probe asks for another frame when the bounds change (the host used the
+/// previous ones this frame).
+pub(crate) fn with_container_probe(
+    container: Option<Entity<ContainerBounds>>,
+    host: AnyElement,
+) -> AnyElement {
+    let Some(container) = container else {
+        return host;
+    };
+    div()
+        .absolute()
+        .inset_0()
+        .child(
+            canvas(
+                move |bounds, window, cx| {
+                    if container.read(cx).0 != Some(bounds) {
+                        container.update(cx, |container, _| container.0 = Some(bounds));
+                        window.request_animation_frame();
+                    }
+                },
+                |_, _, _, _| {},
+            )
+            .absolute()
+            .inset_0(),
+        )
+        .child(host)
+        .into_any_element()
+}
+
+/// A basic dialog container's measured size, for the scale animation.
+struct MeasuredSize(Option<Size<Pixels>>);
+
+fn divider_line() -> Div {
+    div()
+        .h(px(1.))
+        .w_full()
+        .flex_shrink_0()
+        .bg(color(ColorRole::OUTLINE_VARIANT))
+}
+
 impl MaterialDialog {
-    fn basic_surface(self) -> Stateful<Div> {
+    /// The actions row, aligned; `None` without actions.
+    fn actions_row(alignment: DialogActionAlignment, actions: Vec<AnyElement>) -> Option<Div> {
+        if actions.is_empty() {
+            return None;
+        }
+        let row = div()
+            .flex()
+            .flex_shrink_0()
+            .items_center()
+            .gap(rem(8.))
+            .pt(rem(20.))
+            .pb(rem(20.));
+        let row = match alignment {
+            DialogActionAlignment::End => row.justify_end().pl(rem(8.)).pr(rem(24.)),
+            DialogActionAlignment::Start => row.justify_start().pl(rem(24.)).pr(rem(8.)),
+            DialogActionAlignment::Center => row.justify_center().px(rem(24.)),
+            DialogActionAlignment::SpaceBetween => row.justify_between().px(rem(24.)),
+        };
+        Some(row.children(actions))
+    }
+
+    fn supporting_element(supporting: SharedString) -> Div {
+        typed(div(), TypeRole::BodyMedium)
+            .w_full()
+            .text_color(color(ColorRole::ON_SURFACE_VARIANT))
+            .child(supporting)
+    }
+
+    fn basic_surface(
+        self,
+        width: f32,
+        dismiss: Option<Dismiss>,
+        measure: Option<Entity<MeasuredSize>>,
+    ) -> Stateful<Div> {
         let centered = self.icon.is_some();
+        let dividers = self.dividers;
+        let has_close = self.close_label.is_some();
+        let supporting = self.supporting;
         let text = div()
             .flex()
             .flex_col()
@@ -310,59 +607,116 @@ impl MaterialDialog {
                     typed(div(), TypeRole::HeadlineSmall)
                         .w_full()
                         .when(centered, |headline| headline.text_center())
+                        .when(has_close && !centered, |headline| headline.pr(rem(32.)))
                         .text_color(color(ColorRole::ON_SURFACE))
                         .child(headline),
                 )
             })
-            .when_some(self.supporting, |text, supporting| {
-                text.child(
-                    typed(div(), TypeRole::BodyMedium)
-                        .w_full()
-                        .text_color(color(ColorRole::ON_SURFACE_VARIANT))
-                        .child(supporting),
-                )
+            .when_some(self.subtitle, |text, subtitle| {
+                text.child(Self::supporting_element(subtitle).when(centered, |s| s.text_center()))
+            })
+            .when(!dividers, |text| {
+                text.when_some(supporting.clone(), |text, supporting| {
+                    text.child(Self::supporting_element(supporting))
+                })
             });
-        let has_content = !self.content.is_empty();
-        div()
+        let content = self.content;
+        let has_content = !content.is_empty();
+        // With dividers, the supporting text and content form the body
+        // between them; otherwise the content follows the text.
+        let middle = if dividers {
+            Some(
+                div()
+                    .flex()
+                    .flex_col()
+                    .gap(rem(16.))
+                    .py(rem(16.))
+                    .when_some(supporting, |body, supporting| {
+                        body.child(
+                            div()
+                                .px(rem(24.))
+                                .child(Self::supporting_element(supporting)),
+                        )
+                    })
+                    .children(content),
+            )
+        } else {
+            has_content.then(|| div().pt(rem(16.)).flex().flex_col().children(content))
+        };
+        let actions = Self::actions_row(self.alignment, self.actions);
+        let has_actions = actions.is_some();
+        let close = self.close_label.map(|label| {
+            div()
+                .absolute()
+                .top(rem(12.))
+                .right(rem(12.))
+                .child(header_icon_button(
+                    "dialog-close",
+                    IconName::Close.icon(),
+                    label,
+                    move |_, window, cx| {
+                        if let Some(dismiss) = &dismiss {
+                            dismiss(window, cx);
+                        }
+                    },
+                ))
+        });
+        let mut surface = div()
             .id(self.id)
+            .relative()
             .flex()
             .flex_col()
             .flex_shrink_0()
-            .w(rem(self.width))
+            .w(rem(width))
             .overflow_hidden()
             .rounded(DIALOG_RADIUS)
             .bg(color(ColorRole::SURFACE_CONTAINER_HIGH))
             .shadow(elevation::level3())
-            .child(text)
-            .when(has_content, |surface| {
-                surface.child(div().pt(rem(16.)).flex().flex_col().children(self.content))
+            .child(text);
+        match middle {
+            Some(body) if dividers => {
+                surface = surface
+                    .child(div().pt(rem(16.)).child(divider_line()))
+                    .child(body)
+                    .child(divider_line());
+            }
+            Some(content) => surface = surface.child(content),
+            None => {}
+        }
+        surface
+            .when(self.divider && !dividers, |surface| {
+                surface.child(div().pt(rem(16.)).child(divider_line()))
             })
-            .when(self.divider, |surface| {
+            .children(actions)
+            .when(!has_actions, |surface| surface.child(div().h(rem(24.))))
+            .children(close)
+            .when_some(measure, |surface, measure| {
                 surface.child(
-                    div().pt(rem(16.)).child(
-                        div()
-                            .h(px(1.))
-                            .w_full()
-                            .bg(color(ColorRole::OUTLINE_VARIANT)),
-                    ),
+                    canvas(
+                        move |bounds, window, cx| {
+                            if measure.read(cx).0 != Some(bounds.size) {
+                                measure.update(cx, |measure, _| measure.0 = Some(bounds.size));
+                                window.request_animation_frame();
+                            }
+                        },
+                        |_, _, _, _| {},
+                    )
+                    .absolute()
+                    .inset_0(),
                 )
             })
-            .child(
-                div()
-                    .flex()
-                    .justify_end()
-                    .items_center()
-                    .gap(rem(8.))
-                    .pt(rem(20.))
-                    .pb(rem(20.))
-                    .pl(rem(8.))
-                    .pr(rem(24.))
-                    .children(self.actions),
-            )
     }
+}
 
+impl MaterialDialog {
     fn full_screen_surface(mut self, dismiss: Option<Dismiss>) -> Stateful<Div> {
-        let full = self.full_screen.take().expect("a full-screen dialog");
+        let full = self.full_screen.take().unwrap_or(FullScreen {
+            close_label: None,
+            confirm: None,
+        });
+        let close_label = full.close_label.or(self.close_label.take());
+        let dividers = self.dividers;
+        let footer = Self::actions_row(self.alignment, std::mem::take(&mut self.actions));
         div()
             .id(self.id)
             .flex()
@@ -372,21 +726,24 @@ impl MaterialDialog {
             .child(
                 div()
                     .flex()
+                    .flex_shrink_0()
                     .items_center()
                     .h(rem(56.))
-                    .pl(rem(4.))
+                    .pl(rem(if close_label.is_some() { 4. } else { 24. }))
                     .pr(rem(12.))
                     .gap(rem(4.))
-                    .child(header_icon_button(
-                        "dialog-close",
-                        IconName::Close.icon(),
-                        full.close_label,
-                        move |_, window, cx| {
-                            if let Some(dismiss) = &dismiss {
-                                dismiss(window, cx);
-                            }
-                        },
-                    ))
+                    .when_some(close_label, |header, label| {
+                        header.child(header_icon_button(
+                            "dialog-close",
+                            IconName::Close.icon(),
+                            label,
+                            move |_, window, cx| {
+                                if let Some(dismiss) = &dismiss {
+                                    dismiss(window, cx);
+                                }
+                            },
+                        ))
+                    })
                     .child(
                         typed(div(), TypeRole::TitleLarge)
                             .flex_1()
@@ -397,6 +754,7 @@ impl MaterialDialog {
                     )
                     .children(full.confirm),
             )
+            .when(dividers, |page| page.child(divider_line()))
             .child(
                 div()
                     .id("dialog-body")
@@ -407,64 +765,106 @@ impl MaterialDialog {
                     .overflow_y_scroll()
                     .gap(rem(16.))
                     .px(rem(24.))
+                    .when(dividers, |body| body.py(rem(16.)))
+                    .when_some(self.subtitle, |body, subtitle| {
+                        body.child(Self::supporting_element(subtitle))
+                    })
                     .when_some(self.supporting, |body, supporting| {
-                        body.child(
-                            typed(div(), TypeRole::BodyMedium)
-                                .text_color(color(ColorRole::ON_SURFACE_VARIANT))
-                                .child(supporting),
-                        )
+                        body.child(Self::supporting_element(supporting))
                     })
                     .children(self.content),
             )
+            .when(dividers && footer.is_some(), |page| {
+                page.child(divider_line())
+            })
+            .children(footer)
     }
 }
 
 impl RenderOnce for MaterialDialog {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
-        let full_screen = self.full_screen.is_some();
+        let full_screen = self.full_screen.is_some() || self.size == DialogSize::FullScreen;
         let Some(open) = self.modal else {
             // A specimen: the container in place.
             return if full_screen {
                 self.full_screen_surface(None).into_any_element()
             } else {
-                self.basic_surface().into_any_element()
+                let width = self.basic_width(f32::INFINITY);
+                let dismiss = self.on_dismiss.clone();
+                self.basic_surface(width, dismiss, None).into_any_element()
             };
         };
         let id = self.id.clone();
+        let container = self.contained.then(|| container_state(&id, window, cx));
         let frame = overlay_frame(&id, open, window, cx);
         let focus = modal_focus(&id, open, window, cx);
         if frame.settled_closed(open) {
-            return div().into_any_element();
+            return with_container_probe(container, div().into_any_element());
         }
+        let Some(area) = overlay_area(container.as_ref(), window, cx) else {
+            // The container is measured this frame; present on the next.
+            return with_container_probe(container, div().into_any_element());
+        };
         let dismiss = self.on_dismiss.clone();
         // Escape and the scrim reach the caller only while open: a closing
         // dialog keeps its host until the motion settles.
         let cancel_dismiss = dismiss.clone();
-        let viewport = window.viewport_size();
+        let scrim_dismiss = dismiss.clone();
         let opacity = frame.opacity();
         let name = self.label.clone().or_else(|| self.headline.clone());
+        let (dismiss_on_escape, dismiss_on_scrim) = (self.dismiss_on_escape, self.dismiss_on_scrim);
         let surface = if full_screen {
             div()
                 .absolute()
                 .left_0()
-                .w(viewport.width)
-                .h(viewport.height)
-                .top(viewport.height * (1. - frame.spatial))
+                .w(area.size.width)
+                .h(area.size.height)
+                .top(area.size.height * (1. - frame.spatial))
                 .opacity(opacity)
                 .child(self.full_screen_surface(dismiss.filter(|_| open)))
+                .into_any_element()
         } else {
-            div()
+            let rem_size = window.rem_size();
+            let available = f32::from(area.size.width) * crate::tokens::typography::BASE_PX
+                / f32::from(rem_size);
+            let width = self.basic_width(available);
+            let animation = self.animation;
+            let scaling = animation == DialogAnimation::Scale && frame.spatial < 1.;
+            let measure = (animation == DialogAnimation::Scale).then(|| {
+                window.use_keyed_state((id.clone(), "dialog-size"), cx, |_, _| MeasuredSize(None))
+            });
+            let measured = measure.as_ref().and_then(|measure| measure.read(cx).0);
+            let basic = self.basic_surface(width, dismiss.filter(|_| open), measure);
+            let positioned = div()
                 .relative()
-                .top(rem(-DIALOG_RISE * (1. - frame.spatial)))
-                .opacity(opacity)
-                .child(self.basic_surface())
+                .top(rem(slide_offset(animation, frame.spatial)))
+                .opacity(opacity);
+            match measured.filter(|_| scaling) {
+                Some(size) => {
+                    let (clip, offset) = scale_clip(size, frame.spatial.max(0.));
+                    positioned
+                        .child(
+                            div()
+                                .relative()
+                                .w(clip.width)
+                                .h(clip.height)
+                                .overflow_hidden()
+                                .rounded(DIALOG_RADIUS)
+                                .child(div().absolute().left(offset.x).top(offset.y).child(basic)),
+                        )
+                        .into_any_element()
+                }
+                None => positioned.child(basic).into_any_element(),
+            }
         };
-        gpui_base::Dialog::new(cx)
+        let host = gpui_base::Dialog::new(cx)
             .open(true)
             .when_some(name, |dialog, name| dialog.accessibility_label(name))
             .focus_handle(focus)
-            .close_on_escape(true)
-            .close_on_backdrop_press(open)
+            .close_on_escape(dismiss_on_escape)
+            // The scrim occludes the host's backdrop layer (so the pointer
+            // and wheel never reach the page behind), so it dismisses itself.
+            .close_on_backdrop_press(false)
             // Enter activates the focused action; it never dismisses.
             .on_ok(|_, _, _| false)
             .on_cancel(move |_, window, cx| {
@@ -473,9 +873,24 @@ impl RenderOnce for MaterialDialog {
                 }
                 false
             })
-            .backdrop(scrim(frame.fade))
-            .popup(surface)
-            .into_any_element()
+            .backdrop(
+                scrim(frame.fade).on_mouse_down(MouseButton::Left, move |_, window, cx| {
+                    cx.stop_propagation();
+                    if open
+                        && dismiss_on_scrim
+                        && let Some(dismiss) = &scrim_dismiss
+                    {
+                        dismiss(window, cx);
+                    }
+                }),
+            )
+            .popup(surface);
+        let host = if container.is_some() {
+            place_host(host, area)
+        } else {
+            host
+        };
+        with_container_probe(container, host.into_any_element())
     }
 }
 
@@ -620,5 +1035,123 @@ mod tests {
         });
         let _ = actions.get();
         let _ = Modifiers::default();
+    }
+
+    #[test]
+    fn sizes_pick_their_widths_within_the_container() {
+        let width = |size| MaterialDialog::new("d").size(size).basic_width(1000.);
+        assert_eq!(width(DialogSize::Small), DIALOG_WIDTH);
+        assert_eq!(width(DialogSize::Medium), 560.);
+        assert_eq!(width(DialogSize::Large), 720.);
+        assert_eq!(width(DialogSize::FullWidth), 952.);
+        // A narrow container caps every size at its width less margins.
+        let narrow = MaterialDialog::new("d").size(DialogSize::Large);
+        assert_eq!(narrow.basic_width(400.), 352.);
+        // A specimen (no container) shows the widest basic dialog.
+        let specimen = MaterialDialog::new("d").size(DialogSize::FullWidth);
+        assert_eq!(specimen.basic_width(f32::INFINITY), 560.);
+    }
+
+    #[test]
+    fn animations_move_scale_or_only_fade() {
+        assert_eq!(slide_offset(DialogAnimation::SlideUp, 0.), 24.);
+        assert_eq!(slide_offset(DialogAnimation::SlideDown, 0.), -24.);
+        assert_eq!(slide_offset(DialogAnimation::SlideUp, 1.), 0.);
+        assert_eq!(slide_offset(DialogAnimation::Fade, 0.), 0.);
+        assert_eq!(slide_offset(DialogAnimation::Scale, 0.), 0.);
+        let size = gpui::size(px(300.), px(200.));
+        let (clip, offset) = scale_clip(size, 0.);
+        assert_eq!(clip, gpui::size(px(240.), px(160.)));
+        assert_eq!(offset, point(px(-30.), px(-20.)), "the clip stays centered");
+        assert_eq!(scale_clip(size, 1.), (size, point(px(0.), px(0.))));
+    }
+
+    struct Contained {
+        open: bool,
+        scrim: bool,
+        dismissals: usize,
+    }
+    impl Render for Contained {
+        fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+            window.set_rem_size(px(16.));
+            let this = cx.entity().downgrade();
+            div().size_full().pl(px(200.)).child(
+                div()
+                    .relative()
+                    .debug_selector(|| "frame".into())
+                    .w(px(500.))
+                    .h(px(400.))
+                    .child(
+                        MaterialDialog::new("contained")
+                            .headline("Title")
+                            .action(
+                                div()
+                                    .debug_selector(|| "contained-action".into())
+                                    .size(px(40.)),
+                            )
+                            .size(DialogSize::FullWidth)
+                            .animation(DialogAnimation::Scale)
+                            .close_button("Close")
+                            .dismiss_on_scrim(self.scrim)
+                            .contained(true)
+                            .modal(self.open)
+                            .on_dismiss(move |_, cx| {
+                                let _ = this.update(cx, |this, cx| {
+                                    this.dismissals += 1;
+                                    this.open = false;
+                                    cx.notify();
+                                });
+                            }),
+                    ),
+            )
+        }
+    }
+
+    #[gpui::test]
+    fn a_contained_dialog_presents_over_its_parent_and_dismisses(cx: &mut TestAppContext) {
+        cx.update(|cx| {
+            gpui_base::init(cx);
+            cx.set_reduce_motion(true);
+        });
+        let (view, cx) = cx.add_window_view(|_, _| Contained {
+            open: true,
+            scrim: false,
+            dismissals: 0,
+        });
+        for _ in 0..3 {
+            draw(cx);
+        }
+        let frame = cx.debug_bounds("frame").unwrap();
+        let action = cx.debug_bounds("contained-action").unwrap();
+        assert!(frame.contains(&action.origin), "{action:?} in {frame:?}");
+        // Full width: the container less 24dp margins on each side.
+        let close = cx.debug_bounds("dialog-close").unwrap();
+        assert!(close.right() <= frame.right() - px(24.));
+        assert!(close.right() > frame.right() - px(48.));
+        // The scrim does not dismiss when turned off, then does.
+        let corner = frame.origin + point(px(4.), px(4.));
+        cx.simulate_click(corner, Modifiers::default());
+        draw(cx);
+        assert_eq!(view.read_with(cx, |v, _| v.dismissals), 0);
+        view.update(cx, |v, cx| {
+            v.scrim = true;
+            cx.notify();
+        });
+        draw(cx);
+        cx.simulate_click(corner, Modifiers::default());
+        draw(cx);
+        assert_eq!(view.read_with(cx, |v, _| v.dismissals), 1);
+        // The close button dismisses too.
+        view.update(cx, |v, cx| {
+            v.open = true;
+            cx.notify();
+        });
+        for _ in 0..3 {
+            draw(cx);
+        }
+        let close = cx.debug_bounds("dialog-close").unwrap();
+        cx.simulate_click(close.center(), Modifiers::default());
+        draw(cx);
+        assert_eq!(view.read_with(cx, |v, _| v.dismissals), 2);
     }
 }

@@ -171,6 +171,7 @@ pub struct ListItem {
     leading: ListLeading,
     trailing: ListTrailing,
     divider: bool,
+    divider_inset: bool,
     selected: bool,
     disabled: bool,
     density: ListDensity,
@@ -192,6 +193,7 @@ impl ListItem {
             leading: ListLeading::None,
             trailing: ListTrailing::None,
             divider: false,
+            divider_inset: false,
             selected: false,
             disabled: false,
             density: ListDensity::Standard,
@@ -232,6 +234,12 @@ impl ListItem {
     /// A full-width outline-variant divider under the item.
     pub fn divider(mut self, divider: bool) -> Self {
         self.divider = divider;
+        self
+    }
+    /// Inset the divider 16dp from the start edge (the design kit's
+    /// `Horizontal/Inset` divider) instead of running full width.
+    pub fn divider_inset(mut self, inset: bool) -> Self {
+        self.divider_inset = inset;
         self
     }
     pub fn selected(mut self, selected: bool) -> Self {
@@ -569,6 +577,7 @@ impl RenderOnce for ListItem {
 
         let radii = self.corners.map(segment_radii).unwrap_or_default();
         let divider = self.divider;
+        let inset = self.divider_inset;
         let container = paint.container;
         let decorate = move |element: Div| {
             element
@@ -581,11 +590,12 @@ impl RenderOnce for ListItem {
                 .rounded_tr(radii.top_right)
                 .rounded_br(radii.bottom_right)
                 .rounded_bl(radii.bottom_left)
-                .when(divider, |item| {
+                .when(divider && !inset, |item| {
                     item.border_b_1()
                         .border_color(color(ColorRole::OUTLINE_VARIANT))
                 })
         };
+        let inset_line = (divider && inset).then(inset_divider);
 
         let Some(on_click) = self.on_click.take() else {
             // Static content: a plain row that still shows a forced state's
@@ -596,7 +606,9 @@ impl RenderOnce for ListItem {
                 .when(layer > 0. && !disabled, |item| {
                     item.bg(state::layer(container, paint.layer, layer))
                 })
+                .relative()
                 .child(row)
+                .children(inset_line)
                 .into_any_element();
         };
 
@@ -619,7 +631,8 @@ impl RenderOnce for ListItem {
                     .rounded_tr(radii.top_right)
                     .rounded_br(radii.bottom_right)
                     .rounded_bl(radii.bottom_left)
-                    .when(divider, |item| {
+                    .relative()
+                    .when(divider && !inset, |item| {
                         item.border_b_1()
                             .border_color(color(ColorRole::OUTLINE_VARIANT))
                     })
@@ -642,12 +655,38 @@ impl RenderOnce for ListItem {
             .state_layers(hover, press)
             .disabled(disabled)
             .on_click(move |event, window, cx| on_click(event, window, cx))
-            .child(row);
+            .child(row)
+            .children(inset_line);
         if let Some(state) = preview {
             button = button.preview_state(state);
         }
         button.into_any_element()
     }
+}
+
+/// The design kit's inset divider under an item: 1dp outline-variant,
+/// 16dp in from the start edge, over the item's bottom edge.
+fn inset_divider() -> Div {
+    div()
+        .absolute()
+        .left(rem(16.))
+        .right_0()
+        .bottom_0()
+        .h(px(1.))
+        .bg(color(ColorRole::OUTLINE_VARIANT))
+}
+
+/// A list subheader: title-small on-surface-variant text heading a group
+/// of items, aligned with their 16dp padding, 48dp tall.
+pub fn list_subheader(id: impl Into<ElementId>, text: impl Into<SharedString>) -> Stateful<Div> {
+    typed(div().id(id), TypeRole::TitleSmall)
+        .role(Role::Heading)
+        .flex()
+        .items_center()
+        .min_h(rem(48.))
+        .px(rem(16.))
+        .text_color(color(ColorRole::ON_SURFACE_VARIANT))
+        .child(text.into())
 }
 
 /// An Expressive segmented list: each item on its own surface, 2dp apart,
@@ -815,5 +854,45 @@ mod tests {
         cx.simulate_click(row, Modifiers::default());
         draw(cx);
         assert_eq!(clicks.get(), 1, "a disabled row is inert");
+    }
+
+    struct Dividers;
+    impl Render for Dividers {
+        fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+            window.set_rem_size(px(14.));
+            div()
+                .w(px(360.))
+                .child(list_subheader("subheader", "Today").debug_selector(|| "subheader".into()))
+                .child(
+                    ListItem::new("inset", "Inset")
+                        .divider(true)
+                        .divider_inset(true),
+                )
+        }
+    }
+
+    #[gpui::test]
+    fn inset_dividers_start_16dp_in_under_a_48dp_subheader(cx: &mut TestAppContext) {
+        let (_, cx) = cx.add_window_view(|_, _| Dividers);
+        cx.run_until_parked();
+        cx.update(|window, cx| {
+            window.refresh();
+            window.draw(cx).clear(cx);
+        });
+        let subheader = cx.debug_bounds("subheader").unwrap();
+        assert_eq!(subheader.size.height, px(48.));
+        cx.update(|window, _| {
+            let scale = window.scale_factor();
+            let line = window
+                .painted_quads()
+                .into_iter()
+                .find(|quad| quad.bounds.size.height.0 == scale)
+                .expect("the inset divider paints a 1dp line");
+            assert_eq!(line.bounds.origin.x.0, 16. * scale);
+            assert_eq!(line.bounds.size.width.0, (360. - 16.) * scale);
+            // Under the 48dp subheader and the 56dp one-line item.
+            assert_eq!(line.bounds.origin.y.0, (48. + 56. - 1.) * scale);
+            assert_eq!(line.border_widths.bottom.0, 0., "a fill, not the border");
+        });
     }
 }

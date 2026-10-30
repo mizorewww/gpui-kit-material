@@ -72,6 +72,7 @@ mod list;
 mod loading_indicator;
 mod menu;
 mod navigation;
+mod navigation_drawer;
 mod preview;
 mod progress;
 mod radio;
@@ -99,18 +100,20 @@ pub use carousel::{
 pub use checkbox::{CheckboxState, MaterialCheckbox};
 pub use chips::{AssistChip, CHIP_HEIGHT, ChipStyle, FilterChip, InputChip, SuggestionChip, chip};
 pub use choice::{ChoiceGroup, ChoiceTile, Tint, choice_radio, tinted_icon};
-pub use dialog::{DIALOG_WIDTH, MaterialDialog, SCRIM_OPACITY};
+pub use dialog::{
+    DIALOG_WIDTH, DialogActionAlignment, DialogAnimation, DialogSize, MaterialDialog, SCRIM_OPACITY,
+};
 pub use feedback::{
     BADGE_CONTAINER, BADGE_LABEL, CARD_PADDING, CardState, CardSurface, CardVariant,
-    LARGE_BADGE_PADDING, LARGE_BADGE_SIZE, NoticeKind, SMALL_BADGE_SIZE, StatusKind, card,
-    card_surface, large_badge, notice_banner, outlined_status_chip, small_badge, status_chip,
+    LARGE_BADGE_PADDING, LARGE_BADGE_SIZE, MaterialCard, NoticeKind, SMALL_BADGE_SIZE, StatusKind,
+    card, card_surface, large_badge, notice_banner, outlined_status_chip, small_badge, status_chip,
 };
 #[allow(deprecated)]
 pub use feedback::{BadgeKind, badge, outlined_badge};
 pub use focus::{FocusRing, RevealFocus, RingedButton, contain_scroll};
 pub use list::{
     LIST_SEGMENT_GAP, LIST_SEGMENT_INNER_RADIUS, LIST_SEGMENT_RADIUS, ListDensity, ListItem,
-    ListLeading, ListLines, ListTrailing, segmented_list,
+    ListLeading, ListLines, ListTrailing, list_subheader, segmented_list,
 };
 pub use loading_indicator::{
     LOADING_INDICATOR_SIZE, LoadingFrame, LoadingIndicator, LoadingShape, loading_indicator_frame,
@@ -119,9 +122,10 @@ pub use menu::{
     ExposedDropdown, MaterialMenu, MaterialMenuItem, MenuDensity, MenuGroup, MenuPopup, MenuStyle,
 };
 pub use navigation::{
-    NavBadge, NavIcon, NavItem, NavItemLayout, NavigationBar, NavigationItem, NavigationRail,
-    RAIL_COLLAPSED_WIDTH, RAIL_EXPANDED_WIDTH, RailAlignment, navigation_scrim,
+    MEDIUM_WIDTH, NavBadge, NavIcon, NavItem, NavItemLayout, NavigationBar, NavigationItem,
+    NavigationRail, RAIL_COLLAPSED_WIDTH, RAIL_EXPANDED_WIDTH, RailAlignment, navigation_scrim,
 };
+pub use navigation_drawer::{DRAWER_WIDTH, DrawerPosition, NavigationDrawer};
 pub use preview::InteractionPreview;
 pub use progress::{
     CircularProgress, CircularProgressFrame, CircularProgressPlayback, LINEAR_INDETERMINATE_MS,
@@ -134,7 +138,7 @@ pub use progress::{
     progress_with_label, sample_circular_progress, spinner, spinner_with_playback,
 };
 pub use radio::{MaterialRadio, MaterialRadioGroup};
-pub use sheets::{MaterialBottomSheet, MaterialSideSheet};
+pub use sheets::{BottomSheetDetent, MaterialBottomSheet, MaterialSideSheet, SideSheetEdge};
 pub use tabs::{MaterialTabs, TabItem, TabsVariant};
 pub use text::{
     accessible_text, error_text, info_callout, page_heading, section_heading, section_title,

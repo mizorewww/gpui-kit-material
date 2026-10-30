@@ -466,6 +466,8 @@ pub struct Toolbar {
     items: Vec<AnyElement>,
     fab: Option<AnyElement>,
     visible: bool,
+    elevated: Option<bool>,
+    docked_centered: bool,
 }
 
 impl Toolbar {
@@ -480,6 +482,8 @@ impl Toolbar {
             items: Vec::new(),
             fab: None,
             visible: true,
+            elevated: None,
+            docked_centered: false,
         }
     }
     pub fn configuration(mut self, configuration: ToolbarConfiguration) -> Self {
@@ -518,6 +522,24 @@ impl Toolbar {
         self
     }
 
+    /// Paint the level 3 shadow. By default a floating toolbar is elevated
+    /// and a docked one is flat.
+    pub fn elevated(mut self, elevated: bool) -> Self {
+        self.elevated = Some(elevated);
+        self
+    }
+    /// Group a docked toolbar's items in its center, 8dp apart (the kit's
+    /// minimum docked gap), instead of spreading them across its width.
+    pub fn docked_centered(mut self, centered: bool) -> Self {
+        self.docked_centered = centered;
+        self
+    }
+
+    fn is_elevated(&self) -> bool {
+        self.elevated
+            .unwrap_or(self.configuration == ToolbarConfiguration::Floating)
+    }
+
     fn vertical(&self) -> bool {
         self.configuration == ToolbarConfiguration::Floating
             && self.orientation == ToolbarOrientation::Vertical
@@ -527,6 +549,8 @@ impl Toolbar {
 #[cfg(test)]
 thread_local! {
     pub(crate) static SHOWN: std::cell::RefCell<std::collections::BTreeMap<String, f32>> =
+        const { std::cell::RefCell::new(std::collections::BTreeMap::new()) };
+    pub(crate) static ELEVATED: std::cell::RefCell<std::collections::BTreeMap<String, bool>> =
         const { std::cell::RefCell::new(std::collections::BTreeMap::new()) };
 }
 
@@ -549,6 +573,18 @@ impl RenderOnce for Toolbar {
         });
         let gone = !self.visible && shown <= 0.001;
         let container = color(self.scheme.container());
+        let shadow = if self.is_elevated() {
+            elevation::level(3)
+        } else {
+            Vec::new()
+        };
+        #[cfg(test)]
+        ELEVATED.with(|elevated| {
+            elevated
+                .borrow_mut()
+                .insert(format!("{:?}", self.id), !shadow.is_empty())
+        });
+        let centered = self.docked_centered;
 
         let bar = gpui_base::Toolbar::new(self.id.clone())
             .axis(if vertical {
@@ -568,20 +604,27 @@ impl RenderOnce for Toolbar {
                         .h(rem(TOOLBAR_SIZE))
                         .px(rem(DOCKED_PADDING))
                         .gap(rem(DOCKED_GAP))
-                        .justify_between()
+                        .map(|bar| {
+                            if centered {
+                                bar.justify_center()
+                            } else {
+                                bar.justify_between()
+                            }
+                        })
+                        .shadow(shadow)
                 } else if vertical {
                     bar.flex_col()
                         .w(rem(TOOLBAR_SIZE))
                         .py(rem(FLOATING_PADDING))
                         .gap(rem(FLOATING_GAP))
                         .rounded_full()
-                        .shadow(elevation::level(3))
+                        .shadow(shadow)
                 } else {
                     bar.h(rem(TOOLBAR_SIZE))
                         .px(rem(FLOATING_PADDING))
                         .gap(rem(FLOATING_GAP))
                         .rounded_full()
-                        .shadow(elevation::level(3))
+                        .shadow(shadow)
                 }
             })
             .when(!gone, |bar| bar.children(self.items));

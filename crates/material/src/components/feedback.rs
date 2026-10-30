@@ -7,6 +7,7 @@ use crate::tokens::{elevation, layout::*, shape::*, state, typography::*};
 
 use super::InteractionPreview;
 use gpui::{prelude::*, *};
+use std::rc::Rc;
 
 use super::text::accessible_text;
 
@@ -486,6 +487,293 @@ impl Element for CardSurface {
                 BorderStyle::default(),
             ));
         }
+    }
+}
+
+/// Why a [`MaterialCard`] is moving: the pointer holding it, or the
+/// spring carrying it home after release.
+#[derive(Default)]
+struct CardDrag {
+    /// Pointer position and card offset when the press began, while held.
+    grab: Option<(Point<Pixels>, Point<Pixels>)>,
+    /// The card's displacement from its place.
+    offset: Point<Pixels>,
+    /// Whether the current or last press moved the card (it then is not a
+    /// click).
+    moved: bool,
+    /// Bumped on every release, keying the return animation.
+    releases: u64,
+    /// Where the last release left the card.
+    released_at: Point<Pixels>,
+}
+
+/// A [`MaterialCard`]'s action.
+type CardClick = Rc<dyn Fn(&ClickEvent, &mut Window, &mut App)>;
+
+/// The distance a press must travel before it drags the card.
+const CARD_DRAG_SLOP: Pixels = px(4.);
+
+/// A Material card that can act and move: the [`CardSurface`] of its
+/// variant, optionally a GPUI Base button (`on_click`: hover and press
+/// state layers, the kit's hover elevation, ripple, keyboard activation
+/// and the focus ring) and optionally draggable (the dragged state layer
+/// and elevation while the pointer carries it; on release it springs back
+/// to its place on the default spatial spring, or returns at once under
+/// reduced motion). The accessible label names the action.
+#[derive(gpui::IntoElement)]
+pub struct MaterialCard {
+    id: ElementId,
+    variant: CardVariant,
+    label: Option<SharedString>,
+    on_click: Option<CardClick>,
+    draggable: bool,
+    preview: Option<CardState>,
+    children: Vec<AnyElement>,
+    style: StyleRefinement,
+}
+
+impl MaterialCard {
+    pub fn new(id: impl Into<ElementId>, variant: CardVariant) -> Self {
+        Self {
+            id: id.into(),
+            variant,
+            label: None,
+            on_click: None,
+            draggable: false,
+            preview: None,
+            children: Vec::new(),
+            style: StyleRefinement::default(),
+        }
+    }
+
+    /// Make the card one action (Base button semantics).
+    pub fn on_click(
+        mut self,
+        handler: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_click = Some(Rc::new(handler));
+        self
+    }
+
+    /// The action's accessible name.
+    pub fn accessibility_label(mut self, label: impl Into<SharedString>) -> Self {
+        self.label = Some(label.into());
+        self
+    }
+
+    /// Let the pointer pick the card up and move it.
+    pub fn draggable(mut self, draggable: bool) -> Self {
+        self.draggable = draggable;
+        self
+    }
+
+    /// Render a fixed interaction state as a specimen.
+    pub fn state(mut self, state: CardState) -> Self {
+        self.preview = Some(state);
+        self
+    }
+
+    /// Whether this card acts.
+    pub fn is_clickable(&self) -> bool {
+        self.on_click.is_some()
+    }
+}
+
+impl Styled for MaterialCard {
+    fn style(&mut self) -> &mut StyleRefinement {
+        &mut self.style
+    }
+}
+
+impl ParentElement for MaterialCard {
+    fn extend(&mut self, elements: impl IntoIterator<Item = AnyElement>) {
+        self.children.extend(elements);
+    }
+}
+
+impl RenderOnce for MaterialCard {
+    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
+        use super::button::{ButtonFocusRing, ButtonRipple};
+        let id = self.id;
+        let drag =
+            window.use_keyed_state((id.clone(), "card-drag"), cx, |_, _| CardDrag::default());
+        let (grabbed, offset, releases, released_at) = {
+            let drag = drag.read(cx);
+            (
+                drag.grab.is_some(),
+                drag.offset,
+                drag.releases,
+                drag.released_at,
+            )
+        };
+        let dragging = grabbed && drag.read(cx).moved;
+        let clickable = self.on_click.is_some() && self.preview.is_none();
+        let pressed = clickable && grabbed && !dragging;
+        let container = color(card_style(self.variant).container);
+        let group: SharedString = format!("material-card-{id:?}").into();
+
+        let mut surface = CardSurface::new(self.variant)
+            .w_full()
+            .children(self.children);
+        surface = match (self.preview, dragging) {
+            (_, true) => surface.state(CardState::Dragged),
+            (Some(state), _) => surface.state(state),
+            (None, false) if pressed => surface.state(CardState::Pressed),
+            (None, false) if clickable => {
+                let hover = state::hovered(container, color(ON_SURFACE));
+                let hovered = elevation::level(card_elevation(self.variant, CardState::Hovered));
+                surface.group_hover(group.clone(), move |style| {
+                    style.bg(hover).shadow(hovered.clone())
+                })
+            }
+            _ => surface,
+        };
+
+        let body: AnyElement = if let Some(on_click) = self.on_click.clone().filter(|_| clickable) {
+            let focus = window
+                .use_keyed_state((id.clone(), "card-focus"), cx, |_, cx| cx.focus_handle())
+                .read(cx)
+                .clone();
+            let click_drag = drag.clone();
+            let button = gpui_base::Button::new((id.clone(), "card-button"))
+                .group(group)
+                .track_focus(&focus)
+                .w_full()
+                .rounded(RADIUS_CARD)
+                .cursor_pointer()
+                .when_some(self.label.clone(), |button, label| {
+                    button.accessibility_label(label)
+                })
+                .child(surface)
+                .on_click(move |event, window, cx| {
+                    // A press that carried the card away is a drag, not a click.
+                    if !click_drag.read(cx).moved {
+                        on_click(event, window, cx);
+                    }
+                });
+            let ripple = ButtonRipple::new(
+                button,
+                (id.clone(), "card-ripple").into(),
+                true,
+                true,
+                super::navigation::ripple_corners(RADIUS_CARD),
+                Edges::all(px(0.).into()),
+                color(ON_SURFACE),
+                window,
+                cx,
+            );
+            ButtonFocusRing::with_corners(ripple, focus, true, Corners::all(RADIUS_CARD))
+                .into_any_element()
+        } else {
+            surface.into_any_element()
+        };
+
+        let draggable = self.draggable && self.preview.is_none();
+        let mut root = div()
+            .id(id.clone())
+            .relative()
+            .flex()
+            .flex_col()
+            .child(body);
+        root.style().refine(&self.style);
+        if draggable {
+            root = root.cursor(if dragging {
+                CursorStyle::ClosedHand
+            } else {
+                CursorStyle::OpenHand
+            });
+        }
+        if draggable || clickable {
+            // The press: the pressed state of an action, and a drag's grab.
+            let grab = drag.clone();
+            root = root.on_mouse_down(MouseButton::Left, move |event, window, cx| {
+                grab.update(cx, |drag, _| {
+                    drag.grab = Some((event.position, drag.offset));
+                    drag.moved = false;
+                });
+                window.refresh();
+            });
+        }
+        if grabbed {
+            // While held, follow the pointer anywhere in the window.
+            let follow = drag.clone();
+            root = root.child(
+                canvas(
+                    |_, _, _| (),
+                    move |_, _, window, _| {
+                        let moving = follow.clone();
+                        window.on_mouse_event(move |event: &MouseMoveEvent, phase, window, cx| {
+                            if phase != DispatchPhase::Capture {
+                                return;
+                            }
+                            moving.update(cx, |drag, _| {
+                                let Some((start, from)) = drag.grab else {
+                                    return;
+                                };
+                                let delta = event.position - start;
+                                if !draggable {
+                                    return;
+                                }
+                                if drag.moved
+                                    || delta.x.abs() > CARD_DRAG_SLOP
+                                    || delta.y.abs() > CARD_DRAG_SLOP
+                                {
+                                    drag.moved = true;
+                                    drag.offset = from + delta;
+                                }
+                            });
+                            window.refresh();
+                        });
+                        let dropping = follow.clone();
+                        window.on_mouse_event(move |_: &MouseUpEvent, phase, window, cx| {
+                            if phase != DispatchPhase::Capture {
+                                return;
+                            }
+                            dropping.update(cx, |drag, _| {
+                                drag.grab = None;
+                                if drag.moved {
+                                    drag.releases += 1;
+                                    drag.released_at = drag.offset;
+                                }
+                                drag.offset = Point::default();
+                            });
+                            // The click this release may complete reads
+                            // `moved`; forget it once the event is handled.
+                            let settled = dropping.clone();
+                            window.defer(cx, move |_, cx| {
+                                settled.update(cx, |drag, _| drag.moved = false);
+                            });
+                            window.refresh();
+                        });
+                    },
+                )
+                .absolute()
+                .size_0(),
+            );
+        }
+        let lifted = dragging || grabbed;
+        if lifted && offset != Point::default() {
+            return root.left(offset.x).top(offset.y).into_any_element();
+        }
+        if releases > 0 && released_at != Point::default() && !cx.reduce_motion() {
+            let curve = crate::motion::curve(crate::motion::MotionToken::DefaultSpatial);
+            let ease = curve.ease();
+            return root
+                .with_animation(
+                    ElementId::NamedChild(
+                        std::sync::Arc::new(id),
+                        format!("card-return-{releases}").into(),
+                    ),
+                    Animation::new(curve.duration()),
+                    move |root, t| {
+                        let remaining = 1. - ease(t);
+                        root.left(released_at.x * remaining)
+                            .top(released_at.y * remaining)
+                    },
+                )
+                .into_any_element();
+        }
+        root.into_any_element()
     }
 }
 

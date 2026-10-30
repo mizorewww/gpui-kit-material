@@ -41,7 +41,7 @@ use std::{collections::BTreeMap, rc::Rc};
 /// The hover group every item's state layer follows. Items are siblings, so
 /// one static name resolves to the enclosing item (GPUI keeps a stack per
 /// group name).
-const ITEM_GROUP: &str = "material-navigation-item";
+pub(crate) const ITEM_GROUP: &str = "material-navigation-item";
 
 /// An item's badge, drawn on its icon's top-trailing corner.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -138,6 +138,18 @@ impl NavItem {
     }
     fn is_disabled(&self) -> bool {
         self.disabled || self.preview.is_some_and(InteractionPreview::is_disabled)
+    }
+    pub(crate) fn is_disabled_value(&self) -> bool {
+        self.is_disabled()
+    }
+    pub(crate) fn preview_state_value(&self) -> Option<InteractionPreview> {
+        self.preview
+    }
+    pub(crate) fn badge_value(&self) -> &NavBadge {
+        &self.badge
+    }
+    pub(crate) fn icon_value(&self) -> &NavIcon {
+        &self.icon
     }
 }
 
@@ -318,7 +330,7 @@ thread_local! {
         const { std::cell::RefCell::new(BTreeMap::new()) };
 }
 
-type ClickHandler = Rc<dyn Fn(&ClickEvent, &mut Window, &mut App)>;
+pub(crate) type ClickHandler = Rc<dyn Fn(&ClickEvent, &mut Window, &mut App)>;
 
 /// One navigation destination as an M3 item: active-indicator pill, filled
 /// icon when selected, badge and label. Bars and rails compose these; a
@@ -334,6 +346,7 @@ pub struct NavigationItem {
     tab_stop: bool,
     position: Option<(usize, usize)>,
     fill: bool,
+    ripple: bool,
     on_click: Option<ClickHandler>,
 }
 
@@ -349,8 +362,15 @@ impl NavigationItem {
             tab_stop: true,
             position: None,
             fill: false,
+            ripple: true,
             on_click: None,
         }
+    }
+    /// Whether presses spread a ripple (on by default); the state layer
+    /// shows either way.
+    pub fn ripple(mut self, ripple: bool) -> Self {
+        self.ripple = ripple;
+        self
     }
     pub fn layout(mut self, layout: NavItemLayout) -> Self {
         self.layout = layout;
@@ -493,7 +513,7 @@ impl RenderOnce for NavigationItem {
         let ripple = ButtonRipple::new(
             pill,
             (self.id.clone(), "nav-ripple").into(),
-            preview.is_none(),
+            preview.is_none() && self.ripple,
             enabled,
             ripple_corners(radius),
             Edges::all(px(0.).into()),
@@ -554,14 +574,14 @@ impl RenderOnce for NavigationItem {
 }
 
 /// Shared list behavior of bars and rails.
-struct Destinations {
-    handles: Rc<[FocusHandle]>,
-    selected: Option<usize>,
-    entry: Option<usize>,
-    roving: Roving,
+pub(crate) struct Destinations {
+    pub handles: Rc<[FocusHandle]>,
+    pub selected: Option<usize>,
+    pub entry: Option<usize>,
+    pub roving: Roving,
 }
 
-fn destinations(
+pub(crate) fn destinations(
     id: &ElementId,
     items: &[NavItem],
     selected: Option<&SharedString>,
@@ -597,7 +617,11 @@ fn destinations(
     }
 }
 
-fn item_click(on_change: Option<Change>, value: SharedString, selected: bool) -> ClickHandler {
+pub(crate) fn item_click(
+    on_change: Option<Change>,
+    value: SharedString,
+    selected: bool,
+) -> ClickHandler {
     Rc::new(move |_, window, cx| {
         if !selected && let Some(on_change) = &on_change {
             on_change(&value, window, cx);
@@ -614,7 +638,9 @@ pub struct NavigationBar {
     items: Vec<NavItem>,
     selected: Option<SharedString>,
     layout: NavItemLayout,
+    adaptive: bool,
     show_labels: bool,
+    ripple: bool,
     on_change: Option<Change>,
 }
 
@@ -627,7 +653,9 @@ impl NavigationBar {
             items: Vec::new(),
             selected: None,
             layout: NavItemLayout::Vertical,
+            adaptive: false,
             show_labels: true,
+            ripple: true,
             on_change: None,
         }
     }
@@ -638,6 +666,18 @@ impl NavigationBar {
     }
     pub fn selected(mut self, value: impl Into<SharedString>) -> Self {
         self.selected = Some(value.into());
+        self
+    }
+    /// Choose the item layout from the bar's own width, M3's window size
+    /// classes: vertical items while compact (under 600dp), horizontal
+    /// items from medium widths up. Overrides [`Self::layout`].
+    pub fn adaptive(mut self, adaptive: bool) -> Self {
+        self.adaptive = adaptive;
+        self
+    }
+    /// Whether presses spread a ripple (on by default).
+    pub fn ripple(mut self, ripple: bool) -> Self {
+        self.ripple = ripple;
         self
     }
     /// Horizontal items (icon beside label) for medium windows; vertical
@@ -666,6 +706,17 @@ impl NavigationBar {
 /// The widest share a horizontal bar item takes, so a few items gather in
 /// the middle of a wide bar instead of spreading to its edges.
 const HORIZONTAL_ITEM_MAX: f32 = 128.;
+/// The M3 medium window class starts at 600dp.
+pub const MEDIUM_WIDTH: f32 = 600.;
+
+/// The layout an adaptive bar uses at `width` design px.
+pub(crate) fn adaptive_layout(width: f32) -> NavItemLayout {
+    if width >= MEDIUM_WIDTH {
+        NavItemLayout::Horizontal
+    } else {
+        NavItemLayout::Vertical
+    }
+}
 
 impl RenderOnce for NavigationBar {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
@@ -678,8 +729,18 @@ impl RenderOnce for NavigationBar {
             cx,
         );
         let count = self.items.len();
-        let geometry = self.layout.geometry();
-        let horizontal = self.layout == NavItemLayout::Horizontal;
+        // An adaptive bar measures its width after layout and settles on the
+        // matching layout on the next frame (only when the class changes).
+        let measured = self.adaptive.then(|| {
+            window.use_keyed_state((self.id.clone(), "nav-bar-width"), cx, |_, _| None::<f32>)
+        });
+        let layout = match measured.as_ref().and_then(|width| *width.read(cx)) {
+            Some(width) => adaptive_layout(width),
+            None => self.layout,
+        };
+        let geometry = layout.geometry();
+        let horizontal = layout == NavItemLayout::Horizontal;
+        let ripple = self.ripple;
         let lane = gpui_base::Tabs::new((self.id.clone(), "nav-items"))
             .aria_label(self.label.clone())
             .flex()
@@ -696,9 +757,10 @@ impl RenderOnce for NavigationBar {
                     ElementId::NamedChild(self.id.clone().into(), item.value.clone()),
                     item,
                 )
-                .layout(self.layout)
+                .layout(layout)
                 .selected(selected)
                 .show_label(self.show_labels)
+                .ripple(ripple)
                 .fill()
                 .roving(
                     list.handles[index].clone(),
@@ -716,6 +778,28 @@ impl RenderOnce for NavigationBar {
             .flex()
             .justify_center()
             .bg(color(ColorRole::SURFACE_CONTAINER))
+            .when_some(measured, |bar, width| {
+                bar.relative().child(
+                    canvas(
+                        move |bounds, window, cx| {
+                            let design = f32::from(bounds.size.width)
+                                / f32::from(window.rem_size())
+                                * crate::tokens::typography::BASE_PX;
+                            let changed = width.update(cx, |width, _| {
+                                let class = width.map(adaptive_layout);
+                                *width = Some(design);
+                                class != Some(adaptive_layout(design))
+                            });
+                            if changed {
+                                window.defer(cx, |window, _| window.refresh());
+                            }
+                        },
+                        |_, _, _, _| {},
+                    )
+                    .absolute()
+                    .inset_0(),
+                )
+            })
             .child(lane)
     }
 }
@@ -753,6 +837,8 @@ pub struct NavigationRail {
     expanded_width: f32,
     menu: Option<AnyElement>,
     fab: Option<AnyElement>,
+    hide_collapsed: bool,
+    ripple: bool,
     on_change: Option<Change>,
     on_dismiss: Option<ClickHandler>,
 }
@@ -772,6 +858,8 @@ impl NavigationRail {
             expanded_width: RAIL_EXPANDED_WIDTH,
             menu: None,
             fab: None,
+            hide_collapsed: false,
+            ripple: true,
             on_change: None,
             on_dismiss: None,
         }
@@ -801,6 +889,17 @@ impl NavigationRail {
     }
     pub fn alignment(mut self, alignment: RailAlignment) -> Self {
         self.alignment = alignment;
+        self
+    }
+    /// Hide the rail while collapsed: it springs from zero width to the
+    /// expanded width and leaves the tab order once fully collapsed.
+    pub fn hide_collapsed(mut self, hide: bool) -> Self {
+        self.hide_collapsed = hide;
+        self
+    }
+    /// Whether presses spread a ripple (on by default).
+    pub fn ripple(mut self, ripple: bool) -> Self {
+        self.ripple = ripple;
         self
     }
     /// The expanded width in design px, clamped to M3's 220–360dp.
@@ -849,13 +948,19 @@ impl RenderOnce for NavigationRail {
             (self.id.clone(), "rail-width"),
             if expanded {
                 self.expanded_width
+            } else if self.hide_collapsed {
+                0.
             } else {
                 RAIL_COLLAPSED_WIDTH
             },
             MotionToken::DefaultSpatial,
             window,
             cx,
-        );
+        )
+        .max(0.);
+        // A hidden rail keeps nothing focusable once it has closed.
+        let hidden = self.hide_collapsed && !expanded && width < 1.;
+        let ripple = self.ripple;
         let list = destinations(
             &self.id,
             &self.items,
@@ -883,7 +988,8 @@ impl RenderOnce for NavigationRail {
             .when(!expanded, |lane| {
                 lane.items_center().gap(rem(RAIL_ITEM_GAP))
             });
-        for (index, item) in self.items.into_iter().enumerate() {
+        let items = if hidden { Vec::new() } else { self.items };
+        for (index, item) in items.into_iter().enumerate() {
             while let Some((_, header)) = sections.next_if(|(before, _)| *before <= index) {
                 if expanded {
                     lane = lane.child(section_header(index, header));
@@ -898,6 +1004,7 @@ impl RenderOnce for NavigationRail {
                 )
                 .layout(layout)
                 .selected(selected)
+                .ripple(ripple)
                 .roving(
                     list.handles[index].clone(),
                     list.entry == Some(index),
@@ -924,7 +1031,12 @@ impl RenderOnce for NavigationRail {
             ),
             lane,
         );
-        let has_header = self.menu.is_some() || self.fab.is_some();
+        let (menu, fab) = if hidden {
+            (None, None)
+        } else {
+            (self.menu, self.fab)
+        };
+        let has_header = menu.is_some() || fab.is_some();
         let header = div()
             .flex()
             .flex_col()
@@ -937,8 +1049,8 @@ impl RenderOnce for NavigationRail {
                     header.w_full().items_center()
                 }
             })
-            .children(self.menu)
-            .children(self.fab);
+            .children(menu)
+            .children(fab);
         let on_dismiss = self.on_dismiss.filter(|_| modal);
         div()
             .id(self.id)

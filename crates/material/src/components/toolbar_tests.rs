@@ -288,3 +288,75 @@ fn previewed_buttons_leave_the_tab_order(cx: &mut TestAppContext) {
     assert!(cx.update(|window, cx| window.focused(cx)).is_none());
     assert!((painted("specimen").1 - PRESSED_RADIUS).abs() < 0.01);
 }
+
+struct Options {
+    configuration: ToolbarConfiguration,
+    elevated: Option<bool>,
+    centered: bool,
+}
+
+impl Render for Options {
+    fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        window.set_rem_size(px(14.));
+        let mut toolbar = Toolbar::new("options", "Actions")
+            .configuration(self.configuration)
+            .docked_centered(self.centered)
+            .item(
+                div()
+                    .debug_selector(|| "first-item".into())
+                    .child(ToolbarButton::icon("first", icon(), "First")),
+            )
+            .item(ToolbarButton::icon("second", icon(), "Second"));
+        if let Some(elevated) = self.elevated {
+            toolbar = toolbar.elevated(elevated);
+        }
+        div().w(px(412.)).child(toolbar)
+    }
+}
+
+fn elevated() -> bool {
+    ELEVATED.with(|map| *map.borrow().values().next().expect("toolbar drawn"))
+}
+
+#[gpui::test]
+fn floating_toolbars_are_elevated_and_docked_flat_unless_set(cx: &mut TestAppContext) {
+    cx.update(gpui_base::init);
+    let (view, cx) = cx.add_window_view(|_, _| Options {
+        configuration: ToolbarConfiguration::Floating,
+        elevated: None,
+        centered: false,
+    });
+    for (configuration, set, expected) in [
+        (ToolbarConfiguration::Floating, None, true),
+        (ToolbarConfiguration::Docked, None, false),
+        (ToolbarConfiguration::Floating, Some(false), false),
+        (ToolbarConfiguration::Docked, Some(true), true),
+    ] {
+        cx.update(|_, cx| {
+            view.update(cx, |view, _| {
+                view.configuration = configuration;
+                view.elevated = set;
+            })
+        });
+        settle(cx);
+        assert_eq!(elevated(), expected, "{configuration:?} {set:?}");
+    }
+}
+
+#[gpui::test]
+fn docked_items_spread_or_gather_in_the_center(cx: &mut TestAppContext) {
+    cx.update(gpui_base::init);
+    let (view, cx) = cx.add_window_view(|_, _| Options {
+        configuration: ToolbarConfiguration::Docked,
+        elevated: None,
+        centered: false,
+    });
+    settle(cx);
+    let spread = cx.debug_bounds("first-item").unwrap();
+    assert_eq!(spread.left(), px(DOCKED_PADDING), "spread from the edge");
+    cx.update(|_, cx| view.update(cx, |view, _| view.centered = true));
+    settle(cx);
+    let centered = cx.debug_bounds("first-item").unwrap();
+    // Two 48dp items 8dp apart, centered in 412dp.
+    assert_eq!(centered.left(), px((412. - 48. * 2. - DOCKED_GAP) / 2.));
+}

@@ -263,3 +263,37 @@ fn auto_activation_selects_on_focus_and_skips_disabled_tabs(cx: &mut TestAppCont
     cx.simulate_click(at, Modifiers::default());
     cx.update(|_, cx| assert_eq!(view.read(cx).changes, 1, "disabled tabs ignore clicks"));
 }
+
+struct DividerHarness {
+    divider: bool,
+}
+
+impl Render for DividerHarness {
+    fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        window.set_rem_size(px(14.));
+        div().w(px(300.)).child(
+            MaterialTabs::new("tabs", "Sections")
+                .divider(self.divider)
+                .items([TabItem::new("a", "A"), TabItem::new("b", "B")])
+                .selected("a"),
+        )
+    }
+}
+
+#[gpui::test]
+fn the_divider_can_be_hidden(cx: &mut TestAppContext) {
+    cx.update(|cx| {
+        gpui_base::init(cx);
+        super::roving::init(cx);
+    });
+    let (view, cx) = cx.add_window_view(|_, _| DividerHarness { divider: true });
+    settle(cx);
+    let line = cx
+        .debug_bounds("tabs-divider")
+        .expect("the divider is drawn");
+    assert_eq!(line.size.height, px(1.));
+    assert_eq!(line.size.width, px(300.));
+    cx.update(|_, cx| view.update(cx, |view, _| view.divider = false));
+    settle(cx);
+    assert!(cx.debug_bounds("tabs-divider").is_none());
+}
