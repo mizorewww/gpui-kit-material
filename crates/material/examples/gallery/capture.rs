@@ -1,15 +1,20 @@
 //! Explicit native GPU capture for reproducible gallery evidence.
-use super::{Gallery, page::CaptureState, pages::PAGES};
+use super::catalog::{self, CATALOG, Kind};
+use super::playground::Value;
+use super::{Gallery, Tab, page::CaptureState};
 use anyhow::{Context as _, Result, bail, ensure};
 use gpui::{App, Entity, Global, ListOffset, ListState, Pixels, Window, px, size};
 use std::{cell::Cell, path::PathBuf, process::Command, rc::Rc, time::Duration};
 
-pub const USAGE: &str = "gallery [--capture output.png --section <page id>\n  --width 960 --height 900 --scale 1 --dark --reduced-motion --settle-ms 800\n  --active --disabled --selected --loading --no-ripple --offset-y 0 --settings --fps --vsync on|off]\n\nPage ids, in gallery order:\n  color typography shape motion elevation examples app-bars badges buttons\n  cards carousel checkboxes chips date-time-pickers dialogs dividers lists\n  loading-progress menu navigation radio-button search sheets sliders\n  snackbar switch tabs text-fields toolbars tooltips";
+pub const USAGE: &str = "gallery [--capture output.png --section <page id> --tab preview|specs\n  --scenario <name> --set <control>=<value> ...\n  --width 1280 --height 900 --scale 1 --dark --reduced-motion --settle-ms 800\n  --active --disabled --selected --loading --no-ripple --offset-y 0 --settings --fps --vsync on|off]\n\nPage ids, in navigation order:\n  overview button icon-button button-group split-button fab fab-menu\n  extended-fab checkbox switch radio-buttons chips slider text-field select\n  search date-picker time-picker navigation-rail navigation-bar tabs menu\n  top-app-bar bottom-app-bar toolbar card list carousel divider dialog\n  bottom-sheet side-sheet badge progress loading-indicator snackbar tooltip\n  color typography shape motion elevation examples\n\nDesign-kit page ids open the first page showing that kit page on its Specs tab:\n  app-bars badges buttons cards checkboxes date-time-pickers dialogs dividers\n  lists loading-progress navigation radio-button sheets sliders text-fields\n  toolbars tooltips\n\n--tab defaults to preview (specs for a kit page id). --scenario and --set\nconfigure the page's playground, e.g. --set variant=tonal --set disabled=true.";
 
 #[derive(Clone)]
 pub struct CaptureOptions {
     output: PathBuf,
     section: usize,
+    tab: Tab,
+    scenario: Option<usize>,
+    values: Vec<(&'static str, Value)>,
     width: f32,
     height: f32,
     scale: f32,
@@ -38,7 +43,10 @@ impl CaptureOptions {
         let mut options = Self {
             output: PathBuf::new(),
             section: 0,
-            width: 960.,
+            tab: Tab::Preview,
+            scenario: None,
+            values: Vec::new(),
+            width: 1280.,
             height: 900.,
             scale: 1.,
             dark: false,
@@ -55,6 +63,10 @@ impl CaptureOptions {
             vsync: None,
             completed: Rc::new(Cell::new(false)),
         };
+        let mut tab = None;
+        let mut legacy = false;
+        let mut scenario = None;
+        let mut sets = Vec::new();
         while let Some(flag) = args.next() {
             let mut value = || {
                 args.next()
@@ -64,11 +76,18 @@ impl CaptureOptions {
                 "--capture" => output = Some(PathBuf::from(value()?)),
                 "--section" => {
                     let name = value()?;
-                    options.section = PAGES
-                        .iter()
-                        .position(|page| page.info.id == name)
+                    (options.section, legacy) = catalog::resolve(&name)
                         .with_context(|| format!("Unknown section: {name}"))?;
                 }
+                "--tab" => {
+                    tab = Some(match value()?.as_str() {
+                        "preview" => Tab::Preview,
+                        "specs" => Tab::Specs,
+                        _ => bail!("--tab must be preview or specs"),
+                    })
+                }
+                "--scenario" => scenario = Some(value()?),
+                "--set" => sets.push(value()?),
                 "--width" => options.width = value()?.parse()?,
                 "--height" => options.height = value()?.parse()?,
                 "--scale" => options.scale = value()?.parse()?,
@@ -94,6 +113,38 @@ impl CaptureOptions {
             }
         }
         options.output = output.context("Capture options require --capture output.png")?;
+        options.tab = tab.unwrap_or(if legacy { Tab::Specs } else { Tab::Preview });
+        let entry = &CATALOG[options.section];
+        let playground = match entry.kind {
+            Kind::Component { playground } => playground,
+            _ => None,
+        };
+        if scenario.is_some() || !sets.is_empty() {
+            let playground = playground
+                .with_context(|| format!("{} has no playground to configure", entry.id))?;
+            if let Some(name) = scenario {
+                options.scenario = Some(if name == "Default" {
+                    0
+                } else {
+                    1 + playground
+                        .scenarios
+                        .iter()
+                        .position(|scenario| scenario.name == name)
+                        .with_context(|| format!("Unknown scenario for {}: {name}", entry.id))?
+                });
+            }
+            for set in sets {
+                let (id, text) = set
+                    .split_once('=')
+                    .with_context(|| format!("--set expects control=value: {set}"))?;
+                let control = playground
+                    .control(id)
+                    .with_context(|| format!("Unknown control for {}: {id}", entry.id))?;
+                let value = Value::parse(control, text)
+                    .with_context(|| format!("Invalid value for {id}: {text}"))?;
+                options.values.push((control.id(), value));
+            }
+        }
         ensure!(
             options.output.extension().is_some_and(|ext| ext == "png"),
             "Capture output must use .png"
@@ -153,6 +204,7 @@ pub(super) fn install(view: &Entity<Gallery>, window: &mut Window, cx: &mut App)
     view.update(cx, |gallery, cx| {
         gallery.apply_capture(
             options.section,
+            options.tab,
             options.dark,
             options.scale,
             CaptureState {
@@ -164,6 +216,7 @@ pub(super) fn install(view: &Entity<Gallery>, window: &mut Window, cx: &mut App)
             },
             cx,
         );
+        gallery.configure(options.scenario, &options.values, window, cx);
     });
     let view = view.clone();
     // Wait for initial layout, then position the logical section row.
@@ -172,7 +225,7 @@ pub(super) fn install(view: &Entity<Gallery>, window: &mut Window, cx: &mut App)
             if options.settings {
                 super::settings::open(window, cx);
             }
-            view.read(cx).scroll_to_section(options.section);
+            view.read(cx).scroll_to_top();
             window.refresh();
             // Allow the target rows to be measured and painted before settling.
             window.on_next_frame(move |window, cx| {
@@ -207,7 +260,10 @@ pub(super) fn install(view: &Entity<Gallery>, window: &mut Window, cx: &mut App)
                     let metadata=serde_json::json!({
                         "renderer":"native GPUI render_to_image", "source_commit":git(&["rev-parse","HEAD"]),
                         "worktree_dirty":git(&["status","--porcelain"]).map(|status| !status.is_empty()),
-                        "section":PAGES[options.section].info.id,
+                        "section":CATALOG[options.section].id,
+                        "tab":format!("{:?}", options.tab),
+                        "scenario":options.scenario,
+                        "config":options.values.iter().map(|(id, value)| format!("{id}={value:?}")).collect::<Vec<_>>(),
                         "requested_viewport":{"width":options.width,"height":options.height},
                         "actual_viewport":{"width":f32::from(viewport.width),"height":f32::from(viewport.height)},
                         "image_pixels":{"width":image.width(),"height":image.height()},
@@ -297,24 +353,81 @@ fn scroll_measured_offset(
 
 #[cfg(test)]
 mod tests {
-    use super::{CaptureOptions, PAGES};
+    use super::super::pages::PAGES;
+    use super::{CATALOG, CaptureOptions, Tab, Value, catalog};
     fn parse(args: &[&str]) -> anyhow::Result<Option<CaptureOptions>> {
         CaptureOptions::parse(args.iter().map(|s| s.to_string()))
     }
     #[test]
     fn every_page_is_a_capture_section_named_in_the_usage() {
-        for (index, page) in super::PAGES.iter().enumerate() {
-            let options = parse(&["--capture", "out.png", "--section", page.info.id])
+        for (index, entry) in CATALOG.iter().enumerate() {
+            let options = parse(&["--capture", "out.png", "--section", entry.id])
                 .unwrap()
                 .unwrap();
             assert_eq!(options.section, index);
+            assert_eq!(options.tab, Tab::Preview);
             assert!(
-                super::USAGE
-                    .split_whitespace()
-                    .any(|word| word == page.info.id),
+                super::USAGE.split_whitespace().any(|word| word == entry.id),
                 "usage lists {}",
-                page.info.id
+                entry.id
             );
+        }
+        // Design-kit page ids stay valid and open their Specs.
+        for page in PAGES {
+            let id = page.info.id;
+            let options = parse(&["--capture", "out.png", "--section", id])
+                .unwrap()
+                .unwrap();
+            if catalog::position(id).is_none() {
+                assert_eq!(options.tab, Tab::Specs, "{id}");
+                assert!(
+                    super::USAGE.split_whitespace().any(|word| word == id),
+                    "usage lists {id}"
+                );
+            }
+        }
+    }
+    #[test]
+    fn captures_select_tabs_scenarios_and_configuration() {
+        let options = parse(&[
+            "--capture",
+            "out.png",
+            "--section",
+            "button",
+            "--tab",
+            "specs",
+            "--scenario",
+            "Download",
+            "--set",
+            "variant=outlined",
+            "--set",
+            "disabled=true",
+            "--set",
+            "text=Go",
+        ])
+        .unwrap()
+        .unwrap();
+        assert_eq!(options.tab, Tab::Specs);
+        assert_eq!(options.scenario, Some(2));
+        assert_eq!(
+            options.values,
+            [
+                ("variant", Value::Choice(2)),
+                ("disabled", Value::Bool(true)),
+                ("text", Value::Text("Go".into())),
+            ]
+        );
+        for args in [
+            vec!["--section", "button", "--set", "nope=1"],
+            vec!["--section", "button", "--set", "variant=round"],
+            vec!["--section", "button", "--set", "variant"],
+            vec!["--section", "button", "--scenario", "Nope"],
+            vec!["--section", "color", "--set", "a=b"],
+            vec!["--section", "button", "--tab", "code"],
+        ] {
+            let mut args = args;
+            args.extend(["--capture", "out.png"]);
+            assert!(parse(&args).is_err(), "{args:?}");
         }
     }
     #[test]
@@ -372,10 +485,7 @@ mod tests {
                 options.offset_y
             ),
             (
-                PAGES
-                    .iter()
-                    .position(|page| page.info.id == "buttons")
-                    .unwrap(),
+                catalog::position("button").unwrap(),
                 1280.,
                 1000.,
                 1.5,
