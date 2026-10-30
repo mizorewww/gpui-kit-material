@@ -239,7 +239,7 @@ impl RenderOnce for ButtonGroup {
                             } else {
                                 bounds.size.width
                             });
-                            if !moving && measured.get() != extent {
+                            if !moving && (measured.get() - extent).abs() > 0.01 {
                                 measured.set(extent);
                                 if equal && !vertical {
                                     // The others take the new widest width next frame.

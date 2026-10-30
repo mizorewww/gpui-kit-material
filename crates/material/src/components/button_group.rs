@@ -572,7 +572,7 @@ fn equal_slot(
             canvas(
                 move |bounds, window, _| {
                     let measured = f32::from(bounds.size.width);
-                    if width.get() != measured {
+                    if (width.get() - measured).abs() > 0.5 {
                         width.set(measured);
                         // The other options take the new width next frame.
                         window.request_animation_frame();
