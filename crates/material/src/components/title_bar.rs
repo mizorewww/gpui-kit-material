@@ -6,7 +6,7 @@
 //! [`CaptionButtons`]. The bar moves the window when dragged and zooms it on a
 //! double click, the way each platform's own title bar does. Controls placed
 //! in it take their presses with [`title_bar_control`].
-use super::caption::{CaptionButtons, CaptionLabels, CloseRequest};
+use super::caption::{Caption, CaptionButtons, CaptionLabels, CloseRequest};
 use gpui::{
     AnyElement, App, Bounds, InteractiveElement as _, IntoElement, MouseButton, ParentElement,
     Pixels, Point, RenderOnce, SharedString, Stateful, StatefulInteractiveElement as _,
@@ -90,6 +90,7 @@ pub struct TitleBar {
     base: Stateful<gpui::Div>,
     height: Pixels,
     labels: CaptionLabels,
+    caption: Option<Caption>,
     on_close: Option<CloseRequest>,
 }
 
@@ -104,8 +105,16 @@ impl TitleBar {
             id,
             height,
             labels,
+            caption: None,
             on_close: None,
         }
+    }
+
+    /// Force a caption style instead of detecting it, e.g. to compare the
+    /// Windows and Linux bars from another platform.
+    pub fn caption(mut self, caption: Caption) -> Self {
+        self.caption = Some(caption);
+        self
     }
 
     /// Replace the accessible names of the Windows and Linux caption buttons.
@@ -160,6 +169,13 @@ impl RenderOnce for TitleBar {
         let press = intent.clone();
         let release = intent.clone();
         let mut caption = CaptionButtons::new(self.height, self.labels);
+        let trailing = match self.caption {
+            Some(style) => {
+                caption = caption.caption(style);
+                CaptionButtons::trailing_for_style(style, window)
+            }
+            None => CaptionButtons::trailing(window),
+        };
         if let Some(request) = self.on_close {
             caption = caption.on_close(move |window, cx| request(window, cx));
         }
@@ -169,7 +185,7 @@ impl RenderOnce for TitleBar {
             .items_center()
             .h(self.height)
             .pl(px(title_bar_leading(self.height, window)))
-            .pr(px(CaptionButtons::trailing(window)))
+            .pr(px(trailing))
             // Windows hit-tests this as the caption: the system moves the
             // window and zooms on a double click.
             .window_control_area(WindowControlArea::Drag)

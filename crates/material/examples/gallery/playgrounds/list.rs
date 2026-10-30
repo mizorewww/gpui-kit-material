@@ -395,8 +395,6 @@ fn preview(
         .debug_selector(|| "playground-list".into())
         .w(rem(560.))
         .max_w_full()
-        .max_h_full()
-        .overflow_y_scroll()
         .flex()
         .flex_col()
         .role(Role::List)

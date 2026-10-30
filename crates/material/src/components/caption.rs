@@ -18,14 +18,21 @@
 //! system's non-client hit test with `HTMINBUTTON` / `HTMAXBUTTON` /
 //! `HTCLOSE` for them, so Windows itself minimizes, maximizes (with the snap
 //! layouts flyout) and closes. On Linux the buttons act themselves.
+//!
+//! Both styles sit on the bar's vertical center, like everything else in it.
+//! The glyphs are the platform's own shapes, not Material Symbols: symbols
+//! have different optical sizes on their 24dp grid (`remove` is 7/12 of the
+//! box, `crop_square` 3/4, and `filter_none` sits off-center), which at
+//! caption size reads as a crooked row. Each glyph here fills its box
+//! edge to edge and strokes on whole device pixels.
 use crate::color::ColorRole::{self, *};
-use crate::icons::IconName;
 use crate::theme::color;
 use crate::tokens::state;
 use gpui::{
-    AnyElement, App, Decorations, ElementId, InteractiveElement as _, IntoElement, MouseButton,
-    ParentElement as _, Pixels, RenderOnce, Rgba, SharedString, StatefulInteractiveElement as _,
-    Styled, Window, WindowControlArea, div, prelude::FluentBuilder as _, px,
+    AnyElement, App, Bounds, Decorations, ElementId, InteractiveElement as _, IntoElement,
+    MouseButton, ParentElement as _, PathBuilder, Pixels, RenderOnce, Rgba, SharedString,
+    StatefulInteractiveElement as _, Styled, Window, WindowControlArea, canvas, div, fill, point,
+    prelude::FluentBuilder as _, px, size,
 };
 use std::rc::Rc;
 
@@ -58,8 +65,9 @@ impl Caption {
 }
 
 /// Windows caption buttons are 46×32px at 100% display scaling, as Windows
-/// 11 draws them, top-aligned whatever the bar's height. Logical pixels
-/// follow the display scaling; the text scale does not change them.
+/// 11 draws them; a taller bar centers them vertically with its content.
+/// Logical pixels follow the display scaling; the text scale does not change
+/// them.
 const WINDOWS_BUTTON_WIDTH: f32 = 46.;
 const WINDOWS_BUTTON_HEIGHT: f32 = 32.;
 /// Above every dialog layer, below popups and tooltips.
@@ -70,8 +78,13 @@ const LINUX_BUTTON: f32 = 32.;
 const LINUX_SHAPE: f32 = 24.;
 const LINUX_GAP: f32 = 4.;
 const LINUX_END: f32 = 12.;
-/// The glyphs are drawn on a 10px grid.
-const GLYPH: f32 = 10.;
+/// The glyph box and stroke of each style: Windows draws 10px glyphs with
+/// hairlines (Segoe Fluent's chrome glyphs), libadwaita 8px ones with a
+/// heavier line in its round button.
+const WINDOWS_GLYPH: f32 = 10.;
+const WINDOWS_STROKE: f32 = 1.;
+const LINUX_GLYPH: f32 = 8.;
+const LINUX_STROKE: f32 = 1.5;
 
 /// A platform color, not a Material role: Windows 11 turns a hovered
 /// caption close button red (`#C42B1C`) behind a white glyph whatever the
@@ -118,15 +131,6 @@ impl CaptionButton {
             Self::Maximize => "caption-maximize",
             Self::Restore => "caption-restore",
             Self::Close => "caption-close",
-        }
-    }
-
-    fn glyph(self) -> IconName {
-        match self {
-            Self::Minimize => IconName::CaptionMinimize,
-            Self::Maximize => IconName::CaptionMaximize,
-            Self::Restore => IconName::CaptionRestore,
-            Self::Close => IconName::CaptionClose,
         }
     }
 
@@ -294,6 +298,11 @@ impl CaptionButtons {
     pub fn trailing(window: &Window) -> f32 {
         trailing_for(Self::width(window))
     }
+
+    /// [`Self::trailing`] for a forced caption style.
+    pub(super) fn trailing_for_style(caption: Caption, window: &Window) -> f32 {
+        trailing_for(width_of(caption, buttons(caption, window).len()))
+    }
 }
 
 impl RenderOnce for CaptionButtons {
@@ -322,10 +331,10 @@ impl RenderOnce for CaptionButtons {
             .flex_shrink_0()
             .text_color(glyph_color);
         let row = match caption {
-            Caption::Windows => row.h(px(WINDOWS_BUTTON_HEIGHT).min(self.height)).children(
+            Caption::Windows => row.h(self.height).items_center().children(
                 buttons
                     .into_iter()
-                    .map(|b| windows_button(b, &self.labels, live)),
+                    .map(|b| windows_button(b, &self.labels, self.height, live)),
             ),
             _ => {
                 row.h(self.height)
@@ -353,6 +362,95 @@ pub fn title_bar_control<E: gpui::InteractiveElement>(element: E) -> E {
     element.on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
 }
 
+/// The straight strokes of a glyph in a `glyph` px box, relative to the box.
+/// Lines are `stroke` thick; [`CaptionButton::Close`] has none, its diagonals
+/// are stroked as a path. The ink always fills the box, so it is centered in
+/// the box up to one stroke's parity.
+fn glyph_rects(button: CaptionButton, glyph: f32, stroke: f32) -> Vec<Bounds<Pixels>> {
+    let rect = |x: f32, y: f32, width: f32, height: f32| Bounds {
+        origin: point(px(x), px(y)),
+        size: size(px(width), px(height)),
+    };
+    let frame = |x: f32, y: f32, side: f32| {
+        [
+            rect(x, y, side, stroke),
+            rect(x, y + side - stroke, side, stroke),
+            rect(x, y + stroke, stroke, side - 2. * stroke),
+            rect(x + side - stroke, y + stroke, stroke, side - 2. * stroke),
+        ]
+    };
+    match button {
+        CaptionButton::Minimize => vec![rect(0., (glyph - stroke) / 2., glyph, stroke)],
+        CaptionButton::Maximize => frame(0., 0., glyph).to_vec(),
+        CaptionButton::Restore => {
+            // The front window at the lower left, and what shows of the one
+            // behind it: its top and right edges.
+            let offset = (glyph * 0.2).round();
+            let mut rects = frame(0., offset, glyph - offset).to_vec();
+            rects.push(rect(offset, 0., glyph - offset, stroke));
+            rects.push(rect(
+                glyph - stroke,
+                stroke,
+                stroke,
+                glyph - offset - stroke,
+            ));
+            rects
+        }
+        CaptionButton::Close => Vec::new(),
+    }
+}
+
+/// A caption glyph in the surrounding text color, so it follows the button's
+/// hover and press. Strokes stay on whole device pixels at any display scale.
+fn glyph(button: CaptionButton, glyph: f32, stroke: f32) -> impl IntoElement {
+    let ink_box = div()
+        .when(cfg!(test), move |ink_box| {
+            ink_box.debug_selector(move || format!("{}-glyph", button.id()))
+        })
+        .flex_shrink_0()
+        .size(px(glyph));
+    ink_box.child(
+        canvas(
+            |_, _, _| {},
+            move |bounds, _, window, _| {
+                let ink = window.text_style().color;
+                let scale = window.scale_factor();
+                let snap = |value: f32| (value * scale).round() / scale;
+                let stroke = ((stroke * scale).round() / scale).max(1. / scale);
+                let origin = point(
+                    px(snap(f32::from(bounds.origin.x))),
+                    px(snap(f32::from(bounds.origin.y))),
+                );
+                for rect in glyph_rects(button, glyph, stroke) {
+                    let snapped = Bounds {
+                        origin: point(
+                            origin.x + px(snap(f32::from(rect.origin.x))),
+                            origin.y + px(snap(f32::from(rect.origin.y))),
+                        ),
+                        size: rect.size,
+                    };
+                    window.paint_quad(fill(snapped, ink));
+                }
+                if button == CaptionButton::Close {
+                    let side = px(glyph);
+                    for (from, to) in [
+                        (point(px(0.), px(0.)), point(side, side)),
+                        (point(side, px(0.)), point(px(0.), side)),
+                    ] {
+                        let mut path = PathBuilder::stroke(px(stroke));
+                        path.move_to(origin + from);
+                        path.line_to(origin + to);
+                        if let Ok(path) = path.build() {
+                            window.paint_path(path, ink);
+                        }
+                    }
+                }
+            },
+        )
+        .size_full(),
+    )
+}
+
 /// The row at the window's top-right corner, after every dialog layer.
 fn caption_layer(row: impl IntoElement, window: &Window) -> AnyElement {
     let trailing = gpui::point(window.viewport_size().width, px(0.));
@@ -371,6 +469,7 @@ fn caption_layer(row: impl IntoElement, window: &Window) -> AnyElement {
 fn windows_button(
     button: CaptionButton,
     labels: &CaptionLabels,
+    bar_height: Pixels,
     live: bool,
 ) -> gpui::Stateful<gpui::Div> {
     let close = button == CaptionButton::Close;
@@ -395,7 +494,7 @@ fn windows_button(
         .items_center()
         .justify_center()
         .w(px(WINDOWS_BUTTON_WIDTH))
-        .h_full()
+        .h(px(WINDOWS_BUTTON_HEIGHT).min(bar_height))
         .hover(move |style| {
             let style = style.bg(hover);
             if close {
@@ -412,7 +511,10 @@ fn windows_button(
                 style
             }
         })
-        .child(button.glyph().icon().size(px(GLYPH)))
+        .when(cfg!(test), |area| {
+            area.debug_selector(move || button.id().to_string())
+        })
+        .child(glyph(button, WINDOWS_GLYPH, WINDOWS_STROKE))
 }
 
 /// A Linux caption button: GPUI does not hit-test window controls there, so
@@ -453,8 +555,14 @@ fn linux_button(
                 .bg(color(shape))
                 .group_hover(group, move |style| style.bg(hover))
                 .group_active(group, move |style| style.bg(pressed))
-                .child(button.glyph().icon().size(px(GLYPH))),
+                .when(cfg!(test), |shape| {
+                    shape.debug_selector(move || format!("{}-shape", button.id()))
+                })
+                .child(glyph(button, LINUX_GLYPH, LINUX_STROKE)),
         )
+        .when(cfg!(test), |target| {
+            target.debug_selector(move || button.id().to_string())
+        })
         .on_mouse_down(MouseButton::Left, |_, window, cx| {
             window.prevent_default();
             cx.stop_propagation();
@@ -532,7 +640,7 @@ pub(crate) mod tests {
                     CaptionButton::Maximize,
                     CaptionButton::Close,
                 ]
-                .map(|button| windows_button(button, &labels, true)),
+                .map(|button| windows_button(button, &labels, px(WINDOWS_BUTTON_HEIGHT), true)),
             );
             div()
                 .size_full()
@@ -630,7 +738,7 @@ pub(crate) mod tests {
         // In flow at the page's leading edge, not at the window's corner.
         assert_eq!(windows.origin, gpui::point(px(0.), px(0.)));
         assert_eq!(f32::from(windows.size.width), width_of(Caption::Windows, 3));
-        assert_eq!(f32::from(windows.size.height), WINDOWS_BUTTON_HEIGHT);
+        assert_eq!(windows.size.height, px(48.));
         assert_eq!(linux.origin.y, windows.size.height);
         assert_eq!(f32::from(linux.size.width), width_of(Caption::Linux, 3));
         assert_eq!(system.size.height, px(0.));
@@ -645,6 +753,116 @@ pub(crate) mod tests {
             assert!(window.viewport_size().width > px(0.));
             assert_eq!(view.read(cx).page_presses, 0);
         });
+    }
+
+    /// Asserts one row of buttons: every button is on the bar's vertical
+    /// center at the same size, and every glyph box on its button's center.
+    fn assert_centered(
+        cx: &mut gpui::VisualTestContext,
+        (width, height): (f32, f32),
+        glyph_size: f32,
+        round: bool,
+    ) {
+        let bar = cx.debug_bounds("bar").expect("the bar is rendered");
+        for button in [
+            CaptionButton::Minimize,
+            CaptionButton::Maximize,
+            CaptionButton::Close,
+        ] {
+            let id = button.id();
+            let selector = |suffix: &str| -> &'static str {
+                Box::leak(format!("{id}{suffix}").into_boxed_str())
+            };
+            let target = cx.debug_bounds(id).expect("the button is rendered");
+            assert_eq!(target.size, size(px(width), px(height)), "{id}");
+            assert_eq!(
+                target.center().y,
+                bar.center().y,
+                "{id} on the bar's center"
+            );
+            let glyph = cx.debug_bounds(selector("-glyph")).expect("a glyph");
+            assert_eq!(glyph.size, size(px(glyph_size), px(glyph_size)), "{id}");
+            assert_eq!(glyph.center(), target.center(), "{id}'s glyph is centered");
+            if round {
+                let shape = cx.debug_bounds(selector("-shape")).expect("a shape");
+                assert_eq!(shape.center(), target.center(), "{id}'s shape is centered");
+            }
+        }
+    }
+
+    /// One caption style in a bar.
+    struct BarHarness(Caption, Pixels);
+
+    impl Render for BarHarness {
+        fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+            div()
+                .debug_selector(|| "bar".into())
+                .flex()
+                .w_full()
+                .h(self.1)
+                .justify_end()
+                .child(
+                    CaptionButtons::new(self.1, test_labels())
+                        .caption(self.0)
+                        .preview("preview"),
+                )
+        }
+    }
+
+    #[gpui::test]
+    fn windows_buttons_and_glyphs_center_in_the_bar(cx: &mut TestAppContext) {
+        for height in [32., 40., 48., 56., 64.] {
+            let (_, cx) = cx.add_window_view(|_, _| BarHarness(Caption::Windows, px(height)));
+            cx.run_until_parked();
+            assert_centered(cx, (46., 32.), 10., false);
+        }
+    }
+
+    #[gpui::test]
+    fn linux_buttons_and_glyphs_center_in_the_bar(cx: &mut TestAppContext) {
+        for height in [32., 40., 48., 56., 64.] {
+            let (_, cx) = cx.add_window_view(|_, _| BarHarness(Caption::Linux, px(height)));
+            cx.run_until_parked();
+            assert_centered(cx, (32., 32.), 8., true);
+        }
+    }
+
+    #[gpui::test]
+    fn a_bar_shorter_than_the_windows_button_clamps_it(cx: &mut TestAppContext) {
+        let (_, cx) = cx.add_window_view(|_, _| BarHarness(Caption::Windows, px(28.)));
+        cx.run_until_parked();
+        assert_centered(cx, (46., 28.), 10., false);
+    }
+
+    #[test]
+    fn every_glyph_fills_its_box_symmetrically() {
+        for (glyph, stroke) in [(10., 1.), (8., 2.), (8., 1.5)] {
+            for button in [
+                CaptionButton::Minimize,
+                CaptionButton::Maximize,
+                CaptionButton::Restore,
+            ] {
+                let rects = glyph_rects(button, glyph, stroke);
+                let (mut left, mut top, mut right, mut bottom) = (glyph, glyph, 0_f32, 0_f32);
+                for rect in &rects {
+                    left = left.min(f32::from(rect.origin.x));
+                    top = top.min(f32::from(rect.origin.y));
+                    right = right.max(f32::from(rect.origin.x + rect.size.width));
+                    bottom = bottom.max(f32::from(rect.origin.y + rect.size.height));
+                }
+                assert_eq!((left, right), (0., glyph), "{button:?} spans the box");
+                assert_eq!(
+                    (top + bottom) / 2.,
+                    glyph / 2.,
+                    "{button:?} is centered vertically"
+                );
+                if button != CaptionButton::Minimize {
+                    assert_eq!((top, bottom), (0., glyph), "{button:?} fills the box");
+                }
+            }
+        }
+        // The X is two strokes corner to corner, centered by construction.
+        assert!(glyph_rects(CaptionButton::Close, 10., 1.).is_empty());
     }
 
     #[test]

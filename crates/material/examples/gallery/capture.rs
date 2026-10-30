@@ -4,9 +4,10 @@ use super::playground::Value;
 use super::{Gallery, Tab, page::CaptureState};
 use anyhow::{Context as _, Result, bail, ensure};
 use gpui::{App, Entity, Global, ListOffset, ListState, Pixels, Window, px, size};
+use gpui_kit_material::components::Caption;
 use std::{cell::Cell, path::PathBuf, process::Command, rc::Rc, time::Duration};
 
-pub const USAGE: &str = "gallery [--capture output.png --section <page id> --tab preview|specs\n  --scenario <name> --set <control>=<value> ...\n  --width 1280 --height 900 --scale 1 --dark --reduced-motion --settle-ms 800\n  --active --disabled --selected --loading --no-ripple --offset-y 0 --settings --fps --vsync on|off]\n\nPage ids, in navigation order:\n  overview button icon-button button-group split-button fab fab-menu\n  extended-fab checkbox switch radio-buttons chips slider text-field select\n  search date-picker time-picker navigation-rail navigation-bar drawer tabs menu\n  top-app-bar bottom-app-bar toolbar card list carousel divider dialog\n  bottom-sheet side-sheet badge avatar progress loading-indicator snackbar\n  tooltip\n  color typography shape motion elevation examples\n\nDesign-kit page ids open the first page showing that kit page on its Specs tab:\n  app-bars avatars badges buttons cards checkboxes date-time-pickers dialogs dividers\n  lists loading-progress navigation radio-button sheets sliders text-fields\n  toolbars tooltips\n\n--tab defaults to preview (specs for a kit page id). --scenario and --set\nconfigure the page's playground, e.g. --set variant=tonal --set disabled=true.";
+pub const USAGE: &str = "gallery [--capture output.png --section <page id> --tab preview|specs\n  --scenario <name> --set <control>=<value> ...\n  --width 1280 --height 900 --scale 1 --dark --reduced-motion --settle-ms 800\n  --active --disabled --selected --loading --no-ripple --offset-y 0 --settings --fps --vsync on|off --caption windows|linux --drawer]\n\nPage ids, in navigation order:\n  overview button icon-button button-group split-button fab fab-menu\n  extended-fab checkbox switch radio-buttons chips slider text-field select\n  search date-picker time-picker navigation-rail navigation-bar drawer tabs menu\n  top-app-bar bottom-app-bar toolbar card list carousel divider dialog\n  bottom-sheet side-sheet badge avatar progress loading-indicator snackbar\n  tooltip\n  color typography shape motion elevation examples\n\nDesign-kit page ids open the first page showing that kit page on its Specs tab:\n  app-bars avatars badges buttons cards checkboxes date-time-pickers dialogs dividers\n  lists loading-progress navigation radio-button sheets sliders text-fields\n  toolbars tooltips\n\n--tab defaults to preview (specs for a kit page id). --scenario and --set\nconfigure the page's playground, e.g. --set variant=tonal --set disabled=true.";
 
 #[derive(Clone)]
 pub struct CaptureOptions {
@@ -30,6 +31,8 @@ pub struct CaptureOptions {
     settings: bool,
     fps: bool,
     vsync: Option<bool>,
+    caption: Option<Caption>,
+    drawer: bool,
     completed: Rc<Cell<bool>>,
 }
 impl Global for CaptureOptions {}
@@ -61,6 +64,8 @@ impl CaptureOptions {
             settings: false,
             fps: false,
             vsync: None,
+            caption: None,
+            drawer: false,
             completed: Rc::new(Cell::new(false)),
         };
         let mut tab = None;
@@ -94,6 +99,14 @@ impl CaptureOptions {
                 "--offset-y" => options.offset_y = value()?.parse()?,
                 "--settle-ms" => options.settle_ms = value()?.parse()?,
                 "--fps" => options.fps = true,
+                "--drawer" => options.drawer = true,
+                "--caption" => {
+                    options.caption = Some(match value()?.as_str() {
+                        "windows" => Caption::Windows,
+                        "linux" => Caption::Linux,
+                        _ => bail!("--caption must be windows or linux"),
+                    })
+                }
                 "--settings" => options.settings = true,
                 "--vsync" => {
                     options.vsync = Some(match value()?.as_str() {
@@ -185,6 +198,11 @@ pub(super) fn show_fps(cx: &App) -> bool {
         .is_none_or(|options| options.fps)
 }
 
+pub(super) fn caption(cx: &App) -> Option<Caption> {
+    cx.try_global::<CaptureOptions>()
+        .and_then(|options| options.caption)
+}
+
 pub(super) fn window_size(cx: &App) -> Option<gpui::Size<gpui::Pixels>> {
     cx.try_global::<CaptureOptions>()
         .map(|options| size(px(options.width), px(options.height)))
@@ -217,6 +235,7 @@ pub(super) fn install(view: &Entity<Gallery>, window: &mut Window, cx: &mut App)
             cx,
         );
         gallery.configure(options.scenario, &options.values, window, cx);
+        gallery.set_drawer_open(options.drawer, cx);
     });
     let view = view.clone();
     // Wait for initial layout, then position the logical section row.
