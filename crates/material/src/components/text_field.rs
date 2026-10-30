@@ -502,6 +502,7 @@ pub(crate) fn type_style<E: Styled>(element: E, role: TypeRole) -> E {
     element
         .font_family(scale.font_family)
         .text_size(scale.font_size)
+        .letter_spacing(scale.letter_spacing)
         .line_height(scale.line_height)
         .font_weight(FontWeight(scale.font_weight as f32))
 }
@@ -527,7 +528,8 @@ fn label_width(text: &SharedString, window: &Window) -> f32 {
         .text_system()
         .shape_line(text.clone(), size, &[run], None);
     // Back to design px at the base rem, so it composes with `rem()`.
-    line.width.as_f32() / rem.as_f32() * 14.
+    let tracking = scale.letter_spacing.0 * text.chars().count() as f32;
+    (line.width.as_f32() / rem.as_f32() + tracking) * 14.
 }
 
 /// Bring a live input into line with `input_type`, once per change of type.

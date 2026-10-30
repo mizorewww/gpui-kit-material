@@ -1381,6 +1381,7 @@ impl RenderOnce for MaterialButton {
             .text_color(fg)
             .font_family(ty.font_family)
             .text_size(ty.font_size)
+            .letter_spacing(ty.letter_spacing)
             .line_height(ty.line_height)
             .font_weight(FontWeight(ty.font_weight as f32))
             .when(

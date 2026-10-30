@@ -387,7 +387,8 @@ fn label_width(label: &SharedString, role: TypeRole, window: &Window) -> f32 {
         .text_system()
         .shape_line(label.clone(), font_size, &[run], None)
         .width;
-    f32::from(width) * BASE_PX / f32::from(window.rem_size())
+    let tracking = scale.letter_spacing.0 * BASE_PX * label.chars().count() as f32;
+    f32::from(width) * BASE_PX / f32::from(window.rem_size()) + tracking
 }
 
 /// A label revealed to `expansion` (0 … 1) of its width: absent at 0, laid

@@ -344,6 +344,7 @@ impl RenderOnce for MaterialRadio {
                         .whitespace_nowrap()
                         .text_color(label_color)
                         .text_size(scale.font_size)
+                        .letter_spacing(scale.letter_spacing)
                         .line_height(scale.line_height)
                         .child(self.label),
                 )

@@ -429,6 +429,7 @@ impl RenderOnce for TopAppBar {
                                 .bg(paint.search)
                                 .text_color(ink)
                                 .text_size(scale.font_size)
+                                .letter_spacing(scale.letter_spacing)
                                 .line_height(scale.line_height)
                                 .whitespace_nowrap()
                                 .overflow_hidden()
