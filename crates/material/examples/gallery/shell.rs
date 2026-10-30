@@ -682,7 +682,7 @@ impl Gallery {
                     .child(
                         div()
                             .debug_selector(|| "preview-rtl".into())
-                            .w(rem(88.))
+                            .w(rem(120.))
                             .child(
                                 MaterialSwitch::new("preview-rtl", "RTL")
                                     .show_label(true)

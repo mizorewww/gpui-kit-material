@@ -430,7 +430,7 @@ struct TrackPaint {
 fn paint_track(bounds: Bounds<Pixels>, track: &TrackPaint, window: &mut Window) {
     let s = track.scale;
     let horizontal = track.axis == Axis::Horizontal;
-    // Painted, so it does not mirror with layout. The quad's own radii do.
+    // Painted, so neither its segments nor their corners mirror with layout.
     let rtl = crate::scope::is_rtl(window);
     let length = f32::from(if horizontal {
         bounds.size.width
@@ -476,6 +476,11 @@ fn paint_track(bounds: Bounds<Pixels>, track: &TrackPaint, window: &mut Window) 
                 * s)
         };
         let (start, end) = (corner(segment.outer_start), corner(segment.outer_end));
+        let (start, end) = if horizontal && rtl {
+            (end, start)
+        } else {
+            (start, end)
+        };
         let radii = if horizontal {
             Corners {
                 top_left: start,
