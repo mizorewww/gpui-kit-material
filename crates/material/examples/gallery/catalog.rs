@@ -445,7 +445,7 @@ pub static CATALOG: &[Entry] = &[
         Communication,
         "Show that content is on its way, for short waits.",
         spec("loading-progress"),
-        None,
+        Some(&playgrounds::loading_indicator::PLAYGROUND),
     ),
     component(
         "snackbar",
