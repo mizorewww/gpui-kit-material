@@ -6,6 +6,8 @@ struct BarHarness {
     state: Entity<InputState>,
     expanded: bool,
     layout: SearchViewLayout,
+    style: SearchViewStyle,
+    disabled: bool,
     picked: Rc<Cell<Option<usize>>>,
 }
 
@@ -16,9 +18,12 @@ impl Render for BarHarness {
         div().size(px(420.)).p(px(10.)).child(
             SearchView::new(
                 "view",
-                SearchField::new(&self.state).leading(div().size(px(24.))),
+                SearchField::new(&self.state)
+                    .leading(div().size(px(24.)))
+                    .disabled(self.disabled),
             )
             .layout(self.layout)
+            .view_style(self.style)
             .expanded(self.expanded)
             .suggestions((0..3).map(|ix| {
                 let picked = picked.clone();
@@ -49,6 +54,8 @@ fn setup(
         state: cx.new(|cx| InputState::new(window, cx).placeholder("Search")),
         expanded: false,
         layout,
+        style: SearchViewStyle::Contained,
+        disabled: false,
         picked: Rc::default(),
     })
 }
@@ -171,4 +178,43 @@ fn results_grow_with_the_expansion_and_cap_at_max_visible() {
     assert_eq!(results_height(3, 5, 0.5), 96.);
     assert_eq!(results_height(3, 5, 1.1), 192., "overshoot stays inside");
     assert_eq!(results_height(3, 5, 0.), 0.);
+}
+
+#[gpui::test]
+fn a_divided_view_joins_bar_and_results_with_a_divider(cx: &mut TestAppContext) {
+    let (view, cx) = setup(cx, SearchViewLayout::Docked);
+    view.update(cx, |v, cx| {
+        v.style = SearchViewStyle::Divided;
+        v.expanded = true;
+        cx.notify();
+    });
+    draw(cx);
+    let bar = cx.debug_bounds("search-bar").unwrap();
+    let divider = cx.debug_bounds("search-divider").unwrap();
+    let results = cx.debug_bounds("search-results").unwrap();
+    assert_eq!(divider.top(), bar.bottom());
+    assert_eq!(divider.size.height, px(1.));
+    assert_eq!(results.top(), divider.bottom(), "no gap");
+    // The contained view has no divider.
+    view.update(cx, |v, cx| {
+        v.style = SearchViewStyle::Contained;
+        cx.notify();
+    });
+    draw(cx);
+    assert!(cx.debug_bounds("search-divider").is_none());
+}
+
+#[gpui::test]
+fn a_disabled_bar_takes_no_input(cx: &mut TestAppContext) {
+    let (view, cx) = setup(cx, SearchViewLayout::Docked);
+    view.update(cx, |v, cx| {
+        v.disabled = true;
+        cx.notify();
+    });
+    draw(cx);
+    let bar = cx.debug_bounds("search-bar").unwrap();
+    cx.simulate_click(bar.center(), Modifiers::default());
+    cx.simulate_input("home");
+    draw(cx);
+    cx.update(|_, cx| assert_eq!(view.read(cx).state.read(cx).value().as_ref(), ""));
 }

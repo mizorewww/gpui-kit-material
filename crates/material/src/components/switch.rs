@@ -22,6 +22,7 @@ pub struct MaterialSwitch {
     label: SharedString,
     checked: bool,
     disabled: bool,
+    error: bool,
     icons: SwitchIcons,
     preview: Option<InteractionPreview>,
     on_change: Option<SwitchChange>,
@@ -58,6 +59,7 @@ impl MaterialSwitch {
             label: label.into(),
             checked: false,
             disabled: false,
+            error: false,
             icons: SwitchIcons::None,
             preview: None,
             on_change: None,
@@ -78,6 +80,13 @@ impl MaterialSwitch {
     }
     pub fn disabled(mut self, disabled: bool) -> Self {
         self.disabled = disabled;
+        self
+    }
+    /// Paint the error colors (md3.io's invalid switch, e.g. a required
+    /// setting left off): error replaces primary on a selected switch and
+    /// the outline on an unselected one. A disabled switch ignores it.
+    pub fn error(mut self, error: bool) -> Self {
+        self.error = error;
         self
     }
     /// Show icons inside the handle.
@@ -151,9 +160,35 @@ struct SwitchPaint {
 /// role at [`state::DISABLED_CONTENT`], composited over whatever is beneath
 /// rather than pre-mixed into a surface. The one exception is the token's
 /// opaque surface handle of a selected disabled switch.
-fn switch_paint(checked: bool, disabled: bool) -> SwitchPaint {
+///
+/// An error switch swaps its accent for the error roles, as the text field
+/// does: error / on-error / error-container / on-error-container where the
+/// selected switch uses the primary family, and an error outline and
+/// handle (on-error-container while active) on an unselected one.
+fn switch_paint(checked: bool, disabled: bool, error: bool) -> SwitchPaint {
     let role = color;
     let container = |r| role(r).opacity(state::DISABLED_CONTAINER);
+    if error && !disabled {
+        return if checked {
+            SwitchPaint {
+                track: role(ColorRole::ERROR),
+                outline: role(ColorRole::ERROR),
+                handle: role(ColorRole::ON_ERROR),
+                handle_active: role(ColorRole::ERROR_CONTAINER),
+                icon: role(ColorRole::ON_ERROR_CONTAINER),
+                layer: role(ColorRole::ERROR),
+            }
+        } else {
+            SwitchPaint {
+                track: role(ColorRole::SURFACE_CONTAINER_HIGHEST),
+                outline: role(ColorRole::ERROR),
+                handle: role(ColorRole::ERROR),
+                handle_active: role(ColorRole::ON_ERROR_CONTAINER),
+                icon: role(ColorRole::SURFACE_CONTAINER_HIGHEST),
+                layer: role(ColorRole::ERROR),
+            }
+        };
+    }
     match (checked, disabled) {
         (true, false) => SwitchPaint {
             track: role(ColorRole::PRIMARY),
@@ -243,7 +278,7 @@ impl RenderOnce for MaterialSwitch {
         }
         .clamp(0., HANDLE_PRESSED);
         let left = handle_left(t, size);
-        let paint = switch_paint(self.checked, disabled);
+        let paint = switch_paint(self.checked, disabled, self.error);
         let clear = Rgba {
             a: 0.,
             ..paint.layer
@@ -399,26 +434,26 @@ mod tests {
     #[test]
     fn switch_uses_m3_roles_in_every_state() {
         let c = color;
-        let on = switch_paint(true, false);
+        let on = switch_paint(true, false, false);
         assert_eq!(on.track, c(ColorRole::PRIMARY));
         assert_eq!(on.handle, c(ColorRole::ON_PRIMARY));
         assert_eq!(on.handle_active, c(ColorRole::PRIMARY_CONTAINER));
         assert_eq!(on.icon, c(ColorRole::ON_PRIMARY_CONTAINER));
-        let off = switch_paint(false, false);
+        let off = switch_paint(false, false, false);
         assert_eq!(off.track, c(ColorRole::SURFACE_CONTAINER_HIGHEST));
         assert_eq!(off.outline, c(ColorRole::OUTLINE));
         assert_eq!(off.handle, c(ColorRole::OUTLINE));
         assert_eq!(off.handle_active, c(ColorRole::ON_SURFACE_VARIANT));
         assert_eq!(off.icon, c(ColorRole::SURFACE_CONTAINER_HIGHEST));
         let on_surface = c(ColorRole::ON_SURFACE);
-        let disabled_on = switch_paint(true, true);
+        let disabled_on = switch_paint(true, true, false);
         assert_eq!(
             disabled_on.track,
             on_surface.opacity(state::DISABLED_CONTAINER)
         );
         assert_eq!(disabled_on.handle, c(ColorRole::SURFACE));
         assert_eq!(disabled_on.icon, state::disabled(on_surface));
-        let disabled_off = switch_paint(false, true);
+        let disabled_off = switch_paint(false, true, false);
         assert_eq!(disabled_off.handle, state::disabled(on_surface));
         assert_eq!(
             disabled_off.outline,
@@ -430,6 +465,30 @@ mod tests {
         );
         assert_eq!(STATE_LAYER, 40.);
         assert_eq!(ICON, 16.);
+    }
+
+    #[test]
+    fn an_error_switch_uses_the_error_roles_unless_disabled() {
+        let c = color;
+        let on = switch_paint(true, false, true);
+        assert_eq!(on.track, c(ColorRole::ERROR));
+        assert_eq!(on.handle, c(ColorRole::ON_ERROR));
+        assert_eq!(on.handle_active, c(ColorRole::ERROR_CONTAINER));
+        assert_eq!(on.icon, c(ColorRole::ON_ERROR_CONTAINER));
+        assert_eq!(on.layer, c(ColorRole::ERROR));
+        let off = switch_paint(false, false, true);
+        assert_eq!(off.track, c(ColorRole::SURFACE_CONTAINER_HIGHEST));
+        assert_eq!(off.outline, c(ColorRole::ERROR));
+        assert_eq!(off.handle, c(ColorRole::ERROR));
+        assert_eq!(off.handle_active, c(ColorRole::ON_ERROR_CONTAINER));
+        assert_eq!(
+            switch_paint(true, true, true),
+            switch_paint(true, true, false)
+        );
+        assert_eq!(
+            switch_paint(false, true, true),
+            switch_paint(false, true, false)
+        );
     }
 
     struct PressHarness(SwitchIcons, bool, bool);

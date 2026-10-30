@@ -1,9 +1,8 @@
 //! Text field playground: md3.io's Text field configuration on the real
 //! `TextField`, editing a Kit input bound two-way to the Value control.
 //!
-//! md3.io's Density option is not offered: the M3 text field here has one
-//! 56dp density. Input types other than password and multiline have no
-//! browser keyboard to select on the desktop, so they edit plain text.
+//! Input types other than password and multiline have no browser keyboard
+//! to select on the desktop, so they edit plain text.
 use super::prelude::*;
 
 const INPUT_TYPES: &[&str] = &[
@@ -83,6 +82,12 @@ pub static PLAYGROUND: Playground = Playground {
                     id: "variant",
                     label: "Variant",
                     options: &["filled", "outlined"],
+                    default: 0,
+                },
+                Control::Segmented {
+                    id: "density",
+                    label: "Density",
+                    options: &["default", "compact"],
                     default: 0,
                 },
                 Control::Icon {
@@ -223,6 +228,11 @@ fn preview(
         } else {
             TextFieldVariant::Filled
         })
+        .density(if config.option("density") == "compact" {
+            TextFieldDensity::Compact
+        } else {
+            TextFieldDensity::Default
+        })
         .error(config.bool("error"))
         .disabled(disabled)
         .w(rem(280.));
@@ -275,4 +285,37 @@ fn preview(
         .debug_selector(|| "playground-text-field".into())
         .child(field)
         .into_any_element()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::super::testing::*;
+    use super::*;
+    use core::prelude::v1::test;
+
+    #[gpui::test]
+    fn every_scenario_renders_and_density_compacts_the_field(cx: &mut TestAppContext) {
+        let (state, cx) = open(cx, &PLAYGROUND);
+        // The selector spans the row; the field is at its start.
+        let field = rect(cx, "playground-text-field");
+        cx.simulate_click(
+            point(field.left() + px(40.), field.center().y),
+            Modifiers::none(),
+        );
+        cx.simulate_input("Hi");
+        settle(cx);
+        assert_eq!(config(&state, cx).text("value"), "Hi");
+        every_scenario_renders(&state, cx, "playground-text-field");
+        cx.update(|window, cx| state.update(cx, |state, cx| state.reset(window, cx)));
+        settle(cx);
+        let default = rect(cx, "playground-text-field").size.height;
+        set(&state, cx, "density", Value::Choice(1));
+        let compact = rect(cx, "playground-text-field").size.height;
+        // 8dp shorter (the test window's rem is 16px).
+        let lost = f32::from(default - compact);
+        assert!(
+            (lost - 8. * 16. / 14.).abs() < 1.,
+            "8dp shorter, not {lost}"
+        );
+    }
 }

@@ -89,6 +89,54 @@ pub enum SliderAppearance {
     Expressive,
 }
 
+/// The slider's accent (md3.io's Color option). Primary is the M3 default:
+/// a primary active track and handle over a secondary-container inactive
+/// track. The others use their own family throughout: the role for the
+/// active track and handle, its container for the inactive track, and the
+/// matching on-roles for stops and icons.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+pub enum SliderColor {
+    #[default]
+    Primary,
+    Secondary,
+    Tertiary,
+    Error,
+}
+
+impl SliderColor {
+    pub const ALL: [Self; 4] = [Self::Primary, Self::Secondary, Self::Tertiary, Self::Error];
+    /// (active, on-active, inactive, on-inactive) roles.
+    const fn roles(self) -> (ColorRole, ColorRole, ColorRole, ColorRole) {
+        use ColorRole as C;
+        match self {
+            Self::Primary => (
+                C::PRIMARY,
+                C::ON_PRIMARY,
+                C::SECONDARY_CONTAINER,
+                C::ON_SECONDARY_CONTAINER,
+            ),
+            Self::Secondary => (
+                C::SECONDARY,
+                C::ON_SECONDARY,
+                C::SECONDARY_CONTAINER,
+                C::ON_SECONDARY_CONTAINER,
+            ),
+            Self::Tertiary => (
+                C::TERTIARY,
+                C::ON_TERTIARY,
+                C::TERTIARY_CONTAINER,
+                C::ON_TERTIARY_CONTAINER,
+            ),
+            Self::Error => (
+                C::ERROR,
+                C::ON_ERROR,
+                C::ERROR_CONTAINER,
+                C::ON_ERROR_CONTAINER,
+            ),
+        }
+    }
+}
+
 /// M3 Expressive slider details, in dp: the gap between the handle and the
 /// track on either side, the corners where the track meets the gap, the
 /// handle's width (narrowing while pressed) and the stop indicators.
@@ -121,6 +169,7 @@ pub struct MaterialSlider {
     axis: Axis,
     centered: bool,
     stops: bool,
+    color: SliderColor,
     icon: Option<Icon>,
     value_indicator: bool,
     format: Option<ValueFormat>,
@@ -139,6 +188,7 @@ impl MaterialSlider {
             axis: Axis::Horizontal,
             centered: false,
             stops: false,
+            color: SliderColor::Primary,
             icon: None,
             value_indicator: true,
             format: None,
@@ -176,6 +226,11 @@ impl MaterialSlider {
     /// Show a stop indicator at every step (a discrete slider).
     pub fn stops(mut self, stops: bool) -> Self {
         self.stops = stops;
+        self
+    }
+    /// The accent color family (default primary). See [`SliderColor`].
+    pub fn color(mut self, color: SliderColor) -> Self {
+        self.color = color;
         self
     }
     /// An icon inside the track's leading end (medium and larger sizes).
@@ -227,7 +282,7 @@ struct SliderPaint {
     on_inactive: Rgba,
 }
 
-fn slider_paint(disabled: bool) -> SliderPaint {
+fn slider_paint(disabled: bool, accent: SliderColor) -> SliderPaint {
     if disabled {
         let on_surface = color(ColorRole::ON_SURFACE);
         SliderPaint {
@@ -238,12 +293,13 @@ fn slider_paint(disabled: bool) -> SliderPaint {
             on_inactive: state::disabled(on_surface),
         }
     } else {
+        let (active, on_active, inactive, on_inactive) = accent.roles();
         SliderPaint {
-            active: color(ColorRole::PRIMARY),
-            inactive: color(ColorRole::SECONDARY_CONTAINER),
-            handle: color(ColorRole::PRIMARY),
-            on_active: color(ColorRole::ON_PRIMARY),
-            on_inactive: color(ColorRole::ON_SECONDARY_CONTAINER),
+            active: color(active),
+            inactive: color(inactive),
+            handle: color(active),
+            on_active: color(on_active),
+            on_inactive: color(on_inactive),
         }
     }
 }
@@ -605,7 +661,7 @@ impl RenderOnce for MaterialSlider {
             )
             .clamp(0., 1.)
         };
-        let paint = slider_paint(disabled);
+        let paint = slider_paint(disabled, self.color);
         // A handle's state layer: on-primary over the Expressive handle,
         // primary around the classic one.
         let layer = |i: usize| {
@@ -1057,7 +1113,7 @@ mod tests {
 
     #[test]
     fn slider_uses_kit_roles_and_unified_disabled_tokens() {
-        let enabled = slider_paint(false);
+        let enabled = slider_paint(false, SliderColor::Primary);
         assert_eq!(enabled.active, color(ColorRole::PRIMARY));
         assert_eq!(enabled.inactive, color(ColorRole::SECONDARY_CONTAINER));
         assert_eq!(enabled.on_active, color(ColorRole::ON_PRIMARY));
@@ -1065,13 +1121,33 @@ mod tests {
             enabled.on_inactive,
             color(ColorRole::ON_SECONDARY_CONTAINER)
         );
-        let disabled = slider_paint(true);
+        let disabled = slider_paint(true, SliderColor::Tertiary);
         let on_surface = color(ColorRole::ON_SURFACE);
         assert_eq!(disabled.active, state::disabled(on_surface));
         assert_eq!(disabled.handle, state::disabled(on_surface));
         assert_eq!(
             disabled.inactive,
             on_surface.opacity(state::DISABLED_CONTAINER)
+        );
+    }
+
+    #[test]
+    fn slider_colors_use_their_own_role_family() {
+        let tertiary = slider_paint(false, SliderColor::Tertiary);
+        assert_eq!(tertiary.active, color(ColorRole::TERTIARY));
+        assert_eq!(tertiary.handle, color(ColorRole::TERTIARY));
+        assert_eq!(tertiary.inactive, color(ColorRole::TERTIARY_CONTAINER));
+        assert_eq!(tertiary.on_active, color(ColorRole::ON_TERTIARY));
+        let error = slider_paint(false, SliderColor::Error);
+        assert_eq!(error.active, color(ColorRole::ERROR));
+        assert_eq!(error.inactive, color(ColorRole::ERROR_CONTAINER));
+        assert_eq!(error.on_inactive, color(ColorRole::ON_ERROR_CONTAINER));
+        let secondary = slider_paint(false, SliderColor::Secondary);
+        assert_eq!(secondary.active, color(ColorRole::SECONDARY));
+        assert_eq!(
+            slider_paint(true, SliderColor::Error),
+            slider_paint(true, SliderColor::Primary),
+            "disabled ignores the accent"
         );
     }
 

@@ -20,7 +20,7 @@
 use super::InteractionPreview;
 use super::focus::{RingPlacement, RingedButton};
 use super::roving::{Direction, target};
-use super::text_field::{TextField, TextFieldVariant, type_style};
+use super::text_field::{TextField, TextFieldDensity, TextFieldVariant, type_style};
 use crate::{
     color::ColorRole,
     icons::{Icon, Symbol},
@@ -1026,11 +1026,14 @@ impl RenderOnce for MenuPopup {
 pub struct ExposedDropdown {
     id: ElementId,
     variant: TextFieldVariant,
+    density: TextFieldDensity,
     label: SharedString,
     options: Vec<SharedString>,
+    disabled_options: Vec<usize>,
     selected: Option<usize>,
     open: bool,
     disabled: bool,
+    error: bool,
     leading: Option<AnyElement>,
     supporting: Option<SharedString>,
     style: MenuStyle,
@@ -1044,11 +1047,14 @@ impl ExposedDropdown {
         Self {
             id: id.into(),
             variant: TextFieldVariant::Filled,
+            density: TextFieldDensity::Default,
             label: label.into(),
             options: Vec::new(),
+            disabled_options: Vec::new(),
             selected: None,
             open: false,
             disabled: false,
+            error: false,
             leading: None,
             supporting: None,
             style: MenuStyle::Standard,
@@ -1061,8 +1067,24 @@ impl ExposedDropdown {
         self.variant = variant;
         self
     }
+    /// The field's density (default 56dp; compact 48dp).
+    pub fn density(mut self, density: TextFieldDensity) -> Self {
+        self.density = density;
+        self
+    }
     pub fn options<S: Into<SharedString>>(mut self, options: impl IntoIterator<Item = S>) -> Self {
         self.options = options.into_iter().map(Into::into).collect();
+        self
+    }
+    /// Options (by index) shown disabled: they cannot be chosen.
+    pub fn disabled_options(mut self, options: impl IntoIterator<Item = usize>) -> Self {
+        self.disabled_options = options.into_iter().collect();
+        self
+    }
+    /// Paint the field's error colors (with the supporting text as the
+    /// error message).
+    pub fn error(mut self, error: bool) -> Self {
+        self.error = error;
         self
     }
     pub fn selected(mut self, selected: Option<usize>) -> Self {
@@ -1137,8 +1159,10 @@ impl RenderOnce for ExposedDropdown {
         .rotate(std::f32::consts::PI * turn);
         let mut field = TextField::specimen((id.clone(), "field"), value.clone())
             .variant(self.variant)
+            .density(self.density)
             .label(self.label.clone())
             .trailing_icon(arrow)
+            .error(self.error)
             .disabled(self.disabled)
             .w(rem(self.width));
         if let Some(leading) = self.leading {
@@ -1186,6 +1210,7 @@ impl RenderOnce for ExposedDropdown {
             .child(field);
         let selected = self.selected;
         let on_select = self.on_select.clone();
+        let disabled_options = self.disabled_options;
         let menu = MaterialMenu::new((id.clone(), "menu"))
             .style(self.style)
             .width(self.width)
@@ -1193,6 +1218,7 @@ impl RenderOnce for ExposedDropdown {
                 let on_select = on_select.clone();
                 MaterialMenuItem::new(option)
                     .selected(selected == Some(ix))
+                    .disabled(disabled_options.contains(&ix))
                     .on_click(move |_, window, cx| {
                         if let Some(select) = on_select.as_ref() {
                             select(&ix, window, cx);

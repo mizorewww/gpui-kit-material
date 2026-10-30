@@ -52,6 +52,7 @@ pub struct SearchField {
     input: BarInput,
     leading: Option<AnyElement>,
     trailing: Vec<AnyElement>,
+    disabled: bool,
     preview: Option<InteractionPreview>,
     style: StyleRefinement,
 }
@@ -81,9 +82,17 @@ impl SearchField {
             input,
             leading: None,
             trailing: Vec::new(),
+            disabled: false,
             preview: None,
             style: StyleRefinement::default(),
         }
+    }
+
+    /// A disabled bar takes no focus, input or hover, and fades its content
+    /// (icons, query and placeholder) to on-surface at 38%.
+    pub fn disabled(mut self, disabled: bool) -> Self {
+        self.disabled = disabled;
+        self
     }
 
     pub fn id(mut self, id: impl Into<ElementId>) -> Self {
@@ -135,7 +144,14 @@ impl RenderOnce for SearchField {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let on_surface = color(ColorRole::ON_SURFACE);
         let container = color(SEARCH_CONTAINER);
-        let preview = self.preview;
+        let disabled = self.disabled || self.preview.is_some_and(InteractionPreview::is_disabled);
+        let preview = self.preview.filter(|_| !disabled);
+        let live = preview.is_none() && !disabled;
+        let fade = if disabled {
+            state::DISABLED_CONTENT
+        } else {
+            1.
+        };
         let layer = preview.map_or(0., InteractionPreview::layer_opacity);
         // Group hover resolves to the nearest painting ancestor of this name,
         // so a static name stays scoped to this bar without formatting one
@@ -148,6 +164,7 @@ impl RenderOnce for SearchField {
         let content: AnyElement = match self.input {
             BarInput::Live(state) => Input::new(&state)
                 .appearance(false)
+                .disabled(disabled)
                 .with_size(Size::XSmall)
                 .p_0()
                 .h(rem(24.))
@@ -181,7 +198,7 @@ impl RenderOnce for SearchField {
             .bg(container)
             .text_color(on_surface)
             .map(|this| type_style(this, TypeRole::BodyLarge))
-            .cursor_text()
+            .when(live, |this| this.cursor_text())
             // The state layer, under the content.
             .child(
                 div()
@@ -189,24 +206,25 @@ impl RenderOnce for SearchField {
                     .inset_0()
                     .rounded_full()
                     .bg(alpha(on_surface, layer))
-                    .when(preview.is_none(), |this| {
+                    .when(live, |this| {
                         this.group_hover(group.clone(), move |s| {
                             s.bg(alpha(on_surface, state::HOVER))
                         })
                     }),
             )
-            .when(preview.is_none(), |this| {
+            .when(live, |this| {
                 this.active(move |s| s.bg(state::pressed(container, on_surface)))
             })
             .children(
                 self.leading
-                    .map(|icon| target(icon, color(ColorRole::ON_SURFACE))),
+                    .map(|icon| target(icon, color(ColorRole::ON_SURFACE)).opacity(fade)),
             )
             .child(
                 div()
                     .relative()
                     .flex_1()
                     .min_w_0()
+                    .opacity(fade)
                     .when(!has_leading, |this| this.pl(rem(12.)))
                     .when(trailing_count == 0, |this| this.pr(rem(12.)))
                     .child(content),
@@ -214,9 +232,9 @@ impl RenderOnce for SearchField {
             .children(
                 self.trailing
                     .into_iter()
-                    .map(|icon| target(icon, color(ColorRole::ON_SURFACE_VARIANT))),
+                    .map(|icon| target(icon, color(ColorRole::ON_SURFACE_VARIANT)).opacity(fade)),
             );
-        if let Some(focus) = focus.filter(|_| preview.is_none()) {
+        if let Some(focus) = focus.filter(|_| live) {
             bar = bar.on_mouse_down(MouseButton::Left, move |_, window, cx| {
                 focus.focus(window, cx);
             });
@@ -336,6 +354,19 @@ pub enum SearchViewLayout {
     FullScreen,
 }
 
+/// How a search view sets its results apart from the bar (md3.io's Style).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+pub enum SearchViewStyle {
+    /// M3 Expressive: results in a container of their own, 2dp below a
+    /// docked bar (full-screen: under the inset pill).
+    #[default]
+    Contained,
+    /// The baseline view: bar and results share one surface (28dp corners
+    /// when docked, edge to edge full-screen) split by a 1dp outline
+    /// divider.
+    Divided,
+}
+
 /// The M3 search view: a search bar that expands into a results surface.
 ///
 /// The caller controls `expanded` (typically opening on the input's focus and
@@ -347,6 +378,7 @@ pub struct SearchView {
     id: ElementId,
     bar: SearchField,
     layout: SearchViewLayout,
+    view_style: SearchViewStyle,
     expanded: bool,
     suggestions: Vec<SearchSuggestion>,
     max_visible: usize,
@@ -359,6 +391,7 @@ impl SearchView {
             id: id.into(),
             bar,
             layout: SearchViewLayout::Docked,
+            view_style: SearchViewStyle::Contained,
             expanded: false,
             suggestions: Vec::new(),
             max_visible: 5,
@@ -367,6 +400,11 @@ impl SearchView {
     }
     pub fn layout(mut self, layout: SearchViewLayout) -> Self {
         self.layout = layout;
+        self
+    }
+    /// Contained (default) or divided results. See [`SearchViewStyle`].
+    pub fn view_style(mut self, style: SearchViewStyle) -> Self {
+        self.view_style = style;
         self
     }
     pub fn expanded(mut self, expanded: bool) -> Self {
@@ -420,6 +458,16 @@ impl RenderOnce for SearchView {
         let visible = self.expanded || fade > 0.001 || expand > 0.001;
         let rows = self.suggestions.len();
         let live = self.expanded;
+        let divided = self.view_style == SearchViewStyle::Divided;
+        let divider = |fade: f32| {
+            div()
+                .debug_selector(|| "search-divider".into())
+                .flex_shrink_0()
+                .w_full()
+                .h(px(1.))
+                .bg(color(ColorRole::OUTLINE))
+                .opacity(fade)
+        };
         let list = |suggestions: Vec<SearchSuggestion>| {
             div()
                 .id((id.clone(), "results"))
@@ -435,6 +483,31 @@ impl RenderOnce for SearchView {
                 }))
         };
         let mut root = match self.layout {
+            SearchViewLayout::Docked if divided => {
+                let height = results_height(rows, self.max_visible, expand);
+                let open = visible && rows > 0;
+                div()
+                    .id(id.clone())
+                    .relative()
+                    .flex()
+                    .flex_col()
+                    .w(rem(360.))
+                    .rounded(rem(SEARCH_BAR_HEIGHT / 2.))
+                    .overflow_hidden()
+                    .when(open, |this| this.bg(color(SEARCH_CONTAINER)))
+                    .child(self.bar)
+                    .when(open, |this| {
+                        this.child(divider(fade)).child(
+                            div()
+                                .debug_selector(|| "search-results".into())
+                                .w_full()
+                                .h(rem(height))
+                                .overflow_hidden()
+                                .opacity(fade)
+                                .child(list(self.suggestions)),
+                        )
+                    })
+            }
             SearchViewLayout::Docked => {
                 let height = results_height(rows, self.max_visible, expand);
                 div()
@@ -460,7 +533,12 @@ impl RenderOnce for SearchView {
                     })
             }
             SearchViewLayout::FullScreen => {
-                let margin = FULL_SCREEN_MARGIN * expand.clamp(0., 1.);
+                // A divided view runs its header edge to edge.
+                let margin = if divided {
+                    0.
+                } else {
+                    FULL_SCREEN_MARGIN * expand.clamp(0., 1.)
+                };
                 div()
                     .id(id.clone())
                     .relative()
@@ -475,7 +553,12 @@ impl RenderOnce for SearchView {
                             .bg(color(ColorRole::SURFACE))
                             .opacity(fade),
                     )
-                    .child(div().relative().w_full().px(rem(margin)).child(self.bar))
+                    .child(div().relative().w_full().px(rem(margin)).child(if divided {
+                        self.bar.rounded_none()
+                    } else {
+                        self.bar
+                    }))
+                    .when(visible && divided, |this| this.child(divider(fade)))
                     .when(visible, |this| {
                         this.child(
                             div()

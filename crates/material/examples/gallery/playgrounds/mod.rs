@@ -3,14 +3,25 @@
 //! See `super::playground` for the API.
 pub mod badge;
 pub mod button;
+pub mod checkbox;
+pub mod chips;
+pub mod date_picker;
 pub mod loading_indicator;
 pub mod progress;
+pub mod radio;
+pub mod search;
+pub mod select;
+pub mod slider;
 pub mod snackbar;
 pub mod switch;
 #[cfg(test)]
 mod test_support;
 pub mod text_field;
+pub mod time_picker;
 pub mod tooltip;
+
+#[cfg(test)]
+mod testing;
 
 /// The common imports of playground modules.
 pub mod prelude {

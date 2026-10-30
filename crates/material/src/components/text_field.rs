@@ -51,6 +51,32 @@ const NOTCH_PADDING: f32 = 4.;
 /// The focused indicator and outline weight (the design kit's 3dp stroke).
 const FOCUS_INDICATOR: f32 = 3.;
 
+/// md3.io's text field densities. The design kit draws one 56dp field;
+/// compact is density −2 (48dp, the M3 density scale's 4dp steps, as the
+/// baseline menu's compact items), with the filled label and input moved up
+/// 4dp each so the floating label keeps its 4dp gap to the input.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+pub enum TextFieldDensity {
+    #[default]
+    Default,
+    Compact,
+}
+
+impl TextFieldDensity {
+    pub const ALL: [Self; 2] = [Self::Default, Self::Compact];
+    /// The single-line container height in dp.
+    pub const fn height(self) -> f32 {
+        match self {
+            Self::Default => TEXT_FIELD_HEIGHT,
+            Self::Compact => TEXT_FIELD_HEIGHT - 8.,
+        }
+    }
+    /// How far the filled label and input move up from their 56dp places.
+    const fn lift(self) -> f32 {
+        (TEXT_FIELD_HEIGHT - self.height()) / 2.
+    }
+}
+
 /// The two M3 text field styles.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub enum TextFieldVariant {
@@ -82,6 +108,7 @@ pub struct TextField {
     id: ElementId,
     input: FieldInput,
     variant: TextFieldVariant,
+    density: TextFieldDensity,
     label: Option<SharedString>,
     placeholder: Option<SharedString>,
     leading: Option<AnyElement>,
@@ -119,6 +146,7 @@ impl TextField {
             id: id.into(),
             input,
             variant: TextFieldVariant::Filled,
+            density: TextFieldDensity::Default,
             label: None,
             placeholder: None,
             leading: None,
@@ -137,6 +165,11 @@ impl TextField {
 
     pub fn variant(mut self, variant: TextFieldVariant) -> Self {
         self.variant = variant;
+        self
+    }
+    /// The container density (default 56dp; compact 48dp).
+    pub fn density(mut self, density: TextFieldDensity) -> Self {
+        self.density = density;
         self
     }
     pub fn outlined(self) -> Self {
@@ -333,8 +366,19 @@ pub(crate) fn field_paint(variant: TextFieldVariant, s: FieldState) -> FieldPain
 
 /// Label geometry in design px: `(left, top, font size, line height)` for a
 /// float progress `t` (0 resting, 1 floating).
+#[cfg(test)]
 pub(crate) fn label_geometry(
     variant: TextFieldVariant,
+    leading: bool,
+    t: f32,
+) -> (f32, f32, f32, f32) {
+    density_label_geometry(variant, TextFieldDensity::Default, leading, t)
+}
+
+/// The label geometry (see `label_geometry`) in a field of `density`.
+pub(crate) fn density_label_geometry(
+    variant: TextFieldVariant,
+    density: TextFieldDensity,
     leading: bool,
     t: f32,
 ) -> (f32, f32, f32, f32) {
@@ -344,11 +388,11 @@ pub(crate) fn label_geometry(
         PADDING
     };
     let (float_left, float_top) = match variant {
-        TextFieldVariant::Filled => (rest_left, FILLED_FLOAT_TOP),
+        TextFieldVariant::Filled => (rest_left, FILLED_FLOAT_TOP - density.lift()),
         // Centered on the top outline, at the content's leading edge.
         TextFieldVariant::Outlined => (PADDING, -8.),
     };
-    let rest_top = (TEXT_FIELD_HEIGHT - 24.) / 2.;
+    let rest_top = (density.height() - 24.) / 2.;
     let large = TypeRole::BodyLarge.scale();
     let small = TypeRole::BodySmall.scale();
     let lerp = |a: f32, b: f32| a + (b - a) * t;
@@ -426,6 +470,8 @@ impl RenderOnce for TextField {
         let variant = self.variant;
         let filled = variant == TextFieldVariant::Filled;
         let leading = self.leading.is_some();
+        let density = self.density;
+        let height = density.height();
 
         // Motion: float on the fast spatial token, focus emphasis on fast effects.
         let float_t = motion::token_value(
@@ -486,8 +532,8 @@ impl RenderOnce for TextField {
             .relative()
             .flex()
             .w_full()
-            .min_h(rem(TEXT_FIELD_HEIGHT))
-            .when(!multi_line, |this| this.h(rem(TEXT_FIELD_HEIGHT)))
+            .min_h(rem(height))
+            .when(!multi_line, |this| this.h(rem(height)))
             .when(multi_line, |this| this.items_start())
             .when(!multi_line, |this| this.items_center())
             .map(|this| match variant {
@@ -573,11 +619,11 @@ impl RenderOnce for TextField {
             PADDING
         };
         let input_top = if filled && has_label {
-            FILLED_INPUT_TOP
+            FILLED_INPUT_TOP - density.lift()
         } else {
-            (TEXT_FIELD_HEIGHT - 24.) / 2.
+            (height - 24.) / 2.
         };
-        let input_bottom = TEXT_FIELD_HEIGHT - 24. - input_top;
+        let input_bottom = height - 24. - input_top;
         let show_content = floating || !has_label;
         let show_placeholder = !populated && show_content;
 
@@ -588,7 +634,7 @@ impl RenderOnce for TextField {
                 .items_center()
                 .justify_center()
                 .size(rem(ICON_SIZE))
-                .when(multi_line, |this| this.mt(rem(16.)))
+                .when(multi_line, |this| this.mt(rem((height - 24.) / 2.)))
                 .text_color(ink)
                 .child(icon)
         };
@@ -707,7 +753,8 @@ impl RenderOnce for TextField {
         );
 
         if let Some(label) = self.label.clone() {
-            let (left, top, size, line) = label_geometry(variant, leading, float_t);
+            let (left, top, size, line) =
+                density_label_geometry(variant, density, leading, float_t);
             container = container.child(
                 div()
                     .debug_selector(|| "text-field-label".into())

@@ -102,6 +102,39 @@ fn the_label_floats_from_body_large_to_body_small() {
 }
 
 #[test]
+fn a_compact_field_is_48dp_with_its_label_and_input_lifted() {
+    assert_eq!(TextFieldDensity::Default.height(), 56.);
+    assert_eq!(TextFieldDensity::Compact.height(), 48.);
+    let compact = |variant, t| density_label_geometry(variant, TextFieldDensity::Compact, false, t);
+    assert_eq!(
+        compact(TextFieldVariant::Filled, 0.).1,
+        12.,
+        "resting label centered"
+    );
+    assert_eq!(compact(TextFieldVariant::Filled, 1.).1, 4.);
+    assert_eq!(
+        compact(TextFieldVariant::Outlined, 1.).1,
+        -8.,
+        "on the outline"
+    );
+}
+
+#[gpui::test]
+fn a_compact_field_renders_48dp_tall(cx: &mut TestAppContext) {
+    let (view, cx) = setup(cx, TextFieldVariant::Filled, false);
+    view.update(cx, |view, cx| {
+        view.density = TextFieldDensity::Compact;
+        cx.notify();
+    });
+    draw(cx);
+    let field = cx.debug_bounds("field").unwrap();
+    let indicator = cx.debug_bounds("text-field-indicator").unwrap();
+    assert_eq!(indicator.bottom(), field.top() + px(48.));
+    let label = cx.debug_bounds("text-field-label").unwrap();
+    assert_eq!(label.top() - field.top(), px(12.));
+}
+
+#[test]
 fn the_notch_opens_around_the_floating_label() {
     assert_eq!(notch(40., 1.), (12., 48.));
     assert_eq!(notch(40., 0.).1, 0.);
@@ -118,6 +151,7 @@ fn the_notch_opens_around_the_floating_label() {
 struct Harness {
     state: Entity<InputState>,
     variant: TextFieldVariant,
+    density: TextFieldDensity,
     disabled: bool,
 }
 
@@ -128,6 +162,7 @@ impl Render for Harness {
             div().debug_selector(|| "field".into()).w(px(210.)).child(
                 TextField::new("field", &self.state)
                     .variant(self.variant)
+                    .density(self.density)
                     .label("Label")
                     .supporting_text("Supporting")
                     .max_length(20)
@@ -156,6 +191,7 @@ fn setup(
     cx.add_window_view(|window, cx| Harness {
         state: cx.new(|cx| InputState::new(window, cx)),
         variant,
+        density: TextFieldDensity::Default,
         disabled,
     })
 }

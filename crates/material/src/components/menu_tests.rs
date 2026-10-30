@@ -205,6 +205,8 @@ fn escape_closes_the_menu(cx: &mut TestAppContext) {
 struct DropdownHarness {
     open: bool,
     selected: Option<usize>,
+    disabled_options: Vec<usize>,
+    density: TextFieldDensity,
 }
 
 impl Render for DropdownHarness {
@@ -213,6 +215,8 @@ impl Render for DropdownHarness {
         div().p(px(20.)).child(
             ExposedDropdown::new("dropdown", "Fruit")
                 .options(["Apple", "Banana", "Cherry"])
+                .disabled_options(self.disabled_options.clone())
+                .density(self.density)
                 .selected(self.selected)
                 .open(self.open)
                 .on_open_change(cx.listener(|this, open: &bool, _, cx| {
@@ -237,6 +241,8 @@ fn the_exposed_dropdown_selects_an_option(cx: &mut TestAppContext) {
     let (view, cx) = cx.add_window_view(|_, _| DropdownHarness {
         open: false,
         selected: None,
+        disabled_options: Vec::new(),
+        density: TextFieldDensity::Default,
     });
     draw(cx);
     let trigger = cx.debug_bounds("dropdown-trigger").unwrap();
@@ -254,4 +260,31 @@ fn the_exposed_dropdown_selects_an_option(cx: &mut TestAppContext) {
         assert_eq!(view.read(cx).selected, Some(1));
         assert!(!view.read(cx).open);
     });
+}
+
+#[gpui::test]
+fn a_disabled_option_cannot_be_chosen_and_compact_is_48dp(cx: &mut TestAppContext) {
+    cx.update(|cx| {
+        gpui_kit::init(cx);
+        crate::init(cx);
+        cx.set_reduce_motion(true);
+    });
+    let (view, cx) = cx.add_window_view(|_, _| DropdownHarness {
+        open: false,
+        selected: None,
+        disabled_options: vec![1],
+        density: TextFieldDensity::Compact,
+    });
+    draw(cx);
+    let trigger = cx.debug_bounds("dropdown-trigger").unwrap();
+    assert_eq!(trigger.size.height, px(48.), "a compact field");
+    cx.simulate_click(trigger.center(), Modifiers::default());
+    settle(cx);
+    let surface = cx.debug_bounds("menu-popup-surface").unwrap();
+    cx.simulate_click(
+        point(surface.center().x, surface.top() + px(2. + 48. + 24.)),
+        Modifiers::default(),
+    );
+    settle(cx);
+    cx.update(|_, cx| assert_eq!(view.read(cx).selected, None, "banana is disabled"));
 }

@@ -21,6 +21,12 @@
 //! minutes, and the arrow keys step the value. Strings and number
 //! formatting come from the caller's [`TimePickerLabels`].
 //!
+//! md3.io's options beyond the kit: [`TimePickerState::seconds`] adds a
+//! seconds selector, dial unit and input segment; a minute step snaps the
+//! dial and its arrow keys to 5- or 15-minute marks; earliest/latest
+//! limits clamp every edit (dial, keys, period and typing) and fade the
+//! dial numbers that fall outside them.
+//!
 //! Motion: the hand turns along the shorter arc and changes rings on the
 //! default spatial spring, retargeting from wherever it is; reduced motion
 //! moves it at once.
@@ -41,7 +47,7 @@ use crate::{
 };
 use chrono::{NaiveTime, Timelike};
 use gpui::{prelude::*, *};
-use gpui_base::{HourCycle, TimeField, TimeFieldEvent, TimeFieldState, TimeSegment};
+use gpui_base::{HourCycle, TimeField, TimeFieldEvent, TimeFieldState, TimePrecision, TimeSegment};
 use std::{cell::Cell, f32::consts::PI, rc::Rc};
 
 type Format = Rc<dyn Fn(u32) -> SharedString>;
@@ -100,6 +106,8 @@ pub enum TimeUnit {
     #[default]
     Hour,
     Minute,
+    /// With [`TimePickerState::seconds`].
+    Second,
 }
 
 /// A time picker's state. Create it with `cx.new` and hand it to
@@ -113,6 +121,12 @@ pub struct TimePickerState {
     /// The hand's unwrapped target angle in turns, so a change turns along
     /// the shorter arc.
     hand: f32,
+    /// The minute grid the dial and its keys snap to (1 = every minute).
+    minute_step: u32,
+    /// The seconds selector's label, when seconds are shown.
+    second_label: Option<SharedString>,
+    /// Earliest and latest selectable times.
+    limits: Option<(NaiveTime, NaiveTime)>,
     dial_focus: FocusHandle,
     field: Entity<TimeFieldState>,
     _subscription: Subscription,
@@ -138,12 +152,21 @@ impl TimePickerState {
             field.set_time(time, window, cx);
             field
         });
-        let subscription = cx.subscribe(&field, |this, _, event: &TimeFieldEvent, cx| {
-            let TimeFieldEvent::Change(time) = *event;
-            this.apply(time);
-            cx.emit(TimePickerEvent::Change(time));
-            cx.notify();
-        });
+        let subscription = cx.subscribe_in(
+            &field,
+            window,
+            |this, field, event: &TimeFieldEvent, window, cx| {
+                let TimeFieldEvent::Change(typed) = *event;
+                // A typed time outside the limits lands on the nearest one.
+                let time = this.clamp(typed);
+                if time != typed {
+                    field.update(cx, |field, cx| field.set_time(time, window, cx));
+                }
+                this.apply(time);
+                cx.emit(TimePickerEvent::Change(time));
+                cx.notify();
+            },
+        );
         let mut state = Self {
             labels: Rc::new(labels),
             time,
@@ -151,6 +174,9 @@ impl TimePickerState {
             mode: TimeInputMode::Dial,
             unit: TimeUnit::Hour,
             hand: 0.,
+            minute_step: 1,
+            second_label: None,
+            limits: None,
             dial_focus: cx.focus_handle().tab_stop(true),
             field,
             _subscription: subscription,
@@ -170,6 +196,46 @@ impl TimePickerState {
     }
     pub fn input_mode(mut self) -> Self {
         self.mode = TimeInputMode::Input;
+        self
+    }
+    /// Show seconds: a third selector (named `label`), a seconds dial unit
+    /// and a seconds input segment.
+    pub fn seconds(
+        mut self,
+        label: impl Into<SharedString>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> Self {
+        self.second_label = Some(label.into());
+        let time = self.time;
+        self.field.update(cx, |field, cx| {
+            field.set_precision(TimePrecision::Second, window, cx);
+            field.set_time(time, window, cx);
+        });
+        self
+    }
+    /// Snap the dial and its arrow keys to every `step` minutes (e.g. 5 or
+    /// 15; 0 and 1 mean every minute).
+    pub fn minute_step(mut self, step: u32) -> Self {
+        self.minute_step = step.clamp(1, 30);
+        self
+    }
+    /// Only times from `earliest` to `latest` can be chosen; the current
+    /// time moves inside them.
+    pub fn limits(
+        mut self,
+        earliest: NaiveTime,
+        latest: NaiveTime,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> Self {
+        self.limits = Some((earliest.min(latest), earliest.max(latest)));
+        let time = self.clamp(self.time);
+        if time != self.time {
+            self.apply(time);
+            self.field
+                .update(cx, |field, cx| field.set_time(time, window, cx));
+        }
         self
     }
     pub fn unit(mut self, unit: TimeUnit) -> Self {
@@ -192,6 +258,19 @@ impl TimePickerState {
     }
     pub fn current_unit(&self) -> TimeUnit {
         self.unit
+    }
+    pub fn shows_seconds(&self) -> bool {
+        self.second_label.is_some()
+    }
+    pub fn current_minute_step(&self) -> u32 {
+        self.minute_step
+    }
+    pub fn current_limits(&self) -> Option<(NaiveTime, NaiveTime)> {
+        self.limits
+    }
+    /// `time` moved inside the limits.
+    fn clamp(&self, time: NaiveTime) -> NaiveTime {
+        clamp_time(time, self.limits)
     }
     pub fn dial_focus(&self) -> &FocusHandle {
         &self.dial_focus
@@ -219,6 +298,7 @@ impl TimePickerState {
 
     /// Set the time as a person would, emitting [`TimePickerEvent::Change`].
     pub fn set_time(&mut self, time: NaiveTime, window: &mut Window, cx: &mut Context<Self>) {
+        let time = self.clamp(time);
         if time == self.time {
             return;
         }
@@ -262,14 +342,25 @@ impl TimePickerState {
 
     /// Step the dial's value by `delta`, wrapping within the hour or day.
     pub fn step(&mut self, delta: i32, window: &mut Window, cx: &mut Context<Self>) {
-        let time = step_time(self.time, self.unit, self.format, delta);
+        let time = match self.unit {
+            TimeUnit::Minute if self.minute_step > 1 => {
+                let minute = step_minutes(self.time.minute(), self.minute_step, delta);
+                self.time.with_minute(minute).unwrap_or(self.time)
+            }
+            unit => step_time(self.time, unit, self.format, delta),
+        };
         self.set_time(time, window, cx);
     }
 
     /// Choose the dial value nearest a pointer at `offset` from the face's
     /// center (in dp).
     fn pick(&mut self, offset: Point<f32>, window: &mut Window, cx: &mut Context<Self>) {
-        let time = dial_pick(self.time, self.unit, self.format, offset);
+        let mut time = dial_pick(self.time, self.unit, self.format, offset);
+        if self.unit == TimeUnit::Minute && self.minute_step > 1 {
+            let step = self.minute_step as f32;
+            let minute = ((time.minute() as f32 / step).round() * step) as u32 % 60;
+            time = time.with_minute(minute).unwrap_or(time);
+        }
         self.set_time(time, window, cx);
     }
 }
@@ -291,6 +382,61 @@ fn angle_of(time: NaiveTime, unit: TimeUnit) -> f32 {
     match unit {
         TimeUnit::Hour => (time.hour() % 12) as f32 / 12.,
         TimeUnit::Minute => time.minute() as f32 / 60.,
+        TimeUnit::Second => time.second() as f32 / 60.,
+    }
+}
+
+/// `time` moved inside `limits` (earliest, latest).
+pub(crate) fn clamp_time(time: NaiveTime, limits: Option<(NaiveTime, NaiveTime)>) -> NaiveTime {
+    match limits {
+        Some((earliest, latest)) => time.max(earliest).min(latest),
+        None => time,
+    }
+}
+
+/// Step `minute` by `delta` marks of a `step`-minute grid: an off-grid
+/// minute first moves to the neighboring mark in the step's direction.
+pub(crate) fn step_minutes(minute: u32, step: u32, delta: i32) -> u32 {
+    let (minute, step) = (minute as i32, step.max(1) as i32);
+    let floor = minute.div_euclid(step) * step;
+    let next = if floor == minute || delta > 0 {
+        floor + step * delta
+    } else {
+        floor + step * (delta + 1)
+    };
+    next.rem_euclid(60) as u32
+}
+
+/// Whether some time in hour `hour` (or, for minutes and seconds, `time`
+/// with that value) lies inside `limits`.
+pub(crate) fn within_limits(
+    time: NaiveTime,
+    unit: TimeUnit,
+    value: u32,
+    limits: Option<(NaiveTime, NaiveTime)>,
+) -> bool {
+    let Some((earliest, latest)) = limits else {
+        return true;
+    };
+    match unit {
+        TimeUnit::Hour => {
+            let start = NaiveTime::from_hms_opt(value, 0, 0);
+            let end = NaiveTime::from_hms_opt(value, 59, 59);
+            matches!((start, end), (Some(start), Some(end)) if start <= latest && end >= earliest)
+        }
+        TimeUnit::Minute => match time.with_minute(value) {
+            Some(t) => {
+                let (start, end) = (
+                    t.with_second(0).unwrap_or(t),
+                    t.with_second(59).unwrap_or(t),
+                );
+                start <= latest && end >= earliest
+            }
+            None => false,
+        },
+        TimeUnit::Second => time
+            .with_second(value)
+            .is_some_and(|t| t >= earliest && t <= latest),
     }
 }
 
@@ -325,6 +471,10 @@ pub(crate) fn step_time(
             let minute = (time.minute() as i32 + delta).rem_euclid(60) as u32;
             time.with_minute(minute).unwrap_or(time)
         }
+        TimeUnit::Second => {
+            let second = (time.second() as i32 + delta).rem_euclid(60) as u32;
+            time.with_second(second).unwrap_or(time)
+        }
         TimeUnit::Hour => {
             let hour = match format {
                 TimeFormat::TwentyFourHour => (time.hour() as i32 + delta).rem_euclid(24) as u32,
@@ -350,6 +500,10 @@ pub(crate) fn dial_pick(
         TimeUnit::Minute => {
             let minute = (turn * 60.).round() as u32 % 60;
             time.with_minute(minute).unwrap_or(time)
+        }
+        TimeUnit::Second => {
+            let second = (turn * 60.).round() as u32 % 60;
+            time.with_second(second).unwrap_or(time)
         }
         TimeUnit::Hour => {
             let position = (turn * 12.).round() as u32 % 12;
@@ -390,6 +544,8 @@ pub struct ClockDial {
     unit: TimeUnit,
     format: TimeFormat,
     labels: Rc<TimePickerLabels>,
+    second_label: Option<SharedString>,
+    limits: Option<(NaiveTime, NaiveTime)>,
 }
 
 impl ClockDial {
@@ -403,6 +559,8 @@ impl ClockDial {
             unit: s.unit,
             format: s.format,
             labels: s.labels.clone(),
+            second_label: s.second_label.clone(),
+            limits: s.limits,
         }
     }
     /// A static specimen of `time`.
@@ -420,6 +578,8 @@ impl ClockDial {
             unit,
             format,
             labels,
+            second_label: None,
+            limits: None,
         }
     }
 }
@@ -453,7 +613,11 @@ impl RenderOnce for ClockDial {
         };
         let primary = color(ColorRole::PRIMARY);
         let on_primary = color(ColorRole::ON_PRIMARY);
-        let between = unit == TimeUnit::Minute && time.minute() % 5 != 0;
+        let between = match unit {
+            TimeUnit::Minute => time.minute() % 5 != 0,
+            TimeUnit::Second => time.second() % 5 != 0,
+            TimeUnit::Hour => false,
+        };
         let bounds = Rc::new(Cell::new(Bounds::<Pixels>::default()));
         let observed = bounds.clone();
         let hand = canvas(
@@ -485,7 +649,7 @@ impl RenderOnce for ClockDial {
         .absolute()
         .inset_0();
         let numbers: Vec<(u32, f32, f32, SharedString)> = match (unit, format) {
-            (TimeUnit::Minute, _) => (0..12)
+            (TimeUnit::Minute | TimeUnit::Second, _) => (0..12)
                 .map(|i| {
                     (
                         i * 5,
@@ -529,10 +693,18 @@ impl RenderOnce for ClockDial {
         };
         let selected = match (unit, format) {
             (TimeUnit::Minute, _) => time.minute(),
+            (TimeUnit::Second, _) => time.second(),
             (TimeUnit::Hour, TimeFormat::TwelveHour) => (time.hour() + 11) % 12 + 1,
             (TimeUnit::Hour, TimeFormat::TwentyFourHour) => time.hour(),
         };
         let ink = color(ColorRole::ON_SURFACE);
+        let faded = state::disabled(ink);
+        let limits = self.limits;
+        // A 12-hour face's number names an hour in the current period.
+        let hour_of = move |label: u32| match format {
+            TimeFormat::TwelveHour => label % 12 + time.hour() / 12 * 12,
+            TimeFormat::TwentyFourHour => label,
+        };
         let mut face = div()
             .id(self.id.clone())
             .relative()
@@ -544,6 +716,10 @@ impl RenderOnce for ClockDial {
             .aria_label(match unit {
                 TimeUnit::Hour => self.labels.hour.clone(),
                 TimeUnit::Minute => self.labels.minute.clone(),
+                TimeUnit::Second => self
+                    .second_label
+                    .clone()
+                    .unwrap_or_else(|| self.labels.minute.clone()),
             })
             .aria_numeric_value(selected as f64)
             .child(hand)
@@ -557,7 +733,20 @@ impl RenderOnce for ClockDial {
                     .flex()
                     .items_center()
                     .justify_center()
-                    .text_color(if value == selected { on_primary } else { ink })
+                    .text_color(if value == selected {
+                        on_primary
+                    } else {
+                        let value = if unit == TimeUnit::Hour {
+                            hour_of(value)
+                        } else {
+                            value
+                        };
+                        if within_limits(time, unit, value, limits) {
+                            ink
+                        } else {
+                            faded
+                        }
+                    })
                     .map(|d| type_style(d, TypeRole::BodyLarge))
                     .child(label)
             }));
@@ -601,7 +790,15 @@ impl RenderOnce for ClockDial {
                 move |_, _, cx| {
                     if *pressed.read(cx) {
                         pressed.update(cx, |p, _| *p = false);
-                        state.update(cx, |s, cx| s.set_unit(TimeUnit::Minute, cx));
+                        state.update(cx, |s, cx| {
+                            // Releasing moves on to the next unit.
+                            let next = match s.unit {
+                                TimeUnit::Hour => TimeUnit::Minute,
+                                TimeUnit::Minute if s.shows_seconds() => TimeUnit::Second,
+                                unit => unit,
+                            };
+                            s.set_unit(next, cx)
+                        });
                     }
                 }
             })
@@ -629,9 +826,14 @@ pub struct TimeSelector {
     value: SharedString,
     label: SharedString,
     selected: bool,
+    compact: bool,
     preview: Option<InteractionPreview>,
     on_click: Option<Activate>,
 }
+
+/// A compact selector's width: three of them (with seconds) fit where the
+/// kit's two 96dp selectors and a period selector do.
+const COMPACT_SELECTOR: f32 = 72.;
 
 impl TimeSelector {
     /// `value` is the formatted number; `label` names it ("Hour").
@@ -645,12 +847,19 @@ impl TimeSelector {
             value: value.into(),
             label: label.into(),
             selected: false,
+            compact: false,
             preview: None,
             on_click: None,
         }
     }
     pub fn selected(mut self, selected: bool) -> Self {
         self.selected = selected;
+        self
+    }
+    /// 72dp wide with display-medium digits, for hours, minutes and seconds
+    /// side by side.
+    pub fn compact(mut self, compact: bool) -> Self {
+        self.compact = compact;
         self
     }
     pub fn preview_state(mut self, state: InteractionPreview) -> Self {
@@ -687,7 +896,7 @@ impl RenderOnce for TimeSelector {
         let mut button = gpui_base::Button::new(self.id)
             .accessibility_label(self.label)
             .disabled(disabled)
-            .w(rem(96.))
+            .w(rem(if self.compact { COMPACT_SELECTOR } else { 96. }))
             .h(rem(80.))
             .flex()
             .items_center()
@@ -695,7 +904,16 @@ impl RenderOnce for TimeSelector {
             .rounded(rem(8.))
             .bg(fill)
             .text_color(ink)
-            .map(|b| type_style(b, TypeRole::DisplayLarge))
+            .map(|b| {
+                type_style(
+                    b,
+                    if self.compact {
+                        TypeRole::DisplayMedium
+                    } else {
+                        TypeRole::DisplayLarge
+                    },
+                )
+            })
             .when(disabled, |b| b.opacity(state::DISABLED_CONTENT))
             .child(self.value);
         button = match preview {
@@ -922,6 +1140,8 @@ impl RenderOnce for TimePicker {
         let s = self.state.read(cx);
         let labels = s.labels.clone();
         let (time, format, mode, unit) = (s.time, s.format, s.mode, s.unit);
+        let second_label = s.second_label.clone();
+        let seconds = second_label.is_some();
         let field = s.field.clone();
         let id = self.id.clone();
         let specimen = self.specimen;
@@ -959,6 +1179,7 @@ impl RenderOnce for TimePicker {
             let mut selector =
                 TimeSelector::new(named(&id, name), (labels.two_digits)(value), label)
                     .selected(unit == which)
+                    .compact(seconds)
                     .on_click(move |_, cx| state.update(cx, |s, cx| s.set_unit(which, cx)));
             if let Some(p) = preview {
                 selector = selector.preview_state(p);
@@ -990,7 +1211,15 @@ impl RenderOnce for TimePicker {
                 TimeUnit::Minute,
                 time.minute(),
                 labels.minute.clone(),
-            ));
+            ))
+            .when_some(second_label.clone(), |row, label| {
+                row.child(separator(80.)).child(selector(
+                    "second",
+                    TimeUnit::Second,
+                    time.second(),
+                    label,
+                ))
+            });
         let dial = if specimen {
             ClockDial::specimen(named(&id, "dial"), labels.clone(), time, unit, format)
         } else {
@@ -1063,11 +1292,15 @@ impl RenderOnce for TimePicker {
                         }),
                     )),
             );
-        let width = match (mode, horizontal, twelve) {
-            (TimeInputMode::Input, _, false) => 264.,
-            (_, true, _) => 572.,
-            _ => 328.,
-        };
+        // Three compact selectors and two separators are 48dp wider than
+        // the kit's two selectors and separator.
+        let extra = if seconds { 48. } else { 0. };
+        let width = extra
+            + match (mode, horizontal, twelve) {
+                (TimeInputMode::Input, _, false) => 264.,
+                (_, true, _) => 572.,
+                _ => 328.,
+            };
         let surface = div()
             .id(self.id.clone())
             .w(rem(width))
@@ -1130,6 +1363,9 @@ impl RenderOnce for TimePicker {
                         };
                         let label = match which {
                             TimeSegment::Hour => segment_labels.hour.clone(),
+                            TimeSegment::Second => second_label
+                                .clone()
+                                .unwrap_or_else(|| segment_labels.minute.clone()),
                             _ => segment_labels.minute.clone(),
                         };
                         segment
@@ -1137,7 +1373,7 @@ impl RenderOnce for TimePicker {
                             .flex()
                             .flex_col()
                             .gap(rem(7.))
-                            .w(rem(96.))
+                            .w(rem(if seconds { COMPACT_SELECTOR } else { 96. }))
                             .child(
                                 div()
                                     .h(rem(72.))
@@ -1187,7 +1423,7 @@ impl RenderOnce for TimePicker {
                         .px(rem(24.))
                         .child(
                             div()
-                                .w(rem(216.))
+                                .w(rem(216. + extra))
                                 .flex()
                                 .flex_col()
                                 .gap(rem(16.))

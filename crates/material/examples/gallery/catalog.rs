@@ -234,7 +234,7 @@ pub static CATALOG: &[Entry] = &[
         SelectionInput,
         "Make a choice, or represent a partial selection.",
         spec("checkboxes"),
-        None,
+        Some(&playgrounds::checkbox::PLAYGROUND),
     ),
     component(
         "switch",
@@ -250,7 +250,7 @@ pub static CATALOG: &[Entry] = &[
         SelectionInput,
         "Pick exactly one option from a set.",
         spec("radio-button"),
-        None,
+        Some(&playgrounds::radio::PLAYGROUND),
     ),
     component(
         "chips",
@@ -258,7 +258,7 @@ pub static CATALOG: &[Entry] = &[
         SelectionInput,
         "Compact elements for input, filtering, and suggestions.",
         spec("chips"),
-        None,
+        Some(&playgrounds::chips::PLAYGROUND),
     ),
     component(
         "slider",
@@ -266,7 +266,7 @@ pub static CATALOG: &[Entry] = &[
         SelectionInput,
         "Choose a value or a range along a track.",
         spec("sliders"),
-        None,
+        Some(&playgrounds::slider::PLAYGROUND),
     ),
     component(
         "text-field",
@@ -282,7 +282,7 @@ pub static CATALOG: &[Entry] = &[
         SelectionInput,
         "Choose one option from a menu that opens from a field.",
         spec("menu"),
-        None,
+        Some(&playgrounds::select::PLAYGROUND),
     ),
     component(
         "search",
@@ -290,7 +290,7 @@ pub static CATALOG: &[Entry] = &[
         SelectionInput,
         "Find content with a search bar and suggestions.",
         spec("search"),
-        None,
+        Some(&playgrounds::search::PLAYGROUND),
     ),
     component(
         "date-picker",
@@ -298,7 +298,7 @@ pub static CATALOG: &[Entry] = &[
         SelectionInput,
         "Select a date or a range of dates.",
         spec("date-time-pickers"),
-        None,
+        Some(&playgrounds::date_picker::PLAYGROUND),
     ),
     component(
         "time-picker",
@@ -306,7 +306,7 @@ pub static CATALOG: &[Entry] = &[
         SelectionInput,
         "Select a time on a dial or with the keyboard.",
         spec("date-time-pickers"),
-        None,
+        Some(&playgrounds::time_picker::PLAYGROUND),
     ),
     // Navigation
     component(

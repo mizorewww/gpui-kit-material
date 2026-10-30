@@ -144,6 +144,7 @@ pub struct MaterialRadio {
     id: ElementId,
     label: SharedString,
     visible_label: bool,
+    label_before: bool,
     selected: bool,
     disabled: bool,
     preview: Option<InteractionPreview>,
@@ -159,6 +160,7 @@ impl MaterialRadio {
             id: id.into(),
             label: label.into(),
             visible_label: false,
+            label_before: false,
             selected: false,
             disabled: false,
             preview: None,
@@ -179,6 +181,12 @@ impl MaterialRadio {
     /// Show the label after the radio, inside its target.
     pub fn visible_label(mut self, visible: bool) -> Self {
         self.visible_label = visible;
+        self
+    }
+    /// Put the visible label before the radio instead of after it, the
+    /// radio pushed to the row's far end (md3.io's "Labels before").
+    pub fn label_before(mut self, before: bool) -> Self {
+        self.label_before = before;
         self
     }
     /// Render a static specimen in one forced interaction state. See
@@ -279,6 +287,15 @@ impl RenderOnce for MaterialRadio {
         };
         let scale = TypeRole::BodyLarge.scale();
         let on_select = self.on_select;
+        let before = self.label_before && self.visible_label;
+        let (near, far) = (
+            (TARGET - STATE_LAYER) / 2.,
+            if self.visible_label {
+                8.
+            } else {
+                (TARGET - STATE_LAYER) / 2.
+            },
+        );
         let mut radio = gpui_base::Radio::new(self.id)
             .track_focus(&focus)
             .accessibility_label(self.label.clone())
@@ -298,18 +315,24 @@ impl RenderOnce for MaterialRadio {
             .items_center()
             .h(rem(TARGET))
             .min_w(rem(TARGET))
-            .pl(rem((TARGET - STATE_LAYER) / 2.))
-            .pr(rem(if self.visible_label {
-                8.
-            } else {
-                (TARGET - STATE_LAYER) / 2.
-            }))
+            .map(|radio| {
+                if before {
+                    radio
+                        .flex_row_reverse()
+                        .justify_between()
+                        .gap(rem(16.))
+                        .pr(rem(near))
+                        .pl(rem(far))
+                } else {
+                    radio.pl(rem(near)).pr(rem(far))
+                }
+            })
             .when(live, |radio| radio.cursor_pointer())
             .child(ringed)
             .when(self.visible_label, |radio| {
                 radio.child(
                     div()
-                        .pl(rem(4.))
+                        .when(!before, |label| label.pl(rem(4.)))
                         .whitespace_nowrap()
                         .text_color(label_color)
                         .text_size(scale.font_size)
@@ -337,6 +360,8 @@ pub struct MaterialRadioGroup {
     axis: Axis,
     options: Vec<GroupOption>,
     selected: Option<usize>,
+    labels_before: bool,
+    disabled: bool,
     on_change: Option<GroupChange>,
 }
 
@@ -349,6 +374,8 @@ impl MaterialRadioGroup {
             axis: Axis::Vertical,
             options: Vec::new(),
             selected: None,
+            labels_before: false,
+            disabled: false,
             on_change: None,
         }
     }
@@ -369,6 +396,17 @@ impl MaterialRadioGroup {
         self.selected = selected;
         self
     }
+    /// Put each label before its radio. See [`MaterialRadio::label_before`].
+    pub fn labels_before(mut self, before: bool) -> Self {
+        self.labels_before = before;
+        self
+    }
+    /// Disable every option: the group shows its selection but takes no
+    /// focus or input.
+    pub fn disabled(mut self, disabled: bool) -> Self {
+        self.disabled = disabled;
+        self
+    }
     /// Called with the index of a newly chosen option.
     pub fn on_change(mut self, f: impl Fn(&usize, &mut Window, &mut App) + 'static) -> Self {
         self.on_change = Some(Rc::new(f));
@@ -380,7 +418,12 @@ impl RenderOnce for MaterialRadioGroup {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let count = self.options.len();
         let focus = index_handles((self.id.clone(), "radio-focus"), count, window, cx);
-        let skip: Rc<[bool]> = self.options.iter().map(|option| !option.enabled).collect();
+        let disabled = self.disabled;
+        let skip: Rc<[bool]> = self
+            .options
+            .iter()
+            .map(|option| disabled || !option.enabled)
+            .collect();
         let selected = self.selected.filter(|&index| index < count);
         let on_select = self.on_change.clone().map(|on_change| {
             Rc::new(move |index: usize, window: &mut Window, cx: &mut App| {
@@ -396,8 +439,9 @@ impl RenderOnce for MaterialRadioGroup {
             let on_change = self.on_change.clone();
             MaterialRadio::new(("radio", index), option.label)
                 .visible_label(true)
+                .label_before(self.labels_before)
                 .selected(selected == Some(index))
-                .disabled(!option.enabled)
+                .disabled(disabled || !option.enabled)
                 .track_focus(&focus[index])
                 .tab_stop(entry == Some(index))
                 .position(index + 1, count)
@@ -556,6 +600,49 @@ mod tests {
         assert_eq!(
             cx.debug_bounds("radio-dot").unwrap().size,
             size(px(10.), px(10.))
+        );
+    }
+
+    struct BeforeHarness(bool);
+    impl Render for BeforeHarness {
+        fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+            window.set_rem_size(px(14.));
+            div().flex().flex_col().w(px(240.)).child(
+                div().debug_selector(|| "before-radio".into()).child(
+                    MaterialRadio::new("before", "Express")
+                        .visible_label(true)
+                        .label_before(self.0)
+                        .selected(true),
+                ),
+            )
+        }
+    }
+
+    #[gpui::test]
+    fn a_label_before_puts_the_radio_at_the_far_end(cx: &mut TestAppContext) {
+        cx.update(|cx| {
+            gpui_base::init(cx);
+            cx.set_reduce_motion(true);
+        });
+        let (view, cx) = cx.add_window_view(|_, _| BeforeHarness(false));
+        draw(cx);
+        let row = cx.debug_bounds("before-radio").unwrap();
+        let dot = cx.debug_bounds("radio-dot").unwrap();
+        assert_eq!(
+            dot.center().x - row.left(),
+            px(24.),
+            "after: the radio leads"
+        );
+        view.update(cx, |view, cx| {
+            view.0 = true;
+            cx.notify();
+        });
+        draw(cx);
+        let dot = cx.debug_bounds("radio-dot").unwrap();
+        assert_eq!(
+            row.right() - dot.center().x,
+            px(24.),
+            "before: the radio trails"
         );
     }
 
