@@ -18,11 +18,13 @@ pub use split_button::{SplitButton, SplitButtonPart};
 pub use standard_button_group::{ButtonGroup, EXPANDED_RATIO, standard_group_gap};
 mod app_bar;
 mod button_group;
+#[cfg(test)]
 mod controls;
 mod divider;
+mod slider;
+mod snackbar;
 mod switch;
 mod toolbar;
-pub use controls::{MaterialSlider, SliderAppearance};
 pub use divider::{
     DividerContext, DividerDirection, DividerOrientation, DividerVariant, MaterialDivider,
 };
@@ -30,6 +32,8 @@ pub use search::{
     SEARCH_BAR_HEIGHT, SEARCH_SUGGESTION_HEIGHT, SearchField, SearchSuggestion, SearchView,
     SearchViewLayout,
 };
+pub use slider::{MaterialSlider, SliderAppearance, SliderSize};
+pub use snackbar::{SNACKBAR_CLOSE_ICON, Snackbar};
 pub use switch::{MaterialSwitch, SwitchIcons};
 mod caption;
 mod carousel;
@@ -57,6 +61,7 @@ mod dialog;
 mod feedback;
 mod focus;
 mod list;
+mod loading_indicator;
 mod menu;
 mod navigation;
 mod preview;
@@ -88,15 +93,19 @@ pub use chips::{AssistChip, CHIP_HEIGHT, ChipStyle, FilterChip, InputChip, Sugge
 pub use choice::{ChoiceGroup, ChoiceTile, Tint, choice_radio, tinted_icon};
 pub use dialog::{DIALOG_WIDTH, MaterialDialog, SCRIM_OPACITY};
 pub use feedback::{
-    BADGE_CONTAINER, BADGE_LABEL, BadgeKind, CARD_PADDING, CardSurface, CardVariant,
-    LARGE_BADGE_PADDING, LARGE_BADGE_SIZE, NoticeKind, SMALL_BADGE_SIZE, Snackbar, StatusKind,
-    badge, card, card_surface, large_badge, notice_banner, outlined_badge, outlined_status_chip,
-    small_badge, status_chip,
+    BADGE_CONTAINER, BADGE_LABEL, CARD_PADDING, CardState, CardSurface, CardVariant,
+    LARGE_BADGE_PADDING, LARGE_BADGE_SIZE, NoticeKind, SMALL_BADGE_SIZE, StatusKind, card,
+    card_surface, large_badge, notice_banner, outlined_status_chip, small_badge, status_chip,
 };
+#[allow(deprecated)]
+pub use feedback::{BadgeKind, badge, outlined_badge};
 pub use focus::{FocusRing, RevealFocus, RingedButton, contain_scroll};
 pub use list::{
     LIST_SEGMENT_GAP, LIST_SEGMENT_INNER_RADIUS, LIST_SEGMENT_RADIUS, ListDensity, ListItem,
     ListLeading, ListLines, ListTrailing, segmented_list,
+};
+pub use loading_indicator::{
+    LOADING_INDICATOR_SIZE, LoadingFrame, LoadingIndicator, LoadingShape, loading_indicator_frame,
 };
 pub use menu::{
     ExposedDropdown, MaterialMenu, MaterialMenuItem, MenuDensity, MenuGroup, MenuPopup, MenuStyle,
@@ -107,11 +116,13 @@ pub use navigation::{
 };
 pub use preview::InteractionPreview;
 pub use progress::{
-    CircularProgressFrame, CircularProgressPlayback, circular_indeterminate_frame,
-    circular_progress, icon_spinner, icon_spinner_with_playback, indeterminate_circular_progress,
+    CircularProgress, CircularProgressFrame, CircularProgressPlayback, LINEAR_INDETERMINATE_MS,
+    LinearProgress, PROGRESS_THICK_THICKNESS, PROGRESS_THICKNESS, ProgressShape,
+    circular_indeterminate_frame, circular_progress, circular_progress_size, icon_spinner,
+    icon_spinner_with_playback, indeterminate_circular_progress,
     indeterminate_circular_progress_with_playback, indeterminate_linear_progress_with_playback,
-    indeterminate_progress, indeterminate_progress_with_playback, linear_progress, progress,
-    sample_circular_progress, spinner, spinner_with_playback,
+    indeterminate_progress, indeterminate_progress_with_playback, linear_indeterminate_lines,
+    linear_progress, progress, sample_circular_progress, spinner, spinner_with_playback,
 };
 pub use radio::{MaterialRadio, MaterialRadioGroup};
 pub use sheets::{MaterialBottomSheet, MaterialSideSheet};

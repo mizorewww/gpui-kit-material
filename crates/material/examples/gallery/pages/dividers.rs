@@ -23,7 +23,13 @@ impl GalleryPage for Page {
         match row {
             0 => board("horizontal-dividers")
                 .caption("Horizontal")
-                .row_labels(["Full width", "Inset", "Middle inset", "Inset · RTL"])
+                .row_labels([
+                    "Full width",
+                    "Inset",
+                    "Middle inset",
+                    "Inset · RTL",
+                    "With subhead",
+                ])
                 .cells(
                     [
                         (DividerVariant::FullWidth, DividerDirection::Ltr),
@@ -35,17 +41,40 @@ impl GalleryPage for Page {
                     .enumerate()
                     .map(|(index, (variant, direction))| {
                         div()
-                            .w_full()
+                            .w(rem(320.))
                             .h(rem(24.))
                             .flex()
-                            .items_center()
+                            .flex_col()
+                            .justify_center()
                             .bg(color(ColorRole::SURFACE_CONTAINER_HIGH))
                             .child(
                                 MaterialDivider::new(("horizontal-divider", index))
                                     .variant(variant)
                                     .direction(direction),
                             )
-                    }),
+                            .into_any_element()
+                    })
+                    // The kit's divider with subhead: a middle-inset divider
+                    // over a title-small subheader, 4dp apart.
+                    .chain([div()
+                        .w(rem(320.))
+                        .flex()
+                        .flex_col()
+                        .gap(rem(4.))
+                        .bg(color(ColorRole::SURFACE_CONTAINER_HIGH))
+                        .child(
+                            MaterialDivider::new("subhead-divider")
+                                .variant(DividerVariant::MiddleInset),
+                        )
+                        .child(
+                            spec::type_role(
+                                accessible_text("subheader", "Subheader"),
+                                TypeRole::TitleSmall,
+                            )
+                            .px(rem(16.))
+                            .text_color(color(ColorRole::ON_SURFACE_VARIANT)),
+                        )
+                        .into_any_element()]),
                 )
                 .into_any_element(),
             1 => board("vertical-dividers")
@@ -79,7 +108,7 @@ impl GalleryPage for Page {
             _ => board("custom-divider-board")
                 .caption("Custom: primary color, 2px thickness, 24px / 8px insets")
                 .cell(
-                    div().w_full().child(
+                    div().w(rem(320.)).child(
                         MaterialDivider::new("custom-divider")
                             .variant(DividerVariant::MiddleInset)
                             .inset_start(px(24.))

@@ -1,4 +1,4 @@
-//! Badges: the small dot and the large count badge on an icon.
+//! Badges: the kit's large and small badges, and both placed on an icon.
 use super::prelude::*;
 
 pub struct Page;
@@ -24,7 +24,7 @@ impl GalleryPage for Page {
     const INFO: PageInfo = PageInfo {
         id: "badges",
         title: "Badges",
-        description: "Badges show notifications, counts, or status information on navigation items and icons.",
+        description: "Badges are used to convey dynamic information, such as a count or status. A badge can include text, labels, or numbers.",
         guideline: Some("https://m3.material.io/components/badges/overview"),
     };
 
@@ -33,11 +33,21 @@ impl GalleryPage for Page {
     }
 
     fn row_count(&self, _: &Window) -> usize {
-        1
+        2
     }
 
-    fn render_row(&mut self, _: usize, _: &mut Window, _: &mut Context<Self>) -> AnyElement {
-        board("badges")
+    fn render_row(&mut self, row: usize, _: &mut Window, _: &mut Context<Self>) -> AnyElement {
+        if row == 0 {
+            return board("badges")
+                .caption("Badges")
+                .columns(2)
+                .column_labels(["Large", "Small"])
+                .cell(large_badge("large-badge-kit", "3"))
+                .cell(small_badge())
+                .into_any_element();
+        }
+        board("badges-on-icons")
+            .caption("On an icon")
             .columns(3)
             .column_width(120.)
             .column_labels(["Small", "Large", "Large · overflow"])

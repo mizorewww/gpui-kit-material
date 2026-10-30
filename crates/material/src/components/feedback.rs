@@ -1,13 +1,13 @@
-//! Status and notice surfaces: M3 badges, status chips, banners,
-//! cards and snackbars.
+//! Status and notice surfaces: M3 badges, status chips, banners and
+//! cards (the snackbar lives in `snackbar.rs`).
 use crate::color::ColorRole::{self, *};
 use crate::icons::IconName;
 use crate::theme::color;
 use crate::tokens::{elevation, layout::*, shape::*, state, typography::*};
-use gpui::{prelude::*, *};
-use std::rc::Rc;
 
-use super::focus::{RingPlacement, RingedButton};
+use super::InteractionPreview;
+use gpui::{prelude::*, *};
+
 use super::text::accessible_text;
 
 /// The tone of a [`notice_banner`].
@@ -71,6 +71,7 @@ pub enum StatusKind {
 }
 
 /// Former name of [`StatusKind`]: these are status labels, not M3 badges.
+#[deprecated(note = "status labels are not M3 badges: use `StatusKind` with `status_chip`")]
 pub type BadgeKind = StatusKind;
 
 /// A status label chip: a tinted pill with an optional status icon. Icon,
@@ -113,6 +114,9 @@ pub fn status_chip(kind: StatusKind) -> Div {
 const STATUS_ICON: Rems = rem(16.);
 
 /// A status label; same as [`status_chip`], kept under its earlier name.
+#[deprecated(
+    note = "a status chip, not an M3 badge: use `status_chip` (M3 badges are `small_badge` and `large_badge`)"
+)]
 pub fn badge(kind: StatusKind) -> Div {
     status_chip(kind)
 }
@@ -139,6 +143,7 @@ pub fn outlined_status_chip(
 
 /// An outlined status label; same as [`outlined_status_chip`], kept under its
 /// earlier name.
+#[deprecated(note = "a status chip, not an M3 badge: use `outlined_status_chip`")]
 pub fn outlined_badge(id: impl Into<ElementId>, label: impl Into<SharedString>) -> Stateful<Div> {
     outlined_status_chip(id, label)
 }
@@ -234,13 +239,18 @@ pub const CARD_PADDING: Rems = rem(16.);
 ///
 /// Fast's native overflow handling clips children to the rounded shape. The
 /// upstream backend currently provides rectangular overflow clipping only;
-/// rounded content clipping there remains unsupported. Interactive card states
-/// and their animations are outside this static surface's scope.
+/// rounded content clipping there remains unsupported. [`Self::state`] and
+/// [`Self::preview_state`] render the kit's interaction states;
+/// [`Self::interactive`] adds the live hover state (its elevation change is
+/// immediate, not animated).
 ///
 /// The outline paints above content without participating in layout.
 pub struct CardSurface {
     inner: Div,
     outline: Option<ColorRole>,
+    variant: CardVariant,
+    /// A specimen's forced focus: the 3dp secondary ring 2dp outside.
+    focus_ring: bool,
 }
 impl CardSurface {
     pub fn new(variant: CardVariant) -> Self {
@@ -253,7 +263,114 @@ impl CardSurface {
                 .rounded(RADIUS_CARD)
                 .shadow(elevation::level(style.elevation)),
             outline: style.outline,
+            variant,
+            focus_ring: false,
         }
+    }
+
+    /// Render a fixed interaction state as a specimen: the on-surface state
+    /// layer, the state's elevation and, when focused, the focus ring.
+    pub fn state(mut self, state: CardState) -> Self {
+        let container = color(card_style(self.variant).container);
+        self.inner = self
+            .inner
+            .bg(state::layer(
+                container,
+                color(ON_SURFACE),
+                state.layer_opacity(),
+            ))
+            .shadow(elevation::level(card_elevation(self.variant, state)));
+        self.focus_ring = state == CardState::Focused;
+        self
+    }
+
+    /// [`Self::state`] for one of the shared interaction previews.
+    pub fn preview_state(self, preview: InteractionPreview) -> Self {
+        self.state(preview.into())
+    }
+
+    /// A card the pointer can act on: hovering lays the 8% on-surface
+    /// state layer over it and raises it to its hovered elevation. The
+    /// caller supplies the action (and focus) on the content.
+    pub fn interactive(mut self) -> Self {
+        let container = color(card_style(self.variant).container);
+        let hover = state::hovered(container, color(ON_SURFACE));
+        let shadow = elevation::level(card_elevation(self.variant, CardState::Hovered));
+        self.inner = self
+            .inner
+            .hover(move |style| style.bg(hover).shadow(shadow.clone()));
+        self
+    }
+}
+
+/// The interaction states of a card, including the drag the shared
+/// [`InteractionPreview`] does not cover.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+pub enum CardState {
+    #[default]
+    Enabled,
+    Hovered,
+    Focused,
+    Pressed,
+    Dragged,
+}
+
+impl CardState {
+    /// Every state in the kit's order.
+    pub const ALL: [Self; 5] = [
+        Self::Enabled,
+        Self::Hovered,
+        Self::Focused,
+        Self::Pressed,
+        Self::Dragged,
+    ];
+
+    pub const fn name(self) -> &'static str {
+        match self {
+            Self::Enabled => "Enabled",
+            Self::Hovered => "Hovered",
+            Self::Focused => "Focused",
+            Self::Pressed => "Pressed",
+            Self::Dragged => "Dragged",
+        }
+    }
+
+    /// The on-surface state layer's opacity.
+    pub const fn layer_opacity(self) -> f32 {
+        match self {
+            Self::Enabled => 0.,
+            Self::Hovered => state::HOVER,
+            Self::Focused => state::FOCUS,
+            Self::Pressed => state::PRESS,
+            Self::Dragged => state::DRAG,
+        }
+    }
+}
+
+impl From<InteractionPreview> for CardState {
+    fn from(preview: InteractionPreview) -> Self {
+        match preview {
+            InteractionPreview::Hovered => Self::Hovered,
+            InteractionPreview::Focused => Self::Focused,
+            InteractionPreview::Pressed => Self::Pressed,
+            InteractionPreview::Enabled | InteractionPreview::Disabled => Self::Enabled,
+        }
+    }
+}
+
+/// The kit's elevation for each card variant and state: hovering raises a
+/// card one level, dragging to level 4 (elevated) or 3; a filled card stays
+/// at level 1 while focused or pressed.
+fn card_elevation(variant: CardVariant, state: CardState) -> u8 {
+    use CardState::*;
+    match (variant, state) {
+        (CardVariant::Elevated, Hovered) => 2,
+        (CardVariant::Elevated, Dragged) => 4,
+        (CardVariant::Elevated, _) => 1,
+        (_, Dragged) => 3,
+        (_, Hovered) => 1,
+        (CardVariant::Filled, Focused | Pressed) => 1,
+        _ => 0,
     }
 }
 impl Styled for CardSurface {
@@ -357,6 +474,18 @@ impl Element for CardSurface {
                 BorderStyle::default(),
             ));
         }
+        if self.focus_ring {
+            // The kit's focus indicator: 3dp secondary, 2dp outside.
+            let radius = px(f32::from(RADIUS_CARD) + 5.);
+            window.paint_quad(quad(
+                bounds.dilate(px(5.)),
+                radius,
+                rgba(0x00000000),
+                px(3.),
+                color(SECONDARY),
+                BorderStyle::default(),
+            ));
+        }
     }
 }
 
@@ -377,179 +506,13 @@ pub fn card_surface() -> CardSurface {
 #[path = "card_tests.rs"]
 mod card_tests;
 
-/// M3 snackbars sit at elevation level 3.
-const SNACKBAR_ELEVATION: u8 = 3;
-
-type SnackbarHandler = Rc<dyn Fn(&ClickEvent, &mut Window, &mut App)>;
-
-/// M3 snackbar: a brief status message on the inverse surface, with an
-/// optional text action and close button. The caller places it (usually
-/// bottom-leading, 16px from the window edges) and removes it when done.
-#[derive(gpui::IntoElement)]
-pub struct Snackbar {
-    id: ElementId,
-    message: SharedString,
-    action: Option<(SharedString, SnackbarHandler)>,
-    close: Option<(SharedString, SnackbarHandler)>,
-}
-
-impl Snackbar {
-    pub fn new(id: impl Into<ElementId>, message: impl Into<SharedString>) -> Self {
-        Self {
-            id: id.into(),
-            message: message.into(),
-            action: None,
-            close: None,
-        }
-    }
-
-    /// A text button after the message, e.g. "Undo".
-    pub fn action(
-        mut self,
-        label: impl Into<SharedString>,
-        handler: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
-    ) -> Self {
-        self.action = Some((label.into(), Rc::new(handler)));
-        self
-    }
-
-    /// A close icon button, announced with `label`.
-    pub fn close(
-        mut self,
-        label: impl Into<SharedString>,
-        handler: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
-    ) -> Self {
-        self.close = Some((label.into(), Rc::new(handler)));
-        self
-    }
-}
-
-/// A button on the inverse surface, with its state layer in `fg` and the
-/// shared keyboard focus ring.
-fn inverse_button(id: ElementId, fg: Rgba, handler: SnackbarHandler) -> RingedButton {
-    let bg = color(INVERSE_SURFACE);
-    RingedButton::new(id, RingPlacement::Outer(Corners::all(RADIUS_FULL)))
-        .map(move |button| {
-            button
-                .flex()
-                .items_center()
-                .justify_center()
-                .flex_shrink_0()
-                .h(rem(40.))
-                .rounded_full()
-                .text_color(fg)
-                .hover(move |s| s.bg(state::hovered(bg, fg)))
-                .active(move |s| s.bg(state::pressed(bg, fg)))
-        })
-        .on_click(move |event, window, cx| handler(event, window, cx))
-}
-
-impl RenderOnce for Snackbar {
-    fn render(self, _: &mut Window, _: &mut App) -> impl IntoElement {
-        let id = self.id;
-        let child = |name: &'static str| ElementId::NamedChild(id.clone().into(), name.into());
-        gpui_base::h_flex()
-            .id(id.clone())
-            .items_center()
-            .min_h(rem(48.))
-            .max_w(rem(560.))
-            .pl(rem(16.))
-            .pr(rem(if self.action.is_some() || self.close.is_some() {
-                4.
-            } else {
-                16.
-            }))
-            .gap(rem(4.))
-            .rounded(RADIUS_EXTRA_SMALL)
-            .bg(color(INVERSE_SURFACE))
-            .text_color(color(INVERSE_ON_SURFACE))
-            .text_size(TEXT_BODY)
-            .shadow(elevation::level(SNACKBAR_ELEVATION))
-            .child(
-                accessible_text(child("message"), self.message)
-                    .role(Role::Status)
-                    .flex_1()
-                    .min_w_0()
-                    .py(rem(14.))
-                    .whitespace_normal(),
-            )
-            .when_some(self.action, |bar, (label, handler)| {
-                bar.child(
-                    inverse_button(child("action"), color(INVERSE_PRIMARY), handler)
-                        .when(cfg!(test), |b| {
-                            b.debug_selector(|| "snackbar-action".into())
-                        })
-                        .px(rem(12.))
-                        .font_weight(FontWeight::MEDIUM)
-                        .child(label),
-                )
-            })
-            .when_some(self.close, |bar, (label, handler)| {
-                bar.child(
-                    inverse_button(child("close"), color(INVERSE_ON_SURFACE), handler)
-                        .when(cfg!(test), |b| b.debug_selector(|| "snackbar-close".into()))
-                        .accessibility_label(label)
-                        .w(rem(40.))
-                        .child(IconName::Close.icon().size(ICON_SLOT)),
-                )
-            })
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     // The glob import of `gpui` shadows the built-in `#[test]` that
     // `#[gpui::test]` expands to.
     use core::prelude::v1::test;
-    use gpui::{Context, Modifiers, TestAppContext};
-
-    struct Harness {
-        buttons: bool,
-        actions: usize,
-        closes: usize,
-    }
-
-    impl Render for Harness {
-        fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-            let snackbar = Snackbar::new("saved", "Icon saved");
-            let snackbar = if self.buttons {
-                snackbar
-                    .action("Undo", cx.listener(|this, _, _, _| this.actions += 1))
-                    .close("Dismiss", cx.listener(|this, _, _, _| this.closes += 1))
-            } else {
-                snackbar
-            };
-            div().size_full().child(snackbar)
-        }
-    }
-
-    fn open(
-        cx: &mut TestAppContext,
-        buttons: bool,
-    ) -> (Entity<Harness>, &mut gpui::VisualTestContext) {
-        let (view, cx) = cx.add_window_view(move |_, _| Harness {
-            buttons,
-            actions: 0,
-            closes: 0,
-        });
-        cx.run_until_parked();
-        (view, cx)
-    }
-
-    #[gpui::test]
-    fn action_and_close_report_their_own_clicks(cx: &mut TestAppContext) {
-        let (view, cx) = open(cx, true);
-        let action = cx.debug_bounds("snackbar-action").expect("action").center();
-        let close = cx.debug_bounds("snackbar-close").expect("close").center();
-        cx.simulate_click(action, Modifiers::default());
-        cx.simulate_click(close, Modifiers::default());
-        cx.simulate_click(close, Modifiers::default());
-        view.read_with(cx, |h, _| {
-            assert_eq!(h.actions, 1);
-            assert_eq!(h.closes, 2);
-        });
-    }
+    use gpui::{Context, TestAppContext};
 
     #[test]
     fn card_variants_use_m3_container_roles_elevation_and_outline() {
@@ -579,6 +542,21 @@ mod tests {
         );
         assert_eq!(RADIUS_CARD, px(12.));
         assert_eq!(CARD_PADDING, rem(16.));
+    }
+
+    #[test]
+    fn card_states_follow_the_kit_layers_and_elevation() {
+        use CardState::*;
+        let levels = |variant| CardState::ALL.map(|s| card_elevation(variant, s));
+        assert_eq!(levels(CardVariant::Elevated), [1, 2, 1, 1, 4]);
+        assert_eq!(levels(CardVariant::Filled), [0, 1, 1, 1, 3]);
+        assert_eq!(levels(CardVariant::Outlined), [0, 1, 0, 0, 3]);
+        assert_eq!(
+            CardState::ALL.map(CardState::layer_opacity),
+            [0., state::HOVER, state::FOCUS, state::PRESS, state::DRAG]
+        );
+        assert_eq!(CardState::from(InteractionPreview::Disabled), Enabled);
+        assert_eq!(CardState::from(InteractionPreview::Focused), Focused);
     }
 
     #[test]
@@ -615,54 +593,10 @@ mod tests {
         assert_eq!(dot.size, gpui::size(px(6.), px(6.)));
     }
 
-    #[test]
-    fn snackbar_uses_m3_elevation_level_3() {
-        assert_eq!(SNACKBAR_ELEVATION, 3);
-        assert_eq!(elevation::level(SNACKBAR_ELEVATION), elevation::level3());
-    }
-
-    #[gpui::test]
-    fn snackbar_buttons_show_the_ring_only_for_keyboard_focus(cx: &mut TestAppContext) {
-        cx.update(gpui_base::init);
-        let (_, cx) = open(cx, true);
-        let action = cx.debug_bounds("snackbar-action").expect("action");
-        cx.simulate_click(action.center(), Modifiers::default());
-        redraw(cx);
-        assert!(
-            crate::components::focus::test_rings::painted("action").is_none(),
-            "pointer focus must not show the ring"
-        );
-        press_key(cx);
-        assert_eq!(
-            crate::components::focus::test_rings::painted("action"),
-            Some(action.dilate(px(5.))),
-            "keyboard focus shows the 3dp ring 2dp outside the button"
-        );
-    }
-
     pub(crate) fn redraw(cx: &mut gpui::VisualTestContext) {
         cx.update(|window, cx| {
             window.refresh();
             window.draw(cx).clear(cx);
         });
-    }
-
-    /// A key press switches the window to keyboard modality.
-    pub(crate) fn press_key(cx: &mut gpui::VisualTestContext) {
-        let keystroke =
-            cx.update(|_, cx| gpui::Keystroke::parse_with_os("a", cx.platform_info().os).unwrap());
-        cx.simulate_event(gpui::KeyDownEvent {
-            keystroke,
-            is_held: false,
-            prefer_character_input: false,
-        });
-        redraw(cx);
-    }
-
-    #[gpui::test]
-    fn a_plain_snackbar_has_no_buttons(cx: &mut TestAppContext) {
-        let (_, cx) = open(cx, false);
-        assert!(cx.debug_bounds("snackbar-action").is_none());
-        assert!(cx.debug_bounds("snackbar-close").is_none());
     }
 }
