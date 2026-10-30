@@ -74,11 +74,13 @@ pub use navigation::{
 };
 pub use preview::InteractionPreview;
 pub use progress::{
-    CircularProgressFrame, CircularProgressPlayback, circular_indeterminate_frame,
-    circular_progress, icon_spinner, icon_spinner_with_playback, indeterminate_circular_progress,
+    CircularProgress, CircularProgressFrame, CircularProgressPlayback, LINEAR_INDETERMINATE_MS,
+    LinearProgress, PROGRESS_THICK_THICKNESS, PROGRESS_THICKNESS, ProgressShape,
+    circular_indeterminate_frame, circular_progress, circular_progress_size, icon_spinner,
+    icon_spinner_with_playback, indeterminate_circular_progress,
     indeterminate_circular_progress_with_playback, indeterminate_linear_progress_with_playback,
-    indeterminate_progress, indeterminate_progress_with_playback, linear_progress, progress,
-    sample_circular_progress, spinner, spinner_with_playback,
+    indeterminate_progress, indeterminate_progress_with_playback, linear_indeterminate_lines,
+    linear_progress, progress, sample_circular_progress, spinner, spinner_with_playback,
 };
 pub use radio::{MaterialRadio, MaterialRadioGroup};
 pub use tabs::{MaterialTabs, TabItem, TabsVariant};
