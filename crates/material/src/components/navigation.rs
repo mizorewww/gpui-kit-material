@@ -570,7 +570,11 @@ fn destinations(
     let roving = Roving::new(handles.clone(), orientation)
         .skip(skip)
         .selected(selected);
-    let entry = if specimen { None } else { roving.entry() };
+    let entry = if specimen {
+        None
+    } else {
+        roving.tab_stop(window)
+    };
     Destinations {
         handles,
         selected,

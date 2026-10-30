@@ -51,26 +51,40 @@ struct Harness {
     variant: TabsVariant,
     auto: bool,
     disabled: Option<usize>,
+    /// Optional focusable neighbours before and after the tab row.
+    edges: Option<[FocusHandle; 2]>,
 }
 
 impl Render for Harness {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         window.set_rem_size(px(14.));
         let disabled = self.disabled;
-        div().w(px(300.)).child(
-            MaterialTabs::new("tabs", "Sections")
-                .variant(self.variant)
-                .auto_activate(self.auto)
-                .items((0..3).map(|index| {
-                    TabItem::new(format!("t{index}"), "Tab").disabled(disabled == Some(index))
-                }))
-                .selected(self.selected.clone())
-                .on_change(cx.listener(|this, value: &SharedString, _, cx| {
-                    this.selected = value.clone();
-                    this.changes += 1;
-                    cx.notify();
-                })),
-        )
+        let edge = |edge: usize| {
+            self.edges.as_ref().map(|edges| {
+                div()
+                    .id(("edge", edge))
+                    .size(px(10.))
+                    .track_focus(&edges[edge])
+            })
+        };
+        div()
+            .w(px(300.))
+            .children(edge(0))
+            .child(
+                MaterialTabs::new("tabs", "Sections")
+                    .variant(self.variant)
+                    .auto_activate(self.auto)
+                    .items((0..3).map(|index| {
+                        TabItem::new(format!("t{index}"), "Tab").disabled(disabled == Some(index))
+                    }))
+                    .selected(self.selected.clone())
+                    .on_change(cx.listener(|this, value: &SharedString, _, cx| {
+                        this.selected = value.clone();
+                        this.changes += 1;
+                        cx.notify();
+                    })),
+            )
+            .children(edge(1))
     }
 }
 
@@ -83,6 +97,7 @@ fn harness(
         super::roving::init(cx);
     });
     cx.add_window_view(move |_, _| Harness {
+        edges: None,
         selected: "t0".into(),
         changes: 0,
         variant,
@@ -193,6 +208,40 @@ fn arrows_rove_and_enter_activates(cx: &mut TestAppContext) {
     activate(cx, "enter");
     draw(cx);
     cx.update(|_, cx| assert_eq!(view.read(cx).selected.as_ref(), "t0"));
+}
+
+fn edge_focused(edges: &[FocusHandle; 2], edge: usize, cx: &mut VisualTestContext) -> bool {
+    cx.update(|window, _| edges[edge].is_focused(window))
+}
+
+#[gpui::test]
+fn tab_and_shift_tab_leave_after_arrowing_in_manual_mode(cx: &mut TestAppContext) {
+    let (view, cx) = harness(cx, TabsVariant::Primary);
+    let edges: [FocusHandle; 2] = cx.update(|_, cx| {
+        [
+            cx.focus_handle().tab_stop(true),
+            cx.focus_handle().tab_stop(true),
+        ]
+    });
+    view.update(cx, |view, _| view.edges = Some(edges.clone()));
+    settle(cx);
+    cx.update(|window, cx| edges[0].focus(window, cx));
+    draw(cx);
+    cx.update(|window, cx| window.focus_next(cx));
+    draw(cx);
+    cx.simulate_keystrokes("right right");
+    draw(cx);
+    cx.update(|_, cx| assert_eq!(view.read(cx).changes, 0, "manual mode"));
+    cx.update(|window, cx| window.focus_prev(cx));
+    draw(cx);
+    assert!(edge_focused(&edges, 0, cx), "Shift+Tab leaves the tab row");
+    cx.update(|window, cx| window.focus_next(cx));
+    draw(cx);
+    cx.simulate_keystrokes("right right");
+    draw(cx);
+    cx.update(|window, cx| window.focus_next(cx));
+    draw(cx);
+    assert!(edge_focused(&edges, 1, cx), "Tab leaves the tab row");
 }
 
 #[gpui::test]

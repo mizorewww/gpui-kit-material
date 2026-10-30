@@ -301,7 +301,7 @@ mod choice_tile {
                 .skip(skip)
                 .selected(selected)
                 .select_on_focus(on_select);
-            let entry = roving.entry();
+            let entry = roving.tab_stop(window);
             // The title's id is scoped by the group's own id below, so a
             // static name is unique without formatting one per frame.
             let mut group = super::super::TileGroup::new("choice-group-title", self.title.clone());
