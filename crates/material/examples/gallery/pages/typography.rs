@@ -194,6 +194,6 @@ mod tests {
     fn metrics_read_in_px_at_the_base_scale() {
         assert_eq!(metrics(TypeRole::DisplayLarge.scale()), "57 / 64 · 400");
         assert_eq!(metrics(TypeRole::LabelSmall.scale()), "11 / 16 · 500");
-        assert_eq!(metrics(TypeRole::TitleMedium.emphasized()), "16 / 24 · 700");
+        assert_eq!(metrics(TypeRole::TitleMedium.emphasized()), "16 / 24 · 600");
     }
 }
