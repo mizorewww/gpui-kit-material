@@ -507,6 +507,9 @@ struct CardDrag {
     released_at: Point<Pixels>,
 }
 
+/// A [`MaterialCard`]'s action.
+type CardClick = Rc<dyn Fn(&ClickEvent, &mut Window, &mut App)>;
+
 /// The distance a press must travel before it drags the card.
 const CARD_DRAG_SLOP: Pixels = px(4.);
 
@@ -522,7 +525,7 @@ pub struct MaterialCard {
     id: ElementId,
     variant: CardVariant,
     label: Option<SharedString>,
-    on_click: Option<Rc<dyn Fn(&ClickEvent, &mut Window, &mut App)>>,
+    on_click: Option<CardClick>,
     draggable: bool,
     preview: Option<CardState>,
     children: Vec<AnyElement>,

@@ -62,6 +62,9 @@ pub enum CarouselLayout {
     FullScreen,
 }
 
+/// A caller's current-item change handler.
+type ChangeHandler = std::rc::Rc<dyn Fn(&usize, &mut Window, &mut App)>;
+
 /// One keyline: an item's left edge and width on screen.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Keyline {
@@ -337,7 +340,7 @@ struct CarouselState {
     applied: Option<usize>,
     reported: Option<usize>,
     /// The caller's change handler, for the snap task.
-    on_change: Option<std::rc::Rc<dyn Fn(&usize, &mut Window, &mut App)>>,
+    on_change: Option<ChangeHandler>,
     /// While the pointer drags: its x and the scroll when the drag began.
     drag: Option<(Pixels, f32)>,
 }
@@ -447,7 +450,7 @@ pub struct MaterialCarousel {
     radius: Pixels,
     snap: bool,
     current: Option<usize>,
-    on_change: Option<std::rc::Rc<dyn Fn(&usize, &mut Window, &mut App)>>,
+    on_change: Option<ChangeHandler>,
 }
 
 impl MaterialCarousel {
