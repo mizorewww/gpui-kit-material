@@ -29,10 +29,13 @@
 
 ## Material conformance
 
-- Implement the union of all components at <https://m3e.kyralabs.dev/> and
-  <https://md3.io/>. Overlaps use **m3e.kyralabs.dev** as the authority for the
-  entire component's visuals, typography, states and animations. Follow
-  [docs/ROADMAP.md](docs/ROADMAP.md) and [conformance/md3.json](conformance/md3.json).
+- Implement every component in Google's Figma **Material 3 Design Kit**, plus
+  the union of <https://md3.io/> and <https://m3e.kyralabs.dev/>. When the
+  references disagree, priority is **Figma kit > md3.io > m3e.kyralabs.dev**,
+  applied per token family (color, shape, type, motion, state, geometry): use
+  the first reference that defines the value, and record the source with the
+  value. Follow [docs/ROADMAP.md](docs/ROADMAP.md) and
+  [conformance/md3.json](conformance/md3.json).
 - Reusing Kit behavior does not authorize replacing Material visuals or motion
   with Kit defaults. Preserve exact reference parity, including interruptions,
   reduced motion and theme/text-scale changes.
@@ -47,19 +50,33 @@
 - Every component must appear in the shared desktop/WASM gallery, have tests
   for its meaningful rules, and receive independent subagent approval. A source
   review, successful build or reference fixture alone is not conformance PASS.
+- The Gallery is an interactive application, not a static board. Its UI follows
+  md3.io's component pages (navigation by component group, live preview with
+  theme and light/dark switch, and a configuration panel whose switches,
+  segmented buttons and selects expose every variant, size, state and content
+  option), built from this library's own components. Every preview is the real,
+  working component: clicks, keyboard, menus, dialogs and animations work. The
+  Figma kit's spec boards may appear as a secondary view of a component page.
 
 ## Performance and delivery
 
-- The **entire Gallery CPU frame must be <= 2 ms** on desktop and WASM, including
-  rendering, layout, prepaint, paint, submission and cleanup. Include the first
-  frame. Any measured frame > 2 ms fails; averages cannot establish acceptance.
-  Preserve raw frame timings, maxima, build/hardware context and independent
-  review. Report GPU time separately; incomplete timing remains unverified.
-- Continuous upward and downward Gallery scrolling must sustain >= 500 FPS.
-  Measure successful newly drawn frame submissions with vertical sync disabled;
-  report display refresh separately. Failed submissions, repeated presentation
-  of the same draw and idle frames cannot establish this gate. Preserve raw
-  timings and verified scroll movement; an average alone is not a minimum FPS.
+- Performance must clearly beat web implementations. Targets are anchored to
+  GPUI Fast's published results (sidebar scrolling 0.79 ms CPU, unchanged
+  window 0.19 ms) and measured on release builds with raw per-frame timings,
+  maxima, hardware/build context and independent review:
+  - Steady-state frames (scrolling, hover, running animations, typing): main
+    thread CPU work (render, layout, prepaint, paint, scene submission) p95
+    <= 1 ms and max <= 2 ms. Time blocked waiting for a drawable is reported
+    separately and must not occur on the main thread.
+  - Idle windows draw nothing; a forced redraw of an unchanged page <= 0.3 ms.
+  - First frame (window open to first presented frame) <= 16 ms CPU; switching
+    Gallery pages <= 8 ms. GPU time p95 <= 2 ms, reported separately.
+  - Continuous Gallery scrolling with vertical sync off sustains >= 500 newly
+    drawn frames/s (successful submissions only, verified movement); with
+    vertical sync on, no missed refreshes at 120 Hz.
+  - WASM: the same steady-state budgets x2; track main-thread frame time
+    against md3.io in Chrome for equivalent pages and keep it >= 5x lower.
+  Averages alone never establish a target; incomplete timing stays unverified.
 - Notify the narrowest owning view, avoid render-time notification loops and
   virtualize long collections. Measure before introducing caches and identify
   each cache's invalidation owner. Do not simplify required animations to pass.
