@@ -144,8 +144,7 @@ impl TileScale {
                     .text_left()
                     .whitespace_normal()
                     .bg(bg)
-                    .text_color(ink)
-                    .cursor_pointer();
+                    .text_color(ink);
                 let button = match scale {
                     TileScale::Regular => button.min_h(rem(64.)).px(ITEM_INSET).py(rem(16.)),
                     TileScale::Compact => button
@@ -200,7 +199,12 @@ impl TileScale {
             .child(self.label(id.clone(), label))
             .when_some(support, |column, support| {
                 column.child(
-                    self.support(gpui::SharedString::from(format!("{id:?}-support")), support),
+                    // A child id derived without formatting, so a render
+                    // allocates no string per tile.
+                    self.support(
+                        gpui::ElementId::NamedChild(std::sync::Arc::new(id), "support".into()),
+                        support,
+                    ),
                 )
             })
     }
@@ -484,6 +488,47 @@ mod tests {
         );
         assert_eq!(TileScale::Regular.label_line_height(), rem(24.));
         assert_eq!(TileScale::Regular.support_size(), TEXT_SETTINGS_AUX);
+    }
+
+    #[test]
+    fn disabled_and_previewed_tiles_are_inert() {
+        use crate::components::focus::shows_pointer;
+        assert!(shows_pointer(true, None));
+        assert!(
+            !shows_pointer(false, None),
+            "disabled: no pointer, no layers"
+        );
+        assert!(!shows_pointer(
+            false,
+            Some(crate::components::InteractionPreview::Disabled)
+        ));
+        assert!(!shows_pointer(
+            true,
+            Some(crate::components::InteractionPreview::Hovered)
+        ));
+    }
+
+    struct DisabledHarness;
+    impl Render for DisabledHarness {
+        fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+            div().p(px(20.)).w(px(300.)).child(
+                TileScale::Regular
+                    .button("disabled-tile", [true; 4])
+                    .disabled(true)
+                    .debug_selector(|| "disabled-tile".into())
+                    .child(TileScale::Regular.text("disabled-text", "Tile", Some("Off".into()))),
+            )
+        }
+    }
+
+    #[gpui::test]
+    fn a_disabled_tile_is_not_a_tab_stop(cx: &mut TestAppContext) {
+        cx.update(gpui_base::init);
+        let (_, cx) = cx.add_window_view(|_, _| DisabledHarness);
+        draw(cx);
+        assert!(cx.debug_bounds("disabled-tile").is_some());
+        cx.update(|window, cx| window.focus_next(cx));
+        assert!(cx.update(|window, cx| window.focused(cx)).is_none());
     }
 
     #[test]

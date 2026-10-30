@@ -22,7 +22,7 @@ mod controls;
 mod divider;
 mod switch;
 mod toolbar;
-pub use controls::{MaterialSideSheet, MaterialSlider, SliderAppearance};
+pub use controls::{MaterialSlider, SliderAppearance};
 pub use divider::{
     DividerContext, DividerDirection, DividerOrientation, DividerVariant, MaterialDivider,
 };
@@ -32,11 +32,14 @@ pub use search::{
 };
 pub use switch::{MaterialSwitch, SwitchIcons};
 mod caption;
+mod carousel;
 mod checkbox;
 mod chips;
 mod choice;
+mod dialog;
 mod feedback;
 mod focus;
+mod list;
 mod menu;
 mod navigation;
 mod preview;
@@ -45,11 +48,13 @@ mod radio;
 mod roving;
 mod roving_list;
 mod search;
+mod sheets;
 mod tabs;
 mod text;
 mod text_field;
 mod tile;
 mod title_bar;
+mod tooltip;
 
 pub use app_bar::{
     BOTTOM_APP_BAR_HEIGHT, BottomAppBar, TOP_APP_BAR_HEIGHT, TopAppBar, TopAppBarVariant,
@@ -57,9 +62,14 @@ pub use app_bar::{
 };
 pub use button_group::ConnectedButtonGroup;
 pub use caption::{Caption, CaptionButton, CaptionButtons, CaptionLabels, title_bar_control};
+pub use carousel::{
+    CAROUSEL_ITEM_RADIUS, CAROUSEL_SMALL_ITEM, CarouselItem, CarouselLayout, Keyline, Keylines,
+    MaterialCarousel,
+};
 pub use checkbox::{CheckboxState, MaterialCheckbox};
 pub use chips::{AssistChip, CHIP_HEIGHT, ChipStyle, FilterChip, InputChip, SuggestionChip, chip};
 pub use choice::{ChoiceGroup, ChoiceTile, Tint, choice_radio, tinted_icon};
+pub use dialog::{DIALOG_WIDTH, MaterialDialog, SCRIM_OPACITY};
 pub use feedback::{
     BADGE_CONTAINER, BADGE_LABEL, BadgeKind, CARD_PADDING, CardSurface, CardVariant,
     LARGE_BADGE_PADDING, LARGE_BADGE_SIZE, NoticeKind, SMALL_BADGE_SIZE, Snackbar, StatusKind,
@@ -67,6 +77,10 @@ pub use feedback::{
     small_badge, status_chip,
 };
 pub use focus::{FocusRing, RevealFocus, RingedButton, contain_scroll};
+pub use list::{
+    LIST_SEGMENT_GAP, LIST_SEGMENT_INNER_RADIUS, LIST_SEGMENT_RADIUS, ListDensity, ListItem,
+    ListLeading, ListLines, ListTrailing, segmented_list,
+};
 pub use menu::{
     ExposedDropdown, MaterialMenu, MaterialMenuItem, MenuDensity, MenuGroup, MenuPopup, MenuStyle,
 };
@@ -83,6 +97,7 @@ pub use progress::{
     sample_circular_progress, spinner, spinner_with_playback,
 };
 pub use radio::{MaterialRadio, MaterialRadioGroup};
+pub use sheets::{MaterialBottomSheet, MaterialSideSheet};
 pub use tabs::{MaterialTabs, TabItem, TabsVariant};
 pub use text::{
     accessible_text, error_text, info_callout, page_heading, section_heading, section_title,
@@ -99,6 +114,7 @@ pub use toolbar::{
     TOOLBAR_FAB_GAP, TOOLBAR_MARGIN, TOOLBAR_SIZE, Toolbar, ToolbarButton, ToolbarColor,
     ToolbarConfiguration, ToolbarOrientation,
 };
+pub use tooltip::{MaterialTooltip, PLAIN_TOOLTIP_MAX_WIDTH, RICH_TOOLTIP_WIDTH};
 
 pub(crate) fn init(cx: &mut gpui::App) {
     button_group::init(cx);
