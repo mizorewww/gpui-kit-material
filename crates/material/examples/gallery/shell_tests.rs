@@ -1043,3 +1043,21 @@ fn the_caret_stays_above_an_on_screen_keyboard(cx: &mut TestAppContext) {
     settle(&window, &mut cx);
     assert!(caret(&window, &mut cx).bottom() <= visible);
 }
+
+#[test]
+fn every_page_has_an_address_that_opens_it() {
+    use super::catalog::{parse_route, route_hash};
+    for (entry, _) in CATALOG.iter().enumerate() {
+        for tab in [Tab::Preview, Tab::Specs] {
+            let (parsed, parsed_tab) = parse_route(&route_hash(entry, tab)).unwrap();
+            assert_eq!(parsed, entry);
+            assert_eq!(parsed_tab.unwrap_or(Tab::Preview), tab);
+        }
+    }
+    assert!(parse_route("#no-such-page").is_none());
+    assert_eq!(
+        parse_route("#buttons").unwrap().1,
+        Some(Tab::Specs),
+        "a kit page"
+    );
+}
