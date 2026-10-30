@@ -26,7 +26,7 @@ use crate::{
     color::ColorRole,
     motion::{self, MotionToken},
     theme::color,
-    tokens::typography::{TypeRole, rem},
+    tokens::typography::{BASE_PX, TypeRole, rem},
 };
 use gpui::{prelude::*, *};
 use std::time::Duration;
@@ -163,11 +163,24 @@ fn end_keylines(start: &Keylines, layout: CarouselLayout) -> Keylines {
     }
 }
 
-/// The furthest scroll offset for `count` items.
-pub(crate) fn max_scroll(keylines: &Keylines, count: usize, layout: CarouselLayout) -> f32 {
+/// The furthest scroll offset for `count` items in a carousel `width` wide.
+pub(crate) fn max_scroll(
+    keylines: &Keylines,
+    count: usize,
+    layout: CarouselLayout,
+    width: f32,
+) -> f32 {
     let on_screen = match layout {
         // Hero layouts let every item reach the focal keyline.
         CarouselLayout::CenteredHero => return (count.saturating_sub(1)) as f32 * keylines.step,
+        // Uncontained items keep one size, so the end is where the last
+        // item's trailing edge meets the trailing padding. Its keylines run
+        // past the viewport, so their count says nothing about the end.
+        CarouselLayout::Uncontained => {
+            let pad = keylines.lines.first().map_or(0., |line| line.x);
+            let content = count as f32 * keylines.step - GAP;
+            return (content - (width - 2. * pad)).max(0.);
+        }
         _ => keylines.lines.len(),
     };
     count.saturating_sub(on_screen) as f32 * keylines.step
@@ -215,14 +228,13 @@ pub(crate) fn place(
     }
 }
 
-fn blend(a: &[Keyline], b: &[Keyline], t: f32) -> Vec<Keyline> {
-    a.iter()
-        .zip(b)
-        .map(|(a, b)| Keyline {
-            x: a.x + (b.x - a.x) * t,
-            width: a.width + (b.width - a.width) * t,
-        })
-        .collect()
+/// Blend `a` toward `b` into `out`, reusing its allocation.
+fn blend_into(out: &mut Vec<Keyline>, a: &[Keyline], b: &[Keyline], t: f32) {
+    out.clear();
+    out.extend(a.iter().zip(b).map(|(a, b)| Keyline {
+        x: a.x + (b.x - a.x) * t,
+        width: a.width + (b.width - a.width) * t,
+    }));
 }
 
 /// One carousel item: caller content (e.g. an image) masked by the item,
@@ -268,6 +280,13 @@ struct ScrollAnimation {
     started: Instant,
 }
 
+/// The start and end keylines for one layout, width and large size.
+struct KeylineCache {
+    key: (CarouselLayout, u32, u32),
+    start: Keylines,
+    end: Keylines,
+}
+
 #[derive(Default)]
 struct CarouselState {
     /// Whether the start position has been applied.
@@ -275,7 +294,23 @@ struct CarouselState {
     scroll: f32,
     width: Option<f32>,
     animation: Option<ScrollAnimation>,
-    epoch: usize,
+    /// Keylines change only with the layout, width or large size; render
+    /// rebuilds them when that key changes.
+    keylines: Option<KeylineCache>,
+    /// The blended keylines of the current frame, reused between frames.
+    lines: Vec<Keyline>,
+    /// When resting scroll should snap; each wheel event pushes it back.
+    snap_due: Option<Instant>,
+    /// The snap step and end of the latest wheel event.
+    snap_to: (f32, f32),
+    /// Whether the one snap task is waiting for `snap_due`.
+    snap_pending: bool,
+}
+
+#[cfg(test)]
+thread_local! {
+    /// Snap tasks spawned on this thread, for tests.
+    static SNAP_TASKS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
 }
 
 impl CarouselState {
@@ -293,12 +328,41 @@ impl CarouselState {
     }
 }
 
-/// The nearest item boundary to `scroll`.
+/// The nearest item boundary to `scroll`, or the end of the range when that
+/// is nearer (an uncontained carousel's end need not fall on a boundary).
 pub(crate) fn snap(scroll: f32, step: f32, max: f32) -> f32 {
+    let max = max.max(0.);
     if step <= 0. {
         return 0.;
     }
-    ((scroll / step).round() * step).clamp(0., max.max(0.))
+    let boundary = ((scroll / step).round() * step).clamp(0., max);
+    if (max - scroll).abs() < (boundary - scroll).abs() {
+        max
+    } else {
+        boundary
+    }
+}
+
+/// The next item boundary after `current` (or before it, backward), within
+/// `0..=max`; the end of the range counts as a boundary.
+pub(crate) fn neighbor(current: f32, step: f32, max: f32, forward: bool) -> f32 {
+    let max = max.max(0.);
+    if step <= 0. {
+        return 0.;
+    }
+    let to = if forward {
+        (((current + 0.5) / step).floor() + 1.) * step
+    } else {
+        (((current - 0.5) / step).ceil() - 1.) * step
+    };
+    to.clamp(0., max)
+}
+
+/// The kit paints carousel labels in untokenized white (`#FFFFFF`, Figma
+/// "Material 3 Design Kit" › Carousel › Label) over the scrim gradient on
+/// caller imagery, in both themes; no color role is white in both.
+fn label_on_imagery() -> Hsla {
+    gpui::white()
 }
 
 /// An M3 carousel. `label` names it for assistive technology.
@@ -360,7 +424,8 @@ fn typed<E: Styled>(element: E, role: TypeRole) -> E {
         .font_weight(FontWeight(scale.font_weight as f32))
 }
 
-/// Schedule a snap once scrolling has rested.
+/// Snap once scrolling has rested for [`SNAP_IDLE`]. Each wheel event only
+/// pushes the deadline back; one task waits for it.
 fn schedule_snap(
     state: &Entity<CarouselState>,
     step: f32,
@@ -368,21 +433,40 @@ fn schedule_snap(
     window: &mut Window,
     cx: &mut App,
 ) {
-    let epoch = state.update(cx, |state, _| {
-        state.epoch += 1;
-        state.epoch
+    let due = cx.background_executor().now() + SNAP_IDLE;
+    let spawn = state.update(cx, |state, _| {
+        state.snap_due = Some(due);
+        state.snap_to = (step, max);
+        !std::mem::replace(&mut state.snap_pending, true)
     });
+    if !spawn {
+        return;
+    }
+    #[cfg(test)]
+    SNAP_TASKS.with(|tasks| tasks.set(tasks.get() + 1));
     let state = state.downgrade();
     window
         .spawn(cx, async move |cx| {
-            cx.background_executor().timer(SNAP_IDLE).await;
+            loop {
+                let wait = cx.update(|_, cx| {
+                    let due = state.upgrade()?.read(cx).snap_due?;
+                    Some(due.saturating_duration_since(cx.background_executor().now()))
+                });
+                match wait {
+                    Ok(Some(wait)) if !wait.is_zero() => {
+                        cx.background_executor().timer(wait).await
+                    }
+                    Ok(Some(_)) => break,
+                    _ => return,
+                }
+            }
             let _ = cx.update(|window, cx| {
                 let Some(state) = state.upgrade() else { return };
-                if state.read(cx).epoch != epoch {
-                    return;
-                }
                 let reduced = cx.reduce_motion();
                 state.update(cx, |state, _| {
+                    state.snap_pending = false;
+                    state.snap_due = None;
+                    let (step, max) = state.snap_to;
                     let to = snap(state.scroll, step, max);
                     state.animate_to(to, reduced);
                 });
@@ -405,16 +489,34 @@ impl RenderOnce for MaterialCarousel {
             .read(cx)
             .clone();
         let layout = self.layout;
-        let rem_size = f32::from(window.rem_size()) / 16.;
+        // Window px per design dp (`rem` sizes from a 14px base).
+        let rem_size = f32::from(window.rem_size()) / BASE_PX;
         let width = self
             .width
             .or(state.read(cx).width.map(|w| w / rem_size))
             .unwrap_or(412.);
-        let start = keylines(layout, width, self.large);
-        let end = end_keylines(&start, layout);
+        let key = (layout, width.to_bits(), self.large.to_bits());
+        if state.read(cx).keylines.as_ref().map(|cache| cache.key) != Some(key) {
+            let start = keylines(layout, width, self.large);
+            let end = end_keylines(&start, layout);
+            state.update(cx, |state, _| {
+                state.keylines = Some(KeylineCache { key, start, end })
+            });
+        }
         let count = self.items.len();
-        let step = start.step;
-        let max = max_scroll(&start, count, layout);
+        let (step, max, shift_len, large) = {
+            let start = &state
+                .read(cx)
+                .keylines
+                .as_ref()
+                .expect("keylines were just cached")
+                .start;
+            let step = start.step;
+            let max = max_scroll(start, count, layout, width);
+            let shift_len = ((start.lines.len() - start.focal) as f32 * step).min(max);
+            let large = start.lines.iter().map(|line| line.width).fold(0., f32::max);
+            (step, max, shift_len, large)
+        };
         let reduced = cx.reduce_motion();
 
         // Advance a snap or keyboard scroll animation.
@@ -449,13 +551,20 @@ impl RenderOnce for MaterialCarousel {
         }
 
         // Shift toward the mirrored keylines over the final steps.
-        let shift_len = ((start.lines.len() - start.focal) as f32 * step).min(max);
         let shift = if shift_len > 0. {
             ((scroll - (max - shift_len)) / shift_len).clamp(0., 1.)
         } else {
             0.
         };
-        let lines = blend(&start.lines, &end.lines, shift);
+        // Blend into the state's buffer; it is handed back after the items
+        // are built, so animating frames allocate no keylines.
+        let lines = state.update(cx, |state, _| {
+            let mut lines = std::mem::take(&mut state.lines);
+            if let Some(cache) = &state.keylines {
+                blend_into(&mut lines, &cache.start.lines, &cache.end.lines, shift);
+            }
+            lines
+        });
         let gap = if layout == CarouselLayout::FullScreen {
             0.
         } else {
@@ -466,7 +575,6 @@ impl RenderOnce for MaterialCarousel {
         } else {
             0
         };
-        let large = start.lines.iter().map(|line| line.width).fold(0., f32::max);
         let pad_y = if layout == CarouselLayout::FullScreen {
             0.
         } else {
@@ -489,8 +597,15 @@ impl RenderOnce for MaterialCarousel {
                 .clamp(0., 1.);
                 let text = (text - 0.5).max(0.) * 2.;
                 let has_text = item.label.is_some() || item.supporting.is_some();
+                // Each item is a list item named by the caller's label.
+                let name = item.label.clone();
+                let description = item.supporting.clone();
                 Some(
                     div()
+                        .id(("carousel-item", index))
+                        .role(Role::ListItem)
+                        .when_some(name, |tile, name| tile.aria_label(name))
+                        .when_some(description, |tile, text| tile.aria_description(text))
                         .absolute()
                         .top(rem(pad_y))
                         .left(rem(line.x))
@@ -514,9 +629,7 @@ impl RenderOnce for MaterialCarousel {
                                 .children(item.content),
                         )
                         .when(has_text && text > 0., |tile| {
-                            // The kit paints white text over a scrim gradient on
-                            // imagery, independent of the theme.
-                            let ink = gpui::white();
+                            let ink = label_on_imagery();
                             tile.child(
                                 div()
                                     .absolute()
@@ -558,7 +671,7 @@ impl RenderOnce for MaterialCarousel {
         let measure = state.clone();
         let fixed = self.width.is_some();
         let keyboard_focus = focus.is_focused(window) && window.last_input_was_keyboard();
-        div()
+        let carousel = div()
             .id(id)
             .role(Role::List)
             .aria_label(self.label)
@@ -577,7 +690,8 @@ impl RenderOnce for MaterialCarousel {
                 let delta = event.delta.pixel_delta(px(16.));
                 // Horizontal gestures scroll; vertical wheels scroll too when
                 // they dominate, as a horizontal list has no other use.
-                let amount = if delta.x.abs() > delta.y.abs() {
+                let horizontal = delta.x.abs() > delta.y.abs();
+                let amount = if horizontal {
                     -f32::from(delta.x)
                 } else {
                     -f32::from(delta.y)
@@ -585,10 +699,20 @@ impl RenderOnce for MaterialCarousel {
                 if amount == 0. || max <= 0. {
                     return;
                 }
-                cx.stop_propagation();
+                let before = wheel.read(cx).scroll;
+                let after = (before + amount).clamp(0., max);
+                let moved = after != before;
+                // A vertical wheel the carousel cannot follow (it is at that
+                // end) scrolls the page instead.
+                if horizontal || moved {
+                    cx.stop_propagation();
+                }
+                if !moved {
+                    return;
+                }
                 wheel.update(cx, |state, _| {
                     state.animation = None;
-                    state.scroll = (state.scroll + amount).clamp(0., max);
+                    state.scroll = after;
                 });
                 window.refresh();
                 schedule_snap(&wheel, step, max, window, cx);
@@ -599,13 +723,12 @@ impl RenderOnce for MaterialCarousel {
                     .animation
                     .map_or(keys.read(cx).scroll, |a| a.to);
                 let to = match event.keystroke.key.as_str() {
-                    "right" => snap(current, step, max) + step,
-                    "left" => snap(current, step, max) - step,
+                    "right" => neighbor(current, step, max, true),
+                    "left" => neighbor(current, step, max, false),
                     "home" => 0.,
                     "end" => max,
                     _ => return,
-                }
-                .clamp(0., max);
+                };
                 cx.stop_propagation();
                 let reduced = cx.reduce_motion();
                 keys.update(cx, |state, _| state.animate_to(to, reduced));
@@ -625,10 +748,16 @@ impl RenderOnce for MaterialCarousel {
             })
             .child(
                 canvas(
-                    move |bounds, _, cx| {
+                    move |bounds, window, cx| {
                         let width = f32::from(bounds.size.width);
                         if measure.read(cx).width != Some(width) {
                             measure.update(cx, |state, _| state.width = Some(width));
+                            // This frame laid items out for the old width; draw
+                            // again with the new one (`refresh` is ignored while
+                            // drawing).
+                            if !fixed {
+                                window.request_animation_frame();
+                            }
                         }
                     },
                     |_, _, _, _| {},
@@ -637,7 +766,9 @@ impl RenderOnce for MaterialCarousel {
                 .top_0()
                 .left_0()
                 .size_full(),
-            )
+            );
+        state.update(cx, |state, _| state.lines = lines);
+        carousel
     }
 }
 
@@ -699,11 +830,46 @@ mod tests {
         assert_eq!(snap(90., 196., 1000.), 0.);
         assert_eq!(snap(5000., 196., 392.), 392.);
         let start = keylines(CarouselLayout::MultiBrowse, 412., 188.);
-        assert_eq!(max_scroll(&start, 3, CarouselLayout::MultiBrowse), 0.);
         assert_eq!(
-            max_scroll(&start, 5, CarouselLayout::MultiBrowse),
+            max_scroll(&start, 3, CarouselLayout::MultiBrowse, 412.),
+            0.
+        );
+        assert_eq!(
+            max_scroll(&start, 5, CarouselLayout::MultiBrowse, 412.),
             2. * start.step
         );
+    }
+
+    #[test]
+    fn an_uncontained_carousel_reaches_its_last_item() {
+        let layout = CarouselLayout::Uncontained;
+        let start = keylines(layout, 412., 188.);
+        let max = max_scroll(&start, 6, layout, 412.);
+        // Six 188dp items 8dp apart, in 380dp between the paddings.
+        assert_eq!(max, 6. * 196. - 8. - (412. - 2. * PAD_X));
+        // At the end the last item meets the trailing padding.
+        let last = place(&start.lines, start.step, 5. * start.step - max, 0, GAP);
+        assert!((last.x + last.width - (412. - PAD_X)).abs() < 0.01);
+        // Snapping and stepping reach that end, though it is off the grid.
+        assert_eq!(snap(max - 1., start.step, max), max);
+        assert_eq!(neighbor(3. * start.step, start.step, max, true), 4. * 196.);
+        assert_eq!(neighbor(4. * start.step, start.step, max, true), max);
+        assert_eq!(neighbor(max, start.step, max, false), 4. * 196.);
+        // Too few items to scroll.
+        assert_eq!(max_scroll(&start, 1, layout, 412.), 0.);
+    }
+
+    #[test]
+    fn blending_reuses_the_keyline_buffer() {
+        let start = keylines(CarouselLayout::MultiBrowse, 412., 188.);
+        let end = end_keylines(&start, CarouselLayout::MultiBrowse);
+        let mut lines = Vec::new();
+        blend_into(&mut lines, &start.lines, &end.lines, 0.25);
+        let buffer = lines.as_ptr();
+        blend_into(&mut lines, &start.lines, &end.lines, 0.75);
+        assert_eq!(lines.as_ptr(), buffer, "the next frame reallocated");
+        blend_into(&mut lines, &start.lines, &end.lines, 1.);
+        assert_eq!(lines, end.lines);
     }
 
     #[test]
@@ -771,5 +937,141 @@ mod tests {
             cx.debug_bounds("item-4").is_none(),
             "items beyond the keylines stay hidden"
         );
+    }
+
+    /// A carousel inside a page that counts the scroll events reaching it.
+    struct Page {
+        layout: CarouselLayout,
+        fixed: Option<f32>,
+        page_scrolls: std::rc::Rc<std::cell::Cell<usize>>,
+    }
+    impl gpui::Render for Page {
+        fn render(&mut self, window: &mut Window, _: &mut gpui::Context<Self>) -> impl IntoElement {
+            window.set_rem_size(px(BASE_PX));
+            let page_scrolls = self.page_scrolls.clone();
+            let carousel = MaterialCarousel::new("carousel", "Photos")
+                .layout(self.layout)
+                .items((0..6).map(|i| {
+                    CarouselItem::new().content(
+                        div()
+                            .debug_selector(move || format!("item-{i}"))
+                            .size_full(),
+                    )
+                }));
+            div()
+                .id("page")
+                .w(px(600.))
+                .on_scroll(move |_, _, _| page_scrolls.set(page_scrolls.get() + 1))
+                .child(match self.fixed {
+                    Some(width) => carousel.width(width),
+                    None => carousel,
+                })
+        }
+    }
+
+    fn page(
+        cx: &mut gpui::TestAppContext,
+        layout: CarouselLayout,
+        fixed: Option<f32>,
+    ) -> (gpui::Entity<Page>, &mut gpui::VisualTestContext) {
+        cx.update(|cx| {
+            gpui_base::init(cx);
+            cx.set_reduce_motion(true);
+        });
+        cx.add_window_view(move |_, _| Page {
+            layout,
+            fixed,
+            page_scrolls: Default::default(),
+        })
+    }
+
+    fn redraw(cx: &mut gpui::VisualTestContext) {
+        cx.update(|window, cx| {
+            window.refresh();
+            window.draw(cx).clear(cx);
+        })
+    }
+
+    #[gpui::test]
+    fn the_end_key_brings_the_last_uncontained_item_in(cx: &mut gpui::TestAppContext) {
+        let (_, cx) = page(cx, CarouselLayout::Uncontained, Some(412.));
+        redraw(cx);
+        cx.update(|window, cx| window.focus_next(cx));
+        cx.simulate_keystrokes("end");
+        redraw(cx);
+        let last = cx.debug_bounds("item-5").expect("the last item is shown");
+        assert!(
+            (f32::from(last.right()) - (412. - PAD_X)).abs() < 0.5,
+            "the last item ends at the trailing padding: {last:?}"
+        );
+    }
+
+    #[gpui::test]
+    fn a_vertical_wheel_at_an_end_scrolls_the_page(cx: &mut gpui::TestAppContext) {
+        let (view, cx) = page(cx, CarouselLayout::MultiBrowse, Some(412.));
+        redraw(cx);
+        let position = cx.debug_bounds("item-0").unwrap().center();
+        let scrolls = view.read_with(cx, |page, _| page.page_scrolls.clone());
+        let wheel = |cx: &mut gpui::VisualTestContext, x: f32, y: f32| {
+            cx.simulate_event(gpui::ScrollEvent {
+                position,
+                delta: gpui::ScrollDelta::Pixels(point(px(x), px(y))),
+                touch_phase: TouchPhase::Moved,
+                ..Default::default()
+            });
+        };
+        // At the start, scrolling up cannot move the carousel.
+        wheel(cx, 0., 40.);
+        assert_eq!(scrolls.get(), 1, "the page did not receive the wheel");
+        // Scrolling down moves it, so it keeps the wheel.
+        wheel(cx, 0., -40.);
+        assert_eq!(scrolls.get(), 1);
+        // A horizontal gesture always belongs to the carousel.
+        wheel(cx, 400., 0.);
+        wheel(cx, 400., 0.);
+        assert_eq!(scrolls.get(), 1);
+    }
+
+    #[gpui::test]
+    fn wheel_events_share_one_snap_task(cx: &mut gpui::TestAppContext) {
+        let (_, cx) = page(cx, CarouselLayout::MultiBrowse, Some(412.));
+        redraw(cx);
+        let position = cx.debug_bounds("item-0").unwrap().center();
+        for _ in 0..5 {
+            cx.simulate_event(gpui::ScrollEvent {
+                position,
+                delta: gpui::ScrollDelta::Pixels(point(px(-30.), px(0.))),
+                touch_phase: TouchPhase::Moved,
+                ..Default::default()
+            });
+        }
+        assert_eq!(
+            SNAP_TASKS.with(|tasks| tasks.get()),
+            1,
+            "every wheel event spawned a snap task"
+        );
+        // 150dp scrolled rests nearer the second item, which snaps to the
+        // leading keyline.
+        cx.executor().advance_clock(SNAP_IDLE * 2);
+        cx.run_until_parked();
+        redraw(cx);
+        let second = cx.debug_bounds("item-1").unwrap();
+        assert!((f32::from(second.left()) - PAD_X).abs() < 0.5, "{second:?}");
+    }
+
+    #[gpui::test]
+    fn a_new_measured_width_draws_again(cx: &mut gpui::TestAppContext) {
+        let (_, cx) = page(cx, CarouselLayout::MultiBrowse, None);
+        cx.update(|window, cx| {
+            window.refresh();
+            window.draw(cx).clear(cx);
+        });
+        let frames = cx.update(|window, cx| window.simulate_next_frame(cx));
+        assert!(frames > 0, "the 600px width was stored without a new frame");
+        redraw(cx);
+        // The next frame lays out at 600dp: four large items (tablet).
+        assert!(cx.debug_bounds("item-3").is_some());
+        let frames = cx.update(|window, cx| window.simulate_next_frame(cx));
+        assert_eq!(frames, 0, "an unchanged width requests nothing");
     }
 }
