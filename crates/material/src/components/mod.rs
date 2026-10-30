@@ -63,6 +63,7 @@ pub use time_picker::{
     TimePickerEvent, TimePickerLabels, TimePickerState, TimeSelector, TimeUnit,
 };
 mod checkbox;
+mod chip_set;
 mod chips;
 mod choice;
 mod dialog;
@@ -99,6 +100,7 @@ pub use carousel::{
     MaterialCarousel,
 };
 pub use checkbox::{CheckboxState, MaterialCheckbox};
+pub use chip_set::{ChipSelection, ChipSet, ChipSetItem};
 pub use chips::{AssistChip, CHIP_HEIGHT, ChipStyle, FilterChip, InputChip, SuggestionChip, chip};
 pub use choice::{ChoiceGroup, ChoiceTile, Tint, choice_radio, tinted_icon};
 pub use dialog::{
