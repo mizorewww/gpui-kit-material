@@ -109,6 +109,7 @@ pub struct MaterialTabs {
     variant: TabsVariant,
     scrollable: bool,
     auto_activate: bool,
+    divider: bool,
     items: Vec<TabItem>,
     selected: Option<SharedString>,
     on_change: Option<Change>,
@@ -123,6 +124,7 @@ impl MaterialTabs {
             variant: TabsVariant::Primary,
             scrollable: false,
             auto_activate: false,
+            divider: true,
             items: Vec::new(),
             selected: None,
             on_change: None,
@@ -141,6 +143,12 @@ impl MaterialTabs {
     /// selects the focused tab).
     pub fn auto_activate(mut self, auto: bool) -> Self {
         self.auto_activate = auto;
+        self
+    }
+    /// The full-width outline-variant divider under the tabs (on by
+    /// default); the indicator draws over it.
+    pub fn divider(mut self, divider: bool) -> Self {
+        self.divider = divider;
         self
     }
     /// The tabs. Values must be unique.
@@ -551,15 +559,20 @@ impl RenderOnce for MaterialTabs {
             .h(rem(height))
             .bg(color(ColorRole::SURFACE))
             // The full-width divider under the tabs; the indicator covers it.
-            .child(
-                div()
-                    .absolute()
-                    .left_0()
-                    .right_0()
-                    .bottom_0()
-                    .h(px(1.))
-                    .bg(color(ColorRole::OUTLINE_VARIANT)),
-            )
+            .when(self.divider, |list| {
+                list.child(
+                    div()
+                        .absolute()
+                        .left_0()
+                        .right_0()
+                        .bottom_0()
+                        .h(px(1.))
+                        .bg(color(ColorRole::OUTLINE_VARIANT))
+                        .when(cfg!(test), |line| {
+                            line.debug_selector(|| "tabs-divider".into())
+                        }),
+                )
+            })
             .child(lane);
         roving.install(list)
     }
