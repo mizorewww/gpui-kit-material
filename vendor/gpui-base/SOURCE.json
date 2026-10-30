@@ -10,6 +10,7 @@
   "local_patch_files": [
     "src/a11y_disabled.rs",
     "src/button.rs",
+    "src/dialog.rs",
     "src/input/base/state.rs",
     "src/lib.rs",
     "src/motion.rs",
@@ -28,6 +29,11 @@
       "local_sha256": "c493baa980d6832c151cf439bb35023ba86dd7baf37aa5cb5ec03982e5449755",
       "reason": "Caller-controlled busy(bool), independent of disabled (motion-patch.md).",
       "upstream_sha256": "822d81a514355c92f41f4a13392f783b4307061ecc8be49a38f4bc1f41fdd55c"
+    },
+    "src/dialog.rs": {
+      "local_sha256": "950592bd13881d5540885528eb6aa197cf39adcb245109b102ba6abb683e30f1",
+      "reason": "Dialog::accessibility_label names the Role::Dialog host for accessibility clients (motion-patch.md).",
+      "upstream_sha256": "f56cc07dda43678903e2907b8c8c6028ae5fa80f0a637b8f065054a4c55b391d"
     },
     "src/input/base/state.rs": {
       "local_sha256": "5f5521bda7aeb38499f2f700b4465eefc99bcfcf19a47da2351211875944f5bf",

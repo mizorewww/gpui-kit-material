@@ -66,6 +66,12 @@ The local compatibility surface is restricted to:
   Tests: `dragging_snaps_from_min_and_a_zero_step_stays_continuous`,
   `accessibility_steps_move_only_a_ranges_end`.
 
+- `src/dialog.rs`: `Dialog::accessibility_label`. The dialog host is the
+  `Role::Dialog` node but upstream gives it no name and no way to set one,
+  so modal dialogs were announced as an unnamed "dialog". The label (a
+  caller's headline, typically) is set on the host; without it nothing
+  changes. Test: `a_dialog_takes_an_accessible_name`.
+
 These patches require source unification for both the Kit Git dependency and
 any registry Base dependency in the consuming workspace. Cargo patches are not
 inherited by downstream consumers of a published Material crate.
