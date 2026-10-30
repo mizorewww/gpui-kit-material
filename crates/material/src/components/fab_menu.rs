@@ -10,15 +10,21 @@
 //! The toggle and items are [`MaterialButton`]s, so activation, focus,
 //! state layers, ripples and focus rings are the button's. The caller owns
 //! `open`; Escape inside the menu requests closing.
+//!
+//! [`FabMenuPresentation::Menu`] presents the same items as a baseline
+//! [`MaterialMenu`] opening from the FAB in Kit's popover (the menu the web
+//! uses); `Auto` picks the expressive list in compact windows (under
+//! 600dp) and the menu in wider ones.
 use super::{
-    FabColor, InteractionPreview, MaterialButton,
+    FabColor, FabSize, InteractionPreview, MaterialButton, MaterialMenu, MaterialMenuItem,
+    MenuPopup, MenuStyle,
     button::{Form, Palette, Roles},
     fab::{FAB_ELEVATION, revealed_label},
 };
 use crate::{
     icons::{Icon, IconName},
     motion::{self, MotionToken},
-    tokens::typography::{TypeRole, rem},
+    tokens::typography::{BASE_PX, TypeRole, rem},
 };
 use gpui::{prelude::*, *};
 use std::{rc::Rc, time::Duration};
@@ -68,6 +74,42 @@ impl FabMenuColor {
     }
 }
 
+/// How a FAB menu presents its items.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+pub enum FabMenuPresentation {
+    /// The M3 Expressive list of pills stacked above the FAB.
+    #[default]
+    List,
+    /// A baseline menu opening from the FAB.
+    Menu,
+    /// The list in compact windows, the menu from 600dp up.
+    Auto,
+}
+
+impl FabMenuPresentation {
+    pub const ALL: [Self; 3] = [Self::List, Self::Menu, Self::Auto];
+    /// The presentation used in a window `width` design px wide.
+    pub fn resolve(self, width: f32) -> Self {
+        match self {
+            Self::Auto if width < COMPACT_WIDTH => Self::List,
+            Self::Auto => Self::Menu,
+            other => other,
+        }
+    }
+}
+
+/// The compact window class's upper bound, in dp.
+const COMPACT_WIDTH: f32 = 600.;
+
+/// Which side the items align to: the FAB's end (a bottom-end FAB) or
+/// start (a bottom-start FAB).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+pub enum FabMenuAlign {
+    #[default]
+    End,
+    Start,
+}
+
 type ClickHandler = Rc<dyn Fn(&ClickEvent, &mut Window, &mut App)>;
 type ToggleHandler = Rc<dyn Fn(&bool, &mut Window, &mut App)>;
 
@@ -77,7 +119,7 @@ type ToggleHandler = Rc<dyn Fn(&bool, &mut Window, &mut App)>;
 #[derive(gpui::IntoElement)]
 pub struct FabMenuItem {
     id: ElementId,
-    icon: Icon,
+    icon: Option<Icon>,
     label: SharedString,
     color: FabMenuColor,
     preview: Option<InteractionPreview>,
@@ -91,8 +133,15 @@ impl FabMenuItem {
         label: impl Into<SharedString>,
     ) -> Self {
         Self {
+            icon: Some(icon.into()),
+            ..Self::label_only(id, label)
+        }
+    }
+    /// An item showing only its label.
+    pub fn label_only(id: impl Into<ElementId>, label: impl Into<SharedString>) -> Self {
+        Self {
             id: id.into(),
-            icon: icon.into(),
+            icon: None,
             label: label.into(),
             color: FabMenuColor::Primary,
             preview: None,
@@ -118,6 +167,17 @@ impl FabMenuItem {
 }
 
 impl FabMenuItem {
+    /// This item as a baseline menu entry.
+    fn menu_item(self) -> MaterialMenuItem {
+        let mut item = MaterialMenuItem::new(self.label);
+        if let Some(icon) = self.icon {
+            item = item.leading(icon.size(rem(24.)));
+        }
+        if let Some(callback) = self.on_click {
+            item = item.on_click(move |event, window, cx| callback(event, window, cx));
+        }
+        item
+    }
     /// The item at a 0 … 1 `expansion` from FAB size to labelled pill;
     /// only an `open` menu's items can be activated.
     fn button(self, expansion: f32, open: bool, window: &Window) -> MaterialButton {
@@ -125,7 +185,7 @@ impl FabMenuItem {
         let mut button = MaterialButton::new(self.id)
             .form(Form::FabMenuItem { expansion })
             .palette(self.color.item_palette())
-            .icon(self.icon)
+            .when_some(self.icon, |button, icon| button.icon(icon))
             .accessibility_label(self.label)
             .children(label)
             .opacity(expansion.clamp(0., 1.));
@@ -152,6 +212,9 @@ pub struct FabMenu {
     close_icon: Icon,
     label: SharedString,
     color: FabMenuColor,
+    size: FabSize,
+    presentation: FabMenuPresentation,
+    align: FabMenuAlign,
     open: bool,
     items: Vec<FabMenuItem>,
     preview: Option<InteractionPreview>,
@@ -178,6 +241,9 @@ impl FabMenu {
             close_icon: IconName::Close.into(),
             label: label.into(),
             color: FabMenuColor::Primary,
+            size: FabSize::Regular,
+            presentation: FabMenuPresentation::List,
+            align: FabMenuAlign::End,
             open: false,
             items: Vec::new(),
             preview: None,
@@ -194,6 +260,21 @@ impl FabMenu {
     }
     pub fn open(mut self, open: bool) -> Self {
         self.open = open;
+        self
+    }
+    /// The FAB's size (regular by default); open, it is the round close
+    /// button of the same size.
+    pub fn size(mut self, size: FabSize) -> Self {
+        self.size = size;
+        self
+    }
+    pub fn presentation(mut self, presentation: FabMenuPresentation) -> Self {
+        self.presentation = presentation;
+        self
+    }
+    /// Align the items to the FAB's end (default) or start edge.
+    pub fn align(mut self, align: FabMenuAlign) -> Self {
+        self.align = align;
         self
     }
     pub fn item(mut self, item: FabMenuItem) -> Self {
@@ -234,12 +315,67 @@ fn toggle_icon(icon: Icon, close: Icon, morph: f32) -> Icon {
     }
 }
 
+impl FabMenu {
+    /// The baseline presentation: the FAB opens a menu of the items in
+    /// Kit's popover, above the FAB and aligned to its `align` edge.
+    fn render_menu(self) -> AnyElement {
+        let open = self.open;
+        let mut toggle = MaterialButton::new((self.id.clone(), "fab-menu-toggle"))
+            .form(Form::FabMenuToggle {
+                open: false,
+                size: self.size,
+            })
+            .palette(self.color.toggle_palette(false))
+            .icon(self.icon)
+            .accessibility_label(self.label)
+            .aria_expanded(open);
+        if let Some(state) = self.preview {
+            toggle = toggle.preview_state(state);
+        }
+        if let Some(callback) = self.on_toggle.clone() {
+            // The FAB (a blocking Base button) takes pointer and key
+            // activation itself; the popover's trigger toggle could only
+            // request the same `!open`.
+            toggle = toggle.on_click(move |_, window, cx| callback(&!open, window, cx));
+        }
+        let menu = MaterialMenu::new((self.id.clone(), "fab-menu-list"))
+            .style(MenuStyle::Baseline)
+            .items(self.items.into_iter().map(FabMenuItem::menu_item));
+        let mut popup = MenuPopup::new(self.id.clone(), toggle, menu)
+            .open(open)
+            .anchor(match self.align {
+                FabMenuAlign::End => Anchor::BottomRight,
+                FabMenuAlign::Start => Anchor::BottomLeft,
+            });
+        if let Some(callback) = self.on_toggle {
+            popup = popup.on_open_change(move |open, window, cx| callback(open, window, cx));
+        }
+        popup.into_any_element()
+    }
+}
+
 impl RenderOnce for FabMenu {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
+        let width =
+            f32::from(window.viewport_size().width) * BASE_PX / f32::from(window.rem_size());
+        if self.presentation.resolve(width) == FabMenuPresentation::Menu {
+            return self.render_menu();
+        }
         let open = self.open;
         let count = self.items.len();
         let curve = motion::curve(MotionToken::DefaultSpatial);
-        let mut column = div().flex().flex_col().items_end().gap(rem(ITEM_GAP));
+        let start = self.align == FabMenuAlign::Start;
+        let mut column = div()
+            .flex()
+            .flex_col()
+            .map(|column| {
+                if start {
+                    column.items_start()
+                } else {
+                    column.items_end()
+                }
+            })
+            .gap(rem(ITEM_GAP));
         let mut any_item = false;
         for (index, item) in self.items.into_iter().enumerate() {
             // Render runs in the parent's id scope, so key each item's
@@ -275,7 +411,10 @@ impl RenderOnce for FabMenu {
             cx,
         );
         let mut toggle = MaterialButton::new((self.id.clone(), "fab-menu-toggle"))
-            .form(Form::FabMenuToggle { open })
+            .form(Form::FabMenuToggle {
+                open,
+                size: self.size,
+            })
             .palette(self.color.toggle_palette(open))
             .icon(toggle_icon(self.icon, self.close_icon, morph))
             .accessibility_label(self.label)
@@ -291,7 +430,13 @@ impl RenderOnce for FabMenu {
             .id(self.id)
             .flex()
             .flex_col()
-            .items_end()
+            .map(|menu| {
+                if start {
+                    menu.items_start()
+                } else {
+                    menu.items_end()
+                }
+            })
             .gap(rem(BUTTON_GAP))
             .when_some(on_toggle.filter(|_| open), |menu, callback| {
                 menu.on_key_down(move |event, window, cx| {
@@ -303,6 +448,7 @@ impl RenderOnce for FabMenu {
             })
             .when(any_item, |menu| menu.child(column))
             .child(toggle)
+            .into_any_element()
     }
 }
 
@@ -489,5 +635,166 @@ mod tests {
         cx.simulate_click(first, gpui::Modifiers::default());
         draw(cx);
         view.read_with(cx, |view, _| assert_eq!(view.clicks, 1));
+    }
+}
+
+#[cfg(test)]
+mod presentation_tests {
+    use super::{FabMenu, FabMenuAlign, FabMenuItem, FabMenuPresentation};
+    use crate::{components::FabSize, icons::IconName};
+    use gpui::{
+        Context, InteractiveElement as _, IntoElement, Modifiers, ParentElement as _, Render,
+        Styled as _, TestAppContext, VisualTestContext, Window, div, prelude::FluentBuilder as _,
+        px, size,
+    };
+    use std::{cell::RefCell, rc::Rc};
+
+    #[core::prelude::v1::test]
+    fn auto_lists_in_compact_windows_and_menus_in_wider_ones() {
+        let auto = FabMenuPresentation::Auto;
+        assert_eq!(auto.resolve(412.), FabMenuPresentation::List);
+        assert_eq!(auto.resolve(840.), FabMenuPresentation::Menu);
+        assert_eq!(
+            FabMenuPresentation::List.resolve(1200.),
+            FabMenuPresentation::List
+        );
+        assert_eq!(
+            FabMenuPresentation::Menu.resolve(300.),
+            FabMenuPresentation::Menu
+        );
+    }
+
+    struct Harness {
+        open: bool,
+        presentation: FabMenuPresentation,
+        align: FabMenuAlign,
+        size: FabSize,
+        picked: Rc<RefCell<Vec<usize>>>,
+    }
+    impl Render for Harness {
+        fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+            window.set_rem_size(px(14.));
+            div()
+                .size_full()
+                .flex()
+                .items_end()
+                .map(|row| match self.align {
+                    FabMenuAlign::End => row.justify_end(),
+                    FabMenuAlign::Start => row.justify_start(),
+                })
+                .p(px(40.))
+                .child(
+                    div().flex().debug_selector(|| "menu".into()).child(
+                        FabMenu::new("menu", IconName::Check, "Actions")
+                            .presentation(self.presentation)
+                            .align(self.align)
+                            .size(self.size)
+                            .open(self.open)
+                            .on_toggle(cx.listener(|this, open: &bool, _, cx| {
+                                this.open = *open;
+                                cx.notify();
+                            }))
+                            .items((0..3usize).map(|index| {
+                                let picked = self.picked.clone();
+                                let item = if index == 0 {
+                                    FabMenuItem::label_only(("item", index), "First action")
+                                } else {
+                                    FabMenuItem::new(("item", index), IconName::Check, "Action")
+                                };
+                                item.on_click(move |_, _, _| picked.borrow_mut().push(index))
+                            })),
+                    ),
+                )
+        }
+    }
+
+    fn settle(cx: &mut VisualTestContext) {
+        for _ in 0..3 {
+            cx.executor()
+                .advance_clock(std::time::Duration::from_millis(800));
+            cx.update(|window, cx| {
+                window.refresh();
+                window.draw(cx).clear(cx);
+            });
+        }
+    }
+
+    fn setup(
+        cx: &mut TestAppContext,
+        presentation: FabMenuPresentation,
+        align: FabMenuAlign,
+        size: FabSize,
+    ) -> (gpui::Entity<Harness>, &mut VisualTestContext) {
+        cx.update(|cx| {
+            gpui_kit::init(cx);
+            crate::init(cx);
+            cx.set_reduce_motion(true);
+        });
+        cx.add_window_view(move |_, _| Harness {
+            open: false,
+            presentation,
+            align,
+            size,
+            picked: Rc::default(),
+        })
+    }
+
+    #[gpui::test]
+    fn the_menu_presentation_opens_a_baseline_menu_whose_items_act(cx: &mut TestAppContext) {
+        let (view, cx) = setup(
+            cx,
+            FabMenuPresentation::Menu,
+            FabMenuAlign::End,
+            FabSize::Regular,
+        );
+        settle(cx);
+        let fab = cx.debug_bounds("menu").unwrap();
+        assert_eq!(fab.size, size(px(56.), px(56.)));
+        cx.simulate_click(fab.center(), Modifiers::default());
+        settle(cx);
+        cx.update(|_, cx| assert!(view.read(cx).open));
+        let surface = cx.debug_bounds("menu-popup-surface").unwrap();
+        assert!(
+            surface.bottom() <= fab.top(),
+            "the menu opens above the FAB"
+        );
+        assert_eq!(surface.right(), fab.right(), "end-aligned");
+        assert_eq!(
+            cx.debug_bounds("menu").unwrap().size,
+            fab.size,
+            "the FAB stays"
+        );
+        cx.simulate_keystrokes("down down enter");
+        settle(cx);
+        cx.update(|_, cx| {
+            assert_eq!(*view.read(cx).picked.borrow(), vec![1]);
+            assert!(!view.read(cx).open, "an item closes the menu");
+        });
+    }
+
+    #[gpui::test]
+    fn a_start_aligned_list_grows_from_a_sized_fab(cx: &mut TestAppContext) {
+        let (view, cx) = setup(
+            cx,
+            FabMenuPresentation::List,
+            FabMenuAlign::Start,
+            FabSize::Large,
+        );
+        settle(cx);
+        let closed = cx.debug_bounds("menu").unwrap();
+        assert_eq!(closed.size, size(px(96.), px(96.)));
+        view.update(cx, |view, cx| {
+            view.open = true;
+            cx.notify();
+        });
+        settle(cx);
+        let open = cx.debug_bounds("menu").unwrap();
+        assert_eq!(open.left(), closed.left(), "items align to the start");
+        assert_eq!(open.size.height, px(96. + 8. + 56. * 3. + 4. * 2.));
+        // The label-only first item sits at the top, start-aligned.
+        let first = gpui::point(open.left() + px(28.), open.top() + px(28.));
+        cx.simulate_click(first, Modifiers::default());
+        settle(cx);
+        cx.update(|_, cx| assert_eq!(*view.read(cx).picked.borrow(), vec![0]));
     }
 }

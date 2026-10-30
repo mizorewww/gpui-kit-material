@@ -9,13 +9,13 @@ pub use button::{
 mod fab;
 pub use fab::{ExtendedFab, Fab, FabColor};
 mod fab_menu;
-pub use fab_menu::{FabMenu, FabMenuColor, FabMenuItem};
+pub use fab_menu::{FabMenu, FabMenuAlign, FabMenuColor, FabMenuItem, FabMenuPresentation};
 mod icon_button;
 mod split_button;
 mod standard_button_group;
 pub use icon_button::{IconButton, IconButtonVariant};
 pub use split_button::{SplitButton, SplitButtonPart};
-pub use standard_button_group::{ButtonGroup, EXPANDED_RATIO, standard_group_gap};
+pub use standard_button_group::{ButtonDensity, ButtonGroup, EXPANDED_RATIO, standard_group_gap};
 // Forced accessibility trees in tests (GPUI_A11Y_ACTIVE) exist only in GPUI Fast.
 #[cfg(all(test, feature = "gpui-fast"))]
 mod a11y_tests;
@@ -88,7 +88,7 @@ pub use app_bar::{
     BOTTOM_APP_BAR_HEIGHT, BottomAppBar, TOP_APP_BAR_HEIGHT, TopAppBar, TopAppBarVariant,
     collapsed_title_alpha,
 };
-pub use button_group::ConnectedButtonGroup;
+pub use button_group::{ConnectedButtonGroup, GroupLabels, GroupSelection};
 pub use caption::{Caption, CaptionButton, CaptionButtons, CaptionLabels, title_bar_control};
 pub use carousel::{
     CAROUSEL_ITEM_RADIUS, CAROUSEL_SMALL_ITEM, CarouselItem, CarouselLayout, Keyline, Keylines,

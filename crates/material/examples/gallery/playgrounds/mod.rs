@@ -3,9 +3,14 @@
 //! See `super::playground` for the API.
 pub mod badge;
 pub mod button;
+pub mod button_group;
 pub mod checkbox;
 pub mod chips;
 pub mod date_picker;
+pub mod extended_fab;
+pub mod fab;
+pub mod fab_menu;
+pub mod icon_button;
 pub mod loading_indicator;
 pub mod progress;
 pub mod radio;
@@ -13,13 +18,16 @@ pub mod search;
 pub mod select;
 pub mod slider;
 pub mod snackbar;
+pub mod split_button;
 pub mod switch;
-#[cfg(test)]
-mod test_support;
 pub mod text_field;
 pub mod time_picker;
 pub mod tooltip;
 
+#[cfg(test)]
+mod harness;
+#[cfg(test)]
+mod test_support;
 #[cfg(test)]
 mod testing;
 

@@ -185,7 +185,7 @@ pub static CATALOG: &[Entry] = &[
         Actions,
         "Compact actions, with a shape for every state.",
         slice("buttons", icon_button_rows),
-        None,
+        Some(&playgrounds::icon_button::PLAYGROUND),
     ),
     component(
         "button-group",
@@ -193,7 +193,7 @@ pub static CATALOG: &[Entry] = &[
         Actions,
         "Related actions with shared shapes and flexible selection.",
         slice("buttons", button_group_rows),
-        None,
+        Some(&playgrounds::button_group::PLAYGROUND),
     ),
     component(
         "split-button",
@@ -201,7 +201,7 @@ pub static CATALOG: &[Entry] = &[
         Actions,
         "One primary action, with more options close by.",
         slice("buttons", split_button_rows),
-        None,
+        Some(&playgrounds::split_button::PLAYGROUND),
     ),
     component(
         "fab",
@@ -209,7 +209,7 @@ pub static CATALOG: &[Entry] = &[
         Actions,
         "The most important action on a screen.",
         slice("buttons", fab_rows),
-        None,
+        Some(&playgrounds::fab::PLAYGROUND),
     ),
     component(
         "fab-menu",
@@ -217,7 +217,7 @@ pub static CATALOG: &[Entry] = &[
         Actions,
         "A FAB that opens into related actions.",
         slice("buttons", fab_menu_rows),
-        None,
+        Some(&playgrounds::fab_menu::PLAYGROUND),
     ),
     component(
         "extended-fab",
@@ -225,7 +225,7 @@ pub static CATALOG: &[Entry] = &[
         Actions,
         "A FAB with a label, for a clearer primary action.",
         slice("buttons", extended_fab_rows),
-        None,
+        Some(&playgrounds::extended_fab::PLAYGROUND),
     ),
     // Selection & input
     component(

@@ -5,10 +5,13 @@
 //! Each segment is a [`MaterialButton`] in its split-segment form: outer ends
 //! stay fully round while the inner corners widen on hover/focus and press
 //! (fast spatial spring). Opening the menu turns the trailing segment fully
-//! round and rotates its chevron half a turn. The menu itself belongs to
-//! the caller, which owns `open` and receives requested changes.
+//! round and rotates its chevron half a turn. The caller owns `open` and
+//! receives requested changes; with [`SplitButton::menu`] the trailing
+//! segment opens that menu in Kit's popover overlay (below, end-aligned),
+//! whose outside clicks, Escape and item activation request closing.
 use super::{
-    ButtonShape, ButtonSize, ButtonVariant, InteractionPreview, MaterialButton,
+    ButtonShape, ButtonSize, ButtonVariant, InteractionPreview, MaterialButton, MaterialMenu,
+    MenuPopup,
     button::{Form, Segment, segment_metrics},
 };
 use crate::{
@@ -39,6 +42,7 @@ pub struct SplitButton {
     open: bool,
     disabled: bool,
     preview: Option<(SplitButtonPart, InteractionPreview)>,
+    menu: Option<MaterialMenu>,
     on_click: Option<ClickHandler>,
     on_toggle: Option<ToggleHandler>,
 }
@@ -61,9 +65,17 @@ impl SplitButton {
             open: false,
             disabled: false,
             preview: None,
+            menu: None,
             on_click: None,
             on_toggle: None,
         }
+    }
+    /// The menu the trailing segment opens while `open`. Opening and
+    /// closing requests (the segment, outside clicks, Escape, an activated
+    /// item) arrive through `on_toggle`.
+    pub fn menu(mut self, menu: MaterialMenu) -> Self {
+        self.menu = Some(menu);
+        self
     }
     pub fn icon(mut self, icon: impl Into<Icon>) -> Self {
         self.icon = Some(icon.into());
@@ -167,9 +179,26 @@ impl RenderOnce for SplitButton {
         if let Some(state) = trailing_preview {
             trailing = trailing.preview_state(state);
         }
-        if let Some(callback) = self.on_toggle {
+        let has_menu = self.menu.is_some() && !self.disabled;
+        if let Some(callback) = self.on_toggle.clone() {
+            // The segment (a blocking Base button) receives pointer and key
+            // activation itself; the popover's own trigger toggle could only
+            // request the same `!open`, so a repeated request is harmless.
             trailing = trailing.on_click(move |_, window, cx| callback(&!open, window, cx));
         }
+        let trailing = match self.menu {
+            Some(menu) if has_menu => {
+                let mut popup = MenuPopup::new((self.id.clone(), "split-menu"), trailing, menu)
+                    .open(open)
+                    .anchor(Anchor::TopRight);
+                if let Some(callback) = self.on_toggle {
+                    popup =
+                        popup.on_open_change(move |open, window, cx| callback(open, window, cx));
+                }
+                popup.into_any_element()
+            }
+            _ => trailing.into_any_element(),
+        };
         div()
             .id(self.id)
             .role(Role::Group)
@@ -256,5 +285,100 @@ mod tests {
             disabled.preview_of(SplitButtonPart::Trailing),
             Some(InteractionPreview::Disabled)
         );
+    }
+}
+
+#[cfg(test)]
+mod menu_tests {
+    use super::SplitButton;
+    use crate::components::{MaterialMenu, MaterialMenuItem};
+    use gpui::{
+        Context, Entity, InteractiveElement as _, IntoElement, Modifiers, ParentElement as _,
+        Render, Styled as _, TestAppContext, VisualTestContext, Window, div, px,
+    };
+    use std::{cell::RefCell, rc::Rc};
+
+    struct Harness {
+        open: bool,
+        picked: Rc<RefCell<Vec<usize>>>,
+    }
+    impl Render for Harness {
+        fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+            window.set_rem_size(px(14.));
+            let menu = MaterialMenu::new("menu").items((0..3).map(|ix| {
+                let picked = self.picked.clone();
+                MaterialMenuItem::new("Item").on_click(move |_, _, _| picked.borrow_mut().push(ix))
+            }));
+            div().flex().items_start().p(px(20.)).pl(px(400.)).child(
+                div().flex().debug_selector(|| "split".into()).child(
+                    SplitButton::new("split", "Save", "More")
+                        .menu(menu)
+                        .open(self.open)
+                        .on_toggle(cx.listener(|this, open: &bool, _, cx| {
+                            this.open = *open;
+                            cx.notify();
+                        })),
+                ),
+            )
+        }
+    }
+
+    fn settle(cx: &mut VisualTestContext) {
+        for _ in 0..3 {
+            cx.executor()
+                .advance_clock(std::time::Duration::from_millis(600));
+            cx.update(|window, cx| {
+                window.refresh();
+                window.draw(cx).clear(cx);
+            });
+        }
+    }
+
+    fn setup(cx: &mut TestAppContext) -> (Entity<Harness>, &mut VisualTestContext) {
+        cx.update(|cx| {
+            gpui_kit::init(cx);
+            crate::init(cx);
+            cx.set_reduce_motion(true);
+        });
+        cx.add_window_view(|_, _| Harness {
+            open: false,
+            picked: Rc::default(),
+        })
+    }
+
+    #[gpui::test]
+    fn the_trailing_segment_opens_the_menu_and_an_item_closes_it(cx: &mut TestAppContext) {
+        let (view, cx) = setup(cx);
+        settle(cx);
+        let split = cx.debug_bounds("split").unwrap();
+        // The chevron segment sits at the end.
+        let chevron = gpui::point(split.right() - px(20.), split.center().y);
+        cx.simulate_click(chevron, Modifiers::default());
+        settle(cx);
+        cx.update(|_, cx| assert!(view.read(cx).open, "a press opens the menu once"));
+        let surface = cx.debug_bounds("menu-popup-surface").unwrap();
+        assert!(surface.top() >= split.bottom(), "the menu opens below");
+        assert_eq!(
+            surface.right(),
+            split.right(),
+            "end-aligned with the button"
+        );
+        cx.simulate_keystrokes("down enter");
+        settle(cx);
+        cx.update(|_, cx| {
+            assert_eq!(*view.read(cx).picked.borrow(), vec![0]);
+            assert!(!view.read(cx).open, "activating an item closes the menu");
+        });
+    }
+
+    #[gpui::test]
+    fn the_leading_segment_does_not_open_the_menu(cx: &mut TestAppContext) {
+        let (view, cx) = setup(cx);
+        settle(cx);
+        let split = cx.debug_bounds("split").unwrap();
+        let leading = gpui::point(split.left() + px(16.), split.center().y);
+        cx.simulate_click(leading, Modifiers::default());
+        settle(cx);
+        cx.update(|_, cx| assert!(!view.read(cx).open));
     }
 }

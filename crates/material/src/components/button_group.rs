@@ -1,10 +1,13 @@
-//! M3 connected button group for a single controlled selection, with radio
-//! (or tab) semantics and roving keyboard focus.
+//! M3 connected button group with roving keyboard focus: a required single
+//! selection (radio or tab semantics), an optional single or multiple
+//! selection (toggle buttons), or plain actions.
 //!
-//! Each option is its own button 2px from its neighbours; the selected one
+//! Each option is its own button 2px from its neighbours; a selected one
 //! morphs to a full pill on the accent while its inner corners open, on the
-//! fast spatial spring.
-use super::{ButtonShape, ButtonSize, ButtonVariant, InteractionPreview};
+//! fast spatial spring. Groups lay out horizontally or vertically, with
+//! density steps, equal widths, and labels shown always, only on selected
+//! options (revealed with the selection) or never (icon options).
+use super::{ButtonDensity, ButtonShape, ButtonSize, ButtonVariant, InteractionPreview};
 use crate::color::ColorRole;
 use crate::icons::Icon;
 use crate::theme::{blend, color};
@@ -15,6 +18,32 @@ use gpui::*;
 use std::{collections::BTreeMap, rc::Rc};
 
 use super::roving::{Change, Orientation, Roving, select_value};
+
+/// How a connected group selects.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+pub enum GroupSelection {
+    /// Plain actions: no option stays selected.
+    None,
+    /// At most one option (exactly one with [`ConnectedButtonGroup::required`]).
+    #[default]
+    Single,
+    /// Any number of options.
+    Multi,
+}
+
+/// When an option with an icon shows its label.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+pub enum GroupLabels {
+    #[default]
+    Always,
+    /// Only while selected, revealed and hidden with the selection.
+    Selected,
+    /// Never: icon-only options (still labelled for assistive technology).
+    Never,
+}
+
+type ToggleHandler = Rc<dyn Fn(&SharedString, bool, &mut Window, &mut App)>;
+type ActivateHandler = Rc<dyn Fn(&SharedString, &mut Window, &mut App)>;
 
 #[derive(Clone)]
 struct OptionItem {
@@ -58,6 +87,15 @@ pub struct ConnectedButtonGroup {
     variant: ButtonVariant,
     size: Option<ButtonSize>,
     shape: ButtonShape,
+    selection: GroupSelection,
+    required: bool,
+    values: Vec<SharedString>,
+    on_toggle: Option<ToggleHandler>,
+    on_activate: Option<ActivateHandler>,
+    vertical: bool,
+    density: ButtonDensity,
+    equal_widths: bool,
+    labels: GroupLabels,
 }
 impl ConnectedButtonGroup {
     pub fn new(id: impl Into<ElementId>, label: impl Into<SharedString>) -> Self {
@@ -80,7 +118,74 @@ impl ConnectedButtonGroup {
             variant: ButtonVariant::Tonal,
             size: None,
             shape: ButtonShape::Round,
+            selection: GroupSelection::Single,
+            required: true,
+            values: Vec::new(),
+            on_toggle: None,
+            on_activate: None,
+            vertical: false,
+            density: ButtonDensity::Default,
+            equal_widths: false,
+            labels: GroupLabels::Always,
         }
+    }
+    /// Single (default), multiple or no selection.
+    pub fn selection(mut self, selection: GroupSelection) -> Self {
+        self.selection = selection;
+        self
+    }
+    /// Whether a single selection must keep one option selected (default,
+    /// radio semantics). Optional selections are toggle buttons whose
+    /// changes arrive through `on_toggle`.
+    pub fn required(mut self, required: bool) -> Self {
+        self.required = required;
+        self
+    }
+    /// The selected values of a multiple or optional selection.
+    pub fn selected_values<V: Into<SharedString>>(
+        mut self,
+        values: impl IntoIterator<Item = V>,
+    ) -> Self {
+        self.values = values.into_iter().map(Into::into).collect();
+        self
+    }
+    /// The requested selection of one option of a toggle group (multiple,
+    /// or an optional single selection).
+    pub fn on_toggle(
+        mut self,
+        callback: impl Fn(&SharedString, bool, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_toggle = Some(Rc::new(callback));
+        self
+    }
+    /// An activated option of a group without selection.
+    pub fn on_activate(
+        mut self,
+        callback: impl Fn(&SharedString, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_activate = Some(Rc::new(callback));
+        self
+    }
+    /// Stack the options vertically (connected top to bottom).
+    pub fn vertical(mut self, vertical: bool) -> Self {
+        self.vertical = vertical;
+        self
+    }
+    /// Shorten the options by the density's step.
+    pub fn density(mut self, density: ButtonDensity) -> Self {
+        self.density = density;
+        self
+    }
+    /// Give every option the widest one's width (horizontal groups that
+    /// fit their content; vertical options always share the column).
+    pub fn equal_widths(mut self, equal: bool) -> Self {
+        self.equal_widths = equal;
+        self
+    }
+    /// When options with icons show their labels.
+    pub fn labels(mut self, labels: GroupLabels) -> Self {
+        self.labels = labels;
+        self
     }
     /// The toggle-button colors the options use: tonal by default (the
     /// kit's connected group), or filled, elevated or outlined.
@@ -218,6 +323,8 @@ struct Metrics {
     padding: f32,
     icon: f32,
     text: Option<TypeRole>,
+    /// Options stack top to bottom.
+    vertical: bool,
 }
 
 impl Metrics {
@@ -239,6 +346,7 @@ impl Metrics {
             padding: padding - 2.,
             icon,
             text: Some(text),
+            vertical: false,
         }
     }
     fn compact(height: f32) -> Self {
@@ -249,6 +357,7 @@ impl Metrics {
             padding: 12.,
             icon: 18.,
             text: None,
+            vertical: false,
         }
     }
 }
@@ -358,8 +467,16 @@ fn item_style<T: Styled + StatefulInteractiveElement + gpui::prelude::FluentBuil
             metrics.padding + 2.
         }))
         .py_0()
-        .rounded_l(paint.left_radius)
-        .rounded_r(paint.right_radius)
+        .map(|item| {
+            // The first option's outer corners lead the main axis.
+            if metrics.vertical {
+                item.rounded_t(paint.left_radius)
+                    .rounded_b(paint.right_radius)
+            } else {
+                item.rounded_l(paint.left_radius)
+                    .rounded_r(paint.right_radius)
+            }
+        })
         // A transparent 2px border keeps the content inset; the focus ring is
         // the shared one, drawn by `focus_ring`.
         .border_2()
@@ -403,20 +520,70 @@ fn focus_ring(
     disabled: bool,
     forced: bool,
     paint: OptionPaint,
+    vertical: bool,
 ) -> super::button::ButtonFocusRing {
+    let (start, end) = (paint.left_radius, paint.right_radius);
     super::button::ButtonFocusRing::with_corners(
         option,
         focus.clone(),
         !disabled,
-        Corners {
-            top_left: paint.left_radius,
-            top_right: paint.right_radius,
-            bottom_right: paint.right_radius,
-            bottom_left: paint.left_radius,
+        if vertical {
+            Corners {
+                top_left: start,
+                top_right: start,
+                bottom_right: end,
+                bottom_left: end,
+            }
+        } else {
+            Corners {
+                top_left: start,
+                top_right: end,
+                bottom_right: end,
+                bottom_left: start,
+            }
         },
     )
     .inward()
     .forced(forced)
+}
+
+/// An option of an equal-width group: at least `widest` wide, reporting its
+/// own width. Other options pass through unwrapped.
+fn equal_slot(
+    option: impl IntoElement,
+    width: &Rc<std::cell::Cell<f32>>,
+    equal: bool,
+    widest: f32,
+) -> AnyElement {
+    if !equal {
+        return option.into_any_element();
+    }
+    let width = width.clone();
+    div()
+        .relative()
+        .flex()
+        // A column stretches the option across the slot.
+        .flex_col()
+        .items_stretch()
+        .flex_shrink_0()
+        .when(widest > 0., |slot| slot.min_w(px(widest)))
+        .child(option)
+        .child(
+            canvas(
+                move |bounds, window, _| {
+                    let measured = f32::from(bounds.size.width);
+                    if (width.get() - measured).abs() > 0.5 {
+                        width.set(measured);
+                        // The other options take the new width next frame.
+                        window.request_animation_frame();
+                    }
+                },
+                |_, _, _, _| {},
+            )
+            .absolute()
+            .size_full(),
+        )
+        .into_any_element()
 }
 
 /// The focus handle of each option, created on first sight (see
@@ -442,15 +609,22 @@ impl RenderOnce for ConnectedButtonGroup {
                 sync_handles(handles, &self.options, || cx.focus_handle())
             })
         };
+        let radio = self.tabs || (self.selection == GroupSelection::Single && self.required);
+        let toggles = !radio && self.selection != GroupSelection::None;
         let selected = self
             .options
             .iter()
             .position(|option| Some(&option.value) == self.value.as_ref());
+        let is_checked = |index: usize, value: &SharedString| match self.selection {
+            _ if radio => selected == Some(index),
+            GroupSelection::None => false,
+            _ => self.values.contains(value) || self.value.as_ref() == Some(value),
+        };
         let specimen = !self.previews.is_empty();
         let roving = Roving::new(handles.clone(), Orientation::Both)
             .disabled(disabled)
-            .selected(selected)
-            .select_on_focus(self.on_change.clone().map(|on_change| {
+            .selected(if radio { selected } else { None })
+            .select_on_focus(self.on_change.clone().filter(|_| radio).map(|on_change| {
                 select_value(
                     self.options.iter().map(|option| option.value.clone()),
                     on_change,
@@ -462,9 +636,32 @@ impl RenderOnce for ConnectedButtonGroup {
             roving.tab_stop(window)
         };
         let count = self.options.len();
-        let metrics = match self.size {
+        let mut metrics = match self.size {
             Some(size) => Metrics::of(size, self.shape),
             None => Metrics::compact(if self.segmented { 48. } else { 40. }),
+        };
+        metrics.height = (metrics.height + self.density.offset()).max(0.);
+        let vertical = self.vertical;
+        metrics.vertical = vertical;
+        let equal = self.equal_widths && !vertical && !self.full_width;
+        let widths = window
+            .use_keyed_state((self.id.clone(), "equal-widths"), cx, |_, _| {
+                Vec::<Rc<std::cell::Cell<f32>>>::new()
+            })
+            .update(cx, |widths, _| {
+                widths.resize_with(self.options.len(), Rc::default);
+                if !equal {
+                    // Re-measure from natural widths when equal widths return.
+                    widths.iter().for_each(|width| width.set(0.));
+                }
+                widths.clone()
+            });
+        // Equal options share the widest measured width, which holds while
+        // the group stays equal.
+        let widest = if equal {
+            widths.iter().map(|width| width.get()).fold(0., f32::max)
+        } else {
+            0.
         };
         let item_height = match self.height {
             Some(height) => height.to_pixels(window.rem_size()),
@@ -476,20 +673,25 @@ impl RenderOnce for ConnectedButtonGroup {
         let selection_root: std::sync::Arc<ElementId> =
             std::sync::Arc::new((self.id.clone(), "selection").into());
         let debug_kind = if fill { "full" } else { "content" };
-        let mut lane = gpui_base::h_flex()
-            .w_full()
-            .min_w_0()
+        let mut lane = div()
+            .flex()
+            .map(|lane| {
+                if vertical {
+                    lane.flex_col().items_stretch()
+                } else {
+                    lane.flex_row().items_center().w_full().min_w_0()
+                }
+            })
             .gap(px(GAP))
-            .items_center()
             // When even the labels' own widths exceed the parent (large text
             // in a narrow pane), options wrap to another row rather than
             // clipping their labels.
-            .when(fill, |lane| lane.flex_wrap())
+            .when(fill && !vertical, |lane| lane.flex_wrap())
             .when(cfg!(test), |lane| {
                 lane.debug_selector(|| "full-choice-lane".into())
             });
         for (index, option) in self.options.into_iter().enumerate() {
-            let checked = selected == Some(index);
+            let checked = is_checked(index, &option.value);
             let focus = handles[index].clone().tab_stop(entry == Some(index));
             let callback = self.on_change.clone();
             let value = option.value.clone();
@@ -546,17 +748,29 @@ impl RenderOnce for ConnectedButtonGroup {
                             .child(icon.size(icon_size)),
                     )
                 })
-                .child(
-                    div()
-                        .when(!fill, |label| label.min_w_0().text_ellipsis())
-                        .whitespace_nowrap()
-                        .when(cfg!(test), |label| {
-                            label.debug_selector(move || {
-                                format!("{debug_kind}-choice-label-{index}")
-                            })
-                        })
-                        .child(label.clone()),
-                );
+                .map(|content| {
+                    let has_icon = self.icons.contains_key(&value);
+                    match self.labels {
+                        GroupLabels::Never if has_icon => content,
+                        GroupLabels::Selected if has_icon => {
+                            let role = metrics.text.unwrap_or(TypeRole::LabelLarge);
+                            content.gap(rem(8. * selection.clamp(0., 1.))).children(
+                                super::fab::revealed_label(&label, role, selection, window),
+                            )
+                        }
+                        _ => content.child(
+                            div()
+                                .when(!fill, |label| label.min_w_0().text_ellipsis())
+                                .whitespace_nowrap()
+                                .when(cfg!(test), |label| {
+                                    label.debug_selector(move || {
+                                        format!("{debug_kind}-choice-label-{index}")
+                                    })
+                                })
+                                .child(label.clone()),
+                        ),
+                    }
+                });
             if self.tabs {
                 let click_focus = focus.clone();
                 let tab = item_style(
@@ -591,7 +805,75 @@ impl RenderOnce for ConnectedButtonGroup {
                     option_disabled,
                     forced_focus,
                     paint,
+                    vertical,
                 ));
+            } else if toggles || self.selection == GroupSelection::None {
+                let click_focus = focus.clone();
+                let on_toggle = self.on_toggle.clone();
+                let on_activate = self.on_activate.clone();
+                let option = if toggles {
+                    item_style(
+                        gpui_base::Toggle::new(value.clone()),
+                        paint,
+                        item_height,
+                        fill,
+                        option_disabled,
+                        preview,
+                        metrics,
+                    )
+                    .when_some(self.label_text_size, |item, size| item.text_size(size))
+                    .pressed(checked)
+                    .tab_stop(entry == Some(index))
+                    .disabled(option_disabled)
+                    .accessibility_label(label)
+                    .track_focus(&focus)
+                    .child(content)
+                    .when(cfg!(test), |item| {
+                        item.debug_selector(move || format!("{debug_kind}-choice-option-{index}"))
+                    })
+                    .on_change(move |pressed, _, window, cx| {
+                        click_focus.focus(window, cx);
+                        if let Some(callback) = &on_toggle {
+                            callback(&value, pressed, window, cx);
+                        }
+                    })
+                    .into_any_element()
+                } else {
+                    item_style(
+                        gpui_base::Button::new(value.clone()),
+                        paint,
+                        item_height,
+                        fill,
+                        option_disabled,
+                        preview,
+                        metrics,
+                    )
+                    .when_some(self.label_text_size, |item, size| item.text_size(size))
+                    .tab_stop(entry == Some(index))
+                    .disabled(option_disabled)
+                    .accessibility_label(label)
+                    .track_focus(&focus)
+                    .child(content)
+                    .when(cfg!(test), |item| {
+                        item.debug_selector(move || format!("{debug_kind}-choice-option-{index}"))
+                    })
+                    .on_click(move |_, window, cx| {
+                        click_focus.focus(window, cx);
+                        if let Some(callback) = &on_activate {
+                            callback(&value, window, cx);
+                        }
+                    })
+                    .into_any_element()
+                };
+                let ring = focus_ring(
+                    option,
+                    &focus,
+                    option_disabled,
+                    forced_focus,
+                    paint,
+                    vertical,
+                );
+                lane = lane.child(equal_slot(ring, &widths[index], equal, widest));
             } else {
                 let click_focus = focus.clone();
                 let radio = item_style(
@@ -620,21 +902,25 @@ impl RenderOnce for ConnectedButtonGroup {
                         callback(&value, window, cx);
                     }
                 });
-                lane = lane.child(focus_ring(
+                let ring = focus_ring(
                     radio,
                     &focus,
                     option_disabled,
                     forced_focus,
                     paint,
-                ));
+                    vertical,
+                );
+                lane = lane.child(equal_slot(ring, &widths[index], equal, widest));
             }
         }
         let group = div()
             .id(self.id.clone())
             .role(if self.tabs {
                 Role::TabList
-            } else {
+            } else if radio {
                 Role::RadioGroup
+            } else {
+                Role::Group
             })
             .aria_label(self.label)
             .flex()
@@ -1618,5 +1904,206 @@ mod tests {
         }
         // The current option keeps its pill shape.
         assert_eq!(painted("full-1").left_radius, px(20.));
+    }
+}
+
+#[cfg(test)]
+mod mode_tests {
+    use super::{ConnectedButtonGroup, GroupLabels, GroupSelection};
+    use crate::components::{ButtonDensity, ButtonSize};
+    use crate::icons::IconName;
+    use gpui::{
+        Context, InteractiveElement as _, IntoElement, Modifiers, ParentElement as _, Render,
+        SharedString, Styled as _, TestAppContext, VisualTestContext, Window, div, px,
+    };
+    use std::{cell::RefCell, rc::Rc};
+
+    #[derive(Default)]
+    struct Harness {
+        selection: Option<GroupSelection>,
+        required: bool,
+        vertical: bool,
+        density: ButtonDensity,
+        equal: bool,
+        labels: GroupLabels,
+        values: Vec<SharedString>,
+        events: Rc<RefCell<Vec<String>>>,
+    }
+    impl Render for Harness {
+        fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+            window.set_rem_size(px(14.));
+            let events = self.events.clone();
+            let activated = self.events.clone();
+            let view = cx.entity().downgrade();
+            div().flex().items_start().p(px(40.)).child(
+                div().flex().debug_selector(|| "group".into()).child(
+                    ConnectedButtonGroup::new("group", "Format")
+                        .button_size(ButtonSize::Small)
+                        .options([("b", "Bold"), ("i", "Italic"), ("u", "Underline wide")])
+                        .icon("b", IconName::Check)
+                        .icon("i", IconName::Check)
+                        .icon("u", IconName::Check)
+                        .selection(self.selection.unwrap_or_default())
+                        .required(self.required)
+                        .vertical(self.vertical)
+                        .density(self.density)
+                        .equal_widths(self.equal)
+                        .labels(self.labels)
+                        .selected_values(self.values.clone())
+                        .on_toggle(move |value: &SharedString, on, _, cx| {
+                            events.borrow_mut().push(format!("{value}={on}"));
+                            let _ = view.update(cx, |this, cx| {
+                                if on {
+                                    this.values.push(value.clone());
+                                } else {
+                                    this.values.retain(|v| v != value);
+                                }
+                                cx.notify();
+                            });
+                        })
+                        .on_activate(move |value, _, _| {
+                            activated.borrow_mut().push(format!("{value}!"))
+                        }),
+                ),
+            )
+        }
+    }
+
+    fn draw(cx: &mut VisualTestContext) {
+        for _ in 0..3 {
+            cx.executor()
+                .advance_clock(std::time::Duration::from_millis(800));
+            cx.update(|window, cx| {
+                window.refresh();
+                window.draw(cx).clear(cx);
+            });
+        }
+    }
+
+    fn setup(cx: &mut TestAppContext, harness: Harness) -> &mut VisualTestContext {
+        cx.update(|cx| {
+            gpui_base::init(cx);
+            cx.set_reduce_motion(true);
+        });
+        let (_, cx) = cx.add_window_view(move |_, _| harness);
+        draw(cx);
+        cx
+    }
+
+    fn option(cx: &mut VisualTestContext, index: usize) -> gpui::Bounds<gpui::Pixels> {
+        let name: &'static str = Box::leak(format!("content-choice-option-{index}").into());
+        cx.debug_bounds(name).unwrap()
+    }
+
+    #[gpui::test]
+    fn multiple_selection_toggles_each_option(cx: &mut TestAppContext) {
+        let events = Rc::new(RefCell::new(Vec::new()));
+        let cx = setup(
+            cx,
+            Harness {
+                selection: Some(GroupSelection::Multi),
+                events: events.clone(),
+                ..Harness::default()
+            },
+        );
+        for index in [0, 2, 0] {
+            let at = option(cx, index).center();
+            cx.simulate_click(at, Modifiers::none());
+            draw(cx);
+        }
+        assert_eq!(*events.borrow(), ["b=true", "u=true", "b=false"]);
+    }
+
+    #[gpui::test]
+    fn an_optional_single_selection_can_be_cleared(cx: &mut TestAppContext) {
+        let events = Rc::new(RefCell::new(Vec::new()));
+        let cx = setup(
+            cx,
+            Harness {
+                selection: Some(GroupSelection::Single),
+                required: false,
+                values: vec!["i".into()],
+                events: events.clone(),
+                ..Harness::default()
+            },
+        );
+        let at = option(cx, 1).center();
+        cx.simulate_click(at, Modifiers::none());
+        draw(cx);
+        assert_eq!(*events.borrow(), ["i=false"]);
+    }
+
+    #[gpui::test]
+    fn a_group_without_selection_activates(cx: &mut TestAppContext) {
+        let events = Rc::new(RefCell::new(Vec::new()));
+        let cx = setup(
+            cx,
+            Harness {
+                selection: Some(GroupSelection::None),
+                events: events.clone(),
+                ..Harness::default()
+            },
+        );
+        let at = option(cx, 2).center();
+        cx.simulate_click(at, Modifiers::none());
+        draw(cx);
+        assert_eq!(*events.borrow(), ["u!"]);
+    }
+
+    #[gpui::test]
+    fn vertical_dense_groups_stack_shorter_options_of_one_width(cx: &mut TestAppContext) {
+        let cx = setup(
+            cx,
+            Harness {
+                required: true,
+                vertical: true,
+                density: ButtonDensity::Compact,
+                ..Harness::default()
+            },
+        );
+        let (first, last) = (option(cx, 0), option(cx, 2));
+        assert_eq!(first.size.height, px(40. - 8.));
+        assert_eq!(
+            first.size.width, last.size.width,
+            "options share the column"
+        );
+        assert_eq!(last.top(), first.top() + px(2. * (32. + 2.)));
+    }
+
+    #[gpui::test]
+    fn equal_widths_take_the_widest_option(cx: &mut TestAppContext) {
+        let cx = setup(
+            cx,
+            Harness {
+                required: true,
+                equal: true,
+                ..Harness::default()
+            },
+        );
+        draw(cx);
+        let widths = [0, 1, 2].map(|index| option(cx, index).size.width);
+        assert_eq!(widths[0], widths[2], "{widths:?}");
+        assert_eq!(widths[1], widths[2], "{widths:?}");
+    }
+
+    #[gpui::test]
+    fn selected_labels_show_only_on_selected_options(cx: &mut TestAppContext) {
+        let cx = setup(
+            cx,
+            Harness {
+                selection: Some(GroupSelection::Multi),
+                labels: GroupLabels::Selected,
+                values: vec!["u".into()],
+                ..Harness::default()
+            },
+        );
+        let (bare, labelled) = (option(cx, 0), option(cx, 2));
+        // An unselected icon option is the icon, its padding and border.
+        assert_eq!(bare.size.width, px(20. + (16. + 2.) * 2.));
+        assert!(labelled.size.width > bare.size.width + px(40.));
+        let at = bare.center();
+        cx.simulate_click(at, Modifiers::none());
+        draw(cx);
+        assert!(option(cx, 0).size.width > bare.size.width, "revealed");
     }
 }

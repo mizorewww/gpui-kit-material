@@ -53,8 +53,30 @@ pub(crate) fn width_deltas(natural: &[f32], pressed: Option<usize>) -> Vec<f32> 
     deltas
 }
 
+/// Group density: each step below default takes 4dp off the buttons'
+/// height (Figma kit "Segmented button" Density 0, −1, −2).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+pub enum ButtonDensity {
+    #[default]
+    Default,
+    Comfortable,
+    Compact,
+}
+
+impl ButtonDensity {
+    pub const ALL: [Self; 3] = [Self::Default, Self::Comfortable, Self::Compact];
+    /// The height change in design px.
+    pub const fn offset(self) -> f32 {
+        match self {
+            Self::Default => 0.,
+            Self::Comfortable => -4.,
+            Self::Compact => -8.,
+        }
+    }
+}
+
 /// Per-item state that survives renders: ids, press probes and the
-/// natural widths measured while each item is at rest.
+/// natural main-axis extents measured while each item is at rest.
 #[derive(Default)]
 struct GroupState {
     items: Vec<ItemState>,
@@ -71,6 +93,9 @@ pub struct ButtonGroup {
     id: ElementId,
     label: SharedString,
     size: ButtonSize,
+    vertical: bool,
+    density: ButtonDensity,
+    equal_widths: bool,
     items: Vec<MaterialButton>,
 }
 
@@ -81,12 +106,30 @@ impl ButtonGroup {
             id: id.into(),
             label: label.into(),
             size: ButtonSize::Small,
+            vertical: false,
+            density: ButtonDensity::Default,
+            equal_widths: false,
             items: Vec::new(),
         }
     }
     /// The size of the group's buttons, which sets the gap between them.
     pub fn button_size(mut self, size: ButtonSize) -> Self {
         self.size = size;
+        self
+    }
+    /// Stack the buttons vertically; a pressed button then grows in height.
+    pub fn vertical(mut self, vertical: bool) -> Self {
+        self.vertical = vertical;
+        self
+    }
+    /// Shorten every button by the density's step.
+    pub fn density(mut self, density: ButtonDensity) -> Self {
+        self.density = density;
+        self
+    }
+    /// Give every button the widest one's width.
+    pub fn equal_widths(mut self, equal: bool) -> Self {
+        self.equal_widths = equal;
         self
     }
     /// Add a button or an icon button.
@@ -119,35 +162,47 @@ impl RenderOnce for ButtonGroup {
                 });
             }
             state.items.truncate(count);
+            let items = &state.items;
             (
-                state
-                    .items
+                items
                     .iter()
                     .map(|item| item.pressed.clone())
                     .collect::<Vec<_>>(),
-                state
-                    .items
+                items
                     .iter()
                     .map(|item| item.natural.clone())
                     .collect::<Vec<_>>(),
-                state
-                    .items
-                    .iter()
-                    .map(|item| item.id.clone())
-                    .collect::<Vec<_>>(),
+                items.iter().map(|item| item.id.clone()).collect::<Vec<_>>(),
             )
         });
         let pressed = probes.iter().position(|probe| probe.get());
-        let natural: Vec<f32> = naturals.iter().map(|width| width.get()).collect();
+        let natural: Vec<f32> = naturals.iter().map(|extent| extent.get()).collect();
         let targets = width_deltas(&natural, pressed);
+        let vertical = self.vertical;
+        let equal = self.equal_widths;
+        // Horizontal equal widths share the widest measured width (which
+        // then holds while the group is equal); vertical ones stretch to
+        // the column.
+        let widest = natural.iter().copied().fold(0., f32::max);
+        let height = (self.size.height() + self.density.offset()).max(0.);
+        let dense = self.density != ButtonDensity::Default;
         let mut row = div()
             .id(self.id)
             .role(Role::Group)
             .aria_label(self.label)
             .flex()
-            .flex_row()
+            .map(|row| {
+                if vertical {
+                    row.flex_col()
+                } else {
+                    row.flex_row()
+                }
+            })
             .flex_shrink_0()
-            .items_center()
+            .map(|row| match (vertical, equal) {
+                (true, true) => row.items_stretch(),
+                _ => row.items_center(),
+            })
             .gap(rem(standard_group_gap(self.size)));
         for (index, button) in self.items.into_iter().enumerate() {
             let delta = motion::token_value(
@@ -158,20 +213,38 @@ impl RenderOnce for ButtonGroup {
                 cx,
             );
             let moving = delta != 0.;
-            let width = natural[index] + delta;
+            let extent = natural[index] + delta;
             let button = button
                 .press_probe(probes[index].clone())
+                .when(dense, |button| button.h(rem(height)))
+                .when(equal && !vertical && widest > 0., |button| {
+                    button.min_w(px(widest))
+                })
+                .when(equal && vertical, |button| button.w_full())
                 .when(moving && natural[index] > 0., |button| {
-                    button.w(px(width.max(0.))).min_w(px(0.))
+                    if vertical {
+                        button.h(px(extent.max(0.))).min_h(px(0.))
+                    } else {
+                        button.w(px(extent.max(0.))).min_w(px(0.))
+                    }
                 });
             let measured = naturals[index].clone();
             row = row.child(
                 div().relative().flex().flex_shrink_0().child(button).child(
                     canvas(
-                        move |bounds, _, _| {
-                            // Only an item at rest shows its natural width.
-                            if !moving {
-                                measured.set(f32::from(bounds.size.width));
+                        move |bounds, window, _| {
+                            // Only an item at rest shows its natural extent.
+                            let extent = f32::from(if vertical {
+                                bounds.size.height
+                            } else {
+                                bounds.size.width
+                            });
+                            if !moving && (measured.get() - extent).abs() > 0.01 {
+                                measured.set(extent);
+                                if equal && !vertical {
+                                    // The others take the new widest width next frame.
+                                    window.request_animation_frame();
+                                }
                             }
                         },
                         |_, _, _, _| {},
@@ -296,5 +369,102 @@ mod tests {
         draw(cx);
         draw(cx);
         assert_eq!(widths(cx), rest);
+    }
+}
+
+#[cfg(test)]
+mod layout_tests {
+    use super::{ButtonDensity, ButtonGroup};
+    use crate::components::MaterialButton;
+    use gpui::{
+        Context, InteractiveElement as _, IntoElement, ParentElement as _, Render, Styled as _,
+        TestAppContext, VisualTestContext, Window, div, px,
+    };
+
+    const ITEMS: [&str; 3] = ["item-0", "item-1", "item-2"];
+    const LABELS: [&str; 3] = ["S", "Medium", "Extra large"];
+
+    struct Harness {
+        vertical: bool,
+        density: ButtonDensity,
+        equal: bool,
+    }
+    impl Render for Harness {
+        fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+            window.set_rem_size(px(14.));
+            div().flex().items_start().p(px(40.)).child(
+                ButtonGroup::new("group", "Sizes")
+                    .vertical(self.vertical)
+                    .density(self.density)
+                    .equal_widths(self.equal)
+                    .items((0..3usize).map(|index| {
+                        MaterialButton::new(("item", index))
+                            .debug_selector(move || ITEMS[index].into())
+                            .child(LABELS[index])
+                    })),
+            )
+        }
+    }
+
+    fn draw(cx: &mut VisualTestContext) {
+        for _ in 0..3 {
+            cx.update(|window, cx| {
+                window.refresh();
+                window.draw(cx).clear(cx);
+            });
+        }
+    }
+
+    fn bounds(harness: Harness, cx: &mut TestAppContext) -> [gpui::Bounds<gpui::Pixels>; 3] {
+        cx.update(|cx| {
+            gpui_base::init(cx);
+            cx.set_reduce_motion(true);
+        });
+        let (_, cx) = cx.add_window_view(move |_, _| harness);
+        draw(cx);
+        ITEMS.map(|item| cx.debug_bounds(item).unwrap())
+    }
+
+    #[gpui::test]
+    fn a_vertical_compact_group_stacks_shorter_buttons(cx: &mut TestAppContext) {
+        let [first, second, _] = bounds(
+            Harness {
+                vertical: true,
+                density: ButtonDensity::Compact,
+                equal: false,
+            },
+            cx,
+        );
+        assert_eq!(first.size.height, px(40. - 8.));
+        assert_eq!(second.top(), first.bottom() + px(12.), "the S gap");
+    }
+
+    #[gpui::test]
+    fn equal_widths_share_the_widest_button(cx: &mut TestAppContext) {
+        let [a, b, c] = bounds(
+            Harness {
+                vertical: false,
+                density: ButtonDensity::Default,
+                equal: true,
+            },
+            cx,
+        );
+        assert!(c.size.width > px(80.));
+        assert_eq!(a.size.width, c.size.width);
+        assert_eq!(b.size.width, c.size.width);
+    }
+
+    #[gpui::test]
+    fn equal_vertical_buttons_stretch_to_the_column(cx: &mut TestAppContext) {
+        let [a, _, c] = bounds(
+            Harness {
+                vertical: true,
+                density: ButtonDensity::Comfortable,
+                equal: true,
+            },
+            cx,
+        );
+        assert_eq!(a.size.width, c.size.width);
+        assert_eq!(a.size.height, px(36.));
     }
 }

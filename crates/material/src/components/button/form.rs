@@ -113,10 +113,11 @@ pub(crate) enum Form {
         expansion: f32,
     },
     Segment(Segment),
-    /// The FAB menu's toggle: a regular FAB that becomes the round close
-    /// button while `open`.
+    /// The FAB menu's toggle: a FAB of `size` that becomes the round close
+    /// button of the same size while `open`.
     FabMenuToggle {
         open: bool,
+        size: FabSize,
     },
     /// A FAB menu item at its animated 0 … 1 `expansion`.
     FabMenuItem {
@@ -331,7 +332,7 @@ impl Form {
                     ..label
                 }
             }
-            Form::FabMenuToggle { .. } => Form::Fab(FabSize::Regular).geometry(size, direction),
+            Form::FabMenuToggle { size: fab, .. } => Form::Fab(fab).geometry(size, direction),
             Form::FabMenuItem { expansion } => {
                 let (height, padding, gap) = FAB_MENU_ITEM;
                 let t = expansion.clamp(0., 1.);
@@ -374,10 +375,9 @@ impl Form {
     pub(crate) fn fixed_radius(self) -> Option<f32> {
         match self {
             Form::Fab(fab) => Some(fab.radius()),
-            Form::FabMenuToggle { open: false } => Some(FabSize::Regular.radius()),
-            Form::FabMenuToggle { open: true } | Form::FabMenuItem { .. } => {
-                Some(FAB_MENU_ITEM.0 / 2.)
-            }
+            Form::FabMenuToggle { open: false, size } => Some(size.radius()),
+            Form::FabMenuToggle { open: true, size } => Some(size.container() / 2.),
+            Form::FabMenuItem { .. } => Some(FAB_MENU_ITEM.0 / 2.),
             Form::ExtendedFab { size, .. } => Some(size.extended_size().radius()),
             _ => None,
         }
