@@ -481,6 +481,9 @@ pub struct TextStyle {
 
     /// The number of lines to display before truncating the text
     pub line_clamp: Option<usize>,
+
+    /// Extra space after each character (CSS `letter-spacing`), in pixels or rems.
+    pub letter_spacing: AbsoluteLength,
 }
 
 impl Default for TextStyle {
@@ -502,6 +505,7 @@ impl Default for TextStyle {
             text_overflow: None,
             text_align: TextAlign::default(),
             line_clamp: None,
+            letter_spacing: AbsoluteLength::Pixels(px(0.)),
         }
     }
 }

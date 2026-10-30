@@ -308,8 +308,8 @@
       },
       "src/fast/text.rs": {
         "upstream_sha256": "e386a393269aee9189cb87c2a1f40f40fb4716b2cd98e6a394e052b318177814",
-        "local_sha256": "bf9df6e2acfc6666f947841b28cc1e0d8b6ef0c05228835502e60588d0f9a519",
-        "reason": "Text measurement inputs carry the font generation and drop stale held layouts; frame carry-over of the detailed-line cache (font invalidation and line-layout options)."
+        "local_sha256": "8bef9c08be62b9f8df61a4148943aadc3d5953dd3fef46546ea555dcbf5a7875",
+        "reason": "Text measurement inputs carry the font generation and drop stale held layouts; frame carry-over of the detailed-line cache (font invalidation and line-layout options). Text measurement and shaping with letter spacing (vendor/gpui-pre/letter-spacing-patch.md)."
       },
       "src/platform.rs": {
         "upstream_sha256": "7f95c2fe68fc225cb45451888355c4df2589632d7bde0d61fce554972f4825ca",
@@ -338,8 +338,8 @@
       },
       "src/style.rs": {
         "upstream_sha256": "d2c9e53fb00271f2dde4afc5a65837b4e1ae83b8849b92b17afe0799b6ed69ce",
-        "local_sha256": "7dea77ff7bc7e8add16767c7a0e607fbf5d479310584a4b2403856d0154f7b20",
-        "reason": "Replace unpublished util_macros #[perf] with #[test] (vendor/gpui-pre/test-harness-patch.md). Mirrored corner radii and border widths when painting; TextAlign::in_direction (vendor/gpui-pre/layout-direction-patch.md)."
+        "local_sha256": "c27e74994af2fdea678a25a2f5d5fd0040fa6e2a04f2798308cb3f3319869ddd",
+        "reason": "Replace unpublished util_macros #[perf] with #[test] (vendor/gpui-pre/test-harness-patch.md). Mirrored corner radii and border widths when painting; TextAlign::in_direction (vendor/gpui-pre/layout-direction-patch.md). TextStyle::letter_spacing (vendor/gpui-pre/letter-spacing-patch.md)."
       },
       "src/svg_renderer.rs": {
         "upstream_sha256": "fb12dae87c0cd4c5f5a1fbbd2f9548d52fde9440c21e3d576dfeb0233eda88a6",
@@ -348,13 +348,13 @@
       },
       "src/text_system.rs": {
         "upstream_sha256": "e07554d460982d07546b4d67d9cd02162853b27a9cab7f53a9266626fff27346",
-        "local_sha256": "bf1ba1916bbc8ee9fe32df256009da273ed725f3c5784dded292e8ac419d2739",
-        "reason": "Detailed layout entry points and em_width/em_advance fallback (line-layout-options-patch.md); add_fonts invalidates Fast text caches after the platform installs the fonts instead of before, and exposes font_generation() to the Fast retention checks."
+        "local_sha256": "f75134047a9b67d5eee943654ad1c389f08e81bade38b26ff745ec5ceb7cff9b",
+        "reason": "Detailed layout entry points and em_width/em_advance fallback (line-layout-options-patch.md); add_fonts invalidates Fast text caches after the platform installs the fonts instead of before, and exposes font_generation() to the Fast retention checks. shape_text_spaced; pooled wrapper spacing reset (vendor/gpui-pre/letter-spacing-patch.md)."
       },
       "src/text_system/line_layout.rs": {
         "upstream_sha256": "757c2672c0831f9f848845c6ac74dece3c6e0401613b1e00325129cbf1548c08",
-        "local_sha256": "a6dacb5437ee9e3cc63c0e3f62d38ecb57c3d9b42971862749b501a2d91d0c39",
-        "reason": "Separate detailed-layout frame cache with index, reuse and truncation; fields pub(crate) for Fast's text-cache carry-over (line-layout-options-patch.md)."
+        "local_sha256": "86b7d4081ec990a22b95dde40a1ce36f27436f550bc0a52e5b8a7506c2211db0",
+        "reason": "Separate detailed-layout frame cache with index, reuse and truncation; fields pub(crate) for Fast's text-cache carry-over (line-layout-options-patch.md). Spaced line layouts in the cache key and apply_letter_spacing (vendor/gpui-pre/letter-spacing-patch.md)."
       },
       "src/window.rs": {
         "upstream_sha256": "d3f00c28cc47446f6c73be67d00830446e0e3a9a7fadefdf54fff9e5ccadee0b",
@@ -390,6 +390,16 @@
         "upstream_sha256": "8086381577b4e5f298e46c9f50a4a0ddc221016d0024c1dde9911658e0e54859",
         "local_sha256": "dcfa82d73005d7ca2b8d33c7df799855b49c0b76752a7f90833ceef9c66f4cd7",
         "reason": "Mirrors children of right-to-left nodes in layout_bounds (vendor/gpui-pre/layout-direction-patch.md)."
+      },
+      "src/styled.rs": {
+        "upstream_sha256": "c6e62fe136bedf887ee755c886df5466d5fe0b398a004b35d1a3530fef809c8d",
+        "local_sha256": "82103c5a8dd9460271f1218de4aafe61a1a70217c0cbd5a5e26ff70a57d1558b",
+        "reason": "Styled::letter_spacing (vendor/gpui-pre/letter-spacing-patch.md)."
+      },
+      "src/text_system/line_wrapper.rs": {
+        "upstream_sha256": "4c0ce82fba13490ec6494245971a6a4a322fc55ca2944c60e708fdbcd5dcee8e",
+        "local_sha256": "debe130befb6e5819c5438dbcbfc987a17468ee075b67673a1a71bae3ce7c216",
+        "reason": "LineWrapper::letter_spacing (vendor/gpui-pre/letter-spacing-patch.md)."
       }
     },
     "added": {
