@@ -362,3 +362,102 @@ fn previewed_items_are_specimens(cx: &mut TestAppContext) {
     assert!(cx.update(|window, cx| window.focused(cx)).is_none());
     assert_eq!(painted("d0").hover.a, painted("d0").hover.a);
 }
+
+#[test]
+fn adaptive_bars_switch_layout_at_the_medium_class() {
+    assert_eq!(adaptive_layout(599.), NavItemLayout::Vertical);
+    assert_eq!(adaptive_layout(MEDIUM_WIDTH), NavItemLayout::Horizontal);
+}
+
+struct Sized {
+    width: f32,
+    hide: bool,
+    expanded: bool,
+}
+
+impl Render for Sized {
+    fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        window.set_rem_size(px(14.));
+        div()
+            .flex()
+            .flex_col()
+            .child(
+                div().w(px(self.width)).child(
+                    NavigationBar::new("bar", "Main")
+                        .items(items(3))
+                        .adaptive(true)
+                        .ripple(false)
+                        .selected("d0"),
+                ),
+            )
+            .child(
+                div().h(px(400.)).child(
+                    NavigationRail::new("rail", "Main")
+                        .items(items(2).into_iter().map(|item| {
+                            let value = item.value().clone();
+                            NavItem::new(format!("r{value}"), item.label().clone(), icon())
+                        }))
+                        .hide_collapsed(self.hide)
+                        .expanded(self.expanded)
+                        .selected("rd0"),
+                ),
+            )
+    }
+}
+
+#[gpui::test]
+fn adaptive_bars_measure_their_width(cx: &mut TestAppContext) {
+    cx.update(|cx| {
+        gpui_base::init(cx);
+        super::roving::init(cx);
+    });
+    let (view, cx) = cx.add_window_view(|_, _| Sized {
+        width: 360.,
+        hide: false,
+        expanded: false,
+    });
+    settle(cx);
+    assert_eq!(pill(cx, "d0").size.height, px(32.), "compact: vertical");
+    view.update(cx, |view, cx| {
+        view.width = 900.;
+        cx.notify();
+    });
+    settle(cx);
+    assert_eq!(pill(cx, "d0").size.height, px(40.), "medium: horizontal");
+    view.update(cx, |view, cx| {
+        view.width = 360.;
+        cx.notify();
+    });
+    settle(cx);
+    assert_eq!(pill(cx, "d0").size.height, px(32.));
+}
+
+#[gpui::test]
+fn hidden_collapsed_rails_open_from_zero_width(cx: &mut TestAppContext) {
+    cx.update(|cx| {
+        gpui_base::init(cx);
+        super::roving::init(cx);
+    });
+    let (view, cx) = cx.add_window_view(|_, _| Sized {
+        width: 360.,
+        hide: true,
+        expanded: false,
+    });
+    settle(cx);
+    assert!(
+        cx.debug_bounds("nav-pill-rd0").is_none(),
+        "a hidden collapsed rail draws no destinations"
+    );
+    view.update(cx, |view, cx| {
+        view.expanded = true;
+        cx.notify();
+    });
+    settle(cx);
+    assert_eq!(pill(cx, "rd0").size.height, px(56.));
+    view.update(cx, |view, cx| {
+        view.expanded = false;
+        cx.notify();
+    });
+    settle(cx);
+    assert!(cx.debug_bounds("nav-pill-rd0").is_none());
+}
