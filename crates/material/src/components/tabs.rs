@@ -230,6 +230,17 @@ pub(crate) fn tab_paint(
     }
 }
 
+/// Whether measured spans differ by more than rounding. The indicator drawn from
+/// a measurement can move a tab's rounded edge by a fraction of a pixel, and a
+/// redraw for that would flip it back: a loop of frames, at some scales forever.
+fn spans_moved(old: &[(f32, f32)], new: &[(f32, f32)]) -> bool {
+    old.len() != new.len()
+        || old.iter().zip(new).any(|(old, new)| {
+            (old.0 - new.0).abs() > SPAN_TOLERANCE || (old.1 - new.1).abs() > SPAN_TOLERANCE
+        })
+}
+const SPAN_TOLERANCE: f32 = 1.;
+
 /// Tab and content spans, in px from the first tab's leading edge, measured
 /// after layout. The indicator follows these on the next frame.
 #[derive(Default)]
@@ -397,11 +408,10 @@ impl RenderOnce for MaterialTabs {
                             .iter()
                             .map(|(left, width)| (along(*left, *width), *width))
                             .collect();
-                        let changed = geometry.tabs != tabs || geometry.contents != contents;
-                        if changed {
-                            geometry.tabs = tabs;
-                            geometry.contents = contents;
-                        }
+                        let changed = spans_moved(&geometry.tabs, &tabs)
+                            || spans_moved(&geometry.contents, &contents);
+                        geometry.tabs = tabs;
+                        geometry.contents = contents;
                         changed
                     });
                     if changed {

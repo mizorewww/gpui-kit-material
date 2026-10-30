@@ -457,7 +457,8 @@ fn preview(
                 .when(open, |field| {
                     field.preview_state(InteractionPreview::Focused)
                 })
-                .w(rem(312.)),
+                .w_full()
+                .max_w(rem(312.)),
         );
     let close = {
         let picker = picker.clone();

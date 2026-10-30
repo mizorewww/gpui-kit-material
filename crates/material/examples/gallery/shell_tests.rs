@@ -387,7 +387,8 @@ fn every_spec_board_fits_its_row(cx: &mut TestAppContext) {
     use super::spec::OVERFLOWS;
     use gpui::{ListOffset, VisualContext as _};
     init(cx);
-    for width in [480., 760., 1000., 1280., 1600.] {
+    let mut failures = Vec::new();
+    for width in [320., 390., 600., 840., 1000., 1280., 1600.] {
         let window = cx.open_window(size(px(width), px(900.)), Gallery::new);
         let mut cx = VisualTestContext::from_window(window.into(), cx);
         design_rem(&window, &mut cx);
@@ -421,24 +422,28 @@ fn every_spec_board_fits_its_row(cx: &mut TestAppContext) {
                 OVERFLOWS.with(|overflows| overflows.borrow_mut().clear());
                 draw(&window, &mut cx);
                 let overflows = OVERFLOWS.with(|overflows| overflows.take());
-                assert!(
-                    overflows.is_empty(),
-                    "{} at {width}px, row {row}: {overflows:?}",
-                    entry.id
-                );
+                if !overflows.is_empty() {
+                    failures.push(format!(
+                        "{} at {width}px, row {row}: {overflows:?}",
+                        entry.id
+                    ));
+                }
             }
         }
         let _ = cx.window_handle();
     }
+    assert!(failures.is_empty(), "{}", failures.join("\n"));
 }
 
 /// The reference widths and the layout each must get.
-const WIDTHS: [(f32, ShellLayout); 5] = [
+const WIDTHS: [(f32, ShellLayout); 7] = [
     (1600., ShellLayout::Wide),
     (1280., ShellLayout::Wide),
     (1000., ShellLayout::Medium),
-    (760., ShellLayout::Compact),
-    (480., ShellLayout::Compact),
+    (840., ShellLayout::Compact),
+    (600., ShellLayout::Compact),
+    (390., ShellLayout::Compact),
+    (320., ShellLayout::Compact),
 ];
 
 fn resize(window: &WindowHandle<Gallery>, cx: &mut VisualTestContext, width: f32) {
@@ -490,33 +495,37 @@ fn the_shell_arranges_itself_for_the_window_width(cx: &mut TestAppContext) {
 fn every_preview_fits_its_canvas_at_every_width(cx: &mut TestAppContext) {
     use super::shell::PREVIEW_DRAWN;
     let (window, mut cx) = open(cx);
-    for (width, _) in WIDTHS {
-        for height in [780., 1200.] {
-            cx.simulate_resize(size(px(width), px(height)));
-            settle(&window, &mut cx);
-            for entry in CATALOG {
-                if !matches!(entry.kind, Kind::Component { .. }) {
-                    continue;
-                }
-                go(&window, &mut cx, entry.id);
-                let canvas = bounds(&mut cx, "preview-canvas");
-                let drawn = PREVIEW_DRAWN
-                    .with(|drawn| drawn.get())
-                    .expect("the preview was drawn");
-                let label = format!("{} at {width}x{height}", entry.id);
-                assert!(
-                    drawn.left() >= canvas.left() - px(0.5)
-                        && drawn.right() <= canvas.right() + px(0.5),
-                    "{label}: {drawn:?} in {canvas:?}"
-                );
-                assert!(
-                    drawn.top() >= canvas.top() - px(0.5)
-                        && drawn.bottom() <= canvas.bottom() + px(0.5),
-                    "{label}: {drawn:?} in {canvas:?}"
-                );
+    let mut overflows = Vec::new();
+    // Each width upright and, for a phone, on its side.
+    let sizes = WIDTHS
+        .iter()
+        .flat_map(|(width, _)| [(*width, 780.), (*width, 1200.)])
+        .chain([(844., 390.), (568., 320.)]);
+    for (width, height) in sizes {
+        cx.simulate_resize(size(px(width), px(height)));
+        settle(&window, &mut cx);
+        for entry in CATALOG {
+            if !matches!(entry.kind, Kind::Component { .. }) {
+                continue;
+            }
+            go(&window, &mut cx, entry.id);
+            let canvas = bounds(&mut cx, "preview-canvas");
+            let drawn = PREVIEW_DRAWN
+                .with(|drawn| drawn.get())
+                .expect("the preview was drawn");
+            if drawn.left() < canvas.left() - px(0.5)
+                || drawn.right() > canvas.right() + px(0.5)
+                || drawn.top() < canvas.top() - px(0.5)
+                || drawn.bottom() > canvas.bottom() + px(0.5)
+            {
+                overflows.push(format!(
+                    "{} at {width}x{height}: {drawn:?} in {canvas:?}",
+                    entry.id
+                ));
             }
         }
     }
+    assert!(overflows.is_empty(), "{}", overflows.join("\n"));
 }
 
 /// A contained overlay's screen keeps its height in the growing canvas.
@@ -1005,4 +1014,50 @@ fn a_scoped_preview_keeps_a_frame_to_itself(cx: &mut TestAppContext) {
             "mode {mode:?}, rtl {rtl}"
         );
     }
+}
+
+/// A keyboard shrinks the page, and the field being edited stays above it.
+#[gpui::test]
+fn the_caret_stays_above_an_on_screen_keyboard(cx: &mut TestAppContext) {
+    let (window, mut cx) = open(cx);
+    cx.simulate_resize(size(px(390.), px(844.)));
+    settle(&window, &mut cx);
+    go(&window, &mut cx, "text-field");
+    let field = bounds(&mut cx, "preview-content").center();
+    click(&window, &mut cx, field);
+    let caret = |window: &WindowHandle<Gallery>, cx: &mut VisualTestContext| {
+        window
+            .update(cx, |_, window, cx| {
+                window.focused_input_selection_bounds(cx)
+            })
+            .unwrap()
+            .expect("the field is being edited")
+    };
+    assert!(caret(&window, &mut cx).bottom() < px(844.));
+    let visible = px(440.);
+    assert!(
+        caret(&window, &mut cx).bottom() > visible,
+        "the keyboard would cover the field"
+    );
+    cx.simulate_resize(size(px(390.), visible));
+    settle(&window, &mut cx);
+    assert!(caret(&window, &mut cx).bottom() <= visible);
+}
+
+#[test]
+fn every_page_has_an_address_that_opens_it() {
+    use super::catalog::{parse_route, route_hash};
+    for (entry, _) in CATALOG.iter().enumerate() {
+        for tab in [Tab::Preview, Tab::Specs] {
+            let (parsed, parsed_tab) = parse_route(&route_hash(entry, tab)).unwrap();
+            assert_eq!(parsed, entry);
+            assert_eq!(parsed_tab.unwrap_or(Tab::Preview), tab);
+        }
+    }
+    assert!(parse_route("#no-such-page").is_none());
+    assert_eq!(
+        parse_route("#buttons").unwrap().1,
+        Some(Tab::Specs),
+        "a kit page"
+    );
 }

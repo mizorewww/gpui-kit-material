@@ -1,7 +1,7 @@
 //! The Examples page's playground: the example app on the selected device.
 use super::super::pages::examples::app::{Body, Device, ExamplesApp, fit};
 use super::super::playground::PaneHint;
-use super::super::shell::{preview_area, preview_card_height};
+use super::super::shell::{ShellLayout, flush_preview_area, preview_area, preview_card_height};
 use super::prelude::*;
 
 pub static PLAYGROUND: Playground = Playground {
@@ -57,14 +57,18 @@ fn preview(
     let device = Device::ALL[config.choice("device")];
     let body = Body::ALL[config.choice("screen")];
     let outer = device.outer();
-    let fit = fit(
-        outer,
-        preview_area(window, false),
-        preview_area(window, true),
-    );
+    // On a phone the device fills the card, its frame standing in for padding.
+    let flush = ShellLayout::of(window).compact();
+    let area = if flush {
+        flush_preview_area
+    } else {
+        preview_area
+    };
+    let fit = fit(outer, area(window, false), area(window, true));
     preview.pane_hint(PaneHint {
         stacked: fit.stacked,
         height: Some(preview_card_height(outer.1 * fit.scale, window)),
+        flush,
     });
     let playground = cx.weak_entity();
     let app = preview.local("example-app", window, cx, move |window, cx| {

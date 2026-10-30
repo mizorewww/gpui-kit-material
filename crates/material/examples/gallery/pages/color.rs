@@ -605,9 +605,9 @@ impl GalleryPage for Page {
                 "Contrast",
                 ConnectedButtonGroup::new("reference-contrast", "Material contrast")
                     .options([
-                        ("standard", "Standard contrast"),
-                        ("medium", "Medium contrast"),
-                        ("high", "High contrast"),
+                        ("standard", "Standard"),
+                        ("medium", "Medium"),
+                        ("high", "High"),
                     ])
                     .selected(match contrast {
                         Contrast::Standard => "standard",

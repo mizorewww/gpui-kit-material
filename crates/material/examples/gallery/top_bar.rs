@@ -8,11 +8,15 @@
 //! trades the brand for the field.
 use super::catalog::{self, TopSection};
 use super::spec::type_role;
-use super::{Gallery, page::GalleryShared, playground::symbol, shell::ShellLayout};
+use super::{
+    Gallery,
+    page::GalleryShared,
+    playground::symbol,
+    shell::{ShellLayout, shell_width},
+};
 use gpui::{prelude::*, *};
 use gpui_base::input::{InputEvent, InputState};
 use gpui_kit_material::prelude::*;
-use gpui_kit_material::tokens::layout::design_width;
 
 /// Below these window widths (in design px) the brand's wordmark gives way:
 /// to the sections and search in the medium layout, to the bar's buttons in
@@ -48,7 +52,7 @@ impl TopBar {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Self {
-        let search = cx.new(|cx| InputState::new(window, cx).placeholder("Search components"));
+        let search = cx.new(|cx| InputState::new(window, cx).placeholder("Search"));
         let shared = gallery.read(cx).shared.clone();
         let subscriptions = vec![
             cx.subscribe_in(&search, window, |this: &mut Self, search, event, _, cx| {
@@ -104,7 +108,7 @@ impl Render for TopBar {
         let (section, mode) = self.shown;
         let dark = mode == ThemeMode::Dark;
         let compact = ShellLayout::of(window) == ShellLayout::Compact;
-        let width = design_width(window);
+        let width = shell_width(window);
         let wordmark = width
             >= if compact {
                 COMPACT_WORDMARK
@@ -135,7 +139,9 @@ impl Render for TopBar {
             .flex()
             .items_center()
             .gap(rem(if compact { 4. } else { 8. }))
-            .when(compact, |bar| {
+            // The field takes the whole bar on a phone: its placeholder is
+            // cut off beside the menu and mode buttons.
+            .when(compact && !searching, |bar| {
                 bar.child(title_bar_control(
                     div().debug_selector(|| "top-menu".into()).child(
                         IconButton::new("top-menu", symbol("menu", 24.), "Open navigation")
@@ -202,30 +208,32 @@ impl Render for TopBar {
                     ),
                 ))
             })
-            .child(title_bar_control(
-                div().debug_selector(|| "mode-toggle".into()).child(
-                    IconButton::new(
-                        "mode-toggle",
-                        symbol(if dark { "light_mode" } else { "dark_mode" }, 24.),
-                        if dark {
-                            "Use light theme"
-                        } else {
-                            "Use dark theme"
-                        },
-                    )
-                    .on_click(cx.listener(move |this, _, _, cx| {
-                        this.shared.update(cx, |shared, cx| {
-                            shared.reference_mode = if dark {
-                                ThemeMode::Light
+            .when(!searching, |bar| {
+                bar.child(title_bar_control(
+                    div().debug_selector(|| "mode-toggle".into()).child(
+                        IconButton::new(
+                            "mode-toggle",
+                            symbol(if dark { "light_mode" } else { "dark_mode" }, 24.),
+                            if dark {
+                                "Use light theme"
                             } else {
-                                ThemeMode::Dark
-                            };
-                            shared.reference_theme.get_or_insert(ThemeId::Baseline);
-                            cx.notify();
-                        })
-                    })),
-                ),
-            ))
+                                "Use dark theme"
+                            },
+                        )
+                        .on_click(cx.listener(move |this, _, _, cx| {
+                            this.shared.update(cx, |shared, cx| {
+                                shared.reference_mode = if dark {
+                                    ThemeMode::Light
+                                } else {
+                                    ThemeMode::Dark
+                                };
+                                shared.reference_theme.get_or_insert(ThemeId::Baseline);
+                                cx.notify();
+                            })
+                        })),
+                    ),
+                ))
+            })
     }
 }
 

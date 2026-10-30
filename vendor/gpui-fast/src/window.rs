@@ -6962,6 +6962,16 @@ impl Window {
         self.platform_window.toggle_simple_fullscreen();
     }
 
+    /// Bounds of the selection in the focused text input, in window coordinates,
+    /// if the focused element is one. A page reads this to keep the caret clear
+    /// of something the platform put over the window, as an on-screen keyboard.
+    pub fn focused_input_selection_bounds(&mut self, cx: &mut App) -> Option<Bounds<Pixels>> {
+        let mut input_handler = self.platform_window.take_input_handler()?;
+        let bounds = input_handler.selected_bounds(self, cx);
+        self.platform_window.set_input_handler(input_handler);
+        bounds
+    }
+
     /// Updates the IME panel position suggestions for languages like japanese, chinese.
     pub fn invalidate_character_coordinates(&self) {
         self.on_next_frame(|window, cx| {

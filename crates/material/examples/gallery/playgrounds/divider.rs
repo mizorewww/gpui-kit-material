@@ -101,7 +101,8 @@ fn preview(
         .when(!vertical, |line| line.flex_col())
         .child(divider);
     div()
-        .w(rem(400.))
+        .w_full()
+        .max_w(rem(400.))
         .h(rem(200.))
         .flex()
         .items_stretch()

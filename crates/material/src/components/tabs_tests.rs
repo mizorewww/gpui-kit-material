@@ -297,3 +297,13 @@ fn the_divider_can_be_hidden(cx: &mut TestAppContext) {
     settle(cx);
     assert!(cx.debug_bounds("tabs-divider").is_none());
 }
+
+#[test]
+fn rounding_of_a_measurement_does_not_redraw_the_tabs() {
+    use super::spans_moved;
+    assert!(!spans_moved(&[(0., 83.5)], &[(0., 84.)]));
+    assert!(!spans_moved(&[(29.5, 25.)], &[(30.5, 25.)]));
+    assert!(spans_moved(&[(0., 83.5)], &[(0., 90.)]));
+    assert!(spans_moved(&[(0., 83.5)], &[(0., 83.5), (84., 80.)]));
+    assert!(spans_moved(&[], &[(0., 83.5)]));
+}

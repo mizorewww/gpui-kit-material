@@ -338,22 +338,21 @@ def build_gallery(output):
     glue_name = f"gallery.{content_hash(glue)}.js"
     (target / "wasm" / wasm_name).write_bytes(wasm)
     (target / "wasm" / glue_name).write_bytes(glue)
-    symbols, total = {}, len(wasm)
+    symbols, symbol_bytes = {}, {}
     for name in SYMBOLS:
         font = (www / "wasm" / name).read_bytes()
         hashed = f"{Path(name).stem}.{content_hash(font)}.ttf"
         (target / "wasm" / hashed).write_bytes(font)
         symbols[name] = f"./wasm/{hashed}"
-        total += len(font)
+        symbol_bytes[name] = len(font)
     assets = json.dumps({"glue": f"./wasm/{glue_name}", "wasm": f"./wasm/{wasm_name}",
-                         "symbols": symbols, "totalBytes": total})
-    preloads = "".join(f'\n    <link rel="preload" as="fetch" crossorigin href="{path}">'
-                       for path in symbols.values())
+                         "symbols": symbols, "wasmBytes": len(wasm), "symbolBytes": symbol_bytes})
     page = (www / "index.html").read_text()
     for marker, value in (
         ("<!--gallery-preload-->",
          f'<link rel="modulepreload" href="./wasm/{glue_name}">\n'
-         f'    <link rel="preload" as="fetch" crossorigin href="./wasm/{wasm_name}">{preloads}'),
+         # The icon fonts are fetched once the page runs; see main.js.
+         f'    <link rel="preload" as="fetch" crossorigin href="./wasm/{wasm_name}">'),
         ("<!--gallery-assets-->",
          f'<script type="application/json" id="gallery-assets">{assets}</script>'),
     ):

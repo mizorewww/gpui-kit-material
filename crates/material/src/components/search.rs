@@ -537,7 +537,8 @@ impl RenderOnce for SearchView {
                     .relative()
                     .flex()
                     .flex_col()
-                    .w(rem(360.))
+                    .w_full()
+                    .max_w(rem(360.))
                     .rounded(rem(SEARCH_BAR_HEIGHT / 2.))
                     .overflow_hidden()
                     .when(open, |this| this.bg(color(SEARCH_CONTAINER)))
@@ -561,7 +562,8 @@ impl RenderOnce for SearchView {
                     .relative()
                     .flex()
                     .flex_col()
-                    .w(rem(360.))
+                    .w_full()
+                    .max_w(rem(360.))
                     .child(self.bar)
                     .when(visible && rows > 0, |this| {
                         this.child(

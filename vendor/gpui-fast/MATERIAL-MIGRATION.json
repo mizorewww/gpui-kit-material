@@ -358,7 +358,7 @@
       },
       "src/window.rs": {
         "upstream_sha256": "d3f00c28cc47446f6c73be67d00830446e0e3a9a7fadefdf54fff9e5ccadee0b",
-        "local_sha256": "a2ed03afafa9b96a22ca713bef502ceff6ce0bd832e19704c1e7db6baf92b439",
+        "local_sha256": "14da3f52e7d986c9824ba0872ccf3ebcb527baf66777e8da14d30b92a387de64",
         "reason": "Same GPUI window patches as vendor/gpui-pre (hitbox extension, touch observers, CPU frame scope, submission stats/vsync/throttle retry, present outcome); touch-observer storage and FrameDirtyAccumulator made pub(crate) for Fast layer reuse. Layout direction on the window, recorded per layout node (vendor/gpui-pre/layout-direction-patch.md)."
       },
       "src/tab_stop.rs": {

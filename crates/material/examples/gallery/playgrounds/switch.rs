@@ -130,7 +130,8 @@ fn preview(
         .on_change(preview.on_bool("checked", cx));
     div()
         .debug_selector(|| "playground-switch".into())
-        .w(rem(320.))
+        .w_full()
+        .max_w(rem(320.))
         .child(switch)
         .into_any_element()
 }

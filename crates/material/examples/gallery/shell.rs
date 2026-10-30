@@ -32,6 +32,11 @@ const MIN_PANE: f32 = 460.;
 /// The height of the page header above the panes, in design px.
 const LEAD_HEADER: f32 = 196.;
 const COMPACT_CANVAS: f32 = 320.;
+/// A short canvas on a phone, so that the header above doesn't push its preview
+/// off the first screen.
+const PHONE_CANVAS: f32 = 240.;
+/// Below this width (M3's compact window) a card's header stacks its controls.
+const PHONE_WINDOW: f32 = 600.;
 /// The preview canvas's padding.
 const CANVAS_PADDING: f32 = 24.;
 const CANVAS_PADDING_COMPACT: f32 = 12.;
@@ -93,9 +98,17 @@ pub(crate) enum ShellLayout {
     Compact,
 }
 
+/// The width the shell lays out in, in design px: the window's, less the
+/// side insets of a phone held sideways.
+pub(crate) fn shell_width(window: &Window) -> f32 {
+    let insets = window.insets().effective();
+    let scale = BASE_PX / f32::from(window.rem_size());
+    design_width(window) - f32::from(insets.left + insets.right) * scale
+}
+
 impl ShellLayout {
     pub(crate) fn of(window: &Window) -> Self {
-        Self::at(design_width(window))
+        Self::at(shell_width(window))
     }
 
     pub(crate) fn at(width: f32) -> Self {
@@ -127,7 +140,7 @@ impl ShellLayout {
         self != Self::Wide
     }
 
-    fn compact(self) -> bool {
+    pub(crate) fn compact(self) -> bool {
         self == Self::Compact
     }
 
@@ -156,7 +169,7 @@ impl ShellLayout {
 /// The width inside a spec card, in design px.
 pub(super) fn spec_content_width(window: &Window) -> f32 {
     let layout = ShellLayout::of(window);
-    layout.content_width(design_width(window)) - 2. * (layout.spec_padding() + 1.)
+    layout.content_width(shell_width(window)) - 2. * (layout.spec_padding() + 1.)
 }
 
 /// The room a preview has inside its canvas, in design px, with the panes
@@ -164,7 +177,7 @@ pub(super) fn spec_content_width(window: &Window) -> f32 {
 /// once the page has scrolled the card to the top.
 pub(crate) fn preview_area(window: &Window, stacked: bool) -> (f32, f32) {
     let layout = ShellLayout::of(window);
-    let content = layout.content_width(design_width(window));
+    let content = layout.content_width(shell_width(window));
     let pane = if stacked || layout.stacked() {
         content
     } else {
@@ -177,6 +190,27 @@ pub(crate) fn preview_area(window: &Window, stacked: bool) -> (f32, f32) {
         - CARD_HEADER
         - padding;
     (pane - padding, height)
+}
+
+/// A preview with fixed reference dimensions, `width` design px wide, in a
+/// canvas that may be narrower: it lays out at a smaller rem, as M3's fixed
+/// time picker dial can't reflow.
+pub(crate) fn fit_preview(width: f32, child: AnyElement, window: &Window) -> AnyElement {
+    let room = preview_area(window, true).0;
+    if room >= width {
+        return child;
+    }
+    spec::RemScaled::new(window.rem_size() * (room / width), child).into_any_element()
+}
+
+/// A preview's room when it asks to be flush with its canvas: its width without
+/// the canvas's padding, as a phone needs every dp of it.
+pub(crate) fn flush_preview_area(window: &Window, stacked: bool) -> (f32, f32) {
+    let (width, height) = preview_area(window, stacked);
+    (
+        width + 2. * ShellLayout::of(window).canvas_padding(),
+        height,
+    )
 }
 
 /// The height of a preview card around a canvas with `content` design px of
@@ -342,6 +376,28 @@ impl Gallery {
         self.lead_scroll.set_offset(Point::default());
     }
 
+    /// Scroll the page so the focused field's caret is above the window's bottom
+    /// edge, with room for the field around it.
+    pub(super) fn reveal_caret(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        const MARGIN: f32 = 32.;
+        let Some(caret) = window.focused_input_selection_bounds(cx) else {
+            return;
+        };
+        let visible = window.fully_visible_bounds();
+        let below = caret.bottom() + rem(MARGIN).to_pixels(window.rem_size()) - visible.bottom();
+        if below <= px(0.) {
+            return;
+        }
+        if self.shows_lead_only() {
+            let offset = self.lead_scroll.offset();
+            self.lead_scroll
+                .set_offset(point(offset.x, offset.y - below));
+        } else {
+            self.list.scroll_by(below);
+        }
+        cx.notify();
+    }
+
     /// The modal drawer the compact layout navigates with: every page under
     /// its group heading, so it also stands in for the collapsed top sections.
     pub(super) fn render_drawer(
@@ -364,7 +420,7 @@ impl Gallery {
             .open(self.drawer_open)
             .dense(true)
             .icons(false)
-            .width(DRAWER_WIDTH.min(design_width(window) - DRAWER_MARGIN))
+            .width(DRAWER_WIDTH.min(shell_width(window) - DRAWER_MARGIN))
             .selected(CATALOG[self.current].id)
             .focus_on_open(!searching)
             .on_change(cx.listener(|this, id: &SharedString, _, cx| {
@@ -584,7 +640,8 @@ impl Gallery {
 
     /// The card's header: the Live preview | Specs tabs, the theme select
     /// and the light/dark segmented control.
-    fn render_card_header(props: &LeadProps, cx: &mut App) -> impl IntoElement {
+    fn render_card_header(props: &LeadProps, window: &Window, cx: &mut App) -> impl IntoElement {
+        let phone = shell_width(window) < PHONE_WINDOW;
         let tab = props.tab;
         let gallery = props.gallery.clone();
         let shared = props.shared.read(cx);
@@ -627,9 +684,10 @@ impl Gallery {
             .child(
                 div()
                     // Two fixed tabs with room for "Live preview" at any
-                    // text scale (both labels scale with the rem).
-                    .w(rem(240.))
-                    .flex_shrink_0()
+                    // text scale (both labels scale with the rem), or the
+                    // card's width on a phone.
+                    .when(phone, |tabs| tabs.w_full())
+                    .when(!phone, |tabs| tabs.w(rem(240.)).flex_shrink_0())
                     .debug_selector(|| "card-tabs".into())
                     .child(
                         MaterialTabs::new("view-tabs", "Playground view")
@@ -663,11 +721,14 @@ impl Gallery {
                     .flex_wrap()
                     .items_center()
                     .gap(rem(8.))
-                    .child(
-                        accessible_text("theme-label", "Theme")
-                            .map(|text| type_role(text, TypeRole::LabelLarge))
-                            .text_color(color(ColorRole::ON_SURFACE)),
-                    )
+                    // The select names itself; the room is the controls' on a phone.
+                    .when(!phone, |theme| {
+                        theme.child(
+                            accessible_text("theme-label", "Theme")
+                                .map(|text| type_role(text, TypeRole::LabelLarge))
+                                .text_color(color(ColorRole::ON_SURFACE)),
+                        )
+                    })
                     .child(
                         CompactSelect::new("preview-theme", "Theme")
                             .options(THEMES.map(|(_, label)| SharedString::new_static(label)))
@@ -752,7 +813,7 @@ impl Gallery {
             .min_w_0()
             // At least the window's pane, and as tall as the preview needs.
             .when(!stacked, |card| card.flex_1().min_h(rem(pane)))
-            .child(Self::render_card_header(props, cx))
+            .child(Self::render_card_header(props, window, cx))
             .child(canvas);
         let config_card = Self::render_config_card(playground, props.views.clone(), stacked, pane);
         div()
@@ -1026,6 +1087,7 @@ impl Gallery {
 pub(crate) fn preview_canvas(
     stacked: bool,
     fallback: bool,
+    flush: bool,
     window: &Window,
     content: AnyElement,
 ) -> AnyElement {
@@ -1034,12 +1096,16 @@ pub(crate) fn preview_canvas(
         .id("preview-canvas")
         .debug_selector(|| "preview-canvas".into())
         .when(!stacked, |canvas| canvas.flex_grow(1.).flex_shrink_0())
-        .min_h(rem(COMPACT_CANVAS))
+        .min_h(rem(if shell_width(window) < PHONE_WINDOW {
+            PHONE_CANVAS
+        } else {
+            COMPACT_CANVAS
+        }))
         .bg(canvas_background())
         .flex()
         .flex_col()
         .when(!fallback, |canvas| canvas.items_center().justify_center())
-        .p(rem(layout.canvas_padding()))
+        .when(!flush, |canvas| canvas.p(rem(layout.canvas_padding())))
         .child(
             div()
                 .debug_selector(|| "preview-content".into())
@@ -1114,7 +1180,7 @@ impl Render for LeadView {
             let stacked = panes_stacked(window, PaneHint::default());
             let canvas = scope.build(window, cx, |window, cx| {
                 let demos = gallery.update(cx, |gallery, cx| gallery.render_demos(window, cx));
-                preview_canvas(stacked, true, window, demos)
+                preview_canvas(stacked, true, false, window, demos)
             });
             scope.child(canvas).into_any_element()
         });
@@ -1126,7 +1192,7 @@ impl Render for LeadView {
                 Tab::Specs => card()
                     .rounded_b(px(0.))
                     .border_b_0()
-                    .child(Gallery::render_card_header(&props, cx))
+                    .child(Gallery::render_card_header(&props, window, cx))
                     .into_any_element(),
             }),
         };
