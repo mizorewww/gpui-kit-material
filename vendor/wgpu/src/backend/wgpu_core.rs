@@ -2161,6 +2161,21 @@ impl dispatch::QueueInterface for CoreQueue {
             }
         }
     }
+
+    fn present_checked(&self, detail: &dispatch::DispatchSurfaceOutputDetail) -> bool {
+        let detail = detail.as_core();
+        match self.context.0.surface_present(detail.surface_id) {
+            Ok(status) => matches!(
+                status,
+                wgt::SurfaceStatus::Good | wgt::SurfaceStatus::Suboptimal
+            ),
+            Err(err) => {
+                self.context
+                    .handle_error_nolabel(&self.error_sink, err, "Queue::present");
+                false
+            }
+        }
+    }
 }
 
 impl Drop for CoreQueue {

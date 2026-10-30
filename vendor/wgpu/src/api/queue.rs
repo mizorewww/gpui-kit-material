@@ -379,6 +379,17 @@ impl Queue {
         self.inner.present(&surface_texture.detail);
     }
 
+    /// [`Self::present`], reporting whether the backend accepted the
+    /// presentation. `Queue::present` discards the status of `surface_present`,
+    /// so a lost, outdated, occluded or timed out presentation is otherwise
+    /// indistinguishable from a successful one. Errors still reach the device's
+    /// error handler exactly as they do for `present`. Local patch: see
+    /// MATERIAL-PATCHES.md.
+    pub fn present_checked(&self, mut surface_texture: SurfaceTexture) -> bool {
+        surface_texture.presented = true;
+        self.inner.present_checked(&surface_texture.detail)
+    }
+
     /// Compact a BLAS, it must have had [`Blas::prepare_compaction_async`] called on it and had the
     /// callback provided called.
     ///

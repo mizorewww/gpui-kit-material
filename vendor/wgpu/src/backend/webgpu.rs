@@ -2879,6 +2879,11 @@ impl dispatch::QueueInterface for WebQueue {
     fn present(&self, _detail: &dispatch::DispatchSurfaceOutputDetail) {
         // Swapchain is presented automatically on the web.
     }
+
+    fn present_checked(&self, _detail: &dispatch::DispatchSurfaceOutputDetail) -> bool {
+        // Swapchain is presented automatically on the web.
+        true
+    }
 }
 impl Drop for WebQueue {
     fn drop(&mut self) {

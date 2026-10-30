@@ -197,12 +197,39 @@
     "src/util/spirv.rs": "ec85d59da63e4d86b19eff9058af3d46de7f8305e1e1517ec49e6503be4389e2",
     "src/util/texture_blitter.rs": "19f6f81ff2cf6bb639fe429ffd6ccae1839d178b76666d8911c1aa166e5051a4"
   },
-  "local_patches": [],
-  "modified_files": {},
+  "local_patches": [
+    "src/api/queue.rs",
+    "src/backend/webgpu.rs",
+    "src/backend/wgpu_core.rs",
+    "src/dispatch.rs"
+  ],
+  "modified_files": {
+    "src/api/queue.rs": {
+      "upstream_sha256": "14dae3b36f75911a5ac4ed556d48875930e097990649110f9a5e53deada8d846",
+      "local_sha256": "419cf74da8f96da34bfa830fc9cffa1524c7e241c764d943562147b45906db8b",
+      "reason": "Queue::present_checked (MATERIAL-PATCHES.md)."
+    },
+    "src/backend/webgpu.rs": {
+      "upstream_sha256": "38ac841e850c31b1902f4247b6e43c18d702dcf732655703ebcecc55f8015068",
+      "local_sha256": "993d4217717f28581b2c0795b1b6bbff975c3b8891e2b2688fabcc0cf12441bf",
+      "reason": "present_checked: the browser presents the swap chain (MATERIAL-PATCHES.md)."
+    },
+    "src/backend/wgpu_core.rs": {
+      "upstream_sha256": "1a9e1f8cb8c7c2dc9d23dce7e22cd9c7b06ce57c3a053189d2fb22aede8860fa",
+      "local_sha256": "9a2b5bf78a015558f9524a399f5621455f03009d12b625e46d04b8f2023e34fb",
+      "reason": "present_checked reports surface_present status (MATERIAL-PATCHES.md)."
+    },
+    "src/dispatch.rs": {
+      "upstream_sha256": "86d9f89d32841f16fb3ef35b49125ad87470f2d4fb17f67e30ddae102cd72bf1",
+      "local_sha256": "9f6a4cebdf80f1968e70cf9d7514186dcd51d8cbc9d59026cf0a1114385f1904",
+      "reason": "QueueInterface::present_checked, defaulting to no established success (MATERIAL-PATCHES.md)."
+    }
+  },
   "added_files": {},
   "removed_files": {},
-  "unchanged_file_count": 191,
+  "unchanged_file_count": 187,
   "provenance_files": [
+    "MATERIAL-PATCHES.md",
     "SOURCE.json"
   ],
   "verification": "Archive taken from ~/.cargo/registry/cache; its SHA-256 equals the Cargo.lock crates.io checksum. upstream_files are hashes of the extracted archive entries. Recompute: extract the .crate and compare with sha256 of each vendor file.",

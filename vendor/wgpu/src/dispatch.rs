@@ -263,6 +263,14 @@ pub trait QueueInterface: CommonTraits {
     fn compact_blas(&self, blas: &DispatchBlas) -> (Option<u64>, DispatchBlas);
 
     fn present(&self, detail: &DispatchSurfaceOutputDetail);
+
+    /// Presents and reports whether the backend accepted the presentation. A
+    /// backend that cannot establish success must not claim it, so the default
+    /// reports `false`. Local patch: see MATERIAL-PATCHES.md.
+    fn present_checked(&self, detail: &DispatchSurfaceOutputDetail) -> bool {
+        self.present(detail);
+        false
+    }
 }
 
 pub trait ShaderModuleInterface: CommonTraits {
