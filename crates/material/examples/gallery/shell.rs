@@ -173,7 +173,7 @@ pub(crate) fn preview_area(window: &Window, stacked: bool) -> (f32, f32) {
     let padding = 2. * (layout.canvas_padding() + 1.);
     let rem_scale = BASE_PX / f32::from(window.rem_size());
     let height = f32::from(window.viewport_size().height) * rem_scale
-        - f32::from(TITLE_BAR) * rem_scale
+        - f32::from(TITLE_BAR)
         - CARD_HEADER
         - padding;
     (pane - padding, height)
@@ -589,9 +589,11 @@ impl Gallery {
         let gallery = props.gallery.clone();
         let shared = props.shared.read(cx);
         let theme = shared
-            .reference_theme
+            .preview_theme
+            .or(shared.reference_theme)
             .and_then(|theme| THEMES.iter().position(|(id, _)| *id == theme));
-        let dark = shared.reference_mode == ThemeMode::Dark;
+        let dark = shared.preview_mode.unwrap_or(shared.reference_mode) == ThemeMode::Dark;
+        let rtl = shared.preview_rtl;
         let update_shared = |f: fn(&mut GalleryShared, usize)| {
             let shared = props.shared.clone();
             move |value: usize, cx: &mut App| {
@@ -602,16 +604,16 @@ impl Gallery {
             }
         };
         let select_theme = update_shared(|shared, index| {
-            shared.reference_theme = Some(THEMES[index].0);
+            shared.preview_theme = Some(THEMES[index].0);
         });
         let select_mode = update_shared(|shared, dark| {
-            shared.reference_mode = if dark == 1 {
+            shared.preview_mode = Some(if dark == 1 {
                 ThemeMode::Dark
             } else {
                 ThemeMode::Light
-            };
-            shared.reference_theme.get_or_insert(ThemeId::Baseline);
+            });
         });
+        let select_rtl = update_shared(|shared, on| shared.preview_rtl = on == 1);
         div()
             .flex()
             .flex_wrap()
@@ -700,6 +702,19 @@ impl Gallery {
                             .on_change(move |value: &SharedString, _, cx| {
                                 select_mode(usize::from(value == "dark"), cx)
                             }),
+                    )
+                    .child(
+                        div()
+                            .debug_selector(|| "preview-rtl".into())
+                            .w(rem(120.))
+                            .child(
+                                MaterialSwitch::new("preview-rtl", "RTL")
+                                    .show_label(true)
+                                    .checked(rtl)
+                                    .on_change(move |on: &bool, _, cx| {
+                                        select_rtl(usize::from(*on), cx)
+                                    }),
+                            ),
                     ),
             )
     }
@@ -712,16 +727,10 @@ impl Gallery {
         window: &mut Window,
         cx: &mut App,
     ) -> AnyElement {
-        let layout = ShellLayout::of(window);
         let design_height =
             f32::from(window.viewport_size().height) * BASE_PX / f32::from(window.rem_size());
         let mut pane = (design_height - f32::from(TITLE_BAR) - LEAD_HEADER - 24.).max(MIN_PANE);
         let playground = props.playground.clone();
-        let canvas = match (&props.views, demos) {
-            (Some(views), _) => views.preview.clone().into_any_element(),
-            (None, Some(demos)) => demos,
-            (None, None) => div().into_any_element(),
-        };
         // Not read from the playground state, which the preview writes every
         // frame: see `PreviewView`.
         let hint = props
@@ -732,42 +741,19 @@ impl Gallery {
         if let Some(height) = hint.height {
             pane = pane.max(height);
         }
-        let fallback = playground.is_none();
+        // `PreviewView` draws the canvas in the preview's scope; demos are built
+        // here, and take the same scope around the canvas.
+        let canvas = match (&props.views, demos) {
+            (Some(views), _) => views.preview.clone().into_any_element(),
+            (None, Some(demos)) => demos,
+            (None, None) => div().into_any_element(),
+        };
         let preview_card = card()
             .min_w_0()
             // At least the window's pane, and as tall as the preview needs.
             .when(!stacked, |card| card.flex_1().min_h(rem(pane)))
             .child(Self::render_card_header(props, cx))
-            .child(
-                div()
-                    .id("preview-canvas")
-                    .debug_selector(|| "preview-canvas".into())
-                    .when(!stacked, |canvas| canvas.flex_grow(1.).flex_shrink_0())
-                    .min_h(rem(COMPACT_CANVAS))
-                    .bg(canvas_background())
-                    .flex()
-                    .flex_col()
-                    .when(!fallback, |canvas| canvas.items_center().justify_center())
-                    .p(rem(layout.canvas_padding()))
-                    .child(
-                        div()
-                            .debug_selector(|| "preview-content".into())
-                            .w_full()
-                            .flex()
-                            .flex_col()
-                            .when(!fallback, |content| content.items_center())
-                            .when(cfg!(test), |content| {
-                                content.on_children_prepainted(|children, _, _| {
-                                    #[cfg(test)]
-                                    PREVIEW_DRAWN
-                                        .with(|drawn| drawn.set(children.first().copied()));
-                                    #[cfg(not(test))]
-                                    let _ = children;
-                                })
-                            })
-                            .child(canvas),
-                    ),
-            );
+            .child(canvas);
         let config_card = Self::render_config_card(playground, props.views.clone(), stacked, pane);
         div()
             .w_full()
@@ -1034,6 +1020,46 @@ impl Gallery {
     }
 }
 
+/// The preview's canvas around `content`, built in the preview's scope because
+/// it paints in the preview's scheme. `fallback` is the stacked demos of a page
+/// without a playground, which take the full width from the top.
+pub(crate) fn preview_canvas(
+    stacked: bool,
+    fallback: bool,
+    window: &Window,
+    content: AnyElement,
+) -> AnyElement {
+    let layout = ShellLayout::of(window);
+    div()
+        .id("preview-canvas")
+        .debug_selector(|| "preview-canvas".into())
+        .when(!stacked, |canvas| canvas.flex_grow(1.).flex_shrink_0())
+        .min_h(rem(COMPACT_CANVAS))
+        .bg(canvas_background())
+        .flex()
+        .flex_col()
+        .when(!fallback, |canvas| canvas.items_center().justify_center())
+        .p(rem(layout.canvas_padding()))
+        .child(
+            div()
+                .debug_selector(|| "preview-content".into())
+                .w_full()
+                .flex()
+                .flex_col()
+                .when(!fallback, |content| content.items_center())
+                .when(cfg!(test), |content| {
+                    content.on_children_prepainted(|children, _, _| {
+                        #[cfg(test)]
+                        PREVIEW_DRAWN.with(|drawn| drawn.set(children.first().copied()));
+                        #[cfg(not(test))]
+                        let _ = children;
+                    })
+                })
+                .child(content),
+        )
+        .into_any_element()
+}
+
 /// What [`LeadView`] draws: a snapshot of the Gallery's state for this row.
 struct LeadProps {
     current: usize,
@@ -1077,10 +1103,21 @@ impl Render for LeadView {
         let Some(gallery) = self.gallery.upgrade() else {
             return div().into_any_element();
         };
-        let demos = gallery
-            .read(cx)
-            .lead_needs_gallery()
-            .then(|| gallery.update(cx, |gallery, cx| gallery.render_demos(window, cx)));
+        // Demos have no view of their own, so their scope is this one's.
+        let demos = gallery.read(cx).lead_needs_gallery().then(|| {
+            let scope = gallery
+                .read(cx)
+                .shared
+                .read(cx)
+                .preview_scope()
+                .resolve(window, cx);
+            let stacked = panes_stacked(window, PaneHint::default());
+            let canvas = scope.build(window, cx, |window, cx| {
+                let demos = gallery.update(cx, |gallery, cx| gallery.render_demos(window, cx));
+                preview_canvas(stacked, true, window, demos)
+            });
+            scope.child(canvas).into_any_element()
+        });
         let props = gallery.read(cx).lead_props(self.gallery.clone());
         let body = match CATALOG[props.current].kind {
             Kind::Overview | Kind::Document => None,

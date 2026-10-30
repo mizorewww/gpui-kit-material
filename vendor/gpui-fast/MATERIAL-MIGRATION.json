@@ -233,8 +233,8 @@
     "modified": {
       "src/app.rs": {
         "upstream_sha256": "2d698e066335022335d3b3f4611f66e55e192fedeee56b1960ebea3f0a62eb23",
-        "local_sha256": "e38caf2c7bbc8823be4d8bc9ea97f92cb28cca2012a12989c2f4dc379858522a",
-        "reason": "CpuFrameScope around initial and test-app draws (vendor/gpui-pre/cpu-frame-scope-patch.md). Material performance patch: record_entities_accessed updates only the entities that entered or left the tracked set instead of removing and re-inserting all of them each frame; the resulting maps are identical."
+        "local_sha256": "33e1f4093aadd37044a66fccc1ec10bb587b08ef53c9370985828f546818b213",
+        "reason": "CpuFrameScope around initial and test-app draws (vendor/gpui-pre/cpu-frame-scope-patch.md). Material performance patch: record_entities_accessed updates only the entities that entered or left the tracked set instead of removing and re-inserting all of them each frame; the resulting maps are identical. Application layout direction (vendor/gpui-pre/layout-direction-patch.md). App::swap_global_quietly (vendor/gpui-pre/quiet-global-swap-patch.md)."
       },
       "src/app/bench_context.rs": {
         "upstream_sha256": "6bef320831a933502651903f85b849b6ea371b84c6822b7b88d3e064dc8c9818",
@@ -281,10 +281,20 @@
         "local_sha256": "d56f8384e268ea8c0af9e04eb769f655211328352aef11caf35062a613279005",
         "reason": "PaintIndex gains touch_observers_index (equality and shifting); touch-replay tests."
       },
+      "src/fast/splice.rs": {
+        "upstream_sha256": "4436ab4f8934aec0e95e73edf69fb3ea36c1b01cb6fe494037cb9923ea221efd",
+        "local_sha256": "e5a18513fa798ad23f0648a81e6544995112cd4a46e8f8346c265ae3c7fa6a0a",
+        "reason": "A view rebuilt alone keeps its direction (vendor/gpui-pre/layout-direction-patch.md)."
+      },
       "src/fast/tests/layers_oracle.rs": {
         "upstream_sha256": "ff28ee326fccca43f6d3a04bf7f3d76693ee0d09e6096c3101fabdc1177f35e6",
         "local_sha256": "33764049ae7efa57ecb1ce74af890eff91a4e0f3001555171e765035db21906f",
         "reason": "Oracle hitbox description includes the clipped extension rectangle (hitbox extension, test only)."
+      },
+      "src/fast/text.rs": {
+        "upstream_sha256": "e386a393269aee9189cb87c2a1f40f40fb4716b2cd98e6a394e052b318177814",
+        "local_sha256": "ec2709cc27fb7bd085d5656d48cb666751d30ce82d2243963baa2ef94c1b4f1a",
+        "reason": "Text measurement and shaping with letter spacing (vendor/gpui-pre/letter-spacing-patch.md)."
       },
       "src/platform.rs": {
         "upstream_sha256": "7f95c2fe68fc225cb45451888355c4df2589632d7bde0d61fce554972f4825ca",
@@ -313,8 +323,8 @@
       },
       "src/style.rs": {
         "upstream_sha256": "d2c9e53fb00271f2dde4afc5a65837b4e1ae83b8849b92b17afe0799b6ed69ce",
-        "local_sha256": "eb805acedbd5ed4afb5d7ed8f6d73ca5a949fd16d5985bc8206364a4ca1cee80",
-        "reason": "Replace unpublished util_macros #[perf] with #[test] (vendor/gpui-pre/test-harness-patch.md)."
+        "local_sha256": "c27e74994af2fdea678a25a2f5d5fd0040fa6e2a04f2798308cb3f3319869ddd",
+        "reason": "Replace unpublished util_macros #[perf] with #[test] (vendor/gpui-pre/test-harness-patch.md). Mirrored corner radii and border widths when painting; TextAlign::in_direction (vendor/gpui-pre/layout-direction-patch.md). TextStyle::letter_spacing (vendor/gpui-pre/letter-spacing-patch.md)."
       },
       "src/svg_renderer.rs": {
         "upstream_sha256": "fb12dae87c0cd4c5f5a1fbbd2f9548d52fde9440c21e3d576dfeb0233eda88a6",
@@ -323,18 +333,58 @@
       },
       "src/text_system.rs": {
         "upstream_sha256": "e07554d460982d07546b4d67d9cd02162853b27a9cab7f53a9266626fff27346",
-        "local_sha256": "33519adfe47d4ea13788023aa6cd1f260953033768bdbdc531a908cfa7ef843d",
-        "reason": "em_width/em_advance fallback (vendor/gpui-pre/em-fallback-patch.md)."
+        "local_sha256": "65d55359e5ef6c284ae3f9af412a1b06fa648d8e4cbca4ba96aebcd847cd34ab",
+        "reason": "em_width/em_advance fallback (vendor/gpui-pre/em-fallback-patch.md). shape_text_spaced; pooled wrapper spacing reset (vendor/gpui-pre/letter-spacing-patch.md)."
+      },
+      "src/text_system/line_layout.rs": {
+        "upstream_sha256": "757c2672c0831f9f848845c6ac74dece3c6e0401613b1e00325129cbf1548c08",
+        "local_sha256": "8bd18b0c560561653790096eb199351a53ac7dc079d86b7c184716fb663e095e",
+        "reason": "Fields pub(crate) for Fast's text-cache carry-over. Spaced line layouts in the cache key and apply_letter_spacing (vendor/gpui-pre/letter-spacing-patch.md)."
       },
       "src/window.rs": {
         "upstream_sha256": "d3f00c28cc47446f6c73be67d00830446e0e3a9a7fadefdf54fff9e5ccadee0b",
-        "local_sha256": "70ce7305427ed2923b2cf3cb7b02761b5f7fa353fe69283981a4dfd7bbd9d62e",
-        "reason": "Same GPUI window patches as vendor/gpui-pre (hitbox extension, touch observers, CPU frame scope, submission stats/vsync/throttle retry, present outcome); touch-observer storage and FrameDirtyAccumulator made pub(crate) for Fast layer reuse."
+        "local_sha256": "a2ed03afafa9b96a22ca713bef502ceff6ce0bd832e19704c1e7db6baf92b439",
+        "reason": "Same GPUI window patches as vendor/gpui-pre (hitbox extension, touch observers, CPU frame scope, submission stats/vsync/throttle retry, present outcome); touch-observer storage and FrameDirtyAccumulator made pub(crate) for Fast layer reuse. Layout direction on the window, recorded per layout node (vendor/gpui-pre/layout-direction-patch.md)."
       },
       "src/tab_stop.rs": {
         "upstream_sha256": "0c14aec0196ad632601015e166dfcd3df72228292646120bbc3857c3631cd680",
         "local_sha256": "62a51ab7de3043ee2f4ffe5f8d9eddf8019021a64c4d633b99bde3cf693f9a10",
         "reason": "Material performance patch: TabStopMap records only its insertion history while painting and builds the tab order and focus lookup lazily on the first query (Tab navigation, a11y dump); query results unchanged. Replaying a reused view's or composited layer's tab stops no longer updates a SumTree per insertion."
+      },
+      "src/elements/text.rs": {
+        "upstream_sha256": "8f2de269d51ad703618666283161c151191070d88e697afe9c73fd8aef6551ef",
+        "local_sha256": "3030dece3c8c2d40da6ebd0465099034b3d93231a7760cd7f5d58936323a15e6",
+        "reason": "Logical text alignment (vendor/gpui-pre/layout-direction-patch.md)."
+      },
+      "src/fast/layout.rs": {
+        "upstream_sha256": "0e4562a18d24c5ca37eeb9ecb057e2db13c62116ed4bd91008adda39b57123af",
+        "local_sha256": "8b9d847f0fe6e9275b504df7212cf5473bef19b07b41be58177193620cf87b7b",
+        "reason": "Forgets released nodes in the mirrored set (vendor/gpui-pre/layout-direction-patch.md)."
+      },
+      "src/fast/rounded_clip.rs": {
+        "upstream_sha256": "d80d082a83591b472225fcc821c2ed8ffa27ec29efc82b12c3d3cf77006a8b19",
+        "local_sha256": "c751391f1af269c08025381ed9ce508562c551f2b3dea046f9d010f3822d0e1c",
+        "reason": "Mirrored clip in right-to-left layout (vendor/gpui-pre/layout-direction-patch.md)."
+      },
+      "src/geometry.rs": {
+        "upstream_sha256": "900fc506a964cda44ed0cf1f97c01ff28d7268c87c9eeadbf7a4f1bb50e33edd",
+        "local_sha256": "6a3c995e2ff60e267281472ca4d870415526f2c7f733bb4cd95ba438b2a36c8f",
+        "reason": "LayoutDirection and Corners/Edges::flip_x (vendor/gpui-pre/layout-direction-patch.md)."
+      },
+      "src/taffy.rs": {
+        "upstream_sha256": "8086381577b4e5f298e46c9f50a4a0ddc221016d0024c1dde9911658e0e54859",
+        "local_sha256": "dcfa82d73005d7ca2b8d33c7df799855b49c0b76752a7f90833ceef9c66f4cd7",
+        "reason": "Mirrors children of right-to-left nodes in layout_bounds (vendor/gpui-pre/layout-direction-patch.md)."
+      },
+      "src/styled.rs": {
+        "upstream_sha256": "c6e62fe136bedf887ee755c886df5466d5fe0b398a004b35d1a3530fef809c8d",
+        "local_sha256": "82103c5a8dd9460271f1218de4aafe61a1a70217c0cbd5a5e26ff70a57d1558b",
+        "reason": "Styled::letter_spacing (vendor/gpui-pre/letter-spacing-patch.md)."
+      },
+      "src/text_system/line_wrapper.rs": {
+        "upstream_sha256": "4c0ce82fba13490ec6494245971a6a4a322fc55ca2944c60e708fdbcd5dcee8e",
+        "local_sha256": "debe130befb6e5819c5438dbcbfc987a17468ee075b67673a1a71bae3ce7c216",
+        "reason": "LineWrapper::letter_spacing (vendor/gpui-pre/letter-spacing-patch.md)."
       }
     },
     "added": {
@@ -373,6 +423,6 @@
         "reason": "Package-level lockfile not retained; the workspace Cargo.lock owns resolution."
       }
     },
-    "unchanged_file_count": 149
+    "unchanged_file_count": 139
   }
 }

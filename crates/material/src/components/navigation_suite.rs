@@ -518,6 +518,23 @@ mod tests {
         );
     }
 
+    /// The suite has no direction of its own: its rail and action follow the
+    /// layout's mirroring, like everything else in a scope.
+    #[gpui::test]
+    fn right_to_left_puts_the_rail_on_the_right(cx: &mut gpui::TestAppContext) {
+        let (view, cx) = open(cx);
+        cx.update(|window, cx| {
+            window.set_layout_direction(LayoutDirection::Rtl);
+            view.update(cx, |view, _| view.size_class = class(800., 800.));
+        });
+        draw(cx);
+        let nav = cx.debug_bounds("navigation-suite-navigation").unwrap();
+        let content = cx.debug_bounds("navigation-suite-content").unwrap();
+        assert_eq!(nav.size.width, px(RAIL_COLLAPSED_WIDTH));
+        assert_eq!(content.left(), px(0.));
+        assert_eq!(nav.left(), content.right());
+    }
+
     #[gpui::test]
     fn hiding_gives_the_content_the_space_and_removes_the_navigation(
         cx: &mut gpui::TestAppContext,

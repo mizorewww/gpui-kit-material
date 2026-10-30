@@ -375,6 +375,7 @@ impl ChipBase {
                     .shadow(elevation::level(elevation))
                     .text_color(paint.label)
                     .text_size(scale.font_size)
+                    .letter_spacing(scale.letter_spacing)
                     .line_height(scale.line_height)
                     .font_weight(FontWeight(scale.font_weight as f32))
                     .whitespace_nowrap()
@@ -403,6 +404,7 @@ impl ChipBase {
                 })
             })
             .state_layers(hover, press)
+            .ripple(paint.layer)
             .disabled(disabled)
             .when_some(preview, |button, preview| button.preview_state(preview))
     }

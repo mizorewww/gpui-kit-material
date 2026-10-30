@@ -8,29 +8,17 @@
 //! trades the brand for the field.
 use super::catalog::{self, TopSection};
 use super::spec::type_role;
-use super::{
-    Gallery, page::GalleryShared, playground::symbol, shell::ShellLayout, spec::RemScaled,
-};
+use super::{Gallery, page::GalleryShared, playground::symbol, shell::ShellLayout};
 use gpui::{prelude::*, *};
 use gpui_base::input::{InputEvent, InputState};
 use gpui_kit_material::prelude::*;
 use gpui_kit_material::tokens::layout::design_width;
-use gpui_kit_material::tokens::typography::BASE_PX;
 
 /// Below these window widths (in design px) the brand's wordmark gives way:
 /// to the sections and search in the medium layout, to the bar's buttons in
 /// the compact one.
 const MEDIUM_WORDMARK: f32 = 1040.;
 const COMPACT_WORDMARK: f32 = 600.;
-/// The bar is a fixed height, so its controls stop following the text scale
-/// where a 40dp control would no longer fit in it.
-const MAX_CHROME_SCALE: f32 = 1.25;
-
-/// The rem the title bar's controls lay out at.
-pub(crate) fn chrome_rem(window: &Window) -> Pixels {
-    window.rem_size().min(px(BASE_PX * MAX_CHROME_SCALE))
-}
-
 /// The search field's width, and the least the medium layout's field shrinks to.
 const SEARCH_WIDTH: f32 = 240.;
 const SEARCH_MIN_WIDTH: f32 = 96.;
@@ -141,8 +129,7 @@ impl Render for TopBar {
                         .h(rem(40.)),
                 ),
         );
-        let rem_size = chrome_rem(window);
-        let bar = div()
+        div()
             .id("top-bar")
             .size_full()
             .flex()
@@ -238,8 +225,7 @@ impl Render for TopBar {
                         })
                     })),
                 ),
-            ));
-        RemScaled::new(rem_size, bar.into_any_element())
+            ))
     }
 }
 

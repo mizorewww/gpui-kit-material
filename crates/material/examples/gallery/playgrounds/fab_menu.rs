@@ -3,7 +3,7 @@
 //! `FabMenu`. The FAB opens and closes the menu with its animation (the
 //! Open control follows), and choosing an item closes it and reports the
 //! action.
-use super::fab::stage;
+use super::fab::{position as fab_position, stage};
 use super::prelude::*;
 
 /// One item preset: the FAB's icon and up to six (label, icon) items.
@@ -228,16 +228,14 @@ fn preview(
                 .text_color(color(ColorRole::ON_SURFACE_VARIANT))
                 .children(status),
         )
-        .child(
-            stage(
-                position,
+        .child(stage(
+            fab_position(position).place(
                 div()
                     .flex()
                     .debug_selector(|| "playground-fab-menu".into())
                     .child(menu),
-            )
-            .debug_selector(|| "playground-stage".into()),
-        )
+            ),
+        ))
         .into_any_element()
 }
 

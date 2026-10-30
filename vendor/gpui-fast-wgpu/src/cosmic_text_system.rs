@@ -1204,7 +1204,10 @@ fn check_is_known_emoji_font(postscript_name: &str) -> bool {
     postscript_name == "NotoColorEmoji"
 }
 
-#[cfg(test)]
+// Local patch: these tests read Zed's fonts from `assets/fonts`, three directories
+// up in Zed's repository, which the published package does not contain, so the
+// crate's test target could not compile. See `MATERIAL-PATCHES.md`.
+#[cfg(any())]
 mod tests {
     use super::*;
 

@@ -138,6 +138,7 @@ impl TextMeasureInputs {
             && self.line_height == other.line_height
             && style.white_space == other_style.white_space
             && style.line_clamp == other_style.line_clamp
+            && style.letter_spacing == other_style.letter_spacing
             && style.text_overflow == other_style.text_overflow
             // Only truncation reads the style's own font.
             && (!self.truncates() || same_font(style, other_style)))
@@ -386,6 +387,7 @@ fn measure_text(
     } = inputs;
     let layout = &*layout.borrow();
     let (font_size, line_height) = (*font_size, *line_height);
+    let letter_spacing = text_style.letter_spacing.to_pixels(window.rem_size());
     let wrap_width = if text_style.white_space == WhiteSpace::Normal {
         known_dimensions.width.or(match available_space.width {
             AvailableSpace::Definite(x) => Some(x),
@@ -439,6 +441,7 @@ fn measure_text(
             None => (SharedString::default(), TruncateFrom::End),
         };
         let mut line_wrapper = cx.text_system().line_wrapper(text_style.font(), font_size);
+        line_wrapper.letter_spacing = letter_spacing;
         if let Some(max_lines) = text_style.line_clamp
             && let Some(wrap_width) = wrap_width
         {
@@ -452,7 +455,7 @@ fn measure_text(
             )
         } else if let Some(unclipped) = window
             .text_system()
-            .shape_text(text.clone(), font_size, runs, None, None)
+            .shape_text_spaced(text.clone(), font_size, runs, None, None, letter_spacing)
             .log_err()
             && unclipped
                 .iter()
@@ -477,7 +480,14 @@ fn measure_text(
 
     let Some(lines) = window
         .text_system()
-        .shape_text(text, font_size, &runs, wrap_width, text_style.line_clamp)
+        .shape_text_spaced(
+            text,
+            font_size,
+            &runs,
+            wrap_width,
+            text_style.line_clamp,
+            letter_spacing,
+        )
         .log_err()
     else {
         layout.0.borrow_mut().replace(TextLayoutInner {

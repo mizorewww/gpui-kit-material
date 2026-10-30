@@ -50,6 +50,9 @@ The local compatibility surface is restricted to:
   longer move it) and reports `Orientation::Vertical`; the default stays
   horizontal and unchanged. Test: `a_vertical_toolbar_roves_with_up_and_down`.
 
+- `src/slider.rs`, right to left: `SliderState` records whether it last rendered
+  under GPUI's right-to-left layout direction, and pointer math then measures a
+  horizontal slider from its right edge. Layout mirrors the thumb and indicator.
 - `src/slider.rs`: three narrow corrections. Dragging snapped with
   `(value / step).round() * step`, so steps were counted from 0 rather than
   `min` (a 3..100 slider with step 5 landed on 10, not 8 or 13); values now

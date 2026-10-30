@@ -208,6 +208,8 @@ const PLAYBACK_STEP: f32 = 0.01;
 pub const CONVERSATIONS: usize = 8;
 
 pub struct ExamplesApp {
+    /// The app bar's collapse offset last drawn, in dp.
+    pub(crate) bar_offset: f32,
     playground: WeakEntity<PlaygroundState>,
     /// The screen on the device, and the browser's history around it.
     shown: Option<Body>,
@@ -269,6 +271,7 @@ impl ExamplesApp {
             },
         );
         Self {
+            bar_offset: 0.,
             playground,
             shown: None,
             back: Vec::new(),

@@ -66,11 +66,29 @@ Root's first render. Palette and scale events call
 `theme::advance_component_theme` before drawing; one pending callback continues
 an active animation. **Render never updates Component Theme.** Full M3 roles,
 reference blending, motion, spacing and elevation remain Material-owned; unmanaged
-fields keep Component's mode behavior. Currently one theme per process: no
-per-window or per-subtree themes.
+fields keep Component's mode behavior.
+
+`scope::Scope` gives a subtree or a window's content its own scheme and direction.
+It is an element that re-enters around each drawing phase of its subtree, while
+`theme::color` answers from it and Kit's theme globals hold its projection.
+Material's overlays wrap what they defer in `current_scope`, which brings it back in.
+Swapping the globals notifies their observers, none of which redraws, but GPUI Fast
+stamps them as changed, so while a scheme scope is on screen a draw rebuilds retained
+subtrees that read Kit's theme. Its limits are listed in `src/scope.rs`.
 
 `theme::color` is context-free and thread-local, so helpers stay plain
 functions; GPUI paints on one UI thread.
+
+## Layout direction
+
+Direction is inherited: the application's, overridden by a window's, overridden by
+a `scope::Scope`. Layout mirrors in the engine after Taffy runs, so a component's
+flex order, padding and absolute offsets flip without restyling, and its own
+asymmetric corners and borders flip when it paints. Components handle only what
+layout cannot reach: painted paths (`LinearProgress`, the slider track), pointer
+math, and arrow keys, which run after the draw and so use the direction captured
+while rendering. Directional icons flip by name (`icons.rs`). A clock dial and window
+controls stay left to right.
 
 ## Icons
 
@@ -103,8 +121,8 @@ the same patches until fixes land upstream. A patched Zed checkout overriding
 | Vendored | Source | Why |
 | --- | --- | --- |
 | `gpui-kit` | Git `main` at audited `bb85882`, unchanged source | Normalized manifest disables implicit WASM threading (`multithreaded-web` restores it). Hashes in `SOURCE.md`/`SOURCE.json`. |
-| `gpui-base` | Git `bb85882` (`crates/base`) + patches (`SOURCE.json`, `motion-patch.md`) | CSS transition reversal, per-transition reduced motion, `TransitionPlayback`, toggle focus policy, busy accessibility state; `Hitbox.additional_bounds` follow-up in `text_selection.rs`; input caller caret color; vertical `Toolbar` axis; slider step snapping from min, assistive Increment/Decrement that move only a range's end, `Slider::track_focus`; `Dialog::accessibility_label`. |
-| `gpui-pre` (GPUI `=0.3.10`) | crates.io + patches (`SOURCE.json`, `*-patch.md`) | Passive raw touch observation; hitbox extensions independent of layout; animation visibility and repeat playback; complete CPU frame scopes, presentation wait, GPU time and submission outcome in the profiler; submission statistics, vsync control and throttle retry; `em`/`ch` metrics for fonts without `m`; lazy tab-stop index; overflowing spaces hang instead of starting a wrapped row; test-harness repairs. |
+| `gpui-base` | Git `bb85882` (`crates/base`) + patches (`SOURCE.json`, `motion-patch.md`) | CSS transition reversal, per-transition reduced motion, `TransitionPlayback`, toggle focus policy, busy accessibility state; `Hitbox.additional_bounds` follow-up in `text_selection.rs`; input caller caret color; vertical `Toolbar` axis; slider step snapping from min, assistive Increment/Decrement that move only a range's end, `Slider::track_focus`, right-to-left pointer math; `Dialog::accessibility_label`. |
+| `gpui-pre` (GPUI `=0.3.10`) | crates.io + patches (`SOURCE.json`, `*-patch.md`) | Layout direction; letter spacing; passive raw touch observation; hitbox extensions independent of layout; animation visibility and repeat playback; complete CPU frame scopes, presentation wait, GPU time and submission outcome in the profiler; submission statistics, vsync control and throttle retry; `em`/`ch` metrics for fonts without `m`; lazy tab-stop index; overflowing spaces hang instead of starting a wrapped row; test-harness repairs. |
 | `gpui-pre-apple` | crates.io + patches (`SOURCE.json`, `VENDORED.md`) | Non-Latin and app-private fallback fonts; `draw_with_status` with a per-draw autorelease pool, drawable-wait and GPU timestamps; off-main-thread drawable acquisition. |
 | `gpui-pre-web` | crates.io + patches (`SOURCE.json`, `MATERIAL-PATCHES.md`) | Successful submission count. |
 | `gpui-fast`, `-apple`, `-web` | 0.1.12 + patches (`MATERIAL-MIGRATION.json`, per-file `local_changes`) | The GPUI, Apple and web patches above carried through Fast retained/scroll replay and composition (touch observers, extended hit targets); explicit single-threaded web defaults. |

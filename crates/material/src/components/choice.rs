@@ -243,6 +243,7 @@ mod choice_tile {
                     .child(animated_choice_radio(amount, selected, enabled))
                 })
                 .state_layers(paint.hover, paint.press)
+                .ripple(color(crate::color::ColorRole::ON_SURFACE))
                 .disabled(!enabled)
                 .when_some(preview, |tile, preview| tile.preview_state(preview))
         }
@@ -298,6 +299,7 @@ mod choice_tile {
                 }) as Select
             });
             let roving = Roving::new(focus.clone(), Orientation::Both)
+                .rtl(crate::scope::is_rtl(window))
                 .skip(skip)
                 .selected(selected)
                 .select_on_focus(on_select);

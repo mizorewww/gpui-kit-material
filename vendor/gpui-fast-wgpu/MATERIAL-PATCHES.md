@@ -21,3 +21,11 @@ needs:
   separate from any surface so they need no GPU. wgpu is only an active dependency
   on Linux and the web, so `cargo test -p gpui-fast-wgpu --lib present_mode` runs on Linux.
 - `src/gpui_wgpu.rs`: declares and exports it.
+- The tests in `src/cosmic_text_system.rs` and the shader-validation tests in `src/wgpu_renderer.rs`
+  and `src/fast/rounded_clip.rs` are compiled out (`#[cfg(any())]`). They read fonts from Zed's repository and use a
+  `naga` dev-dependency, neither of which the published package has, so the test
+  target could not build and the present mode rules above could not run. They never
+  ran here, so nothing that used to be checked is lost.
+- `src/fast/layers/tests.rs` and `src/fast/layers/rounded_clip_texture_tests.rs` find
+  `rounded_clip_fixtures.rs` in `vendor/gpui-fast` instead of Zed's `crates/gpui`, for
+  a build with `test-support`.

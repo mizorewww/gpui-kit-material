@@ -34,10 +34,34 @@
     "src/wgpu_renderer.rs": "cb319689faaf82167f21ce0b24348cc1a31fe2097e20cd37f8aae93f44519fc5"
   },
   "local_patches": [
+    "src/cosmic_text_system.rs",
+    "src/fast/layers/rounded_clip_texture_tests.rs",
+    "src/fast/layers/tests.rs",
+    "src/fast/rounded_clip.rs",
     "src/gpui_wgpu.rs",
     "src/wgpu_renderer.rs"
   ],
   "modified_files": {
+    "src/cosmic_text_system.rs": {
+      "upstream_sha256": "d2aa5ba630e17613676715ea8c24ccce1a27bfa10a2c78bb68f91e1e120b9566",
+      "local_sha256": "b4357aa105e3c731000b3317b3ff5fab437bb6f726b5d53ab96c574cb1ac71f7",
+      "reason": "Compiles out the tests, which read fonts from Zed's repository that the published package lacks (MATERIAL-PATCHES.md)."
+    },
+    "src/fast/layers/rounded_clip_texture_tests.rs": {
+      "upstream_sha256": "39ed6a6b12e2b0cf142154180758fda1c386d03401b5b653c8715da865f333ce",
+      "local_sha256": "b6473cc2a710b654b96cc904b561e2e6f58bf2a206dec41f4737c0835d8af167",
+      "reason": "The rounded clip fixtures' path, for this repository's layout (MATERIAL-PATCHES.md)."
+    },
+    "src/fast/layers/tests.rs": {
+      "upstream_sha256": "d44d03957aed3306f8c030b3e2f608d3013349f9af8a2cd8f329b65cd628c808",
+      "local_sha256": "138ef72ff8ef04ba23ab2a187abb4acec1b0be6744f46877def034d61a532ff4",
+      "reason": "The rounded clip fixtures' path, for this repository's layout (MATERIAL-PATCHES.md)."
+    },
+    "src/fast/rounded_clip.rs": {
+      "upstream_sha256": "33464668a92ab46e6fe36db049854e3ab9d83ed0ce29be4cbb39240fb2751d18",
+      "local_sha256": "662fe7abada7e93f053c999d375bc2c04e187e0c92a0814f28ad01ef91c359a1",
+      "reason": "Compiles out the shader-validation tests, which need a naga dev-dependency the published manifest lacks (MATERIAL-PATCHES.md)."
+    },
     "src/gpui_wgpu.rs": {
       "upstream_sha256": "6e19cc61d18129d691c6a666a1a9e84928dc204fcd05169fe3a14166bae51780",
       "local_sha256": "a5f758f3add2401ce9f32ffa036b3d14fbb84ab3265f2b5553e8ecf5cedd08f3",
@@ -45,8 +69,8 @@
     },
     "src/wgpu_renderer.rs": {
       "upstream_sha256": "cb319689faaf82167f21ce0b24348cc1a31fe2097e20cd37f8aae93f44519fc5",
-      "local_sha256": "cc30dc3b30ff02275981855d04dc547dfb8fdd7904bafdfb721e6976a0fc5661",
-      "reason": "draw presents with present_checked and records it for take_present_succeeded; presentation_synchronized and set_presentation_synchronized (MATERIAL-PATCHES.md)."
+      "local_sha256": "a392c90eac55c360242cff8569220b89c96bdbf11889fe5755af4b7e09bdf554",
+      "reason": "draw presents with present_checked and records it for take_present_succeeded; presentation_synchronized and set_presentation_synchronized (MATERIAL-PATCHES.md). Compiles out the shader-validation tests, which need a naga dev-dependency the published manifest lacks."
     }
   },
   "added_files": {
@@ -56,7 +80,7 @@
     }
   },
   "removed_files": {},
-  "unchanged_file_count": 25,
+  "unchanged_file_count": 21,
   "provenance_files": [
     "MATERIAL-PATCHES.md",
     "SOURCE.json"

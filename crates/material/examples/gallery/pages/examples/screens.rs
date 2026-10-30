@@ -300,8 +300,15 @@ impl ExamplesApp {
                             .size_full()
                             .overflow_y_scroll()
                             .track_scroll(&self.scrolls[body.index()])
-                            // The offset collapses the bar.
-                            .on_scroll(cx.listener(|_, _, _, cx| cx.notify()))
+                            // The offset collapses the bar; beyond that the bar
+                            // does not change, so the screen need not draw again.
+                            .on_scroll(cx.listener(move |this, _, window, cx| {
+                                let seen = this.offset(body, window).min(room);
+                                if seen < room || this.bar_offset < room {
+                                    cx.notify();
+                                }
+                                this.bar_offset = seen;
+                            }))
                             .child(div().w_full().pt(rem(room)).child(content)),
                     )
                     .when_some(bar, |frame, bar| {

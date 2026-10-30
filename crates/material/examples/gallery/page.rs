@@ -39,6 +39,15 @@ pub struct GalleryShared {
     /// `None` paints `palette` instead of a reference theme.
     pub reference_theme: Option<ThemeId>,
     pub reference_mode: ThemeMode,
+    /// A theme generated from a seed color, painted in `reference_mode` and
+    /// `contrast` in place of the reference theme or palette.
+    pub seed: Option<gpui_kit_material::color::dynamic::SeedScheme>,
+    /// The live preview's own theme and mode (md3.io's preview controls). `None`
+    /// follows the application.
+    pub preview_theme: Option<ThemeId>,
+    pub preview_mode: Option<ThemeMode>,
+    /// Lays the live preview out right to left.
+    pub preview_rtl: bool,
     pub contrast: Contrast,
     /// The text scale, as the option value ("1", "1.25", …).
     pub scale: SharedString,
@@ -53,6 +62,10 @@ impl Default for GalleryShared {
             palette: PaletteId::Paper,
             reference_theme: Some(ThemeId::Baseline),
             reference_mode: ThemeMode::Light,
+            seed: None,
+            preview_theme: None,
+            preview_mode: None,
+            preview_rtl: false,
             contrast: Contrast::Standard,
             scale: "1".into(),
             motion_scheme: motion::MotionScheme::Expressive,
@@ -63,10 +76,50 @@ impl Default for GalleryShared {
 
 impl GalleryShared {
     pub fn target_scheme(&self) -> gpui_kit_material::color::Scheme {
+        if let Some(seed) = self.seed_scheme(self.reference_mode) {
+            return seed;
+        }
         self.reference_theme.map_or_else(
             || gpui_kit_material::color::Scheme::from_palette(self.palette),
             |id| id.scheme(self.reference_mode, self.contrast),
         )
+    }
+    fn seed_scheme(&self, mode: ThemeMode) -> Option<gpui_kit_material::color::Scheme> {
+        let seed = self.seed?;
+        Some(
+            seed.dark(mode == ThemeMode::Dark)
+                .contrast(super::pages::color::contrast_level(self.contrast))
+                .scheme(),
+        )
+    }
+    /// The preview's scheme, when it differs from the application's. A mode of
+    /// its own keeps the application's seed, if one is painted.
+    pub fn preview_scheme(&self) -> Option<gpui_kit_material::color::Scheme> {
+        if self.preview_theme.is_none() && self.preview_mode.is_none() {
+            return None;
+        }
+        let mode = self.preview_mode.unwrap_or(self.reference_mode);
+        if self.preview_theme.is_none()
+            && let Some(seed) = self.seed_scheme(mode)
+        {
+            return Some(seed);
+        }
+        let theme = self
+            .preview_theme
+            .or(self.reference_theme)
+            .unwrap_or(ThemeId::Baseline);
+        Some(theme.scheme(mode, self.contrast))
+    }
+    /// The live preview's overrides, as a [`Scope`]. With none set it changes nothing.
+    pub fn preview_scope(&self) -> gpui_kit_material::scope::Scope {
+        let mut scope = gpui_kit_material::scope::Scope::new("preview-scope");
+        if let Some(scheme) = self.preview_scheme() {
+            scope = scope.scheme(scheme);
+        }
+        if self.preview_rtl {
+            scope = scope.direction(gpui_kit_material::scope::LayoutDirection::Rtl);
+        }
+        scope
     }
     pub fn text_scale(&self) -> f32 {
         self.scale.parse().unwrap_or(1.)

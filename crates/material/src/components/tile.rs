@@ -156,6 +156,7 @@ impl TileScale {
                 tile_corners(button, outer)
             })
             .state_layers(state::hovered(bg, ink), state::pressed(bg, ink))
+            .ripple(ink)
     }
 
     /// The gap between a tile's leading slot, text column and trailing items.

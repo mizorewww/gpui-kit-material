@@ -334,6 +334,7 @@ fn typed<E: Styled>(element: E, role: TypeRole) -> E {
     element
         .font_family(scale.font_family)
         .text_size(scale.font_size)
+        .letter_spacing(scale.letter_spacing)
         .line_height(scale.line_height)
         .font_weight(FontWeight(scale.font_weight as f32))
 }
@@ -459,18 +460,23 @@ pub(crate) fn header_icon_button(
         .justify_center()
         .child(super::FocusRing::new(
             ElementId::NamedChild(std::sync::Arc::new(id.clone()), "ring".into()),
-            gpui_base::Button::new(id)
-                .accessibility_label(label)
-                .size(rem(40.))
-                .rounded_full()
-                .flex()
-                .items_center()
-                .justify_center()
-                .cursor_pointer()
-                .hover(move |style| style.bg(state::hovered(clear, ink)))
-                .active(move |style| style.bg(state::pressed(clear, ink)))
-                .child(icon.size(rem(24.)).color(ink))
-                .on_click(on_click),
+            super::Ripple::new(
+                ElementId::NamedChild(std::sync::Arc::new(id.clone()), "ripple".into()),
+                gpui_base::Button::new(id)
+                    .accessibility_label(label)
+                    .size(rem(40.))
+                    .rounded_full()
+                    .flex()
+                    .items_center()
+                    .justify_center()
+                    .cursor_pointer()
+                    .hover(move |style| style.bg(state::hovered(clear, ink)))
+                    .active(move |style| style.bg(state::pressed(clear, ink)))
+                    .child(icon.size(rem(24.)).color(ink))
+                    .on_click(on_click),
+            )
+            .round()
+            .ink(ink),
         ))
 }
 

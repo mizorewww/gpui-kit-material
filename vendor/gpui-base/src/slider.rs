@@ -183,6 +183,9 @@ pub struct SliderState {
     dragging: bool,
     /// The touch drag this slider claimed, while one is live.
     touch_drag: Option<TouchDrag>,
+    /// Whether it last rendered right to left, where a horizontal slider's
+    /// value grows toward the left. Pointer events run after the draw.
+    mirrored: bool,
 }
 
 /// A touch drag claimed by a slider.
@@ -206,6 +209,7 @@ impl SliderState {
             bounds: Bounds::default(),
             scale: SliderScale::default(),
             dragging: false,
+            mirrored: false,
             touch_drag: None,
         }
     }
@@ -366,7 +370,11 @@ impl SliderState {
         let step = self.step;
 
         let inner_pos = if axis.is_horizontal() {
-            position.x - bounds.left()
+            if self.mirrored {
+                bounds.right() - position.x
+            } else {
+                position.x - bounds.left()
+            }
         } else {
             bounds.bottom() - position.y
         };
@@ -397,7 +405,11 @@ impl SliderState {
     fn is_nearer_start(&self, axis: Axis, position: Point<Pixels>) -> bool {
         let size = self.bounds.size.along(axis);
         let along = if axis.is_horizontal() {
-            position.x - self.bounds.left()
+            if self.mirrored {
+                self.bounds.right() - position.x
+            } else {
+                position.x - self.bounds.left()
+            }
         } else {
             self.bounds.bottom() - position.y
         };
@@ -527,6 +539,10 @@ impl Styled for Slider {
 
 impl RenderOnce for Slider {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
+        let mirrored = window.layout_direction().is_rtl();
+        if self.state.read(cx).mirrored != mirrored {
+            self.state.update(cx, |state, _| state.mirrored = mirrored);
+        }
         let axis = self.axis;
         let entity_id = self.state.entity_id();
         let state = self.state.read(cx);
@@ -726,7 +742,11 @@ impl RenderOnce for SliderTrack {
                             let is_start = if is_range {
                                 let size = state.bounds().size.along(axis);
                                 let position = if axis.is_horizontal() {
-                                    event.position.x - state.bounds().left()
+                                    if state.mirrored {
+                                        state.bounds().right() - event.position.x
+                                    } else {
+                                        event.position.x - state.bounds().left()
+                                    }
                                 } else {
                                     state.bounds().bottom() - event.position.y
                                 };
