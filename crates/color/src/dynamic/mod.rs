@@ -6,8 +6,16 @@
 //! states that it was modified.
 //!
 //! [material-color-utilities]: https://github.com/material-foundation/material-color-utilities
+pub mod blend;
+pub mod contrast;
+mod dislike;
 mod hct;
+mod palette;
 mod solver;
+mod temperature;
 pub mod utils;
 
+pub use dislike::{fix_if_disliked, is_disliked};
 pub use hct::{Cam16, Hct, ViewingConditions};
+pub use palette::TonalPalette;
+pub use temperature::{TemperatureCache, raw_temperature};
