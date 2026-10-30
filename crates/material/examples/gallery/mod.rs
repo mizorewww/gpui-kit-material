@@ -175,6 +175,7 @@ pub(crate) struct Gallery {
     navigation_scroll: ScrollHandle,
     pending_focus: Option<(usize, bool)>,
     last_rem: Pixels,
+    last_height: Pixels,
     theme_frame_pending: bool,
     theme_menu_open: bool,
     /// The compact layout's modal navigation drawer.
@@ -231,6 +232,7 @@ impl Gallery {
             navigation_scroll: ScrollHandle::new(),
             pending_focus: None,
             last_rem: window.rem_size(),
+            last_height: window.viewport_size().height,
             theme_frame_pending: false,
             theme_menu_open: false,
             drawer_open: false,
@@ -573,6 +575,14 @@ impl Render for Gallery {
         if self.last_rem != window.rem_size() {
             self.last_rem = window.rem_size();
             self.list.remeasure();
+        }
+        // An on-screen keyboard shrinks the page; keep the caret above it.
+        let height = window.viewport_size().height;
+        if std::mem::replace(&mut self.last_height, height) > height {
+            let view = cx.weak_entity();
+            window.on_next_frame(move |window, cx| {
+                let _ = view.update(cx, |this, cx| this.reveal_caret(window, cx));
+            });
         }
         if let Some((row, reverse)) = self.pending_focus.take() {
             let view = cx.weak_entity();

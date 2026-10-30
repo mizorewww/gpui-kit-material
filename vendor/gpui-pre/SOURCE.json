@@ -268,7 +268,7 @@
     },
     "src/window.rs": {
       "upstream_sha256": "83bace5e5cf503b21c789c4ca7bc3b11965c2256cb5a2398f2b70e5baf7aa1bb",
-      "local_sha256": "97e18a124cd588f70037bb9ca5580992d0f3480952063868c688fdfadf8b10bf",
+      "local_sha256": "e3b5cddbc48373a2e16bf86cb5762fb8f10948ad0d464a2ab0c8f77ed45512e3",
       "reason": "Hitbox.additional_bounds/contains_pointer/insert_hitbox_with_extension (hitbox-extension-patch.md); touch observers (touch-observer-patch.md); CPU frame scope (cpu-frame-scope-patch.md); WindowSubmissionStats, vsync, throttle retry (frame-submission-patch.md); present outcome (presentation-timing-patch.md). Layout direction on the window, recorded per layout node (layout-direction-patch.md)."
     },
     "src/tab_stop.rs": {
