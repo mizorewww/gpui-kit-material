@@ -342,6 +342,31 @@ impl WindowFrameSource {
         self.frame_requests.merge_data(1);
     }
 
+    /// Material patch: `wake` for any thread, which the window's renderer
+    /// calls from its drawable prefetch thread once a drawable a skipped
+    /// frame waited for is ready.
+    pub fn waker(&self) -> gpui_apple::DrawableWaker {
+        struct Waker {
+            frame_requests: DispatchRetained<DispatchSource>,
+            signal: Arc<PlatformFrameSignal>,
+        }
+        // SAFETY: a dispatch source is a thread-safe GCD object (the display
+        // link's io thread already merges data into this one), and the signal
+        // is already shared with that thread.
+        unsafe impl Send for Waker {}
+        unsafe impl Sync for Waker {}
+        let waker = Waker {
+            frame_requests: self.frame_requests.clone(),
+            signal: self.signal.clone(),
+        };
+        Arc::new(move || {
+            if let Some(at) = PlatformFrameSignal::capture(Instant::now) {
+                waker.signal.record(at, FrameRequestSource::LocalSchedule);
+            }
+            waker.frame_requests.merge_data(1);
+        })
+    }
+
     pub fn take_signal(&self) -> Option<(Instant, FrameRequestSource)> {
         self.signal.take()
     }

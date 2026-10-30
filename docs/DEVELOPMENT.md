@@ -75,16 +75,104 @@ Reports keep raw positions, laps and row coverage, successful new-frame
 counts, the lowest FPS over ≥ 250 ms windows, and draw-associated submission
 attempt gaps as a diagnostic. Runs whose rate sits near or below the display
 refresh while VSync reads disabled are marked (`observed_rate_near_or_below_refresh`).
-On macOS a windowed `CAMetalLayer` with `displaySyncEnabled = NO` was observed
-blocking in `nextDrawable` (dispatch semaphore) for most of each ~16.6 ms
-frame, so VSync readback alone does not prove unpaced presentation.
 
-The 2 ms judgement uses the whole synchronous CPU scope, including drawable
-acquisition. The elapsed time of each `nextDrawable` call is reported
-separately (`presentation_wait_*`, `diagnostic_*_excluding_drawable_call`) and
-never subtracted from acceptance. GPU time (Metal `GPUStartTime`/`GPUEndTime`,
-macOS only) is reported per frame under `gpu` and never counts toward the CPU
-budget; other backends report null with a reason.
+Drawable acquisition runs off the main thread: each vendored Metal renderer
+(`gpui-{pre,fast}-apple`, `src/drawable_prefetch.rs`) keeps one drawable
+acquired ahead by its own thread, and the macOS window skips a frame request
+until one is ready instead of blocking in `nextDrawable` (see the crates'
+`MATERIAL-PATCHES.md`/`MATERIAL-MIGRATION.json`). Any remaining main-thread
+wait (live resize, a stale drawable size, a failed prefetch) is still timed
+and reported separately as `presentation_wait_*`/`drawable_wait`. GPU time
+(Metal `GPUStartTime`/`GPUEndTime`, macOS only) is reported per frame under
+`gpu` and never counts toward the CPU budget; other backends report null with
+a reason.
+
+### Targets
+
+Every run writes `targets.json` and prints one verdict per AGENTS.md target
+(PASS, FAIL or UNVERIFIED when the data to judge it is missing), from raw
+per-frame data with nearest-rank quantiles; an average never decides one:
+
+| Target | Limit | Source |
+| --- | --- | --- |
+| steady-state CPU p95 / max, excluding drawable wait | 1 ms / 2 ms (WASM 2 / 4 ms) | scroll frames after a 750 ms settle |
+| main-thread drawable wait | none (> 0.1 ms in any frame fails) | `drawable_wait` per frame |
+| idle window | 0 frames drawn or presented | `--bench` idle scenario, `?profile=idle` |
+| forced redraw of an unchanged page | 0.3 ms every frame | `--bench` redraw scenario (root notified each frame) |
+| first frame | 16 ms main-thread CPU | thread CPU clock from `open_window` to after the first submission |
+| page switch | 8 ms | hook: the Gallery shell reports `page_switch_ns` (native) or calls `window.__galleryPageSwitch(ms)` (web) |
+| GPU p95 | 2 ms | Metal timestamps |
+| new frames/s, vsync off | ≥ 500 in every 100 ms window | successful submissions only |
+| missed refreshes, vsync on | 0 at 120 Hz | intervals > 1.5 refreshes; UNVERIFIED on other displays |
+
+Re-judge saved evidence without running anything:
+
+```sh
+python3 scripts/profile-gallery.py --summarize /tmp/material-bench/*.json /tmp/material-scroll/frames.json
+```
+
+### Engine benchmark
+
+`crates/material/examples/engine_bench.rs` validates engine changes without
+the Gallery: a 4000-row `list` of Material components (`--content material`),
+plain quads and text (`simple`), or Gallery-like sections whose boards scroll
+horizontally inside their rows (`boards`). It drives one 8 px wheel event per
+frame (scroll), nothing (idle), or a root notify per frame (redraw), and
+writes raw per-frame CPU scopes, phases, drawable waits, submissions, GPU
+executions, engine counters and main-thread CPU time. `--bench` builds it and
+runs startup ×3, scroll with vsync off and on, idle and redraw:
+
+```sh
+python3 scripts/profile-gallery.py /tmp/material-bench --bench --seconds 5 [--bench-content boards]
+cargo run --release -p gpui-kit-material --example engine_bench --features frame-profiler -- \
+  --scenario scroll --vsync off --seconds 5 --content material --out /tmp/scroll.json
+```
+
+`--open-delay-ms N` opens a small plain window first and the measured window
+N ms later, so `sample <pid>` can attach in between (attaching during
+launch blocks the process on dyld notifications). Close other Gallery and
+build processes first: the reports record the load average, and a loaded
+machine inflates every timing and caps FPS.
+
+### Chrome comparison with md3.io
+
+AGENTS.md asks for WASM main-thread frame time ≥ 5× lower than md3.io in
+Chrome for equivalent pages and interactions. Measure both sides the same way,
+release WASM, same Chrome build, flags, viewport (1280×800) and DPR, with the
+machine otherwise idle.
+
+1. Automated probe. `www/profile.js` contains `runFrameProbe`, a
+   self-contained function that times each animation frame from its
+   `requestAnimationFrame` callback to a `MessageChannel` task posted there,
+   which runs after that frame's style, layout, paint and commit, while it
+   sends 8 px wheel steps (and scrolls the nearest scroller) at 1000 Hz:
+
+   ```sh
+   python3 scripts/profile-gallery.py /tmp/md3io --md3io https://md3.io/components/buttons --seconds 10
+   # same probe on the Gallery, served as in "Browser gallery":
+   #   http://127.0.0.1:8080/?profile=probe&seconds=10  -> window.__galleryProfile.report
+   ```
+
+   `probe.json` keeps the raw per-frame durations. The probe does not see
+   input handlers that run before the frame or compositor-thread work, and
+   Chrome scrolls md3.io on the compositor thread, so its scroll frames cost
+   the main thread almost nothing; compare interactions that need main-thread
+   work on both sides as well (hover sweeps over buttons, ripples, switching
+   theme or page) with the DevTools trace below.
+2. DevTools trace (authoritative breakdown). Start Chrome with
+   `--disable-gpu-vsync --disable-frame-rate-limit`, open md3.io, DevTools →
+   Performance (Screenshots and CPU throttling off), record while
+   repeating the interaction for 10 s (paste `runFrameProbe` into the console
+   to drive the same wheel input), then for each frame read the main-thread
+   *Animation Frame* duration (Task → Animation frame fired → Style/Layout/
+   Paint/Commit) from the Summary/Bottom-Up panels or export the trace JSON
+   and sum `RunTask` durations per `BeginMainFrame`. Record the same
+   interaction on the Gallery page, where the per-frame work is the
+   `requestAnimationFrame` callback (`?profile=scroll` reports it directly).
+3. Report p50, p95 and max per side with raw durations, and the ratio of the
+   Gallery's p95 to md3.io's. A probe that rounds to zero (100 µs timer
+   resolution without cross-origin isolation) means the reference interaction
+   does no main-thread work, not that the comparison passed.
 
 Runner exit status: `0` only for a complete run the gallery reports eligible
 with the CPU and FPS gates both passing; `1` when a measured gate failed; `2`
@@ -104,7 +192,7 @@ python3 scripts/profile-gallery.py /tmp/material-web --web --backend fast --seco
 ```
 
 The same page works by hand: open `http://127.0.0.1:8080/?profile=scroll&seconds=15`
-(or `profile=startup`; optional `hz`, `legpx`) and read
+(or `profile=startup`, `profile=idle`; optional `hz`, `legpx`) and read
 `window.__galleryProfile.report` when `done`. `www/profile.js` times every
 `requestAnimationFrame` callback (one whole GPUI frame) and the synchronous
 `run()` startup with `performance.now()` into preallocated buffers, and reads

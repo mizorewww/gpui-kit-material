@@ -9,13 +9,31 @@
 // `run()` is timed as its own startup scope. Buffers are preallocated so
 // recording never allocates per frame.
 // The finished report is published as `window.__galleryProfile`.
+//
+// `?profile=idle` records an untouched window: every new frame after the
+// settle period counts against the "idle windows draw nothing" target.
+// `targets` judges the AGENTS.md budgets for WASM (steady-state x2) from the
+// raw scopes; a target without data is UNVERIFIED, never PASS.
 
 const BUDGET_MS = 2;
 const WINDOW_MS = 250;
+// AGENTS.md: WASM steady-state budgets are the native ones x2.
+const WASM_STEADY_P95_MS = 2;
+const WASM_STEADY_MAX_MS = 4;
+const SETTLE_MS = 750;
 
 export function installProfiler(params) {
   const mode = params.get("profile");
-  if (mode !== "startup" && mode !== "scroll") return null;
+  if (mode === "probe") {
+    // The same probe `--md3io` injects into md3.io, for a like-for-like
+    // comparison; it waits for the Gallery to load before measuring.
+    const seconds = Number(params.get("seconds") ?? "10");
+    runFrameProbe({ seconds, hz: Number(params.get("hz") ?? "1000"), settleMs: 3000 }).then(
+      (report) => (window.__galleryProfile = { done: true, report }),
+    );
+    return null;
+  }
+  if (mode !== "startup" && mode !== "scroll" && mode !== "idle") return null;
   const seconds = Number(params.get("seconds") ?? "10");
   const hz = Number(params.get("hz") ?? "1000");
   const legPx = Number(params.get("legpx") ?? "40000");
@@ -59,6 +77,12 @@ export function installProfiler(params) {
     });
 
   const state = { mode, seconds, hz, legPx, initial: null };
+  // Hook for the md3.io-style shell: it reports the main-thread CPU duration
+  // of each page switch (ms) here; the report judges them against 8 ms.
+  const pageSwitches = [];
+  window.__galleryPageSwitch = (ms) => {
+    if (recording && Number.isFinite(ms) && pageSwitches.length < 4096) pageSwitches.push(ms);
+  };
   return {
     /** Time the synchronous startup (includes the first window draw). */
     timeRun(run) {
@@ -123,8 +147,45 @@ export function installProfiler(params) {
     const vsyncFinal = counters?.gallery_vsync_status() ?? null;
     const cpuFailure = scopes.some((ms) => ms > BUDGET_MS);
     const fpsFailure = mode === "scroll" && minimumFps !== null && minimumFps < 500;
+    const targetFailure = Object.values(targets).some((t) => t.verdict === "FAIL");
+    const settled = rows.filter((r) => startedAt !== null && r.start_ms >= startedAt + SETTLE_MS);
+    const steady = settled.map((r) => r.cpu_ms);
+    const steadySummary = summarize(steady);
+    const firstNew = rows.find((r) => r.successful_new_frames !== null && r.successful_new_frames > 0);
+    const idleNewFrames =
+      mode === "idle" && settled.length
+        ? (settled[settled.length - 1].successful_new_frames ?? NaN) -
+          (rows.filter((r) => r.start_ms < startedAt + SETTLE_MS).pop()?.successful_new_frames ?? 0)
+        : null;
+    const judge = (target, limit, measured, compare = "<=", note = undefined) => ({
+      target,
+      limit,
+      measured,
+      verdict:
+        measured === null || Number.isNaN(measured)
+          ? "UNVERIFIED"
+          : (compare === "<=" ? measured <= limit : measured >= limit)
+            ? "PASS"
+            : "FAIL",
+      ...(note ? { note } : {}),
+    });
+    const targets = {
+      steady_cpu_p95: judge("steady-state rAF CPU p95 (WASM budget x2)", WASM_STEADY_P95_MS,
+        mode === "scroll" ? steadySummary.p95_ms : null),
+      steady_cpu_max: judge("steady-state rAF CPU max (WASM budget x2)", WASM_STEADY_MAX_MS,
+        mode === "scroll" ? steadySummary.max_ms : null),
+      idle_frames: judge("idle window draws nothing (new frames after settling)", 0, idleNewFrames),
+      first_frame: judge("synchronous run() plus the first presenting rAF scope (reported; native budget 16 ms)", 16,
+        state.initial && firstNew ? state.initial.end - state.initial.start + firstNew.cpu_ms : null),
+      page_switch: judge("page switch main-thread CPU, worst", 8,
+        pageSwitches.length ? Math.max(...pageSwitches) : null, "<=",
+        pageSwitches.length ? undefined : "hook window.__galleryPageSwitch(ms) not called by the shell"),
+      gpu_p95: judge("GPU time p95", 2, null, "<=", "no WebGPU timestamp queries"),
+      fps_vsync_off_min: judge("new frames/s, minimum full window", 500,
+        mode === "scroll" ? minimumFps : null, ">="),
+    };
     const report = {
-      schema: "gallery-web-frames-v1",
+      schema: "gallery-web-frames-v2",
       mode,
       budget_ms: BUDGET_MS,
       scope:
@@ -137,6 +198,10 @@ export function installProfiler(params) {
       initial_scope_ms: state.initial ? state.initial.end - state.initial.start : null,
       cpu_summary: summarize(scopes),
       subsequent_frames_summary: summarize(durations),
+      steady_frames_summary: steadySummary,
+      steady_definition: `rAF scopes starting ${SETTLE_MS} ms after the measured run started`,
+      page_switch_ms: pageSwitches,
+      targets,
       gpu_time_ms: null,
       gpu_time_reason: "WebGPU timestamp queries are not wired into the web renderer",
       vsync_initial: vsyncInitial,
@@ -158,7 +223,7 @@ export function installProfiler(params) {
         "Gallery traversal coverage is not verifiable from the browser driver",
         "window FPS is an average per 250 ms window, not a per-frame minimum",
       ],
-      exit_code: cpuFailure || fpsFailure ? 1 : 2,
+      exit_code: cpuFailure || fpsFailure || targetFailure ? 1 : 2,
     };
     window.__galleryProfile = { done: true, report };
     console.info(`Gallery profile done: exit ${report.exit_code}`);
@@ -267,3 +332,96 @@ function summarize(values) {
     over_budget_frames: values.filter((ms) => ms > BUDGET_MS).length,
   };
 }
+
+// BEGIN frame-probe
+// Self-contained per-frame main-thread probe for any page, including md3.io.
+// `scripts/profile-gallery.py --md3io` injects this function's source with
+// agent-browser; it can also be pasted into DevTools. Each animation frame is
+// timed from its requestAnimationFrame callback to a MessageChannel task
+// posted there, which runs after that frame's style, layout, paint and
+// commit, so it covers the page's rAF work plus the browser's main-thread
+// rendering. Input handlers that run before rAF and compositor-thread
+// scrolling are not included: compare with a DevTools trace (see
+// docs/DEVELOPMENT.md). Wheel input: fixed 8 px steps at `hz` over the element
+// under the viewport centre, reversing every `legPx`.
+function runFrameProbe({ seconds = 10, hz = 1000, legPx = 4000, settleMs = 750 } = {}) {
+  return new Promise((resolve) => {
+    const starts = [];
+    const ends = [];
+    let pending = null;
+    let running = true;
+    const done = new MessageChannel();
+    done.port1.onmessage = () => {
+      if (pending !== null) {
+        starts.push(pending);
+        ends.push(performance.now());
+        pending = null;
+      }
+    };
+    const frame = () => {
+      if (!running) return;
+      pending = performance.now();
+      done.port2.postMessage(0);
+      requestAnimationFrame(frame);
+    };
+    requestAnimationFrame(frame);
+    const target = document.elementFromPoint(innerWidth / 2, innerHeight / 2) ?? document.body;
+    const input = new MessageChannel();
+    const begun = performance.now();
+    let next = begun + settleMs;
+    let leg = 0;
+    let down = true;
+    let dispatched = 0;
+    input.port1.onmessage = () => {
+      if (!running) return;
+      const now = performance.now();
+      if (now >= next) {
+        target.dispatchEvent(new WheelEvent("wheel", {
+          deltaY: down ? 8 : -8, deltaMode: 0, clientX: innerWidth / 2, clientY: innerHeight / 2,
+          bubbles: true, cancelable: true,
+        }));
+        // Untrusted wheel events do not scroll; scroll the nearest scroller too.
+        let scroller = target;
+        while (scroller && scroller !== document.documentElement &&
+               !(scroller.scrollHeight > scroller.clientHeight &&
+                 /(auto|scroll)/.test(getComputedStyle(scroller).overflowY))) {
+          scroller = scroller.parentElement;
+        }
+        (scroller ?? document.scrollingElement).scrollBy(0, down ? 8 : -8);
+        dispatched += 1;
+        leg += 8;
+        if (leg >= legPx) { leg = 0; down = !down; }
+        next = Math.max(next + 1000 / hz, now);
+      }
+      input.port2.postMessage(0);
+    };
+    input.port2.postMessage(0);
+    setTimeout(() => {
+      running = false;
+      input.port1.close();
+      const settled = [];
+      for (let i = 0; i < starts.length; i += 1) {
+        if (starts[i] >= begun + settleMs) settled.push(ends[i] - starts[i]);
+      }
+      const sorted = [...settled].sort((a, b) => a - b);
+      const rank = (q) => (sorted.length ? sorted[Math.max(0, Math.ceil(q * sorted.length) - 1)] : null);
+      const span = (performance.now() - begun - settleMs) / 1000;
+      resolve({
+        schema: "frame-probe-v1",
+        url: location.href,
+        user_agent: navigator.userAgent,
+        device_pixel_ratio: devicePixelRatio,
+        viewport_css_px: [innerWidth, innerHeight],
+        definition: "rAF callback start to a MessageChannel task posted in it (after style/layout/paint/commit)",
+        frames: settled.length,
+        frames_per_s: span > 0 ? settled.length / span : null,
+        p50_ms: rank(0.5),
+        p95_ms: rank(0.95),
+        max_ms: sorted.length ? sorted[sorted.length - 1] : null,
+        wheel_inputs: dispatched,
+        raw_ms: settled,
+      });
+    }, settleMs + seconds * 1000);
+  });
+}
+// END frame-probe

@@ -32,8 +32,8 @@
   "modified_files": {
     "src/display_link.rs": {
       "upstream_sha256": "088f3e0b8dd9b242a1f6c090a2c79ef081857cc917564673d61d84a48c6cf1cc",
-      "local_sha256": "0254d01fe67a54f8d23b53f2dc649cc99e94629bcd310262c4f81d27f42a376e",
-      "reason": "WindowFrameSource::is_running and wake: one coalesced demand request on the existing main-thread source (MATERIAL-PATCHES.md)."
+      "local_sha256": "26ad65fcdc41f05100e1578c39f0e78e94c704f6f4ee8f51c3b8d3bab74dae72",
+      "reason": "WindowFrameSource::is_running and wake: one coalesced demand request on the existing main-thread source (MATERIAL-PATCHES.md). Material presentation patch: WindowFrameSource::waker, a Send + Sync wake for the renderer's prefetch thread."
     },
     "src/fast/composition.rs": {
       "upstream_sha256": "565d2e92ca930f921aef6513719442d2900b7a416b18404b13cfe31d272d4434",
@@ -42,8 +42,8 @@
     },
     "src/window.rs": {
       "upstream_sha256": "d559ef3d21486e7e20fade38d917105ff4924d883143f5ef3aaca48faab5d1d8",
-      "local_sha256": "7f2c6a387c4996b82bb710eaee3f871920de8e48308d9ec72cecf11e6c54b1df",
-      "reason": "vsync_status/set_vsync, successful_frame_submissions via draw_with_status, has_periodic_frame_source, weak-owner demand frame_waker, unconditional anyhow::Result import (MATERIAL-PATCHES.md)."
+      "local_sha256": "f2b3173f23e8a0d37ff561ecb336276cd6856adf5109c16d0e1c0c5b468677e3",
+      "reason": "vsync_status/set_vsync, successful_frame_submissions via draw_with_status, has_periodic_frame_source, weak-owner demand frame_waker, unconditional anyhow::Result import (MATERIAL-PATCHES.md). Material presentation patch: step() skips a frame request until the renderer has a prefetched drawable (drawable_ready_or_wake) and start_display_link hands the renderer the frame source's thread-safe waker."
     }
   },
   "added_files": {},
