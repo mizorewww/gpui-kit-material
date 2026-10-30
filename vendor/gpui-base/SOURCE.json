@@ -36,8 +36,8 @@
       "upstream_sha256": "f56cc07dda43678903e2907b8c8c6028ae5fa80f0a637b8f065054a4c55b391d"
     },
     "src/input/base/state.rs": {
-      "local_sha256": "5f5521bda7aeb38499f2f700b4465eefc99bcfcf19a47da2351211875944f5bf",
-      "reason": "Caller caret colour that wins over the projected editor style, set_caret_color (motion-patch.md).",
+      "local_sha256": "0c3ac20accc0e6ab2ee418132be9733e4e802d0d46a719c2d15df4d9af649536",
+      "reason": "Caller caret colour that wins over the projected editor style, set_caret_color (motion-patch.md). A disabled input is not a Tab stop (motion-patch.md).",
       "upstream_sha256": "39296e195f6dabbb581b8f72ee06809b13fae3b328c4a71b48768dbff5c81c53"
     },
     "src/lib.rs": {

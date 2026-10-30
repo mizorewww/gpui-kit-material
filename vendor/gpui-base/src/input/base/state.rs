@@ -5206,13 +5206,46 @@ impl<M: InputModeKind> Render for InputBaseState<M> {
         // `Self` is concrete enough to name its own entity type.
         M::register_actions(element, &entity, window)
             .test_support()
-            .track_focus(&self.focus_handle)
+            .track_focus(&self.focus_handle.clone().tab_stop(!self.disabled))
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[gpui::test]
+    fn a_disabled_input_leaves_the_tab_order(cx: &mut TestAppContext) {
+        struct Pair {
+            first: Entity<crate::input::InputState>,
+            second: Entity<crate::input::InputState>,
+        }
+        impl Render for Pair {
+            fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+                div().child(self.first.clone()).child(self.second.clone())
+            }
+        }
+        cx.update(crate::init);
+        let (pair, cx) = cx.add_window_view(|window, cx| Pair {
+            first: cx.new(|cx| crate::input::InputState::new(window, cx)),
+            second: cx.new(|cx| crate::input::InputState::new(window, cx)),
+        });
+        let (first, second) =
+            pair.read_with(cx, |pair, _| (pair.first.clone(), pair.second.clone()));
+        let tab_from_first = |cx: &mut gpui::VisualTestContext| {
+            cx.update(|window, cx| {
+                window.draw(cx).clear(cx);
+                first.read(cx).focus_handle.clone().focus(window, cx);
+                window.focus_next(cx);
+                second.read(cx).focus_handle.is_focused(window)
+            })
+        };
+        assert!(tab_from_first(cx));
+        second.update(cx, |second, cx| second.set_disabled(true, cx));
+        assert!(!tab_from_first(cx));
+        second.update(cx, |second, cx| second.set_disabled(false, cx));
+        assert!(tab_from_first(cx));
+    }
 
     #[gpui::test]
     fn a_caller_caret_color_wins_over_the_projected_style(cx: &mut TestAppContext) {

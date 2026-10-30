@@ -46,6 +46,10 @@ The local compatibility surface is restricted to:
   error caret) had no way to paint it. `None` restores the projected caret;
   nothing else in the style changes. Test:
   `a_caller_caret_color_wins_over_the_projected_style`.
+- `src/input/base/state.rs`: a disabled input is not a Tab stop. Upstream keeps
+  it in the order, so Tab lands on a control that cannot be used. Test:
+  `a_disabled_input_leaves_the_tab_order`. From the course2md desktop's input
+  patch; the rest of that patch is screen-reader text-run detail not taken here.
 - `src/toolbar.rs`: `Toolbar::axis(Axis)`. Upstream handles only Left/Right
   and always reports a horizontal orientation, so a vertical toolbar needed
   a private copy of the subtree-constrained focus walk and still announced
