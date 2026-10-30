@@ -5,6 +5,7 @@ pub mod button;
 pub mod checkbox;
 pub mod chips;
 pub mod radio;
+pub mod search;
 pub mod select;
 pub mod slider;
 pub mod switch;

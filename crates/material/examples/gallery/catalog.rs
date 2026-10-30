@@ -290,7 +290,7 @@ pub static CATALOG: &[Entry] = &[
         SelectionInput,
         "Find content with a search bar and suggestions.",
         spec("search"),
-        None,
+        Some(&playgrounds::search::PLAYGROUND),
     ),
     component(
         "date-picker",
