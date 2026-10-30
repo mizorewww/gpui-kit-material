@@ -142,7 +142,7 @@ fn effective_curve(token: MotionToken, cx: &App) -> MotionCurve {
     })
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq)]
 struct RunningCurve {
     curve: MotionCurve,
     running: bool,
@@ -265,13 +265,16 @@ where
             running: false,
         }
     });
-    let active = state.read(cx);
+    let active = *state.read(cx);
     let resolved = active.resolve(requested);
     let sample =
         gpui_base::transition_with_status(id, target, token_policy(resolved, token), window, cx);
-    state.update(cx, |state, _| {
-        state.record(resolved, sample.status);
-    });
+    let mut next = active;
+    next.record(resolved, sample.status);
+    // A settled channel is only read: a write would mark what read it as changed.
+    if next != active {
+        state.update(cx, |state, _| *state = next);
+    }
     sample.value
 }
 
