@@ -35,6 +35,7 @@ mod chips;
 mod choice;
 mod feedback;
 mod focus;
+mod loading_indicator;
 mod menu;
 mod navigation;
 mod preview;
@@ -61,6 +62,9 @@ pub use feedback::{
     small_badge, status_chip,
 };
 pub use focus::{FocusRing, RevealFocus, RingedButton, contain_scroll};
+pub use loading_indicator::{
+    LOADING_INDICATOR_SIZE, LoadingFrame, LoadingIndicator, LoadingShape, loading_indicator_frame,
+};
 pub use menu::{
     ExposedDropdown, MaterialMenu, MaterialMenuItem, MenuDensity, MenuGroup, MenuPopup, MenuStyle,
 };
