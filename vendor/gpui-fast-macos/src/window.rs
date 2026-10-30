@@ -693,6 +693,9 @@ pub(crate) struct MacWindowState {
     select_next_tab_callback: Option<Box<dyn FnMut()>>,
     select_previous_tab_callback: Option<Box<dyn FnMut()>>,
     toggle_tab_bar_callback: Option<Box<dyn FnMut()>>,
+    /// Whether this window asked for or was given window tabbing. See
+    /// `tab_bar_visible`.
+    tabbing_in_use: bool,
     activated_least_once: bool,
     closed: Arc<AtomicBool>,
     accesskit_adapter: Option<accesskit_macos::SubclassingAdapter>,
@@ -1128,6 +1131,7 @@ impl MacWindow {
                 select_next_tab_callback: None,
                 select_previous_tab_callback: None,
                 toggle_tab_bar_callback: None,
+                tabbing_in_use: allows_automatic_window_tabbing,
                 activated_least_once: false,
                 closed: Arc::new(AtomicBool::new(false)),
                 accesskit_adapter: None,
@@ -1446,7 +1450,11 @@ impl PlatformWindow for MacWindow {
     }
 
     fn merge_all_windows(&self) {
-        let native_window = self.0.lock().native_window;
+        let native_window = {
+            let mut lock = self.0.lock();
+            lock.tabbing_in_use = true;
+            lock.native_window
+        };
         extern "C" fn merge_windows_async(context: *mut std::ffi::c_void) {
             unsafe {
                 let native_window = context as *mut AnyObject;
@@ -1486,7 +1494,11 @@ impl PlatformWindow for MacWindow {
     }
 
     fn set_tabbing_identifier(&self, tabbing_identifier: Option<String>) {
-        let native_window = self.0.lock().native_window;
+        let native_window = {
+            let mut lock = self.0.lock();
+            lock.tabbing_in_use |= tabbing_identifier.is_some();
+            lock.native_window
+        };
         unsafe {
             let allows_automatic_window_tabbing = tabbing_identifier.is_some();
             if allows_automatic_window_tabbing {
@@ -2125,7 +2137,26 @@ impl PlatformWindow for MacWindow {
 
     fn tab_bar_visible(&self) -> bool {
         unsafe {
-            let tab_group: *mut AnyObject = msg_send![self.0.lock().native_window, tabGroup];
+            // Material performance patch: `tabGroup` builds AppKit's window
+            // stack controller, about 40% of opening a window. A window that
+            // never used tabbing and has no tabbed siblings shows no tab bar,
+            // so it is not built just to ask.
+            let (native_window, tabbing_in_use) = {
+                let lock = self.0.lock();
+                (lock.native_window, lock.tabbing_in_use)
+            };
+            if !tabbing_in_use {
+                let windows: *mut AnyObject = msg_send![native_window, tabbedWindows];
+                let count: NSUInteger = if windows.is_null() {
+                    0
+                } else {
+                    msg_send![windows, count]
+                };
+                if count <= 1 {
+                    return false;
+                }
+            }
+            let tab_group: *mut AnyObject = msg_send![native_window, tabGroup];
             if tab_group.is_null() {
                 false
             } else {
@@ -4049,6 +4080,7 @@ extern "C" fn merge_all_windows(this: &AnyObject, _: Sel, _: *mut AnyObject) {
 
         let window_state = get_window_state(this);
         let mut lock = window_state.as_ref().lock();
+        lock.tabbing_in_use = true;
         if let Some(mut callback) = lock.merge_all_windows_callback.take() {
             drop(lock);
             callback();
@@ -4084,6 +4116,7 @@ extern "C" fn toggle_tab_bar(this: &AnyObject, _sel: Sel, _id: *mut AnyObject) {
 
         let window_state = get_window_state(this);
         let mut lock = window_state.as_ref().lock();
+        lock.tabbing_in_use = true;
         lock.move_traffic_light();
 
         if let Some(mut callback) = lock.toggle_tab_bar_callback.take() {

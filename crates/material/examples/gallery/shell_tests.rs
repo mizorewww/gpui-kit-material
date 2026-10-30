@@ -614,7 +614,7 @@ mod examples {
     use super::super::pages::examples::app::{Body, Device, ExamplesApp};
     use super::super::playground::Value;
     use super::*;
-    use gpui::{Entity, ListOffset};
+    use gpui::Entity;
 
     fn set(
         window: &WindowHandle<Gallery>,
@@ -654,10 +654,7 @@ mod examples {
     fn top(window: &WindowHandle<Gallery>, cx: &mut VisualTestContext) {
         window
             .update(cx, |g, _, cx| {
-                g.list.scroll_to(ListOffset {
-                    item_ix: 0,
-                    offset_in_item: px(0.),
-                });
+                g.scroll_to_top();
                 cx.notify();
             })
             .unwrap();
@@ -702,6 +699,61 @@ mod examples {
                 }
             }
         }
+    }
+
+    /// A preview asks for its arrangement while it renders, after the lead
+    /// row, which must not read the playground state for it. The hint still
+    /// arrives, both ways, without a refresh, and a settled page keeps a
+    /// preview frame to itself.
+    #[gpui::test]
+    fn a_device_rearranges_the_panes_without_the_lead_row_reading_the_state(
+        cx: &mut TestAppContext,
+    ) {
+        let (window, mut cx) = open(cx);
+        go(&window, &mut cx, "examples");
+        cx.simulate_resize(size(px(1600.), px(1200.)));
+        settle(&window, &mut cx);
+        // `draw` refreshes the window, building every view: not this.
+        let frames = |cx: &mut VisualTestContext| {
+            for _ in 0..3 {
+                cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear(cx))
+                    .unwrap();
+                cx.run_until_parked();
+            }
+        };
+        let switch = |cx: &mut VisualTestContext, device: Device| {
+            window
+                .update(cx, |g, window, cx| {
+                    let state = g.entries[g.current].playground.clone().unwrap();
+                    state.update(cx, |state, cx| {
+                        state.set_value("device", Value::Choice(device.index()), window, cx)
+                    });
+                })
+                .unwrap();
+            frames(cx);
+        };
+        let side_by_side = |cx: &mut VisualTestContext| {
+            let canvas = bounds(cx, "preview-canvas");
+            let config = bounds(cx, "configuration-card");
+            config.left() > canvas.right()
+        };
+        let (preview, lead) = window
+            .update(&mut cx, |g, _, _| {
+                let views = g.entries[g.current].views.clone().unwrap();
+                (views.preview, g.lead.clone())
+            })
+            .unwrap();
+        assert!(side_by_side(&mut cx), "a phone leaves room for the panel");
+        switch(&mut cx, Device::Desktop);
+        assert!(!side_by_side(&mut cx), "a desktop needs the width");
+        let rendered = cx.read(|cx| lead.read(cx).renders.get());
+        for _ in 0..3 {
+            cx.update(|_, cx| cx.notify(preview.entity_id()));
+            frames(&mut cx);
+        }
+        assert_eq!(cx.read(|cx| lead.read(cx).renders.get()), rendered);
+        switch(&mut cx, Device::Phone);
+        assert!(side_by_side(&mut cx), "and the panel comes back");
     }
 
     #[gpui::test]

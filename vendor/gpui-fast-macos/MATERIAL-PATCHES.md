@@ -43,3 +43,13 @@ performance are verified separately.
 See `src/drawable_prefetch.rs` in the matching Apple renderer crate.
 Successful-submission counting is unchanged: only `draw_with_status`
 submissions count.
+
+## Window tab group built only when tabbing is in use
+
+- `src/window.rs`: `tab_bar_visible` returns false without asking for `tabGroup`
+  when the window has no tabbing identifier, was never merged or toggled, and
+  has at most one tabbed window. Asking builds AppKit's window stack controller,
+  which was about 40% of `open_window` in a warm sampled window open.
+  `MacWindowState::tabbing_in_use` records the opening identifier,
+  `set_tabbing_identifier`, `merge_all_windows` and the `toggleTabBar:` and
+  `mergeAllWindows:` actions; once set, behavior is as upstream.

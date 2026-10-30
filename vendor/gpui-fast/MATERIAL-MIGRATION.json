@@ -238,8 +238,8 @@
       },
       "src/app.rs": {
         "upstream_sha256": "2d698e066335022335d3b3f4611f66e55e192fedeee56b1960ebea3f0a62eb23",
-        "local_sha256": "56ac979976d49c802d6630b7fb9fbb0878079967bbefa1d81f41309bf0c7d0ac",
-        "reason": "CpuFrameScope around initial and test-app draws (vendor/gpui-pre/cpu-frame-scope-patch.md)."
+        "local_sha256": "e38caf2c7bbc8823be4d8bc9ea97f92cb28cca2012a12989c2f4dc379858522a",
+        "reason": "CpuFrameScope around initial and test-app draws (vendor/gpui-pre/cpu-frame-scope-patch.md). Material performance patch: record_entities_accessed updates only the entities that entered or left the tracked set instead of removing and re-inserting all of them each frame; the resulting maps are identical."
       },
       "src/app/bench_context.rs": {
         "upstream_sha256": "6bef320831a933502651903f85b849b6ea371b84c6822b7b88d3e064dc8c9818",
