@@ -1543,17 +1543,11 @@ impl App {
         self.layout_direction
     }
 
-    /// Set the application's direction. Open windows follow, redrawing, unless
-    /// they called [`Window::set_layout_direction`].
+    /// Set the application's direction. Open windows follow on their next draw,
+    /// which this asks for, unless they called [`Window::set_layout_direction`].
     pub fn set_layout_direction(&mut self, direction: LayoutDirection) {
         self.layout_direction = direction;
-        for window in self.windows() {
-            window
-                .update(self, |_, window, _| {
-                    window.follow_app_layout_direction(direction)
-                })
-                .ok();
-        }
+        self.refresh_windows();
     }
 
     /// Returns handles to all open windows in the application.

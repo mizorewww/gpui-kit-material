@@ -36,11 +36,15 @@ Left-to-right trees take one extra branch per `request_layout` and one empty-set
 check per `layout_bounds`, and allocate nothing.
 
 Fast keeps layout nodes across frames, so its record outlives the frame like them:
-each request rewrites the node's entry and releasing a transient node removes it.
+each request rewrites the node's entry and releasing a node removes it. A view Fast
+rebuilds on its own (`fast/splice.rs`) keeps the direction it was drawn in.
 
 Not covered, and left to the caller: painted paths and quads inside an element,
 pointer arithmetic against `bounds.left()`, and key handling, which runs after the
-draw. `gpui-kit-material` handles these per component.
+draw. `gpui-kit-material` handles these per component. Also not covered: `uniform_list`
+places its items from its own padding and border rather than `layout_bounds`, so
+asymmetric ones on the list itself stay physical, and `InteractiveText` still measures
+hit positions from the left of its box, as upstream does for any non-left alignment.
 
 Left-to-right behavior is unchanged: no node is recorded, so `child_offset` returns
 the location as it is, and `in_direction` and the paint flips are identity.

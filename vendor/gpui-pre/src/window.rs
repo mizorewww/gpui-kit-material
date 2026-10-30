@@ -3203,14 +3203,6 @@ impl Window {
         }
     }
 
-    /// Follow a new application direction unless this window chose its own.
-    pub(crate) fn follow_app_layout_direction(&mut self, direction: LayoutDirection) {
-        if !self.layout_direction_is_own && self.layout_direction != direction {
-            self.layout_direction = direction;
-            self.refresh();
-        }
-    }
-
     /// Run `f` with `direction` in effect, for one drawing phase of a subtree.
     /// An element overriding direction wraps its request_layout, prepaint and
     /// paint.
@@ -3548,6 +3540,9 @@ impl Window {
     /// the contents of the new [`Scene`], use [`Self::present`].
     #[profiling::function]
     pub fn draw(&mut self, cx: &mut App) -> ArenaClearNeeded {
+        if !self.layout_direction_is_own {
+            self.layout_direction = cx.layout_direction();
+        }
         // Drain every draw in profiler builds so a previous frame's
         // first-invalidation timestamp can't be attributed to this one.
         #[cfg(feature = "profiler")]

@@ -25,8 +25,9 @@ cosmic-text, the web) gets the same result from one implementation.
   `apply_letter_spacing` returns at once.
 - `LineLayoutCache::layout_line_spaced` and `layout_wrapped_line_spaced` add the
   spacing to the cache key, so a spaced line is shaped once and reused like any
-  other. The original functions keep their signatures and pass zero, and zero
-  leaves the layout untouched.
+  other. `layout_line` keeps its signature and passes zero, as does `shape_text`, and zero
+  leaves the layout untouched. `layout_wrapped_line`, whose one caller is
+  `shape_text_spaced`, became the spaced form.
 - `WindowTextSystem::shape_text_spaced`, used by the text element.
 - `LineWrapper::letter_spacing`, added to each character's width by truncation, so
   a truncated line is measured as it paints. A pooled wrapper's handle starts at
@@ -35,6 +36,8 @@ cosmic-text, the web) gets the same result from one implementation.
 
 Limits:
 
+- Fast's kept measurements compare the spacing as written, so a pixel-sized line with
+  a spacing in rems is not measured again when the rem changes alone.
 - Ligatures are not disabled. CSS turns them off under non-zero spacing, but GPUI
   fonts opt in through `FontFeatures` chosen by the caller.
 - `shape_line` callers, which include Kit's editors, pass no spacing. An editor
