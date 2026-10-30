@@ -14,8 +14,13 @@ impl ShadowPair {
         Self(elevation::layers(level))
     }
 
+    /// What to paint: a fully transparent entry shows nothing, but would still be
+    /// a primitive in the scene of every frame, as a flat button's both are.
     pub(super) fn into_shadows(self) -> Vec<BoxShadow> {
-        self.0.into_iter().collect()
+        self.0
+            .into_iter()
+            .filter(|shadow| shadow.color.a > 0.)
+            .collect()
     }
 }
 
@@ -52,8 +57,12 @@ mod tests {
     #[test]
     fn none_to_level_one_interpolates_geometry_and_alpha() {
         let none = ShadowPair::level(0);
-        for shadow in none.clone().into_shadows() {
-            assert_shadow(&shadow, 0., 0., 0., 0.);
+        assert!(
+            none.clone().into_shadows().is_empty(),
+            "nothing to paint at rest, while the pair stays matched to interpolate"
+        );
+        for shadow in &none.0 {
+            assert_shadow(shadow, 0., 0., 0., 0.);
         }
         let middle = none.interpolate(&ShadowPair::level(1), 0.5).into_shadows();
         assert_eq!(middle.len(), 2);
