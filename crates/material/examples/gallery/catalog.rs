@@ -209,7 +209,7 @@ pub static CATALOG: &[Entry] = &[
         Actions,
         "The most important action on a screen.",
         slice("buttons", fab_rows),
-        None,
+        Some(&playgrounds::fab::PLAYGROUND),
     ),
     component(
         "fab-menu",
