@@ -45,7 +45,8 @@ cargo run -p gpui-kit-material --example gallery -- \
 design-kit page id (`buttons`, `text-fields`, …, which opens that page's
 Specs tab). `--tab preview|specs` picks the component card's tab;
 `--scenario <name>` and repeated `--set <control>=<value>` configure the
-page's playground. `--help` lists the ids, theme, text scale, state
+page's playground (control ids are in `playgrounds/<component>.rs`); invalid
+names are errors. `--help` lists the ids, theme, text scale, state
 (`--active`, `--disabled`, `--no-ripple`, `--selected`, `--loading`) and
 scroll options. A JSON sidecar
 records revision, dirty state, requested and actual viewport, device scale,
@@ -209,8 +210,10 @@ and it is not display refresh or GPU completion. Recorded runs live under
 
 ## Fonts and reference fixtures
 
-The gallery uses the reference site's Roboto 400/500 (pinned hashes, SIL OFL)
-from `crates/material/examples/gallery/fonts/roboto`; the browser build also
+The gallery uses Roboto 400/500/600 (the Figma kit's emphasized styles need 600),
+instantiated from the reference site's pinned variable font (hashes in
+`fonts/SOURCES.json`, SIL OFL), from
+`crates/material/examples/gallery/fonts/roboto`; the browser build also
 embeds IBM Plex Sans. Rebuild the static fonts with:
 
 ```sh
@@ -226,11 +229,13 @@ python3 scripts/capture-reference-colors.py /path/to/floor-material /tmp/md3-col
 ```
 
 The `scripts/capture-*.{py,js}` pairs record per-component reference behavior
-into `conformance/reference/`.
+into `conformance/reference/`. Figma kit token fixtures (`figma-*.json`) come from
+`scripts/figma/figma.py` ([scripts/README.md](../scripts/README.md#figma-kit-first-priority-reference)).
 
 ## Vendored engine tests
 
 ```sh
 cargo test -p gpui-pre --test line_layout_options
 cargo test -p gpui-pre --lib text_system
+cargo test -p gpui-kit-material -p gpui-fast --features gpui-kit-material/gpui-fast,gpui-kit-material/frame-profiler --lib
 ```

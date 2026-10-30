@@ -59,14 +59,15 @@ Galleries use `gpui_kit::application`, `init` and `open_window`; Kit owns the
 single Root and Component window extensions. Capture settings apply before the
 initial theme projection and Root creation.
 
-`theme::init_component_theme` projects 17 generic Material roles, the body font
+`theme::init_component_theme` projects 19 generic Material roles (including the
+caret and text selection colors of Kit's inputs), the body font
 and text scale into Component colors/tokens (and its Base projection) before
 Root's first render. Palette and scale events call
 `theme::advance_component_theme` before drawing; one pending callback continues
 an active animation. **Render never updates Component Theme.** Full M3 roles,
 reference blending, motion, spacing and elevation remain Material-owned; unmanaged
-fields keep Component's mode behavior. Currently one theme per process (single
-gallery window), not per-window themes.
+fields keep Component's mode behavior. Currently one theme per process: no
+per-window or per-subtree themes.
 
 `theme::color` is context-free and thread-local, so helpers stay plain
 functions; GPUI paints on one UI thread.
@@ -102,15 +103,25 @@ the same patches until fixes land upstream. A patched Zed checkout overriding
 | Vendored | Source | Why |
 | --- | --- | --- |
 | `gpui-kit` | Git `main` at audited `bb85882`, unchanged source | Normalized manifest disables implicit WASM threading (`multithreaded-web` restores it). Hashes in `SOURCE.md`/`SOURCE.json`. |
-| `gpui-base` | Git `bb85882` (`crates/base`) + patches (`SOURCE.json`, `motion-patch.md`) | CSS transition reversal, per-transition reduced motion, `TransitionPlayback`, toggle focus policy, busy accessibility state; `RootTab`/`RootTabPrev` exports; `Hitbox.additional_bounds` follow-up in `text_selection.rs`; input caller caret colour; vertical `Toolbar` axis. |
-| `gpui-pre` (GPUI `=0.3.10`) | crates.io + patches (`SOURCE.json`, `*-patch.md`) | Passive raw touch observation; hitbox extensions independent of layout; animation visibility and repeat playback; complete CPU frame scopes, presentation wait, GPU time and submission outcome in the profiler; submission statistics, vsync control and throttle retry; opt-in paragraph layout with clusters (`unicode-segmentation` pinned); test-harness repairs. |
-| `gpui-pre-apple` | crates.io + patches (`SOURCE.json`, `VENDORED.md`) | Detailed CoreText layout (direction, clusters, carets); non-Latin and app-private fallback fonts; `draw_with_status` with a per-draw autorelease pool, drawable-wait and GPU timestamps. |
+| `gpui-base` | Git `bb85882` (`crates/base`) + patches (`SOURCE.json`, `motion-patch.md`) | CSS transition reversal, per-transition reduced motion, `TransitionPlayback`, toggle focus policy, busy accessibility state; `RootTab`/`RootTabPrev` exports; `Hitbox.additional_bounds` follow-up in `text_selection.rs`; input caller caret color; vertical `Toolbar` axis; slider step snapping from min, assistive Increment/Decrement that move only a range's end, `Slider::track_focus`; `Dialog::accessibility_label`. |
+| `gpui-pre` (GPUI `=0.3.10`) | crates.io + patches (`SOURCE.json`, `*-patch.md`) | Passive raw touch observation; hitbox extensions independent of layout; animation visibility and repeat playback; complete CPU frame scopes, presentation wait, GPU time and submission outcome in the profiler; submission statistics, vsync control and throttle retry; opt-in paragraph layout with clusters (`unicode-segmentation` pinned); lazy tab-stop index; overflowing spaces hang instead of starting a wrapped row; test-harness repairs. |
+| `gpui-pre-apple` | crates.io + patches (`SOURCE.json`, `VENDORED.md`) | Detailed CoreText layout (direction, clusters, carets); non-Latin and app-private fallback fonts; `draw_with_status` with a per-draw autorelease pool, drawable-wait and GPU timestamps; off-main-thread drawable acquisition. |
 | `gpui-pre-web` | crates.io + patches (`SOURCE.json`, `MATERIAL-PATCHES.md`) | Keeps CSS viewport size separate from backing-store pixels (CSS × DPR fallback); successful submission count. |
 | `gpui-fast`, `-apple`, `-web` | 0.1.12 + patches (`MATERIAL-MIGRATION.json`, per-file `local_changes`) | The GPUI, Apple and web patches above carried through Fast retained/scroll replay and composition (touch observers, extended hit targets, font-generation invalidation); explicit single-threaded web defaults. |
 | `gpui-pre-macos`, `gpui-fast-macos` | crates.io + patches (`SOURCE.json`, `MATERIAL-PATCHES.md`) | Vsync control, demand waker, periodic-source report and submission statistics (below). |
 
 Touch patches leave gesture recognition, scrolling and activation in GPUI while
 letting Material start a ripple on touch-down and release it on cancellation.
+
+**Off-main-thread drawable acquisition.** Each vendored Metal renderer keeps one
+drawable acquired ahead by its own thread (`src/drawable_prefetch.rs`), and the
+macOS window skips a frame request until one is ready, so the main thread does
+not block in `nextDrawable`.
+
+**Lazy tab stops.** `TabStopMap` records insertions during paint and builds the
+order and focus lookup on the first query after a change
+(`vendor/gpui-pre/tab-stop-index-patch.md`). Upstream updated both per insertion,
+which took about 27% of a Material list scroll frame.
 
 **Backend selection.** Material and gallery-web expose `gpui-fast`, forwarding
 to Kit's backend feature; it is on by default. Material's `gpui` alias points to

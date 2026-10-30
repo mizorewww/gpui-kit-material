@@ -3,15 +3,18 @@
 Material 3 / **M3 Expressive** tokens, motion and components for
 [Longbridge GPUI Kit](https://github.com/longbridge/gpui-kit).
 
-Components are thin Material adapters over Kit's `gpui-component` controls
-(`gpui_kit::component`): Kit owns behavior (input, focus, accessibility,
-overlays, windows), this crate owns Material visuals and motion. Icons come from
+Components are Material adapters over Kit's `gpui-component` controls
+(`gpui_kit::component`) and Base parts: Kit owns behavior (input, focus,
+accessibility, overlays, windows), this crate owns Material visuals and motion.
+Icons come from
 [gpui-material-symbols](https://github.com/mizorewww/gpui-material-symbols).
 
-> **Status: pre-release (0.1).** The APIs below work and are tested, but no
-> component has passed visual/motion conformance review yet. Per-component
-> status lives in [`conformance/md3.json`](conformance/md3.json); the plan is in
-> [docs/ROADMAP.md](docs/ROADMAP.md).
+> **Status: pre-release (0.1).** Almost every component is implemented and
+> tested, but none is stable: no component has passed independent conformance
+> review, and none meets the [production standard](docs/PRODUCTION.md) yet.
+> [docs/COVERAGE.md](docs/COVERAGE.md) lists the state and gaps per component,
+> [docs/ROADMAP.md](docs/ROADMAP.md) what remains, and
+> [conformance/md3.json](conformance/md3.json) the review record.
 
 | Crate | Purpose |
 | --- | --- |
@@ -21,20 +24,25 @@ overlays, windows), this crate owns Material visuals and motion. Icons come from
 
 ## What's included
 
-- **Color & theme** — semantic `ColorRole`s, all 20 md3.io reference themes
+- **Color and theme**: semantic `ColorRole`s, all 20 md3.io reference themes
   (light/dark × standard/medium/high contrast, 52 roles each), 10 legacy
-  palettes (Paper/Ink, Nord, Tokyo Night, Catppuccin), animated theme
-  transitions and a 100–200% text scale. Dynamic seed/HCT schemes are pending.
-- **Tokens** — shape, type scale (15 roles), layout metrics, elevation, state
-  layers.
-- **Motion** — Expressive (default) and Standard schemes, spatial/effects
+  palettes, animated theme transitions and a 100–200% text scale. Dynamic
+  seed/HCT schemes are not implemented.
+- **Tokens**: shape, the 15 type roles and their emphasized styles, layout
+  metrics, elevation, state layers.
+- **Motion**: Expressive (default) and Standard schemes, spatial/effects
   curves, entrances, retargetable values, per-transition reduced motion.
-- **Components** — `MaterialButton` (5 variants × 5 sizes × round/square,
-  toggle, loading, ripple, shape morph), `ConnectedButtonGroup`, dividers,
-  linear/circular progress, switch, slider, search field, side sheet, snackbar,
-  focus ring/reveal and a custom title bar with caption buttons. Tiles, choice
-  tiles, status badges, chips, notices and cards come from course2md and do not
-  yet follow M3 geometry.
+- **Components**:
+
+| Group | Components |
+| --- | --- |
+| Actions | `MaterialButton` (5 variants, 5 sizes, round/square, toggle, loading), `IconButton`, `ButtonGroup`, `ConnectedButtonGroup`, `SplitButton`, `Fab`, `ExtendedFab`, `FabMenu` |
+| Selection | `MaterialCheckbox`, `MaterialSwitch`, `MaterialRadio`/`MaterialRadioGroup`, `AssistChip`/`FilterChip`/`InputChip`/`SuggestionChip`, `MaterialSlider` |
+| Text input | `TextField`, `ExposedDropdown` (select), `SearchField`/`SearchView`, `DatePicker`, `TimePicker` |
+| Navigation | `NavigationRail`, `NavigationBar`, `NavigationDrawer`, `MaterialTabs`, `MaterialMenu`, `TopAppBar`, `BottomAppBar`, `Toolbar` (docked and floating) |
+| Containment | `MaterialCard`, `ListItem`, `MaterialCarousel`, `MaterialDivider`, `MaterialDialog`, `MaterialBottomSheet`, `MaterialSideSheet` |
+| Communication | `Badge`, `Avatar`, `LinearProgress`/`CircularProgress`, `LoadingIndicator`, `Snackbar`, `MaterialTooltip` |
+| Application | `TitleBar`, `CaptionButtons`, tiles, choice tiles, status chips and notices (from course2md, not M3 components) |
 
 ## Quick start
 
@@ -49,7 +57,7 @@ gpui-kit-material = { git = "https://github.com/mizorewww/gpui-kit-material" }
 > Downstream workspaces need the same patches until they land upstream.
 
 ```rust
-use gpui_kit_material::{icons::Assets, prelude::*, theme};
+use gpui_kit_material::{color::themes::{Contrast, ThemeId, ThemeMode}, icons::Assets, theme};
 
 gpui_kit::application()
     .with_assets(Assets::new())
@@ -57,7 +65,8 @@ gpui_kit::application()
         gpui_kit::init(cx);
         gpui_kit_material::init(cx);
         // Project the initial scheme into Kit's theme before the first Root render.
-        theme::init_component_theme(initial_scheme, 1.0, cx);
+        let scheme = ThemeId::Baseline.scheme(ThemeMode::Light, Contrast::Standard);
+        theme::init_component_theme(scheme, 1.0, cx);
         // Open windows with gpui_kit::open_window; Kit supplies the Root.
     });
 ```
@@ -78,8 +87,8 @@ let running = theme::advance_component_theme(ocean, 1.0, window, cx);
 gpui_kit_material::motion::set_motion_scheme(gpui_kit_material::motion::MotionScheme::Standard);
 ```
 
-A controlled toggle
-button (the caller owns `selected`; the button never stores it):
+A controlled toggle button (the caller owns `selected`; the button never
+stores it):
 
 ```rust
 use gpui_kit_material::icons::IconName;
@@ -96,12 +105,16 @@ material_button("save", ButtonVariant::Tonal)
     .child(label)
 ```
 
-Labels and accessible names always come from the caller. See the rustdoc (`cargo doc --open -p gpui-kit-material`) for the full
-contracts of each component.
+Labels and accessible names always come from the caller. See the rustdoc
+(`cargo doc --open -p gpui-kit-material`) for each component's contract.
 
 ## Gallery
 
-One gallery module runs on desktop and in the browser.
+One gallery module runs on desktop and in the browser. It follows md3.io's
+component pages: navigation by component group, a live preview of the real
+component with theme and light/dark switches, and a configuration panel for
+every variant, size, state and content option. A **Specs** tab shows the Figma
+kit's boards. Style pages cover color, typography, shape, motion and elevation.
 
 ```sh
 cargo run -p gpui-kit-material --example gallery          # desktop (GPUI Fast backend)
@@ -113,6 +126,29 @@ The title bar shows FPS of newly drawn frames; **Settings → Vertical sync**
 toggles Metal display sync on macOS. Headless capture, profiling and fixture
 tooling are described in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
 
+## References
+
+Where references disagree, priority is **Figma Material 3 Design Kit > md3.io >
+m3e.kyralabs.dev**, per token family and per value; each value records its
+source. See [Reference sources](docs/ARCHITECTURE.md#reference-sources).
+
+## Performance targets
+
+Measured on release builds from raw per-frame timings ([AGENTS.md](AGENTS.md)
+has the full rules, [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md#targets) the
+tooling). These are targets; acceptance evidence is still open.
+
+| Target | Limit |
+| --- | --- |
+| Steady-state main-thread CPU | p95 ≤ 1 ms, max ≤ 2 ms (WASM ×2) |
+| Main-thread drawable wait | none |
+| Idle window | draws nothing |
+| Forced redraw of an unchanged page | ≤ 0.3 ms |
+| First frame / page switch | ≤ 16 ms CPU / ≤ 8 ms |
+| GPU time | p95 ≤ 2 ms, reported separately |
+| Scrolling, vsync off | ≥ 500 new frames/s |
+| Scrolling, vsync on | no missed refreshes at 120 Hz |
+
 ## Develop
 
 ```sh
@@ -122,16 +158,18 @@ cargo test --workspace
 ```
 
 CI runs these on macOS, Linux and Windows, plus both GPUI backends and the WASM
-gallery build. Project rules for contributors and agents — Kit reuse,
-conformance acceptance and the performance gates (every gallery CPU frame
-≤ 2 ms, scrolling ≥ 500 FPS) — are in [AGENTS.md](AGENTS.md).
+gallery build. Project rules for contributors and agents are in
+[AGENTS.md](AGENTS.md).
 
 | Document | Contents |
 | --- | --- |
-| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Layers, Kit reuse, theme bridge, engine patches |
-| [docs/ROADMAP.md](docs/ROADMAP.md) | Component plan and acceptance criteria |
+| [docs/PRODUCTION.md](docs/PRODUCTION.md) | What a component and a release must meet to be called stable |
+| [docs/COVERAGE.md](docs/COVERAGE.md) | Every reference component, its status and what is missing |
+| [docs/ROADMAP.md](docs/ROADMAP.md) | Status tables and remaining work |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Layers, Kit reuse, reference sources, theme bridge, engine patches |
 | [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) | Gallery capture, profiling, WASM, fixtures |
 | [docs/EXTRACTION.md](docs/EXTRACTION.md) | Mapping from course2md, where the kit originated |
+| [scripts/README.md](scripts/README.md) | Reference capture, Figma extraction and font scripts |
 
 ## License
 

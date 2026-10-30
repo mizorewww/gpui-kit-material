@@ -17,10 +17,12 @@ switched to the kit yet; this table is the guide for that change.
 | `motion.rs` springs, `enter`, `state_enter`, `page_enter`, `value`, `selection_value`, `disclosure` | `motion` |
 | `motion::{spinner, icon_spinner, progress, linear_progress, indeterminate_progress}` | `components` (progress) |
 | `choice_group::SingleChoiceGroup` | `components::ConnectedButtonGroup` |
-| `TileScale`, `TileGroup`, `tile`, `list_tile`, `tile_info`, `tile_chevron`, `disclosure_chevron` | `components` (tile); `TileScale::button` is now a `gpui_base::Button` |
+| `TileScale`, `TileGroup`, `tile`, `list_tile`, `tile_info`, `tile_chevron`, `disclosure_chevron` | `components` (tile); `TileScale::button` returns a `RingedButton` |
 | `ChoiceTile`, `choice_radio`, `Tint`, `tinted_icon` | `components` (choice) |
 | `accessible_text`, `error_text`, `semantic_label`, `supporting_info`, `info_callout`, `page_heading`, `section_title`, `section_heading` | `components` (text) |
-| `badge`, `outlined_badge`, `chip`, `notice_banner`, `card_surface` | `components` (feedback) |
+| `badge`, `outlined_badge` | `components::{status_chip, outlined_status_chip}` (the old names remain deprecated; `Badge` is now the M3 badge) |
+| `chip` | `components` (chips) |
+| `notice_banner`, `card_surface` | `components` (feedback) |
 | `focus_scroll::{FocusRing, RevealFocus, contain_scroll}` | `components` (focus) |
 | `window_controls` | `components::{CaptionButtons, Caption, CaptionLabels, title_bar_control}` |
 | `icons.rs` (subset used by components) | `icons::{IconName, Icon, Assets}` |
