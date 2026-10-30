@@ -622,6 +622,7 @@ impl RenderOnce for ConnectedButtonGroup {
         };
         let specimen = !self.previews.is_empty();
         let roving = Roving::new(handles.clone(), Orientation::Both)
+            .rtl(crate::scope::is_rtl(window))
             .disabled(disabled)
             .selected(if radio { selected } else { None })
             .select_on_focus(self.on_change.clone().filter(|_| radio).map(|on_change| {

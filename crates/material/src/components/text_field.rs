@@ -758,11 +758,15 @@ impl RenderOnce for TextField {
             FieldInput::Multi(state) => state.update(cx, |s, _| s.set_caret_color(caret)),
             FieldInput::Static(_) => {}
         }
+        // Kit's editors align physically; they do not mirror with layout.
+        let rtl = crate::scope::is_rtl(window);
         let editor: AnyElement = match &self.input {
             FieldInput::Single(state) => Input::new(state)
                 .appearance(false)
                 .with_size(Size::XSmall)
                 .disabled(disabled)
+                .readonly(self.read_only)
+                .when(rtl, |this| this.text_right())
                 .when_some(self.label.clone(), |this, label| this.aria_label(label))
                 .p_0()
                 .h(rem(24.))
@@ -773,6 +777,8 @@ impl RenderOnce for TextField {
                 .appearance(false)
                 .with_size(Size::XSmall)
                 .disabled(disabled)
+                .readonly(self.read_only)
+                .when(rtl, |this| this.text_right())
                 .when_some(self.label.clone(), |this, label| this.aria_label(label))
                 .p_0()
                 // Kit insets multi-line text by the XSmall input padding.

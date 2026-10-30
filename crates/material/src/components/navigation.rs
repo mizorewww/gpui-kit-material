@@ -602,6 +602,7 @@ pub(crate) fn destinations(
     let skip: Rc<[bool]> = items.iter().map(NavItem::is_disabled).collect();
     // Arrows only move focus; Enter or Space activates.
     let roving = Roving::new(handles.clone(), orientation)
+        .rtl(crate::scope::is_rtl(window))
         .skip(skip)
         .selected(selected);
     let entry = if specimen {

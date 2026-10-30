@@ -33,6 +33,8 @@ actions!(
     [
         FocusNextItem,
         FocusPreviousItem,
+        FocusRightItem,
+        FocusLeftItem,
         FocusFirstItem,
         FocusLastItem
     ]
@@ -47,17 +49,17 @@ pub(crate) const BOTH_CONTEXT: &str = "MaterialRovingGroup";
 
 pub(crate) fn init(cx: &mut App) {
     cx.bind_keys([
-        KeyBinding::new("right", FocusNextItem, Some(ROW_CONTEXT)),
-        KeyBinding::new("left", FocusPreviousItem, Some(ROW_CONTEXT)),
+        KeyBinding::new("right", FocusRightItem, Some(ROW_CONTEXT)),
+        KeyBinding::new("left", FocusLeftItem, Some(ROW_CONTEXT)),
         KeyBinding::new("home", FocusFirstItem, Some(ROW_CONTEXT)),
         KeyBinding::new("end", FocusLastItem, Some(ROW_CONTEXT)),
         KeyBinding::new("down", FocusNextItem, Some(COLUMN_CONTEXT)),
         KeyBinding::new("up", FocusPreviousItem, Some(COLUMN_CONTEXT)),
         KeyBinding::new("home", FocusFirstItem, Some(COLUMN_CONTEXT)),
         KeyBinding::new("end", FocusLastItem, Some(COLUMN_CONTEXT)),
-        KeyBinding::new("right", FocusNextItem, Some(BOTH_CONTEXT)),
+        KeyBinding::new("right", FocusRightItem, Some(BOTH_CONTEXT)),
         KeyBinding::new("down", FocusNextItem, Some(BOTH_CONTEXT)),
-        KeyBinding::new("left", FocusPreviousItem, Some(BOTH_CONTEXT)),
+        KeyBinding::new("left", FocusLeftItem, Some(BOTH_CONTEXT)),
         KeyBinding::new("up", FocusPreviousItem, Some(BOTH_CONTEXT)),
         KeyBinding::new("home", FocusFirstItem, Some(BOTH_CONTEXT)),
         KeyBinding::new("end", FocusLastItem, Some(BOTH_CONTEXT)),
@@ -163,9 +165,17 @@ pub(crate) struct Roving {
     orientation: Orientation,
     select_on_focus: Option<Select>,
     reveal: Option<ScrollHandle>,
+    rtl: bool,
 }
 
 impl Roving {
+    /// Resolve left and right arrows for this direction. Key handling runs
+    /// after the draw, outside any scope, so the caller passes what it rendered in.
+    pub(crate) fn rtl(mut self, rtl: bool) -> Self {
+        self.rtl = rtl;
+        self
+    }
+
     /// One focus handle per item; every item can take focus until
     /// [`Roving::skip`] says otherwise.
     pub(crate) fn new(focus: impl Into<Rc<[FocusHandle]>>, orientation: Orientation) -> Self {
@@ -177,6 +187,7 @@ impl Roving {
             orientation,
             select_on_focus: None,
             reveal: None,
+            rtl: false,
         }
     }
 
@@ -251,6 +262,13 @@ impl Roving {
     pub(crate) fn install<E: InteractiveElement>(self, element: E) -> E {
         let next = self.clone();
         let previous = self.clone();
+        let right = self.clone();
+        let left = self.clone();
+        let (toward_right, toward_left) = if self.rtl {
+            (Direction::Previous, Direction::Next)
+        } else {
+            (Direction::Next, Direction::Previous)
+        };
         let first = self.clone();
         let context = self.orientation.context();
         let last = self;
@@ -262,6 +280,10 @@ impl Roving {
             .on_action(move |_: &FocusPreviousItem, window, cx| {
                 previous.navigate(Direction::Previous, window, cx)
             })
+            .on_action(move |_: &FocusRightItem, window, cx| {
+                right.navigate(toward_right, window, cx)
+            })
+            .on_action(move |_: &FocusLeftItem, window, cx| left.navigate(toward_left, window, cx))
             .on_action(move |_: &FocusFirstItem, window, cx| {
                 first.navigate(Direction::First, window, cx)
             })

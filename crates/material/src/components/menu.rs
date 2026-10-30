@@ -628,6 +628,17 @@ impl RenderOnce for MaterialMenu {
             }
         };
         let on_collapse = self.on_collapse.clone();
+        let collapse = Rc::new(move |window: &mut Window, cx: &mut App| {
+            if let Some(collapse) = on_collapse.as_ref() {
+                collapse(window, cx);
+            } else {
+                cx.propagate();
+            }
+        });
+        let rtl = crate::scope::is_rtl(window);
+        let expand = Rc::new(expand);
+        let (expand_right, expand_left) = (expand.clone(), expand);
+        let (collapse_right, collapse_left) = (collapse.clone(), collapse);
         let activate = {
             let handles = handles.clone();
             let activators = activators.clone();
@@ -745,12 +756,18 @@ impl RenderOnce for MaterialMenu {
             .on_action(move |_: &SelectFirst, window, cx| nav_first(Direction::First, window, cx))
             .on_action(move |_: &SelectLast, window, cx| nav_last(Direction::Last, window, cx))
             .on_action(move |_: &Confirm, window, cx| activate(window, cx))
-            .on_action(move |_: &SelectRight, window, cx| expand(window, cx))
-            .on_action(move |_: &SelectLeft, window, cx| {
-                if let Some(collapse) = on_collapse.as_ref() {
-                    collapse(window, cx);
+            .on_action(move |_: &SelectRight, window, cx| {
+                if rtl {
+                    collapse_right(window, cx)
                 } else {
-                    cx.propagate();
+                    expand_right(window, cx)
+                }
+            })
+            .on_action(move |_: &SelectLeft, window, cx| {
+                if rtl {
+                    expand_left(window, cx)
+                } else {
+                    collapse_left(window, cx)
                 }
             })
             .on_action(move |_: &Cancel, window, cx| {
@@ -1089,6 +1106,20 @@ impl MenuPopup {
     }
 }
 
+/// The same anchor with its sides exchanged. Kit places popups physically, so
+/// right-to-left layout asks for the mirrored corner.
+pub(crate) fn mirrored_anchor(anchor: Anchor) -> Anchor {
+    match anchor {
+        Anchor::TopLeft => Anchor::TopRight,
+        Anchor::TopRight => Anchor::TopLeft,
+        Anchor::BottomLeft => Anchor::BottomRight,
+        Anchor::BottomRight => Anchor::BottomLeft,
+        Anchor::LeftCenter => Anchor::RightCenter,
+        Anchor::RightCenter => Anchor::LeftCenter,
+        other => other,
+    }
+}
+
 /// Whether a popup anchored at `anchor` sits above its trigger, so it
 /// reveals from its bottom edge.
 pub(crate) fn opens_upward(anchor: Anchor) -> bool {
@@ -1363,7 +1394,11 @@ impl RenderOnce for MenuPopup {
             .child(self.trigger);
         Popover::new(self.id.clone())
             .appearance(false)
-            .anchor(anchor)
+            .anchor(if crate::scope::is_rtl(window) {
+                mirrored_anchor(anchor)
+            } else {
+                anchor
+            })
             .offset(rem(4.).to_pixels(window.rem_size()))
             .track_focus(&focus)
             .open(visible)

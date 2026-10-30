@@ -1257,6 +1257,11 @@ fn ripple_ink(painted: &Style, fg: Rgba) -> (Rgba, bool) {
 impl RenderOnce for MaterialButton {
     fn render(mut self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         use gpui_base::StyledExt;
+        // Layout already mirrors under an inherited right-to-left direction, so
+        // the logical order stays the left-to-right one here.
+        if crate::scope::is_rtl(window) {
+            self.direction = ButtonDirection::Ltr;
+        }
         let loading = self.loading.as_ref().is_some_and(|(visible, _)| *visible);
         let show_progress = loading || self.progress_visible();
         self.disabled |= loading;

@@ -430,6 +430,8 @@ struct TrackPaint {
 fn paint_track(bounds: Bounds<Pixels>, track: &TrackPaint, window: &mut Window) {
     let s = track.scale;
     let horizontal = track.axis == Axis::Horizontal;
+    // Painted, so it does not mirror with layout. The quad's own radii do.
+    let rtl = crate::scope::is_rtl(window);
     let length = f32::from(if horizontal {
         bounds.size.width
     } else {
@@ -443,7 +445,11 @@ fn paint_track(bounds: Bounds<Pixels>, track: &TrackPaint, window: &mut Window) 
         if horizontal {
             Bounds::new(
                 point(
-                    bounds.origin.x + px(a),
+                    if rtl {
+                        bounds.right() - px(b)
+                    } else {
+                        bounds.origin.x + px(a)
+                    },
                     bounds.center().y - px(cross * s / 2.),
                 ),
                 size(px(b - a), px(cross * s)),
@@ -568,6 +574,8 @@ fn stepped_value(
 
 impl RenderOnce for MaterialSlider {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
+        // Key handling runs after the draw, so it keeps this frame's direction.
+        let mirrored_keys = crate::scope::is_rtl(window);
         let id = self.id.clone();
         let classic = self.appearance == SliderAppearance::Classic;
         // A single slider focuses its Role::Slider node; a range focuses each
@@ -943,7 +951,11 @@ impl RenderOnce for MaterialSlider {
                     window.refresh();
                 })
                 .on_key_down(move |event, window, cx| {
-                    let key = event.keystroke.key.as_str();
+                    let key = match event.keystroke.key.as_str() {
+                        "left" if mirrored_keys => "right",
+                        "right" if mirrored_keys => "left",
+                        key => key,
+                    };
                     let moves_start = is_range && start_focus.is_focused(window);
                     state_entity.update(cx, |state, cx| {
                         let value = state.value();

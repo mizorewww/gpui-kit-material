@@ -915,6 +915,8 @@ impl DatePicker {
 
 /// A snapshot of the state a render needs.
 struct Snapshot {
+    /// The direction the grid rendered in, for the arrow keys.
+    rtl: bool,
     labels: Rc<DatePickerLabels>,
     selection: DateSelection,
     today: NaiveDate,
@@ -987,6 +989,7 @@ impl RenderOnce for DatePicker {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let s = self.state.read(cx);
         let snap = Rc::new(Snapshot {
+            rtl: crate::scope::is_rtl(window),
             labels: s.labels.clone(),
             selection: s.selection,
             today: s.today,
@@ -1312,8 +1315,13 @@ impl PickerCx {
             .track_focus(&self.snap.focus)
             .key_context(CONTEXT)
             .on_action(move |_: &SelectCursor, window, cx| select(window, cx));
-        let element = on_step::<CursorLeft>(element, state, CursorStep::Left);
-        let element = on_step::<CursorRight>(element, state, CursorStep::Right);
+        let (left, right) = if self.snap.rtl {
+            (CursorStep::Right, CursorStep::Left)
+        } else {
+            (CursorStep::Left, CursorStep::Right)
+        };
+        let element = on_step::<CursorLeft>(element, state, left);
+        let element = on_step::<CursorRight>(element, state, right);
         let element = on_step::<CursorUp>(element, state, CursorStep::Up);
         let element = on_step::<CursorDown>(element, state, CursorStep::Down);
         let element = on_step::<CursorPreviousMonth>(element, state, CursorStep::PreviousMonth);

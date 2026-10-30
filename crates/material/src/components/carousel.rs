@@ -591,6 +591,8 @@ fn schedule_snap(
 
 impl RenderOnce for MaterialCarousel {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
+        // Input runs after the draw, so it keeps this frame's direction.
+        let rtl = crate::scope::is_rtl(window);
         let id = self.id.clone();
         let state = window.use_keyed_state((id.clone(), "carousel"), cx, |_, _| {
             CarouselState::default()
@@ -866,8 +868,8 @@ impl RenderOnce for MaterialCarousel {
                     .animation
                     .map_or(keys.read(cx).scroll, |a| a.to);
                 let to = match event.keystroke.key.as_str() {
-                    "right" => neighbor(current, step, max, true),
-                    "left" => neighbor(current, step, max, false),
+                    "right" => neighbor(current, step, max, !rtl),
+                    "left" => neighbor(current, step, max, rtl),
                     "home" => 0.,
                     "end" => max,
                     _ => return,
@@ -901,6 +903,7 @@ impl RenderOnce for MaterialCarousel {
                                     moving.update(cx, |state, _| {
                                         if let Some((x, from)) = state.drag {
                                             let delta = f32::from(event.position.x - x) / rem_size;
+                                            let delta = if rtl { -delta } else { delta };
                                             state.scroll = (from - delta).clamp(0., max);
                                         }
                                     });

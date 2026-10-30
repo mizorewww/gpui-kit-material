@@ -586,7 +586,17 @@ impl ClockDial {
 }
 
 impl RenderOnce for ClockDial {
-    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
+    /// A clock does not mirror: its numerals keep their places in every direction.
+    fn render(self, _: &mut Window, _: &mut App) -> impl IntoElement {
+        let id = self.id.clone();
+        crate::scope::Scope::new((id, "clock-direction"))
+            .direction(crate::scope::LayoutDirection::Ltr)
+            .child_with(move |window, cx| self.render_dial(window, cx))
+    }
+}
+
+impl ClockDial {
+    fn render_dial(self, window: &mut Window, cx: &mut App) -> AnyElement {
         let (time, unit, format) = (self.time, self.unit, self.format);
         let inner = inner_ring(time, unit, format);
         let target_radius = if inner { INNER_RADIUS } else { OUTER_RADIUS };
