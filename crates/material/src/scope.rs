@@ -260,15 +260,17 @@ impl Frame {
     }
 
     /// Run deferred work, which starts outside every scope, inside this one.
-    fn reenter<R>(
+    fn reenter(
         self: &Rc<Self>,
         window: &mut Window,
         cx: &mut App,
-        f: impl FnOnce(&mut Window, &mut App) -> R,
-    ) -> R {
+        f: &mut dyn FnMut(&mut Window, &mut App),
+    ) {
         match self.outer.clone() {
-            Some(outer) => outer.reenter(window, cx, |window, cx| self.enter(window, cx, f)),
-            None => self.enter(window, cx, f),
+            Some(outer) => outer.reenter(window, cx, &mut |window, cx| {
+                self.enter(window, cx, |window, cx| f(window, cx))
+            }),
+            None => self.enter(window, cx, |window, cx| f(window, cx)),
         }
     }
 }
@@ -298,7 +300,9 @@ impl ResolvedScope {
             .frame
             .direction
             .unwrap_or_else(|| window.layout_direction());
+        let outer = CURRENT.with(|current| current.replace(Some(self.frame.clone())));
         let result = window.with_layout_direction(direction, |window| f(window, cx));
+        CURRENT.with(|current| current.replace(outer));
         if let (Some(kit), Some(previous)) = (&self.frame.scheme, previous) {
             theme::replace_scoped_scheme(previous);
             if let Some(projection) = &kit.projection {
@@ -439,10 +443,11 @@ impl Element for ReplayElement {
         cx: &mut App,
     ) -> (LayoutId, ()) {
         let child = &mut self.child;
-        let id = self
-            .frame
-            .reenter(window, cx, |window, cx| child.request_layout(window, cx));
-        (id, ())
+        let mut id = None;
+        self.frame.reenter(window, cx, &mut |window, cx| {
+            id = Some(child.request_layout(window, cx));
+        });
+        (id.expect("a scope runs its work once"), ())
     }
     fn prepaint(
         &mut self,
@@ -454,7 +459,7 @@ impl Element for ReplayElement {
         cx: &mut App,
     ) {
         let child = &mut self.child;
-        self.frame.reenter(window, cx, |window, cx| {
+        self.frame.reenter(window, cx, &mut |window, cx| {
             child.prepaint(window, cx);
         });
     }
@@ -470,7 +475,7 @@ impl Element for ReplayElement {
     ) {
         let child = &mut self.child;
         self.frame
-            .reenter(window, cx, |window, cx| child.paint(window, cx));
+            .reenter(window, cx, &mut |window, cx| child.paint(window, cx));
     }
 }
 

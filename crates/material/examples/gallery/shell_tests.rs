@@ -853,45 +853,15 @@ mod examples {
     }
 }
 
-/// Draw only what is dirty, as the platform does between refreshes.
-fn draw_dirty(window: &WindowHandle<Gallery>, cx: &mut VisualTestContext) {
-    cx.update_window((*window).into(), |_, window, cx| {
-        window.draw(cx).clear(cx);
-    })
-    .unwrap();
-    cx.run_until_parked();
-}
-
-#[gpui::test]
-fn scrolling_an_example_device_does_not_render_the_gallery(cx: &mut TestAppContext) {
-    let (window, mut cx) = open(cx);
-    go(&window, &mut cx, "examples");
-    let at = bounds(&mut cx, "example-scroll").center();
-    let before = window.update(&mut cx, |g, _, _| g.renders.get()).unwrap();
-    for _ in 0..3 {
-        cx.simulate_event(gpui::ScrollEvent {
-            position: at,
-            delta: gpui::ScrollDelta::Pixels(gpui::point(px(0.), px(-8.))),
-            modifiers: Modifiers::none(),
-            touch_phase: gpui::TouchPhase::Moved,
-            ..Default::default()
-        });
-        draw_dirty(&window, &mut cx);
-    }
-    assert_eq!(
-        window.update(&mut cx, |g, _, _| g.renders.get()).unwrap(),
-        before,
-        "the device is its own notify scope"
-    );
-}
-
 #[gpui::test]
 fn the_preview_controls_stay_in_the_card(cx: &mut TestAppContext) {
     use gpui_kit_material::color::themes::ThemeMode;
     let (window, mut cx) = open(cx);
     go(&window, &mut cx, "button");
     let shared = window.update(&mut cx, |g, _, _| g.shared.clone()).unwrap();
-    let applied = window.update(&mut cx, |g, _, _| g.applied_theme).unwrap();
+    let applied = window
+        .update(&mut cx, |g, _, _| g.applied_theme.clone())
+        .unwrap();
     let app_paint = gpui_kit_material::theme::scheme();
     cx.update(|_, cx| {
         shared.update(cx, |s, cx| {

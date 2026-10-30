@@ -877,4 +877,49 @@ mod window_tests {
         draw(window.into(), cx);
         assert_eq!(cx.read(|cx| gallery.read(cx).renders.get()), rendered + 1);
     }
+
+    #[gpui::test]
+    fn scrolling_an_example_device_does_not_render_the_gallery(cx: &mut TestAppContext) {
+        cx.update(|cx| {
+            gpui_kit::init(cx);
+            gpui_kit_material::init(cx);
+        });
+        let mut parts = None;
+        let window = cx.open_window(size(px(1280.), px(900.)), |window, cx| {
+            let gallery = cx.new(|cx| Gallery::new(window, cx));
+            let top_bar = cx.new(|cx| top_bar::TopBar::new(gallery.clone(), window, cx));
+            parts = Some(gallery.clone());
+            GalleryWindow {
+                gallery,
+                top_bar,
+                fps: None,
+                caption: None,
+            }
+        });
+        let gallery = parts.unwrap();
+        let entry = catalog::position("examples").unwrap();
+        cx.update(|cx| gallery.update(cx, |gallery, cx| gallery.navigate(entry, cx)));
+        for _ in 0..4 {
+            draw(window.into(), cx);
+        }
+        let mut cx = gpui::VisualTestContext::from_window(window.into(), cx);
+        let at = cx.debug_bounds("example-scroll").unwrap().center();
+        let rendered = cx.read(|cx| gallery.read(cx).renders.get());
+        for _ in 0..3 {
+            cx.simulate_event(gpui::ScrollEvent {
+                position: at,
+                delta: gpui::ScrollDelta::Pixels(point(px(0.), px(-8.))),
+                modifiers: gpui::Modifiers::none(),
+                touch_phase: gpui::TouchPhase::Moved,
+                ..Default::default()
+            });
+            cx.update(|window, cx| window.draw(cx).clear(cx));
+            cx.run_until_parked();
+        }
+        assert_eq!(
+            cx.read(|cx| gallery.read(cx).renders.get()),
+            rendered,
+            "the device is its own notify scope"
+        );
+    }
 }

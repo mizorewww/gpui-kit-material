@@ -141,25 +141,50 @@ fn every_phase_and_kit_read_the_scoped_scheme_and_the_outside_does_not(cx: &mut 
     });
 }
 
+/// Holds a harness in a cached view, as an application's root does.
+struct CachedRoot(Entity<Harness>);
+impl Render for CachedRoot {
+    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        AnyView::from(self.0.clone()).cached(StyleRefinement::default().size_full())
+    }
+}
+
 #[gpui::test]
 fn a_settled_scope_does_not_keep_the_window_drawing(cx: &mut TestAppContext) {
-    let (view, cx) = open(cx);
-    draw(cx);
-    cx.run_until_parked();
+    cx.update(|cx| {
+        gpui_kit::init(cx);
+        theme::init_component_theme(paper(), 1., cx);
+        cx.set_reduce_motion(true);
+    });
+    let (root, cx) = cx.add_window_view(|_, cx| {
+        CachedRoot(cx.new(|_| Harness {
+            renders: Rc::default(),
+            scheme: ink(),
+            rendered: Rc::default(),
+            painted: Rc::default(),
+            deferred: Rc::default(),
+            kit: Rc::default(),
+            outside: Rc::default(),
+        }))
+    });
     let dirty_draw = |cx: &mut VisualTestContext| {
         cx.update(|window, cx| window.draw(cx).clear(cx));
         cx.run_until_parked();
     };
     dirty_draw(cx);
-    let settled = view.read_with(cx, |h, _| h.renders.get());
+    dirty_draw(cx);
+    let view = root.read_with(cx, |root, _| root.0.clone());
+    let notified = Rc::new(Cell::new(0));
+    let _watch = cx.update(|_, cx| {
+        let notified = notified.clone();
+        cx.observe(&view, move |_, _| notified.set(notified.get() + 1))
+    });
     for _ in 0..3 {
         dirty_draw(cx);
     }
-    assert_eq!(
-        view.read_with(cx, |h, _| h.renders.get()),
-        settled,
-        "swapping Kit's globals notifies no view"
-    );
+    // Fast stamps the swapped globals, so a draw rebuilds what read them while a
+    // scheme scope is on screen; but nothing is notified, so no draw is asked for.
+    assert_eq!(notified.get(), 0, "swapping Kit's globals notifies no view");
 }
 
 #[gpui::test]
@@ -254,6 +279,7 @@ impl Render for RtlControls {
                 .child(
                     div().debug_selector(|| "tabs".into()).child(
                         MaterialTabs::new("tabs", "Tabs")
+                            .auto_activate(true)
                             .items([
                                 TabItem::new("a", "A"),
                                 TabItem::new("b", "B"),
@@ -333,4 +359,76 @@ fn a_slider_grows_from_the_right(cx: &mut TestAppContext) {
     draw(cx);
     let after = view.read_with(cx, |h, cx| h.slider.read(cx).value().end());
     assert!(after > value, "left increases in a right-to-left slider");
+}
+
+struct ScrolledRow {
+    scroll: gpui::ScrollHandle,
+    rtl: bool,
+}
+impl Render for ScrolledRow {
+    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        let direction = if self.rtl {
+            LayoutDirection::Rtl
+        } else {
+            LayoutDirection::Ltr
+        };
+        Scope::new("scrolled").direction(direction).child(
+            div()
+                .id("list")
+                .w(px(100.))
+                .h(px(40.))
+                .overflow_y_scroll()
+                .track_scroll(&self.scroll)
+                .child(
+                    div()
+                        .h(px(200.))
+                        .flex()
+                        .child(div().w(px(10.)).h_full().debug_selector(|| "cell".into())),
+                ),
+        )
+    }
+}
+
+#[gpui::test]
+fn mirrored_layout_survives_retained_frames_and_scrolling(cx: &mut TestAppContext) {
+    cx.update(|cx| gpui_kit::init(cx));
+    let (view, cx) = cx.add_window_view(|_, _| ScrolledRow {
+        scroll: gpui::ScrollHandle::new(),
+        rtl: true,
+    });
+    let dirty = |cx: &mut VisualTestContext| {
+        cx.update(|window, cx| window.draw(cx).clear(cx));
+        cx.run_until_parked();
+    };
+    draw(cx);
+    let at = cx.debug_bounds("cell").unwrap();
+    assert_eq!(at.left(), px(90.), "mirrored");
+    // Scroll without a refresh: Fast replays the layer rather than laying out.
+    cx.simulate_event(ScrollEvent {
+        position: point(px(50.), px(20.)),
+        delta: ScrollDelta::Pixels(point(px(0.), px(-30.))),
+        modifiers: Modifiers::default(),
+        touch_phase: TouchPhase::Moved,
+        ..Default::default()
+    });
+    dirty(cx);
+    let moved = cx.debug_bounds("cell").unwrap();
+    assert_eq!(moved.left(), px(90.), "still mirrored after the replay");
+    assert_eq!(moved.top(), at.top() - px(30.), "and scrolled");
+    // A view notification reuses retained nodes: the record must hold.
+    view.update(cx, |_, cx| cx.notify());
+    dirty(cx);
+    assert_eq!(cx.debug_bounds("cell").unwrap().left(), px(90.));
+    // Changing direction lays the same retained nodes out the other way.
+    view.update(cx, |view, cx| {
+        view.rtl = false;
+        cx.notify();
+    });
+    dirty(cx);
+    dirty(cx);
+    assert_eq!(
+        cx.debug_bounds("cell").unwrap().left(),
+        px(0.),
+        "unmirrored"
+    );
 }

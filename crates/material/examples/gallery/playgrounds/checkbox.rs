@@ -178,16 +178,21 @@ fn row(
     style: RowStyle,
     on_change: impl Fn(&CheckboxState, &mut Window, &mut App) + 'static,
 ) -> Div {
-    div().debug_selector(move || id.into()).child(
-        MaterialCheckbox::new(id, label)
-            .show_label(true)
-            .label_position(style.position)
-            .required(style.required)
-            .state(state)
-            .error(style.error)
-            .disabled(style.disabled)
-            .on_change(on_change),
-    )
+    // Hugging the row, so the selector's center is on the control or its label.
+    div()
+        .flex()
+        .self_start()
+        .debug_selector(move || id.into())
+        .child(
+            MaterialCheckbox::new(id, label)
+                .show_label(true)
+                .label_position(style.position)
+                .required(style.required)
+                .state(state)
+                .error(style.error)
+                .disabled(style.disabled)
+                .on_change(on_change),
+        )
 }
 
 const CHILD_IDS: [&str; 4] = [

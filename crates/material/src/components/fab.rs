@@ -128,7 +128,7 @@ impl FabPosition {
             .absolute()
             .inset_0()
             .flex()
-            .p(rem(FAB_EDGE))
+            .when(self != Self::Center, |stage| stage.p(rem(FAB_EDGE)))
             .map(|stage| match self {
                 Self::Center => stage.items_center().justify_center(),
                 Self::BottomEnd => stage.items_end().justify_end(),

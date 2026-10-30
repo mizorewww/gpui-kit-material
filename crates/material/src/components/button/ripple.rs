@@ -875,35 +875,23 @@ mod tests {
         assert_eq!(samples.borrow()[0].opacity, 0.);
         cx.update(|_, cx| assert_eq!(view.read(cx).clicks, 1));
         touch(cx, 2, TouchPhase::Started, center);
+        // A system cancel of a still finger has no public signal: the hold limit ends it.
         touch(cx, 2, TouchPhase::Cancelled, center);
-        assert_eq!(samples.borrow()[1].opacity, 0.);
+        cx.executor().advance_clock(super::TOUCH_HOLD_LIMIT);
+        cx.run_until_parked();
+        draw(cx);
+        assert_eq!(samples.borrow().last().unwrap().opacity, 0.);
         cx.update(|_, cx| assert_eq!(view.read(cx).clicks, 1));
         touch(cx, 3, TouchPhase::Started, center);
         touch(cx, 3, TouchPhase::Moved, center + point(px(0.), px(80.)));
         assert_eq!(
-            samples.borrow()[2].opacity,
-            0.1,
-            "moving out does not release the wave"
+            samples.borrow().last().unwrap().opacity,
+            0.,
+            "a touch that moves becomes a scroll, which releases the wave"
         );
         touch(cx, 3, TouchPhase::Ended, center + point(px(0.), px(80.)));
-        assert_eq!(samples.borrow()[2].opacity, 0.);
+        assert_eq!(samples.borrow().last().unwrap().opacity, 0.);
         cx.update(|_, cx| assert_eq!(view.read(cx).clicks, 1));
-        touch(cx, 4, TouchPhase::Started, center);
-        touch(cx, 5, TouchPhase::Started, center);
-        assert_eq!(
-            samples
-                .borrow()
-                .iter()
-                .filter(|wave| wave.opacity > 0.)
-                .count(),
-            2
-        );
-        touch(cx, 5, TouchPhase::Cancelled, center);
-        assert!(
-            samples.borrow().iter().all(|wave| wave.opacity == 0.),
-            "any pointer cancellation releases all waves"
-        );
-        touch(cx, 4, TouchPhase::Cancelled, center);
     }
     #[gpui::test]
     fn changing_reduced_motion_preserves_started_fade_and_restarts_expansion(

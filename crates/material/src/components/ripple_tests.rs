@@ -83,6 +83,10 @@ fn every_control_answers_a_press_with_a_wave(cx: &mut TestAppContext) {
         cx.simulate_mouse_move(at, None, Modifiers::default());
         cx.simulate_mouse_down(at, MouseButton::Left, Modifiers::default());
         draw(cx);
+        // A wave has no size until its expansion has started.
+        cx.executor()
+            .advance_clock(std::time::Duration::from_millis(100));
+        draw(cx);
         assert!(waves_painted() > before, "{name} paints a wave while held");
         cx.simulate_mouse_up(at, MouseButton::Left, Modifiers::default());
         draw(cx);
