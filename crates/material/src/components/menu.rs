@@ -629,6 +629,7 @@ impl RenderOnce for MaterialMenu {
                     density,
                     handles.get(index).cloned(),
                     on_activate.clone(),
+                    window.rem_size(),
                 ));
                 index += 1;
             }
@@ -750,6 +751,7 @@ fn render_item(
     density: MenuDensity,
     focus: Option<FocusHandle>,
     on_activate: Option<Notify>,
+    rem_size: Pixels,
 ) -> AnyElement {
     let expressive = style.expressive();
     let paint = item_paint(style, item.selected);
@@ -767,7 +769,8 @@ fn render_item(
     } else {
         0.
     };
-    let corners = Corners::all(px(radius * 14. / 14.));
+    // The ring and ripple share the item container's rem-sized corners.
+    let corners = Corners::all(rem(radius).to_pixels(rem_size));
     let content_height = item_height(style, density, item.supporting.is_some(), false)
         - if expressive {
             2. * EXPRESSIVE_INSET_Y

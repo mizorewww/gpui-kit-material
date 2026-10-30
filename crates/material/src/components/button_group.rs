@@ -462,14 +462,13 @@ impl RenderOnce for ConnectedButtonGroup {
             roving.tab_stop(window)
         };
         let count = self.options.len();
-        let scale = f32::from(window.rem_size()) / 14.;
         let metrics = match self.size {
             Some(size) => Metrics::of(size, self.shape),
             None => Metrics::compact(if self.segmented { 48. } else { 40. }),
         };
         let item_height = match self.height {
             Some(height) => height.to_pixels(window.rem_size()),
-            None => px(metrics.height * scale),
+            None => rem(metrics.height).to_pixels(window.rem_size()),
         };
         let fill = self.full_width;
         let icon_size = rem(metrics.icon);
@@ -527,7 +526,7 @@ impl RenderOnce for ConnectedButtonGroup {
             });
             let content = gpui_base::h_flex()
                 .when(!fill, |content| content.max_w_full().min_w_0())
-                .gap(rems(8. / 14.))
+                .gap(rem(8.))
                 .items_center()
                 // Text-only options center their label; no empty icon slot.
                 .when_some(self.icons.get(&value).cloned(), |content, icon| {
