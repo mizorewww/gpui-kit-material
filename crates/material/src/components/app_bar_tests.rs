@@ -74,6 +74,43 @@ fn scrolled_under_paints_surface_container() {
     assert_eq!(scrolled.search, color(ColorRole::SURFACE_CONTAINER_HIGHEST));
 }
 
+#[test]
+fn a_custom_flat_container_still_fades_to_surface_container() {
+    let flat = bar_paint_on(ColorRole::SURFACE_CONTAINER_LOWEST, 0.);
+    assert_eq!(flat.container, color(ColorRole::SURFACE_CONTAINER_LOWEST));
+    let scrolled = bar_paint_on(ColorRole::SURFACE_CONTAINER_LOWEST, 1.);
+    assert_eq!(scrolled.container, color(ColorRole::SURFACE_CONTAINER));
+    assert_eq!(scrolled.search, color(ColorRole::SURFACE_CONTAINER_HIGHEST));
+}
+
+#[gpui::test]
+fn the_container_role_paints_the_flat_bar(cx: &mut TestAppContext) {
+    struct OnPane;
+    impl Render for OnPane {
+        fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+            window.set_rem_size(px(14.));
+            div().w(px(412.)).child(
+                TopAppBar::new("pane-bar", TopAppBarVariant::Small)
+                    .title("Title")
+                    .container(ColorRole::SURFACE_CONTAINER_LOWEST),
+            )
+        }
+    }
+    cx.update(gpui_base::init);
+    let (_, cx) = cx.add_window_view(|_, _| OnPane);
+    settle(cx);
+    let paint = PAINTED.with(|painted| {
+        painted
+            .borrow()
+            .iter()
+            .find(|(key, _)| key.contains("pane-bar"))
+            .expect("the bar painted")
+            .1
+            .0
+    });
+    assert_eq!(paint.container, color(ColorRole::SURFACE_CONTAINER_LOWEST));
+}
+
 struct Harness {
     variant: TopAppBarVariant,
     offset: f32,
