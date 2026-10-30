@@ -557,6 +557,7 @@ pub struct BottomAppBar {
     label: SharedString,
     actions: Vec<AnyElement>,
     fab: Option<AnyElement>,
+    fab_centered: bool,
     visible: bool,
 }
 
@@ -568,6 +569,7 @@ impl BottomAppBar {
             label: label.into(),
             actions: Vec::new(),
             fab: None,
+            fab_centered: false,
             visible: true,
         }
     }
@@ -584,11 +586,23 @@ impl BottomAppBar {
         self.fab = Some(fab.into_any_element());
         self
     }
+    /// Center the FAB in the bar, with the actions split around it (the
+    /// first half before it), instead of trailing them.
+    pub fn fab_centered(mut self, centered: bool) -> Self {
+        self.fab_centered = centered;
+        self
+    }
     /// Show or hide the bar, e.g. hidden while scrolling down.
     pub fn visible(mut self, visible: bool) -> Self {
         self.visible = visible;
         self
     }
+}
+
+/// How many of `count` actions sit before a centered FAB: the first half,
+/// rounded up.
+pub(crate) fn actions_before_center(count: usize) -> usize {
+    count.div_ceil(2)
 }
 
 impl RenderOnce for BottomAppBar {
@@ -603,6 +617,28 @@ impl RenderOnce for BottomAppBar {
         #[cfg(test)]
         BOTTOM_SHOWN.with(|map| map.borrow_mut().insert(format!("{:?}", self.id), shown));
         let gone = !self.visible && shown <= 0.001;
+        let row = |actions: Vec<AnyElement>| {
+            div()
+                .flex_1()
+                .flex()
+                .items_center()
+                .gap(rem(TITLE_GAP))
+                .children(actions)
+        };
+        let content: Vec<AnyElement> = match self.fab {
+            Some(fab) if self.fab_centered => {
+                let mut before = self.actions;
+                let after = before.split_off(actions_before_center(before.len()));
+                vec![
+                    row(before).into_any_element(),
+                    fab,
+                    row(after).justify_end().into_any_element(),
+                ]
+            }
+            fab => std::iter::once(row(self.actions).into_any_element())
+                .chain(fab)
+                .collect(),
+        };
         div()
             .when(cfg!(test), |bar| {
                 bar.debug_selector(|| "bottom-app-bar".into())
@@ -621,17 +657,7 @@ impl RenderOnce for BottomAppBar {
                     .pl(rem(EDGE))
                     .pr(rem(TITLE_INSET))
                     .bg(color(ColorRole::SURFACE_CONTAINER))
-                    .when(!gone, |bar| {
-                        bar.child(
-                            div()
-                                .flex_1()
-                                .flex()
-                                .items_center()
-                                .gap(rem(TITLE_GAP))
-                                .children(self.actions),
-                        )
-                        .children(self.fab)
-                    }),
+                    .when(!gone, |bar| bar.children(content)),
             )
     }
 }

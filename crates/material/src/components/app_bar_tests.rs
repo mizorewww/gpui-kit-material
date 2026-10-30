@@ -268,3 +268,53 @@ fn the_bottom_bar_hides_on_the_spatial_spring(cx: &mut TestAppContext) {
     settle(cx);
     assert_eq!(height(cx), px(0.));
 }
+
+#[test]
+fn a_centered_fab_takes_the_first_half_of_the_actions_before_it() {
+    assert_eq!(actions_before_center(0), 0);
+    assert_eq!(actions_before_center(1), 1);
+    assert_eq!(actions_before_center(2), 1);
+    assert_eq!(actions_before_center(3), 2);
+    assert_eq!(actions_before_center(4), 2);
+}
+
+#[gpui::test]
+fn the_bottom_bar_fab_trails_or_centers(cx: &mut TestAppContext) {
+    struct Bar {
+        centered: bool,
+    }
+    impl Render for Bar {
+        fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+            window.set_rem_size(px(14.));
+            let action =
+                |name: &'static str| div().debug_selector(move || name.into()).size(px(48.));
+            div().w(px(412.)).child(
+                BottomAppBar::new("bottom", "Actions")
+                    .action(action("first-action"))
+                    .action(action("second-action"))
+                    .fab(action("fab").size(px(56.)))
+                    .fab_centered(self.centered),
+            )
+        }
+    }
+    cx.update(gpui_base::init);
+    let (view, cx) = cx.add_window_view(|_, _| Bar { centered: false });
+    settle(cx);
+    let fab = cx.debug_bounds("fab").unwrap();
+    assert_eq!(fab.right(), px(412. - TITLE_INSET), "trailing FAB");
+    let second = cx.debug_bounds("second-action").unwrap();
+    assert!(second.right() < fab.left());
+    view.update(cx, |view, cx| {
+        view.centered = true;
+        cx.notify();
+    });
+    settle(cx);
+    let fab = cx.debug_bounds("fab").unwrap();
+    // The two flexible rows are equal, so the FAB sits in their middle.
+    let middle = (EDGE + (412. - TITLE_INSET)) / 2.;
+    assert!((f32::from(fab.center().x) - middle).abs() < 0.5, "{fab:?}");
+    assert!(cx.debug_bounds("first-action").unwrap().right() < fab.left());
+    let second = cx.debug_bounds("second-action").unwrap();
+    assert!(second.left() > fab.right(), "the second half follows");
+    assert_eq!(second.right(), px(412. - TITLE_INSET));
+}
