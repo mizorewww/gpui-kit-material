@@ -14,25 +14,8 @@ use gpui::prelude::FluentBuilder as _;
 use gpui::*;
 use std::{collections::BTreeMap, rc::Rc};
 
-actions!(
-    material_button_group,
-    [NextChoice, PreviousChoice, FirstChoice, LastChoice]
-);
+use super::roving::{Change, Orientation, Roving, select_value};
 
-pub(crate) fn init(cx: &mut App) {
-    cx.bind_keys([
-        KeyBinding::new("right", NextChoice, Some("ConnectedButtonGroup")),
-        KeyBinding::new("down", NextChoice, Some("ConnectedButtonGroup")),
-        KeyBinding::new("left", PreviousChoice, Some("ConnectedButtonGroup")),
-        KeyBinding::new("up", PreviousChoice, Some("ConnectedButtonGroup")),
-        KeyBinding::new("home", FirstChoice, Some("ConnectedButtonGroup")),
-        KeyBinding::new("end", LastChoice, Some("ConnectedButtonGroup")),
-    ]);
-}
-
-#[cfg(test)]
-use super::roving_list::destination;
-use super::roving_list::{Change, Direction, Roving as Navigation};
 #[derive(Clone)]
 struct OptionItem {
     value: SharedString,
@@ -437,13 +420,13 @@ fn focus_ring(
 }
 
 /// The focus handle of each option, created on first sight (see
-/// [`super::roving_list::sync_handles`]).
+/// [`super::roving::sync_handles`]).
 fn sync_handles(
     handles: &mut BTreeMap<SharedString, FocusHandle>,
     options: &[OptionItem],
     create: impl FnMut() -> FocusHandle,
 ) -> Vec<FocusHandle> {
-    super::roving_list::sync_handles(handles, options, |option| &option.value, create)
+    super::roving::sync_handles(handles, options, |option| &option.value, create)
 }
 
 impl RenderOnce for ConnectedButtonGroup {
@@ -465,26 +448,15 @@ impl RenderOnce for ConnectedButtonGroup {
             .position(|option| Some(&option.value) == self.value.as_ref());
         let specimen = !self.previews.is_empty();
         let entry = (!disabled && !specimen).then(|| selected.unwrap_or(0));
-        let navigation = Navigation {
-            values: if disabled {
-                Vec::new()
-            } else {
-                self.options
-                    .iter()
-                    .map(|option| option.value.clone())
-                    .collect()
-            },
-            focus: handles.clone(),
-            skip: Vec::new(),
-            selected,
-            on_change: self.on_change.clone(),
-            follow_focus: true,
-            reveal: None,
-        };
-        let next = navigation.clone();
-        let previous = navigation.clone();
-        let first = navigation.clone();
-        let last = navigation;
+        let roving = Roving::new(handles.clone(), Orientation::Both)
+            .disabled(disabled)
+            .selected(selected)
+            .select_on_focus(self.on_change.clone().map(|on_change| {
+                select_value(
+                    self.options.iter().map(|option| option.value.clone()),
+                    on_change,
+                )
+            }));
         let count = self.options.len();
         let scale = f32::from(window.rem_size()) / 14.;
         let metrics = match self.size {
@@ -662,7 +634,6 @@ impl RenderOnce for ConnectedButtonGroup {
                 Role::RadioGroup
             })
             .aria_label(self.label)
-            .key_context("ConnectedButtonGroup")
             .flex()
             .min_w_0()
             .max_w_full()
@@ -670,15 +641,8 @@ impl RenderOnce for ConnectedButtonGroup {
             .when(cfg!(test), |group| {
                 group.debug_selector(|| "full-choice-track".into())
             })
-            .on_action(move |_: &NextChoice, window, cx| next.navigate(Direction::Next, window, cx))
-            .on_action(move |_: &PreviousChoice, window, cx| {
-                previous.navigate(Direction::Previous, window, cx)
-            })
-            .on_action(move |_: &FirstChoice, window, cx| {
-                first.navigate(Direction::First, window, cx)
-            })
-            .on_action(move |_: &LastChoice, window, cx| last.navigate(Direction::Last, window, cx))
             .child(lane);
+        let group = roving.install(group);
         if let Some(scroll) = self.reveal_in {
             let reveal_id = ElementId::from((self.id.clone(), "choice-reveal"));
             let reveal = super::RevealFocus::new(reveal_id, group, scroll);
@@ -692,8 +656,8 @@ impl RenderOnce for ConnectedButtonGroup {
 #[cfg(test)]
 mod tests {
     use super::{
-        ConnectedButtonGroup, Direction, OptionItem, OptionPaint, PAINTED, destination,
-        option_paint, state, sync_handles, unique_options,
+        ConnectedButtonGroup, OptionItem, OptionPaint, PAINTED, option_paint, state, sync_handles,
+        unique_options,
     };
 
     #[core::prelude::v1::test]
@@ -829,7 +793,7 @@ mod tests {
     fn tab_traversal_uses_only_selected_radio_and_tracks_arrow_changes(cx: &mut TestAppContext) {
         cx.update(|cx| {
             gpui_base::init(cx);
-            super::init(cx);
+            crate::components::roving::init(cx);
             cx.set_reduce_motion(true);
         });
         for disabled in [false, true] {
@@ -1533,7 +1497,7 @@ mod tests {
     fn arrow_keys_move_focus_and_selection_once_per_step(cx: &mut TestAppContext) {
         cx.update(|cx| {
             cx.set_reduce_motion(true);
-            super::init(cx);
+            crate::components::roving::init(cx);
         });
         let (view, cx) = cx.add_window_view(|_, _| FullWidthHarness {
             count: 3,
@@ -1598,17 +1562,5 @@ mod tests {
         }
         // The current option keeps its pill shape.
         assert_eq!(painted("full-1").left_radius, px(20.));
-    }
-
-    #[test]
-    fn arrows_wrap_and_start_when_selection_is_unknown() {
-        assert_eq!(destination(3, Some(0), Direction::Next), Some(1));
-        assert_eq!(destination(3, Some(2), Direction::Next), Some(0));
-        assert_eq!(destination(3, Some(0), Direction::Previous), Some(2));
-        assert_eq!(destination(3, None, Direction::Next), Some(0));
-        assert_eq!(destination(3, None, Direction::Previous), Some(2));
-        assert_eq!(destination(3, Some(1), Direction::First), Some(0));
-        assert_eq!(destination(3, Some(1), Direction::Last), Some(2));
-        assert_eq!(destination(0, Some(0), Direction::Next), None);
     }
 }
