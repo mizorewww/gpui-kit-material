@@ -39,29 +39,49 @@ fn toggle_roles_and_shape_swap_match_reference_for_every_variant_and_size() {
             } else {
                 assert_eq!((bg, fg, border), colors(variant, false));
             }
-            // m3e button.css toggles: on-surface at 10%, an outline-variant
-            // wash for outlined, and no container for text.
+            // The kit's disabled toggles (Toggle button* sets, State=Disabled).
             let (bg, fg, border) = resolved(true);
+            let fixture: serde_json::Value =
+                serde_json::from_str(include_str!("../../../tests/fixtures/figma-button.json"))
+                    .unwrap();
+            let kit_variant = match variant {
+                ButtonVariant::Filled => "filled",
+                ButtonVariant::Elevated => "elevated",
+                ButtonVariant::Tonal => "tonal",
+                ButtonVariant::Outlined => "outlined",
+                // The kit has no text toggle; it disables like the text button.
+                ButtonVariant::Text => {
+                    assert_eq!((bg, fg, border), colors(variant, true));
+                    continue;
+                }
+            };
+            let selection = if selected { "selected" } else { "unselected" };
+            let reference = &fixture["disabled"][format!("toggle-{kit_variant}-{selection}")];
+            let (role, opacity) =
+                super::tests::figma_role(reference["container"]["variable"].as_str().unwrap());
             assert_eq!(
                 bg,
-                match variant {
-                    ButtonVariant::Text => colors(variant, true).0,
-                    ButtonVariant::Outlined => {
-                        alpha(crate::theme::color(C::OUTLINE_VARIANT), 0.1)
-                    }
-                    _ => alpha(crate::theme::color(C::ON_SURFACE), 0.1),
-                },
-                "{variant:?}"
+                alpha(crate::theme::color(role), opacity),
+                "{variant:?} {selected}"
             );
-            assert_eq!(fg, alpha(crate::theme::color(C::ON_SURFACE_VARIANT), 0.38));
+            let (role, _) =
+                super::tests::figma_role(reference["content"]["variable"].as_str().unwrap());
             assert_eq!(
-                border.a,
-                if variant == ButtonVariant::Outlined {
-                    0.1
-                } else {
-                    0.
-                }
+                fg,
+                alpha(
+                    crate::theme::color(role),
+                    reference["content"]["opacity"].as_f64().unwrap() as f32
+                ),
+                "{variant:?} {selected}"
             );
+            match reference["outline"].as_object() {
+                Some(outline) => {
+                    let (role, opacity) =
+                        super::tests::figma_role(outline["variable"].as_str().unwrap());
+                    assert_eq!(border, alpha(crate::theme::color(role), opacity));
+                }
+                None => assert_eq!(border.a, 0., "{variant:?} {selected}"),
+            }
         }
     }
     for size in ButtonSize::ALL {

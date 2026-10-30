@@ -1,10 +1,13 @@
 //! Material button presentation over GPUI Base activation and focus behavior.
-//! Sizes, paddings and disabled colors: m3e.kyralabs.dev (kyra-labs/m3exp-web
-//! 3b1e0047c0021eab7b4c0128fa1bec95c76ca746, `packages/m3e-css/src/button.css`
-//! and `packages/m3e-tokens/src/generated/components/button-*.css`; fixture
-//! `tests/fixtures/m3e-sys-tokens.json`). State-layer, shadow, ripple and
-//! color-transition timing still follow the md3.io captures of floor/material
-//! c910072f3fc5b660276731d8a935d7186f288364 (`conformance/reference/button-*.json`).
+//! Reference priority is Figma kit > md3.io > m3e.kyralabs.dev, per value.
+//! Sizes, paddings, gaps, icon sizes, corners, outline widths and disabled
+//! colors come from the Figma Material 3 Design Kit's Buttons page (Button
+//! 57994:2227 and its text/elevated/outline/tonal/toggle sets; fixture
+//! `tests/fixtures/figma-button.json`). The kit has no motion, so
+//! state-layer, shadow, ripple and color-transition timing follow the md3.io
+//! captures of floor/material c910072f3fc5b660276731d8a935d7186f288364
+//! (`conformance/reference/button-*.json`). m3e's button tokens
+//! (`tests/fixtures/m3e-sys-tokens.json`) are outranked secondary evidence.
 //! Controlled toggle and loading presentation over Base behavior.
 #[cfg(test)]
 mod active_tests;
@@ -231,7 +234,7 @@ impl ButtonSize {
             Self::Small => (40., 16., 8., 1., 12., 8., TypeRole::LabelLarge),
             Self::Medium => (56., 24., 8., 1., 16., 12., TypeRole::TitleMedium),
             Self::Large => (96., 48., 12., 2., 28., 16., TypeRole::HeadlineSmall),
-            Self::ExtraLarge => (136., 64., 16., 3., 28., 16., TypeRole::HeadlineLarge),
+            Self::ExtraLarge => (136., 64., 16., 2., 28., 16., TypeRole::HeadlineLarge),
         };
         Geometry {
             height,
@@ -245,10 +248,10 @@ impl ButtonSize {
     }
 }
 
-/// Inline padding: m3e pads every variant, with or without an icon, by the
-/// size's leading/trailing space (XS: ButtonDefaults' 12px), unlike md3.io's
-/// compact text and small-icon paddings. Both sides are equal, so logical
-/// direction does not change them.
+/// Inline padding: the kit pads every variant, with or without an icon, by
+/// the size's State-layer padding (12/16/24/48/64), unlike md3.io's compact
+/// text and small-icon paddings. Both sides are equal, so logical direction
+/// does not change them.
 fn horizontal_padding(size: ButtonSize) -> (f32, f32) {
     let padding = size.geometry().padding;
     (padding, padding)
@@ -259,33 +262,27 @@ fn alpha(mut color: Rgba, opacity: f32) -> Rgba {
     color.a *= opacity;
     color
 }
-/// Disabled colors follow m3e (`packages/m3e-css/src/button.css` at
-/// kyra-labs/m3exp-web 3b1e004): the token objects Compose uses, so the
-/// plain tonal button takes `FilledTonalButtonTokens` (on-surface at 12% and
-/// 38%) while the other variants use on-surface at 10% and
-/// on-surface-variant at 38%. Fixture: `tests/fixtures/m3e-sys-tokens.json`.
+/// Disabled colors follow the Figma kit (every Button*/Toggle button* set at
+/// State=Disabled): every variant, including text and outlined, fills its
+/// container with `State Layers/On Surface/Opacity-10` and draws its content
+/// in on-surface under a 0.38 layer; the outlined button keeps its full
+/// outline-variant outline. Fixture: `tests/fixtures/figma-button.json`.
+fn disabled_targets(outlined: bool) -> (CssColor, CssColor, CssColor) {
+    use ColorRole as C;
+    (
+        CssColor::alpha_role(C::ON_SURFACE, 0.10),
+        CssColor::alpha_role(C::ON_SURFACE, crate::tokens::state::DISABLED_CONTENT),
+        if outlined {
+            CssColor::role(C::OUTLINE_VARIANT)
+        } else {
+            CssColor::transparent()
+        },
+    )
+}
 fn color_targets(variant: ButtonVariant, disabled: bool) -> (CssColor, CssColor, CssColor) {
     use ColorRole as C;
     if disabled {
-        return (
-            match variant {
-                ButtonVariant::Text | ButtonVariant::Outlined => CssColor::transparent(),
-                ButtonVariant::Tonal => CssColor::alpha_role(C::ON_SURFACE, 0.12),
-                ButtonVariant::Filled | ButtonVariant::Elevated => {
-                    CssColor::alpha_role(C::ON_SURFACE, 0.10)
-                }
-            },
-            if variant == ButtonVariant::Tonal {
-                CssColor::alpha_role(C::ON_SURFACE, 0.38)
-            } else {
-                CssColor::alpha_role(C::ON_SURFACE_VARIANT, 0.38)
-            },
-            if variant == ButtonVariant::Outlined {
-                CssColor::alpha_role(C::OUTLINE_VARIANT, 0.10)
-            } else {
-                CssColor::transparent()
-            },
-        );
+        return disabled_targets(variant == ButtonVariant::Outlined);
     }
     let (bg, fg) = match variant {
         ButtonVariant::Filled => (CssColor::role(C::PRIMARY), C::ON_PRIMARY),
@@ -327,18 +324,10 @@ fn toggle_color_targets(
         return color_targets(variant, disabled);
     }
     if disabled {
-        // m3e toggles: TonalButtonTokens for tonal, an outline-variant wash
-        // for outlined, and no container for text.
-        let (_, _, border) = color_targets(variant, true);
-        return (
-            match variant {
-                ButtonVariant::Text => CssColor::transparent(),
-                ButtonVariant::Outlined => CssColor::alpha_role(C::OUTLINE_VARIANT, 0.10),
-                _ => CssColor::alpha_role(C::ON_SURFACE, 0.10),
-            },
-            CssColor::alpha_role(C::ON_SURFACE_VARIANT, 0.38),
-            border,
-        );
+        // The kit's disabled toggles match the plain buttons, except that a
+        // selected outlined toggle (inverse surface when enabled) drops its
+        // outline.
+        return disabled_targets(variant == ButtonVariant::Outlined && !selected);
     }
     let roles = match (variant, selected) {
         (ButtonVariant::Filled, false) => Some((C::SURFACE_CONTAINER, C::ON_SURFACE_VARIANT)),
@@ -1953,99 +1942,88 @@ mod tests {
         assert_eq!(filled.a, 1.);
         assert!((filled.r - (1. * 0.9 + content.r * 0.1)).abs() < 0.00001);
     }
-    #[test]
-    fn size_geometry_matches_the_pinned_m3e_button_tokens() {
-        let fixture: serde_json::Value =
-            serde_json::from_str(include_str!("../../tests/fixtures/m3e-sys-tokens.json")).unwrap();
-        let button = &fixture["button"];
-        let defaults = &button["defaults"];
-        let px = |value: &serde_json::Value| value.as_f64().unwrap() as f32;
-        let corner = |value: &serde_json::Value| {
-            value
-                .as_str()
-                .unwrap()
-                .trim_end_matches("px")
-                .parse::<f32>()
-                .unwrap()
-        };
-        assert_eq!(px(&defaults["button-min-width"]), 58.);
-        for (size, name) in ButtonSize::ALL
-            .into_iter()
-            .zip(["x-small", "small", "medium", "large", "x-large"])
-        {
-            let reference = &button["sizes"][name];
-            let g = size.geometry();
-            assert_eq!(g.height, px(&reference["container_height"]), "{name}");
-            assert_eq!(size.icon_size(), px(&reference["icon_size"]), "{name}");
-            assert_eq!(g.outline, px(&reference["outline_width"]), "{name}");
-            assert_eq!(g.square, corner(&reference["shape_square"]), "{name}");
-            assert_eq!(g.pressed, corner(&reference["shape_pressed"]), "{name}");
-            // Compose ButtonDefaults overrides the XS padding and spacing.
-            let (padding, gap) = if size == ButtonSize::ExtraSmall {
-                (
-                    px(&defaults["button-x-small-content-padding-horizontal"]),
-                    px(&defaults["button-x-small-icon-spacing"]),
-                )
-            } else {
-                assert_eq!(reference["leading_space"], reference["trailing_space"]);
-                (
-                    px(&reference["leading_space"]),
-                    px(&reference["icon_label_space"]),
-                )
-            };
-            assert_eq!(
-                super::horizontal_padding(size),
-                (padding, padding),
-                "{name}"
-            );
-            assert_eq!(g.gap, gap, "{name}");
+    fn figma_buttons() -> serde_json::Value {
+        serde_json::from_str(include_str!("../../tests/fixtures/figma-button.json")).unwrap()
+    }
+
+    /// A kit color variable name as the role (and opacity) it paints.
+    pub(super) fn figma_role(variable: &str) -> (ColorRole, f32) {
+        match variable {
+            "Schemes/On Surface" => (ColorRole::ON_SURFACE, 1.),
+            "Schemes/Outline Variant" => (ColorRole::OUTLINE_VARIANT, 1.),
+            "State Layers/On Surface/Opacity-10" => (ColorRole::ON_SURFACE, 0.10),
+            other => panic!("unexpected kit variable {other}"),
         }
     }
 
     #[test]
-    fn disabled_buttons_use_independent_content_container_and_outline_roles() {
-        let fixture: serde_json::Value =
-            serde_json::from_str(include_str!("../../tests/fixtures/m3e-sys-tokens.json")).unwrap();
-        let disabled = &fixture["button"]["disabled"];
+    fn size_geometry_matches_the_figma_kit_buttons() {
+        let fixture = figma_buttons();
+        let px = |value: &serde_json::Value| value.as_f64().unwrap() as f32;
+        for (size, name) in ButtonSize::ALL
+            .into_iter()
+            .zip(["XSmall", "Small", "Medium", "Large", "XLarge"])
+        {
+            let reference = &fixture["sizes"][name];
+            let g = size.geometry();
+            assert_eq!(g.height, px(&reference["container_height"]), "{name}");
+            assert_eq!(size.icon_size(), px(&reference["icon_size"]), "{name}");
+            assert_eq!(g.outline, px(&reference["outline_width"]), "{name}");
+            assert_eq!(g.square, px(&reference["shape_square"]), "{name}");
+            assert_eq!(g.pressed, px(&reference["shape_pressed"]), "{name}");
+            assert_eq!(g.gap, px(&reference["icon_label_gap"]), "{name}");
+            let padding = reference["padding"].as_array().unwrap();
+            // [top, right, bottom, left]; the label's line box fills the rest.
+            assert_eq!(padding[1], padding[3], "{name}");
+            assert_eq!(
+                super::horizontal_padding(size),
+                (px(&padding[3]), px(&padding[1])),
+                "{name}"
+            );
+            let style = reference["label_style"].as_str().unwrap();
+            let role = g.typography.name();
+            assert_eq!(
+                style,
+                format!("M3/{}", role.replacen('-', "/", 1)),
+                "{name} label style"
+            );
+        }
+    }
+
+    #[test]
+    fn disabled_buttons_match_the_figma_kit() {
+        let fixture = figma_buttons();
+        let disabled = &fixture["disabled"];
         for variant in ButtonVariant::ALL {
             let (bg, fg, border) = colors(variant, true);
-            // button.css maps the plain tonal button to FilledTonalButtonTokens.
             let reference = &disabled[match variant {
                 ButtonVariant::Filled => "filled",
                 ButtonVariant::Elevated => "elevated",
-                ButtonVariant::Tonal => "filled-tonal",
+                ButtonVariant::Tonal => "tonal",
                 ButtonVariant::Outlined => "outlined",
                 ButtonVariant::Text => "text",
             }];
-            let content = match reference["content_color"].as_str().unwrap() {
-                "on-surface" => ColorRole::ON_SURFACE,
-                "on-surface-variant" => ColorRole::ON_SURFACE_VARIANT,
-                other => panic!("unexpected disabled content role {other}"),
-            };
-            let content_opacity = reference["content_opacity"].as_f64().unwrap() as f32;
-            assert_eq!(fg, alpha(color(content), content_opacity), "{variant:?}");
+            let (container, opacity) =
+                figma_role(reference["container"]["variable"].as_str().unwrap());
             assert_eq!(
                 bg,
-                if matches!(variant, ButtonVariant::Outlined | ButtonVariant::Text) {
-                    // Transparent disabled containers in button.css.
-                    alpha(rgba(0), 0.)
-                } else {
-                    assert_eq!(reference["container_color"], "on-surface");
-                    alpha(
-                        color(ColorRole::ON_SURFACE),
-                        reference["container_opacity"].as_f64().unwrap() as f32,
-                    )
-                },
+                alpha(color(container), opacity),
+                "{variant:?} container"
+            );
+            let (content, _) = figma_role(reference["content"]["variable"].as_str().unwrap());
+            let content_opacity = reference["content"]["opacity"].as_f64().unwrap() as f32;
+            assert_eq!(
+                reference["content"]["icon_opacity"], reference["content"]["opacity"],
                 "{variant:?}"
             );
-            assert_eq!(
-                border.a,
-                if variant == ButtonVariant::Outlined {
-                    0.10
-                } else {
-                    0.
+            assert_eq!(fg, alpha(color(content), content_opacity), "{variant:?}");
+            match reference["outline"].as_object() {
+                Some(outline) => {
+                    let (role, opacity) = figma_role(outline["variable"].as_str().unwrap());
+                    assert_eq!(border, alpha(color(role), opacity), "{variant:?} outline");
                 }
-            );
+                None => assert_eq!(border.a, 0., "{variant:?} outline"),
+            }
         }
         assert_eq!(
             colors(ButtonVariant::Text, false).1,
@@ -2502,12 +2480,11 @@ mod tests {
                         draw(cx);
                         let button = cx.debug_bounds("icon-button").unwrap();
                         let label = cx.debug_bounds("icon-label").unwrap();
-                        // m3e: the size's leading/trailing space on both sides.
+                        // The kit: the size's State-layer padding on both sides.
                         let (icon_side, label_side) = (pad, pad);
                         let border = if variant == ButtonVariant::Outlined {
                             match size {
-                                ButtonSize::Large => 2.,
-                                ButtonSize::ExtraLarge => 3.,
+                                ButtonSize::Large | ButtonSize::ExtraLarge => 2.,
                                 _ => 1.,
                             }
                         } else {
