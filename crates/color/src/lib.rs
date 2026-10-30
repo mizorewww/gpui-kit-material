@@ -9,11 +9,13 @@
 //! - [`themes`]: the 20 md3.io reference presets, with explicit light/dark mode
 //!   and standard/medium/high contrast. Values come from the reference CSS;
 //!   these tables do not implement dynamic seed-color generation.
+//! - [`dynamic`]: Material's dynamic color, ported from
+//!   material-color-utilities: HCT, tonal palettes and seed schemes.
 //!
 //! Keeping this crate free of GPUI lets the scheme rules be tested on their
-//! own, and leaves room for Material's dynamic color (HCT tonal palettes)
-//! to arrive here without touching components.
+//! own.
 mod color;
+pub mod dynamic;
 pub mod palette;
 pub mod scheme;
 pub mod themes;
