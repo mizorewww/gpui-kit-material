@@ -654,6 +654,7 @@ pub(crate) fn draw_composed(window: &WaylandWindow, scene: ComposedScene<'_>) {
     drop(state);
 
     let mut base_scene = Scene::default();
+    let mut surfaces_presented = true;
     for layer in scene.layers() {
         let surface_scene = match scene.layer_scene(layer) {
             Ok(surface_scene) => surface_scene,
@@ -693,15 +694,17 @@ pub(crate) fn draw_composed(window: &WaylandWindow, scene: ComposedScene<'_>) {
             // Synchronized subsurfaces cache this commit until the window
             // surface commits the base frame below.
             surface.renderer.draw(&surface_scene);
+            surfaces_presented &= surface.renderer.take_present_succeeded();
         } else {
             log::error!(
                 "missing Wayland GPUI composition surface {:?}",
                 layer.surface
             );
+            surfaces_presented = false;
         }
     }
     drop(composition_ref);
-    window.draw(&base_scene);
+    window.draw_frame(&base_scene, surfaces_presented);
 }
 
 /// `PlatformWindow::enable_window_composition`: composition needs

@@ -287,6 +287,7 @@ pub struct X11WindowState {
     visibility: WindowVisibility,
     hovered: bool,
     force_render_after_recovery: bool,
+    frame_submissions: gpui::FrameSubmissionCounter,
     fullscreen: bool,
     client_side_decorations_supported: bool,
     decorations: WindowDecorations,
@@ -852,6 +853,7 @@ impl X11WindowState {
                 visibility: WindowVisibility::Hidden,
                 hovered: false,
                 force_render_after_recovery: false,
+                frame_submissions: Default::default(),
                 fullscreen: false,
                 maximized_vertical: false,
                 maximized_horizontal: false,
@@ -1393,6 +1395,49 @@ impl X11WindowStatePtr {
     }
 }
 
+impl X11Window {
+    /// Draws the window's surface. A frame counts as submitted only when its
+    /// presentation succeeds and any other surface of the frame presented too.
+    pub(crate) fn draw_frame(&self, scene: &Scene, required_surfaces_presented: bool) {
+        let mut inner = self.0.state.borrow_mut();
+        let inner = &mut *inner;
+        let Some(renderer) = &mut inner.renderer else {
+            return;
+        };
+
+        if renderer.device_lost() {
+            let raw_window = RawWindow {
+                connection: as_raw_xcb_connection::AsRawXcbConnection::as_raw_xcb_connection(
+                    &*self.0.xcb,
+                ) as *mut _,
+                screen_id: inner.x_screen_index,
+                window_id: self.0.x_window,
+                visual_id: inner.visual_id,
+            };
+            match renderer.recover(&raw_window) {
+                Ok(()) => {}
+                Err(err) => {
+                    log::warn!("GPU recovery failed, will retry on next frame: {err}");
+                }
+            }
+
+            inner.force_render_after_recovery = true;
+            return;
+        }
+
+        renderer.draw(scene);
+        // A skipped, failed or rejected presentation is not a frame.
+        inner.frame_submissions.record_frame([
+            required_surfaces_presented,
+            renderer.take_present_succeeded(),
+        ]);
+
+        if renderer.needs_redraw() {
+            inner.force_render_after_recovery = true;
+        }
+    }
+}
+
 impl PlatformWindow for X11Window {
     fn bounds(&self) -> Bounds<Pixels> {
         self.0.state.borrow().bounds
@@ -1757,38 +1802,30 @@ impl PlatformWindow for X11Window {
         self.0.callbacks.borrow_mut().button_layout_changed = Some(callback);
     }
 
+    fn successful_frame_submissions(&self) -> Option<u64> {
+        Some(self.0.state.borrow().frame_submissions.count())
+    }
+
+    fn vsync_status(&self) -> gpui::VsyncStatus {
+        match self.0.state.borrow().renderer.as_ref() {
+            Some(renderer) if renderer.presentation_synchronized() => gpui::VsyncStatus::Enabled,
+            Some(_) => gpui::VsyncStatus::Disabled,
+            None => gpui::VsyncStatus::Unsupported,
+        }
+    }
+
+    fn set_vsync(&mut self, enabled: bool) -> anyhow::Result<()> {
+        self.0
+            .state
+            .borrow_mut()
+            .renderer
+            .as_mut()
+            .ok_or_else(|| anyhow::anyhow!("the window has no renderer"))?
+            .set_presentation_synchronized(enabled)
+    }
+
     fn draw(&self, scene: &Scene) {
-        let mut inner = self.0.state.borrow_mut();
-        let inner = &mut *inner;
-        let Some(renderer) = &mut inner.renderer else {
-            return;
-        };
-
-        if renderer.device_lost() {
-            let raw_window = RawWindow {
-                connection: as_raw_xcb_connection::AsRawXcbConnection::as_raw_xcb_connection(
-                    &*self.0.xcb,
-                ) as *mut _,
-                screen_id: inner.x_screen_index,
-                window_id: self.0.x_window,
-                visual_id: inner.visual_id,
-            };
-            match renderer.recover(&raw_window) {
-                Ok(()) => {}
-                Err(err) => {
-                    log::warn!("GPU recovery failed, will retry on next frame: {err}");
-                }
-            }
-
-            inner.force_render_after_recovery = true;
-            return;
-        }
-
-        renderer.draw(scene);
-
-        if renderer.needs_redraw() {
-            inner.force_render_after_recovery = true;
-        }
+        self.draw_frame(scene, true);
     }
 
     fn draw_composed(&self, scene: gpui::ComposedScene<'_>) {

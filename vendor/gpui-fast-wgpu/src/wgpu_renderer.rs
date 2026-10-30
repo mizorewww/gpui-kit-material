@@ -1,6 +1,9 @@
 // Modified by Longbridge for gpui-fast.
 // Modified for gpui-fast releases: adapted to wgpu =30.0.1.
-use crate::{CompositorGpuHint, DeviceErrorState, WgpuAtlas, WgpuContext};
+use crate::{
+    CompositorGpuHint, DeviceErrorState, WgpuAtlas, WgpuContext, present_mode_for_synchronization,
+    present_mode_is_synchronized,
+};
 use anyhow::{Context as _, Result};
 use bytemuck::{Pod, Zeroable};
 use collections::FxHashMap;
@@ -266,6 +269,10 @@ pub struct WgpuRenderer {
     observed_error_generation: u64,
     last_surface_error: Option<String>,
     needs_redraw: bool,
+    /// Whether the last `draw` reached a presentation the backend accepted.
+    last_present_succeeded: bool,
+    /// The present modes the surface reported when it was created.
+    supported_present_modes: Vec<wgpu::PresentMode>,
 }
 
 impl WgpuRenderer {
@@ -468,6 +475,7 @@ impl WgpuRenderer {
             alpha_mode,
             view_formats: vec![],
         };
+        let supported_present_modes = surface_caps.present_modes.clone();
         // Configure the surface immediately. The adapter selection process already validated
         // that this adapter can successfully configure this surface.
         surface.configure(&context.device, &surface_config);
@@ -489,6 +497,8 @@ impl WgpuRenderer {
             observed_error_generation: 0,
             last_surface_error: None,
             needs_redraw: false,
+            last_present_succeeded: false,
+            supported_present_modes,
         })
     }
 }
@@ -1122,7 +1132,47 @@ impl WgpuRenderer {
         self.max_texture_size
     }
 
+    /// Whether the last `draw` reached a presentation the backend accepted,
+    /// which `draw`'s result does not say: it reports that a present was issued,
+    /// for callers pacing their frame loop on it. Taking clears the flag, so
+    /// a frame is established at most once.
+    pub fn take_present_succeeded(&mut self) -> bool {
+        std::mem::take(&mut self.last_present_succeeded)
+    }
+
+    /// Whether the configured present mode synchronizes with the display.
+    pub fn presentation_synchronized(&self) -> bool {
+        present_mode_is_synchronized(self.surface_config.present_mode)
+    }
+
+    /// Reconfigures the surface for a synchronized or unsynchronized present
+    /// mode the surface supports, keeping the current mode when it already
+    /// matches. This does not change what paces frame requests.
+    pub fn set_presentation_synchronized(&mut self, synchronized: bool) -> anyhow::Result<()> {
+        if self.presentation_synchronized() == synchronized {
+            return Ok(());
+        }
+        let mode = present_mode_for_synchronization(synchronized, &self.supported_present_modes)
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "the surface has no {} present mode (it supports {:?})",
+                    if synchronized {
+                        "synchronized"
+                    } else {
+                        "unsynchronized"
+                    },
+                    self.supported_present_modes,
+                )
+            })?;
+        self.surface_config.present_mode = mode;
+        if let RendererState::Ready { surface, core } = &self.state {
+            surface.configure(&core.resources.device, &self.surface_config);
+        }
+        Ok(())
+    }
+
     pub fn draw(&mut self, scene: &Scene) -> bool {
+        self.last_present_succeeded = false;
         #[cfg(target_family = "wasm")]
         if self.device_lost() {
             if matches!(self.state, RendererState::Ready { .. }) {
@@ -1210,7 +1260,7 @@ impl WgpuRenderer {
             return false;
         }
 
-        core.resources.queue.present(frame);
+        self.last_present_succeeded = core.resources.queue.present_checked(frame);
         true
     }
 }

@@ -37,12 +37,27 @@
     "src/linux/x11/xim_handler.rs": "5a1f5b1a6a436a82c6bbbf9222a7470d537c5fac6b06da4e898aca497ee2adf2",
     "src/linux/xdg_desktop_portal.rs": "2e3a8eb44718dbd31b21fc368ad2f5c2105b340ef04f7e002ee0029adb9f3cc1"
   },
-  "local_patches": [],
-  "modified_files": {},
+  "local_patches": [
+    "src/linux/wayland/window.rs",
+    "src/linux/x11/window.rs"
+  ],
+  "modified_files": {
+    "src/linux/wayland/window.rs": {
+      "upstream_sha256": "73d878ac910c686189ccce87b5650c1c90455ef3ea74379051a5bc7b9a2e8bb3",
+      "local_sha256": "702d550a3d4f80fe1aaab2a67c86e6fa733ec872b0fd3fb4deb466e862a7992b",
+      "reason": "successful_frame_submissions, vsync_status, set_vsync; draw moved into draw_frame to record successful presentations (MATERIAL-PATCHES.md)."
+    },
+    "src/linux/x11/window.rs": {
+      "upstream_sha256": "87b737ecda518123196c3f60369120c6a8fb8021b43a4830cc21bf7834eda438",
+      "local_sha256": "6928ea781625d01a5a28612804c4bb0317ef3f6f65f2971a1a74bc606a2df710",
+      "reason": "successful_frame_submissions, vsync_status, set_vsync; draw moved into draw_frame to record successful presentations (MATERIAL-PATCHES.md)."
+    }
+  },
   "added_files": {},
   "removed_files": {},
-  "unchanged_file_count": 31,
+  "unchanged_file_count": 29,
   "provenance_files": [
+    "MATERIAL-PATCHES.md",
     "SOURCE.json"
   ],
   "verification": "Archive taken from ~/.cargo/registry/cache; its SHA-256 equals the Cargo.lock crates.io checksum. upstream_files are hashes of the extracted archive entries. Recompute: extract the .crate and compare with sha256 of each vendor file.",

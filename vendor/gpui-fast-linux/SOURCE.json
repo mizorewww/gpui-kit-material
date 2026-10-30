@@ -45,12 +45,39 @@
     "src/linux/x11/xim_handler.rs": "5a1f5b1a6a436a82c6bbbf9222a7470d537c5fac6b06da4e898aca497ee2adf2",
     "src/linux/xdg_desktop_portal.rs": "2e3a8eb44718dbd31b21fc368ad2f5c2105b340ef04f7e002ee0029adb9f3cc1"
   },
-  "local_patches": [],
-  "modified_files": {},
+  "local_patches": [
+    "src/fast/composition/wayland.rs",
+    "src/fast/composition/x11.rs",
+    "src/linux/wayland/window.rs",
+    "src/linux/x11/window.rs"
+  ],
+  "modified_files": {
+    "src/fast/composition/wayland.rs": {
+      "upstream_sha256": "45d76e804a8c307a384f58487ce7a5cd68f176c181165f215646ee7f9cc2e555",
+      "local_sha256": "b0c6188c433564e726cf5f8c9b7fd5386a3de3ce9f11e3760433bd558ccf4afe",
+      "reason": "A composed frame counts only when every surface presented (MATERIAL-PATCHES.md)."
+    },
+    "src/fast/composition/x11.rs": {
+      "upstream_sha256": "73460bec3081eee24c9a2cc802f74174341396f077c6c5773d105740c9e20ce9",
+      "local_sha256": "a6ddebbf1b83e72e85b05de40f86d2063ac74c24a7808ba951164c1d06347190",
+      "reason": "A composed frame counts only when the base surface and overlay presented (MATERIAL-PATCHES.md)."
+    },
+    "src/linux/wayland/window.rs": {
+      "upstream_sha256": "2f5e6b1d9ab549788de545fff4a7299dcea1c16169b833de62ab2bfaf68baa7e",
+      "local_sha256": "3850e9821f27020ac2632111ba6b8a542c9931a063206823b9efe8cfad253b21",
+      "reason": "successful_frame_submissions, vsync_status, set_vsync; draw moved into draw_frame to record successful presentations (MATERIAL-PATCHES.md)."
+    },
+    "src/linux/x11/window.rs": {
+      "upstream_sha256": "f1c8389e6eb18f176ade2363ac31fac0392d0ae928e5959d679249a7ee3f5a01",
+      "local_sha256": "bf876f14980ce9bfe647bc5c9b8233933d1ada3efede36a18b2a263fd8ec8ceb",
+      "reason": "successful_frame_submissions, vsync_status, set_vsync; draw moved into draw_frame to record successful presentations (MATERIAL-PATCHES.md)."
+    }
+  },
   "added_files": {},
   "removed_files": {},
-  "unchanged_file_count": 39,
+  "unchanged_file_count": 35,
   "provenance_files": [
+    "MATERIAL-PATCHES.md",
     "SOURCE.json"
   ],
   "verification": "Archive taken from ~/.cargo/registry/cache; its SHA-256 equals the Cargo.lock crates.io checksum. upstream_files are hashes of the extracted archive entries. Recompute: extract the .crate and compare with sha256 of each vendor file.",

@@ -134,6 +134,7 @@ pub struct WaylandWindowState {
     active: bool,
     hovered: bool,
     redraw_requested: bool,
+    frame_submissions: gpui::FrameSubmissionCounter,
     presentation: PresentationState,
     pending_frame_callback: Option<wl_callback::WlCallback>,
     in_progress_configure: Option<InProgressConfigure>,
@@ -642,6 +643,7 @@ impl WaylandWindowState {
             active: false,
             hovered: false,
             redraw_requested: false,
+            frame_submissions: Default::default(),
             presentation: PresentationState::Unpresented,
             pending_frame_callback: None,
             in_progress_window_controls: None,
@@ -1724,6 +1726,68 @@ impl rwh::HasDisplayHandle for WaylandWindow {
     }
 }
 
+impl WaylandWindow {
+    /// Draws the window's surface. A frame counts as submitted only when its
+    /// presentation succeeds and any other surface of the frame presented too.
+    pub(crate) fn draw_frame(&self, scene: &Scene, required_surfaces_presented: bool) {
+        let mut state = self.borrow_mut();
+        let state = &mut *state;
+        let Some(renderer) = &mut state.renderer else {
+            return;
+        };
+
+        if renderer.device_lost() {
+            let raw_window = RawWindow {
+                window: state.surface.id().as_ptr().cast::<std::ffi::c_void>(),
+                display: state
+                    .surface
+                    .backend()
+                    .upgrade()
+                    .unwrap()
+                    .display_ptr()
+                    .cast::<std::ffi::c_void>(),
+            };
+            match renderer.recover(&raw_window) {
+                Ok(()) => {
+                    crate::fast::composition::wayland::Composition::renderers_lost(
+                        &state.fast_composition,
+                    );
+                }
+                Err(err) => {
+                    log::warn!("GPU recovery failed, will retry on next frame: {err}");
+                }
+            }
+
+            state.redraw_requested = true;
+            return;
+        }
+
+        // Surface state changed during this GPUI tick is included in this presentation.
+        state.redraw_requested = false;
+        if state.pending_frame_callback.is_none() {
+            let callback = state.surface.frame(&state.globals.qh, state.surface.id());
+            state.pending_frame_callback = Some(callback);
+        }
+        if renderer.draw(scene) {
+            state.presentation = PresentationState::Presented;
+            self.0.frame_loop.set(FrameLoop::AwaitingCallback);
+        } else {
+            state.presentation = state.presentation.failed();
+            self.0.frame_loop.set(FrameLoop::PresentationFailed);
+        }
+        // `draw` reports an issued present, which paces the loop above; a frame
+        // needs the presentation to have succeeded.
+        let presented = renderer.take_present_succeeded();
+        state
+            .frame_submissions
+            .record_frame([required_surfaces_presented, presented]);
+
+        if renderer.needs_redraw() {
+            state.redraw_requested = true;
+        }
+    }
+}
+
 impl PlatformWindow for WaylandWindow {
     fn bounds(&self) -> Bounds<Pixels> {
         self.borrow().bounds
@@ -2022,56 +2086,28 @@ impl PlatformWindow for WaylandWindow {
         self.0.callbacks.borrow_mut().button_layout_changed = Some(callback);
     }
 
+    fn successful_frame_submissions(&self) -> Option<u64> {
+        Some(self.borrow().frame_submissions.count())
+    }
+
+    fn vsync_status(&self) -> gpui::VsyncStatus {
+        match self.borrow().renderer.as_ref() {
+            Some(renderer) if renderer.presentation_synchronized() => gpui::VsyncStatus::Enabled,
+            Some(_) => gpui::VsyncStatus::Disabled,
+            None => gpui::VsyncStatus::Unsupported,
+        }
+    }
+
+    fn set_vsync(&mut self, enabled: bool) -> anyhow::Result<()> {
+        self.borrow_mut()
+            .renderer
+            .as_mut()
+            .ok_or_else(|| anyhow::anyhow!("the window has no renderer"))?
+            .set_presentation_synchronized(enabled)
+    }
+
     fn draw(&self, scene: &Scene) {
-        let mut state = self.borrow_mut();
-        let state = &mut *state;
-        let Some(renderer) = &mut state.renderer else {
-            return;
-        };
-
-        if renderer.device_lost() {
-            let raw_window = RawWindow {
-                window: state.surface.id().as_ptr().cast::<std::ffi::c_void>(),
-                display: state
-                    .surface
-                    .backend()
-                    .upgrade()
-                    .unwrap()
-                    .display_ptr()
-                    .cast::<std::ffi::c_void>(),
-            };
-            match renderer.recover(&raw_window) {
-                Ok(()) => {
-                    crate::fast::composition::wayland::Composition::renderers_lost(
-                        &state.fast_composition,
-                    );
-                }
-                Err(err) => {
-                    log::warn!("GPU recovery failed, will retry on next frame: {err}");
-                }
-            }
-
-            state.redraw_requested = true;
-            return;
-        }
-
-        // Surface state changed during this GPUI tick is included in this presentation.
-        state.redraw_requested = false;
-        if state.pending_frame_callback.is_none() {
-            let callback = state.surface.frame(&state.globals.qh, state.surface.id());
-            state.pending_frame_callback = Some(callback);
-        }
-        if renderer.draw(scene) {
-            state.presentation = PresentationState::Presented;
-            self.0.frame_loop.set(FrameLoop::AwaitingCallback);
-        } else {
-            state.presentation = state.presentation.failed();
-            self.0.frame_loop.set(FrameLoop::PresentationFailed);
-        }
-
-        if renderer.needs_redraw() {
-            state.redraw_requested = true;
-        }
+        self.draw_frame(scene, true);
     }
 
     fn draw_composed(&self, scene: gpui::ComposedScene<'_>) {

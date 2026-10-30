@@ -33,12 +33,32 @@
     "src/wgpu_context.rs": "f6090f721f2c4c356e04f2c454bf41a1d3ba02e7f745a5b19294b74e7bb29b49",
     "src/wgpu_renderer.rs": "cb319689faaf82167f21ce0b24348cc1a31fe2097e20cd37f8aae93f44519fc5"
   },
-  "local_patches": [],
-  "modified_files": {},
-  "added_files": {},
+  "local_patches": [
+    "src/gpui_wgpu.rs",
+    "src/wgpu_renderer.rs"
+  ],
+  "modified_files": {
+    "src/gpui_wgpu.rs": {
+      "upstream_sha256": "6e19cc61d18129d691c6a666a1a9e84928dc204fcd05169fe3a14166bae51780",
+      "local_sha256": "a5f758f3add2401ce9f32ffa036b3d14fbb84ab3265f2b5553e8ecf5cedd08f3",
+      "reason": "Declares and exports present_mode."
+    },
+    "src/wgpu_renderer.rs": {
+      "upstream_sha256": "cb319689faaf82167f21ce0b24348cc1a31fe2097e20cd37f8aae93f44519fc5",
+      "local_sha256": "cc30dc3b30ff02275981855d04dc547dfb8fdd7904bafdfb721e6976a0fc5661",
+      "reason": "draw presents with present_checked and records it for take_present_succeeded; presentation_synchronized and set_presentation_synchronized (MATERIAL-PATCHES.md)."
+    }
+  },
+  "added_files": {
+    "src/present_mode.rs": {
+      "sha256": "fcc012981eb51d93dabfd20b8eeb40f5295d00b09b489222541b5699ca049ef0",
+      "reason": "Added: present mode synchronization rules, tested without a GPU (MATERIAL-PATCHES.md)."
+    }
+  },
   "removed_files": {},
-  "unchanged_file_count": 27,
+  "unchanged_file_count": 25,
   "provenance_files": [
+    "MATERIAL-PATCHES.md",
     "SOURCE.json"
   ],
   "verification": "Archive taken from ~/.cargo/registry/cache; its SHA-256 equals the Cargo.lock crates.io checksum. upstream_files are hashes of the extracted archive entries. Recompute: extract the .crate and compare with sha256 of each vendor file.",
