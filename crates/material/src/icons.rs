@@ -5,7 +5,7 @@
 use gpui::{
     AbsoluteLength, App, AssetSource, Hsla, IntoElement, RenderOnce, SharedString, Styled, Window,
 };
-pub use gpui_material_symbols::{Axes, Icon as SymbolIcon, MaterialSymbols, Style, Symbol};
+pub use gpui_material_symbols::{Asset, Axes, Icon as SymbolIcon, MaterialSymbols, Style, Symbol};
 use std::{borrow::Cow, collections::HashMap, sync::OnceLock};
 
 mod kit_mapping;
