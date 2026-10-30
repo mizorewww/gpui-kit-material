@@ -30,6 +30,18 @@ pub use search::{
 };
 pub use switch::{MaterialSwitch, SwitchIcons};
 mod caption;
+mod date_parts;
+mod date_picker;
+pub use chrono::{Datelike, NaiveDate, NaiveTime, Timelike, Weekday};
+pub use date_parts::{
+    CalendarDay, DAY_CELL, DayRange, PickerListItem, PickerMenuButton, YearChip, add_months,
+    first_of_month, month_weeks, week_days,
+};
+pub use date_picker::{
+    DATE_INPUT_PICKER_WIDTH, DATE_PICKER_WIDTH, DateInputMode, DateMatcher, DatePicker,
+    DatePickerEvent, DatePickerLabels, DatePickerState, DatePickerVariant, DatePickerView,
+    DateSelection, PickerDialog,
+};
 mod checkbox;
 mod chips;
 mod choice;
@@ -96,4 +108,5 @@ pub(crate) fn init(cx: &mut gpui::App) {
     choice::init(cx);
     radio::init(cx);
     menu::init(cx);
+    date_picker::init(cx);
 }
