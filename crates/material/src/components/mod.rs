@@ -107,7 +107,7 @@ pub use feedback::{BadgeKind, badge, outlined_badge};
 pub use focus::{FocusRing, RevealFocus, RingedButton, contain_scroll};
 pub use list::{
     LIST_SEGMENT_GAP, LIST_SEGMENT_INNER_RADIUS, LIST_SEGMENT_RADIUS, ListDensity, ListItem,
-    ListLeading, ListLines, ListTrailing, segmented_list,
+    ListLeading, ListLines, ListTrailing, list_subheader, segmented_list,
 };
 pub use loading_indicator::{
     LOADING_INDICATOR_SIZE, LoadingFrame, LoadingIndicator, LoadingShape, loading_indicator_frame,
