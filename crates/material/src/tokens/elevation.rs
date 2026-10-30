@@ -1,12 +1,13 @@
 //! M3 elevation shadows, painted with [`ColorRole::SHADOW`].
 //!
 //! Each level is the reference two-layer box shadow: a key layer at 30% and
-//! an ambient layer at 15% of the shadow role. The table is m3e's
-//! `--m3e-sys-elevation-level*-shadow` (kyra-labs/m3exp-web
-//! `3b1e0047c0021eab7b4c0128fa1bec95c76ca746`,
-//! `packages/m3e-tokens/src/generated/tokens.css`), which m3e vendors from
-//! Material Web 2.5.0 because Compose draws platform shadows; md3.io agrees.
-//! Fixture: `tests/fixtures/m3e-sys-tokens.json`.
+//! an ambient layer at 15% of the shadow role. Reference priority is Figma
+//! kit > md3.io > m3e.kyralabs.dev; the table is the Figma Material 3 Design
+//! Kit's local effect styles `M3/Elevation Light/1-5` and
+//! `M3/Elevation Dark/1-5` (file key ozddDB2Z1v51f1IFZlUuJ2), which share
+//! geometry and opacities in both themes and differ only in layer order.
+//! Fixture: `tests/fixtures/figma-sys-tokens.json`. md3.io and m3e
+//! (`tests/fixtures/m3e-sys-tokens.json`) agree.
 //!
 //! | Level | Key (x/y/blur/spread @ 30%) | Ambient (x/y/blur/spread @ 15%) |
 //! |-------|-----------------------------|---------------------------------|
@@ -139,26 +140,35 @@ mod tests {
     }
 
     #[test]
-    fn levels_match_the_pinned_m3e_shadows() {
+    fn levels_match_the_figma_kit_effect_styles() {
         let fixture: serde_json::Value =
-            serde_json::from_str(include_str!("../../tests/fixtures/m3e-sys-tokens.json")).unwrap();
-        let levels = fixture["elevation"].as_array().unwrap();
-        assert_eq!(levels.len(), MAX_LEVEL as usize + 1);
-        assert!(levels[0]["layers"].as_array().unwrap().is_empty());
-        for level in 1..=MAX_LEVEL {
-            let reference = levels[level as usize]["layers"].as_array().unwrap();
-            let shadows = super::level(level);
-            assert_eq!(shadows.len(), reference.len());
-            for (shadow, layer) in shadows.iter().zip(reference) {
-                let value = |key: &str| layer[key].as_f64().unwrap() as f32;
-                assert_eq!(value("x"), 0.);
-                assert_layer(
-                    shadow,
-                    value("y"),
-                    value("blur"),
-                    value("spread"),
-                    value("opacity"),
-                );
+            serde_json::from_str(include_str!("../../tests/fixtures/figma-sys-tokens.json"))
+                .unwrap();
+        for theme in ["light", "dark"] {
+            for level in 1..=MAX_LEVEL {
+                let style = &fixture["elevation"][theme][level.to_string()];
+                let mut reference = style["layers"].as_array().unwrap().clone();
+                // Key (30%) first, as painted; the kit orders them per theme.
+                reference.sort_by(|a, b| {
+                    b["opacity"]
+                        .as_f64()
+                        .unwrap()
+                        .total_cmp(&a["opacity"].as_f64().unwrap())
+                });
+                let shadows = super::level(level);
+                assert_eq!(shadows.len(), reference.len(), "{theme} {level}");
+                for (shadow, layer) in shadows.iter().zip(&reference) {
+                    let value = |key: &str| layer[key].as_f64().unwrap() as f32;
+                    assert_eq!(value("x"), 0.);
+                    assert_eq!(layer["color"], "#000000", "the shadow role");
+                    assert_layer(
+                        shadow,
+                        value("y"),
+                        value("blur"),
+                        value("spread"),
+                        value("opacity"),
+                    );
+                }
             }
         }
     }
