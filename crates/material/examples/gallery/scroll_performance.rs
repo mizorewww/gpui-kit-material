@@ -904,9 +904,15 @@ mod tests {
 
     #[test]
     fn journal_offsets_preserve_negative_times_and_stream_loss() {
+        // Windows' `Instant` treats differences up to one performance-counter
+        // tick (commonly 100 ns) as equal, so the offsets must be well above it.
+        const BEFORE: Duration = Duration::from_millis(7);
+        const AFTER: Duration = Duration::from_millis(9);
+        const BEFORE_NS: i128 = -7_000_000;
+        const AFTER_NS: i128 = 9_000_000;
         let origin = Instant::now();
-        assert_eq!(journal_offset(origin - Duration::from_nanos(7), origin), -7);
-        assert_eq!(journal_offset(origin + Duration::from_nanos(9), origin), 9);
+        assert_eq!(journal_offset(origin - BEFORE, origin), BEFORE_NS);
+        assert_eq!(journal_offset(origin + AFTER, origin), AFTER_NS);
         assert_eq!(journal_offset(origin, origin), 0);
         use profiler::journal::{
             DrainedEntries, ForegroundJournalEntry as Entry, FrameSkipReason, FrameSkipped,
@@ -920,7 +926,7 @@ mod tests {
                 entries: vec![
                     Entry::PlatformSignal(PlatformSignal {
                         window_id: id,
-                        signal_at: Some(origin - Duration::from_nanos(7)),
+                        signal_at: Some(origin - BEFORE),
                         handled_at: origin,
                         source: gpui::FrameRequestSource::LocalSchedule,
                     }),
@@ -932,7 +938,7 @@ mod tests {
                     }),
                     Entry::Boundary(IntervalBoundary::FrameSkipped(FrameSkipped {
                         window_id: id,
-                        at: origin + Duration::from_nanos(9),
+                        at: origin + AFTER,
                         reason: FrameSkipReason::ThermalFrameRateLimit,
                     })),
                     Entry::Discontinuity { lost: 3 },
@@ -944,9 +950,9 @@ mod tests {
         let report = evidence.report();
         assert_eq!(report["lost"], 3);
         assert_eq!(report["entries"].as_array().unwrap().len(), 3);
-        assert_eq!(report["entries"][0]["signal_at_ns"], -7);
+        assert_eq!(report["entries"][0]["signal_at_ns"], BEFORE_NS as i64);
         assert_eq!(report["entries"][0]["source"], "local_schedule");
-        assert_eq!(report["entries"][1]["at_ns"], 9);
+        assert_eq!(report["entries"][1]["at_ns"], AFTER_NS as i64);
         assert_eq!(report["entries"][1]["reason"], "thermal_frame_rate_limit");
         assert_eq!(report["entries"][2]["lost"], 3);
         assert_eq!(report["batches"][0]["entries"], 4);

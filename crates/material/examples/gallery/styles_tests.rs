@@ -102,7 +102,7 @@ fn typography_samples_follow_the_text_and_style(cx: &mut TestAppContext) {
     let input = bounds(&mut cx, "type-sample-input");
     cx.simulate_click(input.center(), Modifiers::none());
     settle(&window, &mut cx);
-    cx.simulate_keystrokes("cmd-a");
+    cx.simulate_keystrokes("secondary-a");
     cx.simulate_input("Hello");
     settle(&window, &mut cx);
     assert_eq!(cx.read(|cx| page.read(cx).sample.read(cx).value()), "Hello");
