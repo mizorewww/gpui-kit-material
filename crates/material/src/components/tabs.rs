@@ -15,11 +15,11 @@
 //!
 //! Behavior is GPUI Base's `Tab`/`Tabs` (tab list and tab roles, selection,
 //! position in set, pointer and Enter/Space activation); arrow keys, Home
-//! and End rove focus through the shared [`super::roving_list`] helper, and
+//! and End rove focus through the shared [`super::roving`] helper, and
 //! activation is manual unless [`MaterialTabs::auto_activate`] is set.
 use super::button::{ButtonFocusRing, ButtonRipple};
 use super::navigation::{NavBadge, badged_icon, ripple_corners, type_role};
-use super::roving_list::{self as roving, Change, Roving};
+use super::roving::{self, Change, Orientation, Roving};
 use super::{InteractionPreview, large_badge, small_badge};
 use crate::color::ColorRole;
 use crate::icons::Icon;
@@ -250,14 +250,16 @@ impl RenderOnce for MaterialTabs {
         let handles_state = window.use_keyed_state((self.id.clone(), "tab-focus"), cx, |_, _| {
             BTreeMap::<SharedString, FocusHandle>::new()
         });
-        let handles = handles_state.update(cx, |handles, cx| {
-            roving::sync_handles(
-                handles,
-                &self.items,
-                |item| &item.value,
-                || cx.focus_handle(),
-            )
-        });
+        let handles: Rc<[FocusHandle]> = handles_state
+            .update(cx, |handles, cx| {
+                roving::sync_handles(
+                    handles,
+                    &self.items,
+                    |item| &item.value,
+                    || cx.focus_handle(),
+                )
+            })
+            .into();
         let scroll = window
             .use_keyed_state((self.id.clone(), "tab-scroll"), cx, |_, _| {
                 ScrollHandle::new()
@@ -277,21 +279,20 @@ impl RenderOnce for MaterialTabs {
             .iter()
             .position(|item| Some(&item.value) == self.selected.as_ref());
         let specimen = self.items.iter().any(|item| item.preview.is_some());
-        let skip: Vec<bool> = self.items.iter().map(TabItem::is_disabled).collect();
-        let entry = if specimen {
-            None
-        } else {
-            roving::entry(selected, &skip)
-        };
-        let roving = Roving {
-            values: self.items.iter().map(|item| item.value.clone()).collect(),
-            focus: handles.clone(),
-            skip,
-            selected,
-            on_change: self.on_change.clone(),
-            follow_focus: self.auto_activate,
-            reveal: scrollable.then(|| scroll.clone()),
-        };
+        let skip: Rc<[bool]> = self.items.iter().map(TabItem::is_disabled).collect();
+        let select = self
+            .on_change
+            .clone()
+            .filter(|_| self.auto_activate)
+            .map(|on_change| {
+                roving::select_value(self.items.iter().map(|item| item.value.clone()), on_change)
+            });
+        let roving = Roving::new(handles.clone(), Orientation::Row)
+            .skip(skip)
+            .selected(selected)
+            .select_on_focus(select)
+            .reveal(scrollable.then(|| scroll.clone()));
+        let entry = if specimen { None } else { roving.entry() };
 
         // The sliding indicator, once this tab row has been measured.
         let measured = {
@@ -540,7 +541,6 @@ impl RenderOnce for MaterialTabs {
         }
         let lane = lane.children(sliding);
         let list = gpui_base::Tabs::new(self.id)
-            .key_context(roving::ROW_CONTEXT)
             .aria_label(self.label)
             .relative()
             .w_full()

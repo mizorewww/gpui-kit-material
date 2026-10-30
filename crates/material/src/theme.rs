@@ -217,24 +217,39 @@ fn component_color(painted: Scheme, role: ColorRole) -> Hsla {
     rgba(painted.get(role)).into()
 }
 
+/// `role` at `opacity`, e.g. the text selection highlight.
+fn component_color_at(painted: Scheme, role: ColorRole, opacity: f32) -> Hsla {
+    let mut color = rgba(painted.get(role));
+    color.a *= opacity;
+    color.into()
+}
+
 // Only generic semantic colors belong to this bridge. Full M3 role storage,
 // state-layer recipes, motion, spacing and elevation remain Material-owned.
+// A role may carry an opacity (`role @ opacity`).
 macro_rules! component_role_projection {
-    ($($field:ident => $role:ident),* $(,)?) => {
+    ($($field:ident => $role:ident $(@ $opacity:expr)?),* $(,)?) => {
         fn component_projection_matches(theme: &ComponentTheme, painted: Scheme, scale: f32) -> bool {
             theme.font_size == scale_pixels(scale)
                 && theme.font_family.as_ref() == component_font_family()
-                $(&& theme.colors.$field == component_color(painted, ColorRole::$role)
-                  && theme.tokens.$field == component_color(painted, ColorRole::$role).into())*
+                $(&& theme.colors.$field == component_role_projection!(@color painted, $role $(, $opacity)?)
+                  && theme.tokens.$field
+                      == component_role_projection!(@color painted, $role $(, $opacity)?).into())*
         }
 
         fn write_component_projection(theme: &mut ComponentTheme, painted: Scheme, scale: f32) {
             theme.font_size = scale_pixels(scale);
             theme.font_family = component_font_family().into();
-            $(let color = component_color(painted, ColorRole::$role);
+            $(let color = component_role_projection!(@color painted, $role $(, $opacity)?);
               theme.colors.$field = color;
               theme.tokens.$field = color.into();)*
         }
+    };
+    (@color $painted:ident, $role:ident) => {
+        component_color($painted, ColorRole::$role)
+    };
+    (@color $painted:ident, $role:ident, $opacity:expr) => {
+        component_color_at($painted, ColorRole::$role, $opacity)
     };
 }
 
@@ -256,6 +271,9 @@ component_role_projection! {
     border => OUTLINE_VARIANT,
     input => OUTLINE,
     ring => PRIMARY,
+    // Kit's text inputs paint the caret and selection from these.
+    caret => PRIMARY,
+    selection => PRIMARY @ crate::tokens::state::TEXT_SELECTION,
 }
 
 fn sync_component_theme(painted: Scheme, scale: f32, cx: &mut App) -> bool {
@@ -359,6 +377,16 @@ mod tests {
         assert_eq!(theme.radius, gpui::px(13.));
         assert_eq!(theme.colors.chart_1, unowned);
         assert_eq!(painted.get(ColorRole::PRIMARY_FIXED), Color::hex(0x123456));
+        // Text editing paints the caret in primary and the selection in
+        // primary at the M3 selection opacity.
+        let primary: Hsla = rgba(painted.get(ColorRole::PRIMARY)).into();
+        assert_eq!(theme.colors.caret, primary);
+        assert_eq!(theme.tokens.caret.color, primary);
+        assert_eq!(
+            theme.colors.selection,
+            primary.opacity(crate::tokens::state::TEXT_SELECTION)
+        );
+        assert_eq!(theme.tokens.selection.color, theme.colors.selection);
         // Both representations are managed, including a pre-existing mismatched token.
         theme.tokens.primary = Hsla::default().into();
         assert!(!component_projection_matches(&theme, painted, 1.5));

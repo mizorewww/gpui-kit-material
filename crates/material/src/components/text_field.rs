@@ -238,6 +238,8 @@ pub(crate) struct FieldPaint {
     pub trailing: Rgba,
     pub supporting: Rgba,
     pub state_layer: Rgba,
+    /// The text caret (`md.comp.*-text-field.caret.color`, error in error).
+    pub caret: Rgba,
 }
 
 fn alpha(mut c: Rgba, a: f32) -> Rgba {
@@ -272,6 +274,7 @@ pub(crate) fn field_paint(variant: TextFieldVariant, s: FieldState) -> FieldPain
             trailing: content,
             supporting: content,
             state_layer: alpha(on_surface, 0.),
+            caret: color(C::PRIMARY),
         };
     }
     let (rest, hover) = if filled {
@@ -319,6 +322,11 @@ pub(crate) fn field_paint(variant: TextFieldVariant, s: FieldState) -> FieldPain
             alpha(on_surface, state::HOVER)
         } else {
             alpha(on_surface, 0.)
+        },
+        caret: if s.error {
+            color(C::ERROR)
+        } else {
+            color(C::PRIMARY)
         },
     }
 }
@@ -586,6 +594,14 @@ impl RenderOnce for TextField {
                 .text_color(rest.placeholder)
                 .child(text)
         };
+        // Kit's input paints the theme caret (primary through the theme
+        // bridge); the field's own caret follows its error state.
+        let caret = Some(Hsla::from(active.caret));
+        match &self.input {
+            FieldInput::Single(state) => state.update(cx, |s, _| s.set_caret_color(caret)),
+            FieldInput::Multi(state) => state.update(cx, |s, _| s.set_caret_color(caret)),
+            FieldInput::Static(_) => {}
+        }
         let editor: AnyElement = match &self.input {
             FieldInput::Single(state) => Input::new(state)
                 .appearance(false)

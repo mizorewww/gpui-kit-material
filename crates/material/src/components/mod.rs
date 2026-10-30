@@ -68,7 +68,6 @@ mod preview;
 mod progress;
 mod radio;
 mod roving;
-mod roving_list;
 mod search;
 mod sheets;
 mod tabs;
@@ -145,10 +144,7 @@ pub use toolbar::{
 pub use tooltip::{MaterialTooltip, PLAIN_TOOLTIP_MAX_WIDTH, RICH_TOOLTIP_WIDTH};
 
 pub(crate) fn init(cx: &mut gpui::App) {
-    button_group::init(cx);
-    roving_list::init(cx);
-    choice::init(cx);
-    radio::init(cx);
+    roving::init(cx);
     menu::init(cx);
     date_picker::init(cx);
 }

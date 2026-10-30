@@ -14,7 +14,7 @@ mod choice_tile {
     use crate::components::InteractionPreview;
     use crate::components::focus::{RingPlacement, RingedButton};
     use crate::components::radio::animated_choice_radio;
-    use crate::components::roving::{RovingFocus, roving_handles};
+    use crate::components::roving::{Orientation, Roving, Select, index_handles};
     use crate::components::tile::outer_corner_radii;
     use gpui_base::v_flex;
     use std::rc::Rc;
@@ -289,15 +289,18 @@ mod choice_tile {
     impl RenderOnce for ChoiceGroup {
         fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
             let count = self.tiles.len();
-            let focus = roving_handles((self.id.clone(), "choice-focus"), count, window, cx);
-            let enabled: Rc<[bool]> = self.tiles.iter().map(|tile| tile.enabled).collect();
+            let focus = index_handles((self.id.clone(), "choice-focus"), count, window, cx);
+            let skip: Rc<[bool]> = self.tiles.iter().map(|tile| !tile.enabled).collect();
             let selected = self.tiles.iter().position(|tile| tile.selected);
             let on_select = self.on_change.clone().map(|on_change| {
                 Rc::new(move |index: usize, window: &mut Window, cx: &mut App| {
                     on_change(&index, window, cx)
-                }) as Rc<dyn Fn(usize, &mut Window, &mut App)>
+                }) as Select
             });
-            let roving = RovingFocus::new(focus.clone(), enabled, selected, on_select);
+            let roving = Roving::new(focus.clone(), Orientation::Both)
+                .skip(skip)
+                .selected(selected)
+                .select_on_focus(on_select);
             let entry = roving.entry();
             // The title's id is scoped by the group's own id below, so a
             // static name is unique without formatting one per frame.
@@ -332,18 +335,10 @@ mod choice_tile {
                         .aria_label(self.title)
                         .w_full()
                         .min_w_0(),
-                    CHOICE_GROUP_CONTEXT,
                 )
                 .child(group)
         }
     }
-}
-
-const CHOICE_GROUP_CONTEXT: &str = "ChoiceGroup";
-
-/// Arrow keys, Home and End move within a [`ChoiceGroup`].
-pub(crate) fn init(cx: &mut App) {
-    super::roving::bind_roving_keys(cx, CHOICE_GROUP_CONTEXT);
 }
 
 /// A distinct color family for a category icon: a tonal container role and

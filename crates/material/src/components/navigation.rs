@@ -20,10 +20,10 @@
 //! Behavior is GPUI Base's: each item is a Base [`gpui_base::Tab`] (tab role,
 //! selection, position in set, pointer and Enter/Space activation) inside a
 //! Base [`gpui_base::Tabs`] tab list, wrapped in a navigation landmark. Arrow
-//! keys rove focus between items through the shared [`super::roving_list`]
+//! keys rove focus between items through the shared [`super::roving`]
 //! helper; Enter or Space activates.
 use super::button::{ButtonFocusRing, ButtonRipple};
-use super::roving_list::{self as roving, Change, Roving};
+use super::roving::{self, Change, Orientation, Roving};
 use super::{InteractionPreview, large_badge, small_badge};
 use crate::color::ColorRole;
 use crate::icons::{Icon, Style, Symbol};
@@ -541,7 +541,7 @@ impl RenderOnce for NavigationItem {
 
 /// Shared list behavior of bars and rails.
 struct Destinations {
-    handles: Vec<FocusHandle>,
+    handles: Rc<[FocusHandle]>,
     selected: Option<usize>,
     entry: Option<usize>,
     roving: Roving,
@@ -551,33 +551,26 @@ fn destinations(
     id: &ElementId,
     items: &[NavItem],
     selected: Option<&SharedString>,
-    on_change: Option<Change>,
+    orientation: Orientation,
     window: &mut Window,
     cx: &mut App,
 ) -> Destinations {
     let state = window.use_keyed_state((id.clone(), "nav-focus-handles"), cx, |_, _| {
         BTreeMap::<SharedString, FocusHandle>::new()
     });
-    let handles = state.update(cx, |handles, cx| {
-        roving::sync_handles(handles, items, |item| &item.value, || cx.focus_handle())
-    });
+    let handles: Rc<[FocusHandle]> = state
+        .update(cx, |handles, cx| {
+            roving::sync_handles(handles, items, |item| &item.value, || cx.focus_handle())
+        })
+        .into();
     let selected = items.iter().position(|item| Some(&item.value) == selected);
     let specimen = items.iter().any(|item| item.preview.is_some());
-    let skip: Vec<bool> = items.iter().map(NavItem::is_disabled).collect();
-    let entry = if specimen {
-        None
-    } else {
-        roving::entry(selected, &skip)
-    };
-    let roving = Roving {
-        values: items.iter().map(|item| item.value.clone()).collect(),
-        focus: handles.clone(),
-        skip,
-        selected,
-        on_change,
-        follow_focus: false,
-        reveal: None,
-    };
+    let skip: Rc<[bool]> = items.iter().map(NavItem::is_disabled).collect();
+    // Arrows only move focus; Enter or Space activates.
+    let roving = Roving::new(handles.clone(), orientation)
+        .skip(skip)
+        .selected(selected);
+    let entry = if specimen { None } else { roving.entry() };
     Destinations {
         handles,
         selected,
@@ -662,7 +655,7 @@ impl RenderOnce for NavigationBar {
             &self.id,
             &self.items,
             self.selected.as_ref(),
-            self.on_change.clone(),
+            Orientation::Row,
             window,
             cx,
         );
@@ -670,7 +663,6 @@ impl RenderOnce for NavigationBar {
         let geometry = self.layout.geometry();
         let horizontal = self.layout == NavItemLayout::Horizontal;
         let lane = gpui_base::Tabs::new((self.id.clone(), "nav-items"))
-            .key_context(roving::ROW_CONTEXT)
             .aria_label(self.label.clone())
             .flex()
             .flex_row()
@@ -850,7 +842,7 @@ impl RenderOnce for NavigationRail {
             &self.id,
             &self.items,
             self.selected.as_ref(),
-            self.on_change.clone(),
+            Orientation::Column,
             window,
             cx,
         );
@@ -865,7 +857,6 @@ impl RenderOnce for NavigationRail {
         sections.sort_by_key(|(before, _)| *before);
         let mut sections = sections.into_iter().peekable();
         let mut lane = gpui_base::Tabs::new((self.id.clone(), "rail-items"))
-            .key_context(roving::COLUMN_CONTEXT)
             .aria_label(self.label.clone())
             .aria_orientation(accesskit::Orientation::Vertical)
             .w_full()

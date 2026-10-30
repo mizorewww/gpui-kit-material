@@ -453,9 +453,12 @@ impl IntoElement for Board {
             .gap_x(rem(CELL_GAP))
             .gap_y(rem(CELL_GAP))
             .children(items);
+        // The band is at least as wide as its row, fixed column widths or
+        // not, so spare width spreads around the columns; wider content
+        // widens the band, which then scrolls inside its row.
         let frame = div()
             .flex_shrink_0()
-            .when(width.is_none(), |frame| frame.min_w(relative(1.)))
+            .min_w(relative(1.))
             .flex()
             .flex_col()
             .px(rem(BOARD_PADDING))

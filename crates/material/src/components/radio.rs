@@ -7,7 +7,7 @@
 //! at once.
 use super::InteractionPreview;
 use super::button::ButtonFocusRing;
-use super::roving::{RovingFocus, bind_roving_keys, roving_handles};
+use super::roving::{self, Orientation, Roving, index_handles};
 use crate::{
     color::ColorRole,
     motion,
@@ -376,20 +376,21 @@ impl MaterialRadioGroup {
     }
 }
 
-const RADIO_GROUP_CONTEXT: &str = "MaterialRadioGroup";
-
 impl RenderOnce for MaterialRadioGroup {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let count = self.options.len();
-        let focus = roving_handles((self.id.clone(), "radio-focus"), count, window, cx);
-        let enabled: Rc<[bool]> = self.options.iter().map(|option| option.enabled).collect();
+        let focus = index_handles((self.id.clone(), "radio-focus"), count, window, cx);
+        let skip: Rc<[bool]> = self.options.iter().map(|option| !option.enabled).collect();
         let selected = self.selected.filter(|&index| index < count);
         let on_select = self.on_change.clone().map(|on_change| {
             Rc::new(move |index: usize, window: &mut Window, cx: &mut App| {
                 on_change(&index, window, cx)
-            }) as Rc<dyn Fn(usize, &mut Window, &mut App)>
+            }) as roving::Select
         });
-        let roving = RovingFocus::new(focus.clone(), enabled, selected, on_select);
+        let roving = Roving::new(focus.clone(), Orientation::Both)
+            .skip(skip)
+            .selected(selected)
+            .select_on_focus(on_select);
         let entry = roving.entry();
         let radios = self.options.into_iter().enumerate().map(|(index, option)| {
             let on_change = self.on_change.clone();
@@ -415,13 +416,8 @@ impl RenderOnce for MaterialRadioGroup {
                 Axis::Horizontal => group.flex_row().flex_wrap(),
             })
             .children(radios);
-        roving.install(group, RADIO_GROUP_CONTEXT)
+        roving.install(group)
     }
-}
-
-/// Arrow keys, Home and End move within a [`MaterialRadioGroup`].
-pub(crate) fn init(cx: &mut App) {
-    bind_roving_keys(cx, RADIO_GROUP_CONTEXT);
 }
 
 #[cfg(test)]

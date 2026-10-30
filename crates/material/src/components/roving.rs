@@ -1,69 +1,276 @@
-//! Roving keyboard focus for single-selection groups (radio groups, choice
-//! tiles, connected button groups): one tab stop at the selection, arrow
-//! keys, Home and End move focus among the available items and select them.
+//! Roving keyboard focus shared by every Material composite widget: radio
+//! groups, choice tiles, connected button groups, tabs, navigation bars and
+//! rails.
 //!
-//! A group owns one focus handle per position ([`roving_handles`]), builds a
-//! [`RovingFocus`] each frame from its items' availability and selection, and
-//! installs it on its container with a key context bound by
-//! [`bind_roving_keys`].
+//! GPUI Base's `Tab`/`Tabs`, `Radio`/`RadioGroup` own pointer activation and
+//! their roles but deliberately leave compound keyboard navigation to the
+//! caller (`gpui-base/src/tabs.rs`: "Add compound keyboard navigation with
+//! roving focus"), and Kit's `TabBar` has no arrow-key navigation either. This
+//! module is that one missing behavior:
+//!
+//! - one tab stop per widget ([`Roving::entry`]): the selection when it can
+//!   take focus, otherwise the first item that can;
+//! - arrow keys along the widget's [`Orientation`] move focus with wrapping,
+//!   and Home/End go to the ends, skipping items that cannot take focus;
+//! - optionally the selection follows focus (radio groups, auto-activating
+//!   tabs); otherwise Enter and Space activate the focused item through
+//!   GPUI's own keyboard click;
+//! - optionally a scroll container reveals the newly focused item.
+//!
+//! A widget keeps its items' focus handles across frames ([`index_handles`]
+//! or [`sync_handles`]), builds a [`Roving`] each frame and installs it on
+//! its container, which also sets the orientation's key context.
 use gpui::*;
-use std::rc::Rc;
+use std::{collections::BTreeMap, rc::Rc};
 
-pub(crate) use super::button_group::{FirstChoice, LastChoice, NextChoice, PreviousChoice};
+actions!(
+    material_roving,
+    [
+        FocusNextItem,
+        FocusPreviousItem,
+        FocusFirstItem,
+        FocusLastItem
+    ]
+);
 
-/// One arrow-key, Home or End movement within a group.
+/// Key context of a widget whose items run along a row (left/right).
+pub(crate) const ROW_CONTEXT: &str = "MaterialRovingRow";
+/// Key context of a widget whose items run down a column (up/down).
+pub(crate) const COLUMN_CONTEXT: &str = "MaterialRovingColumn";
+/// Key context of a widget that answers both axes (radio groups).
+pub(crate) const BOTH_CONTEXT: &str = "MaterialRovingGroup";
+
+pub(crate) fn init(cx: &mut App) {
+    cx.bind_keys([
+        KeyBinding::new("right", FocusNextItem, Some(ROW_CONTEXT)),
+        KeyBinding::new("left", FocusPreviousItem, Some(ROW_CONTEXT)),
+        KeyBinding::new("home", FocusFirstItem, Some(ROW_CONTEXT)),
+        KeyBinding::new("end", FocusLastItem, Some(ROW_CONTEXT)),
+        KeyBinding::new("down", FocusNextItem, Some(COLUMN_CONTEXT)),
+        KeyBinding::new("up", FocusPreviousItem, Some(COLUMN_CONTEXT)),
+        KeyBinding::new("home", FocusFirstItem, Some(COLUMN_CONTEXT)),
+        KeyBinding::new("end", FocusLastItem, Some(COLUMN_CONTEXT)),
+        KeyBinding::new("right", FocusNextItem, Some(BOTH_CONTEXT)),
+        KeyBinding::new("down", FocusNextItem, Some(BOTH_CONTEXT)),
+        KeyBinding::new("left", FocusPreviousItem, Some(BOTH_CONTEXT)),
+        KeyBinding::new("up", FocusPreviousItem, Some(BOTH_CONTEXT)),
+        KeyBinding::new("home", FocusFirstItem, Some(BOTH_CONTEXT)),
+        KeyBinding::new("end", FocusLastItem, Some(BOTH_CONTEXT)),
+    ]);
+}
+
+/// Which arrow keys move between a widget's items.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum RovingStep {
+pub(crate) enum Orientation {
+    /// Left/Right (tabs, navigation bars).
+    Row,
+    /// Up/Down (navigation rails).
+    Column,
+    /// All four arrows (radio groups, connected button groups).
+    Both,
+}
+
+impl Orientation {
+    pub(crate) const fn context(self) -> &'static str {
+        match self {
+            Self::Row => ROW_CONTEXT,
+            Self::Column => COLUMN_CONTEXT,
+            Self::Both => BOTH_CONTEXT,
+        }
+    }
+}
+
+/// One arrow-key, Home or End movement.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Direction {
     Next,
     Previous,
     First,
     Last,
 }
 
-/// The item `step` lands on from `current`, among `enabled` items. Arrows
-/// wrap; with no current item, Next starts at the first available item and
-/// Previous at the last.
-pub(crate) fn roving_step(
-    enabled: &[bool],
+/// The item `direction` lands on from `current` among `count` items when
+/// none is skipped. Arrows wrap; with no current item, Next starts at the
+/// first and Previous at the last.
+pub(crate) fn destination(
+    count: usize,
     current: Option<usize>,
-    step: RovingStep,
+    direction: Direction,
 ) -> Option<usize> {
-    let mut available = (0..enabled.len()).filter(|&i| enabled[i]);
-    let first = available.next()?;
-    let last = (0..enabled.len()).rev().find(|&i| enabled[i])?;
-    let after = |current: usize| (current + 1..enabled.len()).find(|&i| enabled[i]);
-    let before = |current: usize| (0..current).rev().find(|&i| enabled[i]);
-    Some(match (step, current) {
-        (RovingStep::First, _) | (RovingStep::Next, None) => first,
-        (RovingStep::Last, _) | (RovingStep::Previous, None) => last,
-        (RovingStep::Next, Some(current)) => after(current).unwrap_or(first),
-        (RovingStep::Previous, Some(current)) => before(current).unwrap_or(last),
+    if count == 0 {
+        return None;
+    }
+    Some(match direction {
+        Direction::First => 0,
+        Direction::Last => count - 1,
+        Direction::Next => current.map_or(0, |index| (index + 1) % count),
+        Direction::Previous => current.map_or(count - 1, |index| (index + count - 1) % count),
     })
 }
 
-/// The single tab stop of a group: the selected item when it is available,
-/// otherwise the first available one.
-pub(crate) fn roving_entry(enabled: &[bool], selected: Option<usize>) -> Option<usize> {
+/// The item `direction` lands on from `current`, passing over items that
+/// cannot take focus (`skip`); `None` when no item can.
+pub(crate) fn target(skip: &[bool], current: Option<usize>, direction: Direction) -> Option<usize> {
+    let count = skip.len();
+    let mut index = destination(count, current, direction)?;
+    let step = match direction {
+        Direction::First | Direction::Next => Direction::Next,
+        Direction::Last | Direction::Previous => Direction::Previous,
+    };
+    for _ in 0..count {
+        if !skip[index] {
+            return Some(index);
+        }
+        index = destination(count, Some(index), step)?;
+    }
+    None
+}
+
+/// The item that holds a widget's one tab stop: the selection when it can
+/// take focus, otherwise the first item that can.
+pub(crate) fn entry(selected: Option<usize>, skip: &[bool]) -> Option<usize> {
     selected
-        .filter(|&i| enabled.get(i).copied().unwrap_or(false))
-        .or_else(|| enabled.iter().position(|&e| e))
+        .filter(|index| !skip.get(*index).copied().unwrap_or(true))
+        .or_else(|| skip.iter().position(|skip| !skip))
 }
 
-/// Bind the arrow keys, Home and End to the roving actions in `context`.
-pub(crate) fn bind_roving_keys(cx: &mut App, context: &'static str) {
-    cx.bind_keys([
-        KeyBinding::new("right", NextChoice, Some(context)),
-        KeyBinding::new("down", NextChoice, Some(context)),
-        KeyBinding::new("left", PreviousChoice, Some(context)),
-        KeyBinding::new("up", PreviousChoice, Some(context)),
-        KeyBinding::new("home", FirstChoice, Some(context)),
-        KeyBinding::new("end", LastChoice, Some(context)),
-    ]);
+/// Called with the index of the item keyboard movement newly focuses.
+pub(crate) type Select = Rc<dyn Fn(usize, &mut Window, &mut App)>;
+
+/// The roving state of one rendered widget. Clone it into each handler.
+#[derive(Clone)]
+pub(crate) struct Roving {
+    focus: Rc<[FocusHandle]>,
+    skip: Rc<[bool]>,
+    selected: Option<usize>,
+    orientation: Orientation,
+    select_on_focus: Option<Select>,
+    reveal: Option<ScrollHandle>,
 }
 
-/// One focus handle per position of the group keyed by `id`, kept across
+impl Roving {
+    /// One focus handle per item; every item can take focus until
+    /// [`Roving::skip`] says otherwise.
+    pub(crate) fn new(focus: impl Into<Rc<[FocusHandle]>>, orientation: Orientation) -> Self {
+        let focus = focus.into();
+        Self {
+            skip: vec![false; focus.len()].into(),
+            focus,
+            selected: None,
+            orientation,
+            select_on_focus: None,
+            reveal: None,
+        }
+    }
+
+    /// Items that cannot take focus (disabled), one entry per item; arrows,
+    /// Home, End and the tab stop pass over them.
+    pub(crate) fn skip(mut self, skip: impl Into<Rc<[bool]>>) -> Self {
+        let skip = skip.into();
+        debug_assert_eq!(skip.len(), self.focus.len());
+        self.skip = skip;
+        self
+    }
+
+    /// Make every item unreachable (a disabled widget).
+    pub(crate) fn disabled(self, disabled: bool) -> Self {
+        if disabled {
+            let count = self.focus.len();
+            self.skip(vec![true; count])
+        } else {
+            self
+        }
+    }
+
+    pub(crate) fn selected(mut self, selected: Option<usize>) -> Self {
+        self.selected = selected;
+        self
+    }
+
+    /// Selection follows focus: `select` is called with each item keyboard
+    /// movement focuses, unless it is already selected. Without it arrows
+    /// only move focus and Enter/Space activates.
+    pub(crate) fn select_on_focus(mut self, select: Option<Select>) -> Self {
+        self.select_on_focus = select;
+        self
+    }
+
+    /// A scroll container whose children are the items, scrolled to reveal
+    /// the newly focused item.
+    pub(crate) fn reveal(mut self, scroll: Option<ScrollHandle>) -> Self {
+        self.reveal = scroll;
+        self
+    }
+
+    /// The item that takes the widget's tab stop.
+    pub(crate) fn entry(&self) -> Option<usize> {
+        entry(self.selected, &self.skip)
+    }
+
+    pub(crate) fn navigate(&self, direction: Direction, window: &mut Window, cx: &mut App) {
+        let current = self
+            .focus
+            .iter()
+            .position(|focus| focus.is_focused(window))
+            .or(self.selected);
+        let Some(index) = target(&self.skip, current, direction) else {
+            return;
+        };
+        self.focus[index].focus(window, cx);
+        if let Some(scroll) = &self.reveal {
+            scroll.scroll_to_item(index);
+        }
+        if self.selected != Some(index)
+            && let Some(select) = &self.select_on_focus
+        {
+            select(index, window, cx);
+        }
+    }
+
+    /// Set the orientation's key context on `element` and install the four
+    /// movement actions.
+    pub(crate) fn install<E: InteractiveElement>(self, element: E) -> E {
+        let next = self.clone();
+        let previous = self.clone();
+        let first = self.clone();
+        let context = self.orientation.context();
+        let last = self;
+        element
+            .key_context(context)
+            .on_action(move |_: &FocusNextItem, window, cx| {
+                next.navigate(Direction::Next, window, cx)
+            })
+            .on_action(move |_: &FocusPreviousItem, window, cx| {
+                previous.navigate(Direction::Previous, window, cx)
+            })
+            .on_action(move |_: &FocusFirstItem, window, cx| {
+                first.navigate(Direction::First, window, cx)
+            })
+            .on_action(move |_: &FocusLastItem, window, cx| {
+                last.navigate(Direction::Last, window, cx)
+            })
+    }
+}
+
+/// A value-keyed widget's change callback.
+pub(crate) type Change = Rc<dyn Fn(&SharedString, &mut Window, &mut App)>;
+
+/// Adapt a value callback to [`Select`] for widgets keyed by value.
+pub(crate) fn select_value(
+    values: impl IntoIterator<Item = SharedString>,
+    on_change: Change,
+) -> Select {
+    let values: Rc<[SharedString]> = values.into_iter().collect();
+    Rc::new(move |index, window, cx| {
+        if let Some(value) = values.get(index) {
+            on_change(value, window, cx);
+        }
+    })
+}
+
+/// One focus handle per position of the widget keyed by `id`, kept across
 /// frames. Extra handles go with removed items.
-pub(crate) fn roving_handles(
+pub(crate) fn index_handles(
     id: impl Into<ElementId>,
     count: usize,
     window: &mut Window,
@@ -81,119 +288,200 @@ pub(crate) fn roving_handles(
     })
 }
 
-type Select = Rc<dyn Fn(usize, &mut Window, &mut App)>;
-
-/// A group's roving focus for one frame.
-#[derive(Clone)]
-pub(crate) struct RovingFocus {
-    focus: Rc<[FocusHandle]>,
-    enabled: Rc<[bool]>,
-    selected: Option<usize>,
-    on_select: Option<Select>,
-}
-
-impl RovingFocus {
-    /// `focus` and `enabled` have one entry per item; `on_select` is called
-    /// with the index of an item that keyboard movement newly selects.
-    pub(crate) fn new(
-        focus: Rc<[FocusHandle]>,
-        enabled: Rc<[bool]>,
-        selected: Option<usize>,
-        on_select: Option<Select>,
-    ) -> Self {
-        debug_assert_eq!(focus.len(), enabled.len());
-        Self {
-            focus,
-            enabled,
-            selected,
-            on_select,
-        }
+/// The focus handle of each item keyed by value, created on first sight.
+/// Handles of items that are gone are dropped, so the map tracks the current
+/// items instead of every value ever shown. Keys must be unique.
+pub(crate) fn sync_handles<T>(
+    handles: &mut BTreeMap<SharedString, FocusHandle>,
+    items: &[T],
+    key: impl Fn(&T) -> &SharedString,
+    mut create: impl FnMut() -> FocusHandle,
+) -> Vec<FocusHandle> {
+    let current = items
+        .iter()
+        .map(|item| {
+            handles
+                .entry(key(item).clone())
+                .or_insert_with(&mut create)
+                .clone()
+        })
+        .collect::<Vec<_>>();
+    // Keys are unique, so any extra entry is stale.
+    if handles.len() > items.len() {
+        handles.retain(|value, _| items.iter().any(|item| key(item) == value));
     }
-
-    /// The item that takes the group's tab stop.
-    pub(crate) fn entry(&self) -> Option<usize> {
-        roving_entry(&self.enabled, self.selected)
-    }
-
-    /// Move focus by `step` and select the item it lands on.
-    pub(crate) fn go(&self, step: RovingStep, window: &mut Window, cx: &mut App) {
-        let current = self
-            .focus
-            .iter()
-            .position(|focus| focus.is_focused(window))
-            .or(self.selected);
-        let Some(index) = roving_step(&self.enabled, current, step) else {
-            return;
-        };
-        self.focus[index].focus(window, cx);
-        if self.selected != Some(index)
-            && let Some(on_select) = &self.on_select
-        {
-            on_select(index, window, cx);
-        }
-    }
-
-    /// Install the movement actions on the group's container, under the key
-    /// `context` given to [`bind_roving_keys`].
-    pub(crate) fn install<E: InteractiveElement>(self, element: E, context: &'static str) -> E {
-        let (next, previous, first, last) = (self.clone(), self.clone(), self.clone(), self);
-        element
-            .key_context(context)
-            .on_action(move |_: &NextChoice, window, cx| next.go(RovingStep::Next, window, cx))
-            .on_action(move |_: &PreviousChoice, window, cx| {
-                previous.go(RovingStep::Previous, window, cx)
-            })
-            .on_action(move |_: &FirstChoice, window, cx| first.go(RovingStep::First, window, cx))
-            .on_action(move |_: &LastChoice, window, cx| last.go(RovingStep::Last, window, cx))
-    }
+    current
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use core::prelude::v1::test;
+    use std::cell::RefCell;
 
     #[test]
-    fn arrows_skip_unavailable_items_and_wrap() {
-        let enabled = [true, false, true, true];
-        assert_eq!(roving_step(&enabled, Some(0), RovingStep::Next), Some(2));
-        assert_eq!(roving_step(&enabled, Some(3), RovingStep::Next), Some(0));
-        assert_eq!(
-            roving_step(&enabled, Some(2), RovingStep::Previous),
-            Some(0)
-        );
-        assert_eq!(
-            roving_step(&enabled, Some(0), RovingStep::Previous),
-            Some(3)
-        );
-        assert_eq!(roving_step(&enabled, None, RovingStep::Next), Some(0));
-        assert_eq!(roving_step(&enabled, None, RovingStep::Previous), Some(3));
-        assert_eq!(roving_step(&enabled, Some(2), RovingStep::Last), Some(3));
-        assert_eq!(roving_step(&enabled, Some(3), RovingStep::First), Some(0));
-        assert_eq!(
-            roving_step(&[false, false], Some(0), RovingStep::Next),
-            None
-        );
-        assert_eq!(roving_step(&[], None, RovingStep::First), None);
+    fn arrows_wrap_and_start_when_the_current_item_is_unknown() {
+        assert_eq!(destination(3, Some(0), Direction::Next), Some(1));
+        assert_eq!(destination(3, Some(2), Direction::Next), Some(0));
+        assert_eq!(destination(3, Some(0), Direction::Previous), Some(2));
+        assert_eq!(destination(3, None, Direction::Next), Some(0));
+        assert_eq!(destination(3, None, Direction::Previous), Some(2));
+        assert_eq!(destination(3, Some(1), Direction::First), Some(0));
+        assert_eq!(destination(3, Some(1), Direction::Last), Some(2));
+        assert_eq!(destination(0, Some(0), Direction::Next), None);
     }
 
     #[test]
-    fn an_all_available_group_moves_like_a_ring() {
-        let enabled = [true; 3];
-        assert_eq!(roving_step(&enabled, Some(1), RovingStep::Next), Some(2));
-        assert_eq!(roving_step(&enabled, Some(2), RovingStep::Next), Some(0));
-        assert_eq!(
-            roving_step(&enabled, Some(0), RovingStep::Previous),
-            Some(2)
-        );
+    fn arrows_skip_items_that_cannot_take_focus() {
+        let skip = [false, true, false, true];
+        assert_eq!(target(&skip, Some(0), Direction::Next), Some(2));
+        assert_eq!(target(&skip, Some(2), Direction::Next), Some(0));
+        assert_eq!(target(&skip, Some(0), Direction::Previous), Some(2));
+        assert_eq!(target(&skip, None, Direction::Last), Some(2));
+        assert_eq!(target(&[true, false], None, Direction::First), Some(1));
+        assert_eq!(target(&[true, true], None, Direction::Next), None);
+        assert_eq!(target(&[], None, Direction::First), None);
     }
 
     #[test]
-    fn tab_enters_at_the_selected_available_item() {
-        assert_eq!(roving_entry(&[true, true, true], Some(2)), Some(2));
-        assert_eq!(roving_entry(&[true, true, false], Some(2)), Some(0));
-        assert_eq!(roving_entry(&[false, true], None), Some(1));
-        assert_eq!(roving_entry(&[true], Some(5)), Some(0));
-        assert_eq!(roving_entry(&[false], None), None);
+    fn the_tab_stop_prefers_a_focusable_selection() {
+        assert_eq!(entry(Some(1), &[false, false]), Some(1));
+        assert_eq!(entry(Some(1), &[true, true, false]), Some(2));
+        assert_eq!(entry(None, &[true, false]), Some(1));
+        assert_eq!(entry(Some(5), &[false]), Some(0));
+        assert_eq!(entry(None, &[true]), None);
+    }
+
+    #[test]
+    fn each_orientation_has_its_own_key_context() {
+        assert_eq!(Orientation::Row.context(), ROW_CONTEXT);
+        assert_eq!(Orientation::Column.context(), COLUMN_CONTEXT);
+        assert_eq!(Orientation::Both.context(), BOTH_CONTEXT);
+    }
+
+    struct Harness {
+        focus: Rc<[FocusHandle]>,
+        orientation: Orientation,
+        skip: Vec<bool>,
+        selected: Option<usize>,
+        follow: bool,
+        picked: Rc<RefCell<Vec<usize>>>,
+    }
+
+    impl Render for Harness {
+        fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+            let picked = self.picked.clone();
+            let entity = cx.entity().downgrade();
+            let select: Option<Select> = self.follow.then(|| {
+                Rc::new(move |index, _: &mut Window, cx: &mut App| {
+                    picked.borrow_mut().push(index);
+                    entity
+                        .update(cx, |this, cx| {
+                            this.selected = Some(index);
+                            cx.notify();
+                        })
+                        .ok();
+                }) as Select
+            });
+            let roving = Roving::new(self.focus.clone(), self.orientation)
+                .skip(self.skip.clone())
+                .selected(self.selected)
+                .select_on_focus(select);
+            let entry = roving.entry();
+            roving
+                .install(div().id("group"))
+                .children(self.focus.iter().enumerate().map(|(index, focus)| {
+                    div()
+                        .id(index)
+                        .size(px(20.))
+                        .track_focus(&focus.clone().tab_stop(entry == Some(index)))
+                }))
+        }
+    }
+
+    type Rig<'a> = (
+        Entity<Harness>,
+        Rc<[FocusHandle]>,
+        Rc<RefCell<Vec<usize>>>,
+        &'a mut gpui::VisualTestContext,
+    );
+
+    fn harness(
+        cx: &mut gpui::TestAppContext,
+        orientation: Orientation,
+        skip: Vec<bool>,
+        follow: bool,
+    ) -> Rig<'_> {
+        cx.update(init);
+        let picked = Rc::new(RefCell::new(Vec::new()));
+        let focus: Rc<[FocusHandle]> =
+            cx.update(|cx| (0..skip.len()).map(|_| cx.focus_handle()).collect());
+        let (view, cx) = cx.add_window_view({
+            let (focus, picked) = (focus.clone(), picked.clone());
+            move |_, _| Harness {
+                focus,
+                orientation,
+                skip,
+                selected: None,
+                follow,
+                picked,
+            }
+        });
+        cx.run_until_parked();
+        (view, focus, picked, cx)
+    }
+
+    fn focused(focus: &[FocusHandle], cx: &mut gpui::VisualTestContext) -> Option<usize> {
+        cx.update(|window, _| focus.iter().position(|focus| focus.is_focused(window)))
+    }
+
+    #[gpui::test]
+    fn a_row_moves_with_left_and_right_only(cx: &mut gpui::TestAppContext) {
+        let (_, focus, picked, cx) = harness(cx, Orientation::Row, vec![false, true, false], false);
+        cx.update(|window, cx| focus[0].focus(window, cx));
+        cx.simulate_keystrokes("right");
+        assert_eq!(focused(&focus, cx), Some(2), "the disabled item is skipped");
+        cx.simulate_keystrokes("down");
+        assert_eq!(focused(&focus, cx), Some(2), "a row ignores Up/Down");
+        cx.simulate_keystrokes("right");
+        assert_eq!(focused(&focus, cx), Some(0), "arrows wrap");
+        cx.simulate_keystrokes("end");
+        assert_eq!(focused(&focus, cx), Some(2));
+        assert!(picked.borrow().is_empty(), "focus alone selects nothing");
+    }
+
+    #[gpui::test]
+    fn a_column_moves_with_up_and_down_only(cx: &mut gpui::TestAppContext) {
+        let (_, focus, _, cx) = harness(cx, Orientation::Column, vec![false; 3], false);
+        cx.update(|window, cx| focus[1].focus(window, cx));
+        cx.simulate_keystrokes("right");
+        assert_eq!(focused(&focus, cx), Some(1), "a column ignores Left/Right");
+        cx.simulate_keystrokes("up");
+        assert_eq!(focused(&focus, cx), Some(0));
+        cx.simulate_keystrokes("up");
+        assert_eq!(focused(&focus, cx), Some(2));
+        cx.simulate_keystrokes("home");
+        assert_eq!(focused(&focus, cx), Some(0));
+    }
+
+    #[gpui::test]
+    fn selection_follows_focus_on_both_axes(cx: &mut gpui::TestAppContext) {
+        let (view, focus, picked, cx) = harness(cx, Orientation::Both, vec![false; 3], true);
+        cx.update(|window, cx| focus[0].focus(window, cx));
+        cx.simulate_keystrokes("down");
+        cx.simulate_keystrokes("right");
+        cx.simulate_keystrokes("left");
+        assert_eq!(focused(&focus, cx), Some(1));
+        assert_eq!(*picked.borrow(), [1, 2, 1]);
+        assert_eq!(view.read_with(cx, |view, _| view.selected), Some(1));
+    }
+
+    #[gpui::test]
+    fn a_disabled_widget_cannot_be_entered(cx: &mut gpui::TestAppContext) {
+        let focus: Rc<[FocusHandle]> = cx.update(|cx| (0..2).map(|_| cx.focus_handle()).collect());
+        let roving = Roving::new(focus, Orientation::Row)
+            .selected(Some(0))
+            .disabled(true);
+        assert_eq!(roving.entry(), None);
     }
 }

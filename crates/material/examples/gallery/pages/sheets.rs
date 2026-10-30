@@ -242,19 +242,13 @@ impl GalleryPage for Page {
         match row {
             STANDARD => board("side-standard")
                 .caption("Side sheets · Standard")
-                .columns(1)
-                .column_width(4. * SIDE_WIDTH + 3. * 16.)
-                .cell(
-                    div()
-                        .flex()
-                        .gap(rem(16.))
-                        .children((0..4).map(|index| side_specimen(false, index))),
-                )
+                .columns(4)
+                .column_width(SIDE_WIDTH)
+                .cells((0..4).map(|index| side_specimen(false, index)))
                 .into_any_element(),
             MODAL => board("side-modal")
                 .caption("Side sheets · Modal")
                 .columns(1)
-                .column_width(4. * SIDE_WIDTH + 3. * 16. + 32.)
                 .cell(scrim_frame(
                     div()
                         .flex()

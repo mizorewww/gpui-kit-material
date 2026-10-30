@@ -150,23 +150,18 @@ impl Page {
             .band(Band::of(group, LEADS.len()))
             .caption(if group == 0 { "List Items" } else { "" })
             .side_label(name)
-            .columns(1)
-            .column_width(3. * ITEM_WIDTH + 2. * 16.)
+            .columns(3)
+            .column_width(ITEM_WIDTH)
             .row_labels(["3 line", "2 line", "1 line"])
-            // One cell per line count holding the trailing columns, so the
-            // kit's three columns never wrap.
-            .cells([3usize, 2, 1].into_iter().map(move |lines| {
-                div()
-                    .flex()
-                    .gap(rem(16.))
-                    .children((0..3).map(move |column| {
-                        let id = ("list-item", (group * 3 + lines) * 3 + column);
-                        div().w(rem(ITEM_WIDTH)).flex_shrink_0().children(
-                            trails
-                                .get(column)
-                                .map(|&trail| kit_item(id, lead, trail, lines)),
-                        )
-                    }))
+            .cells([3usize, 2, 1].into_iter().flat_map(move |lines| {
+                (0..3).map(move |column| {
+                    let id = ("list-item", (group * 3 + lines) * 3 + column);
+                    div().w(rem(ITEM_WIDTH)).children(
+                        trails
+                            .get(column)
+                            .map(|&trail| kit_item(id, lead, trail, lines)),
+                    )
+                })
             }))
             .into_any_element()
     }
@@ -201,48 +196,30 @@ impl Page {
         const WIDTH: f32 = 280.;
         board("list-states")
             .caption("List item states")
-            .columns(1)
-            .column_width(2. * WIDTH + 16.)
-            .row_labels(
-                std::iter::once("").chain(InteractionPreview::ALL.map(InteractionPreview::name)),
-            )
-            .cell(
-                div().flex().gap(rem(16.)).children(
-                    ["Unselected", "Selected"]
-                        .into_iter()
-                        .enumerate()
-                        .map(|(index, label)| {
-                            div()
-                                .w(rem(WIDTH))
-                                .flex()
-                                .justify_center()
-                                .child(spec::small_label(("state-column", index), label))
-                        }),
-                ),
-            )
+            .columns(2)
+            .column_width(WIDTH)
+            .column_labels(["Unselected", "Selected"])
+            .row_labels(InteractionPreview::ALL.map(InteractionPreview::name))
             .cells(
                 InteractionPreview::ALL
                     .into_iter()
                     .enumerate()
-                    .map(|(row, state)| {
-                        div()
-                            .flex()
-                            .gap(rem(16.))
-                            .children([false, true].into_iter().map(move |selected| {
-                                div().w(rem(WIDTH)).child(
-                                    ListItem::new(
-                                        ("list-state", row * 2 + usize::from(selected)),
-                                        "Label text",
-                                    )
-                                    .overline("Overline")
-                                    .supporting("Supporting line text")
-                                    .leading(ListLeading::Icon(symbol(0)))
-                                    .trailing(ListTrailing::Icon(symbol(1)))
-                                    .selected(selected)
-                                    .preview_state(state)
-                                    .on_click(|_, _, _| {}),
+                    .flat_map(|(row, state)| {
+                        [false, true].into_iter().map(move |selected| {
+                            div().w(rem(WIDTH)).child(
+                                ListItem::new(
+                                    ("list-state", row * 2 + usize::from(selected)),
+                                    "Label text",
                                 )
-                            }))
+                                .overline("Overline")
+                                .supporting("Supporting line text")
+                                .leading(ListLeading::Icon(symbol(0)))
+                                .trailing(ListTrailing::Icon(symbol(1)))
+                                .selected(selected)
+                                .preview_state(state)
+                                .on_click(|_, _, _| {}),
+                            )
+                        })
                     }),
             )
             .into_any_element()
