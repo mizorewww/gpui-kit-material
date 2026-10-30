@@ -99,6 +99,8 @@ fn kit_item(id: impl Into<ElementId>, lead: Lead, trail: Trail, lines: usize) ->
 }
 
 const ITEM_WIDTH: f32 = 232.;
+/// The kit's list item width (Lists page, `Leading=Video` items: 360×72).
+const VIDEO_ITEM_WIDTH: f32 = 360.;
 
 pub struct Page {
     page: PageCx,
@@ -146,17 +148,24 @@ impl Page {
     fn matrix(&self, group: usize) -> AnyElement {
         let (lead, name) = LEADS[group];
         let trails = trails(lead);
+        // Video thumbnails take 114 of a row: give those rows the kit's
+        // full 360dp width so their text is not cut to a few letters.
+        let width = if matches!(lead, Lead::Video) {
+            VIDEO_ITEM_WIDTH
+        } else {
+            ITEM_WIDTH
+        };
         board(("list-items", group))
             .band(Band::of(group, LEADS.len()))
             .caption(if group == 0 { "List Items" } else { "" })
             .side_label(name)
             .columns(3)
-            .column_width(ITEM_WIDTH)
+            .column_width(width)
             .row_labels(["3 line", "2 line", "1 line"])
             .cells([3usize, 2, 1].into_iter().flat_map(move |lines| {
                 (0..3).map(move |column| {
                     let id = ("list-item", (group * 3 + lines) * 3 + column);
-                    div().w(rem(ITEM_WIDTH)).children(
+                    div().w(rem(width)).children(
                         trails
                             .get(column)
                             .map(|&trail| kit_item(id, lead, trail, lines)),
