@@ -256,11 +256,69 @@ fn preview(
 
 /// A landscape illustration standing in for a photo: a sky, a sun and two
 /// mountain ranges, painted in the theme's roles so it follows the scheme.
-pub(crate) fn scene(id: &'static str) -> Stateful<Div> {
-    let sky = color(ColorRole::SECONDARY_CONTAINER);
-    let sun = color(ColorRole::TERTIARY_CONTAINER);
-    let far = color(ColorRole::OUTLINE);
-    let near = color(ColorRole::SECONDARY);
+pub(crate) fn scene(id: impl Into<ElementId>) -> Stateful<Div> {
+    scene_variant(id, 0)
+}
+
+/// [`scene`] in one of several palettes and ridge shapes, for galleries of
+/// distinct pictures.
+pub(crate) fn scene_variant(id: impl Into<ElementId>, variant: usize) -> Stateful<Div> {
+    use ColorRole as R;
+    const PALETTES: [[ColorRole; 4]; 4] = [
+        [
+            R::SECONDARY_CONTAINER,
+            R::TERTIARY_CONTAINER,
+            R::OUTLINE,
+            R::SECONDARY,
+        ],
+        [
+            R::PRIMARY_CONTAINER,
+            R::TERTIARY_CONTAINER,
+            R::PRIMARY,
+            R::ON_PRIMARY_CONTAINER,
+        ],
+        [
+            R::TERTIARY_CONTAINER,
+            R::SECONDARY_CONTAINER,
+            R::TERTIARY,
+            R::ON_TERTIARY_CONTAINER,
+        ],
+        [
+            R::SURFACE_CONTAINER_HIGHEST,
+            R::PRIMARY_CONTAINER,
+            R::OUTLINE_VARIANT,
+            R::ON_SURFACE_VARIANT,
+        ],
+    ];
+    let [sky, sun, far, near] = PALETTES[variant % PALETTES.len()].map(color);
+    // Ridges and the sun drift with the variant.
+    let shift = (variant as f32 * 0.37).fract() * 0.3;
+    let ridges = [
+        (
+            far,
+            [
+                (0., 1.),
+                (0., 0.75),
+                (0.29 + shift, 0.15 + shift / 2.),
+                (0.6, 0.62),
+                (0.83, 0.45 - shift / 3.),
+                (1., 0.6),
+                (1., 1.),
+            ],
+        ),
+        (
+            near,
+            [
+                (0., 1.),
+                (0., 0.85 - shift / 2.),
+                (0.38 - shift / 2., 0.6),
+                (0.7, 0.9),
+                (1., 0.72),
+                (1., 1.),
+                (1., 1.),
+            ],
+        ),
+    ];
     div().id(id).relative().overflow_hidden().bg(sky).child(
         canvas(
             |_, _, _| (),
@@ -268,7 +326,7 @@ pub(crate) fn scene(id: &'static str) -> Stateful<Div> {
                 let (w, h) = (bounds.size.width, bounds.size.height);
                 let at = |x: f32, y: f32| bounds.origin + point(w * x, h * y);
                 let radius = h.min(w) * 0.14;
-                let center = at(0.74, 0.16) + point(px(0.), radius * 0.6);
+                let center = at(0.74 - shift, 0.16) + point(px(0.), radius * 0.6);
                 let mut disc = PathBuilder::fill();
                 for step in 0..=32 {
                     let angle = step as f32 / 32. * std::f32::consts::TAU;
@@ -283,31 +341,7 @@ pub(crate) fn scene(id: &'static str) -> Stateful<Div> {
                 if let Ok(path) = disc.build() {
                     window.paint_path(path, sun);
                 }
-                for (ink, points) in [
-                    (
-                        far,
-                        &[
-                            (0., 1.),
-                            (0., 0.75),
-                            (0.29, 0.15),
-                            (0.6, 0.62),
-                            (0.83, 0.45),
-                            (1., 0.6),
-                            (1., 1.),
-                        ][..],
-                    ),
-                    (
-                        near,
-                        &[
-                            (0., 1.),
-                            (0., 0.85),
-                            (0.38, 0.6),
-                            (0.7, 0.9),
-                            (1., 0.72),
-                            (1., 1.),
-                        ][..],
-                    ),
-                ] {
+                for (ink, points) in &ridges {
                     let mut range = PathBuilder::fill();
                     for (index, (x, y)) in points.iter().enumerate() {
                         if index == 0 {
@@ -318,7 +352,7 @@ pub(crate) fn scene(id: &'static str) -> Stateful<Div> {
                     }
                     range.close();
                     if let Ok(path) = range.build() {
-                        window.paint_path(path, ink);
+                        window.paint_path(path, *ink);
                     }
                 }
             },

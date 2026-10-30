@@ -76,6 +76,26 @@ pub struct Keylines {
     pub focal: usize,
     /// Scroll-space extent of one item (large width plus the gap).
     pub step: f32,
+    /// The space between items, in dp.
+    pub gap: f32,
+}
+
+/// A carousel's spacing in dp: between items and at the leading and
+/// trailing edges. Full-screen carousels use neither.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct CarouselSpacing {
+    pub gap: f32,
+    pub padding: f32,
+}
+
+impl Default for CarouselSpacing {
+    /// The kit's 8dp gap and 16dp padding.
+    fn default() -> Self {
+        Self {
+            gap: GAP,
+            padding: PAD_X,
+        }
+    }
 }
 
 fn lay_out(widths: &[f32], start: f32, gap: f32) -> Vec<Keyline> {
@@ -92,11 +112,22 @@ fn lay_out(widths: &[f32], start: f32, gap: f32) -> Vec<Keyline> {
 
 /// The start-aligned keylines of `layout` in a carousel `width` wide whose
 /// large items are `large` wide.
+#[cfg(test)]
 pub(crate) fn keylines(layout: CarouselLayout, width: f32, large: f32) -> Keylines {
+    spaced_keylines(layout, width, large, CarouselSpacing::default())
+}
+
+/// [`keylines`] with caller spacing.
+pub(crate) fn spaced_keylines(
+    layout: CarouselLayout,
+    width: f32,
+    large: f32,
+    spacing: CarouselSpacing,
+) -> Keylines {
     let (pad, gap) = if layout == CarouselLayout::FullScreen {
         (0., 0.)
     } else {
-        (PAD_X, GAP)
+        (spacing.padding.max(0.), spacing.gap.max(0.))
     };
     let available = (width - 2. * pad).max(CAROUSEL_SMALL_ITEM);
     let small = CAROUSEL_SMALL_ITEM;
@@ -138,6 +169,7 @@ pub(crate) fn keylines(layout: CarouselLayout, width: f32, large: f32) -> Keylin
         lines: lay_out(&widths, pad, gap),
         focal,
         step: large + gap,
+        gap,
     }
 }
 
@@ -151,15 +183,11 @@ fn end_keylines(start: &Keylines, layout: CarouselLayout) -> Keylines {
     }
     let widths: Vec<f32> = start.lines.iter().rev().map(|line| line.width).collect();
     let first = start.lines.first().map_or(0., |line| line.x);
-    let gap = if layout == CarouselLayout::FullScreen {
-        0.
-    } else {
-        GAP
-    };
     Keylines {
-        lines: lay_out(&widths, first, gap),
+        lines: lay_out(&widths, first, start.gap),
         focal: start.focal,
         step: start.step,
+        gap: start.gap,
     }
 }
 
@@ -178,7 +206,7 @@ pub(crate) fn max_scroll(
         // past the viewport, so their count says nothing about the end.
         CarouselLayout::Uncontained => {
             let pad = keylines.lines.first().map_or(0., |line| line.x);
-            let content = count as f32 * keylines.step - GAP;
+            let content = count as f32 * keylines.step - keylines.gap;
             return (content - (width - 2. * pad)).max(0.);
         }
         _ => keylines.lines.len(),
@@ -282,7 +310,7 @@ struct ScrollAnimation {
 
 /// The start and end keylines for one layout, width and large size.
 struct KeylineCache {
-    key: (CarouselLayout, u32, u32),
+    key: (CarouselLayout, u32, u32, u32, u32),
     start: Keylines,
     end: Keylines,
 }
@@ -305,6 +333,13 @@ struct CarouselState {
     snap_to: (f32, f32),
     /// Whether the one snap task is waiting for `snap_due`.
     snap_pending: bool,
+    /// The caller's current item last applied, and the item last reported.
+    applied: Option<usize>,
+    reported: Option<usize>,
+    /// The caller's change handler, for the snap task.
+    on_change: Option<std::rc::Rc<dyn Fn(&usize, &mut Window, &mut App)>>,
+    /// While the pointer drags: its x and the scroll when the drag began.
+    drag: Option<(Pixels, f32)>,
 }
 
 #[cfg(test)]
@@ -314,6 +349,20 @@ thread_local! {
 }
 
 impl CarouselState {
+    /// The scroll the carousel is at or heading to.
+    fn destination(&self) -> f32 {
+        self.animation.map_or(self.scroll, |animation| animation.to)
+    }
+
+    /// The item a scroll position settles on.
+    fn item_at(scroll: f32, step: f32) -> usize {
+        if step <= 0. {
+            0
+        } else {
+            (scroll / step).round().max(0.) as usize
+        }
+    }
+
     fn animate_to(&mut self, to: f32, reduced: bool) {
         if reduced || (to - self.scroll).abs() < 0.5 {
             self.scroll = to;
@@ -325,6 +374,22 @@ impl CarouselState {
                 started: Instant::now(),
             });
         }
+    }
+}
+
+/// Tell the caller the item `to` settles on, once per change.
+fn report(state: &Entity<CarouselState>, to: f32, step: f32, window: &mut Window, cx: &mut App) {
+    let item = CarouselState::item_at(to, step);
+    let handler = state.update(cx, |state, _| {
+        if state.reported == Some(item) {
+            return None;
+        }
+        state.reported = Some(item);
+        state.applied = Some(item);
+        state.on_change.clone()
+    });
+    if let Some(handler) = handler {
+        handler(&item, window, cx);
     }
 }
 
@@ -378,6 +443,11 @@ pub struct MaterialCarousel {
     large: f32,
     height: f32,
     width: Option<f32>,
+    spacing: CarouselSpacing,
+    radius: Pixels,
+    snap: bool,
+    current: Option<usize>,
+    on_change: Option<std::rc::Rc<dyn Fn(&usize, &mut Window, &mut App)>>,
 }
 
 impl MaterialCarousel {
@@ -390,7 +460,44 @@ impl MaterialCarousel {
             large: 188.,
             height: 205.,
             width: None,
+            spacing: CarouselSpacing::default(),
+            radius: CAROUSEL_ITEM_RADIUS,
+            snap: true,
+            current: None,
+            on_change: None,
         }
+    }
+    /// The space between items, in dp (the kit's 8dp by default).
+    pub fn gap(mut self, gap: f32) -> Self {
+        self.spacing.gap = gap.max(0.);
+        self
+    }
+    /// The leading and trailing padding, in dp (the kit's 16dp by default).
+    pub fn padding(mut self, padding: f32) -> Self {
+        self.spacing.padding = padding.max(0.);
+        self
+    }
+    /// Item corners (the kit's 28dp extra-large shape by default).
+    pub fn corner_radius(mut self, radius: Pixels) -> Self {
+        self.radius = radius.max(px(0.));
+        self
+    }
+    /// Whether resting scroll settles on an item boundary (on by default).
+    pub fn snap(mut self, snap: bool) -> Self {
+        self.snap = snap;
+        self
+    }
+    /// The current item: the leading focal one (the hero, centered). A new
+    /// value scrolls there on the default spatial curve.
+    pub fn current(mut self, index: usize) -> Self {
+        self.current = Some(index);
+        self
+    }
+    /// Called with the new current item when scrolling, dragging or the
+    /// keyboard moves the carousel to another one.
+    pub fn on_change(mut self, handler: impl Fn(&usize, &mut Window, &mut App) + 'static) -> Self {
+        self.on_change = Some(std::rc::Rc::new(handler));
+        self
     }
     pub fn layout(mut self, layout: CarouselLayout) -> Self {
         self.layout = layout;
@@ -464,13 +571,15 @@ fn schedule_snap(
             let _ = cx.update(|window, cx| {
                 let Some(state) = state.upgrade() else { return };
                 let reduced = cx.reduce_motion();
-                state.update(cx, |state, _| {
+                let (to, step) = state.update(cx, |state, _| {
                     state.snap_pending = false;
                     state.snap_due = None;
                     let (step, max) = state.snap_to;
                     let to = snap(state.scroll, step, max);
                     state.animate_to(to, reduced);
+                    (to, step)
                 });
+                report(&state, to, step, window, cx);
                 window.refresh();
             });
         })
@@ -496,16 +605,23 @@ impl RenderOnce for MaterialCarousel {
             .width
             .or(state.read(cx).width.map(|w| w / rem_size))
             .unwrap_or(412.);
-        let key = (layout, width.to_bits(), self.large.to_bits());
+        let spacing = self.spacing;
+        let key = (
+            layout,
+            width.to_bits(),
+            self.large.to_bits(),
+            spacing.gap.to_bits(),
+            spacing.padding.to_bits(),
+        );
         if state.read(cx).keylines.as_ref().map(|cache| cache.key) != Some(key) {
-            let start = keylines(layout, width, self.large);
+            let start = spaced_keylines(layout, width, self.large, spacing);
             let end = end_keylines(&start, layout);
             state.update(cx, |state, _| {
                 state.keylines = Some(KeylineCache { key, start, end })
             });
         }
         let count = self.items.len();
-        let (step, max, shift_len, large) = {
+        let (step, max, shift_len, large, gap) = {
             let start = &state
                 .read(cx)
                 .keylines
@@ -516,7 +632,7 @@ impl RenderOnce for MaterialCarousel {
             let max = max_scroll(start, count, layout, width);
             let shift_len = ((start.lines.len() - start.focal) as f32 * step).min(max);
             let large = start.lines.iter().map(|line| line.width).fold(0., f32::max);
-            (step, max, shift_len, large)
+            (step, max, shift_len, large, start.gap)
         };
         let reduced = cx.reduce_motion();
 
@@ -533,6 +649,26 @@ impl RenderOnce for MaterialCarousel {
                 state.started = true;
                 state.scroll = start;
             });
+        }
+        // Follow the caller's current item when it changes.
+        let on_change = self.on_change.clone();
+        state.update(cx, |state, _| state.on_change = on_change);
+        if let Some(current) = self.current
+            && state.read(cx).applied != Some(current)
+        {
+            let to = (current as f32 * step).clamp(0., max);
+            let first = state.read(cx).applied.is_none();
+            state.update(cx, |state, _| {
+                state.applied = Some(current);
+                state.reported = Some(current);
+                if CarouselState::item_at(state.destination(), step) != current {
+                    // The first frame starts there; later changes move.
+                    state.animate_to(to, reduced || first);
+                }
+            });
+            if state.read(cx).animation.is_some() {
+                window.request_animation_frame();
+            }
         }
         let mut scroll = state.read(cx).scroll.clamp(0., max);
         if let Some(animation) = state.read(cx).animation {
@@ -566,11 +702,6 @@ impl RenderOnce for MaterialCarousel {
             }
             lines
         });
-        let gap = if layout == CarouselLayout::FullScreen {
-            0.
-        } else {
-            GAP
-        };
         let leading = if layout == CarouselLayout::CenteredHero {
             1
         } else {
@@ -582,6 +713,7 @@ impl RenderOnce for MaterialCarousel {
             PAD_Y
         };
 
+        let radius = self.radius;
         let items = self
             .items
             .into_iter()
@@ -613,7 +745,7 @@ impl RenderOnce for MaterialCarousel {
                         .w(rem(line.width))
                         .h(rem(self.height))
                         .overflow_hidden()
-                        .rounded(CAROUSEL_ITEM_RADIUS)
+                        .rounded(radius)
                         .bg(color(ColorRole::SURFACE_CONTAINER_HIGH))
                         .child(
                             // Content keeps the large width, centered under the
@@ -670,6 +802,9 @@ impl RenderOnce for MaterialCarousel {
         let wheel = state.clone();
         let keys = state.clone();
         let measure = state.clone();
+        let grab = state.clone();
+        let snaps = self.snap;
+        let dragging = state.read(cx).drag.is_some();
         let fixed = self.width.is_some();
         let keyboard_focus = focus.is_focused(window) && window.last_input_was_keyboard();
         let carousel = div()
@@ -716,7 +851,11 @@ impl RenderOnce for MaterialCarousel {
                     state.scroll = after;
                 });
                 window.refresh();
-                schedule_snap(&wheel, step, max, window, cx);
+                if snaps {
+                    schedule_snap(&wheel, step, max, window, cx);
+                } else {
+                    report(&wheel, after, step, window, cx);
+                }
             })
             .on_key_down(move |event, window, cx| {
                 let current = keys
@@ -733,7 +872,62 @@ impl RenderOnce for MaterialCarousel {
                 cx.stop_propagation();
                 let reduced = cx.reduce_motion();
                 keys.update(cx, |state, _| state.animate_to(to, reduced));
+                report(&keys, to, step, window, cx);
                 window.refresh();
+            })
+            .on_mouse_down(MouseButton::Left, move |event, window, cx| {
+                // Swipe: the pointer drags the items.
+                grab.update(cx, |state, _| {
+                    state.animation = None;
+                    state.drag = Some((event.position.x, state.scroll));
+                });
+                window.refresh();
+            })
+            .when(dragging, |carousel| {
+                let follow = state.clone();
+                carousel.cursor_grabbing().child(
+                    canvas(
+                        |_, _, _| (),
+                        move |_, _, window, _| {
+                            let moving = follow.clone();
+                            window.on_mouse_event(
+                                move |event: &MouseMoveEvent, phase, window, cx| {
+                                    if phase != DispatchPhase::Capture {
+                                        return;
+                                    }
+                                    moving.update(cx, |state, _| {
+                                        if let Some((x, from)) = state.drag {
+                                            let delta = f32::from(event.position.x - x) / rem_size;
+                                            state.scroll = (from - delta).clamp(0., max);
+                                        }
+                                    });
+                                    window.refresh();
+                                },
+                            );
+                            let dropping = follow.clone();
+                            window.on_mouse_event(move |_: &MouseUpEvent, phase, window, cx| {
+                                if phase != DispatchPhase::Capture {
+                                    return;
+                                }
+                                let reduced = cx.reduce_motion();
+                                let to = dropping.update(cx, |state, _| {
+                                    state.drag = None;
+                                    let to = if snaps {
+                                        snap(state.scroll, step, max)
+                                    } else {
+                                        state.scroll
+                                    };
+                                    state.animate_to(to, reduced);
+                                    to
+                                });
+                                report(&dropping, to, step, window, cx);
+                                window.refresh();
+                            });
+                        },
+                    )
+                    .absolute()
+                    .size_0(),
+                )
             })
             .children(items)
             .when(keyboard_focus, |carousel| {
@@ -742,7 +936,7 @@ impl RenderOnce for MaterialCarousel {
                     div()
                         .absolute()
                         .inset_0()
-                        .rounded(CAROUSEL_ITEM_RADIUS)
+                        .rounded(radius)
                         .border(px(3.))
                         .border_color(color(ColorRole::SECONDARY)),
                 )
@@ -1071,5 +1265,134 @@ mod tests {
         assert!(cx.debug_bounds("item-3").is_some());
         let frames = cx.update(|window, cx| window.simulate_next_frame(cx));
         assert_eq!(frames, 0, "an unchanged width requests nothing");
+    }
+
+    /// A carousel whose current item the test controls and observes.
+    struct Controlled {
+        current: usize,
+        snap: bool,
+        reported: std::rc::Rc<std::cell::Cell<Option<usize>>>,
+    }
+    impl gpui::Render for Controlled {
+        fn render(
+            &mut self,
+            window: &mut Window,
+            cx: &mut gpui::Context<Self>,
+        ) -> impl IntoElement {
+            window.set_rem_size(px(BASE_PX));
+            let reported = self.reported.clone();
+            MaterialCarousel::new("controlled", "Photos")
+                .width(412.)
+                .gap(12.)
+                .padding(24.)
+                .snap(self.snap)
+                .current(self.current)
+                .on_change(cx.listener(move |this, item: &usize, _, cx| {
+                    reported.set(Some(*item));
+                    this.current = *item;
+                    cx.notify();
+                }))
+                .items((0..8).map(|i| {
+                    CarouselItem::new().content(
+                        div()
+                            .debug_selector(move || format!("item-{i}"))
+                            .size_full(),
+                    )
+                }))
+        }
+    }
+
+    fn controlled(
+        cx: &mut gpui::TestAppContext,
+        current: usize,
+        snap: bool,
+    ) -> (gpui::Entity<Controlled>, &mut gpui::VisualTestContext) {
+        cx.update(|cx| {
+            gpui_base::init(cx);
+            cx.set_reduce_motion(true);
+        });
+        cx.add_window_view(move |_, _| Controlled {
+            current,
+            snap,
+            reported: Default::default(),
+        })
+    }
+
+    #[test]
+    fn spacing_sets_the_padding_and_gap_of_the_keylines() {
+        let spacing = CarouselSpacing {
+            gap: 12.,
+            padding: 24.,
+        };
+        let lines = spaced_keylines(CarouselLayout::MultiBrowse, 412., 188., spacing);
+        assert_eq!(lines.lines[0].x, 24.);
+        assert_eq!(lines.lines[1].x, 24. + lines.lines[0].width + 12.);
+        assert_eq!(lines.step, 188. + 12.);
+        // Full screen ignores both.
+        let full = spaced_keylines(CarouselLayout::FullScreen, 412., 188., spacing);
+        assert_eq!((full.lines[0].x, full.gap), (0., 0.));
+    }
+
+    #[gpui::test]
+    fn the_current_item_starts_and_follows_the_caller(cx: &mut gpui::TestAppContext) {
+        let (view, cx) = controlled(cx, 2, true);
+        redraw(cx);
+        // Item 2 starts at the leading keyline, inside the 24dp padding.
+        let third = cx.debug_bounds("item-2").unwrap();
+        assert!((f32::from(third.left()) - 24.).abs() < 0.5, "{third:?}");
+        view.update(cx, |view, cx| {
+            view.current = 3;
+            cx.notify();
+        });
+        redraw(cx);
+        // (Item 3 is the last before the end arrangement shifts in.)
+        let fourth = cx.debug_bounds("item-3").unwrap();
+        assert!((f32::from(fourth.left()) - 24.).abs() < 0.5, "{fourth:?}");
+        // The keyboard moves on and reports the new item.
+        cx.update(|window, cx| window.focus_next(cx));
+        cx.simulate_keystrokes("left");
+        redraw(cx);
+        let reported = view.read_with(cx, |view, _| view.reported.get());
+        assert_eq!(reported, Some(2));
+    }
+
+    #[gpui::test]
+    fn dragging_swipes_and_snaps_to_the_nearest_item(cx: &mut gpui::TestAppContext) {
+        use gpui::{Modifiers, MouseButton};
+        let (view, cx) = controlled(cx, 0, true);
+        redraw(cx);
+        let start = cx.debug_bounds("item-0").unwrap().center();
+        cx.simulate_mouse_down(start, MouseButton::Left, Modifiers::none());
+        redraw(cx);
+        // 260dp left: past the middle of the second step (200dp).
+        let to = start - point(px(260.), px(0.));
+        cx.simulate_mouse_move(to, Some(MouseButton::Left), Modifiers::none());
+        redraw(cx);
+        cx.simulate_mouse_up(to, MouseButton::Left, Modifiers::none());
+        redraw(cx);
+        let reported = view.read_with(cx, |view, _| view.reported.get());
+        assert_eq!(reported, Some(1), "a 260dp drag settles on item 1");
+        let second = cx.debug_bounds("item-1").unwrap();
+        assert!((f32::from(second.left()) - 24.).abs() < 0.5, "{second:?}");
+    }
+
+    #[gpui::test]
+    fn without_snapping_a_drag_rests_where_released(cx: &mut gpui::TestAppContext) {
+        use gpui::{Modifiers, MouseButton};
+        let (_, cx) = controlled(cx, 0, false);
+        redraw(cx);
+        let home = cx.debug_bounds("item-1").unwrap();
+        let start = cx.debug_bounds("item-0").unwrap().center();
+        cx.simulate_mouse_down(start, MouseButton::Left, Modifiers::none());
+        let to = start - point(px(60.), px(0.));
+        cx.simulate_mouse_move(to, Some(MouseButton::Left), Modifiers::none());
+        cx.simulate_mouse_up(to, MouseButton::Left, Modifiers::none());
+        redraw(cx);
+        let moved = cx.debug_bounds("item-1").unwrap();
+        assert!(moved.left() < home.left(), "the drag moved the items");
+        assert!(
+            (f32::from(moved.left()) - 24.).abs() > 1.,
+            "it did not snap to an item"
+        );
     }
 }
