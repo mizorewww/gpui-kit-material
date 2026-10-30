@@ -69,6 +69,8 @@ mod choice;
 mod dialog;
 mod feedback;
 mod focus;
+mod prepaint_bounds;
+pub use prepaint_bounds::{PrepaintBounds, prepaint_bounds};
 mod labeled;
 mod list;
 mod loading_indicator;

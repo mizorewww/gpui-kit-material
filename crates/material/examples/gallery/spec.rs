@@ -534,8 +534,19 @@ impl RenderOnce for Board {
                     }
                 }
             }
-            let widths = frame_widths.clone();
             let scale = scales[group_index];
+            // Each item reports its width, unscaled so that scaling does not
+            // feed back into the grouping.
+            let items = items.into_iter().zip(item_columns).map(|(item, column)| {
+                let widths = frame_widths.clone();
+                prepaint_bounds(item, move |bounds, _, _| {
+                    if let Some(column) = column {
+                        let width = f32::from(bounds.size.width) / scale;
+                        let mut widths = widths.borrow_mut();
+                        widths[column] = widths[column].max(width);
+                    }
+                })
+            });
             let grid = div()
                 .w_full()
                 .grid()
@@ -553,17 +564,6 @@ impl RenderOnce for Board {
                 .items_center()
                 .gap_x(rem(CELL_GAP))
                 .gap_y(rem(CELL_GAP))
-                .on_children_prepainted(move |bounds, _, _| {
-                    let mut widths = widths.borrow_mut();
-                    for (bounds, column) in bounds.iter().zip(&item_columns) {
-                        if let Some(column) = column {
-                            // Record unscaled widths, so scaling does not
-                            // feed back into the grouping.
-                            let width = f32::from(bounds.size.width) / scale;
-                            widths[*column] = widths[*column].max(width);
-                        }
-                    }
-                })
                 .children(items);
             grids.push(
                 div()
@@ -617,7 +617,6 @@ impl RenderOnce for Board {
                 frame.border_b_1().rounded_b(radius)
             })
             .children(grids);
-        let has_side_label = self.side_label.is_some();
         // In a narrow card the side label goes over the board: the gutter
         // would take the width the board needs.
         let label_above = content_width(window) < NARROW_CONTENT;
@@ -660,7 +659,7 @@ impl RenderOnce for Board {
                                 .child(small_label("side-label", label).whitespace_normal()),
                         )
                     })
-                    .child(
+                    .child(prepaint_bounds(
                         div()
                             .when(!label_above, |holder| holder.flex_1())
                             .when(label_above, |holder| holder.w_full())
@@ -677,48 +676,46 @@ impl RenderOnce for Board {
                                 })
                             })
                             .child(frame),
-                    )
-                    // Runs after the grids' listeners: record this frame's
-                    // measurements and regroup on the next frame if they
-                    // change the groups.
-                    .on_children_prepainted(move |bounds, _, cx| {
-                        let holder = bounds.get(usize::from(has_side_label));
-                        let Some(holder) = holder else { return };
-                        let available = f32::from(holder.size.width);
-                        #[cfg(test)]
-                        if !unmeasured && drawn_width.get() > available + 1. {
-                            OVERFLOWS.with(|overflows| {
-                                overflows.borrow_mut().push(format!(
-                                    "{key}: {} px in {available} px",
-                                    drawn_width.get()
-                                ))
-                            });
-                        }
-                        let mut widths = frame_widths.borrow().clone();
-                        if let Some(fixed) = &fixed {
-                            widths[..columns].copy_from_slice(fixed);
-                        }
-                        let lead = lead_of(widths[columns]);
-                        let regrouped =
-                            wrap_columns(&widths[..columns], lead, gap, available - chrome);
-                        let changed = regrouped != rendered;
-                        MEASURES.with(|measures| {
-                            let mut measures = measures.borrow_mut();
-                            if measures.len() >= MEASURE_LIMIT && !measures.contains_key(&key) {
-                                measures.clear();
+                        // Runs after the grids' items: record this frame's
+                        // measurements and regroup on the next frame if they
+                        // change the groups.
+                        move |holder, _, cx| {
+                            let available = f32::from(holder.size.width);
+                            #[cfg(test)]
+                            if !unmeasured && drawn_width.get() > available + 1. {
+                                OVERFLOWS.with(|overflows| {
+                                    overflows.borrow_mut().push(format!(
+                                        "{key}: {} px in {available} px",
+                                        drawn_width.get()
+                                    ))
+                                });
                             }
-                            measures.insert(
-                                key.clone(),
-                                Measure {
-                                    columns: widths,
-                                    available,
-                                },
-                            );
-                        });
-                        if changed {
-                            cx.defer(move |cx| cx.notify(view));
-                        }
-                    }),
+                            let mut widths = frame_widths.borrow().clone();
+                            if let Some(fixed) = &fixed {
+                                widths[..columns].copy_from_slice(fixed);
+                            }
+                            let lead = lead_of(widths[columns]);
+                            let regrouped =
+                                wrap_columns(&widths[..columns], lead, gap, available - chrome);
+                            let changed = regrouped != rendered;
+                            MEASURES.with(|measures| {
+                                let mut measures = measures.borrow_mut();
+                                if measures.len() >= MEASURE_LIMIT && !measures.contains_key(&key) {
+                                    measures.clear();
+                                }
+                                measures.insert(
+                                    key.clone(),
+                                    Measure {
+                                        columns: widths,
+                                        available,
+                                    },
+                                );
+                            });
+                            if changed {
+                                cx.defer(move |cx| cx.notify(view));
+                            }
+                        },
+                    )),
             )
     }
 }
