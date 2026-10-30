@@ -121,7 +121,13 @@ impl LineWrapper {
                 };
 
                 width += item_width;
-                if width > wrap_width && ix > last_wrap_ix {
+                // A space that overflows after content hangs past the edge
+                // instead of starting the next row: the following word is the
+                // break candidate, so no row begins with a stray space.
+                let hanging_space =
+                    matches!(candidate, WrapBoundaryCandidate::Char { character: ' ' })
+                        && first_non_whitespace_ix.is_some();
+                if width > wrap_width && ix > last_wrap_ix && !hanging_space {
                     let wrap_at_candidate =
                         last_candidate_ix > 0 && width - last_candidate_width <= wrap_width;
 
@@ -885,11 +891,9 @@ mod tests {
                     IndentAdjustment::default()
                 )
                 .collect::<Vec<_>>(),
-            &[
-                Boundary::new(5, 0),
-                Boundary::new(9, 0),
-                Boundary::new(11, 0)
-            ],
+            // The space after the 30px element overflows and hangs, so the
+            // element stays on the `bbb` row instead of starting its own.
+            &[Boundary::new(5, 0), Boundary::new(11, 0)],
         );
 
         // Test with element at the beginning and text afterward
@@ -925,10 +929,12 @@ mod tests {
                     IndentAdjustment::default()
                 )
                 .collect::<Vec<_>>(),
+            // The space after the oversized element hangs on its row, so
+            // the next row starts at `more`, not at that space.
             &[
                 Boundary::new(6, 0),
                 Boundary::new(11, 0),
-                Boundary::new(12, 0),
+                Boundary::new(13, 0),
                 Boundary::new(18, 0)
             ],
         );
@@ -942,7 +948,9 @@ mod tests {
                     IndentAdjustment::default()
                 )
                 .collect::<Vec<_>>(),
-            &[Boundary::new(12, 0),], // special chars above take up 3, 2 and 3 bytes, so boundary ends up at 12
+            // The special chars above take up 3, 2 and 3 bytes; the space at
+            // byte 12 overflows and hangs, so the next row starts at `e` (13).
+            &[Boundary::new(13, 0),],
         );
     }
 
@@ -1717,10 +1725,11 @@ mod tests {
                     IndentAdjustment::ExtraColumns(2),
                 )
                 .collect::<Vec<_>>(),
+            // The space after each two-letter word hangs past column 10, so
+            // every row starts at the next word rather than at that space.
             &[
                 Boundary::new(9, 8),
-                Boundary::new(11, 8),
-                Boundary::new(13, 8),
+                Boundary::new(12, 8),
                 Boundary::new(15, 8),
             ]
         );
@@ -1926,5 +1935,29 @@ mod tests {
                 .collect::<Vec<_>>(),
             &[Boundary::new(4, 0), Boundary::new(8, 0)]
         );
+    }
+
+    #[test]
+    fn test_wrap_line_hangs_overflowing_space() {
+        let mut wrapper = build_wrapper();
+        let mut wrap = |text: &'static str| {
+            wrapper
+                .wrap_line(
+                    &[LineFragment::text(text)],
+                    px(72.),
+                    IndentAdjustment::default(),
+                )
+                .collect::<Vec<_>>()
+        };
+
+        // Seven columns fit; the space at column 7 overflows. The next row
+        // starts at `b`, not at the space.
+        assert_eq!(wrap("aaaaaaa bbb"), &[Boundary::new(8, 0)]);
+        // The word that fit is not pushed down by the space after it.
+        assert_eq!(wrap("aa bbbb cc"), &[Boundary::new(8, 0)]);
+        // A run of overflowing spaces hangs together.
+        assert_eq!(wrap("aaaaaaa   bb"), &[Boundary::new(10, 0)]);
+        // A trailing overflowing space produces no row at all.
+        assert_eq!(wrap("aaaaaaa "), &[] as &[Boundary]);
     }
 }

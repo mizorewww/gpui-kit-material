@@ -248,7 +248,11 @@ impl LineLayout {
             let next_x = glyphs.peek().map_or(self.width, |(_, _, x)| *x);
             let width = next_x - last_boundary_x;
 
-            if width > wrap_width && boundary > last_boundary {
+            // A space that overflows after content hangs past the edge
+            // (as in `LineWrapper::wrap_line`); the next word breaks instead,
+            // so no wrapped row begins with a stray space.
+            let hanging_space = ch == ' ' && first_non_whitespace_ix.is_some();
+            if width > wrap_width && boundary > last_boundary && !hanging_space {
                 // When used line_clamp, we should limit the number of lines.
                 if let Some(max_lines) = max_lines
                     && boundaries.len() >= max_lines.saturating_sub(1)
@@ -1299,5 +1303,56 @@ mod letter_spacing_tests {
         apply_letter_spacing(&mut layout, px(0.));
         assert_eq!(layout.width, px(5.));
         assert_eq!(layout.runs[0].glyphs[0].position.x, px(1.));
+    }
+}
+
+#[cfg(test)]
+mod hanging_space_tests {
+    use super::*;
+    use crate::{GlyphId, point};
+
+    fn wrapped_rows(text: &str, wrap_width: f32) -> Vec<&str> {
+        let glyphs: Vec<_> = text
+            .char_indices()
+            .enumerate()
+            .map(|(column, (index, _))| ShapedGlyph {
+                id: GlyphId(0),
+                position: point(px(10. * column as f32), px(0.)),
+                index,
+                is_emoji: false,
+            })
+            .collect();
+        let layout = LineLayout {
+            font_size: px(16.),
+            width: px(10. * text.chars().count() as f32),
+            ascent: px(12.),
+            descent: px(4.),
+            runs: vec![ShapedRun {
+                font_id: FontId(0),
+                glyphs,
+            }],
+            len: text.len(),
+        };
+        let mut start = 0;
+        let mut rows = Vec::new();
+        for boundary in layout.compute_wrap_boundaries(text, px(wrap_width), None) {
+            let end = layout.runs[boundary.run_ix].glyphs[boundary.glyph_ix].index;
+            rows.push(&text[start..end]);
+            start = end;
+        }
+        rows.push(&text[start..]);
+        rows
+    }
+
+    #[test]
+    fn overflowing_space_hangs_instead_of_starting_the_next_row() {
+        // The space after `Hello` is the glyph that overflows 50px.
+        assert_eq!(wrapped_rows("Hello world", 50.), ["Hello ", "world"]);
+        // Several spaces hang together; the word that fit stays on its row.
+        assert_eq!(wrapped_rows("aa bb   cc", 50.), ["aa bb   ", "cc"]);
+        // A trailing space never opens an empty row.
+        assert_eq!(wrapped_rows("Hello ", 50.), ["Hello "]);
+        // Leading indentation still wraps before any content.
+        assert_eq!(wrapped_rows("       ab", 50.), ["     ", "  ab"]);
     }
 }

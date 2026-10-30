@@ -257,8 +257,8 @@
     },
     "src/text_system/line_layout.rs": {
       "upstream_sha256": "a78d230d050bbf17bd968612da1d84f4c8aaefc39f82100e11b2b3a6990d45e4",
-      "local_sha256": "dad9b929705854c69a5533dbed6ca89ec3e8533f1ccb63875cb01e96af7a7b2f",
-      "reason": "Spaced line layouts in the cache key and apply_letter_spacing (letter-spacing-patch.md)."
+      "local_sha256": "a867b1604e157fd61bf7f02358acf4ca12eab29bacb8254d327d1fd97fa33bd8",
+      "reason": "Spaced line layouts in the cache key and apply_letter_spacing (letter-spacing-patch.md). Hanging overflow space in compute_wrap_boundaries (hanging-space-patch.md)."
     },
     "src/window.rs": {
       "upstream_sha256": "83bace5e5cf503b21c789c4ca7bc3b11965c2256cb5a2398f2b70e5baf7aa1bb",
@@ -287,8 +287,8 @@
     },
     "src/text_system/line_wrapper.rs": {
       "upstream_sha256": "58feea87a0f1e150d8d733886fe9601d5afcd37f91b00c80d6717d5e9b7272ed",
-      "local_sha256": "a60d97baacd375ac4d3428c8079dad934ae09e70a43561772cc90730f4a1023e",
-      "reason": "LineWrapper::letter_spacing (letter-spacing-patch.md)."
+      "local_sha256": "936df139d615d1c6329521bddf8494bbc90aa06b7022276f8abad959a2c916be",
+      "reason": "Hanging overflow space: a space that overflows a row after content no longer starts the next row; it hangs past the edge and the following word is the break (LineWrapper::wrap_line, the multi-line truncation that replicates it in Fast, LineLayout::compute_wrap_boundaries), with tests (hanging-space-patch.md). Letter spacing state (letter-spacing-patch.md)."
     },
     "Cargo.toml": {
       "upstream_sha256": "17c581884c21901f604eec93d32171dd17518606ce726fd7e59f9a442abc07de",
@@ -335,6 +335,7 @@
     "cpu-frame-scope-patch.md",
     "em-fallback-patch.md",
     "frame-submission-patch.md",
+    "hanging-space-patch.md",
     "hitbox-extension-patch.md",
     "layout-direction-patch.md",
     "letter-spacing-patch.md",

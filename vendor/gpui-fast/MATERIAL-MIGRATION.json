@@ -338,8 +338,8 @@
       },
       "src/text_system/line_layout.rs": {
         "upstream_sha256": "757c2672c0831f9f848845c6ac74dece3c6e0401613b1e00325129cbf1548c08",
-        "local_sha256": "8bd18b0c560561653790096eb199351a53ac7dc079d86b7c184716fb663e095e",
-        "reason": "Fields pub(crate) for Fast's text-cache carry-over. Spaced line layouts in the cache key and apply_letter_spacing (vendor/gpui-pre/letter-spacing-patch.md)."
+        "local_sha256": "e8a428f8f02b05f307c0743f0b8d646ba68fc40ec6593cf08fe6ad08e69fa89f",
+        "reason": "Fields pub(crate) for Fast's text-cache carry-over. Spaced line layouts in the cache key and apply_letter_spacing (vendor/gpui-pre/letter-spacing-patch.md). Hanging overflow space in compute_wrap_boundaries (vendor/gpui-pre/hanging-space-patch.md)."
       },
       "src/window.rs": {
         "upstream_sha256": "d3f00c28cc47446f6c73be67d00830446e0e3a9a7fadefdf54fff9e5ccadee0b",
@@ -378,8 +378,8 @@
       },
       "src/text_system/line_wrapper.rs": {
         "upstream_sha256": "4c0ce82fba13490ec6494245971a6a4a322fc55ca2944c60e708fdbcd5dcee8e",
-        "local_sha256": "debe130befb6e5819c5438dbcbfc987a17468ee075b67673a1a71bae3ce7c216",
-        "reason": "LineWrapper::letter_spacing (vendor/gpui-pre/letter-spacing-patch.md)."
+        "local_sha256": "3b513ee70515dfa102825632acb0a580192b23265c315985559b25449d578e69",
+        "reason": "Hanging overflow space: a space that overflows a row after content no longer starts the next row; it hangs past the edge and the following word is the break (LineWrapper::wrap_line, the multi-line truncation that replicates it in Fast, LineLayout::compute_wrap_boundaries), with tests (vendor/gpui-pre/hanging-space-patch.md). Letter spacing state (vendor/gpui-pre/letter-spacing-patch.md)."
       },
       "Cargo.toml": {
         "upstream_sha256": "1f8d49e1f08e320cf393fcacb2ac402044ddb7aaf8dffc4572e31aa3d5a9e7ea",
