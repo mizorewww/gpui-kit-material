@@ -241,7 +241,10 @@ fn preview(
                     .bg(color(ColorRole::SURFACE_CONTAINER_LOW))
                     .when(!expanded, |frame| frame.p(rem(12.)))
             } else {
-                frame.w_full().max_w(rem(360.)).min_h(rem(56. + 2. + 5. * 64.))
+                frame
+                    .w_full()
+                    .max_w(rem(360.))
+                    .min_h(rem(56. + 2. + 5. * 64.))
             }
         })
         .child(view)
