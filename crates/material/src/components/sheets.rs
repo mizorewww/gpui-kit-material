@@ -466,16 +466,13 @@ fn modal_host(
     area: Option<Bounds<Pixels>>,
     surface: impl IntoElement,
 ) -> impl IntoElement {
-    deferred(
-        ModalSheetHost {
-            focus,
-            fade: frame.fade,
-            dismissals,
-            area,
-            surface: surface.into_any_element(),
-        }
-        .into_any_element(),
-    )
+    deferred(crate::scope::current_scope(ModalSheetHost {
+        focus,
+        fade: frame.fade,
+        dismissals,
+        area,
+        surface: surface.into_any_element(),
+    }))
     .with_priority(10)
 }
 

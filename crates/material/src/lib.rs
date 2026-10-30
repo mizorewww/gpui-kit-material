@@ -28,6 +28,7 @@ pub use gpui_kit_material_color as color;
 pub mod components;
 pub mod icons;
 pub mod motion;
+pub mod scope;
 pub mod theme;
 pub mod tokens;
 
@@ -43,6 +44,7 @@ pub mod prelude {
     pub use crate::color::themes::{Contrast, ThemeId, ThemeMode};
     pub use crate::color::{Appearance, ColorRole, PaletteId, ThemePreferences};
     pub use crate::components::*;
+    pub use crate::scope::{LayoutDirection, Scope, is_rtl};
     pub use crate::theme::color;
     pub use crate::tokens::{layout::*, shape::*, typography::*};
 }

@@ -530,7 +530,7 @@ impl RenderOnce for MaterialTooltip {
             .relative()
             .flex_shrink_0()
             .child(wrapper)
-            .child(deferred(positioner).with_priority(200))
+            .child(deferred(crate::scope::current_scope(positioner)).with_priority(200))
             .into_any_element()
     }
 }
