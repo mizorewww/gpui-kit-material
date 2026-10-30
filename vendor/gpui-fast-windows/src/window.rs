@@ -51,6 +51,9 @@ pub struct WindowsWindowState {
     pub border_offset: WindowBorderOffset,
     pub appearance: Cell<WindowAppearance>,
     pub background_appearance: Cell<WindowBackgroundAppearance>,
+    /// A `Cell` outside the renderer: stays readable while the renderer is borrowed
+    /// and survives device-lost recovery.
+    pub frame_submissions: Cell<FrameSubmissionCounter>,
     pub scale_factor: Cell<f32>,
     pub restore_from_minimized: Cell<Option<Box<dyn FnMut(RequestFrameOptions)>>>,
 
@@ -113,6 +116,12 @@ pub(crate) struct WindowsWindowInner {
 }
 
 impl WindowsWindowState {
+    pub(crate) fn record_frame_submission(&self, presented: bool) {
+        let mut submissions = self.frame_submissions.get();
+        submissions.record_frame([presented]);
+        self.frame_submissions.set(submissions);
+    }
+
     fn new(
         hwnd: HWND,
         directx_devices: &DirectXDevices,
@@ -169,6 +178,7 @@ impl WindowsWindowState {
             border_offset,
             appearance: Cell::new(appearance),
             background_appearance: Cell::new(WindowBackgroundAppearance::Opaque),
+            frame_submissions: Cell::default(),
             scale_factor: Cell::new(scale_factor),
             restore_from_minimized: Cell::new(restore_from_minimized),
             min_size,
@@ -1046,12 +1056,32 @@ impl PlatformWindow for WindowsWindow {
             .set(Some(callback));
     }
 
+    fn successful_frame_submissions(&self) -> Option<u64> {
+        Some(self.state.frame_submissions.get().count())
+    }
+
+    fn vsync_status(&self) -> VsyncStatus {
+        if self.state.renderer.borrow().present_sync_interval == 0 {
+            VsyncStatus::Disabled
+        } else {
+            VsyncStatus::Enabled
+        }
+    }
+
+    fn set_vsync(&mut self, enabled: bool) -> anyhow::Result<()> {
+        self.state.renderer.borrow_mut().present_sync_interval = u32::from(enabled);
+        Ok(())
+    }
+
     fn draw(&self, scene: &Scene) {
-        self.state
+        let presented = self
+            .state
             .renderer
             .borrow_mut()
             .draw(scene, self.state.background_appearance.get())
-            .log_err();
+            .log_err()
+            .unwrap_or(false);
+        self.state.record_frame_submission(presented);
         crate::fast::frame_schedule::schedule_frame(self);
     }
 

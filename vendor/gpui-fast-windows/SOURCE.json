@@ -51,12 +51,33 @@
     "src/window.rs": "4b765250edf2e941fee42e3169305b7cf2f7e26d691ba3cd187f364fab2eb711",
     "src/wrapper.rs": "a17bfb94697904d650a0db4007880262256d06bf96cb00af387e73fde7536c8b"
   },
-  "local_patches": [],
-  "modified_files": {},
+  "local_patches": [
+    "src/directx_renderer.rs",
+    "src/fast/composition.rs",
+    "src/window.rs"
+  ],
+  "modified_files": {
+    "src/directx_renderer.rs": {
+      "upstream_sha256": "341ec3bf62269eff658b3d98f2946f12f70731603b8d11a6386dd4c1e0f72cd9",
+      "local_sha256": "44eddd319ac7bac7365a2c2c3b61b48d3f8380e2f8fd7bedab8a403f9f7ed607",
+      "reason": "draw and present report whether the frame was presented (S_OK only); present_sync_interval (MATERIAL-PATCHES.md)."
+    },
+    "src/fast/composition.rs": {
+      "upstream_sha256": "2621a72809fdd13a2705ef05042342735ebda7302de40f225d4811034195ae28",
+      "local_sha256": "ef629093639effd0468d3f4b5cd4e254ad8d679eabce894d0b34d095e50b9cb4",
+      "reason": "A composed frame counts only when every swap chain presented; overlays use the sync interval (MATERIAL-PATCHES.md)."
+    },
+    "src/window.rs": {
+      "upstream_sha256": "4b765250edf2e941fee42e3169305b7cf2f7e26d691ba3cd187f364fab2eb711",
+      "local_sha256": "5eaf7b5903fc72c3b5e08eff3d95168a16e86303e8d2bb4fe1bc5126e1c2a16e",
+      "reason": "successful_frame_submissions, vsync_status, set_vsync (MATERIAL-PATCHES.md)."
+    }
+  },
   "added_files": {},
   "removed_files": {},
-  "unchanged_file_count": 45,
+  "unchanged_file_count": 42,
   "provenance_files": [
+    "MATERIAL-PATCHES.md",
     "SOURCE.json"
   ],
   "verification": "Archive taken from ~/.cargo/registry/cache; its SHA-256 equals the Cargo.lock crates.io checksum. upstream_files are hashes of the extracted archive entries. Recompute: extract the .crate and compare with sha256 of each vendor file.",

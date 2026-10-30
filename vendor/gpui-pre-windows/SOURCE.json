@@ -34,12 +34,27 @@
     "src/window.rs": "e0813871c6eb06180b702e3345e00331c3f4a7f062089b599f19580cf30b4cbb",
     "src/wrapper.rs": "a17bfb94697904d650a0db4007880262256d06bf96cb00af387e73fde7536c8b"
   },
-  "local_patches": [],
-  "modified_files": {},
+  "local_patches": [
+    "src/directx_renderer.rs",
+    "src/window.rs"
+  ],
+  "modified_files": {
+    "src/directx_renderer.rs": {
+      "upstream_sha256": "e53e6aff126fb1c160f31566eefc3e13a7eadc9f2354f804597f4b8ebfa6506a",
+      "local_sha256": "0c7f6195e7f4cfab45348a02a09650417d4ca8c3f9bfea69fb8fbcd6396f9ff2",
+      "reason": "draw and present report whether the frame was presented (S_OK only); present_sync_interval (MATERIAL-PATCHES.md)."
+    },
+    "src/window.rs": {
+      "upstream_sha256": "e0813871c6eb06180b702e3345e00331c3f4a7f062089b599f19580cf30b4cbb",
+      "local_sha256": "03b2391e102f3c7c6e2c5c69d89acbc1b9c25f7d9c75c1f345cf2237b847ecba",
+      "reason": "successful_frame_submissions, vsync_status, set_vsync (MATERIAL-PATCHES.md)."
+    }
+  },
   "added_files": {},
   "removed_files": {},
-  "unchanged_file_count": 28,
+  "unchanged_file_count": 26,
   "provenance_files": [
+    "MATERIAL-PATCHES.md",
     "SOURCE.json"
   ],
   "verification": "Archive taken from ~/.cargo/registry/cache; its SHA-256 equals the Cargo.lock crates.io checksum. upstream_files are hashes of the extracted archive entries. Recompute: extract the .crate and compare with sha256 of each vendor file.",
