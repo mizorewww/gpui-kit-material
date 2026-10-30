@@ -31,6 +31,8 @@ pub(crate) mod spec;
 #[cfg(test)]
 mod styles_tests;
 mod top_bar;
+#[cfg(target_family = "wasm")]
+mod web_route;
 
 use gpui::{prelude::*, *};
 use gpui_kit_material::icons::Assets;
@@ -693,6 +695,9 @@ impl Render for GalleryWindow {
         // The compact bar has no room for a counter, and labels its settings
         // with an icon only.
         let compact = shell::ShellLayout::of(window) == shell::ShellLayout::Compact;
+        // A phone's cutouts and home indicator: the content stays clear of them
+        // and the bar's color reaches the top edge.
+        let insets = window.insets().effective();
         let settings = title_bar_control(div().debug_selector(|| "gallery-settings-open".into()))
             .child(if compact {
                 IconButton::new(
@@ -717,25 +722,35 @@ impl Render for GalleryWindow {
         }
         gpui_base::v_flex()
             .size_full()
+            .pl(insets.left)
+            .pr(insets.right)
+            .pb(insets.bottom)
             .bg(spec::page_background())
             .text_color(color(ColorRole::ON_SURFACE))
             .font_family("Roboto")
             .child(
-                bar.gap(rem(if compact { 4. } else { 12. }))
+                div()
+                    .w_full()
+                    .flex_shrink_0()
+                    .pt(insets.top)
                     .bg(color(ColorRole::SURFACE_CONTAINER_LOW))
-                    .border_b_1()
-                    .border_color(color(ColorRole::OUTLINE_VARIANT))
                     .child(
-                        AnyView::from(self.top_bar.clone())
-                            .cached(StyleRefinement::default().flex_1().min_w_0().h_full()),
-                    )
-                    .when_some(self.fps.clone().filter(|_| !compact), |bar, fps| {
-                        bar.child(fps)
-                    })
-                    .child(spec::RemScaled::new(
-                        top_bar::chrome_rem(window),
-                        settings.into_any_element(),
-                    )),
+                        bar.gap(rem(if compact { 4. } else { 12. }))
+                            .bg(color(ColorRole::SURFACE_CONTAINER_LOW))
+                            .border_b_1()
+                            .border_color(color(ColorRole::OUTLINE_VARIANT))
+                            .child(
+                                AnyView::from(self.top_bar.clone())
+                                    .cached(StyleRefinement::default().flex_1().min_w_0().h_full()),
+                            )
+                            .when_some(self.fps.clone().filter(|_| !compact), |bar, fps| {
+                                bar.child(fps)
+                            })
+                            .child(spec::RemScaled::new(
+                                top_bar::chrome_rem(window),
+                                settings.into_any_element(),
+                            )),
+                    ),
             )
             // Not `cached`: a dirty cached view always renders again, and every
             // preview animation frame dirties the views around the preview. As
@@ -799,6 +814,8 @@ pub fn run(application: gpui::Application, initialize: impl FnOnce(&mut App) + '
                 let caption = capture::caption(cx);
                 #[cfg(target_family = "wasm")]
                 let caption = None;
+                #[cfg(target_family = "wasm")]
+                web_route::install(&gallery, cx);
                 let shared = gallery.read(cx).shared.read(cx);
                 let (initial_scheme, initial_scale) = (shared.target_scheme(), shared.text_scale());
                 theme::init_component_theme(initial_scheme, initial_scale, cx);

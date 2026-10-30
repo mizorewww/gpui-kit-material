@@ -9,12 +9,15 @@
 use super::catalog::{self, TopSection};
 use super::spec::type_role;
 use super::{
-    Gallery, page::GalleryShared, playground::symbol, shell::ShellLayout, spec::RemScaled,
+    Gallery,
+    page::GalleryShared,
+    playground::symbol,
+    shell::{ShellLayout, shell_width},
+    spec::RemScaled,
 };
 use gpui::{prelude::*, *};
 use gpui_base::input::{InputEvent, InputState};
 use gpui_kit_material::prelude::*;
-use gpui_kit_material::tokens::layout::design_width;
 use gpui_kit_material::tokens::typography::BASE_PX;
 
 /// Below these window widths (in design px) the brand's wordmark gives way:
@@ -116,7 +119,7 @@ impl Render for TopBar {
         let (section, mode) = self.shown;
         let dark = mode == ThemeMode::Dark;
         let compact = ShellLayout::of(window) == ShellLayout::Compact;
-        let width = design_width(window);
+        let width = shell_width(window);
         let wordmark = width
             >= if compact {
                 COMPACT_WORDMARK
@@ -148,7 +151,9 @@ impl Render for TopBar {
             .flex()
             .items_center()
             .gap(rem(if compact { 4. } else { 8. }))
-            .when(compact, |bar| {
+            // The field takes the whole bar on a phone: its placeholder is
+            // cut off beside the menu and mode buttons.
+            .when(compact && !searching, |bar| {
                 bar.child(title_bar_control(
                     div().debug_selector(|| "top-menu".into()).child(
                         IconButton::new("top-menu", symbol("menu", 24.), "Open navigation")
@@ -215,7 +220,8 @@ impl Render for TopBar {
                     ),
                 ))
             })
-            .child(title_bar_control(
+            .when(!searching, |bar| {
+                bar.child(title_bar_control(
                 div().debug_selector(|| "mode-toggle".into()).child(
                     IconButton::new(
                         "mode-toggle",
@@ -238,7 +244,8 @@ impl Render for TopBar {
                         })
                     })),
                 ),
-            ));
+            ))
+            });
         RemScaled::new(rem_size, bar.into_any_element())
     }
 }
