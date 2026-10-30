@@ -227,7 +227,7 @@ impl EventEmitter<DatePickerEvent> for DatePickerState {}
 impl DatePickerState {
     /// A single-date picker showing `today`'s month, with nothing selected.
     pub fn new(labels: DatePickerLabels, today: NaiveDate, cx: &mut Context<Self>) -> Self {
-        Self {
+        let state = Self {
             focus: cx.focus_handle().tab_stop(true),
             labels: Rc::new(labels),
             selection: DateSelection::Single(None),
@@ -248,7 +248,9 @@ impl DatePickerState {
             inputs: None,
             invalid: (false, false),
             _subscriptions: Vec::new(),
-        }
+        };
+        state.reveal_cursor();
+        state
     }
     /// Select a range instead of a single date.
     pub fn range(mut self) -> Self {
@@ -258,6 +260,7 @@ impl DatePickerState {
     /// Start with `selection`, showing its (first) month.
     pub fn selection(mut self, selection: impl Into<DateSelection>) -> Self {
         self.apply(selection.into());
+        self.reveal_cursor();
         self
     }
     /// Dates matching `matcher` cannot be selected.
@@ -268,6 +271,7 @@ impl DatePickerState {
     /// The years the year grid and lists offer.
     pub fn years(mut self, years: RangeInclusive<i32>) -> Self {
         self.years = years;
+        self.reveal_cursor();
         self
     }
     /// The weekday each grid row starts on (default Sunday).
@@ -1316,6 +1320,7 @@ impl PickerCx {
                 .map(|row| {
                     div()
                         .id(row)
+                        .w_full()
                         .flex()
                         .gap(rem(8.))
                         .px(rem(24.))
@@ -1343,6 +1348,7 @@ impl PickerCx {
                 .collect()
         })
         .track_scroll(&self.snap.year_scroll)
+        .w_full()
         .h(rem(height));
         self.key_host(
             div()
@@ -1809,6 +1815,11 @@ impl PickerCx {
             .child(grid)
             .child(self.action_row(actions, true).border_t(rem(0.)))
     }
+}
+
+/// Today's date on the local clock, for a picker's today marker.
+pub fn today() -> NaiveDate {
+    chrono::Local::now().date_naive()
 }
 
 /// A modal host for pickers: a scrim and a centered dialog over the

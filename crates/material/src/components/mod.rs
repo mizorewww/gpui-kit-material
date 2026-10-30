@@ -41,7 +41,7 @@ pub use date_parts::{
 pub use date_picker::{
     DATE_INPUT_PICKER_WIDTH, DATE_PICKER_WIDTH, DateInputMode, DateMatcher, DatePicker,
     DatePickerEvent, DatePickerLabels, DatePickerState, DatePickerVariant, DatePickerView,
-    DateSelection, PickerDialog,
+    DateSelection, PickerDialog, today,
 };
 pub use time_picker::{
     ClockDial, DIAL_SIZE, PeriodSelector, TimeFormat, TimeInputMode, TimeOrientation, TimePicker,
