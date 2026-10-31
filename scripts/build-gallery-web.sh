@@ -33,6 +33,8 @@ if [[ "$(wasm-bindgen --version)" != "wasm-bindgen $bindgen_version" ]]; then
   exit 1
 fi
 
+source_state="$(python3 scripts/site_stamp.py state)"
+
 # A panic location names its source file: neither the builder's home directory nor the
 # registry's path belongs in a published module, and each costs bytes.
 if [[ "$profile" == wasm-release ]]; then
@@ -70,3 +72,4 @@ if [[ "$profile" == wasm-release ]]; then
     echo "wasm-opt not found (brew install binaryen): skipping the size pass." >&2
   fi
 fi
+python3 scripts/site_stamp.py module "$out_dir" "$profile" "$source_state"

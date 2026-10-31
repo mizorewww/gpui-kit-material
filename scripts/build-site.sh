@@ -17,6 +17,7 @@ if ! command -v uv >/dev/null; then
   echo "scripts/build-site.py runs through uv: https://docs.astral.sh/uv/" >&2
   exit 1
 fi
+source_state="$(python3 scripts/site_stamp.py state)"
 target_dir="$(cargo metadata --no-deps --format-version 1 | python3 -c 'import json,sys; print(json.load(sys.stdin)["target_directory"])')"
 
 if [[ "$build_wasm" == true ]]; then
@@ -26,4 +27,4 @@ fi
 rm -rf "$target_dir/doc"
 cargo doc --locked --no-deps -p gpui-kit-material -p gpui-kit-material-color
 uv run --no-project --with 'markdown==3.10' --with 'brotli==1.2.0' python3 scripts/build-site.py \
-  "$target_dir/site" --api-docs "$target_dir/doc"
+  "$target_dir/site" --api-docs "$target_dir/doc" --source-state "$source_state"

@@ -1,8 +1,15 @@
 #!/usr/bin/env bash
 # Publish target/site (from scripts/build-site.sh) to material.mizore.blog with
 # the Cloudflare CLI, then check the live URLs. Run by hand after `cf auth login`;
-# no credentials live in this repository and CI does not deploy.
+# no credentials live in this repository and CI does not deploy. Refuses a site not
+# built from the current commit. --check stops after the checks, publishing nothing.
 set -euo pipefail
+check_only=false
+case "${1:-}" in
+  "") ;;
+  --check) check_only=true ;;
+  *) echo "Usage: $0 [--check]" >&2; exit 2 ;;
+esac
 
 workspace_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$workspace_dir"
@@ -25,12 +32,17 @@ if [[ -n "$(find "$site_dir" -name .cloudflare -print -quit)" ]]; then
   echo "Refusing to publish a .cloudflare directory from $site_dir." >&2
   exit 1
 fi
+python3 scripts/site_stamp.py verify "$site_dir"
 wasm_path="$(cd "$site_dir" && find gallery/wasm -name 'gallery.*.wasm')"
 if [[ ! -f "$site_dir/$wasm_path.br" ]]; then
   echo "$wasm_path has no Brotli copy for the Worker to serve." >&2
   exit 1
 fi
 commit="$(git rev-parse --short HEAD)"
+if [[ "$check_only" == true ]]; then
+  echo "$site_dir is the site of $commit and ready to deploy."
+  exit 0
+fi
 
 (
   cd deploy/site

@@ -22,6 +22,8 @@ from markdown.extensions import Extension
 from markdown.extensions.toc import TocExtension
 from markdown.treeprocessors import Treeprocessor
 
+from site_stamp import write_site
+
 ROOT = Path(__file__).resolve().parent.parent
 REPOSITORY = "https://github.com/mizorewww/gpui-kit-material"
 GLUE = "gpui_kit_material_gallery_web.js"
@@ -464,6 +466,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("output", type=Path)
     parser.add_argument("--api-docs", type=Path, required=True, help="cargo doc output directory")
+    parser.add_argument("--source-state", type=json.loads, required=True,
+                        help="`site_stamp.py state` from before the build started")
     args = parser.parse_args()
     output = args.output
     shutil.rmtree(output, ignore_errors=True)
@@ -478,6 +482,7 @@ def main():
     check_links(output)
     files = [path for path in output.rglob("*") if path.is_file()]
     print(f"{output}: {len(files)} files, {sum(path.stat().st_size for path in files) / 1e6:.1f} MB")
+    write_site(output, ROOT / "crates/gallery-web/www/wasm", args.source_state)
 
 
 if __name__ == "__main__":
