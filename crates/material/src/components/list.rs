@@ -16,7 +16,7 @@
 //! so the whole row is the one target, as M3 specifies.
 use super::InteractionPreview;
 use super::focus::{RingPlacement, RingedButton};
-use super::{CheckboxState, MaterialCheckbox, MaterialRadio, MaterialSwitch};
+use super::{CheckboxState, MaterialCheckbox, MaterialRadio, MaterialSwitch, SwitchIcons};
 use crate::{
     color::ColorRole,
     icons::Icon,
@@ -174,6 +174,7 @@ pub struct ListItem {
     divider_inset: bool,
     selected: bool,
     disabled: bool,
+    switch_icons: SwitchIcons,
     density: ListDensity,
     corners: Option<OuterCorners>,
     container: ColorRole,
@@ -196,12 +197,18 @@ impl ListItem {
             divider_inset: false,
             selected: false,
             disabled: false,
+            switch_icons: SwitchIcons::None,
             density: ListDensity::Standard,
             corners: None,
             container: ColorRole::SURFACE,
             preview: None,
             on_click: None,
         }
+    }
+    /// The handle icons of a leading or trailing switch.
+    pub fn switch_icons(mut self, icons: SwitchIcons) -> Self {
+        self.switch_icons = icons;
+        self
     }
     /// A label-medium line above the headline.
     pub fn overline(mut self, text: impl Into<SharedString>) -> Self {
@@ -354,6 +361,7 @@ fn control(
     label: &SharedString,
     on: bool,
     disabled: bool,
+    icons: SwitchIcons,
 ) -> AnyElement {
     let preview = control_preview(disabled);
     match kind {
@@ -380,6 +388,7 @@ fn control(
             .child(
                 MaterialSwitch::new(id, label.clone())
                     .checked(on)
+                    .icons(icons)
                     .preview_state(preview),
             )
             .into_any_element(),
@@ -400,6 +409,7 @@ fn thumbnail(width: f32, height: f32, content: Option<AnyElement>) -> Div {
 impl ListItem {
     fn leading_element(&mut self, ink: Rgba, disabled: bool) -> Option<AnyElement> {
         let label = self.headline.clone();
+        let icons = self.switch_icons;
         let leading = std::mem::replace(&mut self.leading, ListLeading::None);
         Some(match leading {
             ListLeading::None => return None,
@@ -432,20 +442,26 @@ impl ListItem {
                 .into_any_element(),
             ListLeading::Image(content) => thumbnail(56., 56., content).into_any_element(),
             ListLeading::Video(content) => thumbnail(114., 64., content).into_any_element(),
-            ListLeading::Checkbox(checked) => {
-                control("checkbox", Control::Checkbox, &label, checked, disabled)
-            }
+            ListLeading::Checkbox(checked) => control(
+                "checkbox",
+                Control::Checkbox,
+                &label,
+                checked,
+                disabled,
+                icons,
+            ),
             ListLeading::Radio(selected) => {
-                control("radio", Control::Radio, &label, selected, disabled)
+                control("radio", Control::Radio, &label, selected, disabled, icons)
             }
             ListLeading::Switch(checked) => {
-                control("switch", Control::Switch, &label, checked, disabled)
+                control("switch", Control::Switch, &label, checked, disabled, icons)
             }
         })
     }
 
     fn trailing_element(&mut self, ink: Rgba, disabled: bool) -> Option<AnyElement> {
         let label = self.headline.clone();
+        let icons = self.switch_icons;
         let trailing = std::mem::replace(&mut self.trailing, ListTrailing::None);
         Some(match trailing {
             ListTrailing::None => return None,
@@ -460,16 +476,23 @@ impl ListItem {
                 &label,
                 checked,
                 disabled,
+                icons,
             ),
-            ListTrailing::Radio(selected) => {
-                control("trailing-radio", Control::Radio, &label, selected, disabled)
-            }
+            ListTrailing::Radio(selected) => control(
+                "trailing-radio",
+                Control::Radio,
+                &label,
+                selected,
+                disabled,
+                icons,
+            ),
             ListTrailing::Switch(checked) => control(
                 "trailing-switch",
                 Control::Switch,
                 &label,
                 checked,
                 disabled,
+                icons,
             ),
         })
     }
@@ -778,6 +801,7 @@ mod tests {
                         .supporting("Supporting")
                         .leading(ListLeading::Monogram("A".into()))
                         .trailing(ListTrailing::Switch(self.checked))
+                        .switch_icons(SwitchIcons::Both)
                         .disabled(self.disabled)
                         .on_click(cx.listener(move |this, _, _, cx| {
                             clicks.set(clicks.get() + 1);
