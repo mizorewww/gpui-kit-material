@@ -336,6 +336,15 @@ component_role_projection! {
     // Kit's text inputs paint the caret and selection from these.
     caret => PRIMARY,
     selection => PRIMARY @ crate::tokens::state::TEXT_SELECTION,
+    // Every Base `Scrollbar` paints from these, and no reference defines them: the
+    // thumb is a control's outline, stronger under the pointer, on no track.
+    scrollbar => SURFACE @ 0.,
+    scrollbar_thumb => OUTLINE,
+    scrollbar_thumb_hover => ON_SURFACE_VARIANT,
+    // What `TextView` paints that the roles above do not name.
+    link => PRIMARY,
+    table_head => SURFACE_CONTAINER,
+    table_head_foreground => ON_SURFACE,
 }
 
 fn sync_component_theme(painted: Scheme, scale: f32, cx: &mut App) -> bool {
@@ -448,6 +457,12 @@ mod tests {
             theme.colors.selection,
             primary.opacity(crate::tokens::state::TEXT_SELECTION)
         );
+        // Scrollbars and links follow the palette too, on no track of their own.
+        let outline: Hsla = rgba(painted.get(ColorRole::OUTLINE)).into();
+        assert_eq!(theme.colors.scrollbar_thumb, outline);
+        assert_eq!(theme.tokens.scrollbar_thumb.color, outline);
+        assert_eq!(theme.colors.scrollbar.a, 0.);
+        assert_eq!(theme.colors.link, primary);
         assert_eq!(theme.tokens.selection.color, theme.colors.selection);
         // Both representations are managed, including a pre-existing mismatched token.
         theme.tokens.primary = Hsla::default().into();
