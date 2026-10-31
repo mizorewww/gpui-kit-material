@@ -2,7 +2,8 @@
 //! with vertical and horizontal items, collapsed and expanded rails (standard
 //! and modal, top and middle aligned), every item building block, and live
 //! bar and rail demos. The kit's deprecated drawer and XR sections are not
-//! mirrored.
+//! mirrored; the library's drawer and navigation suite have boards of their
+//! own at the end, for those components' Specs tabs.
 use super::prelude::*;
 use gpui_kit_material::icons::Symbol;
 use std::sync::OnceLock;
@@ -79,6 +80,8 @@ enum Row {
     RailVerticalItems(usize),
     RailExpandedItems(usize),
     RailDemo,
+    Drawer,
+    Suite,
 }
 
 const ROWS: [Row; 17] = [
@@ -100,11 +103,132 @@ const ROWS: [Row; 17] = [
     Row::RailVerticalItems(2),
     Row::RailExpandedItems(0),
 ];
-const LAST_ROWS: [Row; 3] = [
+const LAST_ROWS: [Row; 5] = [
     Row::RailExpandedItems(1),
     Row::RailExpandedItems(2),
     Row::RailDemo,
+    Row::Drawer,
+    Row::Suite,
 ];
+
+fn rows_where(keep: fn(Row) -> bool) -> Vec<usize> {
+    (0..ROWS.len() + LAST_ROWS.len())
+        .filter(|index| keep(row(*index)))
+        .collect()
+}
+/// The navigation bar's rows on its Specs tab.
+pub fn bar_rows() -> Vec<usize> {
+    rows_where(|row| {
+        matches!(
+            row,
+            Row::BarVertical
+                | Row::BarHorizontal
+                | Row::BarVerticalItems(_)
+                | Row::BarHorizontalItems(_)
+                | Row::BarDemo
+        )
+    })
+}
+/// The navigation rail's rows on its Specs tab, without the page's rail heading.
+pub fn rail_rows() -> Vec<usize> {
+    rows_where(|row| {
+        matches!(
+            row,
+            Row::RailCollapsed
+                | Row::RailExpanded(_)
+                | Row::RailVerticalItems(_)
+                | Row::RailExpandedItems(_)
+                | Row::RailDemo
+        )
+    })
+}
+/// The navigation drawer's rows on its Specs tab.
+pub fn drawer_rows() -> Vec<usize> {
+    rows_where(|row| matches!(row, Row::Drawer))
+}
+/// The navigation suite's rows on its Specs tab.
+pub fn suite_rows() -> Vec<usize> {
+    rows_where(|row| matches!(row, Row::Suite))
+}
+
+/// The drawer open beside (standard) and over (modal) its content.
+fn drawer_board() -> AnyElement {
+    const WIDTH: f32 = 280.;
+    let cells = [false, true].map(|modal| {
+        let drawer = NavigationDrawer::new(("drawer-specimen", usize::from(modal)), "Mail")
+            .headline("Mail")
+            .modal(modal)
+            .open(true)
+            .focus_on_open(false)
+            .width(WIDTH)
+            .selected("home")
+            .section(3, "Library")
+            .items(demo_items().iter().cloned());
+        div()
+            .relative()
+            .flex()
+            .w(rem(WIDTH + 40.))
+            .h(rem(420.))
+            .overflow_hidden()
+            .rounded(rem(16.))
+            .border_1()
+            .border_color(color(ColorRole::OUTLINE_VARIANT))
+            .bg(color(ColorRole::SURFACE))
+            .child(drawer)
+    });
+    board("navigation-drawer")
+        .caption("Navigation drawer")
+        .columns(2)
+        .column_width(WIDTH + 40.)
+        .column_labels(["Standard", "Modal"])
+        .cells(cells)
+        .into_any_element()
+}
+
+/// The suite's four forms, each fixed: the form a window's width selects.
+fn suite_board() -> AnyElement {
+    const FORMS: [(NavigationSuiteType, &str, f32); 4] = [
+        (NavigationSuiteType::BarCompact, "Bar", 280.),
+        (NavigationSuiteType::RailCollapsed, "Rail", 280.),
+        (NavigationSuiteType::RailExpanded, "Expanded rail", 400.),
+        (NavigationSuiteType::Drawer, "Drawer", 400.),
+    ];
+    board("navigation-suite")
+        .caption("Navigation suite")
+        .columns(2)
+        .column_width(400.)
+        .column_labels(["Compact and medium", "Expanded"])
+        .cells(
+            FORMS
+                .into_iter()
+                .enumerate()
+                .map(|(ix, (form, name, width))| {
+                    div()
+                        .w(rem(width))
+                        .h(rem(320.))
+                        .overflow_hidden()
+                        .rounded(rem(16.))
+                        .border_1()
+                        .border_color(color(ColorRole::OUTLINE_VARIANT))
+                        .child(
+                            NavigationSuite::new(("suite-specimen", ix), "Main")
+                                .items(demo_items().iter().cloned())
+                                .selected("home")
+                                .layout_type(Some(form))
+                                .child(
+                                    div()
+                                        .size_full()
+                                        .p(rem(16.))
+                                        .bg(color(ColorRole::SURFACE))
+                                        .map(|text| spec::type_role(text, TypeRole::TitleMedium))
+                                        .text_color(color(ColorRole::ON_SURFACE))
+                                        .child(name),
+                                ),
+                        )
+                }),
+        )
+        .into_any_element()
+}
 
 fn row(index: usize) -> Row {
     ROWS.iter()
@@ -694,6 +818,8 @@ impl GalleryPage for Page {
                 BAR_VERTICAL,
             ),
             Row::RailDemo => self.rail_demo(cx),
+            Row::Drawer => drawer_board(),
+            Row::Suite => suite_board(),
         }
     }
 

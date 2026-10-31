@@ -28,6 +28,7 @@ const CARD_RADIUS: f32 = 16.;
 const CONFIG_WIDTH: f32 = 340.;
 /// The card header: tabs, theme select and mode.
 const CARD_HEADER: f32 = 72.;
+const HEADER_PADDING: f32 = 16.;
 const MIN_PANE: f32 = 460.;
 /// The height of the page header above the panes, in design px.
 const LEAD_HEADER: f32 = 196.;
@@ -667,8 +668,11 @@ impl Gallery {
             .items_center()
             .gap(rem(8.))
             .min_h(rem(CARD_HEADER))
-            .px(rem(16.))
-            .py(rem(8.))
+            // Flush with the card on a phone: at 200% text both tabs' labels
+            // need the header's padding too.
+            .when(!phone, |header| header.px(rem(HEADER_PADDING)))
+            .pb(rem(8.))
+            .when(!phone, |header| header.pt(rem(8.)))
             .border_b_1()
             .border_color(outline())
             .child(
@@ -681,6 +685,8 @@ impl Gallery {
                     .debug_selector(|| "card-tabs".into())
                     .child(
                         MaterialTabs::new("view-tabs", "Playground view")
+                            // The card's header, which the tabs blend into.
+                            .container(ColorRole::SURFACE_CONTAINER_LOW)
                             .items([
                                 TabItem::new("preview", "Live preview"),
                                 TabItem::new("specs", "Specs"),
@@ -707,6 +713,7 @@ impl Gallery {
             .child(
                 // One unit: on a narrow card it wraps under the tabs whole.
                 div()
+                    .when(phone, |theme| theme.px(rem(HEADER_PADDING)))
                     .flex()
                     .flex_wrap()
                     .items_center()

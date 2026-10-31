@@ -141,6 +141,18 @@ fn kit_today() -> NaiveDate {
     date(2025, 8, 5)
 }
 
+/// The row of the live pickers, which open from either component's page.
+const LIVE: usize = 6;
+
+/// The date picker's rows on its Specs tab.
+pub fn date_picker_rows() -> Vec<usize> {
+    vec![0, 1, 2, 3, LIVE]
+}
+/// The time picker's rows on its Specs tab.
+pub fn time_picker_rows() -> Vec<usize> {
+    vec![4, 5, LIVE]
+}
+
 pub struct Page {
     page: PageCx,
     modal_day: Entity<DatePickerState>,
@@ -264,11 +276,11 @@ impl GalleryPage for Page {
     }
 
     fn row_count(&self, _: &Window) -> usize {
-        7
+        LIVE + 1
     }
 
     fn interactive(&self, row: usize) -> bool {
-        row == 6
+        row == LIVE
     }
 
     fn render_row(

@@ -281,7 +281,7 @@ pub static CATALOG: &[Entry] = &[
         "Select",
         SelectionInput,
         "Choose one option from a menu that opens from a field.",
-        spec("menu"),
+        slice("menu", pages::menu::select_rows),
         Some(&playgrounds::select::PLAYGROUND),
     ),
     component(
@@ -297,7 +297,10 @@ pub static CATALOG: &[Entry] = &[
         "Date picker",
         SelectionInput,
         "Select a date or a range of dates.",
-        spec("date-time-pickers"),
+        slice(
+            "date-time-pickers",
+            pages::date_time_pickers::date_picker_rows,
+        ),
         Some(&playgrounds::date_picker::PLAYGROUND),
     ),
     component(
@@ -305,7 +308,10 @@ pub static CATALOG: &[Entry] = &[
         "Time picker",
         SelectionInput,
         "Select a time on a dial or with the keyboard.",
-        spec("date-time-pickers"),
+        slice(
+            "date-time-pickers",
+            pages::date_time_pickers::time_picker_rows,
+        ),
         Some(&playgrounds::time_picker::PLAYGROUND),
     ),
     // Navigation
@@ -314,7 +320,7 @@ pub static CATALOG: &[Entry] = &[
         "Navigation rail",
         Navigation,
         "Move between destinations from the side of the window.",
-        spec("navigation"),
+        slice("navigation", pages::navigation::rail_rows),
         Some(&playgrounds::navigation_rail::PLAYGROUND),
     ),
     component(
@@ -322,7 +328,7 @@ pub static CATALOG: &[Entry] = &[
         "Navigation bar",
         Navigation,
         "Move between destinations along the bottom of the window.",
-        spec("navigation"),
+        slice("navigation", pages::navigation::bar_rows),
         Some(&playgrounds::navigation_bar::PLAYGROUND),
     ),
     component(
@@ -330,7 +336,7 @@ pub static CATALOG: &[Entry] = &[
         "Drawer",
         Navigation,
         "Grouped destinations in a side panel, standard or modal.",
-        spec("navigation"),
+        slice("navigation", pages::navigation::drawer_rows),
         Some(&playgrounds::navigation_drawer::PLAYGROUND),
     ),
     component(
@@ -338,7 +344,7 @@ pub static CATALOG: &[Entry] = &[
         "Navigation suite",
         Navigation,
         "One set of destinations as a bar, rail or drawer, by window width.",
-        spec("navigation"),
+        slice("navigation", pages::navigation::suite_rows),
         Some(&playgrounds::navigation_suite::PLAYGROUND),
     ),
     component(
@@ -354,7 +360,7 @@ pub static CATALOG: &[Entry] = &[
         "Menu",
         Navigation,
         "A list of choices on a temporary surface.",
-        spec("menu"),
+        slice("menu", pages::menu::menu_rows),
         Some(&playgrounds::menu::PLAYGROUND),
     ),
     component(
@@ -362,7 +368,7 @@ pub static CATALOG: &[Entry] = &[
         "Top app bar",
         Navigation,
         "The title and actions at the top of a screen.",
-        spec("app-bars"),
+        slice("app-bars", pages::app_bars::top_bar_rows),
         Some(&playgrounds::top_app_bar::PLAYGROUND),
     ),
     component(
@@ -370,7 +376,7 @@ pub static CATALOG: &[Entry] = &[
         "Bottom app bar",
         Navigation,
         "Actions along the bottom of a screen.",
-        spec("app-bars"),
+        slice("app-bars", pages::app_bars::bottom_bar_rows),
         Some(&playgrounds::bottom_app_bar::PLAYGROUND),
     ),
     component(
@@ -427,7 +433,7 @@ pub static CATALOG: &[Entry] = &[
         "Bottom sheet",
         Containment,
         "Secondary content anchored to the bottom of the screen.",
-        spec("sheets"),
+        slice("sheets", pages::sheets::bottom_sheet_rows),
         Some(&playgrounds::bottom_sheet::PLAYGROUND),
     ),
     component(
@@ -435,7 +441,7 @@ pub static CATALOG: &[Entry] = &[
         "Side sheet",
         Containment,
         "Secondary content anchored to the side of the screen.",
-        spec("sheets"),
+        slice("sheets", pages::sheets::side_sheet_rows),
         Some(&playgrounds::side_sheet::PLAYGROUND),
     ),
     component(
@@ -443,7 +449,7 @@ pub static CATALOG: &[Entry] = &[
         "Canonical layouts",
         Containment,
         "List-detail, supporting pane and feed layouts that adapt to their width.",
-        spec("examples"),
+        slice("examples", pages::examples::canonical_rows),
         Some(&playgrounds::canonical_layouts::PLAYGROUND),
     ),
     // Communication
@@ -468,7 +474,7 @@ pub static CATALOG: &[Entry] = &[
         "Progress",
         Communication,
         "Show the status of ongoing work, linear or circular.",
-        spec("loading-progress"),
+        slice("loading-progress", pages::loading_progress::progress_rows),
         Some(&playgrounds::progress::PLAYGROUND),
     ),
     component(
@@ -476,7 +482,10 @@ pub static CATALOG: &[Entry] = &[
         "Loading indicator",
         Communication,
         "Show that content is on its way, for short waits.",
-        spec("loading-progress"),
+        slice(
+            "loading-progress",
+            pages::loading_progress::loading_indicator_rows,
+        ),
         Some(&playgrounds::loading_indicator::PLAYGROUND),
     ),
     component(
@@ -484,7 +493,10 @@ pub static CATALOG: &[Entry] = &[
         "Pull to refresh",
         Communication,
         "Pull the top of a list down to refresh it.",
-        spec("loading-progress"),
+        slice(
+            "loading-progress",
+            pages::loading_progress::pull_to_refresh_rows,
+        ),
         Some(&playgrounds::pull_to_refresh::PLAYGROUND),
     ),
     component(
@@ -540,7 +552,7 @@ pub static CATALOG: &[Entry] = &[
         "Examples",
         Examples,
         "Complete screens built from the library's components: pick a device and a screen, and use the app.",
-        spec("examples"),
+        slice("examples", pages::examples::layout_grid_rows),
         Some(&playgrounds::examples::PLAYGROUND),
     ),
 ];
@@ -651,11 +663,13 @@ fn fab_rows() -> Vec<usize> {
         .filter(|row| !matches!(rows()[*row], Row::Fab { extended: true, .. }))
         .collect()
 }
+/// Its own boards first, then the demo it shares with the FAB.
 fn extended_fab_rows() -> Vec<usize> {
-    section_rows(Some(3))
+    let (demo, boards): (Vec<_>, Vec<_>) = section_rows(Some(3))
         .into_iter()
         .filter(|row| matches!(rows()[*row], Row::Fab { extended: true, .. } | Row::FabDemo))
-        .collect()
+        .partition(|row| matches!(rows()[*row], Row::FabDemo));
+    [boards, demo].concat()
 }
 fn button_group_rows() -> Vec<usize> {
     section_rows(Some(4))
@@ -710,6 +724,38 @@ mod tests {
                 "{} is reachable",
                 info.info.id
             );
+        }
+    }
+
+    /// Entries sharing a kit page each open on their own rows, not on another
+    /// component's: only a live demo the components share may repeat, and never
+    /// first.
+    #[test]
+    fn entries_sharing_a_kit_page_open_on_their_own_specs() {
+        let mut firsts = Vec::new();
+        for (index, entry) in CATALOG.iter().enumerate() {
+            let Some(page) = spec_page(index) else {
+                continue;
+            };
+            let shared = (0..CATALOG.len())
+                .filter(|other| spec_page(*other) == Some(page))
+                .count();
+            if shared == 1 {
+                continue;
+            }
+            let rows = entry.spec.and_then(|spec| spec.rows).unwrap_or_else(|| {
+                panic!(
+                    "{} shares the {} page and shows all of it",
+                    entry.id, PAGES[page].info.id
+                )
+            })();
+            let first = (page, rows[0]);
+            assert!(
+                !firsts.contains(&first),
+                "{} opens on another entry's row {first:?}",
+                entry.id
+            );
+            firsts.push(first);
         }
     }
 

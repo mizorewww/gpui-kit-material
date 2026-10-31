@@ -7,6 +7,7 @@ use gpui::{
     Transformation, Window, size,
 };
 pub use gpui_material_symbols::{Asset, Axes, Icon as SymbolIcon, MaterialSymbols, Style, Symbol};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::{borrow::Cow, collections::HashMap, sync::OnceLock};
 
 mod kit_mapping;
@@ -83,6 +84,9 @@ impl Default for Assets<()> {
 }
 impl<F: AssetSource> AssetSource for Assets<F> {
     fn load(&self, path: &str) -> gpui::Result<Option<Cow<'static, [u8]>>> {
+        if path == PENDING_PATH {
+            return Ok(Some(Cow::Borrowed(PENDING_SVG)));
+        }
         match self.inner.load(path) {
             // A page that downloads its fonts draws empty icons until they arrive,
             // not an error for every icon in every frame.
@@ -100,6 +104,21 @@ impl<F: AssetSource> AssetSource for Assets<F> {
     fn list(&self, prefix: &str) -> gpui::Result<Vec<SharedString>> {
         self.inner.list(prefix)
     }
+}
+
+/// What an icon draws while the page is still downloading its font: a dot in the
+/// icon's own color and slot. A separate path, so that the glyph drawn later is
+/// not the placeholder's cached sprite.
+const PENDING_PATH: &str = "material-symbols/pending.svg";
+const PENDING_SVG: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4" fill-opacity="0.4"/></svg>"#;
+
+static SYMBOLS_PENDING: AtomicBool = AtomicBool::new(false);
+
+/// Whether the symbol fonts are still on their way, for a page that downloads
+/// them: until it says otherwise, icons draw a placeholder instead of nothing.
+/// Change it before a window redraw, which this does not cause.
+pub fn set_symbols_pending(pending: bool) {
+    SYMBOLS_PENDING.store(pending, Ordering::Relaxed);
 }
 
 /// Material's 20px default slot and legacy builder API over Component Icon.
@@ -209,7 +228,10 @@ impl From<SymbolIcon> for Icon {
     }
 }
 impl RenderOnce for Icon {
-    fn render(self, window: &mut Window, _: &mut App) -> impl IntoElement {
+    fn render(mut self, window: &mut Window, _: &mut App) -> impl IntoElement {
+        if SYMBOLS_PENDING.load(Ordering::Relaxed) {
+            self.inner = self.inner.path(PENDING_PATH);
+        }
         if self.directional && window.layout_direction().is_rtl() {
             let flip = Transformation::scale(size(-1., 1.));
             let flip = match self.rotation {
@@ -225,6 +247,15 @@ impl RenderOnce for Icon {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn the_pending_placeholder_is_an_svg_of_its_own() {
+        let assets = Assets::new();
+        let bytes = assets.load(PENDING_PATH).unwrap().unwrap();
+        assert!(bytes.starts_with(b"<svg"));
+        // Never the path of a real symbol, whose sprite would be kept.
+        assert!(SymbolIcon::from_asset_path(PENDING_PATH).is_err());
+    }
+
     #[test]
     fn only_symbols_along_the_reading_direction_mirror() {
         for name in ["arrow_back", "chevron_right", "send", "undo"] {

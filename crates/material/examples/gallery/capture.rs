@@ -255,7 +255,8 @@ pub(super) fn install(view: &Entity<Gallery>, window: &mut Window, cx: &mut App)
     window.on_next_frame(move |window, _| {
         window.on_next_frame(move |window, cx| {
             if options.settings {
-                super::settings::open(window, cx);
+                let shared = view.read(cx).shared.clone();
+                super::settings::open(shared, window, cx);
             }
             view.read(cx).scroll_to_top();
             window.refresh();

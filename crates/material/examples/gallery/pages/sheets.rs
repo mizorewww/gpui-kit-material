@@ -72,6 +72,15 @@ const MODAL: usize = 1;
 const BOTTOM: usize = 2;
 const LIVE: usize = 3;
 
+/// The side sheet's rows on its Specs tab.
+pub fn side_sheet_rows() -> Vec<usize> {
+    vec![STANDARD, MODAL, LIVE]
+}
+/// The bottom sheet's rows on its Specs tab.
+pub fn bottom_sheet_rows() -> Vec<usize> {
+    vec![BOTTOM, LIVE]
+}
+
 fn close<T: 'static>(
     entity: WeakEntity<T>,
     f: impl Fn(&mut T) + 'static,
