@@ -95,8 +95,9 @@ is **unverified**, never assumed.
 
 Budgets are the targets in [AGENTS.md](../AGENTS.md#performance-and-delivery)
 and [DEVELOPMENT.md](DEVELOPMENT.md#targets): steady-state main-thread CPU p95 ≤
-1 ms and max ≤ 2 ms (WASM ×2), idle windows draw nothing, ≥ 500 new frames/s
-while scrolling with vsync off. A component meets them when its Gallery page does
+1 ms and max ≤ 2 ms (WASM ×2), a Material list at most 2× the instructions per frame
+of an equivalent Kit list, idle windows draw nothing, no missed refreshes at 120 Hz
+with vsync on. A component meets them when its Gallery page does
 in a release build, with raw per-frame timings and hardware context preserved.
 Averages never establish a target.
 

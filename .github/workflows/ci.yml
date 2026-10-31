@@ -1,8 +1,8 @@
 name: CI
-# Hosted runners check formatting, lints, tests and the WASM build only. The
-# Gallery frame-budget (<= 2 ms CPU per frame) and scroll (>= 500 FPS) gates
-# are measured with scripts/profile-gallery.py on real hardware, because shared
-# virtual runners give neither stable timing nor a real display.
+# Hosted runners check formatting, lints, tests, packaging and the WASM build only.
+# AGENTS.md's performance targets are measured with scripts/profile-gallery.py on
+# real hardware, because shared virtual runners give neither stable timing nor a
+# real display.
 on:
   push:
     branches: [main]

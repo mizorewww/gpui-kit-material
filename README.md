@@ -127,7 +127,8 @@ python3 -m http.server 8080 --bind 127.0.0.1 --directory crates/gallery-web/www
 ```
 
 The title bar shows FPS of newly drawn frames; **Settings → Vertical sync**
-toggles Metal display sync on macOS. Headless capture, profiling and fixture
+toggles Metal display sync on macOS, the surface's `PresentMode` on Linux and the
+DXGI sync interval on Windows. Headless capture, profiling and fixture
 tooling are described in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
 
 ## References
@@ -144,14 +145,15 @@ tooling). These are targets; acceptance evidence is still open.
 
 | Target | Limit |
 | --- | --- |
-| Steady-state main-thread CPU | p95 ≤ 1 ms, max ≤ 2 ms (WASM ×2) |
-| Main-thread drawable wait | none |
+| Steady-state main-thread CPU (scrolling, hover, animations, typing) | p95 ≤ 1 ms, max ≤ 2 ms (WASM ×2) |
+| Material list against an equivalent Kit list | ≤ 2× the instructions per frame |
 | Idle window | draws nothing |
-| Forced redraw of an unchanged page | ≤ 0.3 ms |
-| First frame / page switch | ≤ 16 ms CPU / ≤ 8 ms |
-| GPU time | p95 ≤ 2 ms, reported separately |
-| Scrolling, vsync off | ≥ 500 new frames/s |
-| Scrolling, vsync on | no missed refreshes at 120 Hz |
+| Vertical sync on | no missed refreshes at 120 Hz |
+| First frame | ≤ 20% above Kit's stories baseline on the same machine |
+| Gallery page switch | ≤ 8 ms |
+| WASM against md3.io in Chrome, interactions with real main-thread work | main-thread frame time ≥ 5× lower |
+
+GPU time is reported separately.
 
 ## Develop
 

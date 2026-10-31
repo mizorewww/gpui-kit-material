@@ -70,23 +70,30 @@
     "themes": "light and dark, every built-in palette, and reference baseline",
     "review_invalidation": "Any implementation change invalidates affected prior PASS verdicts until independently reviewed again.",
     "performance": {
-      "status": "failed: measured native startup scopes exceed 2ms; other scenarios and WASM timing remain unverified",
-      "scope": "entire gallery frame, on both desktop and wasm-browser; applies to acceptance of every component",
-      "metric": "CPU frame elapsed time including view rendering, layout, prepaint, paint, scene finalization and graphics command submission",
-      "submission_timing": "Keep synchronous drawable acquisition and submission elapsed time in the complete frame budget, including cleanup. API-call elapsed time may be reported separately for diagnosis, but must not be subtracted to establish the <= 2 ms gate; it is not a measurement of pure blocking or GPU time.",
-      "threshold_ms": 2.0,
-      "comparison": "less than or equal to; any measured frame > 2.0 ms fails",
-      "aggregation": "maximum per-frame duration; also report median, p95, p99 and over-budget count",
-      "first_frame": "included; report cold-start and steady-state separately without excluding slow frames from acceptance",
-      "gpu": "measure and report separately; never substitute GPU or average FPS for CPU frame time",
+      "status": "unverified: AGENTS.md's targets have no acceptance evidence yet. conformance/performance/ holds earlier measurements against retired limits (whole-gallery frames <= 2 ms including the first, >= 500 FPS while scrolling), kept as raw data.",
+      "scope": "release builds on an idle machine, on desktop and in a browser; applies to acceptance of every component",
+      "steady_state": {
+        "frames": "scrolling, hover, running animations, typing",
+        "metric": "main-thread CPU work: render, layout, prepaint, paint, scene submission. A drawable wait is reported and not counted.",
+        "p95_ms": 1.0,
+        "max_ms": 2.0,
+        "wasm_factor": 2
+      },
+      "material_list": "at most 2x the instructions per frame of an equivalent Kit list",
+      "idle": "windows draw nothing",
+      "vertical_sync_on": "no missed refreshes at 120 Hz",
+      "first_frame": "at most 20% above Kit's stories baseline on the same machine",
+      "page_switch_ms": 8.0,
+      "wasm_against_md3io": "main-thread frame time at least 5x below md3.io in Chrome, for interactions with real main-thread work",
+      "gpu": "report separately; it decides no target",
+      "aggregation": "nearest-rank p95 and maximum from raw per-frame timings; averages alone never establish a target, and incomplete timing stays unverified",
       "evidence_required": [
         "exact source commit and dirty-worktree status",
         "release build profile and build flags",
         "hardware, OS, browser and graphics backend",
         "viewport, device pixel ratio, zoom, theme and text scale",
         "scenario and interaction schedule",
-        "per-frame raw timings and timing boundaries",
-        "frame count, maximum and over-budget count",
+        "per-frame raw timings and maxima",
         "independent subagent review"
       ],
       "scenarios": [
@@ -100,29 +107,9 @@
         "theme and text-scale changes",
         "reduced-motion transitions"
       ],
-      "completion": "No component or gallery can pass without whole-gallery evidence at or below the budget. Existing functional or visual reviews do not establish performance acceptance.",
-      "evidence": "conformance/performance/startup-backend-comparison.json",
-      "scrolling_fps": {
-        "status": "failed: native release local wheel-input scrolling measured a minimum full-window 58.5115 FPS; complete Gallery traversal and strict per-submission timing remain unverified",
-        "diagnostic_evidence": "conformance/performance/scroll-wheel-fast-state/frames.json",
-        "diagnostic_provenance": "conformance/performance/scroll-wheel-fast-state/build.json",
-        "diagnostic_comparison": "conformance/performance/scroll-wheel-fast-state/summary.json",
-        "diagnostic_review": "independent subagent verified dispatch-based wheel input, actual movement, Disabled backend VSync readback, stable source and binary identities, 598 of 601 CPU scopes over 2ms, enabled Fast retention with observed reuse, and incomplete Gallery coverage. A prior source-drift run is retained separately and not accepted; this is a reviewed failure, not conformance PASS",
-        "minimum_fps": 500,
-        "scenario": "continuous upward and downward scrolling through the complete Gallery, including newly exposed component rows and direction reversals",
-        "metric": "actual rendered frame submissions during the declared active scrolling interval; not frame requests, monitor refresh rate, or skipped/no-drawable submission attempts",
-        "synchronization": "measure with vertical synchronization disabled where the backend exposes this capability; report actual synchronization state and request pacing; unsupported browser/platform control is not a PASS",
-        "evidence_required": [
-          "raw frame submission timestamps",
-          "frame intervals and minimum FPS, with the sampling definition stated",
-          "all slow intervals during the declared continuous scrolling scenario",
-          "CPU scope timings, GPU measurements separately",
-          "actual backend and synchronization state",
-          "independent subagent review"
-        ],
-        "cpu_budget": "the existing <= 2ms whole-gallery CPU frame gate remains required independently",
-        "interpretation": "rendering/submission throughput; physical monitor refresh is reported separately"
-      }
+      "completion": "No component or gallery can pass without evidence that meets these targets. Existing functional or visual reviews do not establish performance acceptance.",
+      "tooling": "scripts/profile-gallery.py judges these targets; docs/DEVELOPMENT.md#targets lists its sources",
+      "evidence": "conformance/performance/releases/README.md"
     },
     "reference_precedence": "Use reference_policy for all visual, motion, theme, typography and state assertions. A secondary-reference PASS cannot establish primary-reference conformance."
   },
@@ -139,7 +126,7 @@
       ],
       "reference": "https://md3.io/styles/themes/",
       "reference_status": "available",
-      "primary_reference_review": "pending: reconcile with m3e.kyralabs.dev; existing md3.io evidence is not a primary-reference PASS"
+      "primary_reference_review": "pending: fixture-tested against the Figma kit (baseline) and md3.io (other themes), which outrank m3e; independent subagent review pending"
     },
     {
       "id": "color",
@@ -277,7 +264,7 @@
       "evidence": [],
       "reference": "https://md3.io/styles/",
       "reference_status": "Coming on website; verify source and runtime",
-      "primary_reference_review": "pending: reconcile with m3e.kyralabs.dev; existing md3.io evidence is not a primary-reference PASS"
+      "primary_reference_review": "pending: the Figma kit and md3.io name no icon values to reconcile; verify source and runtime against the Symbols repository; independent subagent review pending"
     }
   ],
   "components": [
@@ -1195,7 +1182,7 @@
       }
     }
   ],
-  "objective": "Reproduce every component of Google's Figma Material 3 Design Kit plus the union of https://md3.io/ and https://m3e.kyralabs.dev/ components, styles and animations on desktop and WASM galleries, with priority Figma kit > md3.io > m3e.kyralabs.dev per value; use https://gpui-kit.com/ for gallery organization. Exact visual and animation parity, independent subagent approval for every component, whole-gallery CPU frames <= 2 ms and continuous vertical-scrolling rendering throughput >= 500 FPS, atomic commits and frequent GitHub progress pushes are required. Material icons must come from the gpui-material-symbols repository, pinned by Git revision for default builds; its sibling checkout may be used explicitly for development and improved as needed. Build on Longbridge gpui-kit and its gpui-component layer, reusing existing controls and infrastructure before implementing Material-specific differences.",
+  "objective": "Reproduce every component of Google's Figma Material 3 Design Kit plus the union of https://md3.io/ and https://m3e.kyralabs.dev/ components, styles and animations on desktop and WASM galleries, with priority Figma kit > md3.io > m3e.kyralabs.dev per value; use https://gpui-kit.com/ for gallery organization. Exact visual and animation parity, independent subagent approval for every component, the performance targets in AGENTS.md, atomic commits and frequent GitHub progress pushes are required. Material icons must come from the gpui-material-symbols repository, pinned by Git revision for default builds; its sibling checkout may be used explicitly for development and improved as needed. Build on Longbridge gpui-kit and its gpui-component layer, reusing existing controls and infrastructure before implementing Material-specific differences.",
   "reference_policy": {
     "priority": [
       "figma-m3-design-kit",
