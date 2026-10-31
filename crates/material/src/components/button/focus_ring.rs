@@ -39,6 +39,8 @@ pub(crate) struct ButtonFocusRing {
     forced: bool,
     #[cfg(test)]
     observed: Option<std::rc::Rc<std::cell::Cell<Option<Bounds<Pixels>>>>>,
+    #[cfg(test)]
+    observed_corners: Option<std::rc::Rc<std::cell::Cell<Option<Corners<Pixels>>>>>,
 }
 impl ButtonFocusRing {
     pub(crate) fn new(
@@ -56,6 +58,8 @@ impl ButtonFocusRing {
             forced: false,
             #[cfg(test)]
             observed: None,
+            #[cfg(test)]
+            observed_corners: None,
         }
     }
 
@@ -84,6 +88,8 @@ impl ButtonFocusRing {
             forced: false,
             #[cfg(test)]
             observed: None,
+            #[cfg(test)]
+            observed_corners: None,
         }
     }
 
@@ -194,6 +200,17 @@ impl Element for ButtonFocusRing {
             Radius::Rems(radius) => Corners::all(radius.to_pixels(window.rem_size())),
             Radius::Corners(corners) => corners,
         };
+        // A painted quad has physical corners, and style corners are in reading
+        // order: mirrored, this control's start corner is on the right.
+        let corners = if window.layout_direction().is_rtl() {
+            corners.flip_x()
+        } else {
+            corners
+        };
+        #[cfg(test)]
+        if let Some(observed) = &self.observed_corners {
+            observed.set(Some(corners));
+        }
         let (ring_bounds, ring_corners) = ring_geometry(bounds, corners, self.inward);
         #[cfg(test)]
         if let Some(observed) = &self.observed {
@@ -318,6 +335,55 @@ mod tests {
         cx.simulate_click(original.center(), Modifiers::default());
         draw(cx);
         assert!(observed.get().is_none());
+    }
+
+    struct Asymmetric {
+        focus: FocusHandle,
+        observed: Rc<Cell<Option<gpui::Corners<Pixels>>>>,
+    }
+    impl Render for Asymmetric {
+        fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+            let mut ring = ButtonFocusRing::with_corners(
+                div().size(px(40.)),
+                self.focus.clone(),
+                true,
+                gpui::Corners {
+                    top_left: px(1.),
+                    top_right: px(2.),
+                    bottom_right: px(3.),
+                    bottom_left: px(4.),
+                },
+            )
+            .forced(true);
+            ring.observed_corners = Some(self.observed.clone());
+            crate::scope::Scope::new("rtl-ring")
+                .direction(gpui::LayoutDirection::Rtl)
+                .child(ring)
+        }
+    }
+
+    #[gpui::test]
+    fn the_rings_corners_mirror_with_the_control(cx: &mut TestAppContext) {
+        cx.update(gpui_base::init);
+        let observed = Rc::new(Cell::new(None));
+        let (_, cx) = cx.add_window_view({
+            let observed = observed.clone();
+            move |_, cx| Asymmetric {
+                focus: cx.focus_handle(),
+                observed,
+            }
+        });
+        draw(cx);
+        assert_eq!(
+            observed.get(),
+            Some(gpui::Corners {
+                top_left: px(2.),
+                top_right: px(1.),
+                bottom_right: px(4.),
+                bottom_left: px(3.),
+            }),
+            "the start corner is on the right"
+        );
     }
 
     #[gpui::test]
