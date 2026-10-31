@@ -35,6 +35,13 @@ opt-level = 3
 [profile.dev.package.gpui-fast]
 opt-level = 3
 
+# The browser module only (scripts/build-gallery-web.sh --release): a host caps the file
+# at 25 MiB, and every byte is downloaded. The default `release` stays as profiles measure it.
+[profile.wasm-release]
+inherits = "release"
+lto = "fat"
+codegen-units = 1
+
 [patch.crates-io]
 gpui-fast-macos = { path = "vendor/gpui-fast-macos" }
 gpui-pre-macos = { path = "vendor/gpui-pre-macos" }
