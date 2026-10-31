@@ -355,10 +355,12 @@ pub enum Tint {
     Green,
     Pink,
     Purple,
+    /// The error container: a state, not a category.
+    Danger,
 }
 
 impl Tint {
-    pub const ALL: [Tint; 7] = [
+    pub const ALL: [Tint; 8] = [
         Tint::Orange,
         Tint::Blue,
         Tint::Teal,
@@ -366,6 +368,7 @@ impl Tint {
         Tint::Green,
         Tint::Pink,
         Tint::Purple,
+        Tint::Danger,
     ];
 
     /// The container role and the content role on it.
@@ -378,6 +381,7 @@ impl Tint {
             Tint::Green => TintFamily::Green.roles(),
             Tint::Pink => TintFamily::Pink.roles(),
             Tint::Purple => TintFamily::Purple.roles(),
+            Tint::Danger => (ColorRole::ERROR_CONTAINER, ColorRole::ERROR),
         }
     }
 
