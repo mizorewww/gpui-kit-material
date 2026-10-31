@@ -1102,6 +1102,7 @@ mod window_tests {
         }
     }
 
+    #[cfg(feature = "gpui-fast")]
     fn preview_updates_are_isolated_at(width: f32, cx: &mut TestAppContext) {
         let mut parts = None;
         let window = cx.open_window(size(px(width), px(800.)), |window, cx| {
