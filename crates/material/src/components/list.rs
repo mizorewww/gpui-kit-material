@@ -20,6 +20,7 @@ use super::{CheckboxState, MaterialCheckbox, MaterialRadio, MaterialSwitch};
 use crate::{
     color::ColorRole,
     icons::Icon,
+    motion,
     theme::color,
     tokens::{
         shape::{OuterCorners, list_corners},
@@ -101,6 +102,21 @@ impl ListLines {
     }
 }
 
+/// A row's gap, vertical padding override and leading or trailing icon size, in dp:
+/// the kit's baseline `List Item`, or its expressive `List item`.
+const fn row_rhythm(expressive: bool) -> (f32, Option<f32>, f32) {
+    if expressive {
+        (12., Some(10.), 20.)
+    } else {
+        (16., None, 24.)
+    }
+}
+
+/// An expressive row's corners, as selection (or a press) arrives: 4dp to 16dp.
+fn expressive_radius(amount: f32) -> f32 {
+    4. + 12. * amount.clamp(0., 1.)
+}
+
 /// The minimum height and vertical padding of a row, in dp.
 fn row_metrics(lines: ListLines, density: ListDensity) -> (f32, f32) {
     match (density, lines) {
@@ -176,6 +192,7 @@ pub struct ListItem {
     disabled: bool,
     density: ListDensity,
     corners: Option<OuterCorners>,
+    expressive: bool,
     container: ColorRole,
     preview: Option<InteractionPreview>,
     on_click: Option<Click>,
@@ -198,6 +215,7 @@ impl ListItem {
             disabled: false,
             density: ListDensity::Standard,
             corners: None,
+            expressive: false,
             container: ColorRole::SURFACE,
             preview: None,
             on_click: None,
@@ -263,6 +281,13 @@ impl ListItem {
     }
     /// Round the item as a segment of an Expressive segmented list
     /// (top-left, top-right, bottom-right, bottom-left; true = outside).
+    /// The kit's expressive `List item`: tighter (10dp and 16dp padding, a 12dp gap,
+    /// 20dp icons), a label-large trailing text, and 4dp corners that round to 16dp
+    /// when selected, pressed or focused. Without it, the baseline `List Item`.
+    pub fn expressive(mut self, expressive: bool) -> Self {
+        self.expressive = expressive;
+        self
+    }
     pub fn segment(mut self, corners: OuterCorners) -> Self {
         self.corners = Some(corners);
         self
@@ -398,7 +423,7 @@ fn thumbnail(width: f32, height: f32, content: Option<AnyElement>) -> Div {
 }
 
 impl ListItem {
-    fn leading_element(&mut self, ink: Rgba, disabled: bool) -> Option<AnyElement> {
+    fn leading_element(&mut self, ink: Rgba, disabled: bool, size: f32) -> Option<AnyElement> {
         let label = self.headline.clone();
         let leading = std::mem::replace(&mut self.leading, ListLeading::None);
         Some(match leading {
@@ -427,8 +452,8 @@ impl ListItem {
             .into_any_element(),
             ListLeading::Icon(icon) => div()
                 .flex_shrink_0()
-                .size(rem(24.))
-                .child(icon.size(rem(24.)).color(ink))
+                .size(rem(size))
+                .child(icon.size(rem(size)).color(ink))
                 .into_any_element(),
             ListLeading::Image(content) => thumbnail(56., 56., content).into_any_element(),
             ListLeading::Video(content) => thumbnail(114., 64., content).into_any_element(),
@@ -444,15 +469,15 @@ impl ListItem {
         })
     }
 
-    fn trailing_element(&mut self, ink: Rgba, disabled: bool) -> Option<AnyElement> {
+    fn trailing_element(&mut self, ink: Rgba, disabled: bool, size: f32) -> Option<AnyElement> {
         let label = self.headline.clone();
         let trailing = std::mem::replace(&mut self.trailing, ListTrailing::None);
         Some(match trailing {
             ListTrailing::None => return None,
             ListTrailing::Icon(icon) => div()
                 .flex_shrink_0()
-                .size(rem(24.))
-                .child(icon.size(rem(24.)).color(ink))
+                .size(rem(size))
+                .child(icon.size(rem(size)).color(ink))
                 .into_any_element(),
             ListTrailing::Checkbox(checked) => control(
                 "trailing-checkbox",
@@ -493,7 +518,9 @@ impl ListItem {
 }
 
 impl RenderOnce for ListItem {
-    fn render(mut self, _: &mut Window, _: &mut App) -> impl IntoElement {
+    fn render(mut self, window: &mut Window, cx: &mut App) -> impl IntoElement {
+        let expressive = self.expressive;
+        let (row_gap, expressive_pad, icon_size) = row_rhythm(expressive);
         let preview = self.preview;
         let disabled = self.disabled || preview.is_some_and(InteractionPreview::is_disabled);
         let lines = self.lines();
@@ -505,8 +532,8 @@ impl RenderOnce for ListItem {
         let (toggled, radio) = self.toggle_state();
         let selected = self.selected || radio;
         let description = self.supporting.clone();
-        let leading = self.leading_element(paint.support, disabled);
-        let trailing = self.trailing_element(paint.support, disabled);
+        let leading = self.leading_element(paint.support, disabled, icon_size);
+        let trailing = self.trailing_element(paint.support, disabled, icon_size);
         let top_aligned = lines == ListLines::Three;
         let supporting_lines = self.supporting_lines;
 
@@ -541,9 +568,16 @@ impl RenderOnce for ListItem {
             });
 
         let trailing_text = self.trailing_text.clone().map(|value| {
-            typed(div().flex_shrink_0(), TypeRole::LabelSmall)
-                .text_color(paint.support)
-                .child(value)
+            typed(
+                div().flex_shrink_0(),
+                if expressive {
+                    TypeRole::LabelLarge
+                } else {
+                    TypeRole::LabelSmall
+                },
+            )
+            .text_color(paint.support)
+            .child(value)
         });
 
         let row = div()
@@ -551,9 +585,9 @@ impl RenderOnce for ListItem {
             .flex_1()
             .w_full()
             .min_w_0()
-            .gap(rem(16.))
+            .gap(rem(row_gap))
             .px(rem(16.))
-            .py(rem(pad_y))
+            .py(rem(expressive_pad.unwrap_or(pad_y)))
             .min_h(rem(min_height))
             .map(|row| {
                 if top_aligned {
@@ -576,7 +610,25 @@ impl RenderOnce for ListItem {
                 )
             });
 
-        let radii = self.corners.map(segment_radii).unwrap_or_default();
+        let rem_size = window.rem_size();
+        let corners = |dp: f32| Corners::all(rem(dp).to_pixels(rem_size));
+        let forced = preview.is_some_and(|p| p.is_pressed() || p.is_focused());
+        let radii = match self.corners {
+            Some(corners) => segment_radii(corners),
+            None if expressive => {
+                // Selection morphs the corners, as a press does below.
+                let amount = motion::selection_value(
+                    (self.id.clone(), "list-corners"),
+                    if self.selected { 1. } else { 0. },
+                    window,
+                    cx,
+                );
+                corners(expressive_radius(if forced { 1. } else { amount }))
+            }
+            None => Corners::default(),
+        };
+        let active_radius = (expressive && self.corners.is_none())
+            .then(|| rem(expressive_radius(1.)).to_pixels(rem_size));
         let divider = self.divider;
         let inset = self.divider_inset;
         let container = paint.container;
@@ -615,7 +667,13 @@ impl RenderOnce for ListItem {
 
         let (hover, press) = (
             state::hovered(container, paint.layer),
-            state::pressed(container, paint.layer),
+            // The kit's expressive row presses at the hover's opacity; the ripple
+            // above it is what a press adds.
+            if expressive {
+                state::hovered(container, paint.layer)
+            } else {
+                state::pressed(container, paint.layer)
+            },
         );
         let mut button = RingedButton::new(self.id, RingPlacement::Inner(radii))
             .map(|button| {
@@ -654,7 +712,8 @@ impl RenderOnce for ListItem {
                     .when_some(description, |button, text| button.aria_description(text))
             })
             .state_layers(hover, press)
-            .ripple(color(ColorRole::ON_SURFACE))
+            .active_radius(active_radius)
+            .ripple(paint.layer)
             .disabled(disabled)
             .on_click(move |event, window, cx| on_click(event, window, cx))
             .child(row)
@@ -754,6 +813,40 @@ mod tests {
             disabled.headline,
             state::disabled(color(ColorRole::ON_SURFACE))
         );
+    }
+
+    /// The kit's `List item`, `Alignment=Middle-aligned`.
+    #[test]
+    fn an_expressive_row_follows_the_kits_rhythm_and_corners() {
+        assert_eq!(row_rhythm(true), (12., Some(10.), 20.));
+        assert_eq!(row_rhythm(false), (16., None, 24.));
+        assert_eq!(expressive_radius(0.), 4.);
+        assert_eq!(expressive_radius(1.), 16.);
+    }
+
+    struct Rows;
+    impl Render for Rows {
+        fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+            window.set_rem_size(px(14.));
+            div().w(px(300.)).child(
+                ListItem::new("row", "Headline")
+                    .expressive(true)
+                    .leading(ListLeading::Icon(crate::icons::IconName::Info.icon()))
+                    .on_click(|_, _, _| {})
+                    .selected(true),
+            )
+        }
+    }
+
+    #[gpui::test]
+    fn an_expressive_row_renders_and_settles(cx: &mut TestAppContext) {
+        cx.update(|cx| {
+            gpui_base::init(cx);
+            cx.set_reduce_motion(true);
+        });
+        let (_, cx) = cx.add_window_view(|_, _| Rows);
+        draw(cx);
+        draw(cx);
     }
 
     #[test]

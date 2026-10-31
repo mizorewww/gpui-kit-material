@@ -91,6 +91,8 @@ pub struct RingedButton {
     layers: Option<(Rgba, Rgba)>,
     /// The level hovering lifts the button to, if it does.
     hover_elevation: Option<u8>,
+    /// The corners a live press or keyboard focus rounds it to, if they do.
+    active_radius: Option<Pixels>,
     ripple: Option<Rgba>,
     preview: Option<InteractionPreview>,
 }
@@ -106,6 +108,7 @@ impl RingedButton {
             disabled: false,
             layers: None,
             hover_elevation: None,
+            active_radius: None,
             ripple: None,
             preview: None,
         }
@@ -127,6 +130,12 @@ impl RingedButton {
     /// The elevation level of a live hover, if it changes the button's.
     pub(crate) fn hover_elevation(mut self, level: Option<u8>) -> Self {
         self.hover_elevation = level;
+        self
+    }
+
+    /// The corners of a live press and keyboard focus, if they change the button's.
+    pub(crate) fn active_radius(mut self, radius: Option<Pixels>) -> Self {
+        self.active_radius = radius;
         self
     }
 
@@ -220,6 +229,7 @@ impl RenderOnce for RingedButton {
             }
         });
         let hover_elevation = self.hover_elevation;
+        let active_radius = self.active_radius;
         if let Some((hover, press)) = self.layers.filter(|_| enabled) {
             button = match self.preview {
                 None => button
@@ -230,7 +240,16 @@ impl RenderOnce for RingedButton {
                             None => style,
                         }
                     })
-                    .active(move |style| style.bg(press)),
+                    .active(move |style| {
+                        let style = style.bg(press);
+                        match active_radius {
+                            Some(radius) => style.rounded(radius),
+                            None => style,
+                        }
+                    })
+                    .when_some(active_radius, |button, radius| {
+                        button.focus_visible(move |style| style.rounded(radius))
+                    }),
                 Some(InteractionPreview::Hovered) => button.bg(hover),
                 Some(InteractionPreview::Pressed) => button.bg(press),
                 Some(_) => button,
