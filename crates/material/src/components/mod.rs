@@ -37,8 +37,8 @@ pub use divider::{
     DividerContext, DividerDirection, DividerOrientation, DividerVariant, MaterialDivider,
 };
 pub use search::{
-    SEARCH_BAR_HEIGHT, SEARCH_SUGGESTION_HEIGHT, SearchField, SearchSuggestion, SearchView,
-    SearchViewLayout, SearchViewStyle,
+    SEARCH_BAR_HEIGHT, SEARCH_SUGGESTION_HEIGHT, SearchField, SearchFieldStyle, SearchSuggestion,
+    SearchView, SearchViewLayout, SearchViewStyle,
 };
 pub use slider::{MaterialSlider, SliderAppearance, SliderColor, SliderSize};
 pub use snackbar::{SNACKBAR_CLOSE_ICON, Snackbar, SnackbarDuration, SnackbarPosition};
