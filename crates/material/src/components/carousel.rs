@@ -45,6 +45,8 @@ const PAD_X: f32 = 16.;
 const PAD_Y: f32 = 8.;
 /// How long scrolling must rest before the carousel snaps.
 const SNAP_IDLE: Duration = Duration::from_millis(160);
+/// Travel before a press on an item is a swipe rather than a click, in dp.
+const SWIPE_SLOP: f32 = 8.;
 
 /// A carousel's keyline strategy.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -343,6 +345,10 @@ struct CarouselState {
     on_change: Option<ChangeHandler>,
     /// While the pointer drags: its x and the scroll when the drag began.
     drag: Option<(Pixels, f32)>,
+    /// The pointer has travelled far enough to be a swipe, not a click.
+    swiped: bool,
+    /// The item step the scroll was last laid out with.
+    laid_out_step: Option<f32>,
 }
 
 #[cfg(test)]
@@ -366,13 +372,31 @@ impl CarouselState {
         }
     }
 
+    /// Where the items are now: part way along an animation, if one runs.
+    /// Whatever interrupts one starts from here, not from its origin.
+    fn position(&self) -> f32 {
+        let Some(animation) = self.animation else {
+            return self.scroll;
+        };
+        let curve = motion::curve(MotionToken::DefaultSpatial);
+        let duration = curve.duration().as_secs_f32().max(f32::EPSILON);
+        let t = animation.started.elapsed().as_secs_f32() / duration;
+        if t >= 1. {
+            animation.to
+        } else {
+            animation.from + (animation.to - animation.from) * curve.ease()(t)
+        }
+    }
+
     fn animate_to(&mut self, to: f32, reduced: bool) {
-        if reduced || (to - self.scroll).abs() < 0.5 {
+        let from = self.position();
+        self.scroll = from;
+        if reduced || (to - from).abs() < 0.5 {
             self.scroll = to;
             self.animation = None;
         } else {
             self.animation = Some(ScrollAnimation {
-                from: self.scroll,
+                from,
                 to,
                 started: Instant::now(),
             });
@@ -538,6 +562,30 @@ fn typed<E: Styled>(element: E, role: TypeRole) -> E {
         .font_weight(FontWeight(scale.font_weight as f32))
 }
 
+/// Let go of a swipe at the position it reached, snapping if the carousel does.
+fn end_swipe(
+    state: &Entity<CarouselState>,
+    snaps: bool,
+    step: f32,
+    max: f32,
+    window: &mut Window,
+    cx: &mut App,
+) {
+    let reduced = cx.reduce_motion();
+    let to = state.update(cx, |state, _| {
+        state.drag = None;
+        let to = if snaps {
+            snap(state.scroll, step, max)
+        } else {
+            state.scroll
+        };
+        state.animate_to(to, reduced);
+        to
+    });
+    report(state, to, step, window, cx);
+    window.refresh();
+}
+
 /// Snap once scrolling has rested for [`SNAP_IDLE`]. Each wheel event only
 /// pushes the deadline back; one task waits for it.
 fn schedule_snap(
@@ -569,7 +617,15 @@ fn schedule_snap(
                 match wait {
                     Ok(Some(wait)) if !wait.is_zero() => cx.background_executor().timer(wait).await,
                     Ok(Some(_)) => break,
-                    _ => return,
+                    _ => {
+                        // Something else took over and called the snap off.
+                        let _ = cx.update(|_, cx| {
+                            if let Some(state) = state.upgrade() {
+                                state.update(cx, |state, _| state.snap_pending = false);
+                            }
+                        });
+                        return;
+                    }
                 }
             }
             let _ = cx.update(|window, cx| {
@@ -641,6 +697,22 @@ impl RenderOnce for MaterialCarousel {
             (step, max, shift_len, large, start.gap)
         };
         let reduced = cx.reduce_motion();
+
+        // A carousel measures its width a frame late and follows its parent,
+        // and its step follows the width. What is showing keeps showing.
+        if state.read(cx).laid_out_step != Some(step) {
+            state.update(cx, |state, _| {
+                if let Some(last) = state.laid_out_step.filter(|last| *last > 0.) {
+                    let scale = step / last;
+                    state.scroll = state.position() * scale;
+                    state.animation = None;
+                    if let Some((_, from)) = state.drag.as_mut() {
+                        *from *= scale;
+                    }
+                }
+                state.laid_out_step = Some(step);
+            });
+        }
 
         // Advance a snap or keyboard scroll animation.
         if !state.read(cx).started {
@@ -834,14 +906,19 @@ impl RenderOnce for MaterialCarousel {
                 // they dominate, as a horizontal list has no other use.
                 let horizontal = delta.x.abs() > delta.y.abs();
                 let amount = if horizontal {
-                    -f32::from(delta.x)
+                    // Items laid out from the right follow the fingers the other way.
+                    if rtl {
+                        f32::from(delta.x)
+                    } else {
+                        -f32::from(delta.x)
+                    }
                 } else {
                     -f32::from(delta.y)
                 } / rem_size;
                 if amount == 0. || max <= 0. {
                     return;
                 }
-                let before = wheel.read(cx).scroll;
+                let before = wheel.read(cx).position();
                 let after = (before + amount).clamp(0., max);
                 let moved = after != before;
                 // A vertical wheel the carousel cannot follow (it is at that
@@ -877,14 +954,20 @@ impl RenderOnce for MaterialCarousel {
                 };
                 cx.stop_propagation();
                 let reduced = cx.reduce_motion();
-                keys.update(cx, |state, _| state.animate_to(to, reduced));
+                keys.update(cx, |state, _| {
+                    state.snap_due = None;
+                    state.animate_to(to, reduced);
+                });
                 report(&keys, to, step, window, cx);
                 window.refresh();
             })
             .on_mouse_down(MouseButton::Left, move |event, window, cx| {
                 // Swipe: the pointer drags the items.
                 grab.update(cx, |state, _| {
+                    state.scroll = state.position();
                     state.animation = None;
+                    state.snap_due = None;
+                    state.swiped = false;
                     state.drag = Some((event.position.x, state.scroll));
                 });
                 window.refresh();
@@ -901,9 +984,17 @@ impl RenderOnce for MaterialCarousel {
                                     if phase != DispatchPhase::Capture {
                                         return;
                                     }
+                                    if !event.dragging() {
+                                        // The button came up where we could not see it.
+                                        if moving.read(cx).drag.is_some() {
+                                            end_swipe(&moving, snaps, step, max, window, cx);
+                                        }
+                                        return;
+                                    }
                                     moving.update(cx, |state, _| {
                                         if let Some((x, from)) = state.drag {
                                             let delta = f32::from(event.position.x - x) / rem_size;
+                                            state.swiped |= delta.abs() >= SWIPE_SLOP;
                                             let delta = if rtl { -delta } else { delta };
                                             state.scroll = (from - delta).clamp(0., max);
                                         }
@@ -912,24 +1003,20 @@ impl RenderOnce for MaterialCarousel {
                                 },
                             );
                             let dropping = follow.clone();
-                            window.on_mouse_event(move |_: &MouseUpEvent, phase, window, cx| {
-                                if phase != DispatchPhase::Capture {
-                                    return;
-                                }
-                                let reduced = cx.reduce_motion();
-                                let to = dropping.update(cx, |state, _| {
-                                    state.drag = None;
-                                    let to = if snaps {
-                                        snap(state.scroll, step, max)
-                                    } else {
-                                        state.scroll
-                                    };
-                                    state.animate_to(to, reduced);
-                                    to
-                                });
-                                report(&dropping, to, step, window, cx);
-                                window.refresh();
-                            });
+                            window.on_mouse_event(
+                                move |event: &MouseUpEvent, phase, window, cx| {
+                                    if phase != DispatchPhase::Capture
+                                        || event.button != MouseButton::Left
+                                    {
+                                        return;
+                                    }
+                                    // A swipe's release clicks nothing under it.
+                                    if dropping.read(cx).swiped {
+                                        cx.stop_propagation();
+                                    }
+                                    end_swipe(&dropping, snaps, step, max, window, cx);
+                                },
+                            );
                         },
                     )
                     .absolute()
@@ -1401,5 +1488,227 @@ mod tests {
             (f32::from(moved.left()) - 24.).abs() > 1.,
             "it did not snap to an item"
         );
+    }
+
+    #[test]
+    fn a_new_target_starts_from_where_the_animation_is() {
+        let duration = motion::curve(MotionToken::DefaultSpatial).duration();
+        let mut state = CarouselState {
+            animation: Some(ScrollAnimation {
+                from: 0.,
+                to: 200.,
+                started: Instant::now() - duration / 2,
+            }),
+            ..Default::default()
+        };
+        state.animate_to(400., false);
+        let from = state.animation.expect("still moving").from;
+        assert!(from > 50., "it went back to the old origin: {from}");
+    }
+
+    #[gpui::test]
+    fn pressing_a_moving_carousel_holds_it_where_it_is(cx: &mut gpui::TestAppContext) {
+        use gpui::{Modifiers, MouseButton};
+        let (view, cx) = controlled(cx, 0, true);
+        cx.update(|_, cx| cx.set_reduce_motion(false));
+        redraw(cx);
+        let start = cx.debug_bounds("item-0").unwrap().center();
+        view.update(cx, |view, cx| {
+            view.current = 1;
+            cx.notify();
+        });
+        redraw(cx);
+        std::thread::sleep(std::time::Duration::from_millis(100));
+        redraw(cx);
+        let moving = cx.debug_bounds("item-1").unwrap().left();
+        cx.simulate_mouse_down(start, MouseButton::Left, Modifiers::none());
+        redraw(cx);
+        let held = cx.debug_bounds("item-1").unwrap().left();
+        assert!(
+            held <= moving + px(0.5),
+            "it jumped back: {moving:?} {held:?}"
+        );
+    }
+
+    #[gpui::test]
+    fn a_measured_width_rests_like_a_fixed_one(cx: &mut gpui::TestAppContext) {
+        let left = |cx: &mut gpui::TestAppContext, fixed| {
+            let (_, cx) = page(cx, CarouselLayout::CenteredHero, fixed);
+            for _ in 0..3 {
+                redraw(cx);
+            }
+            cx.debug_bounds("item-1").unwrap().left()
+        };
+        let measured = left(cx, None);
+        assert_eq!(measured, left(cx, Some(600.)), "the first width stayed");
+    }
+
+    #[gpui::test]
+    fn a_key_during_the_wheels_pause_is_not_undone_by_its_snap(cx: &mut gpui::TestAppContext) {
+        let (view, cx) = controlled(cx, 0, true);
+        // With motion: the wheel's position stays behind while the key's
+        // animation runs, which is what an old snap would land on.
+        cx.update(|_, cx| cx.set_reduce_motion(false));
+        redraw(cx);
+        let position = cx.debug_bounds("item-0").unwrap().center();
+        let wheel = |cx: &mut gpui::VisualTestContext, x: f32| {
+            cx.simulate_event(gpui::ScrollEvent {
+                position,
+                delta: gpui::ScrollDelta::Pixels(point(px(x), px(0.))),
+                touch_phase: TouchPhase::Moved,
+                ..Default::default()
+            });
+        };
+        wheel(cx, -150.);
+        cx.update(|window, cx| window.focus_next(cx));
+        cx.simulate_keystrokes("home");
+        redraw(cx);
+        cx.executor().advance_clock(SNAP_IDLE * 2);
+        cx.run_until_parked();
+        redraw(cx);
+        let reported = view.read_with(cx, |view, _| view.reported.get());
+        assert_ne!(reported, Some(1), "the key's destination stands");
+        // The wheel still snaps afterwards.
+        wheel(cx, -650.);
+        cx.executor().advance_clock(SNAP_IDLE * 2);
+        cx.run_until_parked();
+        redraw(cx);
+        let reported = view.read_with(cx, |view, _| view.reported.get());
+        assert!(reported.is_some_and(|item| item > 1), "{reported:?}");
+    }
+
+    #[gpui::test]
+    fn a_lost_release_ends_the_swipe(cx: &mut gpui::TestAppContext) {
+        use gpui::{Modifiers, MouseButton};
+        let (_, cx) = controlled(cx, 0, false);
+        redraw(cx);
+        let start = cx.debug_bounds("item-0").unwrap().center();
+        cx.simulate_mouse_down(start, MouseButton::Left, Modifiers::none());
+        redraw(cx);
+        cx.simulate_mouse_move(
+            start - point(px(60.), px(0.)),
+            Some(MouseButton::Left),
+            Modifiers::none(),
+        );
+        redraw(cx);
+        let released = cx.debug_bounds("item-1").unwrap();
+        // No button any more: this move is not a drag.
+        cx.simulate_mouse_move(
+            start - point(px(120.), px(0.)),
+            None::<MouseButton>,
+            Modifiers::none(),
+        );
+        redraw(cx);
+        assert_eq!(cx.debug_bounds("item-1").unwrap(), released);
+    }
+
+    #[gpui::test]
+    fn a_release_of_another_button_does_not_end_the_swipe(cx: &mut gpui::TestAppContext) {
+        use gpui::{Modifiers, MouseButton};
+        let (_, cx) = controlled(cx, 0, false);
+        redraw(cx);
+        let start = cx.debug_bounds("item-0").unwrap().center();
+        cx.simulate_mouse_down(start, MouseButton::Left, Modifiers::none());
+        redraw(cx);
+        cx.simulate_mouse_up(start, MouseButton::Right, Modifiers::none());
+        redraw(cx);
+        let to = start - point(px(60.), px(0.));
+        let home = cx.debug_bounds("item-1").unwrap();
+        cx.simulate_mouse_move(to, Some(MouseButton::Left), Modifiers::none());
+        redraw(cx);
+        assert!(cx.debug_bounds("item-1").unwrap().left() < home.left());
+    }
+
+    struct RtlCarousel;
+    impl gpui::Render for RtlCarousel {
+        fn render(&mut self, window: &mut Window, _: &mut gpui::Context<Self>) -> impl IntoElement {
+            window.set_rem_size(px(BASE_PX));
+            crate::scope::Scope::new("rtl-carousel")
+                .direction(gpui::LayoutDirection::Rtl)
+                .child(
+                    MaterialCarousel::new("carousel", "Photos")
+                        .width(412.)
+                        .snap(false)
+                        .items((0..8).map(|i| {
+                            CarouselItem::new().content(
+                                div()
+                                    .debug_selector(move || format!("item-{i}"))
+                                    .size_full(),
+                            )
+                        })),
+                )
+        }
+    }
+
+    #[gpui::test]
+    fn a_horizontal_swipe_moves_items_with_the_fingers_right_to_left(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        cx.update(|cx| {
+            gpui_base::init(cx);
+            cx.set_reduce_motion(true);
+        });
+        let (_, cx) = cx.add_window_view(|_, _| RtlCarousel);
+        redraw(cx);
+        let home = cx.debug_bounds("item-1").unwrap();
+        cx.simulate_event(gpui::ScrollEvent {
+            position: home.center(),
+            delta: gpui::ScrollDelta::Pixels(point(px(30.), px(0.))),
+            touch_phase: TouchPhase::Moved,
+            ..Default::default()
+        });
+        redraw(cx);
+        assert!(
+            cx.debug_bounds("item-1").unwrap().right() > home.right(),
+            "fingers moving right carry the items right"
+        );
+    }
+
+    struct Clickable(std::rc::Rc<std::cell::Cell<usize>>);
+    impl gpui::Render for Clickable {
+        fn render(&mut self, window: &mut Window, _: &mut gpui::Context<Self>) -> impl IntoElement {
+            window.set_rem_size(px(BASE_PX));
+            let clicks = self.0.clone();
+            MaterialCarousel::new("carousel", "Photos")
+                .width(412.)
+                .snap(false)
+                .items((0..8).map(move |i| {
+                    let clicks = clicks.clone();
+                    CarouselItem::new().content(
+                        div()
+                            .id(("content", i as usize))
+                            .debug_selector(move || format!("item-{i}"))
+                            .size_full()
+                            .on_click(move |_, _, _| clicks.set(clicks.get() + 1)),
+                    )
+                }))
+        }
+    }
+
+    #[gpui::test]
+    fn a_swipe_is_not_a_click(cx: &mut gpui::TestAppContext) {
+        use gpui::{Modifiers, MouseButton};
+        cx.update(|cx| {
+            gpui_base::init(cx);
+            cx.set_reduce_motion(true);
+        });
+        let clicks = std::rc::Rc::new(std::cell::Cell::new(0));
+        let (_, cx) = cx.add_window_view({
+            let clicks = clicks.clone();
+            move |_, _| Clickable(clicks)
+        });
+        redraw(cx);
+        let start = cx.debug_bounds("item-1").unwrap().center();
+        cx.simulate_click(start, Modifiers::none());
+        assert_eq!(clicks.get(), 1, "a click still clicks");
+        redraw(cx);
+        cx.simulate_mouse_down(start, MouseButton::Left, Modifiers::none());
+        redraw(cx);
+        let to = start - point(px(40.), px(0.));
+        cx.simulate_mouse_move(to, Some(MouseButton::Left), Modifiers::none());
+        redraw(cx);
+        cx.simulate_mouse_up(to, MouseButton::Left, Modifiers::none());
+        redraw(cx);
+        assert_eq!(clicks.get(), 1, "the swipe's release did not click");
     }
 }
