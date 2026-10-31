@@ -445,6 +445,7 @@ impl DatePickerState {
     pub fn set_value(&mut self, selection: DateSelection, cx: &mut Context<Self>) {
         self.apply(selection);
         self.inputs_stale = self.inputs.is_some();
+        self.reveal_cursor();
         cx.notify();
     }
 
@@ -463,6 +464,7 @@ impl DatePickerState {
         self.selection = next_selection(previous, date);
         let changed = self.selection != previous;
         self.cursor = date;
+        self.inputs_stale = self.inputs.is_some();
         if (date.year(), date.month()) != (self.year, self.month)
             && self.view == DatePickerView::Day
         {
@@ -485,6 +487,7 @@ impl DatePickerState {
             DateSelection::Single(None)
         };
         self.invalid = (false, false);
+        self.inputs_stale = self.inputs.is_some();
         cx.emit(DatePickerEvent::Change(self.selection));
         cx.notify();
     }
@@ -818,6 +821,10 @@ pub(crate) fn cursor_target(
         }
     };
     match (view, step) {
+        // The month list shows one year, which a choice in it is taken in.
+        (DatePickerView::Month, PreviousMonth) if cursor.month() == 1 => cursor,
+        (DatePickerView::Month, NextMonth) if cursor.month() == 12 => cursor,
+        (DatePickerView::Month, PreviousYear | NextYear) => cursor,
         (_, PreviousMonth) => add_months(cursor, -1),
         (_, NextMonth) => add_months(cursor, 1),
         (_, PreviousYear) => add_months(cursor, -12),

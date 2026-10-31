@@ -477,3 +477,75 @@ fn a_date_outside_the_offered_years_cannot_be_selected(cx: &mut TestAppContext) 
     assert!(!selected);
     assert_eq!(state.read_with(cx, |s, _| s.value()), before);
 }
+
+/// The month list shows the displayed year, and Enter chooses in that year: its
+/// keys cannot leave it, whichever key it is.
+#[test]
+fn month_list_keys_stay_in_the_year() {
+    use CursorStep::*;
+    let at = |date, step| cursor_target(DatePickerView::Month, date, step, Weekday::Sun);
+    assert_eq!(at(d(2026, 1, 5), PreviousMonth), d(2026, 1, 5));
+    assert_eq!(at(d(2026, 12, 5), NextMonth), d(2026, 12, 5));
+    assert_eq!(at(d(2026, 6, 5), PreviousMonth), d(2026, 5, 5));
+    assert_eq!(at(d(2026, 6, 5), PreviousYear), d(2026, 6, 5));
+    assert_eq!(at(d(2026, 6, 5), NextYear), d(2026, 6, 5));
+}
+
+/// Input mode parses its text when confirmed: a selection changed any other way
+/// has to reach the text, or the old one is parsed back.
+#[gpui::test]
+fn clearing_or_selecting_reaches_the_inputs(cx: &mut TestAppContext) {
+    init_picker(cx);
+    let (view, cx) = cx.add_window_view(|window, cx| {
+        let input = cx.new(|cx| InputState::new(window, cx));
+        Harness(cx.new(|cx| {
+            DatePickerState::new(labels(), d(2025, 8, 5), cx)
+                .selection(DateSelection::Single(Some(d(2025, 8, 17))))
+                .input_mode()
+                .with_inputs(input, None, cx)
+        }))
+    });
+    let state = view.read_with(cx, |h, _| h.0.clone());
+    draw(cx);
+    cx.run_until_parked();
+    state.update(cx, |s, cx| s.select(d(2025, 8, 20), cx));
+    draw(cx);
+    cx.run_until_parked();
+    state.update(cx, |s, cx| s.parse_inputs(cx));
+    assert_eq!(
+        state.read_with(cx, |s, _| s.value()),
+        DateSelection::Single(Some(d(2025, 8, 20))),
+        "selected"
+    );
+    state.update(cx, |s, cx| s.clear(cx));
+    draw(cx);
+    cx.run_until_parked();
+    state.update(cx, |s, cx| s.parse_inputs(cx));
+    assert_eq!(
+        state.read_with(cx, |s, _| s.value()),
+        DateSelection::Single(None),
+        "cleared"
+    );
+}
+
+/// A full-screen picker lists its months: a new value scrolls to its month.
+#[gpui::test]
+fn setting_a_value_reveals_its_month(cx: &mut TestAppContext) {
+    init_picker(cx);
+    let (view, cx) = cx.add_window_view(|_, cx| {
+        FullScreen(cx.new(|cx| DatePickerState::new(labels(), d(2025, 8, 5), cx)))
+    });
+    let state = view.read_with(cx, |h, _| h.0.clone());
+    draw(cx);
+    cx.run_until_parked();
+    let offset = |s: &DatePickerState| s.month_scroll.0.borrow().base_handle.offset().y;
+    let before = state.read_with(cx, |s, _| offset(s));
+    state.update(cx, |s, cx| {
+        s.set_value(DateSelection::Single(Some(d(2029, 3, 1))), cx)
+    });
+    draw(cx);
+    cx.run_until_parked();
+    draw(cx);
+    let after = state.read_with(cx, |s, _| offset(s));
+    assert_ne!(before, after, "the list moved to the new month");
+}
