@@ -275,7 +275,7 @@ def build_assets(output):
     """The stylesheet and font, named by content so they can be cached forever."""
     fonts = output / "fonts"
     fonts.mkdir(parents=True)
-    source = ROOT / "crates/material/examples/gallery/fonts/roboto"
+    source = ROOT / "crates/gallery/fonts/roboto"
     font = (source / "Roboto-latin-wght.woff2").read_bytes()
     font_name = f"roboto-latin-wght.{content_hash(font)}.woff2"
     (fonts / font_name).write_bytes(font)
@@ -300,7 +300,7 @@ def symbols_checkout():
 
 def build_licenses(output):
     """Publish the license of everything the site serves, and return its page."""
-    fonts = ROOT / "crates/material/examples/gallery/fonts"
+    fonts = ROOT / "crates/gallery/fonts"
     symbols = symbols_checkout()
     groups = (
         ("This project", (

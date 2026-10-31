@@ -136,7 +136,7 @@ every variant, size, state and content option. A **Specs** tab shows the Figma
 kit's boards. Style pages cover color, typography, shape, motion and elevation.
 
 ```sh
-cargo run -p gpui-kit-material --example gallery          # desktop (GPUI Fast backend)
+cargo run -p gpui-kit-material-gallery          # desktop (GPUI Fast backend)
 ./scripts/build-gallery-web.sh --release                   # browser, then:
 python3 -m http.server 8080 --bind 127.0.0.1 --directory crates/gallery-web/www
 ```
@@ -199,7 +199,7 @@ Palette sources and licenses: [crates/color/PALETTES.md](crates/color/PALETTES.m
 Material Symbols assets are Apache-2.0, retained in the pinned
 [Symbols repository](https://github.com/mizorewww/gpui-material-symbols/tree/593aa15a46076f3e2870c23c0e4fd79f94f105bd).
 The gallery's fonts are SIL OFL 1.1, each beside its license in
-[crates/material/examples/gallery/fonts](crates/material/examples/gallery/fonts): Roboto
+[crates/gallery/fonts](crates/gallery/fonts): Roboto
 and IBM Plex Sans, which it bundles, and Noto Sans Arabic, Noto Sans Hebrew, Noto Emoji
 and Noto Color Emoji, kept for conformance captures only and not bundled. None of them
 is part of the library's package. The published site lists every license at

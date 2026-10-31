@@ -10,7 +10,7 @@ Material, the gallery and gallery-web default to Kit's **GPUI Fast** backend.
 For comparison, run the upstream backend:
 
 ```sh
-cargo run -p gpui-kit-material --example gallery --no-default-features --features serde,embedded-symbols
+cargo run -p gpui-kit-material-gallery --no-default-features --features embedded-symbols
 ./scripts/build-gallery-web.sh --upstream   # or --fast (default)
 ```
 
@@ -76,7 +76,7 @@ that hostname and changes nothing else in the zone.
 The native gallery can save a GPU-rendered frame in a reproducible state:
 
 ```sh
-cargo run -p gpui-kit-material --example gallery -- \
+cargo run -p gpui-kit-material-gallery -- \
   --capture /tmp/material-button.png --section button \
   --set variant=tonal --set size=L --width 1280 --height 900 --reduced-motion
 ```
@@ -147,9 +147,9 @@ Re-judge saved evidence without running anything:
 ```sh
 python3 scripts/profile-gallery.py --summarize /tmp/material-bench/*.json /tmp/material-scroll/frames.json \
   --kit-first-frame-ms 42
-cargo run --release -p gpui-kit-material --example component_bench -- \
+cargo run --release -p gpui-kit-material-bench --bin component_bench -- \
   --content material-list --mode scroll --frames 300 --out /tmp/material-list.json
-cargo run --release -p gpui-kit-material --example component_bench -- \
+cargo run --release -p gpui-kit-material-bench --bin component_bench -- \
   --content kit-list --mode scroll --frames 300 --out /tmp/kit-list.json
 python3 scripts/profile-gallery.py --summarize /tmp/material-list.json /tmp/kit-list.json
 ```
@@ -159,7 +159,7 @@ commit goes under [conformance/performance/releases/](../conformance/performance
 
 ### Engine benchmark
 
-`crates/material/examples/engine_bench.rs` validates engine changes without
+`crates/bench/src/bin/engine_bench.rs` validates engine changes without
 the Gallery: a 4000-row `list` of Material components (`--content material`),
 plain quads and text (`simple`), or Gallery-like sections whose boards scroll
 horizontally inside their rows (`boards`). It drives one 8 px wheel event per
@@ -170,7 +170,7 @@ runs startup ×3, scroll with vsync off and on, idle and redraw:
 
 ```sh
 python3 scripts/profile-gallery.py /tmp/material-bench --bench --seconds 5 [--bench-content boards]
-cargo run --release -p gpui-kit-material --example engine_bench --features frame-profiler -- \
+cargo run --release -p gpui-kit-material-bench --bin engine_bench --features frame-profiler -- \
   --scenario scroll --vsync off --seconds 5 --content material --out /tmp/scroll.json
 ```
 
@@ -257,8 +257,8 @@ signal shows `FPS: unavailable`. Recorded runs live under
 To verify the counter on Linux or Windows, run the gallery on either backend:
 
 ```sh
-cargo run -p gpui-kit-material --example gallery
-cargo run -p gpui-kit-material --example gallery --no-default-features --features serde,embedded-symbols
+cargo run -p gpui-kit-material-gallery
+cargo run -p gpui-kit-material-gallery --no-default-features --features embedded-symbols
 ```
 
 The counter should show a number, not `FPS: unavailable`. It should read `FPS: 0.0`
@@ -272,7 +272,7 @@ reconfigures presentation without changing that ceiling.
 The gallery uses Roboto 400/500/600 (the Figma kit's emphasized styles need 600),
 instantiated from the reference site's pinned variable font (hashes in
 `fonts/SOURCES.json`, SIL OFL), from
-`crates/material/examples/gallery/fonts/roboto`; the browser build also
+`crates/gallery/fonts/roboto`; the browser build also
 embeds IBM Plex Sans. Rebuild the static fonts with:
 
 ```sh
@@ -296,5 +296,5 @@ into `conformance/reference/`. Figma kit token fixtures (`figma-*.json`) come fr
 ```sh
 cargo test -p gpui-pre-apple --test font_fallback
 cargo test -p gpui-pre --lib text_system
-cargo test -p gpui-kit-material -p gpui-fast --features gpui-kit-material/gpui-fast,gpui-kit-material/frame-profiler --lib
+cargo test -p gpui-kit-material -p gpui-fast --features gpui-kit-material/gpui-fast --lib
 ```

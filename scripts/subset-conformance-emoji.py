@@ -5,7 +5,7 @@ from fontTools import subset
 import fontTools
 from pathlib import Path
 import json, hashlib, urllib.request, io
-root = Path(__file__).resolve().parents[1] / 'crates/material/examples/gallery/fonts/conformance/notocoloremoji'
+root = Path(__file__).resolve().parents[1] / 'crates/gallery/fonts/conformance/notocoloremoji'
 p = root / 'SOURCES.json'
 metadata = json.loads(p.read_text())
 source = next(row for row in metadata['files'] if row['file'] == 'NotoColorEmoji.ttf')

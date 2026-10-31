@@ -10,7 +10,7 @@ from pathlib import Path
 from fontTools.ttLib import TTFont
 from fontTools.varLib.instancer import instantiateVariableFont
 
-root = Path(__file__).resolve().parents[1] / 'crates/material/examples/gallery/fonts'
+root = Path(__file__).resolve().parents[1] / 'crates/gallery/fonts'
 sources = json.loads((root / 'SOURCES.json').read_text())
 source = root / 'roboto/Roboto-latin-wght.woff2'
 expected = sources['roboto/Roboto-latin-wght.woff2']['sha256']
