@@ -6,7 +6,7 @@
 //! overshoot kept) while the ring's color follows it; reduced motion lands
 //! at once.
 use super::InteractionPreview;
-use super::button::ButtonFocusRing;
+use super::interaction::ButtonFocusRing;
 use super::ripple::Ripple;
 use super::roving::{self, Orientation, Roving, index_handles};
 use crate::{

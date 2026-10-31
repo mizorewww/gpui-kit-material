@@ -22,7 +22,8 @@
 //! Base [`gpui_base::Tabs`] tab list, wrapped in a navigation landmark. Arrow
 //! keys rove focus between items through the shared [`super::roving`]
 //! helper; Enter or Space activates.
-use super::button::{ButtonFocusRing, ButtonRipple};
+use super::interaction::{ButtonFocusRing, ButtonRipple};
+use super::ripple::ripple_corners;
 use super::roving::{self, Change, Orientation, Roving};
 use super::{InteractionPreview, large_badge, small_badge};
 use crate::color::ColorRole;
@@ -274,17 +275,6 @@ pub(crate) fn type_role<E: Styled>(element: E, role: TypeRole) -> E {
         .letter_spacing(scale.letter_spacing)
         .line_height(scale.line_height)
         .font_weight(FontWeight(scale.font_weight as f32))
-}
-
-/// Uniform ripple clip corners.
-pub(crate) fn ripple_corners(radius: Pixels) -> Corners<AbsoluteLength> {
-    let radius = AbsoluteLength::from(radius);
-    Corners {
-        top_left: radius,
-        top_right: radius,
-        bottom_right: radius,
-        bottom_left: radius,
-    }
 }
 
 /// The large badge an item draws after its label instead of on its icon.

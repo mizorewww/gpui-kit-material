@@ -6,5 +6,6 @@ __pycache__/
 .DS_Store
 /deploy/site/node_modules
 .cloudflare/
+.wrangler/
 .playwright-cli/
 /crates/consumer-check/target

@@ -594,7 +594,7 @@ impl ParentElement for MaterialCard {
 
 impl RenderOnce for MaterialCard {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
-        use super::button::{ButtonFocusRing, ButtonRipple};
+        use super::interaction::{ButtonFocusRing, ButtonRipple};
         let id = self.id;
         let drag =
             window.use_keyed_state((id.clone(), "card-drag"), cx, |_, _| CardDrag::default());
@@ -657,7 +657,7 @@ impl RenderOnce for MaterialCard {
                 (id.clone(), "card-ripple").into(),
                 true,
                 true,
-                super::navigation::ripple_corners(RADIUS_CARD),
+                super::ripple::ripple_corners(RADIUS_CARD),
                 Edges::all(px(0.).into()),
                 color(ON_SURFACE),
                 window,

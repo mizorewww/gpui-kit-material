@@ -46,6 +46,45 @@ Icons come from
 | Layout | `PaneScaffold`, `FeedLayout` |
 | Application | `TitleBar`, `CaptionButtons`, tiles, choice tiles, status chips and notices (from course2md, not M3 components) |
 
+## Crates
+
+| Crate | Published | Holds |
+| --- | --- | --- |
+| [`gpui-kit-material-color`](crates/color) | Dry run in CI | Color roles, palettes, reference themes and dynamic schemes, without GPUI. Features `serde`, `dynamic` (both default). |
+| [`gpui-kit-material`](crates/material) | Git revision | The library: theme, tokens, motion, icons and the components below. |
+| [`gpui-kit-material-gallery`](crates/gallery) | Never | The shared Gallery, its fonts and its dev-only profiler: a library and the `gallery` binary. |
+| [`gpui-kit-material-gallery-web`](crates/gallery-web) | Never | The Gallery's browser entry point. |
+| [`gpui-kit-material-bench`](crates/bench) | Never | `component_bench` and `engine_bench`. |
+
+The library's `default` features enable every group, the Fast backend, embedded symbols
+and `serde`. To drop code, turn them off and name what you use; a group brings what it
+needs. `full` is every group, without the backend, symbols or `serde`.
+
+```toml
+gpui-kit-material = { git = "...", rev = "...", default-features = false, features = ["buttons", "selection", "gpui-fast", "embedded-symbols"] }
+```
+
+| Feature | Components | Needs |
+| --- | --- | --- |
+| `buttons` | `MaterialButton`, `IconButton`, `ButtonGroup`, `ConnectedButtonGroup`, `SplitButton`, `Fab`, `ExtendedFab`, `FabMenu` | `menus`, `progress` |
+| `progress` | `LinearProgress`, `CircularProgress` | |
+| `loading` | `LoadingIndicator`, `PullToRefresh` | `progress`, `shapes` |
+| `feedback` | `Badge`, `Snackbar`, `MaterialTooltip`, `MaterialCard`, status chips, notices | |
+| `selection` | `MaterialCheckbox`, `MaterialRadio`, `MaterialSwitch`, chips, `ChipSet`, `MaterialSlider`, tiles, choice tiles | |
+| `inputs` | `TextField`, `SearchField`, `SearchView` | |
+| `menus` | `MaterialMenu`, and `ExposedDropdown` when `inputs` is on too | |
+| `pickers` | `DatePicker`, `TimePicker` | `buttons`, `inputs`, `chrono` |
+| `dialogs` | `MaterialDialog`, `MaterialBottomSheet`, `MaterialSideSheet` | |
+| `containment` | `Avatar`, `MaterialCarousel`, `MaterialDivider`, `ListItem` | `selection` |
+| `navigation` | `NavigationBar`, `NavigationRail`, `NavigationDrawer`, `NavigationSuite`, `MaterialTabs`, `TopAppBar`, `BottomAppBar`, `Toolbar` | `adaptive`, `dialogs`, `feedback` |
+| `adaptive` | Window size classes, `PaneScaffold`, `FeedLayout` | |
+| `window-chrome` | `TitleBar`, `CaptionButtons` | |
+| `shapes` | `shapes`: `MaterialShape`, `Morph` | |
+| `dynamic-color` | `color::dynamic`: HCT and seed schemes | |
+
+The theme, tokens, motion, icons, scopes, focus ring, ripple and text helpers are always
+there.
+
 ## Quick start
 
 The library is distributed by Git revision, and a downstream workspace needs the
@@ -136,8 +175,8 @@ every variant, size, state and content option. A **Specs** tab shows the Figma
 kit's boards. Style pages cover color, typography, shape, motion and elevation.
 
 ```sh
-cargo run -p gpui-kit-material --example gallery          # desktop (GPUI Fast backend)
-./scripts/build-gallery-web.sh --release                   # browser, then:
+cargo run -p gpui-kit-material-gallery      # desktop (GPUI Fast backend)
+./scripts/build-gallery-web.sh --release    # browser, then:
 python3 -m http.server 8080 --bind 127.0.0.1 --directory crates/gallery-web/www
 ```
 
@@ -178,8 +217,8 @@ cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace
 ```
 
-CI runs these on macOS, Linux and Windows, plus both GPUI backends and the WASM
-gallery build. Project rules for contributors and agents are in
+CI runs these on macOS, Linux and Windows, plus both GPUI backends, every feature
+combination (`scripts/check-features.sh`) and the WASM gallery build. Project rules for contributors and agents are in
 [AGENTS.md](AGENTS.md).
 
 | Document | Contents |
@@ -199,7 +238,7 @@ Palette sources and licenses: [crates/color/PALETTES.md](crates/color/PALETTES.m
 Material Symbols assets are Apache-2.0, retained in the pinned
 [Symbols repository](https://github.com/mizorewww/gpui-material-symbols/tree/593aa15a46076f3e2870c23c0e4fd79f94f105bd).
 The gallery's fonts are SIL OFL 1.1, each beside its license in
-[crates/material/examples/gallery/fonts](crates/material/examples/gallery/fonts): Roboto
+[crates/gallery/fonts](crates/gallery/fonts): Roboto
 and IBM Plex Sans, which it bundles, and Noto Sans Arabic, Noto Sans Hebrew, Noto Emoji
 and Noto Color Emoji, kept for conformance captures only and not bundled. None of them
 is part of the library's package. The published site lists every license at

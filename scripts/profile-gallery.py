@@ -58,15 +58,15 @@ def source_identity(features):
     # package metadata. Keep only local package identities and dependency edges.
     command = ["cargo", "metadata", "--locked", "--format-version", "1",
                "--no-default-features", "--features",
-               ",".join("gpui-kit-material/" + feature for feature in features.split(","))]
+               ",".join("gpui-kit-material-gallery/" + feature for feature in features.split(","))]
     metadata = json.loads(output(*command))
     packages = {package["id"]: package for package in metadata["packages"]}
     nodes = {node["id"]: node for node in metadata["resolve"]["nodes"]}
-    material_manifest = ROOT / "crates/material/Cargo.toml"
+    material_manifest = ROOT / "crates/gallery/Cargo.toml"
     seeds = [key for key, package in packages.items()
              if Path(package["manifest_path"]).resolve() == material_manifest]
     if len(seeds) != 1:
-        raise RuntimeError("metadata did not resolve exactly one Material package")
+        raise RuntimeError("metadata did not resolve exactly one Gallery package")
     reachable = set()
     pending = seeds[:]
     while pending:
@@ -342,7 +342,7 @@ def missed_refreshes(frame_end_ns, refresh_ns):
 
 def bench_targets(reports, *, kit_first_frame_ns=None):
     """Target verdicts from engine_bench reports keyed by scenario-vsync."""
-    out = {"source": "crates/material/examples/engine_bench.rs (standalone, not the Gallery)",
+    out = {"source": "crates/bench/src/bin/engine_bench.rs (standalone, not the Gallery)",
            "metrics": {}, "targets": {}}
     m = out["metrics"]
     scroll = reports.get("scroll-off")
@@ -467,9 +467,9 @@ BENCH_SCENARIOS = ("startup-1", "startup-2", "startup-3", "scroll-off", "scroll-
 
 def bench_profile(args, destination):
     """Build and run the standalone engine benchmark scenarios."""
-    features = "serde,embedded-symbols,frame-profiler" + (",gpui-fast" if args.backend == "fast" else "")
-    command = ["cargo", "build", "--locked", "--release", "-p", "gpui-kit-material",
-               "--example", "engine_bench", "--no-default-features", "--features", features,
+    features = "embedded-symbols,frame-profiler" + (",gpui-fast" if args.backend == "fast" else "")
+    command = ["cargo", "build", "--locked", "--release", "-p", "gpui-kit-material-bench",
+               "--bin", "engine_bench", "--no-default-features", "--features", features,
                "--message-format=json-render-diagnostics"]
     provenance = {"build_command": command, "requested_backend": args.backend,
                   "source_before_build": repository_identity(ROOT),
@@ -688,11 +688,11 @@ def main():
         result = web_profile(args, destination)
         print(f"Evidence: {destination}; runner exit {result}.")
         return result
-    features = "serde,embedded-symbols,frame-profiler"
+    features = "embedded-symbols,frame-profiler"
     if args.backend == "fast":
         features += ",gpui-fast"
-    command = ["cargo", "build", "--locked", "--release", "-p", "gpui-kit-material",
-               "--example", "gallery", "--no-default-features", "--features", features,
+    command = ["cargo", "build", "--locked", "--release", "-p", "gpui-kit-material-gallery",
+               "--bin", "gallery", "--no-default-features", "--features", features,
                "--message-format=json-render-diagnostics"]
     provenance = {
         "source_before_build": source_identity(features),
@@ -734,8 +734,8 @@ def main():
         target = event.get("target", {})
         if (event.get("reason") == "compiler-artifact"
                 and target.get("name") == "gallery"
-                and "example" in target.get("kind", [])
-                and Path(target.get("src_path", "")).resolve() == ROOT / "crates/material/examples/gallery.rs"
+                and "bin" in target.get("kind", [])
+                and Path(target.get("src_path", "")).resolve() == ROOT / "crates/gallery/src/main.rs"
                 and event.get("executable")):
             artifacts.append(event)
     if len(artifacts) != 1:

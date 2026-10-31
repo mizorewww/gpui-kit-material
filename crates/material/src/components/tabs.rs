@@ -17,8 +17,9 @@
 //! position in set, pointer and Enter/Space activation); arrow keys, Home
 //! and End rove focus through the shared [`super::roving`] helper, and
 //! activation is manual unless [`MaterialTabs::auto_activate`] is set.
-use super::button::{ButtonFocusRing, ButtonRipple};
-use super::navigation::{NavBadge, badged_icon, ripple_corners, type_role};
+use super::interaction::{ButtonFocusRing, ButtonRipple};
+use super::navigation::{NavBadge, badged_icon, type_role};
+use super::ripple::ripple_corners;
 use super::roving::{self, Change, Orientation, Roving};
 use super::{InteractionPreview, large_badge, small_badge};
 use crate::color::ColorRole;

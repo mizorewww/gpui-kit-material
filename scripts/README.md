@@ -21,8 +21,10 @@ script's docstring (`--help`) and [docs/DEVELOPMENT.md](../docs/DEVELOPMENT.md).
 | `extract-m3e-tokens.py` | `conformance/fixtures/m3e-motion.json`, `crates/material/tests/fixtures/m3e-typography.json` and `m3e-sys-tokens.json` from a clean kyra-labs/m3exp-web checkout at its pinned `REVISION` (reads committed generated tokens only) |
 | `check-gallery-dpr.py` | Validates WASM canvas backing size across DPR/viewport changes of a served gallery |
 | `build-gallery-web.sh` | Builds the WASM gallery (`--fast`, `--upstream`, `--release`) into `crates/gallery-web/www/wasm` |
-| `build-site.sh`, `build-site.py` | Static site (docs, release gallery, API docs) into `target/site` |
-| `deploy-site.sh` | Publishes `target/site` to material.mizore.blog with the Cloudflare CLI |
+| `build-site.sh`, `build-site.py` | Static site (docs, release gallery with Brotli copies, API docs) into `target/site` |
+| `site_stamp.py` | Records what the module and site were built from, and judges it for `deploy-site.sh` |
+| `deploy-site.sh` | Publishes `target/site` to material.mizore.blog with the Cloudflare CLI, if built from the current commit (`--check` publishes nothing) |
+| `check-features.sh` | `cargo check` of the library's default, empty, `full` and single-group feature selections, and the color crate's |
 | `check-git-consumer.sh` | Builds the README's quick start in a directory outside the repository, from Git at a pushed commit (`git-consumer/`) |
 | `check-package.sh` | Checks that each package ships its license texts and notices, and not the Gallery's fonts |
 | `profile-gallery.py` | Builds and records a native Gallery CPU frame profile with provenance, and judges AGENTS.md's performance targets |

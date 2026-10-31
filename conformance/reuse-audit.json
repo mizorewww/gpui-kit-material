@@ -24,8 +24,8 @@
       "disposition": "done",
       "priority": "P0",
       "local_paths": [
-        "crates/material/examples/gallery.rs",
-        "crates/material/examples/gallery/mod.rs",
+        "crates/gallery/src/main.rs",
+        "crates/gallery/src/lib.rs",
         "crates/gallery-web/src/lib.rs"
       ],
       "upstream_paths": [
@@ -33,7 +33,7 @@
       ],
       "action": "Use gpui_kit::application/init/open_window; remove direct Base initialization and manual Root construction.",
       "conditions": "Keep capture/profiler setup and one Root; verify overlay initialization and native/Web entry points.",
-      "status": "Native gallery starts with gpui_kit::application() (examples/gallery.rs) and gallery::run calls gpui_kit::init and gpui_kit::open_window (examples/gallery/mod.rs); the WASM gallery enters through gpui_kit::platform::web_init/single_threaded_web (crates/gallery-web/src/lib.rs)."
+      "status": "Native gallery starts with gpui_kit::application() (crates/gallery/src/main.rs) and gallery::run calls gpui_kit::init and gpui_kit::open_window (crates/gallery/src/lib.rs); the WASM gallery enters through gpui_kit::platform::web_init/single_threaded_web (crates/gallery-web/src/lib.rs)."
     },
     {
       "id": "material-icons",
@@ -79,7 +79,7 @@
       "disposition": "reuse-parts",
       "priority": "P1",
       "local_paths": [
-        "crates/material/examples/gallery/mod.rs"
+        "crates/gallery/src/lib.rs"
       ],
       "upstream_paths": [
         "crates/story/src/gallery.rs"
@@ -162,7 +162,7 @@
       "priority": "P0",
       "local_paths": [
         "vendor/gpui-pre/src/profiler.rs",
-        "crates/material/examples/gallery/performance.rs",
+        "crates/gallery/src/performance.rs",
         "scripts/profile-gallery.py"
       ],
       "upstream_paths": [

@@ -6,7 +6,9 @@
 //! tab, scroll position) across navigation. See `catalog` for the pages
 //! and `playground` for how to write a component playground.
 //!
-//! `cargo run -p gpui-kit-material --example gallery`
+//! `cargo run -p gpui-kit-material-gallery`
+extern crate gpui_kit as gpui;
+
 #[cfg(not(target_family = "wasm"))]
 pub mod capture;
 #[cfg(all(not(target_family = "wasm"), feature = "instruction-bench"))]
@@ -861,14 +863,14 @@ pub fn run(application: gpui::Application, initialize: impl FnOnce(&mut App) + '
         #[cfg(target_family = "wasm")]
         cx.text_system()
             .add_fonts(vec![std::borrow::Cow::Borrowed(include_bytes!(
-                "fonts/IBMPlexSans-Regular.ttf"
+                "../fonts/IBMPlexSans-Regular.ttf"
             ))])
             .expect("Failed to load the gallery font");
         cx.text_system()
             .add_fonts(vec![
-                std::borrow::Cow::Borrowed(include_bytes!("fonts/roboto/Roboto-Regular.ttf")),
-                std::borrow::Cow::Borrowed(include_bytes!("fonts/roboto/Roboto-Medium.ttf")),
-                std::borrow::Cow::Borrowed(include_bytes!("fonts/roboto/Roboto-SemiBold.ttf")),
+                std::borrow::Cow::Borrowed(include_bytes!("../fonts/roboto/Roboto-Regular.ttf")),
+                std::borrow::Cow::Borrowed(include_bytes!("../fonts/roboto/Roboto-Medium.ttf")),
+                std::borrow::Cow::Borrowed(include_bytes!("../fonts/roboto/Roboto-SemiBold.ttf")),
             ])
             .expect("Failed to load the reference Roboto fonts");
         gpui_kit::init(cx);
@@ -1114,7 +1116,7 @@ mod window_tests {
             }
         });
         let gallery = parts.unwrap();
-        let entry = crate::gallery::catalog::position("button").unwrap();
+        let entry = crate::catalog::position("button").unwrap();
         cx.update(|cx| gallery.update(cx, |gallery, cx| gallery.navigate(entry, cx)));
         // Until the page has settled: stacked, its first frames are not the last.
         for _ in 0..6 {

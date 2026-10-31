@@ -31,10 +31,10 @@
 //! default spatial spring, retargeting from wherever it is; reduced motion
 //! moves it at once.
 use super::InteractionPreview;
-use super::button::ButtonFocusRing;
 use super::date_parts::Activate;
+use super::interaction::ButtonFocusRing;
 use super::ripple::Ripple;
-use super::text_field::type_style;
+use super::text::type_style;
 use super::{ButtonVariant, IconButton, material_button};
 use crate::{
     color::ColorRole,

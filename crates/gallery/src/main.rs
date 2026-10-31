@@ -1,8 +1,5 @@
 //! Desktop entrypoint for the shared Material gallery.
-extern crate gpui_kit as gpui;
-
-#[path = "gallery/mod.rs"]
-mod gallery;
+use gpui_kit_material_gallery as gallery;
 
 fn main() -> anyhow::Result<()> {
     let args: Vec<String> = std::env::args().skip(1).collect();

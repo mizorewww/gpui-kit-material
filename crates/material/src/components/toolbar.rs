@@ -24,8 +24,9 @@
 //! A vertical toolbar sets Base's axis, so Up/Down rove focus and assistive
 //! technology hears a vertical orientation.
 use super::InteractionPreview;
-use super::button::{ButtonFocusRing, ButtonRipple};
-use super::navigation::{NavIcon, ripple_corners, type_role};
+use super::interaction::{ButtonFocusRing, ButtonRipple};
+use super::navigation::{NavIcon, type_role};
+use super::ripple::ripple_corners;
 use crate::color::ColorRole;
 use crate::icons::Icon;
 use crate::motion::{self, MotionToken};

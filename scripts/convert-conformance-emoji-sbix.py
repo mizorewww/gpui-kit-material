@@ -6,7 +6,7 @@ from fontTools.ttLib import TTFont,newTable
 from fontTools.ttLib.tables.sbixGlyph import Glyph
 from fontTools.ttLib.tables.sbixStrike import Strike
 from fontTools.pens.ttGlyphPen import TTGlyphPen
-root=Path(__file__).resolve().parents[1]/'crates/material/examples/gallery/fonts/conformance/notocoloremoji'
+root=Path(__file__).resolve().parents[1]/'crates/gallery/fonts/conformance/notocoloremoji'
 source=root/'NotoColorEmoji-Probe.ttf';font=TTFont(source);font.recalcTimestamp=False
 sbix=newTable('sbix');sbix.version=1;sbix.flags=1;sbix.strikes={}
 for index,original in enumerate(font['CBLC'].strikes):

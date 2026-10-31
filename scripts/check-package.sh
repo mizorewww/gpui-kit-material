@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # What each published crate ships: its license texts and notices, and not the
-# Gallery's fonts, whose OFL-1.1 the library's `license` does not declare.
+# Gallery's fonts, whose OFL-1.1 the library's `license` does not declare. The Gallery
+# and benches are their own unpublished crates, so nothing of theirs can be in a package.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 

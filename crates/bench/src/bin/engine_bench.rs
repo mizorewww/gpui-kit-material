@@ -2,7 +2,7 @@
 //! idled or force-redrawn under the frame profiler, independent of the Gallery.
 //!
 //! ```sh
-//! cargo run --release -p gpui-kit-material --example engine_bench \
+//! cargo run --release -p gpui-kit-material-bench --bin engine_bench \
 //!     --features frame-profiler -- --scenario scroll --vsync off --seconds 5 \
 //!     --out /tmp/bench/scroll-off.json
 //! ```
@@ -392,10 +392,10 @@ mod bench {
                 cx.text_system()
                     .add_fonts(vec![
                         std::borrow::Cow::Borrowed(include_bytes!(
-                            "gallery/fonts/roboto/Roboto-Regular.ttf"
+                            "../../../gallery/fonts/roboto/Roboto-Regular.ttf"
                         )),
                         std::borrow::Cow::Borrowed(include_bytes!(
-                            "gallery/fonts/roboto/Roboto-Medium.ttf"
+                            "../../../gallery/fonts/roboto/Roboto-Medium.ttf"
                         )),
                     ])
                     .expect("Failed to load the Roboto fonts");

@@ -9,7 +9,7 @@
 //! retargeting mid-flight and honoring reduced motion via [`crate::motion`]).
 use super::InteractionPreview;
 use super::focus::{RingPlacement, RingedButton};
-use super::text_field::type_style;
+use super::text::type_style;
 use crate::{
     color::ColorRole,
     motion::{self, MotionToken},

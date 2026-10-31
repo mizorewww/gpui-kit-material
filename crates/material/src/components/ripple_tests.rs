@@ -1,6 +1,6 @@
 //! The shared ripple across controls, and its promise not to take input.
 use super::*;
-use crate::components::button::waves_painted;
+use crate::components::interaction::waves_painted;
 use core::prelude::v1::test;
 use gpui::{
     AnyElement, Context, Entity, Modifiers, MouseButton, Render, ScrollDelta, ScrollEvent,
@@ -260,7 +260,7 @@ impl Render for IdleRipple {
 /// write: a scrolling list would render all the rows it holds on each frame.
 #[gpui::test]
 fn an_idle_ripple_writes_nothing_when_drawn_or_on_global_events(cx: &mut TestAppContext) {
-    use crate::components::button::ripple_writes;
+    use crate::components::interaction::ripple_writes;
     cx.update(gpui_base::init);
     let (_, cx) = cx.add_window_view(|_, _| IdleRipple);
     let at = point(px(20.), px(20.));

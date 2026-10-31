@@ -531,9 +531,9 @@ fn focus_ring(
     forced: bool,
     paint: OptionPaint,
     vertical: bool,
-) -> super::button::ButtonFocusRing {
+) -> super::interaction::ButtonFocusRing {
     let (start, end) = (paint.left_radius, paint.right_radius);
-    super::button::ButtonFocusRing::with_corners(
+    super::interaction::ButtonFocusRing::with_corners(
         option,
         focus.clone(),
         !disabled,
@@ -2303,7 +2303,7 @@ mod mode_tests {
 
     #[gpui::test]
     fn every_kind_of_option_ripples(cx: &mut TestAppContext) {
-        use crate::components::button::waves_painted;
+        use crate::components::interaction::waves_painted;
         cx.update(|cx| {
             gpui_base::init(cx);
             cx.set_reduce_motion(true);
