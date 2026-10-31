@@ -34,7 +34,7 @@ switched to the kit yet; this table is the guide for that change.
   `text_input`, `search_field`, `confirm_dialog`, `preference_switch`,
   `SelectField`, `menu_style`, scrollbars. They rely on course2md's reviewed
   gpui-component patches (`MenuStyle`, `label_text_size`, switch geometry). The
-  roadmap replaces them with kit components on GPUI Base.
+  roadmap replaces them with kit components on Kit's Component and Base layers.
 - **Product-specific layout**: `hero_top`, `task_dialog_top`, image viewer
   metrics, `cover_frame`, `nav_destination*`, `detail_row`, `transfer_status`.
 - **Localization**: `tr!` strings now arrive as parameters.

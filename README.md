@@ -27,7 +27,8 @@ Icons come from
 - **Color and theme**: semantic `ColorRole`s, all 20 md3.io reference themes
   (light/dark × standard/medium/high contrast, 52 roles each), 10 legacy
   palettes, animated theme transitions and a 100–200% text scale. Dynamic
-  seed/HCT schemes are not implemented.
+  seed/HCT schemes are ported from material-color-utilities; image-derived seeds
+  are not supported.
 - **Tokens**: shape, the 15 type roles and their emphasized styles, layout
   metrics, elevation, state layers.
 - **Motion**: Expressive (default) and Standard schemes, spatial/effects
@@ -37,11 +38,12 @@ Icons come from
 | Group | Components |
 | --- | --- |
 | Actions | `MaterialButton` (5 variants, 5 sizes, round/square, toggle, loading), `IconButton`, `ButtonGroup`, `ConnectedButtonGroup`, `SplitButton`, `Fab`, `ExtendedFab`, `FabMenu` |
-| Selection | `MaterialCheckbox`, `MaterialSwitch`, `MaterialRadio`/`MaterialRadioGroup`, `AssistChip`/`FilterChip`/`InputChip`/`SuggestionChip`, `MaterialSlider` |
+| Selection | `MaterialCheckbox`, `MaterialSwitch`, `MaterialRadio`/`MaterialRadioGroup`, `AssistChip`/`FilterChip`/`InputChip`/`SuggestionChip`, `ChipSet`, `MaterialSlider` |
 | Text input | `TextField`, `ExposedDropdown` (select), `SearchField`/`SearchView`, `DatePicker`, `TimePicker` |
-| Navigation | `NavigationRail`, `NavigationBar`, `NavigationDrawer`, `MaterialTabs`, `MaterialMenu`, `TopAppBar`, `BottomAppBar`, `Toolbar` (docked and floating) |
+| Navigation | `NavigationRail`, `NavigationBar`, `NavigationDrawer`, `NavigationSuite`, `MaterialTabs`, `MaterialMenu`, `TopAppBar`, `BottomAppBar`, `Toolbar` (docked and floating) |
 | Containment | `MaterialCard`, `ListItem`, `MaterialCarousel`, `MaterialDivider`, `MaterialDialog`, `MaterialBottomSheet`, `MaterialSideSheet` |
-| Communication | `Badge`, `Avatar`, `LinearProgress`/`CircularProgress`, `LoadingIndicator`, `Snackbar`, `MaterialTooltip` |
+| Communication | `Badge`, `Avatar`, `LinearProgress`/`CircularProgress`, `LoadingIndicator`, `Snackbar`, `MaterialTooltip`, `PullToRefresh` |
+| Layout | `PaneScaffold`, `FeedLayout` |
 | Application | `TitleBar`, `CaptionButtons`, tiles, choice tiles, status chips and notices (from course2md, not M3 components) |
 
 ## Quick start
@@ -175,7 +177,8 @@ gallery build. Project rules for contributors and agents are in
 
 ## License
 
-MIT. Palette sources and licenses: [crates/color/PALETTES.md](crates/color/PALETTES.md).
+MIT, except files ported from Apache-2.0 sources, which keep their notices.
+Palette sources and licenses: [crates/color/PALETTES.md](crates/color/PALETTES.md).
 Material Symbols assets are Apache-2.0, retained in the pinned
 [Symbols repository](https://github.com/mizorewww/gpui-material-symbols/tree/593aa15a46076f3e2870c23c0e4fd79f94f105bd).
 Roboto and IBM Plex Sans gallery fonts are SIL OFL, bundled with their licenses.
