@@ -355,8 +355,7 @@ impl TimePickerState {
     fn pick(&mut self, offset: Point<f32>, window: &mut Window, cx: &mut Context<Self>) {
         let mut time = dial_pick(self.time, self.unit, self.format, offset);
         if self.unit == TimeUnit::Minute && self.minute_step > 1 {
-            let step = self.minute_step as f32;
-            let minute = ((time.minute() as f32 / step).round() * step) as u32 % 60;
+            let minute = snap_minute(time.minute(), self.minute_step);
             time = time.with_minute(minute).unwrap_or(time);
         }
         self.set_time(time, window, cx);
@@ -392,17 +391,35 @@ pub(crate) fn clamp_time(time: NaiveTime, limits: Option<(NaiveTime, NaiveTime)>
     }
 }
 
+/// How many marks a `step`-minute grid has in an hour, counting from :00.
+fn minute_marks(step: i32) -> i32 {
+    (60 + step - 1) / step
+}
+
 /// Step `minute` by `delta` marks of a `step`-minute grid: an off-grid
 /// minute first moves to the neighboring mark in the step's direction.
 pub(crate) fn step_minutes(minute: u32, step: u32, delta: i32) -> u32 {
     let (minute, step) = (minute as i32, step.max(1) as i32);
-    let floor = minute.div_euclid(step) * step;
-    let next = if floor == minute || delta > 0 {
-        floor + step * delta
+    let floor = minute.div_euclid(step);
+    let next = if floor * step == minute || delta > 0 {
+        floor + delta
     } else {
-        floor + step * (delta + 1)
+        floor + delta + 1
     };
-    next.rem_euclid(60) as u32
+    (next.rem_euclid(minute_marks(step)) * step) as u32
+}
+
+/// The mark of a `step`-minute grid nearest `minute`, which past the last mark
+/// may be the :00 it wraps to.
+pub(crate) fn snap_minute(minute: u32, step: u32) -> u32 {
+    let step = step.max(1);
+    let (below, above) = (minute / step * step, (minute / step + 1) * step);
+    let nearest = if minute - below < above.min(60) - minute {
+        below
+    } else {
+        above
+    };
+    if nearest >= 60 { 0 } else { nearest }
 }
 
 /// Whether some time in hour `hour` (or, for minutes and seconds, `time`

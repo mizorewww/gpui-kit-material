@@ -152,6 +152,42 @@ fn typing_in_input_mode_updates_the_time(cx: &mut TestAppContext) {
     assert_eq!(state.read_with(cx, |s, _| s.time()), t(20, 35));
 }
 
+/// A step that does not divide 60 has its marks from 0 and wraps to 0 past the last,
+/// in both directions and for a pointer past the last mark.
+#[gpui::test]
+fn a_minute_step_that_does_not_divide_sixty_keeps_its_grid(cx: &mut TestAppContext) {
+    assert_eq!(step_minutes(56, 7, 1), 0, "past the last mark");
+    assert_eq!(step_minutes(0, 7, -1), 56, "back from 0");
+    assert_eq!(step_minutes(49, 7, 1), 56);
+    assert_eq!(step_minutes(58, 7, 1), 0, "off grid past the last mark");
+    assert_eq!(step_minutes(58, 7, -1), 56);
+    assert_eq!(step_minutes(40, 25, 1), 50);
+    assert_eq!(step_minutes(50, 25, 1), 0);
+    assert_eq!(step_minutes(0, 25, -1), 50);
+
+    cx.update(|cx| {
+        gpui_kit::init(cx);
+        crate::init(cx);
+    });
+    let (view, cx) = cx.add_window_view(|window, cx| {
+        Harness(cx.new(|cx| TimePickerState::new(labels(), t(7, 0), window, cx).minute_step(7)))
+    });
+    let state = view.read_with(cx, |h, _| h.0.clone());
+    // The fifty-ninth minute on the dial is nearer 0 than 56.
+    let pick = |minute: f32, cx: &mut VisualTestContext| {
+        let angle = minute / 60. * std::f32::consts::TAU;
+        cx.update(|window, cx| {
+            state.update(cx, |s, cx| {
+                s.set_unit(TimeUnit::Minute, cx);
+                s.pick(point(angle.sin() * 100., -angle.cos() * 100.), window, cx);
+            });
+        });
+        state.read_with(cx, |s, _| s.time().minute())
+    };
+    assert_eq!(pick(59., cx), 0);
+    assert_eq!(pick(57., cx), 56);
+}
+
 #[test]
 fn minute_steps_snap_to_their_grid() {
     assert_eq!(step_minutes(10, 15, 1), 15, "off grid: up to the next mark");
