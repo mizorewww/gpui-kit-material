@@ -58,6 +58,11 @@ pub static PLAYGROUND: Playground = Playground {
                     options: &["default", "compact"],
                     default: 0,
                 },
+                Control::Switch {
+                    id: "full_width",
+                    label: "Full width",
+                    default: false,
+                },
             ],
         },
         Section {
@@ -171,8 +176,13 @@ fn preview(
     if !supporting.is_empty() {
         dropdown = dropdown.supporting_text(supporting);
     }
+    let full_width = config.bool("full_width");
+    if full_width {
+        dropdown = dropdown.full_width();
+    }
     div()
         .debug_selector(|| "playground-select".into())
+        .when(full_width, |select| select.w_full())
         .child(dropdown)
         .into_any_element()
 }
