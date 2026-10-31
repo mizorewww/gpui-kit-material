@@ -1205,12 +1205,24 @@ impl Render for PanelView {
             return panel;
         }
         let scroll = self.state.read(cx).scroll.clone();
+        // Always shown: a panel cut off at a section's title has to say that it
+        // goes on.
         div()
-            .id("configuration-body")
+            .relative()
             .size_full()
-            .overflow_y_scroll()
-            .track_scroll(&scroll)
-            .child(panel)
+            .child(
+                div()
+                    .id("configuration-body")
+                    .size_full()
+                    .overflow_y_scroll()
+                    .track_scroll(&scroll)
+                    .child(panel),
+            )
+            .child(
+                gpui_base::Scrollbar::vertical(&scroll)
+                    .id("configuration-scrollbar")
+                    .mode(gpui_base::ScrollbarMode::Always),
+            )
             .into_any_element()
     }
 }
