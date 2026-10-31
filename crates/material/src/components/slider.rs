@@ -849,7 +849,7 @@ impl RenderOnce for MaterialSlider {
             classic_track(
                 &self.state,
                 self.axis,
-                disabled,
+                !live,
                 &handles,
                 self.centered,
                 steps,
@@ -1603,6 +1603,38 @@ mod tests {
                 cx.new(|_| SliderState::new().max(100.).default_value(30.)),
                 Some(InteractionPreview::Hovered),
             )
+        });
+        draw(cx);
+        let before = view.read_with(cx, |view, cx| view.0.read(cx).value());
+        let bounds = cx.debug_bounds("slider").unwrap();
+        let spot = point(bounds.left() + px(5.), bounds.center().y);
+        cx.simulate_click(spot, Modifiers::default());
+        draw(cx);
+        assert_eq!(
+            view.read_with(cx, |view, cx| view.0.read(cx).value()),
+            before
+        );
+    }
+
+    struct ClassicSpecimen(Entity<SliderState>);
+    impl Render for ClassicSpecimen {
+        fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+            window.set_rem_size(px(14.));
+            let slider = MaterialSlider::new(&self.0, "Level")
+                .appearance(SliderAppearance::Classic)
+                .preview_state(InteractionPreview::Hovered);
+            div()
+                .w(px(200.))
+                .p(px(60.))
+                .child(div().debug_selector(|| "slider".into()).child(slider))
+        }
+    }
+
+    #[gpui::test]
+    fn a_classic_specimen_slider_does_not_move(cx: &mut TestAppContext) {
+        cx.update(gpui_base::init);
+        let (view, cx) = cx.add_window_view(|_, cx| {
+            ClassicSpecimen(cx.new(|_| SliderState::new().max(100.).default_value(30.)))
         });
         draw(cx);
         let before = view.read_with(cx, |view, cx| view.0.read(cx).value());
