@@ -23,14 +23,26 @@ pub fn provide_symbol_asset(file_name: &str, bytes: Vec<u8>) -> Result<(), wasm_
         .ok_or_else(|| wasm_bindgen::JsError::new(&format!("unknown asset {file_name}")))?
         .provide(bytes)
         .map_err(|error| wasm_bindgen::JsError::new(&format!("{error:?}")))?;
+    gpui_kit_material::icons::set_symbols_pending(!drawn_symbols_available());
     frame_counters::refresh_windows();
     Ok(())
+}
+
+/// Whether the fonts of the styles the Gallery draws have arrived. Until then
+/// icons draw a placeholder: on a phone the download outlasts several page visits.
+#[cfg(target_family = "wasm")]
+fn drawn_symbols_available() -> bool {
+    use gpui_kit_material::icons::{Asset, Style};
+    [Style::Outlined, Style::Rounded]
+        .into_iter()
+        .all(|style| Asset::Font(style).is_available())
 }
 
 #[cfg(target_family = "wasm")]
 #[wasm_bindgen::prelude::wasm_bindgen]
 pub fn run() {
     gpui_kit::platform::web_init();
+    gpui_kit_material::icons::set_symbols_pending(!drawn_symbols_available());
     // The Gallery's fonts have no CJK, and a phone's IME types it: draw those
     // characters with the browser's fonts, as it does for emoji by default.
     let platform = std::rc::Rc::new(
