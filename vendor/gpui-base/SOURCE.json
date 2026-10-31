@@ -48,8 +48,8 @@
       "upstream_sha256": "4c992d9765bf6638952ff9c897d7706c6fad5f54eaa8dc428fd568f8fe6323fe"
     },
     "src/input/base/element.rs": {
-      "local_sha256": "cbcc1edd60471e71c47c5598976eff8ae1b185c6facc91be0b685d825d801d36",
-      "reason": "Tell the platform when the caret moves, so a browser IME panel opens at it (ime-anchor-patch.md).",
+      "local_sha256": "e932cb10f87c8089a0145b145fcff5ddcc1fd899f113d228540e4ef6d1562be0",
+      "reason": "Tell the platform when the caret moves, so a browser IME panel opens at it (ime-anchor-patch.md). An input moved by its parent is notified only while focused (input-move-patch.md).",
       "upstream_sha256": "2d0697813d4e13f705d03c35c575e798754756c0528e013014e98aebfb67c5d5"
     }
   },
@@ -84,7 +84,8 @@
   "provenance_files": [
     "SOURCE.json",
     "ime-anchor-patch.md",
-    "motion-patch.md"
+    "motion-patch.md",
+    "input-move-patch.md"
   ],
   "repository": "https://github.com/longbridge/gpui-kit",
   "revision": "bb85882e1faab845d9e7be33b69a152879a90f69",
