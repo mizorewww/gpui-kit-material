@@ -251,18 +251,20 @@ pub(super) fn install(view: &Entity<Gallery>, window: &mut Window, cx: &mut App)
         gallery.set_drawer_open(options.drawer, cx);
     });
     let view = view.clone();
-    // Wait for initial layout, then position the logical section row.
-    window.on_next_frame(move |window, _| {
-        window.on_next_frame(move |window, cx| {
-            if options.settings {
-                let shared = view.read(cx).shared.clone();
-                super::settings::open(shared, window, cx);
-            }
-            view.read(cx).scroll_to_top();
-            window.refresh();
-            // Allow the target rows to be measured and painted before settling.
-            window.on_next_frame(move |window, cx| {
-            window.spawn(cx, async move |cx| {
+    // Wait for initial layout, then position the logical section row. Not on frames:
+    // a window under another one gets none, and the capture would wait forever at
+    // no CPU. It draws for itself, which needs no screen.
+    window.spawn(cx, async move |cx| {
+                drawn_frames(LAYOUT_FRAMES, cx).await;
+                let _ = cx.update(|window, cx| {
+                    if options.settings {
+                        let shared = view.read(cx).shared.clone();
+                        super::settings::open(shared, window, cx);
+                    }
+                    view.read(cx).scroll_to_top();
+                });
+                // Allow the target rows to be measured and painted before settling.
+                drawn_frames(LAYOUT_FRAMES, cx).await;
                 let positioned = cx.update(|window, cx| -> Result<()> {
                     let scroll = view.read(cx).list.clone();
                     scroll_measured_offset(&scroll, px(options.offset_y), window, cx)?;
@@ -277,6 +279,8 @@ pub(super) fn install(view: &Entity<Gallery>, window: &mut Window, cx: &mut App)
                 // New rows mount while applying the offset. Their animations
                 // receive the full settle interval, just like the section row.
                 cx.background_executor().timer(Duration::from_millis(options.settle_ms)).await;
+                // What measures itself as it draws (a tab's indicator) draws again.
+                drawn_frames(LAYOUT_FRAMES, cx).await;
                 let result=cx.update(|window, cx| -> Result<()> {
                     let scroll=view.read(cx).list.clone();
                     window.refresh();
@@ -325,9 +329,22 @@ pub(super) fn install(view: &Entity<Gallery>, window: &mut Window, cx: &mut App)
                 } }
                 let _=cx.update(|_,cx| cx.quit());
             }).detach();
-            });
+}
+
+/// How many drawn frames it takes for what measures itself as it draws to settle.
+const LAYOUT_FRAMES: usize = 3;
+
+/// Draws `count` frames a frame's time apart, without waiting for the display.
+async fn drawn_frames(count: usize, cx: &mut gpui::AsyncWindowContext) {
+    for _ in 0..count {
+        cx.background_executor()
+            .timer(Duration::from_millis(16))
+            .await;
+        let _ = cx.update(|window, cx| {
+            window.refresh();
+            window.draw(cx).clear(cx);
         });
-    });
+    }
 }
 
 /// Advance using measured row heights. A ListState's unmeasured entries have
@@ -391,6 +408,44 @@ mod tests {
     fn parse(args: &[&str]) -> anyhow::Result<Option<CaptureOptions>> {
         CaptureOptions::parse(args.iter().map(|s| s.to_string()))
     }
+    /// A window under another one is sent no frames, so the wait for layout must
+    /// not be for them: nothing here delivers one.
+    #[gpui::test]
+    fn the_wait_for_layout_needs_no_frame_from_the_display(cx: &mut gpui::TestAppContext) {
+        use std::{cell::Cell, rc::Rc, time::Duration};
+        struct Counted(Rc<Cell<usize>>);
+        impl gpui::Render for Counted {
+            fn render(
+                &mut self,
+                _: &mut gpui::Window,
+                _: &mut gpui::Context<Self>,
+            ) -> impl gpui::IntoElement {
+                self.0.set(self.0.get() + 1);
+                gpui::div()
+            }
+        }
+        let renders = Rc::new(Cell::new(0));
+        let (_, cx) = cx.add_window_view({
+            let renders = renders.clone();
+            move |_, _| Counted(renders)
+        });
+        let done = Rc::new(Cell::new(false));
+        let finished = done.clone();
+        cx.update(|window, cx| {
+            window
+                .spawn(cx, async move |cx| {
+                    super::drawn_frames(3, cx).await;
+                    finished.set(true);
+                })
+                .detach();
+        });
+        let before = renders.get();
+        cx.executor().advance_clock(Duration::from_millis(100));
+        cx.run_until_parked();
+        assert!(done.get(), "it finished with no frame delivered");
+        assert!(renders.get() >= before + 3, "and it drew on its own");
+    }
+
     #[test]
     fn every_page_is_a_capture_section_named_in_the_usage() {
         for (index, entry) in CATALOG.iter().enumerate() {
