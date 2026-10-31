@@ -13,6 +13,8 @@ Distribution is by Git revision for now; see the [quick start](README.md#quick-s
 - `rust-version` 1.99.1, the toolchain this workspace is verified with.
 - `[package.metadata.docs.rs]`, `deny.toml`, and CI checks of what each package ships.
 
+- `ListItem::switch_icons`: the handle icons of a list item's switch.
+
 ### Changed
 
 - Kit is pinned by revision (`bb85882`) instead of `branch = "main"`, so a consumer
