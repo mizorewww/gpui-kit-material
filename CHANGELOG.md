@@ -24,6 +24,7 @@ Distribution is by Git revision for now; see the [quick start](README.md#quick-s
   accent roles for a variant, for screens that need more than one level of action.
 - `SearchFieldStyle`, `CardVariant::Surface` and `MaterialDialog::container`: a search bar,
   card and dialog that sit on the surface, for a page whose ground is a step below it.
+- `ListItem::switch_icons`: the handle icons of a list item's switch.
 
 ### Changed
 
