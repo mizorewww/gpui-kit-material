@@ -794,6 +794,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::single_range_in_vec_init)] // A run really is a one-element array here.
     fn columns_wrap_into_runs_that_fit() {
         // Everything fits: one run.
         assert_eq!(wrap_columns(&[50., 50., 50.], 10., 10., 200.), [0..3]);
