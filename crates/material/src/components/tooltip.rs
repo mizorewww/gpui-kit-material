@@ -842,7 +842,7 @@ mod tests {
 
     #[gpui::test]
     fn right_to_left_a_tooltip_travels_away_and_aligns_from_the_start(cx: &mut TestAppContext) {
-        cx.update(|cx| gpui_base::init(cx));
+        cx.update(gpui_base::init);
         for side in [Placement::Right, Placement::Left] {
             let (view, vcx) = cx.add_window_view(move |_, _| RtlHarness {
                 placement: side,
