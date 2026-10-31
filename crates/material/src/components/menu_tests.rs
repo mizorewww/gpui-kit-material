@@ -593,6 +593,68 @@ fn a_material_button_trigger_toggles_the_menu_by_pointer(cx: &mut TestAppContext
     cx.update(|_, cx| assert!(!view.read(cx).open, "a second press closes it"));
 }
 
+struct FullWidthDropdown {
+    width: Pixels,
+    open: bool,
+}
+
+impl Render for FullWidthDropdown {
+    fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        window.set_rem_size(px(14.));
+        div().flex().w(self.width).child(
+            div().flex_1().min_w_0().child(
+                ExposedDropdown::new("dropdown", "Folder")
+                    .options(["Inbox", "Archive"])
+                    .full_width()
+                    .open(self.open),
+            ),
+        )
+    }
+}
+
+#[gpui::test]
+fn a_full_width_dropdown_fills_its_parent_and_sizes_its_menu_to_it(cx: &mut TestAppContext) {
+    cx.update(|cx| {
+        gpui_kit::init(cx);
+        crate::init(cx);
+        cx.set_reduce_motion(true);
+    });
+    let (view, cx) = cx.add_window_view(|_, _| FullWidthDropdown {
+        width: px(500.),
+        open: false,
+    });
+    settle(cx);
+    let trigger = cx.debug_bounds("dropdown-trigger").unwrap();
+    assert_eq!(trigger.size.width, px(500.));
+    view.update(cx, |v, cx| {
+        v.open = true;
+        cx.notify();
+    });
+    settle(cx);
+    let menu = cx.debug_bounds("material-menu").unwrap();
+    assert_eq!(menu.size.width, px(500.));
+
+    view.update(cx, |v, cx| {
+        v.width = px(300.);
+        v.open = false;
+        cx.notify();
+    });
+    settle(cx);
+    assert_eq!(
+        cx.debug_bounds("dropdown-trigger").unwrap().size.width,
+        px(300.)
+    );
+    view.update(cx, |v, cx| {
+        v.open = true;
+        cx.notify();
+    });
+    settle(cx);
+    assert_eq!(
+        cx.debug_bounds("material-menu").unwrap().size.width,
+        px(300.)
+    );
+}
+
 /// The kit draws menus anchored to a text field as baseline menus: the select's
 /// selected option is on the secondary container, not the expressive tertiary.
 #[test]

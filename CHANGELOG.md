@@ -12,6 +12,7 @@ Distribution is by Git revision for now; see the [quick start](README.md#quick-s
 - A published `[patch]` block for downstream workspaces, built from Git by CI.
 - `rust-version` 1.99.1, the toolchain this workspace is verified with.
 - `[package.metadata.docs.rs]`, `deny.toml`, and CI checks of what each package ships.
+- `ExposedDropdown::full_width`: the field fills its parent and the menu matches it.
 
 ### Changed
 
