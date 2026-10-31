@@ -587,6 +587,36 @@ fn equal_slot(
         .into_any_element()
 }
 
+/// The press wave over an option, clipped to its corners along the group's axis.
+fn option_ripple(
+    option: impl IntoElement,
+    index: usize,
+    paint: &OptionPaint,
+    vertical: bool,
+) -> super::Ripple {
+    let (start, end) = (paint.left_radius, paint.right_radius);
+    super::Ripple::new(
+        ElementId::NamedInteger("option-ripple".into(), index as u64),
+        option,
+    )
+    .corners(if vertical {
+        Corners {
+            top_left: start,
+            top_right: start,
+            bottom_right: end,
+            bottom_left: end,
+        }
+    } else {
+        Corners {
+            top_left: start,
+            top_right: end,
+            bottom_right: end,
+            bottom_left: start,
+        }
+    })
+    .ink(paint.foreground)
+}
+
 /// The focus handle of each option, created on first sight (see
 /// [`super::roving::sync_handles`]).
 fn sync_handles(
@@ -816,6 +846,9 @@ impl RenderOnce for ConnectedButtonGroup {
                         callback(&value, window, cx);
                     }
                 });
+                let tab = option_ripple(tab, index, &paint, vertical)
+                    .disabled(option_disabled)
+                    .specimen(preview.is_some());
                 let ring = focus_ring(tab, &focus, option_disabled, forced_focus, paint, vertical);
                 lane = lane.child(equal_slot(ring, &widths[index], equal, widest));
             } else if toggles || self.selection == GroupSelection::None {
@@ -880,29 +913,9 @@ impl RenderOnce for ConnectedButtonGroup {
                     })
                     .into_any_element()
                 };
-                let (start, end) = (paint.left_radius, paint.right_radius);
-                let option = super::Ripple::new(
-                    ElementId::NamedInteger("option-ripple".into(), index as u64),
-                    option,
-                )
-                .corners(if vertical {
-                    Corners {
-                        top_left: start,
-                        top_right: start,
-                        bottom_right: end,
-                        bottom_left: end,
-                    }
-                } else {
-                    Corners {
-                        top_left: start,
-                        top_right: end,
-                        bottom_right: end,
-                        bottom_left: start,
-                    }
-                })
-                .ink(paint.foreground)
-                .disabled(option_disabled)
-                .specimen(preview.is_some());
+                let option = option_ripple(option, index, &paint, vertical)
+                    .disabled(option_disabled)
+                    .specimen(preview.is_some());
                 let ring = focus_ring(
                     option,
                     &focus,
@@ -940,6 +953,9 @@ impl RenderOnce for ConnectedButtonGroup {
                         callback(&value, window, cx);
                     }
                 });
+                let radio = option_ripple(radio, index, &paint, vertical)
+                    .disabled(option_disabled)
+                    .specimen(preview.is_some());
                 let ring = focus_ring(
                     radio,
                     &focus,
@@ -2208,5 +2224,57 @@ mod mode_tests {
         let (_, cx) = cx.add_window_view(|_, _| EqualTabs);
         draw(cx);
         assert_eq!(option(cx, 0).size.width, option(cx, 1).size.width);
+    }
+
+    struct RadioGroup;
+    impl Render for RadioGroup {
+        fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+            window.set_rem_size(px(14.));
+            div().flex().items_start().p(px(40.)).child(
+                ConnectedButtonGroup::new("group", "Format")
+                    .button_size(ButtonSize::Small)
+                    .options([("a", "One"), ("b", "Two")])
+                    .selected("a")
+                    .required(true),
+            )
+        }
+    }
+
+    struct TabGroup;
+    impl Render for TabGroup {
+        fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+            window.set_rem_size(px(14.));
+            div().flex().items_start().p(px(40.)).child(
+                ConnectedButtonGroup::new("group", "Format")
+                    .button_size(ButtonSize::Small)
+                    .options([("a", "One"), ("b", "Two")])
+                    .selected("a")
+                    .tabs(),
+            )
+        }
+    }
+
+    #[gpui::test]
+    fn every_kind_of_option_ripples(cx: &mut TestAppContext) {
+        use crate::components::button::waves_painted;
+        cx.update(|cx| {
+            gpui_base::init(cx);
+            cx.set_reduce_motion(true);
+        });
+        let (_, cx) = cx.add_window_view(|_, _| RadioGroup);
+        draw(cx);
+        let center = option(cx, 1).center();
+        let before = waves_painted();
+        cx.simulate_mouse_down(center, gpui::MouseButton::Left, Modifiers::none());
+        draw(cx);
+        assert!(waves_painted() > before, "a radio option");
+        cx.simulate_mouse_up(center, gpui::MouseButton::Left, Modifiers::none());
+        let (_, cx) = cx.cx.add_window_view(|_, _| TabGroup);
+        draw(cx);
+        let center = option(cx, 1).center();
+        let before = waves_painted();
+        cx.simulate_mouse_down(center, gpui::MouseButton::Left, Modifiers::none());
+        draw(cx);
+        assert!(waves_painted() > before, "a tab option");
     }
 }
