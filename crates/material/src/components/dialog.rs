@@ -149,6 +149,7 @@ pub struct MaterialDialog {
     dismiss_on_scrim: bool,
     dismiss_on_escape: bool,
     on_dismiss: Option<Dismiss>,
+    container: ColorRole,
 }
 
 /// The full-screen dialog's header: its close button's accessible name and
@@ -182,6 +183,7 @@ impl MaterialDialog {
             dismiss_on_scrim: true,
             dismiss_on_escape: true,
             on_dismiss: None,
+            container: ColorRole::SURFACE_CONTAINER_HIGH,
         }
     }
     /// The hero icon above the headline; the headline then centers.
@@ -227,6 +229,12 @@ impl MaterialDialog {
     /// and content), for a body that scrolls (md3.io's Dividers).
     pub fn dividers(mut self, dividers: bool) -> Self {
         self.dividers = dividers;
+        self
+    }
+    /// Paint the dialog in `role` instead of M3's surface-container-high, for an app whose
+    /// surfaces are one layer above its ground.
+    pub fn container(mut self, role: ColorRole) -> Self {
+        self.container = role;
         self
     }
     /// The basic dialog's width in dp, clamped to M3's 280–560dp.
@@ -676,7 +684,7 @@ impl MaterialDialog {
             .w(rem(width))
             .overflow_hidden()
             .rounded(DIALOG_RADIUS)
-            .bg(color(ColorRole::SURFACE_CONTAINER_HIGH))
+            .bg(color(self.container))
             .shadow(elevation::level3())
             .child(text);
         match middle {
