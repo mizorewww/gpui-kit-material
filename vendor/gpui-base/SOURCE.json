@@ -17,12 +17,11 @@
     "src/motion.rs",
     "src/slider.rs",
     "src/text_selection.rs",
-    "src/toggle.rs",
     "src/toolbar.rs"
   ],
   "local_patch_sha256": {
     "src/a11y_disabled.rs": {
-      "local_sha256": "1568f7d301c66cd754ef37ea372edc474d0c760d20e159df56c1764155797a36",
+      "local_sha256": "369279b8e5a2bec83c572c44fb5b62aa477cff6c2aac3be2f9004255ad878f40",
       "reason": "Transparent accessibility state for disabled and busy controls (motion-patch.md).",
       "upstream_sha256": "979c0103db88f31fad9425ca6fc16351bdb07a5b5b0fe30a85d2aaec573bcceb"
     },
@@ -60,11 +59,6 @@
       "local_sha256": "be2bc711ab2f1b109c73b1c45411b5b58029c46d852ae6962164ec7bd9cd75f4",
       "reason": "Hitbox literals set additional_bounds: None after the GPUI Hitbox field patch (vendor/gpui-pre/hitbox-extension-patch.md); no behavior change.",
       "upstream_sha256": "4d45f303915294b0e1984bc6a83a00f8752751c96bf78d6f24dcd057b17b742c"
-    },
-    "src/toggle.rs": {
-      "local_sha256": "ba62b028b21e4210cfe780a5abb8825a468a379b37a73c9d106a5252c6934163",
-      "reason": "Busy state and nonfocusable activation/focus corrections (motion-patch.md).",
-      "upstream_sha256": "f534cdf953b1ed7d61e98f787e108d1698bfe482ad6ac28ebc314afea98ad802"
     },
     "src/toolbar.rs": {
       "local_sha256": "2eb0d4560dac01d2c278354bc3c2f6d745dcf8f2f09d3c9b948c4e90bcf17716",

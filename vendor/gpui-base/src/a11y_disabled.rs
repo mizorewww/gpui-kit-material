@@ -200,17 +200,6 @@ mod tests {
                                             .render(window, cx),
                                     ),
                                 ));
-                                nodes.push((
-                                    busy,
-                                    disabled,
-                                    node_of(
-                                        Toggle::new("busy-toggle")
-                                            .busy(busy)
-                                            .disabled(disabled)
-                                            .on_change(|_, _, _, _| {})
-                                            .render(window, cx),
-                                    ),
-                                ));
                             }
                         }
                     },
@@ -225,7 +214,7 @@ mod tests {
         });
         cx.update(|window, cx| window.draw(cx).clear(cx));
         let nodes = captured.lock().unwrap();
-        assert_eq!(nodes.len(), 8);
+        assert_eq!(nodes.len(), 4);
         for (busy, disabled, node) in nodes.iter() {
             assert_eq!(node.role(), gpui::Role::Button);
             assert_eq!(node.is_busy(), *busy);

@@ -1,5 +1,6 @@
-//! Shared presentation adapter. Base Button and Toggle remain the only owners
-//! of activation and accessibility; no selection state is retained here.
+//! Shared presentation adapter. Base Button remains the only owner of activation
+//! and accessibility, a toggle reporting its state through `aria_toggled` because
+//! Base's Toggle has no focus policy; no selection state is retained here.
 use gpui::{prelude::*, *};
 use std::rc::Rc;
 
@@ -111,49 +112,43 @@ impl RenderOnce for BaseControl {
         #[cfg(not(test))]
         let a11y_observer = ();
         // Transfer caller and passive visual listeners onto the one Base root.
-        // Both variants get identical layout, focus configuration and children.
-        macro_rules! configure {
-            ($base:expr) => {{
-                let mut base = $base;
-                std::mem::swap(base.interactivity(), self.interaction.interactivity());
-                base.disabled(self.disabled)
-                    .busy(self.busy)
-                    .focusable(self.focusable)
-                    .tab_index(self.tab_index)
-                    .tab_stop(self.tab_stop)
-                    .when_some(self.focus.as_ref(), |base, focus| base.track_focus(focus))
-                    .when_some(self.label, |base, label| base.accessibility_label(label))
-                    .children(self.children)
-                    .refine_style(&self.style)
-            }};
-        }
-        if self.toggle {
-            let on_click = self.on_click;
+        let mut base = gpui_base::Button::new(self.id);
+        std::mem::swap(base.interactivity(), self.interaction.interactivity());
+        let base = base
+            .disabled(self.disabled)
+            .busy(self.busy)
+            .focusable(self.focusable)
+            .tab_index(self.tab_index)
+            .tab_stop(self.tab_stop)
+            .when_some(self.focus.as_ref(), |base, focus| base.track_focus(focus))
+            .when_some(self.label, |base, label| base.accessibility_label(label))
+            .children(self.children)
+            .refine_style(&self.style);
+        let on_click = self.on_click;
+        let base = if self.toggle {
+            let selected = self.selected;
             let on_change = self.on_change.filter(|_| self.toggle_on_click);
-            let base = configure!(gpui_base::Toggle::new(self.id).pressed(self.selected)).when(
-                on_click.is_some() || on_change.is_some(),
-                |base| {
-                    base.on_change(move |next, event, window, cx| {
-                        if let Some(callback) = &on_change {
-                            callback(next, event, window, cx);
-                        }
-                        if let Some(callback) = &on_click {
-                            callback(event, window, cx);
-                        }
-                    })
-                },
-            );
-            finish(base, a11y_observer, window, cx)
+            base.aria_toggled(if selected {
+                Toggled::True
+            } else {
+                Toggled::False
+            })
+            .when(on_click.is_some() || on_change.is_some(), |base| {
+                base.on_click(move |event, window, cx| {
+                    if let Some(callback) = &on_change {
+                        callback(!selected, event, window, cx);
+                    }
+                    if let Some(callback) = &on_click {
+                        callback(event, window, cx);
+                    }
+                })
+            })
         } else {
-            let on_click = self.on_click;
-            let base = configure!(gpui_base::Button::new(self.id)).when_some(
-                on_click,
-                |base, callback| {
-                    base.on_click(move |event, window, cx| callback(event, window, cx))
-                },
-            );
-            finish(base, a11y_observer, window, cx)
-        }
+            base.when_some(on_click, |base, callback| {
+                base.on_click(move |event, window, cx| callback(event, window, cx))
+            })
+        };
+        finish(base, a11y_observer, window, cx)
     }
 }
 

@@ -23,7 +23,6 @@ The local compatibility surface is restricted to:
 - `src/a11y_disabled.rs`: transparent accessibility state presentation for
   disabled and busy controls.
 - `src/button.rs`: caller-controlled `busy(bool)`, independent of disabled.
-- `src/toggle.rs`: busy state and the nonfocusable activation/focus corrections.
 - `src/motion.rs`: CSS reversing-adjusted start values, reversal duration and
   negative-delay scaling, plus explicit per-transition reduced-motion policy.
   The default finishes transitions immediately under reduced motion; callers
