@@ -5,7 +5,10 @@
 //! technology and reports reordering. Selection stays with the caller, as for
 //! every control here; [`ChipSelection`] holds the rules so each caller
 //! does not write them again.
-use crate::tokens::typography::rem;
+use crate::{
+    scope::{CapturedScope, horizontal_arrow, is_rtl},
+    tokens::typography::rem,
+};
 use gpui::{prelude::*, *};
 use std::rc::Rc;
 
@@ -77,11 +80,13 @@ struct DraggedChip {
     set: ElementId,
     from: usize,
     preview: DragPreview,
+    /// A drag draws from the window's root, outside the set's scope.
+    scope: CapturedScope,
 }
 
 impl Render for DraggedChip {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        (self.preview)(window, cx)
+        self.scope.draw((self.preview)(window, cx))
     }
 }
 
@@ -125,6 +130,10 @@ impl ChipSet {
     }
     /// Make chips with a [`ChipSetItem::drag_preview`] draggable within the
     /// set. Called with the moved chip's position and where it was dropped.
+    ///
+    /// The keyboard reorders them too: Alt with an arrow along the set moves
+    /// the chip holding focus one place, which calls this the same way. Key
+    /// each chip by what it stands for, so its focus moves with it.
     pub fn on_reorder(mut self, f: impl Fn(usize, usize, &mut Window, &mut App) + 'static) -> Self {
         self.on_reorder = Some(Rc::new(f));
         self
@@ -137,14 +146,42 @@ impl Styled for ChipSet {
     }
 }
 
+/// Which way a keystroke moves a chip along the set, if it does.
+fn reorder_step(keystroke: &Keystroke, vertical: bool, rtl: bool) -> Option<i32> {
+    let modifiers = keystroke.modifiers;
+    if !modifiers.alt || modifiers.control || modifiers.platform || modifiers.shift {
+        return None;
+    }
+    if vertical {
+        match keystroke.key.as_str() {
+            "up" => Some(-1),
+            "down" => Some(1),
+            _ => None,
+        }
+    } else {
+        horizontal_arrow(&keystroke.key, rtl)
+    }
+}
+
 impl RenderOnce for ChipSet {
-    fn render(self, _: &mut Window, _: &mut App) -> impl IntoElement {
+    fn render(self, window: &mut Window, _: &mut App) -> impl IntoElement {
         let set = self.id.clone();
         let on_reorder = self.on_reorder;
+        let vertical = self.vertical;
+        let rtl = is_rtl(window);
+        let scope = CapturedScope::now();
+        // Only a chip that can be dragged can be dropped on or moved past.
+        let movable: Rc<[bool]> = self
+            .items
+            .iter()
+            .map(|item| item.drag_preview.is_some())
+            .collect();
         let slots = self.items.into_iter().enumerate().map(|(position, item)| {
             let preview = item.drag_preview.filter(|_| on_reorder.is_some());
             let on_reorder = on_reorder.clone();
             let set = set.clone();
+            let scope = scope.clone();
+            let movable = movable.clone();
             div()
                 .id(("chip-slot", position))
                 .when_some(preview, |slot, preview| {
@@ -152,17 +189,34 @@ impl RenderOnce for ChipSet {
                         set: set.clone(),
                         from: position,
                         preview,
+                        scope,
                     };
-                    slot.cursor_grab()
-                        .on_drag(dragged, |dragged, _, _, cx| cx.new(|_| dragged.clone()))
-                        .drag_over::<DraggedChip>(|style, _, _, _| style.opacity(0.6))
-                        .on_drop(move |dragged: &DraggedChip, window, cx| {
-                            if dragged.set == set
-                                && let Some(on_reorder) = &on_reorder
-                            {
-                                on_reorder(dragged.from, position, window, cx);
-                            }
-                        })
+                    let keyed = on_reorder.clone();
+                    slot.on_key_down(move |event, window, cx| {
+                        let Some(step) = reorder_step(&event.keystroke, vertical, rtl) else {
+                            return;
+                        };
+                        let target = position.checked_add_signed(step as isize);
+                        let Some(target) =
+                            target.filter(|target| movable.get(*target).copied().unwrap_or(false))
+                        else {
+                            return;
+                        };
+                        cx.stop_propagation();
+                        if let Some(on_reorder) = &keyed {
+                            on_reorder(position, target, window, cx);
+                        }
+                    })
+                    .cursor_grab()
+                    .on_drag(dragged, |dragged, _, _, cx| cx.new(|_| dragged.clone()))
+                    .drag_over::<DraggedChip>(|style, _, _, _| style.opacity(0.6))
+                    .on_drop(move |dragged: &DraggedChip, window, cx| {
+                        if dragged.set == set
+                            && let Some(on_reorder) = &on_reorder
+                        {
+                            on_reorder(dragged.from, position, window, cx);
+                        }
+                    })
                 })
                 .child(item.chip)
         });
@@ -258,5 +312,152 @@ mod tests {
         cx.simulate_mouse_move(last.center(), MouseButton::Left, Modifiers::default());
         cx.simulate_mouse_up(last.center(), MouseButton::Left, Modifiers::default());
         view.read_with(cx, |view, _| assert_eq!(view.reorders, [(0, 2)]));
+    }
+
+    /// What a preview sees of where it is drawn.
+    #[derive(gpui::IntoElement)]
+    struct Probe(Rc<std::cell::Cell<Option<bool>>>);
+    impl RenderOnce for Probe {
+        fn render(self, window: &mut Window, _: &mut App) -> impl IntoElement {
+            self.0.set(Some(is_rtl(window)));
+            div().size(px(40.))
+        }
+    }
+
+    struct Scoped {
+        rtl_in_preview: Rc<std::cell::Cell<Option<bool>>>,
+    }
+    impl Render for Scoped {
+        fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+            let seen = self.rtl_in_preview.clone();
+            crate::scope::Scope::new("rtl-chips")
+                .direction(LayoutDirection::Rtl)
+                .child(
+                    ChipSet::new("set", "Filters")
+                        .item(
+                            ChipSetItem::new(div().size(px(40.)).debug_selector(|| "chip".into()))
+                                .drag_preview(move |_, _| Probe(seen.clone()).into_any_element()),
+                        )
+                        .on_reorder(|_, _, _, _| {}),
+                )
+        }
+    }
+
+    #[gpui::test]
+    fn a_drag_preview_draws_in_the_sets_scope(cx: &mut TestAppContext) {
+        let seen = Rc::new(std::cell::Cell::new(None));
+        let (_, cx) = cx.add_window_view({
+            let seen = seen.clone();
+            move |_, _| Scoped {
+                rtl_in_preview: seen,
+            }
+        });
+        cx.update(|window, cx| window.draw(cx).clear(cx));
+        let chip = cx.debug_bounds("chip").unwrap().center();
+        cx.simulate_mouse_down(chip, MouseButton::Left, Modifiers::default());
+        cx.simulate_mouse_move(
+            chip + point(px(30.), px(30.)),
+            MouseButton::Left,
+            Modifiers::default(),
+        );
+        cx.update(|window, cx| {
+            window.refresh();
+            window.draw(cx).clear(cx);
+        });
+        assert_eq!(seen.get(), Some(true), "the preview is in the scope");
+    }
+
+    struct Keyed {
+        vertical: bool,
+        rtl: bool,
+        draggable: [bool; 3],
+        focus: Vec<FocusHandle>,
+        reorders: Vec<(usize, usize)>,
+    }
+    impl Render for Keyed {
+        fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+            let view = cx.entity();
+            let set = ChipSet::new("set", "Filters")
+                .vertical(self.vertical)
+                .items((0..3).map(|i| {
+                    let item = ChipSetItem::new(div().size(px(40.)).track_focus(&self.focus[i]));
+                    if self.draggable[i] {
+                        item.drag_preview(|_, _| div().size(px(40.)).into_any_element())
+                    } else {
+                        item
+                    }
+                }))
+                .on_reorder(move |from, to, _, cx| {
+                    view.update(cx, |this, _| this.reorders.push((from, to)));
+                });
+            let mut scope = crate::scope::Scope::new("direction");
+            if self.rtl {
+                scope = scope.direction(LayoutDirection::Rtl);
+            }
+            scope.child(set)
+        }
+    }
+
+    fn keyed(
+        cx: &mut TestAppContext,
+        vertical: bool,
+        rtl: bool,
+        draggable: [bool; 3],
+    ) -> (Entity<Keyed>, &mut VisualTestContext) {
+        let (view, cx) = cx.add_window_view(move |_, cx| Keyed {
+            vertical,
+            rtl,
+            draggable,
+            focus: (0..3).map(|_| cx.focus_handle()).collect(),
+            reorders: Vec::new(),
+        });
+        cx.update(|window, cx| window.draw(cx).clear(cx));
+        (view, cx)
+    }
+
+    fn press_on(
+        view: &Entity<Keyed>,
+        cx: &mut VisualTestContext,
+        chip: usize,
+        keys: &str,
+    ) -> Vec<(usize, usize)> {
+        cx.update(|window, cx| {
+            let focus = view.read(cx).focus[chip].clone();
+            window.focus(&focus, cx);
+            window.draw(cx).clear(cx);
+        });
+        cx.simulate_keystrokes(keys);
+        view.update(cx, |view, _| std::mem::take(&mut view.reorders))
+    }
+
+    #[gpui::test]
+    fn alt_and_an_arrow_move_the_focused_chip(cx: &mut TestAppContext) {
+        let (view, cx) = keyed(cx, false, false, [true; 3]);
+        assert_eq!(press_on(&view, cx, 1, "alt-right"), [(1, 2)]);
+        assert_eq!(press_on(&view, cx, 1, "alt-left"), [(1, 0)]);
+        assert_eq!(press_on(&view, cx, 2, "alt-right"), [], "the end stays put");
+        assert_eq!(press_on(&view, cx, 0, "alt-left"), [], "so does the start");
+        assert_eq!(press_on(&view, cx, 1, "right"), [], "alt is what moves it");
+        assert_eq!(press_on(&view, cx, 1, "alt-down"), [], "not across the set");
+    }
+
+    #[gpui::test]
+    fn the_keys_follow_the_sets_direction_and_axis(cx: &mut TestAppContext) {
+        let (view, cx) = keyed(cx, false, true, [true; 3]);
+        assert_eq!(
+            press_on(&view, cx, 1, "alt-left"),
+            [(1, 2)],
+            "right to left"
+        );
+        let (view, cx) = keyed(&mut cx.cx, true, false, [true; 3]);
+        assert_eq!(press_on(&view, cx, 1, "alt-down"), [(1, 2)], "a column");
+        assert_eq!(press_on(&view, cx, 1, "alt-right"), []);
+    }
+
+    #[gpui::test]
+    fn a_chip_that_cannot_be_dragged_cannot_be_moved_past(cx: &mut TestAppContext) {
+        let (view, cx) = keyed(cx, false, false, [true, false, true]);
+        assert_eq!(press_on(&view, cx, 0, "alt-right"), []);
+        assert_eq!(press_on(&view, cx, 1, "alt-right"), []);
     }
 }

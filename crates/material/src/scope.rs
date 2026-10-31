@@ -29,7 +29,8 @@
 //!   covered.
 //! - What Kit defers itself reads its colors while rendering, which is in the
 //!   scope, but anything it reads while painting is not.
-//! - Drag previews, unless the preview is built with [`current_scope`].
+//! - Drag previews, unless the preview is built with [`current_scope`]. A
+//!   [`ChipSet`](crate::components::ChipSet)'s are.
 //! - Kit's theme is projected again when the scheme or text size changes. Another
 //!   field changed on Kit's global reaches the subtree at its next scheme change.
 //! - Kit's scrollbar styles, which Kit builds privately from its global theme.
@@ -376,6 +377,29 @@ pub fn current_scope(child: impl IntoElement) -> AnyElement {
         }
         .into_any_element(),
         None => child.into_any_element(),
+    }
+}
+
+/// The scope that is current now, kept for something built later from outside
+/// the tree, where [`current_scope`] cannot reach because nothing exists yet.
+#[derive(Clone)]
+pub(crate) struct CapturedScope(Option<Rc<Frame>>);
+
+impl CapturedScope {
+    pub(crate) fn now() -> Self {
+        Self(CURRENT.with(|current| current.borrow().clone()))
+    }
+
+    /// `child`, drawn inside the scope that was captured.
+    pub(crate) fn draw(&self, child: impl IntoElement) -> AnyElement {
+        match &self.0 {
+            Some(frame) => ReplayElement {
+                frame: frame.clone(),
+                child: child.into_any_element(),
+            }
+            .into_any_element(),
+            None => child.into_any_element(),
+        }
     }
 }
 
