@@ -421,6 +421,7 @@ impl Element for ButtonRipple {
                 color.a *= wave.opacity;
                 #[cfg(test)]
                 {
+                    #[cfg(feature = "buttons")]
                     tests::record_paint(color, radius, border);
                     WAVES_PAINTED.with(|painted| painted.set(painted.get() + 1));
                 }
@@ -505,7 +506,7 @@ impl Element for ButtonRipple {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "buttons"))]
 mod tests {
     use super::ButtonRipple;
     use crate::{components::button::MaterialButton, tokens::typography::rem};
@@ -1161,7 +1162,7 @@ mod tests {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "buttons"))]
 mod target_tests {
     use super::RippleState;
     use crate::components::button::{ButtonSize, ButtonVariant, MaterialButton, PressState};

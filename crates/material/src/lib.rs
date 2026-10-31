@@ -21,6 +21,9 @@
 //! render. Advance [`theme::advance_component_theme`] from input events and
 //! pre-frame callbacks. Base-only consumers can paint with
 //! [`theme::apply_scheme`] at the start of each root render.
+// Helpers shared across feature groups go unused when a consumer leaves some groups out.
+#![cfg_attr(not(feature = "full"), allow(dead_code, unused_imports))]
+
 extern crate gpui_kit as gpui;
 
 pub use gpui_kit_material_color as color;
@@ -29,6 +32,7 @@ pub mod components;
 pub mod icons;
 pub mod motion;
 pub mod scope;
+#[cfg(feature = "shapes")]
 pub mod shapes;
 pub mod theme;
 pub mod tokens;
@@ -46,6 +50,7 @@ pub mod prelude {
     pub use crate::color::{Appearance, ColorRole, PaletteId, ThemePreferences};
     pub use crate::components::*;
     pub use crate::scope::{LayoutDirection, Scope, is_rtl};
+    #[cfg(feature = "shapes")]
     pub use crate::shapes::{MaterialShape, Morph, ShapeFrame, ShapeKind};
     pub use crate::theme::color;
     pub use crate::tokens::{layout::*, shape::*, typography::*};
