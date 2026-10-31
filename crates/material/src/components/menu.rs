@@ -20,7 +20,9 @@
 use super::InteractionPreview;
 use super::focus::{RingPlacement, RingedButton};
 use super::roving::{Direction, target};
-use super::text_field::{TextField, TextFieldDensity, TextFieldVariant, type_style};
+use super::text_field::{
+    TextField, TextFieldDensity, TextFieldShape, TextFieldVariant, type_style,
+};
 use crate::{
     color::ColorRole,
     icons::{Icon, Symbol},
@@ -1429,6 +1431,7 @@ pub struct ExposedDropdown {
     id: ElementId,
     variant: TextFieldVariant,
     density: TextFieldDensity,
+    shape: TextFieldShape,
     label: SharedString,
     options: Vec<SharedString>,
     disabled_options: Vec<usize>,
@@ -1450,6 +1453,7 @@ impl ExposedDropdown {
         Self {
             id: id.into(),
             variant: TextFieldVariant::Filled,
+            shape: TextFieldShape::Standard,
             density: TextFieldDensity::Default,
             label: label.into(),
             options: Vec::new(),
@@ -1476,6 +1480,11 @@ impl ExposedDropdown {
     }
     pub fn variant(mut self, variant: TextFieldVariant) -> Self {
         self.variant = variant;
+        self
+    }
+    /// The field's corners.
+    pub fn shape(mut self, shape: TextFieldShape) -> Self {
+        self.shape = shape;
         self
     }
     /// The field's density (default 56dp; compact 48dp).
@@ -1570,6 +1579,7 @@ impl RenderOnce for ExposedDropdown {
         .rotate(std::f32::consts::PI * turn);
         let mut field = TextField::specimen((id.clone(), "field"), value.clone())
             .variant(self.variant)
+            .shape(self.shape)
             .density(self.density)
             .label(self.label.clone())
             .required(self.required)
