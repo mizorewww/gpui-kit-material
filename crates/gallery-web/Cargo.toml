@@ -22,4 +22,4 @@ gpui-kit.workspace = true
 gpui-base.workspace = true
 gpui-kit-material = { path = "../material", default-features = false, features = ["serde"] }
 wasm-bindgen = "=0.2.129"
-web-sys = { version = "=0.3.106", features = ["Window", "MediaQueryList", "MediaQueryListEvent", "EventTarget"] }
+web-sys = { version = "=0.3.106", features = ["Window", "MediaQueryList", "MediaQueryListEvent", "EventTarget", "Location"] }

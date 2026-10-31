@@ -95,6 +95,68 @@ pub(crate) const fn fab_elevation(lowered: bool) -> (u8, u8) {
 
 type ClickHandler = Box<dyn Fn(&ClickEvent, &mut Window, &mut App)>;
 
+/// Where a placed FAB sits in its positioned ancestor, 16dp from the edges.
+/// Start and end follow the layout direction.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+pub enum FabPosition {
+    Center,
+    #[default]
+    BottomEnd,
+    BottomStart,
+    TopEnd,
+    TopStart,
+}
+
+impl FabPosition {
+    pub const ALL: [Self; 5] = [
+        Self::Center,
+        Self::BottomEnd,
+        Self::BottomStart,
+        Self::TopEnd,
+        Self::TopStart,
+    ];
+}
+
+/// A placed FAB's distance from the edges of its ancestor.
+const FAB_EDGE: f32 = 16.;
+
+impl FabPosition {
+    /// `element` at this position in its nearest positioned ancestor. The overlay
+    /// has no hit target of its own, so content under it stays interactive.
+    pub fn place(self, element: impl IntoElement) -> AnyElement {
+        div()
+            .absolute()
+            .inset_0()
+            .flex()
+            .when(self != Self::Center, |stage| stage.p(rem(FAB_EDGE)))
+            .map(|stage| match self {
+                Self::Center => stage.items_center().justify_center(),
+                Self::BottomEnd => stage.items_end().justify_end(),
+                Self::BottomStart => stage.items_end().justify_start(),
+                Self::TopEnd => stage.items_start().justify_end(),
+                Self::TopStart => stage.items_start().justify_start(),
+            })
+            .child(element)
+            .into_any_element()
+    }
+}
+
+/// `fab`, named for tests, placed if a position was asked for.
+fn placed(
+    position: Option<FabPosition>,
+    fab: MaterialButton,
+    selector: Option<SharedString>,
+) -> AnyElement {
+    let fab = match selector {
+        Some(name) => fab.debug_selector(move || name.to_string()),
+        None => fab,
+    };
+    match position {
+        Some(position) => position.place(fab),
+        None => fab.into_any_element(),
+    }
+}
+
 macro_rules! fab_builders {
     () => {
         pub fn size(mut self, size: FabSize) -> Self {
@@ -109,6 +171,17 @@ macro_rules! fab_builders {
         /// (4), for surfaces where the FAB should not float as high.
         pub fn lowered(mut self, lowered: bool) -> Self {
             self.lowered = lowered;
+            self
+        }
+        /// Place the FAB in its nearest positioned ancestor instead of leaving
+        /// it in the caller's layout.
+        pub fn position(mut self, position: FabPosition) -> Self {
+            self.position = Some(position);
+            self
+        }
+        /// Name the button for layout tests.
+        pub fn debug_name(mut self, name: impl Into<SharedString>) -> Self {
+            self.selector = Some(name.into());
             self
         }
         /// Disabled: on-surface at 10% container and 38% content, no
@@ -145,6 +218,8 @@ pub struct Fab {
     size: FabSize,
     color: FabColor,
     lowered: bool,
+    position: Option<FabPosition>,
+    selector: Option<SharedString>,
     disabled: bool,
     preview: Option<InteractionPreview>,
     focus: Option<FocusHandle>,
@@ -164,6 +239,8 @@ impl Fab {
             size: FabSize::Regular,
             color: FabColor::PrimaryContainer,
             lowered: false,
+            position: None,
+            selector: None,
             disabled: false,
             preview: None,
             focus: None,
@@ -193,7 +270,8 @@ fn finish(
 
 impl RenderOnce for Fab {
     fn render(self, _: &mut Window, _: &mut App) -> impl IntoElement {
-        finish(
+        let position = self.position;
+        let fab = finish(
             MaterialButton::new(self.id)
                 .form(Form::Fab(self.size))
                 .palette(self.color.palette(fab_elevation(self.lowered)))
@@ -203,7 +281,8 @@ impl RenderOnce for Fab {
             self.preview,
             self.focus,
             self.on_click,
-        )
+        );
+        placed(position, fab, self.selector)
     }
 }
 
@@ -221,6 +300,8 @@ pub struct ExtendedFab {
     size: FabSize,
     color: FabColor,
     lowered: bool,
+    position: Option<FabPosition>,
+    selector: Option<SharedString>,
     disabled: bool,
     fluid: bool,
     expanded: bool,
@@ -250,6 +331,8 @@ impl ExtendedFab {
             size: FabSize::Regular,
             color: FabColor::PrimaryContainer,
             lowered: false,
+            position: None,
+            selector: None,
             disabled: false,
             fluid: false,
             expanded: true,
@@ -304,7 +387,8 @@ fn label_width(label: &SharedString, role: TypeRole, window: &Window) -> f32 {
         .text_system()
         .shape_line(label.clone(), font_size, &[run], None)
         .width;
-    f32::from(width) * BASE_PX / f32::from(window.rem_size())
+    let tracking = scale.letter_spacing.0 * BASE_PX * label.chars().count() as f32;
+    f32::from(width) * BASE_PX / f32::from(window.rem_size()) + tracking
 }
 
 /// A label revealed to `expansion` (0 … 1) of its width: absent at 0, laid
@@ -335,6 +419,7 @@ pub(super) fn revealed_label(
 
 impl RenderOnce for ExtendedFab {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
+        let position = self.position;
         let expansion = motion::token_value(
             (self.id.clone(), "fab-expansion"),
             self.target_expansion(),
@@ -344,7 +429,7 @@ impl RenderOnce for ExtendedFab {
         );
         let (_, _, _, role) = self.size.extended_size().extended();
         let label = revealed_label(&self.label, role, expansion, window);
-        finish(
+        let fab = finish(
             MaterialButton::new(self.id)
                 .form(Form::ExtendedFab {
                     size: self.size,
@@ -360,7 +445,8 @@ impl RenderOnce for ExtendedFab {
             self.preview,
             self.focus,
             self.on_click,
-        )
+        );
+        placed(position, fab, self.selector)
     }
 }
 

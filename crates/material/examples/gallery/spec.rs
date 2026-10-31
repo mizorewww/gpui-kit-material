@@ -29,6 +29,7 @@ pub fn type_role<E: Styled>(element: E, role: TypeRole) -> E {
     element
         .font_family(scale.font_family)
         .text_size(scale.font_size)
+        .letter_spacing(scale.letter_spacing)
         .line_height(scale.line_height)
         .font_weight(FontWeight(scale.font_weight as f32))
 }
@@ -328,13 +329,18 @@ pub fn wrap_columns(
     runs
 }
 
+/// The least a board's group shrinks to. Four extra-large buttons in a row need
+/// it on a phone.
+const MIN_FIT_SCALE: f32 = 0.15;
+
 /// The scale that fits `needed` px into `available` px: 1 when it fits,
-/// else a little under the ratio (borders do not scale), never below 0.25.
+/// else a little under the ratio (borders do not scale), never below
+/// [`MIN_FIT_SCALE`].
 pub fn fit_scale(needed: f32, available: f32) -> f32 {
     if needed <= available + 0.5 || needed <= 0. {
         1.
     } else {
-        (available / needed * 0.97).clamp(0.25, 1.)
+        (available / needed * 0.97).clamp(MIN_FIT_SCALE, 1.)
     }
 }
 
@@ -623,6 +629,7 @@ impl RenderOnce for Board {
         // The frame's drawn width, recorded by tests to catch overflow.
         let drawn_width = std::rc::Rc::new(std::cell::Cell::new(0f32));
         let rendered = groups;
+        let drawn_scales = scales;
         let caption = self.caption.filter(|_| band.has_top());
         div()
             .id(self.id)
@@ -700,7 +707,18 @@ impl RenderOnce for Board {
                         let lead = lead_of(widths[columns]);
                         let regrouped =
                             wrap_columns(&widths[..columns], lead, gap, available - chrome);
-                        let changed = regrouped != rendered;
+                        // A new width can leave the groups alone and still overflow,
+                        // until the group draws at its smaller scale. Only that
+                        // redraws: chasing every change of scale would not settle,
+                        // as borders and rounding don't scale with the rem.
+                        let overflowing =
+                            regrouped.iter().zip(&drawn_scales).any(|(group, scale)| {
+                                let needed = lead
+                                    + widths[group.clone()].iter().sum::<f32>()
+                                    + gap * group.len().saturating_sub(1) as f32;
+                                *scale > MIN_FIT_SCALE && needed * scale > available - chrome + 1.
+                            });
+                        let changed = regrouped != rendered || overflowing;
                         MEASURES.with(|measures| {
                             let mut measures = measures.borrow_mut();
                             if measures.len() >= MEASURE_LIMIT && !measures.contains_key(&key) {
@@ -774,7 +792,7 @@ mod tests {
         assert_eq!(super::fit_scale(200.4, 200.), 1.);
         let scale = super::fit_scale(400., 200.);
         assert!(scale < 0.5 && 400. * scale <= 200.);
-        assert_eq!(super::fit_scale(10_000., 200.), 0.25);
+        assert_eq!(super::fit_scale(10_000., 200.), super::MIN_FIT_SCALE);
     }
 
     #[test]

@@ -163,7 +163,11 @@ impl Styled for MaterialDivider {
     }
 }
 impl RenderOnce for MaterialDivider {
-    fn render(self, _: &mut Window, _: &mut App) -> impl IntoElement {
+    fn render(mut self, window: &mut Window, _: &mut App) -> impl IntoElement {
+        // Layout already mirrors under an inherited right-to-left direction.
+        if crate::scope::is_rtl(window) {
+            self.direction = DividerDirection::Ltr;
+        }
         self.into_line()
     }
 }

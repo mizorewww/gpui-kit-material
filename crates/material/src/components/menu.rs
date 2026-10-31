@@ -628,6 +628,17 @@ impl RenderOnce for MaterialMenu {
             }
         };
         let on_collapse = self.on_collapse.clone();
+        let collapse = Rc::new(move |window: &mut Window, cx: &mut App| {
+            if let Some(collapse) = on_collapse.as_ref() {
+                collapse(window, cx);
+            } else {
+                cx.propagate();
+            }
+        });
+        let rtl = crate::scope::is_rtl(window);
+        let expand = Rc::new(expand);
+        let (expand_right, expand_left) = (expand.clone(), expand);
+        let (collapse_right, collapse_left) = (collapse.clone(), collapse);
         let activate = {
             let handles = handles.clone();
             let activators = activators.clone();
@@ -745,12 +756,18 @@ impl RenderOnce for MaterialMenu {
             .on_action(move |_: &SelectFirst, window, cx| nav_first(Direction::First, window, cx))
             .on_action(move |_: &SelectLast, window, cx| nav_last(Direction::Last, window, cx))
             .on_action(move |_: &Confirm, window, cx| activate(window, cx))
-            .on_action(move |_: &SelectRight, window, cx| expand(window, cx))
-            .on_action(move |_: &SelectLeft, window, cx| {
-                if let Some(collapse) = on_collapse.as_ref() {
-                    collapse(window, cx);
+            .on_action(move |_: &SelectRight, window, cx| {
+                if rtl {
+                    collapse_right(window, cx)
                 } else {
-                    cx.propagate();
+                    expand_right(window, cx)
+                }
+            })
+            .on_action(move |_: &SelectLeft, window, cx| {
+                if rtl {
+                    expand_left(window, cx)
+                } else {
+                    collapse_left(window, cx)
                 }
             })
             .on_action(move |_: &Cancel, window, cx| {
@@ -871,6 +888,7 @@ fn render_item(
             state::layer(under, layer, state::HOVER),
             state::layer(under, layer, state::PRESS),
         )
+        .ripple(layer)
         .disabled(disabled)
         .accessibility_label(item.label.clone())
         .map(|b| {
@@ -1085,6 +1103,20 @@ impl MenuPopup {
     pub fn anchor(mut self, anchor: Anchor) -> Self {
         self.anchor = anchor;
         self
+    }
+}
+
+/// The same anchor with its sides exchanged. Kit places popups physically, so
+/// right-to-left layout asks for the mirrored corner.
+pub(crate) fn mirrored_anchor(anchor: Anchor) -> Anchor {
+    match anchor {
+        Anchor::TopLeft => Anchor::TopRight,
+        Anchor::TopRight => Anchor::TopLeft,
+        Anchor::BottomLeft => Anchor::BottomRight,
+        Anchor::BottomRight => Anchor::BottomLeft,
+        Anchor::LeftCenter => Anchor::RightCenter,
+        Anchor::RightCenter => Anchor::LeftCenter,
+        other => other,
     }
 }
 
@@ -1322,7 +1354,7 @@ impl RenderOnce for MenuPopup {
             .when(side_offset > 0., |content| content.mt(rem(side_offset)))
             .child(surface)
             .children(cascade);
-        let surface = std::cell::RefCell::new(Some(content.into_any_element()));
+        let surface = std::cell::RefCell::new(Some(crate::scope::current_scope(content)));
         let open = self.open;
         let measure = trigger_height;
         // Material buttons block the mouse for the elements under them, so
@@ -1362,7 +1394,11 @@ impl RenderOnce for MenuPopup {
             .child(self.trigger);
         Popover::new(self.id.clone())
             .appearance(false)
-            .anchor(anchor)
+            .anchor(if crate::scope::is_rtl(window) {
+                mirrored_anchor(anchor)
+            } else {
+                anchor
+            })
             .offset(rem(4.).to_pixels(window.rem_size()))
             .track_focus(&focus)
             .open(visible)
@@ -1399,6 +1435,7 @@ pub struct ExposedDropdown {
     open: bool,
     disabled: bool,
     error: bool,
+    required: bool,
     leading: Option<AnyElement>,
     supporting: Option<SharedString>,
     style: MenuStyle,
@@ -1420,6 +1457,7 @@ impl ExposedDropdown {
             open: false,
             disabled: false,
             error: false,
+            required: false,
             leading: None,
             supporting: None,
             style: MenuStyle::Standard,
@@ -1427,6 +1465,12 @@ impl ExposedDropdown {
             on_open_change: None,
             on_select: None,
         }
+    }
+    /// Mark the choice as required: the label and accessible name gain the
+    /// required mark. Enforcing it belongs to the form that owns the value.
+    pub fn required(mut self, required: bool) -> Self {
+        self.required = required;
+        self
     }
     pub fn variant(mut self, variant: TextFieldVariant) -> Self {
         self.variant = variant;
@@ -1526,6 +1570,7 @@ impl RenderOnce for ExposedDropdown {
             .variant(self.variant)
             .density(self.density)
             .label(self.label.clone())
+            .required(self.required)
             .trailing_icon(arrow)
             .error(self.error)
             .disabled(self.disabled)
@@ -1555,7 +1600,7 @@ impl RenderOnce for ExposedDropdown {
             .id((id.clone(), "trigger"))
             .debug_selector(|| "dropdown-trigger".into())
             .role(Role::ComboBox)
-            .aria_label(self.label.clone())
+            .aria_label(super::labeled::required_label(&self.label, self.required))
             .aria_value(value)
             .aria_expanded(open)
             .key_context(DROPDOWN_CONTEXT)

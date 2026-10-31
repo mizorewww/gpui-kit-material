@@ -313,6 +313,7 @@ fn typed<E: Styled>(element: E, role: TypeRole) -> E {
     element
         .font_family(scale.font_family)
         .text_size(scale.font_size)
+        .letter_spacing(scale.letter_spacing)
         .line_height(scale.line_height)
         .font_weight(FontWeight(scale.font_weight as f32))
 }
@@ -653,6 +654,7 @@ impl RenderOnce for ListItem {
                     .when_some(description, |button, text| button.aria_description(text))
             })
             .state_layers(hover, press)
+            .ripple(color(ColorRole::ON_SURFACE))
             .disabled(disabled)
             .on_click(move |event, window, cx| on_click(event, window, cx))
             .child(row)

@@ -32,11 +32,18 @@ python3 scripts/check-gallery-dpr.py http://127.0.0.1:8080 /tmp/material-gallery
 ```
 
 The page shows a splash until the engine submits its first frame, and an error
-message when neither WebGPU nor WebGL2 is available or startup fails. Fonts for
-text are embedded in the module. The Outlined and Rounded icon fonts, the symbol
-styles the Gallery draws, are downloaded next to it and passed in through
-`provide_symbol_asset`, which keeps the module under the 25 MiB per-file hosting
-limit. `--release` also strips names and runs Binaryen's `wasm-opt` when it is on
+message when neither WebGPU nor WebGL2 is available, startup fails or a phone takes
+the WebGL context back. Latin text fonts are embedded in the module; CJK and emoji
+draw with the browser's fonts (`CanvasFontFallback::EmojiAndCjk`), so they add no
+download. The Outlined and Rounded icon fonts, the symbol styles the Gallery draws,
+are fetched after the first frame with a thin progress bar and passed in through
+`provide_symbol_asset`; icons draw empty until then. Keeping them out of the module
+also keeps it under the 25 MiB per-file hosting limit.
+
+On a phone the page follows the visual viewport, so the canvas lays out above an
+on-screen keyboard and the Gallery scrolls the caret back into view, and the shell
+stays inside the safe-area insets. `#button` or `#button/specs` opens a page, and
+the browser's Back returns to the previous one. `--release` also strips names and runs Binaryen's `wasm-opt` when it is on
 `PATH` (`brew install binaryen`); publishing needs it to stay under that limit.
 
 ## Publishing the site

@@ -178,6 +178,15 @@ impl ImeMirror {
         };
     }
 
+    /// Moves the element, which the browser anchors its IME panel to, to the caret
+    /// in canvas coordinates. A style write: unlike a value write it leaves the
+    /// IME's connection alone, and the element's fixed position scrolls nothing.
+    pub(crate) fn set_position(&self, x: f32, y: f32) {
+        let style = self.element.style();
+        style.set_property("left", &format!("{x}px")).ok();
+        style.set_property("top", &format!("{y}px")).ok();
+    }
+
     pub(crate) fn event_target(&self) -> &web_sys::EventTarget {
         self.element.as_ref()
     }

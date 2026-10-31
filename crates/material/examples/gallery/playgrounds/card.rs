@@ -202,7 +202,8 @@ fn preview(
     let bottom = config.option("position") == "bottom";
 
     let mut card = MaterialCard::new("playground-card", VARIANTS[config.choice("variant")])
-        .w(rem(WIDTH))
+        .w_full()
+        .max_w(rem(WIDTH))
         .draggable(config.bool("draggable"));
     if config.bool("clickable") {
         let label = if title.is_empty() {

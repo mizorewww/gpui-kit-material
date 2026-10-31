@@ -7,10 +7,7 @@
 //! action and the close button dismiss it. The Figma kit's longer-action
 //! layout is the extra "Action on new line" option.
 use super::prelude::*;
-use std::time::Duration;
 
-const SHORT: Duration = Duration::from_secs(4);
-const LONG: Duration = Duration::from_secs(10);
 const DURATIONS: &[&str] = &["short", "long", "indefinite"];
 
 pub static PLAYGROUND: Playground = Playground {
@@ -127,62 +124,36 @@ pub static PLAYGROUND: Playground = Playground {
     preview,
 };
 
-/// The auto-hide timer: a generation that cancels stale timers, and
-/// whether the pointer pauses it.
-#[derive(Default)]
-struct AutoHide {
-    generation: usize,
-    hovered: bool,
-}
-
-fn timeout(duration: &str) -> Option<Duration> {
-    match duration {
-        "short" => Some(SHORT),
-        "long" => Some(LONG),
-        _ => None,
-    }
-}
-
 fn preview(
     config: &Config,
     preview: &mut Preview,
-    window: &mut Window,
+    _: &mut Window,
     cx: &mut Context<PlaygroundState>,
 ) -> AnyElement {
     let visible = config.bool("visible");
-    let duration = config.option("duration");
-    let timer = preview.local("auto-hide", window, cx, |_, _| AutoHide::default());
-    let hovered = timer.read(cx).hovered;
-    // Each show, duration change or hover end restarts the countdown.
-    if preview.changed("auto-hide", (visible, duration, hovered)) {
-        let generation = timer.update(cx, |timer, _| {
-            timer.generation += 1;
-            timer.generation
-        });
-        if let Some(delay) = timeout(duration).filter(|_| visible && !hovered) {
-            let timer = timer.downgrade();
-            cx.spawn_in(window, async move |state, cx| {
-                cx.background_executor().timer(delay).await;
-                let _ = state.update_in(cx, |state, window, cx| {
-                    if timer
-                        .upgrade()
-                        .is_some_and(|timer| timer.read(cx).generation == generation)
-                    {
-                        state.set_value("visible", Value::Bool(false), window, cx);
-                    }
-                });
-            })
-            .detach();
-        }
-    }
     let hide = preview.setter("visible", cx);
     let hide = std::rc::Rc::new(move |window: &mut Window, cx: &mut App| {
         hide(Value::Bool(false), window, cx)
     });
     let show = preview.setter("visible", cx);
     let mut snackbar = Snackbar::new("playground-snackbar", config.text("message"))
+        .debug_name("playground-snackbar")
         .open(visible)
-        .longer_action(config.bool("new_line"));
+        .longer_action(config.bool("new_line"))
+        .duration(match config.option("duration") {
+            "short" => SnackbarDuration::Short,
+            "long" => SnackbarDuration::Long,
+            _ => SnackbarDuration::Indefinite,
+        })
+        .position(match config.option("position") {
+            "start" => SnackbarPosition::Start,
+            "end" => SnackbarPosition::End,
+            _ => SnackbarPosition::Center,
+        })
+        .on_dismiss({
+            let hide = hide.clone();
+            move |window, cx| hide(window, cx)
+        });
     if config.bool("action") {
         let hide = hide.clone();
         snackbar = snackbar.action(config.text("action_text"), move |_, window, cx| {
@@ -195,38 +166,6 @@ fn preview(
             hide(window, cx)
         });
     }
-    let hover_timer = timer.clone();
-    let escape = hide.clone();
-    let host = div()
-        .id("playground-snackbar-host")
-        .debug_selector(|| "playground-snackbar".into())
-        .on_hover(move |hovered, _, cx| {
-            let hovered = *hovered;
-            hover_timer.update(cx, |timer, cx| {
-                if timer.hovered != hovered {
-                    timer.hovered = hovered;
-                    cx.notify();
-                }
-            });
-        })
-        .on_key_down(move |event, window, cx| {
-            if event.keystroke.key == "escape" {
-                escape(window, cx);
-            }
-        })
-        .child(snackbar);
-    let placed = div()
-        .absolute()
-        .bottom(rem(16.))
-        .left(rem(16.))
-        .right(rem(16.))
-        .flex()
-        .map(|row| match config.option("position") {
-            "start" => row.justify_start(),
-            "end" => row.justify_end(),
-            _ => row.justify_center(),
-        })
-        .child(host);
     div()
         .relative()
         .size_full()
@@ -241,7 +180,7 @@ fn preview(
                 .child("Show snackbar")
                 .on_click(move |_, window, cx| show(Value::Bool(true), window, cx)),
         )
-        .child(placed)
+        .child(snackbar)
         .into_any_element()
 }
 
@@ -250,6 +189,7 @@ mod tests {
     use super::super::test_support::*;
     use super::*;
     use core::prelude::v1::test;
+    use std::time::Duration;
 
     fn visible(state: &Entity<PlaygroundState>, cx: &mut gpui::VisualTestContext) -> bool {
         config(state, cx).bool("visible")
@@ -297,7 +237,7 @@ mod tests {
         set(&state, &mut cx, "duration", Value::Choice(0));
         set(&state, &mut cx, "visible", Value::Bool(true));
         cx.executor()
-            .advance_clock(SHORT - Duration::from_millis(100));
+            .advance_clock(SnackbarDuration::SHORT - Duration::from_millis(100));
         draw(&mut cx);
         assert!(visible(&state, &mut cx), "still shown before 4s");
         cx.executor().advance_clock(Duration::from_millis(200));
@@ -311,7 +251,7 @@ mod tests {
         let snackbar = element_bounds(&mut cx, "playground-snackbar");
         cx.simulate_mouse_move(snackbar.center(), None, gpui::Modifiers::none());
         settle(&mut cx);
-        cx.executor().advance_clock(LONG * 2);
+        cx.executor().advance_clock(SnackbarDuration::LONG * 2);
         settle(&mut cx);
         assert!(visible(&state, &mut cx), "hover pauses the timer");
         cx.simulate_mouse_move(
@@ -321,7 +261,7 @@ mod tests {
         );
         settle(&mut cx);
         cx.executor()
-            .advance_clock(LONG + Duration::from_millis(100));
+            .advance_clock(SnackbarDuration::LONG + Duration::from_millis(100));
         settle(&mut cx);
         assert!(
             !visible(&state, &mut cx),
@@ -331,7 +271,7 @@ mod tests {
         // Indefinite stays.
         set(&state, &mut cx, "duration", Value::Choice(2));
         set(&state, &mut cx, "visible", Value::Bool(true));
-        cx.executor().advance_clock(LONG * 3);
+        cx.executor().advance_clock(SnackbarDuration::LONG * 3);
         settle(&mut cx);
         assert!(visible(&state, &mut cx));
     }

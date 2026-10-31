@@ -540,6 +540,14 @@ pub trait Styled: Sized {
         self
     }
 
+    /// Sets the extra space after each character.
+    ///
+    /// This value cascades to its child elements.
+    fn letter_spacing(mut self, spacing: impl Into<AbsoluteLength>) -> Self {
+        self.text_style().letter_spacing = Some(spacing.into());
+        self
+    }
+
     /// Sets the text size to 'extra small'.
     /// [Docs](https://tailwindcss.com/docs/font-size#setting-the-font-size)
     fn text_xs(mut self) -> Self {

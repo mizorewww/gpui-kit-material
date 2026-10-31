@@ -488,6 +488,7 @@ fn item_style<T: Styled + StatefulInteractiveElement + gpui::prelude::FluentBuil
                 let scale = role.scale();
                 item.font_family(scale.font_family)
                     .text_size(scale.font_size)
+                    .letter_spacing(scale.letter_spacing)
                     .line_height(scale.line_height)
                     .font_weight(FontWeight(scale.font_weight as f32))
             }
@@ -622,6 +623,7 @@ impl RenderOnce for ConnectedButtonGroup {
         };
         let specimen = !self.previews.is_empty();
         let roving = Roving::new(handles.clone(), Orientation::Both)
+            .rtl(crate::scope::is_rtl(window))
             .disabled(disabled)
             .selected(if radio { selected } else { None })
             .select_on_focus(self.on_change.clone().filter(|_| radio).map(|on_change| {
@@ -865,6 +867,29 @@ impl RenderOnce for ConnectedButtonGroup {
                     })
                     .into_any_element()
                 };
+                let (start, end) = (paint.left_radius, paint.right_radius);
+                let option = super::Ripple::new(
+                    ElementId::NamedInteger("option-ripple".into(), index as u64),
+                    option,
+                )
+                .corners(if vertical {
+                    Corners {
+                        top_left: start,
+                        top_right: start,
+                        bottom_right: end,
+                        bottom_left: end,
+                    }
+                } else {
+                    Corners {
+                        top_left: start,
+                        top_right: end,
+                        bottom_right: end,
+                        bottom_left: start,
+                    }
+                })
+                .ink(paint.foreground)
+                .disabled(option_disabled)
+                .specimen(preview.is_some());
                 let ring = focus_ring(
                     option,
                     &focus,

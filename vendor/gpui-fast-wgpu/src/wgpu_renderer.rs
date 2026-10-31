@@ -2820,17 +2820,22 @@ mod tests {
         Ok(())
     }
 
+    // Local patch: these need the dev-dependency on `naga`, which the published
+    // package's manifest drops. See `MATERIAL-PATCHES.md`.
+    #[cfg(any())]
     #[test]
     fn webgl_shader_is_valid_wgsl_without_storage_buffers() {
         assert!(!WEBGL_SHADERS.contains("var<storage"));
         validate_wgsl(WEBGL_SHADERS, naga::valid::Capabilities::empty());
     }
 
+    #[cfg(any())]
     #[test]
     fn storage_buffer_shader_is_valid_wgsl() {
         validate_wgsl(STORAGE_BUFFER_SHADERS, naga::valid::Capabilities::empty());
     }
 
+    #[cfg(any())]
     #[test]
     fn subpixel_shader_is_valid_wgsl() {
         validate_wgsl(
@@ -2839,6 +2844,7 @@ mod tests {
         );
     }
 
+    #[cfg(any())]
     fn validate_wgsl(source: &str, capabilities: naga::valid::Capabilities) {
         let module = naga::front::wgsl::parse_str(source).expect("shader should parse");
         naga::valid::Validator::new(naga::valid::ValidationFlags::all(), capabilities)

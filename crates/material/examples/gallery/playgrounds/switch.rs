@@ -111,76 +111,27 @@ fn preview(
     _: &mut Window,
     cx: &mut Context<PlaygroundState>,
 ) -> AnyElement {
-    let label = config.text("label");
     let supporting = config.text("supporting");
-    let (error, disabled, checked) = (
-        config.bool("error"),
-        config.bool("disabled"),
-        config.bool("checked"),
-    );
-    let accessible: SharedString = if config.bool("required") {
-        format!("{label} *").into()
-    } else {
-        label.clone()
-    };
-    let ink = |role: ColorRole| {
-        let ink = color(role);
-        if disabled { ink.opacity(0.38) } else { ink }
-    };
-    let text_role = if error {
-        ColorRole::ERROR
-    } else {
-        ColorRole::ON_SURFACE
-    };
-    let supporting_role = if error {
-        ColorRole::ERROR
-    } else {
-        ColorRole::ON_SURFACE_VARIANT
-    };
-    let toggle = preview.on_bool("checked", cx);
-    let text = div()
-        .id("switch-text")
-        .flex()
-        .flex_col()
-        .flex_1()
-        .min_w_0()
-        // The label toggles the switch, as an HTML label would.
-        .when(!disabled, |text| text.cursor_pointer())
-        .on_click(move |_, window, cx| {
-            if !disabled {
-                toggle(&!checked, window, cx)
-            }
+    let switch = MaterialSwitch::new("playground-switch", config.text("label"))
+        .show_label(true)
+        .required(config.bool("required"))
+        .label_position(if config.option("position") == "end" {
+            LabelPosition::End
+        } else {
+            LabelPosition::Start
         })
-        .child(
-            accessible_text("switch-label", accessible.clone())
-                .map(|text| type_role(text, TypeRole::BodyLarge))
-                .text_color(ink(text_role)),
-        )
-        .when(!supporting.is_empty(), |text| {
-            text.child(
-                accessible_text("switch-supporting", supporting)
-                    .map(|text| type_role(text, TypeRole::BodyMedium))
-                    .text_color(ink(supporting_role)),
-            )
-        });
-    let switch = MaterialSwitch::new("playground-switch", accessible)
-        .checked(checked)
+        .when(!supporting.is_empty(), |switch| {
+            switch.supporting_text(supporting)
+        })
+        .checked(config.bool("checked"))
         .icons(ICONS[config.choice("icons")])
-        .error(error)
-        .disabled(disabled)
+        .error(config.bool("error"))
+        .disabled(config.bool("disabled"))
         .on_change(preview.on_bool("checked", cx));
-    let switch = div()
-        .debug_selector(|| "playground-switch".into())
-        .child(switch);
-    let end = config.option("position") == "end";
     div()
-        .w(rem(320.))
-        .flex()
-        .items_center()
-        .gap(rem(16.))
-        .flex_row()
-        .when(end, |row| row.flex_row_reverse())
-        .child(text)
+        .debug_selector(|| "playground-switch".into())
+        .w_full()
+        .max_w(rem(320.))
         .child(switch)
         .into_any_element()
 }

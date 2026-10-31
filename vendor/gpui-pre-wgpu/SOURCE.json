@@ -21,10 +21,16 @@
     "src/wgpu_renderer.rs": "accdb28e2d1cfcbd12714e8460b335886a694fe199d5fce629e3e28850f1adbf"
   },
   "local_patches": [
+    "src/cosmic_text_system.rs",
     "src/gpui_wgpu.rs",
     "src/wgpu_renderer.rs"
   ],
   "modified_files": {
+    "src/cosmic_text_system.rs": {
+      "upstream_sha256": "d2aa5ba630e17613676715ea8c24ccce1a27bfa10a2c78bb68f91e1e120b9566",
+      "local_sha256": "b4357aa105e3c731000b3317b3ff5fab437bb6f726b5d53ab96c574cb1ac71f7",
+      "reason": "Compiles out the tests, which read fonts from Zed's repository that the published package lacks (MATERIAL-PATCHES.md)."
+    },
     "src/gpui_wgpu.rs": {
       "upstream_sha256": "b51033ac07d187c89c4079f208d3a557c6fff309b1cd403927ce8974e795afa0",
       "local_sha256": "673681a1f52a04b8b35961abde02f5421e3ba31a9403a6cce402ab62b559a7b1",
@@ -32,8 +38,8 @@
     },
     "src/wgpu_renderer.rs": {
       "upstream_sha256": "accdb28e2d1cfcbd12714e8460b335886a694fe199d5fce629e3e28850f1adbf",
-      "local_sha256": "b7d8604f246aae1bd03e0a88246bc9d6846b39374c35a533634cc6714f8cf1a6",
-      "reason": "draw presents with present_checked and records it for take_present_succeeded; presentation_synchronized and set_presentation_synchronized (MATERIAL-PATCHES.md)."
+      "local_sha256": "ea82889ae0352eb5e52d6f7cfcf63de3d6bf72d27022afda8900f279498c3785",
+      "reason": "draw presents with present_checked and records it for take_present_succeeded; presentation_synchronized and set_presentation_synchronized (MATERIAL-PATCHES.md). Compiles out the shader-validation tests, which need a naga dev-dependency the published manifest lacks."
     }
   },
   "added_files": {
@@ -43,7 +49,7 @@
     }
   },
   "removed_files": {},
-  "unchanged_file_count": 12,
+  "unchanged_file_count": 11,
   "provenance_files": [
     "MATERIAL-PATCHES.md",
     "SOURCE.json"

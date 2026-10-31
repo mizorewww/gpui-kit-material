@@ -28,6 +28,15 @@ fn with_first_window<R>(read: impl FnOnce(&gpui::Window) -> R) -> Option<R> {
     })
 }
 
+/// Draws every window again, after an asset arrived. Does nothing before `run`.
+pub(super) fn refresh_windows() {
+    APP.with_borrow(|app| {
+        if let Some(app) = app {
+            app.update(|cx| cx.refresh_windows());
+        }
+    });
+}
+
 /// Cumulative successful newly drawn frame submissions of the Gallery window,
 /// or `undefined` when the backend cannot report them.
 #[wasm_bindgen]

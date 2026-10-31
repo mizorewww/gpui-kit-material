@@ -589,6 +589,31 @@ pub fn resolve(id: &str) -> Option<(usize, bool)> {
     Some((entry, true))
 }
 
+/// What a browser address's hash names: a page id (or a kit page id, which opens
+/// on Specs) and optionally `/specs` or `/preview`.
+#[cfg(any(target_family = "wasm", test))]
+pub fn parse_route(hash: &str) -> Option<(usize, Option<super::Tab>)> {
+    let route = hash.strip_prefix('#').unwrap_or(hash);
+    let (page, tab) = route.split_once('/').unwrap_or((route, ""));
+    let (entry, kit_page) = resolve(page)?;
+    let tab = match tab {
+        "specs" => Some(super::Tab::Specs),
+        "preview" => Some(super::Tab::Preview),
+        _ => kit_page.then_some(super::Tab::Specs),
+    };
+    Some((entry, tab))
+}
+
+/// The hash that names `entry` on `tab`.
+#[cfg(any(target_family = "wasm", test))]
+pub fn route_hash(entry: usize, tab: super::Tab) -> String {
+    let id = CATALOG[entry].id;
+    match tab {
+        super::Tab::Preview => format!("#{id}"),
+        super::Tab::Specs => format!("#{id}/specs"),
+    }
+}
+
 // Slices of the Buttons kit page, which holds every action component.
 use pages::buttons::{Row, rows};
 

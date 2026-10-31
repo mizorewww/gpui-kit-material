@@ -31,6 +31,8 @@ pub(crate) mod spec;
 #[cfg(test)]
 mod styles_tests;
 mod top_bar;
+#[cfg(target_family = "wasm")]
+mod web_route;
 
 use gpui::{prelude::*, *};
 use gpui_kit_material::icons::Assets;
@@ -67,6 +69,12 @@ fn caption_labels() -> CaptionLabels {
 /// Fixed height keeps the native traffic lights centered at every text scale.
 const TITLE_BAR: Pixels = px(56.);
 
+/// The title bar grows with the text scale, so its 40dp controls and their
+/// labels keep their room up to 200%.
+fn title_bar_height(window: &Window) -> Pixels {
+    TITLE_BAR.max(TITLE_BAR * (f32::from(window.rem_size()) / BASE_PX))
+}
+
 /// The settings whose change starts a theme transition.
 type ThemeKey = (
     PaletteId,
@@ -74,6 +82,7 @@ type ThemeKey = (
     ThemeMode,
     Contrast,
     SharedString,
+    Option<gpui_kit_material::color::dynamic::SeedScheme>,
 );
 fn theme_key(shared: &GalleryShared) -> ThemeKey {
     (
@@ -82,6 +91,7 @@ fn theme_key(shared: &GalleryShared) -> ThemeKey {
         shared.reference_mode,
         shared.contrast,
         shared.scale.clone(),
+        shared.seed,
     )
 }
 
@@ -165,6 +175,7 @@ pub(crate) struct Gallery {
     navigation_scroll: ScrollHandle,
     pending_focus: Option<(usize, bool)>,
     last_rem: Pixels,
+    last_height: Pixels,
     theme_frame_pending: bool,
     theme_menu_open: bool,
     /// The compact layout's modal navigation drawer.
@@ -221,6 +232,7 @@ impl Gallery {
             navigation_scroll: ScrollHandle::new(),
             pending_focus: None,
             last_rem: window.rem_size(),
+            last_height: window.viewport_size().height,
             theme_frame_pending: false,
             theme_menu_open: false,
             drawer_open: false,
@@ -306,8 +318,9 @@ impl Gallery {
             let hint = Rc::new(Cell::new(PaneHint::default()));
             let panel = cx.new(|cx| PanelView::new(state.clone(), hint.clone(), cx));
             let dependents = (self.lead.downgrade(), panel.downgrade());
+            let shared = self.shared.clone();
             let preview =
-                cx.new(|cx| PreviewView::new(state.clone(), hint.clone(), dependents, cx));
+                cx.new(|cx| PreviewView::new(state.clone(), shared, hint.clone(), dependents, cx));
             self.entries[entry].views = Some(PlaygroundViews {
                 preview,
                 panel,
@@ -563,6 +576,11 @@ impl Render for Gallery {
             self.last_rem = window.rem_size();
             self.list.remeasure();
         }
+        // An on-screen keyboard shrinks the page; keep the caret above it.
+        let height = window.viewport_size().height;
+        if std::mem::replace(&mut self.last_height, height) > height {
+            cx.defer_in(window, |this, window, cx| this.reveal_caret(window, cx));
+        }
         if let Some((row, reverse)) = self.pending_focus.take() {
             let view = cx.weak_entity();
             window.on_next_frame(move |window, cx| {
@@ -693,6 +711,9 @@ impl Render for GalleryWindow {
         // The compact bar has no room for a counter, and labels its settings
         // with an icon only.
         let compact = shell::ShellLayout::of(window) == shell::ShellLayout::Compact;
+        // A phone's cutouts and home indicator: the content stays clear of them
+        // and the bar's color reaches the window's edges.
+        let insets = window.insets().effective();
         let settings = title_bar_control(div().debug_selector(|| "gallery-settings-open".into()))
             .child(if compact {
                 IconButton::new(
@@ -711,31 +732,38 @@ impl Render for GalleryWindow {
                     .on_click(|_, window, cx| settings::open(window, cx))
                     .into_any_element()
             });
-        let mut bar = TitleBar::new("title-bar", TITLE_BAR, caption_labels());
+        let mut bar = TitleBar::new("title-bar", title_bar_height(window), caption_labels());
         if let Some(caption) = self.caption {
             bar = bar.caption(caption);
         }
         gpui_base::v_flex()
             .size_full()
+            .pb(insets.bottom)
             .bg(spec::page_background())
             .text_color(color(ColorRole::ON_SURFACE))
             .font_family("Roboto")
             .child(
-                bar.gap(rem(if compact { 4. } else { 12. }))
+                div()
+                    .w_full()
+                    .flex_shrink_0()
+                    .pt(insets.top)
+                    .pl(insets.left)
+                    .pr(insets.right)
                     .bg(color(ColorRole::SURFACE_CONTAINER_LOW))
-                    .border_b_1()
-                    .border_color(color(ColorRole::OUTLINE_VARIANT))
                     .child(
-                        AnyView::from(self.top_bar.clone())
-                            .cached(StyleRefinement::default().flex_1().min_w_0().h_full()),
-                    )
-                    .when_some(self.fps.clone().filter(|_| !compact), |bar, fps| {
-                        bar.child(fps)
-                    })
-                    .child(spec::RemScaled::new(
-                        top_bar::chrome_rem(window),
-                        settings.into_any_element(),
-                    )),
+                        bar.gap(rem(if compact { 4. } else { 12. }))
+                            .bg(color(ColorRole::SURFACE_CONTAINER_LOW))
+                            .border_b_1()
+                            .border_color(color(ColorRole::OUTLINE_VARIANT))
+                            .child(
+                                AnyView::from(self.top_bar.clone())
+                                    .cached(StyleRefinement::default().flex_1().min_w_0().h_full()),
+                            )
+                            .when_some(self.fps.clone().filter(|_| !compact), |bar, fps| {
+                                bar.child(fps)
+                            })
+                            .child(settings),
+                    ),
             )
             // Not `cached`: a dirty cached view always renders again, and every
             // preview animation frame dirties the views around the preview. As
@@ -745,6 +773,8 @@ impl Render for GalleryWindow {
                     .flex_1()
                     .min_h_0()
                     .w_full()
+                    .pl(insets.left)
+                    .pr(insets.right)
                     .child(self.gallery.clone()),
             )
     }
@@ -799,6 +829,8 @@ pub fn run(application: gpui::Application, initialize: impl FnOnce(&mut App) + '
                 let caption = capture::caption(cx);
                 #[cfg(target_family = "wasm")]
                 let caption = None;
+                #[cfg(target_family = "wasm")]
+                web_route::install(&gallery, cx);
                 let shared = gallery.read(cx).shared.read(cx);
                 let (initial_scheme, initial_scale) = (shared.target_scheme(), shared.text_scale());
                 theme::init_component_theme(initial_scheme, initial_scale, cx);
@@ -908,10 +940,11 @@ mod window_tests {
                 mode.right() <= settings.left(),
                 "{width} at {text_scale}: {mode:?} collides with {settings:?}"
             );
-            // The controls stay inside the fixed bar at any text scale.
+            // The bar grows, so the controls fit it at any text scale.
+            let bar = super::TITLE_BAR * text_scale;
             for control in [mode, settings] {
                 assert!(
-                    control.top() >= px(0.) && control.bottom() <= super::TITLE_BAR,
+                    control.top() >= px(0.) && control.bottom() <= bar,
                     "{width} at {text_scale}: {control:?}"
                 );
             }
@@ -1019,5 +1052,95 @@ mod window_tests {
         cx.update(|cx| gallery.update(cx, |_, cx| cx.notify()));
         draw(window.into(), cx);
         assert_eq!(cx.read(|cx| gallery.read(cx).renders.get()), rendered + 1);
+    }
+
+    #[gpui::test]
+    fn only_the_app_bars_collapse_notifies_the_example_app(cx: &mut TestAppContext) {
+        cx.update(|cx| {
+            gpui_kit::init(cx);
+            gpui_kit_material::init(cx);
+        });
+        let mut parts = None;
+        let window = cx.open_window(size(px(1280.), px(900.)), |window, cx| {
+            let gallery = cx.new(|cx| Gallery::new(window, cx));
+            let top_bar = cx.new(|cx| top_bar::TopBar::new(gallery.clone(), window, cx));
+            parts = Some(gallery.clone());
+            GalleryWindow {
+                gallery,
+                top_bar,
+                fps: None,
+                caption: None,
+            }
+        });
+        let gallery = parts.unwrap();
+        let entry = super::catalog::position("examples").unwrap();
+        cx.update(|cx| gallery.update(cx, |gallery, cx| gallery.navigate(entry, cx)));
+        for _ in 0..4 {
+            draw(window.into(), cx);
+        }
+        let mut cx = gpui::VisualTestContext::from_window(window.into(), cx);
+        // A screen with a collapsing app bar; Home has none.
+        cx.update(|window, cx| {
+            let entry = gallery.read(cx).current;
+            let state = gallery.read(cx).entries[entry].playground.clone().unwrap();
+            state.update(cx, |state, cx| {
+                state.set_value(
+                    "screen",
+                    super::Value::Choice(super::pages::examples::app::Body::Library.index()),
+                    window,
+                    cx,
+                )
+            });
+        });
+        for _ in 0..3 {
+            cx.update(|window, cx| {
+                window.refresh();
+                window.draw(cx).clear(cx);
+            });
+            cx.run_until_parked();
+        }
+        let at = cx.debug_bounds("example-scroll").unwrap().center();
+        // Entering the device is a hover change of its own.
+        cx.simulate_mouse_move(at, None, gpui::Modifiers::none());
+        cx.update(|window, cx| window.draw(cx).clear(cx));
+        cx.run_until_parked();
+        cx.update(|window, cx| window.draw(cx).clear(cx));
+        cx.run_until_parked();
+        let wheel = |cx: &mut gpui::VisualTestContext, by: f32| {
+            cx.simulate_event(gpui::ScrollEvent {
+                position: at,
+                delta: gpui::ScrollDelta::Pixels(gpui::point(px(0.), px(by))),
+                modifiers: gpui::Modifiers::none(),
+                touch_phase: gpui::TouchPhase::Moved,
+                ..Default::default()
+            });
+            cx.update(|window, cx| window.draw(cx).clear(cx));
+            cx.run_until_parked();
+        };
+        let app = cx.update(|_, cx| {
+            let entry = gallery.read(cx).current;
+            let state = gallery.read(cx).entries[entry].playground.clone().unwrap();
+            state
+                .read(cx)
+                .local_entity::<super::pages::examples::app::ExamplesApp>("example-app")
+                .unwrap()
+        });
+        let notified = std::rc::Rc::new(std::cell::Cell::new(0));
+        let _watch = cx.update(|_, cx| {
+            let notified = notified.clone();
+            cx.observe(&app, move |_, _| notified.set(notified.get() + 1))
+        });
+        wheel(&mut cx, -8.);
+        assert_eq!(notified.get(), 1, "the bar collapses as it scrolls");
+        wheel(&mut cx, -600.);
+        let collapsed = notified.get();
+        for _ in 0..3 {
+            wheel(&mut cx, -8.);
+        }
+        assert_eq!(
+            notified.get(),
+            collapsed,
+            "past that the app is not notified"
+        );
     }
 }

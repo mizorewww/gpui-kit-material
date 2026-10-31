@@ -94,6 +94,51 @@ pub(crate) fn init(cx: &mut App) {
 type Format<T> = Rc<dyn Fn(T) -> SharedString>;
 type Parse = Rc<dyn Fn(&str) -> Option<NaiveDate>>;
 
+/// The numeric date orders md3.io offers for text entry. The order is data; the
+/// placeholder naming it stays a caller-supplied label.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+pub enum DateFormat {
+    /// `MM/DD/YYYY`.
+    #[default]
+    MonthDayYear,
+    /// `DD/MM/YYYY`.
+    DayMonthYear,
+    /// `YYYY MM DD`.
+    YearMonthDay,
+}
+
+impl DateFormat {
+    pub const ALL: [Self; 3] = [Self::MonthDayYear, Self::DayMonthYear, Self::YearMonthDay];
+    /// `date` as this format writes it.
+    pub fn format(self, date: NaiveDate) -> SharedString {
+        let (y, m, d) = (date.year(), date.month(), date.day());
+        match self {
+            Self::MonthDayYear => format!("{m:02}/{d:02}/{y}"),
+            Self::DayMonthYear => format!("{d:02}/{m:02}/{y}"),
+            Self::YearMonthDay => format!("{y} {m:02} {d:02}"),
+        }
+        .into()
+    }
+    /// The date `text` writes in this format, if it names a real one.
+    pub fn parse(self, text: &str) -> Option<NaiveDate> {
+        let separator = if self == Self::YearMonthDay { ' ' } else { '/' };
+        let parts = text
+            .trim()
+            .split(separator)
+            .map(|part| part.trim().parse::<u32>().ok())
+            .collect::<Option<Vec<_>>>()?;
+        let [a, b, c] = parts[..] else {
+            return None;
+        };
+        let (y, m, d) = match self {
+            Self::MonthDayYear => (c, a, b),
+            Self::DayMonthYear => (c, b, a),
+            Self::YearMonthDay => (a, b, c),
+        };
+        NaiveDate::from_ymd_opt(i32::try_from(y).ok()?, m, d)
+    }
+}
+
 /// Every caller-supplied string and formatter of a date picker. Nothing
 /// user-facing is hard-coded in the component; galleries and apps build
 /// this from their locale.
@@ -147,6 +192,16 @@ pub struct DatePickerLabels {
     /// The text-input representation of a date, and its parser.
     pub format_input: Format<NaiveDate>,
     pub parse_input: Parse,
+}
+
+impl DatePickerLabels {
+    /// Format and parse text entry in `format`, replacing
+    /// [`Self::format_input`] and [`Self::parse_input`].
+    pub fn date_format(mut self, format: DateFormat) -> Self {
+        self.format_input = Rc::new(move |date| format.format(date));
+        self.parse_input = Rc::new(move |text| format.parse(text));
+        self
+    }
 }
 
 /// Calendar or text entry.
@@ -212,6 +267,7 @@ pub struct DatePickerState {
     month_scroll: UniformListScrollHandle,
     inputs: Option<(Entity<InputState>, Option<Entity<InputState>>)>,
     invalid: (bool, bool),
+    close_on_selection: bool,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -220,6 +276,9 @@ pub struct DatePickerState {
 pub enum DatePickerEvent {
     /// The selection changed (possibly to an incomplete range).
     Change(DateSelection),
+    /// With [`DatePickerState::close_on_selection`], the choice is complete
+    /// and the picker asks to close. Emitted after the matching `Change`.
+    Dismiss(DateSelection),
 }
 
 impl EventEmitter<DatePickerEvent> for DatePickerState {}
@@ -247,6 +306,7 @@ impl DatePickerState {
             month_scroll: UniformListScrollHandle::new(),
             inputs: None,
             invalid: (false, false),
+            close_on_selection: false,
             _subscriptions: Vec::new(),
         };
         state.reveal_cursor();
@@ -321,6 +381,15 @@ impl DatePickerState {
         self
     }
 
+    /// Emit [`DatePickerEvent::Dismiss`] once a choice is complete.
+    pub fn close_on_selection(mut self, close: bool) -> Self {
+        self.close_on_selection = close;
+        self
+    }
+    /// Change [`Self::close_on_selection`] on a live picker.
+    pub fn set_close_on_selection(&mut self, close: bool) {
+        self.close_on_selection = close;
+    }
     pub fn labels(&self) -> &DatePickerLabels {
         &self.labels
     }
@@ -389,7 +458,7 @@ impl DatePickerState {
         {
             self.show_month(date.year(), date.month(), cx);
         }
-        cx.emit(DatePickerEvent::Change(self.selection));
+        self.report_change(cx);
         cx.notify();
         true
     }
@@ -573,9 +642,16 @@ impl DatePickerState {
         };
         if next != self.selection {
             self.apply(next);
-            cx.emit(DatePickerEvent::Change(self.selection));
+            self.report_change(cx);
         }
         cx.notify();
+    }
+
+    fn report_change(&mut self, cx: &mut Context<Self>) {
+        cx.emit(DatePickerEvent::Change(self.selection));
+        if self.close_on_selection && self.selection.is_complete() {
+            cx.emit(DatePickerEvent::Dismiss(self.selection));
+        }
     }
 
     /// Move the keyboard cursor and keep it visible.
@@ -839,6 +915,8 @@ impl DatePicker {
 
 /// A snapshot of the state a render needs.
 struct Snapshot {
+    /// The direction the grid rendered in, for the arrow keys.
+    rtl: bool,
     labels: Rc<DatePickerLabels>,
     selection: DateSelection,
     today: NaiveDate,
@@ -911,6 +989,7 @@ impl RenderOnce for DatePicker {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let s = self.state.read(cx);
         let snap = Rc::new(Snapshot {
+            rtl: crate::scope::is_rtl(window),
             labels: s.labels.clone(),
             selection: s.selection,
             today: s.today,
@@ -1236,8 +1315,13 @@ impl PickerCx {
             .track_focus(&self.snap.focus)
             .key_context(CONTEXT)
             .on_action(move |_: &SelectCursor, window, cx| select(window, cx));
-        let element = on_step::<CursorLeft>(element, state, CursorStep::Left);
-        let element = on_step::<CursorRight>(element, state, CursorStep::Right);
+        let (left, right) = if self.snap.rtl {
+            (CursorStep::Right, CursorStep::Left)
+        } else {
+            (CursorStep::Left, CursorStep::Right)
+        };
+        let element = on_step::<CursorLeft>(element, state, left);
+        let element = on_step::<CursorRight>(element, state, right);
         let element = on_step::<CursorUp>(element, state, CursorStep::Up);
         let element = on_step::<CursorDown>(element, state, CursorStep::Down);
         let element = on_step::<CursorPreviousMonth>(element, state, CursorStep::PreviousMonth);

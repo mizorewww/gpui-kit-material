@@ -9,28 +9,20 @@
 use super::catalog::{self, TopSection};
 use super::spec::type_role;
 use super::{
-    Gallery, page::GalleryShared, playground::symbol, shell::ShellLayout, spec::RemScaled,
+    Gallery,
+    page::GalleryShared,
+    playground::symbol,
+    shell::{ShellLayout, shell_width},
 };
 use gpui::{prelude::*, *};
 use gpui_base::input::{InputEvent, InputState};
 use gpui_kit_material::prelude::*;
-use gpui_kit_material::tokens::layout::design_width;
-use gpui_kit_material::tokens::typography::BASE_PX;
 
 /// Below these window widths (in design px) the brand's wordmark gives way:
 /// to the sections and search in the medium layout, to the bar's buttons in
 /// the compact one.
 const MEDIUM_WORDMARK: f32 = 1040.;
 const COMPACT_WORDMARK: f32 = 600.;
-/// The bar is a fixed height, so its controls stop following the text scale
-/// where a 40dp control would no longer fit in it.
-const MAX_CHROME_SCALE: f32 = 1.25;
-
-/// The rem the title bar's controls lay out at.
-pub(crate) fn chrome_rem(window: &Window) -> Pixels {
-    window.rem_size().min(px(BASE_PX * MAX_CHROME_SCALE))
-}
-
 /// The search field's width, and the least the medium layout's field shrinks to.
 const SEARCH_WIDTH: f32 = 240.;
 const SEARCH_MIN_WIDTH: f32 = 96.;
@@ -60,7 +52,7 @@ impl TopBar {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Self {
-        let search = cx.new(|cx| InputState::new(window, cx).placeholder("Search components"));
+        let search = cx.new(|cx| InputState::new(window, cx).placeholder("Search"));
         let shared = gallery.read(cx).shared.clone();
         let subscriptions = vec![
             cx.subscribe_in(&search, window, |this: &mut Self, search, event, _, cx| {
@@ -116,7 +108,7 @@ impl Render for TopBar {
         let (section, mode) = self.shown;
         let dark = mode == ThemeMode::Dark;
         let compact = ShellLayout::of(window) == ShellLayout::Compact;
-        let width = design_width(window);
+        let width = shell_width(window);
         let wordmark = width
             >= if compact {
                 COMPACT_WORDMARK
@@ -141,14 +133,15 @@ impl Render for TopBar {
                         .h(rem(40.)),
                 ),
         );
-        let rem_size = chrome_rem(window);
-        let bar = div()
+        div()
             .id("top-bar")
             .size_full()
             .flex()
             .items_center()
             .gap(rem(if compact { 4. } else { 8. }))
-            .when(compact, |bar| {
+            // The field takes the whole bar on a phone: its placeholder is
+            // cut off beside the menu and mode buttons.
+            .when(compact && !searching, |bar| {
                 bar.child(title_bar_control(
                     div().debug_selector(|| "top-menu".into()).child(
                         IconButton::new("top-menu", symbol("menu", 24.), "Open navigation")
@@ -215,31 +208,32 @@ impl Render for TopBar {
                     ),
                 ))
             })
-            .child(title_bar_control(
-                div().debug_selector(|| "mode-toggle".into()).child(
-                    IconButton::new(
-                        "mode-toggle",
-                        symbol(if dark { "light_mode" } else { "dark_mode" }, 24.),
-                        if dark {
-                            "Use light theme"
-                        } else {
-                            "Use dark theme"
-                        },
-                    )
-                    .on_click(cx.listener(move |this, _, _, cx| {
-                        this.shared.update(cx, |shared, cx| {
-                            shared.reference_mode = if dark {
-                                ThemeMode::Light
+            .when(!searching, |bar| {
+                bar.child(title_bar_control(
+                    div().debug_selector(|| "mode-toggle".into()).child(
+                        IconButton::new(
+                            "mode-toggle",
+                            symbol(if dark { "light_mode" } else { "dark_mode" }, 24.),
+                            if dark {
+                                "Use light theme"
                             } else {
-                                ThemeMode::Dark
-                            };
-                            shared.reference_theme.get_or_insert(ThemeId::Baseline);
-                            cx.notify();
-                        })
-                    })),
-                ),
-            ));
-        RemScaled::new(rem_size, bar.into_any_element())
+                                "Use dark theme"
+                            },
+                        )
+                        .on_click(cx.listener(move |this, _, _, cx| {
+                            this.shared.update(cx, |shared, cx| {
+                                shared.reference_mode = if dark {
+                                    ThemeMode::Light
+                                } else {
+                                    ThemeMode::Dark
+                                };
+                                shared.reference_theme.get_or_insert(ThemeId::Baseline);
+                                cx.notify();
+                            })
+                        })),
+                    ),
+                ))
+            })
     }
 }
 

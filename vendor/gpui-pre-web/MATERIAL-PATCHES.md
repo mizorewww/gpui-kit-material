@@ -20,6 +20,10 @@ Submission counting (`src/window.rs`): `successful_frame_submissions` counts
 `WindowSubmissionStats` patch (`vendor/gpui-pre/frame-submission-patch.md`).
 Browser-controlled vsync stays `VsyncStatus::Unsupported`.
 
+IME position (`src/window.rs`, `src/ime_mirror.rs`): upstream's
+`update_ime_position` did nothing, so a browser's IME panel opened at the hidden
+input in the page's corner. It now moves that input to the caret.
+
 The package-level `Cargo.lock` is not retained; the workspace lockfile owns
 resolution. `gpui-fast-web` carries the identical `canvas_size.rs` and
 `window.rs`.
