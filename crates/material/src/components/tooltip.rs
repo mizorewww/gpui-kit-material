@@ -302,6 +302,19 @@ pub(crate) fn tip_change(visible: bool, wanted: bool, keyboard: bool) -> TipChan
     }
 }
 
+/// Escape hides a shown tooltip, from its trigger or from its own action.
+fn escape_tip(state: &Entity<TipState>, event: &KeyDownEvent, window: &mut Window, cx: &mut App) {
+    if event.keystroke.key == "escape" && state.read(cx).visible {
+        state.update(cx, |tip, _| {
+            tip.visible = false;
+            tip.keyboard_focus = false;
+            tip.trigger_hovered = false;
+            tip.epoch += 1;
+        });
+        window.refresh();
+    }
+}
+
 /// Apply an input change to the tooltip `state`, scheduling the delayed
 /// show or hide on the window.
 fn update_tip(
@@ -383,14 +396,27 @@ impl RenderOnce for MaterialTooltip {
         // Keyboard focus inside the trigger shows the tooltip. Containment is
         // reliable after the frame commits, so resolve it then, and only when
         // window focus has moved.
+        // A rich tooltip's action is drawn outside the trigger, so focus on it
+        // needs a handle of its own to keep the tooltip open.
+        let tip_focus = interactive.then(|| {
+            window
+                .use_keyed_state((id.clone(), "tooltip-content-focus"), cx, |_, cx| {
+                    cx.focus_handle()
+                })
+                .read(cx)
+                .clone()
+        });
         let focused = window.focused(cx);
         if state.read(cx).seen_focus != focused {
             let observed = state.clone();
             let container_focus = focus.clone();
+            let tip_contains = tip_focus.clone();
             window.defer(cx, move |window, cx| {
-                let keyboard = timing.on_focus
-                    && container_focus.contains_focused(window, cx)
-                    && window.last_input_was_keyboard();
+                let inside = container_focus.contains_focused(window, cx)
+                    || tip_contains
+                        .as_ref()
+                        .is_some_and(|focus| focus.contains_focused(window, cx));
+                let keyboard = timing.on_focus && inside && window.last_input_was_keyboard();
                 observed.update(cx, |tip, _| tip.seen_focus = focused);
                 if keyboard != observed.read(cx).keyboard_focus {
                     update_tip(&observed, window, cx, |tip| tip.keyboard_focus = keyboard);
@@ -424,6 +450,8 @@ impl RenderOnce for MaterialTooltip {
             .relative()
             .track_focus(&focus)
             .tab_stop(false)
+            // Only a node with a role reaches the accessibility tree.
+            .role(Role::Group)
             .aria_description(description)
             .on_hover(move |hovered, window, cx| {
                 let hovered = *hovered;
@@ -432,17 +460,7 @@ impl RenderOnce for MaterialTooltip {
                     tip.trigger_hovered = hovered && tip.timing.on_hover;
                 });
             })
-            .on_key_down(move |event, window, cx| {
-                if event.keystroke.key == "escape" && escape_state.read(cx).visible {
-                    escape_state.update(cx, |tip, _| {
-                        tip.visible = false;
-                        tip.keyboard_focus = false;
-                        tip.trigger_hovered = false;
-                        tip.epoch += 1;
-                    });
-                    window.refresh();
-                }
-            })
+            .on_key_down(move |event, window, cx| escape_tip(&escape_state, event, window, cx))
             .child(trigger)
             .child(
                 canvas(
@@ -491,11 +509,15 @@ impl RenderOnce for MaterialTooltip {
                 Placement::Left => tip.left(-away),
                 Placement::Right => tip.left(away),
             })
-            .when(interactive, |tip| {
-                tip.on_hover(move |hovered, window, cx| {
-                    let hovered = *hovered;
-                    update_tip(&tip_state, window, cx, |tip| tip.tip_hovered = hovered);
-                })
+            .when_some(tip_focus, |tip, focus| {
+                let escape = tip_state.clone();
+                tip.track_focus(&focus)
+                    .tab_stop(false)
+                    .on_key_down(move |event, window, cx| escape_tip(&escape, event, window, cx))
+                    .on_hover(move |hovered, window, cx| {
+                        let hovered = *hovered;
+                        update_tip(&tip_state, window, cx, |tip| tip.tip_hovered = hovered);
+                    })
             })
             .child(container(
                 ElementId::NamedChild(std::sync::Arc::new(id), "popup".into()),
@@ -714,5 +736,65 @@ mod tests {
             popup.top() >= trigger.bottom() + px(TOOLTIP_OFFSET),
             "a tooltip flipped below its trigger moved up into it: {popup:?} vs {trigger:?}"
         );
+    }
+
+    struct RichTip {
+        action: FocusHandle,
+    }
+    impl Render for RichTip {
+        fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+            window.set_rem_size(px(16.));
+            div().p(px(100.)).child(
+                MaterialTooltip::rich("tip", "Supporting")
+                    .hide_delay(Duration::from_millis(20))
+                    .action(
+                        div()
+                            .id("action")
+                            .track_focus(&self.action)
+                            .debug_selector(|| "tip-action".into())
+                            .size(px(20.)),
+                    )
+                    .trigger(div().debug_selector(|| "trigger".into()).size(px(40.))),
+            )
+        }
+    }
+
+    #[gpui::test]
+    fn focus_on_a_rich_tooltips_action_keeps_it_open(cx: &mut TestAppContext) {
+        cx.update(|cx| {
+            gpui_base::init(cx);
+            cx.set_reduce_motion(true);
+        });
+        let (view, cx) = cx.add_window_view(|_, cx| RichTip {
+            action: cx.focus_handle(),
+        });
+        draw(cx);
+        let trigger = cx.debug_bounds("trigger").unwrap();
+        cx.simulate_mouse_move(trigger.center(), None, Modifiers::default());
+        cx.executor().advance_clock(Duration::from_secs(1));
+        draw(cx);
+        draw(cx);
+        assert!(tooltip_shown(cx), "shown by hover");
+        // A key press makes the last input the keyboard's, as Tab does.
+        let action = view.read_with(cx, |view, _| view.action.clone());
+        let keystroke =
+            cx.update(|_, cx| gpui::Keystroke::parse_with_os("a", cx.platform_info().os).unwrap());
+        cx.simulate_event(gpui::KeyDownEvent {
+            keystroke,
+            is_held: false,
+            prefer_character_input: false,
+        });
+        cx.update(|window, cx| action.focus(window, cx));
+        draw(cx);
+        cx.update(|window, _| {
+            assert!(action.is_focused(window), "the action took focus");
+        });
+        // The pointer leaves; only the focus holds the tooltip now.
+        cx.simulate_mouse_move(point(px(5.), px(5.)), None, Modifiers::default());
+        draw(cx);
+        cx.executor().advance_clock(Duration::from_secs(2));
+        draw(cx);
+        draw(cx);
+        assert!(tooltip_shown(cx), "the focused action did not vanish");
     }
 }
