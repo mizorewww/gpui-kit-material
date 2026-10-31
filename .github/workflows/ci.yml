@@ -191,7 +191,7 @@ jobs:
       - name: What each package ships
         run: scripts/check-package.sh
       - name: The site Worker's rules
-        run: node --test deploy/site/
+        run: node --test deploy/site/worker.test.js
       # gpui-kit-material has Git dependencies and [patch] needs, so it cannot publish yet.
       - name: Publish dry run of the crate without Git dependencies
         run: cargo publish --locked --dry-run -p gpui-kit-material-color

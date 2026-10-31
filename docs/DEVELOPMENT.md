@@ -73,7 +73,7 @@ paths remapped); `release` stays what performance profiles measure. A `.br` copy
 highest quality sits beside the module, its bindings and the icon fonts, and
 `deploy/site/worker.js` serves it for `/gallery/wasm/*` with `encodeBody: "manual"`,
 which Cloudflare's own compression loses to. Everything else stays a plain asset, and
-only those requests count as Worker invocations. `node --test deploy/site/` tests the
+only those requests count as Worker invocations. `node --test deploy/site/worker.test.js` tests the
 Worker's rules, and `npx cf dev` in `deploy/site` with `SITE_DIR` set runs it locally;
 its dev proxy rewrites `Accept-Encoding`, so a client without Brotli cannot be tried there.
 

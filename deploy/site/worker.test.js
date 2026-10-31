@@ -1,4 +1,4 @@
-// node --test deploy/site/
+// node --test deploy/site/worker.test.js
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { acceptsBrotli, contentType } from "./encoding.js";

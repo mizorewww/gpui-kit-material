@@ -18,7 +18,7 @@ unmaintained = "workspace"
 [licenses]
 confidence-threshold = 0.9
 # Permissive, plus MPL-2.0's file-level copyleft (dwrote, cbindgen, option-ext), and
-# OFL-1.1 for the fonts gpui-kit-material-gallery-web declares.
+# OFL-1.1 for the fonts gpui-kit-material-gallery and its dependents declare.
 allow = [
     "0BSD",
     "Apache-2.0",
