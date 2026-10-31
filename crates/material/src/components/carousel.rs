@@ -846,13 +846,18 @@ impl RenderOnce for MaterialCarousel {
                             tile.child(
                                 div()
                                     .absolute()
+                                    .top_0()
                                     .left_0()
                                     .right_0()
                                     .bottom_0()
                                     .flex()
                                     .flex_col()
+                                    .justify_end()
                                     .gap(rem(4.))
                                     .p(rem(16.))
+                                    .when(cfg!(test), |content| {
+                                        content.debug_selector(|| "carousel-content".into())
+                                    })
                                     .opacity(text)
                                     .bg(linear_gradient(
                                         180.,
@@ -1827,5 +1832,30 @@ mod tests {
         cx.simulate_keystrokes("right");
         redraw(cx);
         assert_eq!(reports.get(), 1);
+    }
+
+    struct Labelled;
+    impl gpui::Render for Labelled {
+        fn render(&mut self, window: &mut Window, _: &mut gpui::Context<Self>) -> impl IntoElement {
+            window.set_rem_size(px(BASE_PX));
+            MaterialCarousel::new("carousel", "Photos")
+                .width(412.)
+                .items((0..4).map(|_| CarouselItem::new().label("Title")))
+        }
+    }
+
+    /// The kit's item `Content`: its gradient covers the whole item, with the text
+    /// at the bottom.
+    #[gpui::test]
+    fn an_items_label_gradient_covers_the_item(cx: &mut gpui::TestAppContext) {
+        cx.update(|cx| {
+            gpui_base::init(cx);
+            cx.set_reduce_motion(true);
+        });
+        let (_, cx) = cx.add_window_view(|_, _| Labelled);
+        redraw(cx);
+        redraw(cx);
+        let content = cx.debug_bounds("carousel-content").expect("a label");
+        assert!(content.size.height > px(120.), "{content:?}");
     }
 }

@@ -777,7 +777,7 @@ impl MaterialBottomSheet {
             .items_center()
             .rounded_t(BOTTOM_SHEET_RADIUS)
             .bg(color(ColorRole::SURFACE_CONTAINER_LOW))
-            .when(!modal, |sheet| sheet.shadow(elevation::level1()))
+            .when(!modal, |sheet| sheet.shadow(standing_sheet_shadow()))
             .children(drag_layer)
             .children(handle)
             .child(
@@ -1210,6 +1210,11 @@ impl RenderOnce for MaterialBottomSheet {
                 .into_any_element(),
         }
     }
+}
+
+/// A standard bottom sheet's shadow: level 3, the kit's `Modal=False`.
+fn standing_sheet_shadow() -> Vec<BoxShadow> {
+    elevation::level3()
 }
 
 #[cfg(test)]
@@ -1945,5 +1950,11 @@ mod tests {
         assert!(body.left() > beside.x);
         cx.simulate_click(beside, Modifiers::default());
         assert_eq!(dismissals.get(), 1);
+    }
+
+    /// The kit's `Bottom sheet`, `Modal=False`.
+    #[test]
+    fn a_standard_bottom_sheet_stands_at_level_three() {
+        assert_eq!(standing_sheet_shadow(), elevation::level3());
     }
 }
