@@ -16,10 +16,10 @@ is still `unreviewed`).
 | Area | State | Remaining |
 | --- | --- | --- |
 | Color roles and reference themes | Implemented | Full M3 role set; Figma baseline scheme, md3.io for the other 19 themes. |
-| Dynamic color | Missing | HCT, tonal palettes and seed schemes with contrast levels. |
-| Scoped theme | Implemented, with limits | `scope::Scope` gives a subtree (or a window's content) its own animated scheme through render, paint, Material's deferred draws and Kit's theme. Kit's `Root` overlays, Kit tooltips, Kit's scrollbar styles and what Kit paints in its own deferred draws stay on the application theme (`src/scope.rs`). |
+| Dynamic color | Implemented | HCT, tonal palettes and seed schemes with contrast levels, ported from material-color-utilities. Image-derived seeds and multiple source colors are missing. |
+| Scoped theme | Implemented, with limits | `scope::Scope` gives a subtree (or a window's content) its own animated scheme through render, paint, Material's deferred draws and Kit's theme. Kit's `Root` overlays, Kit tooltips, Kit's scrollbar styles and what Kit paints in its own deferred draws stay on the application theme (`crates/material/src/scope.rs`). |
 | Motion | Implemented | Expressive and Standard schemes, selectable per app. |
-| Shape | Partial | Corner scale, press morph and the 8 loading-indicator shapes. The Expressive shape library (35 shapes) and general morphing are missing. |
+| Shape | Implemented | Corner scale, press morph, the Expressive shape library (35 shapes) and general morphing. Clipping content to a shape is missing. |
 | Typography | Implemented, with limits | 15 roles and emphasized styles, Roboto 400/500/600. Letter spacing paints on text elements through a fork patch (`vendor/gpui-pre/letter-spacing-patch.md`); Kit's editors shape their own lines and do not apply it, and ligatures stay on. |
 | Icons | Implemented | Material Symbols at the pinned revision; six approximate Kit translations await review. |
 | RTL | Implemented, with limits | Direction is inherited (application, window, `Scope`) and layout mirrors in the engine (`vendor/gpui-pre/layout-direction-patch.md`), with icons, painted bars, pointer math and arrow keys handled per component. Needs a review pass with a real RTL locale and committed captures. |
@@ -31,10 +31,10 @@ is still `unreviewed`).
 | Actions | button, toggle button, icon button, button group, connected group (`segmented()`), split button, FAB, extended FAB, FAB menu | Figma segmented density -3 |
 | Selection | checkbox, switch, radio, assist/filter/input/suggestion chips, chip set, slider | |
 | Text input | text field, select, search bar and view, date picker, time picker | |
-| Navigation | navigation rail, bar and drawer, tabs, menu, top app bar, bottom app bar, docked and floating toolbar | navigation suite; XR app bar, rail, bar, toolbar |
+| Navigation | navigation rail, bar, drawer and suite, tabs, menu, top app bar, bottom app bar, docked and floating toolbar | XR app bar, rail, bar, toolbar |
 | Containment | card, list, carousel, divider, dialog, bottom sheet, side sheet | Figma stacked and horizontal card layouts, list and scrollable-list dialogs, multi-aspect carousel; XR dialog |
-| Communication | badge, avatar, linear and circular progress (flat, wavy), loading indicator (with contained form), snackbar, plain and rich tooltip | pull to refresh |
-| Layout | | m3e canonical layouts |
+| Communication | badge, avatar, linear and circular progress (flat, wavy), loading indicator (with contained form), snackbar, plain and rich tooltip, pull to refresh | |
+| Layout and primitives | m3e canonical layouts: list-detail, supporting pane, feed | m3e primitives: no public generic surface |
 
 No reference defines a contained linear or circular progress; only the loading
 indicator has a contained form, and it is implemented.
