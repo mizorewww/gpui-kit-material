@@ -3,8 +3,8 @@
 mod button;
 pub use button::{
     ButtonDirection, ButtonIconPosition, ButtonProgressPlayback, ButtonShape, ButtonSize,
-    ButtonTransitionInputs, ButtonTransitionPlayback, ButtonVariant, FabSize, IconButtonWidth,
-    MaterialButton, material_button,
+    ButtonTone, ButtonTransitionInputs, ButtonTransitionPlayback, ButtonVariant, FabSize,
+    IconButtonWidth, MaterialButton, material_button,
 };
 mod fab;
 pub use fab::{ExtendedFab, Fab, FabColor, FabPosition};

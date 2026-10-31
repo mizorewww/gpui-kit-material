@@ -159,6 +159,32 @@ pub enum ButtonSize {
     Large,
     ExtraLarge,
 }
+/// Which roles a variant paints with. A screen with several actions needs more levels than
+/// the variants alone: a neutral text action beside a primary one, an outlined action
+/// that reads as live. Selection and the disabled state keep the variant's colors.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+pub enum ButtonTone {
+    /// The variant's own M3 roles.
+    #[default]
+    Standard,
+    /// On-surface content; a tonal or filled container is surface-container-highest,
+    /// an outlined edge the full outline role.
+    Neutral,
+    /// Primary content; an outlined edge is the full outline role.
+    Accent,
+}
+
+impl ButtonTone {
+    pub const ALL: [Self; 3] = [Self::Standard, Self::Neutral, Self::Accent];
+    pub const fn name(self) -> &'static str {
+        match self {
+            Self::Standard => "Standard",
+            Self::Neutral => "Neutral",
+            Self::Accent => "Accent",
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum ButtonShape {
     #[default]
@@ -306,6 +332,31 @@ fn color_targets(variant: ButtonVariant, disabled: bool) -> (CssColor, CssColor,
         },
     )
 }
+/// A variant's enabled colors in `tone`.
+fn toned_color_targets(variant: ButtonVariant, tone: ButtonTone) -> (CssColor, CssColor, CssColor) {
+    use ColorRole as C;
+    let standard = color_targets(variant, false);
+    match (tone, variant) {
+        (ButtonTone::Standard, _) | (ButtonTone::Accent, ButtonVariant::Filled) => standard,
+        (ButtonTone::Neutral, ButtonVariant::Filled | ButtonVariant::Tonal) => (
+            CssColor::role(C::SURFACE_CONTAINER_HIGHEST),
+            CssColor::role(C::ON_SURFACE),
+            CssColor::transparent(),
+        ),
+        (_, ButtonVariant::Outlined) => (
+            CssColor::transparent(),
+            CssColor::role(if tone == ButtonTone::Neutral {
+                C::ON_SURFACE
+            } else {
+                C::PRIMARY
+            }),
+            CssColor::role(C::OUTLINE),
+        ),
+        (ButtonTone::Neutral, _) => (standard.0, CssColor::role(C::ON_SURFACE), standard.2),
+        (ButtonTone::Accent, _) => (standard.0, CssColor::role(C::PRIMARY), standard.2),
+    }
+}
+
 fn resting_radius(size: ButtonSize, shape: ButtonShape, selected: bool) -> f32 {
     let g = size.geometry();
     if (shape == ButtonShape::Round) != selected {
@@ -355,6 +406,12 @@ fn toggle_color_targets(
 /// on their own options.
 pub(crate) fn toggle_colors(variant: ButtonVariant, selected: bool) -> (Rgba, Rgba) {
     let (bg, fg, _) = toggle_color_targets(variant, false, true, selected);
+    (bg.resolve(), fg.resolve())
+}
+
+/// The tonal content and container colors of an unselected toned group option.
+pub(crate) fn toned_colors(variant: ButtonVariant, tone: ButtonTone) -> (Rgba, Rgba) {
+    let (bg, fg, _) = toned_color_targets(variant, tone);
     (bg.resolve(), fg.resolve())
 }
 
@@ -539,6 +596,7 @@ pub struct MaterialButton {
     preview: Option<InteractionPreview>,
     form: Form,
     palette: Option<Palette>,
+    tone: ButtonTone,
     open: bool,
     press_probe: Option<std::rc::Rc<std::cell::Cell<bool>>>,
     style: StyleRefinement,
@@ -579,6 +637,7 @@ impl MaterialButton {
             preview: None,
             form: Form::Label,
             palette: None,
+            tone: ButtonTone::Standard,
             open: false,
             press_probe: None,
             style: StyleRefinement::default(),
@@ -622,6 +681,12 @@ impl MaterialButton {
     fn color_targets(&self) -> (CssColor, CssColor, CssColor) {
         match &self.palette {
             Some(palette) => palette.targets(self.disabled, self.base.toggle, self.base.selected),
+            None if self.tone != ButtonTone::Standard
+                && !self.disabled
+                && !(self.base.toggle && self.base.selected) =>
+            {
+                toned_color_targets(self.variant, self.tone)
+            }
             None => toggle_color_targets(
                 self.variant,
                 self.disabled,
@@ -660,6 +725,11 @@ impl MaterialButton {
         self
     }
     /// Set a decorative icon; the button supplies its reference slot size.
+    /// Which roles the variant paints with.
+    pub fn tone(mut self, tone: ButtonTone) -> Self {
+        self.tone = tone;
+        self
+    }
     pub fn icon(mut self, icon: impl Into<Icon>) -> Self {
         self.icon = Some(icon.into());
         self
@@ -1533,6 +1603,32 @@ pub fn material_button(id: impl Into<ElementId>, variant: ButtonVariant) -> Mate
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn tones_change_the_roles_and_only_where_they_mean_something() {
+        use super::{ButtonTone, ButtonVariant, ColorRole as C};
+        let targets = |variant, tone| {
+            let (bg, fg, edge) = super::toned_color_targets(variant, tone);
+            (bg.resolve(), fg.resolve(), edge.resolve())
+        };
+        let role = |role| crate::theme::color(role);
+        assert_eq!(
+            targets(ButtonVariant::Text, ButtonTone::Neutral).1,
+            role(C::ON_SURFACE)
+        );
+        assert_eq!(
+            targets(ButtonVariant::Tonal, ButtonTone::Neutral).0,
+            role(C::SURFACE_CONTAINER_HIGHEST)
+        );
+        let accent = targets(ButtonVariant::Outlined, ButtonTone::Accent);
+        assert_eq!(accent.1, role(C::PRIMARY));
+        assert_eq!(accent.2, role(C::OUTLINE));
+        let standard = super::color_targets(ButtonVariant::Filled, false);
+        assert_eq!(
+            targets(ButtonVariant::Filled, ButtonTone::Accent).0,
+            standard.0.resolve()
+        );
+    }
+
     use super::{ButtonSize, ButtonVariant, MaterialButton, alpha, colors};
     use crate::tokens::state::layer;
     use crate::{color::ColorRole, theme::color};
