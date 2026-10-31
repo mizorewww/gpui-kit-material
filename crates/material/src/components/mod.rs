@@ -115,6 +115,7 @@ pub use feedback::{
     BADGE_CONTAINER, BADGE_LABEL, CARD_PADDING, CardState, CardSurface, CardVariant,
     LARGE_BADGE_PADDING, LARGE_BADGE_SIZE, MaterialCard, NoticeKind, SMALL_BADGE_SIZE, StatusKind,
     card, card_surface, large_badge, notice_banner, outlined_status_chip, small_badge, status_chip,
+    status_chip_outlined,
 };
 #[allow(deprecated)]
 pub use feedback::{BadgeKind, badge, outlined_badge};

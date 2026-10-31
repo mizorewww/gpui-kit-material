@@ -341,6 +341,8 @@ impl GalleryPage for Page {
                     .child(status_chip(StatusKind::Progress).child("Working"))
                     .child(status_chip(StatusKind::Neutral).child("Queued"))
                     .child(status_chip(StatusKind::Tonal).child("Default"))
+                    .child(status_chip_outlined(StatusKind::Success).child("Checked"))
+                    .child(status_chip_outlined(StatusKind::Warning).child("To repair"))
                     .child(outlined_status_chip("outlined", "Outlined")),
             )
             .into_any_element(),
