@@ -14,7 +14,34 @@ use super::text::accessible_text;
 /// The tone of a [`notice_banner`].
 pub enum NoticeKind {
     Info,
+    /// Something needs attention, but nothing has failed.
+    Warning,
     Danger,
+}
+
+/// A notice's container, ink, icon and role. A warning reads like a status: it
+/// does not interrupt a screen reader the way a failure's alert does.
+fn notice_tone(kind: NoticeKind) -> (ColorRole, ColorRole, IconName, Role) {
+    match kind {
+        NoticeKind::Info => (
+            ColorRole::SECONDARY_CONTAINER,
+            ColorRole::PRIMARY,
+            IconName::Info,
+            Role::Status,
+        ),
+        NoticeKind::Warning => (
+            ColorRole::WARNING_BG,
+            ColorRole::WARNING,
+            IconName::Warning,
+            Role::Status,
+        ),
+        NoticeKind::Danger => (
+            ColorRole::ERROR_CONTAINER,
+            ColorRole::ERROR,
+            IconName::Error,
+            Role::Alert,
+        ),
+    }
 }
 
 /// A page-level notice: tinted surface, status icon and wrapping text.
@@ -24,20 +51,7 @@ pub fn notice_banner(
     kind: NoticeKind,
     text: impl Into<SharedString>,
 ) -> Div {
-    let (bg, tone, icon, role) = match kind {
-        NoticeKind::Info => (
-            ColorRole::SECONDARY_CONTAINER,
-            ColorRole::PRIMARY,
-            IconName::Info,
-            Role::Status,
-        ),
-        NoticeKind::Danger => (
-            ColorRole::ERROR_CONTAINER,
-            ColorRole::ERROR,
-            IconName::Error,
-            Role::Alert,
-        ),
-    };
+    let (bg, tone, icon, role) = notice_tone(kind);
     div()
         .flex()
         .flex_wrap()
@@ -808,6 +822,16 @@ mod tests {
     // `#[gpui::test]` expands to.
     use core::prelude::v1::test;
     use gpui::{Context, TestAppContext};
+
+    #[test]
+    fn a_warning_notice_uses_the_warning_roles_and_does_not_alert() {
+        let (bg, tone, icon, role) = notice_tone(NoticeKind::Warning);
+        assert_eq!(bg, ColorRole::WARNING_BG);
+        assert_eq!(tone, ColorRole::WARNING);
+        assert_eq!(icon, IconName::Warning);
+        assert_eq!(role, Role::Status);
+        assert_eq!(notice_tone(NoticeKind::Danger).3, Role::Alert);
+    }
 
     #[test]
     fn card_variants_use_m3_container_roles_elevation_and_outline() {
