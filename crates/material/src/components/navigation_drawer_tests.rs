@@ -338,3 +338,60 @@ fn a_closing_drawer_does_not_dismiss_again(cx: &mut TestAppContext) {
     draw(cx);
     assert_eq!(view.read_with(cx, |view, _| view.dismissed), 1);
 }
+
+struct LongDrawer;
+impl Render for LongDrawer {
+    fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        window.set_rem_size(px(14.));
+        div().relative().w(px(800.)).h(px(300.)).flex().child(
+            NavigationDrawer::new("drawer", "Main")
+                .items(items(30))
+                .selected("d0")
+                .open(true)
+                .width(280.),
+        )
+    }
+}
+
+/// A row keyboard focus lands on is scrolled into the sheet, and the sheet stays where a
+/// wheel takes it afterwards, with focus still on that row.
+#[gpui::test]
+fn keyboard_focus_scrolls_its_row_into_the_sheet(cx: &mut TestAppContext) {
+    cx.update(|cx| {
+        gpui_base::init(cx);
+        super::super::roving::init(cx);
+        cx.set_reduce_motion(true);
+    });
+    let (_, cx) = cx.add_window_view(|_, _| LongDrawer);
+    settle(cx);
+    let sheet = cx.debug_bounds("navigation-drawer-sheet").unwrap();
+    cx.update(|window, cx| window.focus_next(cx));
+    cx.simulate_keystrokes("end");
+    settle(cx);
+    let last = row(cx, "d29").unwrap();
+    assert!(
+        last.bottom() <= sheet.bottom() && last.top() >= sheet.top(),
+        "end: {last:?} in {sheet:?}"
+    );
+    cx.simulate_keystrokes("home");
+    settle(cx);
+    let first = row(cx, "d0").unwrap();
+    assert!(
+        first.top() >= sheet.top() && first.bottom() <= sheet.bottom(),
+        "home: {first:?} in {sheet:?}"
+    );
+    for _ in 0..3 {
+        cx.simulate_keystrokes("down");
+    }
+    settle(cx);
+    cx.simulate_event(gpui::ScrollEvent {
+        position: sheet.center(),
+        delta: gpui::ScrollDelta::Pixels(gpui::point(px(0.), px(-400.))),
+        ..Default::default()
+    });
+    settle(cx);
+    assert!(
+        row(cx, "d3").unwrap().bottom() < sheet.top(),
+        "the wheel took the focused row away and it stays away"
+    );
+}

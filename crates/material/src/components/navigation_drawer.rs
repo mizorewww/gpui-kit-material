@@ -39,7 +39,7 @@ use crate::tokens::{
 };
 use gpui::{prelude::FluentBuilder as _, *};
 use gpui_base::FocusTrapElement as _;
-use std::rc::Rc;
+use std::{cell::Cell, rc::Rc};
 
 /// The M3 drawer width (360dp maximum).
 pub const DRAWER_WIDTH: f32 = 360.;
@@ -240,6 +240,8 @@ struct DrawerRow {
     focus: FocusHandle,
     tab_stop: bool,
     position: (usize, usize),
+    /// Scrolls this row into the sheet, when focus just came to it.
+    reveal: Option<AnyElement>,
     on_click: ClickHandler,
 }
 
@@ -354,6 +356,7 @@ impl DrawerRow {
         let click_focus = focus.clone();
         let on_click = self.on_click;
         let (index, count) = self.position;
+        let reveal = self.reveal;
         gpui_base::Tab::new(self.id)
             .group(ITEM_GROUP)
             .selected(selected)
@@ -361,11 +364,13 @@ impl DrawerRow {
             .accessibility_label(item.label().clone())
             .set_position(index + 1, count)
             .track_focus(&focus)
+            .relative()
             .w_full()
             .h(height)
             .flex_shrink_0()
             .flex()
             .child(ring)
+            .children(reveal)
             .when(enabled && preview.is_none(), |tab| {
                 tab.cursor_pointer().on_click(move |event, window, cx| {
                     click_focus.focus(window, cx);
@@ -374,6 +379,49 @@ impl DrawerRow {
             })
             .into_any_element()
     }
+}
+
+/// How far to move content so that the span `item` shows in `view`: down when it
+/// starts above the view, or else up when it ends below.
+fn reveal_delta(item: (f32, f32), view: (f32, f32)) -> f32 {
+    if item.0 < view.0 {
+        view.0 - item.0
+    } else if item.1 > view.1 {
+        view.1 - item.1
+    } else {
+        0.
+    }
+}
+
+/// Lays out with the row focus just came to and scrolls it into the sheet, inside
+/// the sheet's padding. Only once: the sheet then stays where a wheel takes it.
+fn reveal_row(index: usize, scroll: ScrollHandle, revealed: Rc<Cell<Option<usize>>>) -> AnyElement {
+    canvas(
+        move |bounds, window, _| {
+            revealed.set(Some(index));
+            let view = scroll.bounds();
+            let padding = rem(DRAWER_PADDING).to_pixels(window.rem_size());
+            let delta = reveal_delta(
+                (f32::from(bounds.top()), f32::from(bounds.bottom())),
+                (
+                    f32::from(view.top() + padding),
+                    f32::from(view.bottom() - padding),
+                ),
+            );
+            if delta != 0. {
+                let mut offset = scroll.offset();
+                offset.y += px(delta);
+                scroll.set_offset(offset);
+                window.request_animation_frame();
+            }
+        },
+        |_, _, _, _| {},
+    )
+    .absolute()
+    .top_0()
+    .left_0()
+    .size_full()
+    .into_any_element()
 }
 
 fn header(id: (&'static str, usize), text: SharedString, height: f32) -> AnyElement {
@@ -457,6 +505,27 @@ impl RenderOnce for NavigationDrawer {
             window.defer(cx, move |window, cx| handle.focus(window, cx));
         }
 
+        // The row focus last came to, while it is still there.
+        let scroll = window
+            .use_keyed_state((self.id.clone(), "drawer-scroll"), cx, |_, _| {
+                ScrollHandle::default()
+            })
+            .read(cx)
+            .clone();
+        let revealed = window
+            .use_keyed_state((self.id.clone(), "drawer-revealed"), cx, |_, _| {
+                Rc::new(Cell::new(None::<usize>))
+            })
+            .read(cx)
+            .clone();
+        let focused = list
+            .handles
+            .iter()
+            .position(|focus| focus.is_focused(window));
+        if focused.is_none() {
+            revealed.set(None);
+        }
+
         let row_height = if self.dense {
             DENSE_ITEM_HEIGHT
         } else {
@@ -492,6 +561,8 @@ impl RenderOnce for NavigationDrawer {
                     focus: list.handles[index].clone(),
                     tab_stop: list.entry == Some(index),
                     position: (index, count),
+                    reveal: (focused == Some(index) && revealed.get() != focused)
+                        .then(|| reveal_row(index, scroll.clone(), revealed.clone())),
                     on_click,
                 }
                 .render(window, cx),
@@ -513,6 +584,7 @@ impl RenderOnce for NavigationDrawer {
             .flex_col()
             .p(rem(DRAWER_PADDING))
             .overflow_y_scroll()
+            .track_scroll(&scroll)
             .bg(color(ColorRole::SURFACE_CONTAINER_LOW))
             .when(modal, |sheet| {
                 let radius = rem(MODAL_RADIUS);
