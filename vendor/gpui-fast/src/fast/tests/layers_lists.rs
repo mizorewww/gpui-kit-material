@@ -3036,6 +3036,87 @@ mod rows {
         }
     }
 
+    /// A hover listener that also hears hover after keyboard input, as a
+    /// Material button's, is held still with the rest: a row scrolled under a
+    /// still pointer does not start hovering, which could start a transition
+    /// that keeps the list off its layer. A pointer that moves reports it at
+    /// once.
+    #[crate::test]
+    fn hover_held_still_reaches_no_input_modality_independent_listener(cx: &mut TestAppContext) {
+        use crate::{HoverListenerMode, InteractiveElement as _};
+
+        struct ListenerPage {
+            state: ListState,
+            hovers: Rc<RefCell<usize>>,
+        }
+
+        impl Render for ListenerPage {
+            fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+                let hovers = self.hovers.clone();
+                div().size_full().bg(rgb(0xffffff)).child(
+                    crate::list(self.state.clone(), move |ix, _, _| {
+                        let hovers = hovers.clone();
+                        div()
+                            .id(("row", ix))
+                            .w(px(VIEWPORT_WIDTH))
+                            .h(px(40.))
+                            .bg(row_color(ix))
+                            .hover_listener_mode(HoverListenerMode::InputModalityIndependent)
+                            .on_hover(move |hovered, _, _| {
+                                if *hovered {
+                                    *hovers.borrow_mut() += 1;
+                                }
+                            })
+                            .into_any_element()
+                    })
+                    .w(px(VIEWPORT_WIDTH))
+                    .h(px(VIEWPORT_HEIGHT)),
+                )
+            }
+        }
+
+        let hovers = Rc::new(RefCell::new(0));
+        let window: AnyWindowHandle = cx
+            .add_window({
+                let hovers = hovers.clone();
+                move |_, _| ListenerPage {
+                    state: ListState::new(300, ListAlignment::Top, px(0.)).measure_all(),
+                    hovers,
+                }
+            })
+            .into();
+        open_at(cx, window, 1.);
+        with_window(cx, window, |window, _| window.set_hover_freeze(true));
+        // The window opened with the pointer over the first row.
+        let before = *hovers.borrow();
+        // A row a frame, while the list is not on its layer yet: each is
+        // painted with the pointer over it.
+        for frame in 0..60 {
+            wheel(cx, window, -41.);
+            cx.run_until_parked();
+            assert_eq!(
+                *hovers.borrow(),
+                before,
+                "frame {frame}: hover is held still"
+            );
+        }
+        with_window(cx, window, |window, cx| {
+            window.dispatch_event(
+                crate::PlatformInput::MouseMove(crate::MouseMoveEvent {
+                    position: crate::point(px(21.), px(21.)),
+                    pressed_button: None,
+                    modifiers: Default::default(),
+                }),
+                cx,
+            );
+        });
+        assert_eq!(
+            *hovers.borrow(),
+            before + 1,
+            "the moved pointer hovers the row"
+        );
+    }
+
     /// The platform cursor stays the text cursor while a wheel scrolls under a
     /// still pointer. Hover styling is held still over that text. Moving the
     /// pointer off the text sets the arrow.

@@ -10,7 +10,8 @@
 //!
 //! So for [`HOVER_FREEZE`] after a wheel event, while the pointer stays where
 //! the event was, hover styling is held still: while a frame is drawn,
-//! [`crate::HitboxId::is_hovered`] is false, and the hit test a list foretells
+//! [`crate::HitboxId::is_hovered`] and what a hover listener for any input
+//! modality reads are false, and the hit test a list foretells
 //! for its rows is empty. Only drawing is held. The frame's hit test stays the
 //! geometry under the pointer, so the cursor follows it, and events dispatched
 //! between frames read it: a click at the spot the wheel scrolled under

@@ -313,8 +313,8 @@
       },
       "src/window.rs": {
         "upstream_sha256": "d3f00c28cc47446f6c73be67d00830446e0e3a9a7fadefdf54fff9e5ccadee0b",
-        "local_sha256": "f5ca5a1c0bb9f76821053e6c25173acc91cc37e0a24005a3824772fcbbbd0380",
-        "reason": "Same GPUI window patches as vendor/gpui-pre (CPU frame scope, submission stats/vsync/throttle retry, present outcome, focused_input_selection_bounds); FrameDirtyAccumulator made pub(crate) to match the public field holding it, used nowhere else. Layout direction on the window, recorded per layout node (vendor/gpui-pre/layout-direction-patch.md)."
+        "local_sha256": "a6d22def05ee15dafbae60ec0305032c62bd868e22d3a97f1987905c97248780",
+        "reason": "Same GPUI window patches as vendor/gpui-pre (CPU frame scope, submission stats/vsync/throttle retry, present outcome, focused_input_selection_bounds); FrameDirtyAccumulator made pub(crate) to match the public field holding it, used nowhere else. Layout direction on the window, recorded per layout node (vendor/gpui-pre/layout-direction-patch.md). Material performance patch: a wheel's hover freeze also holds is_hovered_ignoring_last_input while a frame is drawn, so a hover listener for any input modality (a Material button's) starts no transition that keeps a list off its layer; the cursor reads the hit test through sets_cursor, since a frame sets it while drawn (docs/ARCHITECTURE.md)."
       },
       "src/tab_stop.rs": {
         "upstream_sha256": "0c14aec0196ad632601015e166dfcd3df72228292646120bbc3857c3631cd680",
@@ -370,6 +370,16 @@
         "upstream_sha256": "131164fada000e865db0a14855e4eab5446f89b45e70a1904414408cd0cdb6b0",
         "local_sha256": "6e1ffcb4bb847e0d8bbd501c85d36c2a7133ad29c43120027ccd76f64e63bc05",
         "reason": "A render lease is not a change unless it notifies (vendor/gpui-pre/render-lease-patch.md)."
+      },
+      "src/fast/layers/hover_freeze.rs": {
+        "upstream_sha256": "a8273a396988f3c420a9008525b20dbb8056d4751b4df395200f35ae4a9913d8",
+        "local_sha256": "810a7808ce6896b4c77910ad30fc7a5df4abe40a597b6ab15dcb50cd5a53b161",
+        "reason": "Doc: the freeze covers hover listeners for any input modality."
+      },
+      "src/fast/tests/layers_lists.rs": {
+        "upstream_sha256": "d6cdd3cece19db6931bbcf2dcf5d7cda980eab7a507fee79f6f55444da53d0cf",
+        "local_sha256": "411261b1ee8cfa2f6bb717a271f2b41195b1e82d6e9161ff39345dd1658154ca",
+        "reason": "Test: hover held still reaches no input-modality-independent listener."
       }
     },
     "added": {
@@ -408,6 +418,6 @@
         "reason": "Package-level lockfile not retained; the workspace Cargo.lock owns resolution."
       }
     },
-    "unchanged_file_count": 143
+    "unchanged_file_count": 141
   }
 }
