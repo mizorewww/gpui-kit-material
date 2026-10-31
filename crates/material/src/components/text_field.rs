@@ -129,7 +129,7 @@ impl TextFieldShape {
             Self::Rounded => "Rounded",
         }
     }
-    const fn radius(self) -> f32 {
+    fn radius(self) -> f32 {
         match self {
             Self::Standard => RADIUS_EXTRA_SMALL.as_f32(),
             Self::Rounded => RADIUS_MEDIUM.as_f32(),
@@ -639,7 +639,9 @@ pub(crate) fn density_label_geometry(
         PADDING
     };
     let (float_left, float_top) = match variant {
-        TextFieldVariant::Filled => (rest_left, FILLED_FLOAT_TOP - density.lift()),
+        TextFieldVariant::Filled | TextFieldVariant::Hero => {
+            (rest_left, FILLED_FLOAT_TOP - density.lift())
+        }
         // Centered on the top outline, at the content's leading edge.
         TextFieldVariant::Outlined => (PADDING, -8.),
     };
