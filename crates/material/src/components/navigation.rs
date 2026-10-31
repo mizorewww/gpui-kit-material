@@ -608,6 +608,7 @@ pub(crate) fn destinations(
     let state = window.use_keyed_state((id.clone(), "nav-focus-handles"), cx, |_, _| {
         BTreeMap::<SharedString, FocusHandle>::new()
     });
+    roving::keep_focus_in_handles(&state, items, |item| &item.value, window, cx);
     let handles: Rc<[FocusHandle]> = state
         .update(cx, |handles, cx| {
             roving::sync_handles(handles, items, |item| &item.value, || cx.focus_handle())

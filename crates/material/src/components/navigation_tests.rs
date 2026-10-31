@@ -515,3 +515,44 @@ fn selected_labels_and_state_layers_follow_the_items_layout() {
         bar.opacity(0.08)
     );
 }
+
+struct Shrinking {
+    count: usize,
+}
+impl Render for Shrinking {
+    fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        window.set_rem_size(px(14.));
+        NavigationBar::new("bar", "Main")
+            .items(items(self.count))
+            .selected("0")
+    }
+}
+
+/// Focus on an item that goes moves to one that stays: on nothing, the arrow
+/// keys would leave the widget with it.
+#[gpui::test]
+fn focus_on_a_removed_item_stays_in_the_bar(cx: &mut TestAppContext) {
+    cx.update(|cx| {
+        gpui_kit::init(cx);
+        crate::init(cx);
+        cx.set_reduce_motion(true);
+    });
+    let (view, cx) = cx.add_window_view(|_, _| Shrinking { count: 3 });
+    draw(cx);
+    cx.update(|window, cx| window.focus_next(cx));
+    draw(cx);
+    cx.simulate_keystrokes("right right");
+    draw(cx);
+    let on_last = cx.update(|window, cx| window.focused(cx)).expect("focused");
+    view.update(cx, |view, cx| {
+        view.count = 2;
+        cx.notify();
+    });
+    draw(cx);
+    cx.run_until_parked();
+    draw(cx);
+    let now = cx
+        .update(|window, cx| window.focused(cx))
+        .expect("focus stayed in the bar");
+    assert_ne!(now, on_last, "on an item that is still there");
+}

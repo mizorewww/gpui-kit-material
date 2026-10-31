@@ -341,6 +341,32 @@ pub(crate) fn index_handles(
     })
 }
 
+/// Focus on an item about to go moves to the last of those that stay, as in
+/// [`index_handles`]: it would otherwise fall out of the widget, and its arrow
+/// keys with it. For a widget's [`sync_handles`], before it syncs.
+pub(crate) fn keep_focus_in_handles<T>(
+    handles: &Entity<BTreeMap<SharedString, FocusHandle>>,
+    items: &[T],
+    key: impl Fn(&T) -> &SharedString,
+    window: &mut Window,
+    cx: &mut App,
+) {
+    let current = handles.read(cx);
+    if current.len() <= items.len() {
+        return;
+    }
+    let leaving = current.iter().any(|(value, handle)| {
+        handle.is_focused(window) && !items.iter().any(|item| key(item) == value)
+    });
+    if !leaving {
+        return;
+    }
+    if let Some(neighbor) = items.last().and_then(|item| current.get(key(item))) {
+        let neighbor = neighbor.clone();
+        window.defer(cx, move |window, cx| neighbor.focus(window, cx));
+    }
+}
+
 /// The focus handle of each item keyed by value, created on first sight.
 /// Handles of items that are gone are dropped, so the map tracks the current
 /// items instead of every value ever shown. Keys must be unique.

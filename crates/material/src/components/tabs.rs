@@ -294,6 +294,7 @@ impl RenderOnce for MaterialTabs {
         let handles_state = window.use_keyed_state((self.id.clone(), "tab-focus"), cx, |_, _| {
             BTreeMap::<SharedString, FocusHandle>::new()
         });
+        roving::keep_focus_in_handles(&handles_state, &self.items, |item| &item.value, window, cx);
         let handles: Rc<[FocusHandle]> = handles_state
             .update(cx, |handles, cx| {
                 roving::sync_handles(

@@ -645,6 +645,13 @@ impl RenderOnce for ConnectedButtonGroup {
         let handles = if self.provided_focus.len() == self.options.len() {
             self.provided_focus.clone()
         } else {
+            super::roving::keep_focus_in_handles(
+                &state,
+                &self.options,
+                |option| &option.value,
+                window,
+                cx,
+            );
             state.update(cx, |handles, cx| {
                 sync_handles(handles, &self.options, || cx.focus_handle())
             })
