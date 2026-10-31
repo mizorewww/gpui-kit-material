@@ -16,6 +16,9 @@ const STYLES: [(&str, &str); 3] = [
 pub struct Page {
     page: PageCx,
     pub(crate) sample: Entity<InputState>,
+    /// The sample's text. Rows read this rather than the input: Kit's Input writes its
+    /// state each time it renders, which would rebuild every row that read the state.
+    text: SharedString,
     /// Which styles each role shows: "regular", "emphasized" or "both".
     pub(crate) style: SharedString,
     _subscription: Subscription,
@@ -51,8 +54,9 @@ impl GalleryPage for Page {
 
     fn new(page: PageCx, window: &mut Window, cx: &mut Context<Self>) -> Self {
         let sample = cx.new(|cx| InputState::new(window, cx).default_value(SAMPLE));
-        let subscription = cx.subscribe(&sample, |this: &mut Self, _, event, cx| {
+        let subscription = cx.subscribe(&sample, |this: &mut Self, sample, event, cx| {
             if matches!(event, InputEvent::Change) {
+                this.text = sample.read(cx).value();
                 // Longer text wraps onto more lines.
                 this.page.rows.remeasure(1..=TypeRole::ALL.len());
                 cx.notify();
@@ -60,6 +64,7 @@ impl GalleryPage for Page {
         });
         Self {
             page,
+            text: SAMPLE.into(),
             sample,
             style: "both".into(),
             _subscription: subscription,
@@ -139,8 +144,11 @@ impl GalleryPage for Page {
         }
         let index = row - 1;
         let role = TypeRole::ALL[index];
-        let text = self.sample.read(cx).value();
-        let text: SharedString = if text.is_empty() { SAMPLE.into() } else { text };
+        let text: SharedString = if self.text.is_empty() {
+            SAMPLE.into()
+        } else {
+            self.text.clone()
+        };
         let regular = self.style != "emphasized";
         let emphasized = self.style != "regular";
         let sample = |id: &'static str, scale: TypeScale| {
