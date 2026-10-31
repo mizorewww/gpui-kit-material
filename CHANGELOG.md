@@ -9,6 +9,7 @@ Distribution is by Git revision for now; see the [quick start](README.md#quick-s
 
 ### Added
 
+- `MaterialContextMenu`: a Material menu that opens at the pointer on a right press.
 - A published `[patch]` block for downstream workspaces, built from Git by CI.
 - `rust-version` 1.99.1, the toolchain this workspace is verified with.
 - `[package.metadata.docs.rs]`, `deny.toml`, and CI checks of what each package ships.

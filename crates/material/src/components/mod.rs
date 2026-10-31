@@ -128,7 +128,8 @@ pub use loading_indicator::{
     LOADING_INDICATOR_SIZE, LoadingFrame, LoadingIndicator, LoadingShape, loading_indicator_frame,
 };
 pub use menu::{
-    ExposedDropdown, MaterialMenu, MaterialMenuItem, MenuDensity, MenuGroup, MenuPopup, MenuStyle,
+    ExposedDropdown, MaterialContextMenu, MaterialMenu, MaterialMenuItem, MenuDensity, MenuGroup,
+    MenuPopup, MenuStyle,
 };
 pub use navigation::{
     MEDIUM_WIDTH, NavBadge, NavIcon, NavItem, NavItemLayout, NavigationBar, NavigationItem,

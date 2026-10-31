@@ -368,12 +368,56 @@ fn preview(
         .items_center()
         .gap(rem(12.))
         .child(popup)
+        .child(context_region(style, density, width, state.clone()))
         .child(
             accessible_text("menu-last", last.unwrap_or(""))
                 .map(|text| type_role(text, TypeRole::BodyMedium))
                 .text_color(color(ColorRole::ON_SURFACE_VARIANT)),
         )
         .into_any_element()
+}
+
+/// A surface whose right press opens the same styles of menu at the pointer.
+fn context_region(
+    style: MenuStyle,
+    density: MenuDensity,
+    width: f32,
+    state: Entity<MenuState>,
+) -> impl IntoElement {
+    div()
+        .debug_selector(|| "menu-context-region".into())
+        .relative()
+        .flex()
+        .items_center()
+        .justify_center()
+        .w(rem(240.))
+        .h(rem(64.))
+        .rounded(rem(12.))
+        .bg(color(ColorRole::SURFACE_CONTAINER))
+        .child(MaterialContextMenu::new(
+            "playground-context-menu",
+            move |_, _| {
+                let state = state.clone();
+                MaterialMenu::new("playground-context-items")
+                    .style(style)
+                    .density(density)
+                    .width(width)
+                    .items(MENUS[0][0].iter().map(move |(label, _, _)| {
+                        let (label, state) = (*label, state.clone());
+                        MaterialMenuItem::new(label).on_click(move |_, _, cx| {
+                            state.update(cx, |state, cx| {
+                                state.last = Some(label);
+                                cx.notify();
+                            })
+                        })
+                    }))
+            },
+        ))
+        .child(
+            accessible_text("menu-context-hint", "Right-click for a context menu")
+                .map(|text| type_role(text, TypeRole::BodyMedium))
+                .text_color(color(ColorRole::ON_SURFACE_VARIANT)),
+        )
 }
 
 #[cfg(test)]
