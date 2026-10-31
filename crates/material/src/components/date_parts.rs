@@ -148,7 +148,7 @@ pub(crate) fn day_paint(selected: f32, today: bool, range: bool, adjacent: bool)
     }
 }
 
-/// The M3 disabled paint of a day: a selected day keeps an on-surface 12%
+/// The M3 disabled paint of a day: a selected day keeps an on-surface 10%
 /// container, its label and today's outline turn on-surface 38%. Fading
 /// the enabled paint instead leaves a dark on-primary label on a dim
 /// primary container, unreadable in dark themes.
@@ -163,17 +163,21 @@ pub(crate) fn disabled_day_paint(paint: DayPaint, selected: f32) -> DayPaint {
     }
 }
 
-/// The M3 disabled colors of a year: (container, label).
+/// The M3 disabled colors of a year: (container, label). An unselected year's
+/// label keeps its variant role (the kit's `.Building Blocks/Year`).
 pub(crate) fn disabled_year_paint(selected: bool) -> (Rgba, Rgba) {
     let on_surface = color(ColorRole::ON_SURFACE);
-    (
-        on_surface.opacity(if selected {
-            state::DISABLED_CONTAINER
-        } else {
-            0.
-        }),
-        state::disabled(on_surface),
-    )
+    if selected {
+        (
+            on_surface.opacity(state::DISABLED_CONTAINER),
+            state::disabled(on_surface),
+        )
+    } else {
+        (
+            on_surface.opacity(0.),
+            state::disabled(color(ColorRole::ON_SURFACE_VARIANT)),
+        )
+    }
 }
 
 /// One day of a calendar grid (`.Building Blocks/Local M3 calendar cell`).

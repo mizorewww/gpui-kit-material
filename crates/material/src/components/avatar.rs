@@ -92,7 +92,7 @@ impl Avatar {
         self.selected = selected;
         self
     }
-    /// Paint the M3 disabled container and content (on-surface at 12% and
+    /// Paint the M3 disabled container and content (on-surface at 10% and
     /// 38%). Images fade to 38%.
     pub fn disabled(mut self, disabled: bool) -> Self {
         self.disabled = disabled;
@@ -210,7 +210,7 @@ mod tests {
         assert_eq!(ink, color(ColorRole::ON_PRIMARY_CONTAINER));
         let (container, ink) = Avatar::new("a", "A").disabled(true).colors();
         let on_surface = color(ColorRole::ON_SURFACE);
-        assert_eq!(container, on_surface.opacity(state::DISABLED_CONTAINER));
+        assert_eq!(container, on_surface.opacity(0.10));
         assert_eq!(ink, on_surface.opacity(state::DISABLED_CONTENT));
     }
 }

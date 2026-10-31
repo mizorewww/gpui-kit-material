@@ -411,7 +411,7 @@ fn option_paint_with(
     let left_radius = if index == 0 { outer } else { inner };
     let right_radius = if index + 1 == count { outer } else { inner };
     if disabled {
-        // M3 disabled: on-surface at 12% container and 38% content. The pill
+        // M3 disabled: on-surface at 10% container and 38% content. The pill
         // shape still tells which option is current.
         let ink = color(ColorRole::ON_SURFACE);
         return OptionPaint {
@@ -1077,7 +1077,7 @@ mod tests {
         let disabled = option_paint(1., 1, 3, px(40.), true);
         let ink = crate::theme::color(ColorRole::ON_SURFACE);
         assert_eq!(disabled.foreground, state::disabled(ink));
-        assert_eq!(disabled.background.a, ink.a * state::DISABLED_CONTAINER);
+        assert_eq!(disabled.background.a, ink.a * 0.10);
         assert_eq!(
             disabled.hover, disabled.background,
             "no state layer when disabled"
@@ -1999,7 +1999,7 @@ mod tests {
         let ink = token(ColorRole::ON_SURFACE);
         for index in 0..3 {
             let paint = painted(&format!("full-{index}"));
-            assert_eq!(paint.background, ink.opacity(0.12));
+            assert_eq!(paint.background, ink.opacity(0.10));
             assert_eq!(paint.foreground, ink.opacity(0.38));
             assert_eq!(paint.hover, paint.background, "no hover layer");
         }

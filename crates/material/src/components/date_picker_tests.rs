@@ -139,15 +139,17 @@ fn disabled_days_and_years_use_the_m3_disabled_roles() {
     use crate::tokens::state;
     let on_surface = color(ColorRole::ON_SURFACE);
     let selected = disabled_day_paint(day_paint(1., false, false, false), 1.);
-    assert_eq!(selected.fill, on_surface.opacity(state::DISABLED_CONTAINER));
+    assert_eq!(selected.fill, on_surface.opacity(0.10));
     assert_eq!(selected.ink, state::disabled(on_surface));
     let today = disabled_day_paint(day_paint(0., true, false, false), 0.);
     assert_eq!(today.fill.a, 0.);
     assert_eq!(today.outline, Some(state::disabled(on_surface)));
     let (fill, ink) = disabled_year_paint(true);
-    assert_eq!(fill, on_surface.opacity(state::DISABLED_CONTAINER));
+    assert_eq!(fill, on_surface.opacity(0.10));
     assert_eq!(ink, state::disabled(on_surface));
-    assert_eq!(disabled_year_paint(false).0.a, 0.);
+    let (fill, ink) = disabled_year_paint(false);
+    assert_eq!(fill.a, 0.);
+    assert_eq!(ink, state::disabled(color(ColorRole::ON_SURFACE_VARIANT)));
 }
 
 struct Harness(Entity<DatePickerState>);

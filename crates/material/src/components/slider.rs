@@ -1235,10 +1235,7 @@ mod tests {
         let on_surface = color(ColorRole::ON_SURFACE);
         assert_eq!(disabled.active, state::disabled(on_surface));
         assert_eq!(disabled.handle, state::disabled(on_surface));
-        assert_eq!(
-            disabled.inactive,
-            on_surface.opacity(state::DISABLED_CONTAINER)
-        );
+        assert_eq!(disabled.inactive, on_surface.opacity(0.10));
     }
 
     #[test]

@@ -8,17 +8,17 @@
 //! disabled content is on-surface under a 0.38 layer and disabled button
 //! containers are `State Layers/On Surface/Opacity-10`. Fixture:
 //! `tests/fixtures/figma-sys-tokens.json`. md3.io and m3e
-//! (`tests/fixtures/m3e-sys-tokens.json`) agree. [`DISABLED_CONTAINER`] is the
-//! classic 12% default for components whose kit page does not override it
-//! (buttons use 10%).
+//! (`tests/fixtures/m3e-sys-tokens.json`) agree. [`DISABLED_CONTAINER`] is the kit's
+//! 10%, on every page that has a disabled container or outline.
 use gpui::Rgba;
 
 pub const HOVER: f32 = 0.08;
 pub const FOCUS: f32 = 0.10;
 pub const PRESS: f32 = 0.10;
 pub const DRAG: f32 = 0.16;
-/// Disabled containers and content: on-surface at 12% and 38%.
-pub const DISABLED_CONTAINER: f32 = 0.12;
+/// Disabled containers and content: 10% (the kit's `Opacity-10` layers, of
+/// on-surface and for some containers another role) and 38%.
+pub const DISABLED_CONTAINER: f32 = 0.10;
 pub const DISABLED_CONTENT: f32 = 0.38;
 /// The text selection highlight: primary at 40% (Compose Material 3
 /// `TextSelectionColors.kt`, `TextSelectionBackgroundOpacity = 0.4f`).
@@ -147,5 +147,11 @@ mod tests {
     fn layer_opacity_multiplies_content_alpha() {
         let result = layer(rgba(0., 0., 0., 0.), rgba(1., 1., 1., 0.5), PRESS);
         assert!((result.a - 0.05).abs() < 1e-6);
+    }
+
+    #[test]
+    fn disabled_containers_are_the_kits_ten_percent() {
+        assert_eq!(DISABLED_CONTAINER, 0.10);
+        assert_eq!(DISABLED_CONTENT, 0.38);
     }
 }

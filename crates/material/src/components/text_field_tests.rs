@@ -76,7 +76,7 @@ fn filled_and_outlined_paint_m3_roles_in_every_state() {
     let on_surface = color(C::ON_SURFACE);
     assert_eq!(disabled.label, state::disabled(on_surface));
     assert_eq!(disabled.supporting, state::disabled(on_surface));
-    assert_eq!(disabled.indicator.a, on_surface.a * 0.12);
+    assert_eq!(disabled.indicator.a, on_surface.a * 0.10);
     let disabled_filled = field_paint(
         TextFieldVariant::Filled,
         FieldState {

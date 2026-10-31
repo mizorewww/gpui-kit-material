@@ -252,7 +252,7 @@ fn switch_paint(checked: bool, disabled: bool, error: bool) -> SwitchPaint {
         (false, true) => {
             let handle = state::disabled(role(ColorRole::ON_SURFACE));
             SwitchPaint {
-                track: container(ColorRole::SURFACE_CONTAINER_HIGHEST),
+                track: container(ColorRole::SURFACE_VARIANT),
                 outline: container(ColorRole::ON_SURFACE),
                 handle,
                 handle_active: handle,
@@ -555,21 +555,15 @@ mod tests {
         assert_eq!(off.icon, c(ColorRole::SURFACE_CONTAINER_HIGHEST));
         let on_surface = c(ColorRole::ON_SURFACE);
         let disabled_on = switch_paint(true, true, false);
-        assert_eq!(
-            disabled_on.track,
-            on_surface.opacity(state::DISABLED_CONTAINER)
-        );
+        assert_eq!(disabled_on.track, on_surface.opacity(0.10));
         assert_eq!(disabled_on.handle, c(ColorRole::SURFACE));
         assert_eq!(disabled_on.icon, state::disabled(on_surface));
         let disabled_off = switch_paint(false, true, false);
         assert_eq!(disabled_off.handle, state::disabled(on_surface));
-        assert_eq!(
-            disabled_off.outline,
-            on_surface.opacity(state::DISABLED_CONTAINER)
-        );
+        assert_eq!(disabled_off.outline, on_surface.opacity(0.10));
         assert_eq!(
             disabled_off.track,
-            c(ColorRole::SURFACE_CONTAINER_HIGHEST).opacity(state::DISABLED_CONTAINER)
+            c(ColorRole::SURFACE_VARIANT).opacity(0.10)
         );
         assert_eq!(STATE_LAYER, 40.);
         assert_eq!(ICON, 16.);

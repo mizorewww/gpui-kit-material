@@ -745,6 +745,10 @@ mod tests {
         let selected = list_paint(true, false);
         assert_eq!(selected.container, color(ColorRole::SECONDARY_CONTAINER));
         assert_eq!(selected.headline, color(ColorRole::ON_SECONDARY_CONTAINER));
+        assert_eq!(
+            list_paint(true, true).container,
+            color(ColorRole::ON_SURFACE).opacity(0.10)
+        );
         let disabled = list_paint(false, true);
         assert_eq!(
             disabled.headline,
