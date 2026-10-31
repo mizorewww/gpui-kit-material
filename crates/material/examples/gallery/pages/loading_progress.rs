@@ -3,6 +3,67 @@
 //! Expressive loading indicator's seven shapes, plus live indicators.
 use super::prelude::*;
 
+const LOADING_INDICATOR: usize = 4;
+const PULL_TO_REFRESH: usize = 5;
+
+/// The progress indicators' rows on the Progress page's Specs tab.
+pub fn progress_rows() -> Vec<usize> {
+    (0..LOADING_INDICATOR).collect()
+}
+/// The loading indicator's rows on its Specs tab.
+pub fn loading_indicator_rows() -> Vec<usize> {
+    vec![LOADING_INDICATOR]
+}
+/// Pull to refresh's rows on its Specs tab.
+pub fn pull_to_refresh_rows() -> Vec<usize> {
+    vec![PULL_TO_REFRESH]
+}
+
+/// Pull to refresh at rest and refreshing, for each indicator. The kit has no
+/// pull-to-refresh page: these specimens are the real component over a list.
+fn pull_to_refresh_board() -> AnyElement {
+    const INDICATORS: [PullToRefreshIndicator; 2] = [
+        PullToRefreshIndicator::Default,
+        PullToRefreshIndicator::LoadingIndicator,
+    ];
+    board("pull-to-refresh")
+        .caption("Pull to refresh")
+        .columns(2)
+        .column_width(240.)
+        .column_labels(["Default indicator", "Loading indicator"])
+        .row_labels(["At rest", "Refreshing"])
+        .cells([false, true].into_iter().flat_map(|refreshing| {
+            INDICATORS
+                .into_iter()
+                .enumerate()
+                .map(move |(ix, indicator)| {
+                    let id = ix * 2 + usize::from(refreshing);
+                    let mut list = PullToRefresh::new(("pull-specimen", id), "Refreshing items")
+                        .indicator(indicator)
+                        .refreshing(refreshing);
+                    for item in 1..=3 {
+                        list = list.child(
+                            ListItem::new(
+                                SharedString::from(format!("pull-specimen-{id}-{item}")),
+                                SharedString::from(format!("Item {item}")),
+                            )
+                            .container(ColorRole::SURFACE),
+                        );
+                    }
+                    div()
+                        .w(rem(240.))
+                        .h(rem(200.))
+                        .overflow_hidden()
+                        .rounded(rem(12.))
+                        .border_1()
+                        .border_color(color(ColorRole::OUTLINE_VARIANT))
+                        .bg(color(ColorRole::SURFACE))
+                        .child(list)
+                })
+        }))
+        .into_any_element()
+}
+
 pub struct Page {
     linear: [RepeatAnimationPlayback; 4],
     circular_live: [RepeatAnimationPlayback; 4],
@@ -59,7 +120,7 @@ impl GalleryPage for Page {
     }
 
     fn row_count(&self, _: &Window) -> usize {
-        5
+        PULL_TO_REFRESH + 1
     }
 
     const PREPARES: bool = true;
@@ -175,6 +236,7 @@ impl GalleryPage for Page {
                     cx,
                 ))
                 .into_any_element(),
+            PULL_TO_REFRESH => pull_to_refresh_board(),
             _ => board("loading-indicator")
                 .caption("Loading indicator · Indeterminate")
                 .columns(2)

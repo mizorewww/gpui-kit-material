@@ -9,6 +9,46 @@ use super::text_fields::symbol;
 const STATES: [InteractionPreview; 5] = InteractionPreview::ALL;
 const FRUITS: [&str; 5] = ["Apple", "Banana", "Cherry", "Grape", "Mango"];
 
+const LIVE_MENUS: usize = 5;
+const LIVE_DROPDOWNS: usize = 6;
+const SELECT_BOARD: usize = 7;
+
+/// The menu's rows on its Specs tab.
+pub fn menu_rows() -> Vec<usize> {
+    (0..=LIVE_MENUS).collect()
+}
+/// The select's rows on its Specs tab.
+pub fn select_rows() -> Vec<usize> {
+    vec![SELECT_BOARD, LIVE_DROPDOWNS]
+}
+
+/// The select's field: each variant empty, filled, in error and disabled.
+fn select_board() -> AnyElement {
+    // A board fills row by row.
+    let cells = (0..4).flat_map(|row| {
+        [TextFieldVariant::Filled, TextFieldVariant::Outlined]
+            .into_iter()
+            .enumerate()
+            .map(move |(column, variant)| {
+                ExposedDropdown::new(("select-specimen", column * 4 + row), "Fruit")
+                    .variant(variant)
+                    .options(FRUITS)
+                    .selected((row > 0).then_some(0))
+                    .error(row == 2)
+                    .disabled(row == 3)
+                    .width(240.)
+            })
+    });
+    board("select-field")
+        .caption("Select")
+        .columns(2)
+        .column_width(240.)
+        .column_labels(["Filled", "Outlined"])
+        .row_labels(["Empty", "Selected", "Error", "Disabled"])
+        .cells(cells)
+        .into_any_element()
+}
+
 pub struct Page {
     edit_open: bool,
     view_open: bool,
@@ -62,11 +102,11 @@ impl GalleryPage for Page {
     }
 
     fn row_count(&self, _: &Window) -> usize {
-        7
+        SELECT_BOARD + 1
     }
 
     fn interactive(&self, row: usize) -> bool {
-        row >= 5
+        row == LIVE_MENUS || row == LIVE_DROPDOWNS
     }
 
     /// `--active` opens the live menus so captures show the popups.
@@ -130,8 +170,9 @@ impl GalleryPage for Page {
                 )
                 .into_any_element(),
             4 => baseline_blocks(),
-            5 => self.live_menus(cx),
-            _ => self.live_dropdowns(cx),
+            LIVE_MENUS => self.live_menus(cx),
+            LIVE_DROPDOWNS => self.live_dropdowns(cx),
+            _ => select_board(),
         }
     }
 }
