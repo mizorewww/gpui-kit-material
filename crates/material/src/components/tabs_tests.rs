@@ -307,3 +307,53 @@ fn rounding_of_a_measurement_does_not_redraw_the_tabs() {
     assert!(spans_moved(&[(0., 83.5)], &[(0., 83.5), (84., 80.)]));
     assert!(spans_moved(&[], &[(0., 83.5)]));
 }
+
+struct Narrow {
+    width: f32,
+    container: ColorRole,
+}
+
+impl gpui::Render for Narrow {
+    fn render(&mut self, _: &mut Window, _: &mut gpui::Context<Self>) -> impl IntoElement {
+        div().w(px(self.width)).child(
+            MaterialTabs::new("narrow", "Sections")
+                .variant(TabsVariant::Secondary)
+                .container(self.container)
+                .items([
+                    TabItem::new("a", "Inbox").icon(crate::icons::IconName::Info),
+                    TabItem::new("b", "Favorites").icon(crate::icons::IconName::Info),
+                    TabItem::new("c", "Sent").icon(crate::icons::IconName::Info),
+                ])
+                .selected("a"),
+        )
+    }
+}
+
+/// A tab narrower than its label and the kit's padding keeps the label whole:
+/// the padding gives way first, and only then the label.
+#[gpui::test]
+fn the_padding_gives_way_before_the_label(cx: &mut TestAppContext) {
+    cx.update(crate::init);
+    let (_, cx) = cx.add_window_view(|_, _| Narrow {
+        width: 1200.,
+        container: ColorRole::SURFACE,
+    });
+    let draw = |cx: &mut VisualTestContext| {
+        cx.update(|window, cx| {
+            window.refresh();
+            window.draw(cx).clear(cx);
+        });
+        cx.run_until_parked();
+    };
+    draw(cx);
+    let whole = cx.debug_bounds("tab-label-1").unwrap().size.width;
+    let content = cx.debug_bounds("material-tab-1").unwrap().size.width;
+    assert!(content > whole + px(32.), "a wide tab keeps its padding");
+    // Three tabs narrower than the label and a whole padding on each side.
+    let rem = cx.update(|window, _| window.rem_size());
+    let room = whole + rem * (24. + 8. + 8.) / 16.;
+    let view = cx.update(|window, _| window.root::<Narrow>().flatten().unwrap());
+    view.update(cx, |view, _| view.width = f32::from(room) * 3.);
+    draw(cx);
+    assert_eq!(cx.debug_bounds("tab-label-1").unwrap().size.width, whole);
+}

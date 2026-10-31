@@ -113,6 +113,7 @@ pub struct MaterialTabs {
     items: Vec<TabItem>,
     selected: Option<SharedString>,
     on_change: Option<Change>,
+    container: ColorRole,
 }
 
 impl MaterialTabs {
@@ -128,7 +129,14 @@ impl MaterialTabs {
             items: Vec::new(),
             selected: None,
             on_change: None,
+            container: ColorRole::SURFACE,
         }
+    }
+    /// The tab bar's container (default: surface, the kit's). Tabs set in a
+    /// surface of another role take that role, so that they blend into it.
+    pub fn container(mut self, container: ColorRole) -> Self {
+        self.container = container;
+        self
     }
     pub fn variant(mut self, variant: TabsVariant) -> Self {
         self.variant = variant;
@@ -172,6 +180,16 @@ impl MaterialTabs {
 /// The M3 leading inset of scrollable tabs.
 const SCROLL_INSET: f32 = 52.;
 const TAB_PADDING: f32 = 16.;
+
+/// A side of a tab: the kit's padding, which grows to center the content in a
+/// wide tab and gives way before the label does in a narrow one, so that a label
+/// that fits the tab is never cut off.
+fn tab_padding() -> Div {
+    div()
+        .flex_basis(rem(TAB_PADDING))
+        .flex_grow(1.)
+        .flex_shrink(1000.)
+}
 
 /// Container height: icon-over-label primary tabs are 64dp, all others 48dp.
 pub(crate) fn tabs_height(variant: TabsVariant, items: &[TabItem]) -> f32 {
@@ -412,6 +430,9 @@ impl RenderOnce for MaterialTabs {
 
             let label = item.show_label.then(|| {
                 div()
+                    .when(cfg!(test), |label| {
+                        label.debug_selector(move || format!("tab-label-{index}"))
+                    })
                     .min_w_0()
                     .whitespace_nowrap()
                     .text_ellipsis()
@@ -480,7 +501,8 @@ impl RenderOnce for MaterialTabs {
                 .track_focus(&focus)
                 .relative()
                 .h_full()
-                .px(rem(TAB_PADDING))
+                .flex()
+                .flex_row()
                 .map(|tab| {
                     if scrollable {
                         tab.flex_shrink_0()
@@ -501,7 +523,9 @@ impl RenderOnce for MaterialTabs {
                 .when(cfg!(test), |tab| {
                     tab.debug_selector(move || format!("material-tab-{index}"))
                 })
+                .child(tab_padding())
                 .child(content)
+                .child(tab_padding())
                 .when(fallback && !primary && is_selected, |tab| {
                     tab.child(indicator_bar().left_0().right_0())
                 })
@@ -626,7 +650,7 @@ impl RenderOnce for MaterialTabs {
             .relative()
             .w_full()
             .h(rem(height))
-            .bg(color(ColorRole::SURFACE))
+            .bg(color(self.container))
             // The full-width divider under the tabs; the indicator covers it.
             .when(self.divider, |list| {
                 list.child(
