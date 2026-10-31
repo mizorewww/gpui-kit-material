@@ -193,7 +193,8 @@
     "src/text_system.rs",
     "src/text_system/line_layout.rs",
     "src/text_system/line_wrapper.rs",
-    "src/window.rs"
+    "src/window.rs",
+    "src/app/entity_map.rs"
   ],
   "modified_files": {
     "src/app.rs": {
@@ -300,6 +301,11 @@
       "upstream_sha256": "17c581884c21901f604eec93d32171dd17518606ce726fd7e59f9a442abc07de",
       "local_sha256": "86a6f52566d0702799a2b77f50e5579c9c24eac24b891c830f8d2a5795f813a9",
       "reason": "The dev-only frame-observation feature, which gates frame statistics, vsync control, CPU scopes, presentation timing and GPU time (frame-submission-patch.md)."
+    },
+    "src/app/entity_map.rs": {
+      "upstream_sha256": "47e536ebd98ec97bc1193c176295b4b69dfb2a37c30cb8ab7879e32b1a4ea180",
+      "local_sha256": "08565386dee8a1660600a20f9aedb98a85d80ff68023f9135f4a4f51c43dac20",
+      "reason": "Entity::update_for_render (render-lease-patch.md)."
     }
   },
   "added_files": {
@@ -334,7 +340,7 @@
       "reason": "Not retained; Cargo.toml is the normalized manifest Cargo builds (test-harness-patch.md)."
     }
   },
-  "unchanged_file_count": 142,
+  "unchanged_file_count": 141,
   "provenance_files": [
     "SOURCE.json",
     "animation-visibility-patch.md",
@@ -348,6 +354,7 @@
     "letter-spacing-patch.md",
     "presentation-timing-patch.md",
     "quiet-global-swap-patch.md",
+    "render-lease-patch.md",
     "tab-stop-index-patch.md",
     "test-harness-patch.md",
     "touch-observer-patch.md"

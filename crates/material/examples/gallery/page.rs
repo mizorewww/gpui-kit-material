@@ -253,7 +253,10 @@ impl<P: GalleryPage> AnyPage for Entity<P> {
         self.read(cx).interactive(row)
     }
     fn render_row(&self, row: usize, window: &mut Window, cx: &mut App) -> AnyElement {
-        self.update(cx, |page, cx| page.render_row(row, window, cx))
+        // A row builds from the page and writes nothing to it outside its listeners,
+        // which notify. Through `update`, each row built would invalidate every other
+        // retained row that read the page, and those rebuild in turn.
+        self.update_for_render(cx, |page, cx| page.render_row(row, window, cx))
     }
     fn prepare(&self, window: &mut Window, cx: &mut App) {
         if P::PREPARES {

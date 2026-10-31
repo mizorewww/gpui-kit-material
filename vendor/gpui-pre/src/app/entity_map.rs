@@ -502,6 +502,17 @@ impl<T: 'static> Entity<T> {
         cx.update_entity(self, update)
     }
 
+    /// Leases the entity to build elements from it. The same as [`Self::update`]
+    /// here; GPUI Fast's retained subtrees do not count it as a change.
+    #[inline]
+    pub fn update_for_render<R>(
+        &self,
+        cx: &mut App,
+        build: impl FnOnce(&mut T, &mut Context<T>) -> R,
+    ) -> R {
+        self.update(cx, build)
+    }
+
     /// Updates the entity referenced by this handle with the given function.
     #[inline]
     pub fn as_mut<'a, C: AppContext>(&self, cx: &'a mut C) -> GpuiBorrow<'a, T> {

@@ -390,6 +390,16 @@
         "upstream_sha256": "1f8d49e1f08e320cf393fcacb2ac402044ddb7aaf8dffc4572e31aa3d5a9e7ea",
         "local_sha256": "b01f32721377a3712286427ce84e1d2ea895c0c0e7d2a30b690017c29b75764c",
         "reason": "The dev-only frame-observation feature (vendor/gpui-pre/frame-submission-patch.md)."
+      },
+      "src/fast/dependencies.rs": {
+        "upstream_sha256": "8f230852f0585bec1f92608aec4fcc3d8fb3f00ad4736cba8a8d05f736e84cc5",
+        "local_sha256": "5529a863e4edfb2d3b164dbac494fedd5fb1fdbf1786d51e5312ba6baed3ed91",
+        "reason": "Entity::update_for_render, the public form of dependencies::query (vendor/gpui-pre/render-lease-patch.md)."
+      },
+      "src/fast/tests/dependencies.rs": {
+        "upstream_sha256": "131164fada000e865db0a14855e4eab5446f89b45e70a1904414408cd0cdb6b0",
+        "local_sha256": "9e69cccb259c6531194158b892e3641fef5f09e86dea403eb6c381d1795b737d",
+        "reason": "A render lease is not a change unless it notifies (vendor/gpui-pre/render-lease-patch.md)."
       }
     },
     "added": {
@@ -428,6 +438,6 @@
         "reason": "Package-level lockfile not retained; the workspace Cargo.lock owns resolution."
       }
     },
-    "unchanged_file_count": 139
+    "unchanged_file_count": 137
   }
 }
