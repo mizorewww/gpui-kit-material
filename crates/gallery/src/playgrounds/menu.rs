@@ -56,12 +56,19 @@ pub static PLAYGROUND: Playground = Playground {
         },
         Section {
             title: "Layout",
-            controls: &[Control::Select {
-                id: "position",
-                label: "Position",
-                options: POSITIONS,
-                default: 0,
-            }],
+            controls: &[
+                Control::Select {
+                    id: "position",
+                    label: "Position",
+                    options: POSITIONS,
+                    default: 0,
+                },
+                Control::Switch {
+                    id: "max-height",
+                    label: "Max height",
+                    default: false,
+                },
+            ],
         },
         Section {
             title: "Content",
@@ -305,6 +312,9 @@ fn preview(
         }
     }
     let share_index = index;
+    if config.bool("max-height") {
+        menu = menu.max_height(144.);
+    }
 
     let label = config.text("label");
     let trigger = MaterialButton::new("menu-trigger")
