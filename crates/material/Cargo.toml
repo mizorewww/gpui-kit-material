@@ -12,21 +12,65 @@ authors.workspace = true
 readme = "../../README.md"
 keywords = ["material", "material-design", "gpui", "ui", "desktop"]
 categories = ["gui"]
-# The gallery and benchmarks stay in the repository: the gallery bundles OFL-1.1
-# fonts, which the library does not use. gpui-kit-material-gallery-web declares them.
-exclude = ["examples/"]
 
 [package.metadata.docs.rs]
 targets = ["x86_64-unknown-linux-gnu"]
 
 [features]
-default = ["serde", "embedded-symbols", "gpui-fast"]
+default = ["full", "serde", "embedded-symbols", "gpui-fast"]
 embedded-symbols = ["gpui-material-symbols/embed-assets"]
 serde = ["gpui-kit-material-color/serde"]
-frame-profiler = ["gpui-kit/profiler"]
 gpui-fast = ["gpui-kit/gpui-fast"]
-# The Gallery's per-frame instruction counts; see `examples/gallery/instr_bench.rs`.
-instruction-bench = ["gpui-fast"]
+
+# Every group below. Backend, symbols and serde stay separate choices.
+full = [
+    "adaptive",
+    "buttons",
+    "containment",
+    "dialogs",
+    "dynamic-color",
+    "feedback",
+    "inputs",
+    "loading",
+    "menus",
+    "navigation",
+    "pickers",
+    "progress",
+    "selection",
+    "shapes",
+    "window-chrome",
+]
+# MaterialButton, IconButton, ButtonGroup, ConnectedButtonGroup, SplitButton, Fab, FabMenu.
+buttons = ["menus", "progress"]
+# LinearProgress, CircularProgress.
+progress = []
+# LoadingIndicator, PullToRefresh.
+loading = ["progress", "shapes"]
+# Badge, Snackbar, MaterialTooltip, MaterialCard, status chips and notices.
+feedback = []
+# Checkbox, radio, switch, chips, slider, tiles and choice tiles.
+selection = []
+# TextField, SearchField, SearchView.
+inputs = []
+# MaterialMenu, and ExposedDropdown when `inputs` is on too.
+menus = []
+# DatePicker, TimePicker.
+pickers = ["buttons", "dep:chrono", "inputs"]
+# MaterialDialog, MaterialBottomSheet, MaterialSideSheet.
+dialogs = []
+# Avatar, MaterialCarousel, MaterialDivider, ListItem.
+containment = ["selection"]
+# NavigationBar, NavigationRail, NavigationDrawer, NavigationSuite, MaterialTabs, TopAppBar,
+# BottomAppBar, Toolbar.
+navigation = ["adaptive", "dialogs", "feedback"]
+# Window size classes, PaneScaffold, FeedLayout.
+adaptive = []
+# TitleBar, CaptionButtons.
+window-chrome = []
+# MaterialShape and Morph.
+shapes = []
+# `color::dynamic`: HCT and seed schemes.
+dynamic-color = ["gpui-kit-material-color/dynamic"]
 
 [dependencies]
 gpui-kit-material-color.workspace = true
@@ -34,18 +78,35 @@ gpui-kit.workspace = true
 gpui-material-symbols = { git = "https://github.com/mizorewww/gpui-material-symbols", rev = "593aa15a46076f3e2870c23c0e4fd79f94f105bd", default-features = false, features = ["gpui-kit"] }
 gpui-base.workspace = true
 # Already in Cargo.lock through GPUI Base's calendar; the pickers share its date types.
-chrono = { version = "0.4.38", default-features = false, features = ["clock"] }
+chrono = { version = "0.4.38", default-features = false, features = ["clock"], optional = true }
 
 [target.'cfg(target_family = "wasm")'.dependencies]
 web-time = "1"
 
 [dev-dependencies]
-# Only the icon asset-source test and the native gallery example use anyhow.
+# Only the icon asset-source test uses anyhow.
 anyhow.workspace = true
 
 [target.'cfg(not(target_family = "wasm"))'.dev-dependencies]
 serde_json.workspace = true
 gpui-kit = { workspace = true, features = ["test-support"] }
 
-[[example]]
-name = "gallery"
+[[test]]
+name = "compose_shapes"
+required-features = ["shapes"]
+
+[[test]]
+name = "input_move_guard"
+required-features = ["full"]
+
+[[test]]
+name = "kit_theme"
+required-features = ["full"]
+
+[[test]]
+name = "tab_stops"
+required-features = ["full"]
+
+[[test]]
+name = "wheel_guard"
+required-features = ["full"]

@@ -3,9 +3,8 @@ name = "gpui-kit-material-gallery-web"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
-# The shared gallery bundles IBM Plex Sans and Roboto under OFL-1.1 (their licenses
-# sit beside them in crates/material/examples/gallery/fonts), and serves Material
-# Symbols under Apache-2.0.
+# Links crates/gallery, which bundles IBM Plex Sans and Roboto under OFL-1.1, and serves
+# Material Symbols under Apache-2.0.
 license = "MIT AND Apache-2.0 AND OFL-1.1"
 publish = false
 
@@ -14,21 +13,11 @@ crate-type = ["cdylib", "rlib"]
 
 [features]
 default = ["gpui-fast"]
-gpui-fast = ["gpui-kit/gpui-fast", "gpui-kit-material/gpui-fast", "dep:gpui-fast-web"]
-
-# Shared Gallery source contains native-only profiling code. This acknowledges
-# that source's cfg without advertising a browser frame collector.
-[lints.rust]
-unexpected_cfgs = { level = "warn", check-cfg = ['cfg(feature, values("frame-profiler", "instruction-bench"))'] }
+gpui-fast = ["gpui-kit/gpui-fast", "gpui-kit-material/gpui-fast", "gpui-kit-material-gallery/gpui-fast"]
 
 [target.'cfg(target_family = "wasm")'.dependencies]
 gpui-kit.workspace = true
-gpui-base.workspace = true
-# Only for this feature: the Gallery's frame counters read the engine's dev-only
-# frame observation, which a consumer's web backends leave off. Kit already links
-# these crates, and its normalized manifest keeps their threading off too.
-gpui-pre-web = { version = "=0.3.10", default-features = false, features = ["frame-observation"] }
-gpui-fast-web = { version = "0.1.12", default-features = false, features = ["frame-observation"], optional = true }
 gpui-kit-material = { path = "../material", default-features = false, features = ["serde"] }
+gpui-kit-material-gallery = { path = "../gallery", default-features = false }
 wasm-bindgen = "=0.2.129"
 web-sys = { version = "=0.3.106", features = ["Window", "MediaQueryList", "MediaQueryListEvent", "EventTarget", "Location"] }

@@ -15,9 +15,7 @@ mod control;
 mod playback;
 pub use playback::{ButtonTransitionInputs, ButtonTransitionPlayback};
 mod effects;
-mod focus_ring;
 mod form;
-pub(crate) use focus_ring::ButtonFocusRing;
 pub use form::{FabSize, IconButtonWidth};
 pub(crate) use form::{Form, Palette, Roles, Segment, segment_metrics};
 mod hit_target;
@@ -25,16 +23,12 @@ mod hit_target;
 mod loading_tests;
 #[cfg(test)]
 mod preview_tests;
-mod ripple;
-pub(crate) use ripple::ButtonRipple;
-#[cfg(test)]
-pub(crate) use ripple::{ripple_writes, waves_painted};
-mod ripple_clip;
 mod shadow;
 #[cfg(test)]
 mod toggle_tests;
 
 use super::InteractionPreview;
+use super::interaction::{ButtonFocusRing, ripple};
 use control::BaseControl;
 use effects::CssColor;
 
@@ -192,8 +186,8 @@ pub enum ButtonDirection {
 }
 
 #[derive(Clone, Copy, Debug)]
-struct Geometry {
-    height: f32,
+pub(crate) struct Geometry {
+    pub(crate) height: f32,
     padding: f32,
     gap: f32,
     outline: f32,
@@ -230,7 +224,7 @@ impl ButtonSize {
             Self::ExtraLarge => 40.,
         }
     }
-    fn geometry(self) -> Geometry {
+    pub(crate) fn geometry(self) -> Geometry {
         let (height, padding, gap, outline, square, pressed, typography) = match self {
             Self::ExtraSmall => (32., 12., 4., 1., 12., 8., TypeRole::LabelLarge),
             Self::Small => (40., 16., 8., 1., 12., 8., TypeRole::LabelLarge),
@@ -365,9 +359,9 @@ fn colors(variant: ButtonVariant, disabled: bool) -> (Rgba, Rgba, Rgba) {
 }
 
 /// Passive visual state. Base remains the only activation authority.
-struct PressState {
-    pointer: bool,
-    hovered: bool,
+pub(crate) struct PressState {
+    pub(crate) pointer: bool,
+    pub(crate) hovered: bool,
     caller_hovered: bool,
     native_hovered: bool,
     outside_window: bool,

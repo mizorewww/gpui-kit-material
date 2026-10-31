@@ -18,9 +18,9 @@
 //! whose month grid helper is private) with a fixed six-week grid so a
 //! picker keeps its height while the month changes.
 use super::InteractionPreview;
-use super::button::ButtonFocusRing;
+use super::interaction::ButtonFocusRing;
 use super::ripple::Ripple;
-use super::text_field::type_style;
+use super::text::type_style;
 use crate::{
     color::ColorRole,
     icons::{Icon, Symbol},

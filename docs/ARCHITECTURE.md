@@ -36,6 +36,31 @@ colors; they paint `ColorRole`s through `theme::color`. Material, galleries and
 fixtures import `gpui` through the Kit facade so engine types always match the
 selected backend.
 
+## Crates and features
+
+```
+gpui-kit-material-color          no GPUI; independently usable
+        ▲
+gpui-kit-material                the library; nothing below is in its package
+        ▲
+gpui-kit-material-gallery        publish = false: Gallery, fonts, frame-profiler, instruction-bench
+        ▲            ▲
+        │            gpui-kit-material-gallery-web   publish = false: browser entry, wasm-bindgen
+gpui-kit-material-bench          publish = false: component_bench, engine_bench (on the library only)
+```
+
+`crates/consumer-check` stands outside the workspace, as a downstream manifest does.
+Dev-only engine features are selected only by the Gallery and benches; the library has
+none ([Consumer patch set](#consumer-patch-set)). The Gallery's native build keeps
+`gpui-kit/test-support`, whose `render_to_image` draws `--capture`.
+
+The library's components are in Cargo feature groups, listed in the
+[README](../README.md#crates). A component using one in another group means its group
+declares that group in `Cargo.toml`, and `scripts/check-features.sh`, which checks each
+group alone in CI, fails when it does not. `components/interaction` (focus ring, ripple),
+`focus`, `ripple`, `roving`, `preview`, `labeled` and `text` are shared by the groups and
+have no gate. Tests that span groups need `full`, and so run only with it.
+
 ## Reference sources
 
 Token values follow the priority **Figma M3 Design Kit > md3.io >
@@ -141,13 +166,13 @@ Its engine has upstream's `FrameEvent`, `PlatformWindow` and frame path.
 
 Everything else in `vendor/` is a **dev-only overlay**, marked in the table below,
 for the Gallery's FPS display
-and vsync switch, `engine_bench` and `scripts/profile-gallery.py`: frame statistics,
+and vsync switch, `crates/bench`'s `engine_bench` and `scripts/profile-gallery.py`: frame statistics,
 vsync control, CPU scopes, presentation timing and GPU time, and the render lease the
 Gallery's rows build through. `gpui-pre` and
 `gpui-fast` gate them behind the `frame-observation` Cargo feature, and only the
 overlay's backend manifests (`gpui-*-macos`, `-linux`, `-windows`) turn it on. The
 web crates are not overlays, so their manifests leave it off and offer a
-`frame-observation` feature of their own, which only `crates/gallery-web` selects
+`frame-observation` feature of their own, which only `crates/gallery` selects
 for its browser frame counters. No library code may use them; `crates/consumer-check` fails to build if it does.
 Inside this workspace the feature is therefore always on, so upstream's `gpui-fps`
 does not compile here (`E0004`, `FrameEvent::Complete`) and is not used here.
@@ -191,8 +216,8 @@ composited scrolling list replays every frame, in Kit's lists as in Material's.
 Query results are upstream's, including gpui-kit#3612, which no Material widget
 reaches (`crates/material/tests/tab_stops.rs`).
 
-**Backend selection.** Material and gallery-web expose `gpui-fast`, forwarding
-to Kit's backend feature; it is on by default. Material's `gpui` alias points to
+**Backend selection.** Material, the Gallery, gallery-web and the benches expose
+`gpui-fast`, forwarding to Kit's backend feature; it is on by default. Material's `gpui` alias points to
 Kit, so upstream and Fast types cannot mix. Cargo still compiles upstream
 packages additively; they do not define the facade's public types. Disable
 default features to compare against upstream.

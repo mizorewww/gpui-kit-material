@@ -169,7 +169,7 @@
         },
         {
           "kind": "reference-font-assets",
-          "path": "crates/material/examples/gallery/fonts/SOURCES.json",
+          "path": "crates/gallery/fonts/SOURCES.json",
           "scope": "Live md3.io typography samples load Roboto-latin-wght.woff2 (3.015); pinned source and reproducible 400/500 TTF instances registered in both gallery targets. Latin subset only; other scripts use platform fallback. Does not prove complete typography or tracking conformance."
         }
       ],

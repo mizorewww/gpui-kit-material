@@ -8,7 +8,7 @@ const LIFETIME: Duration = Duration::from_millis(450);
 /// How long a held touch can go without an end before its wave is released. GPUI
 /// reports a tap's end and a pan's scroll publicly, but not a system cancel of a
 /// still finger; this keeps that wave from staying on screen.
-pub(super) const TOUCH_HOLD_LIMIT: Duration = Duration::from_secs(5);
+pub(crate) const TOUCH_HOLD_LIMIT: Duration = Duration::from_secs(5);
 #[derive(Clone)]
 struct Wave {
     id: u64,
@@ -421,6 +421,7 @@ impl Element for ButtonRipple {
                 color.a *= wave.opacity;
                 #[cfg(test)]
                 {
+                    #[cfg(feature = "buttons")]
                     tests::record_paint(color, radius, border);
                     WAVES_PAINTED.with(|painted| painted.set(painted.get() + 1));
                 }
@@ -505,7 +506,7 @@ impl Element for ButtonRipple {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "buttons"))]
 mod tests {
     use super::ButtonRipple;
     use crate::{components::button::MaterialButton, tokens::typography::rem};
@@ -1161,7 +1162,7 @@ mod tests {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "buttons"))]
 mod target_tests {
     use super::RippleState;
     use crate::components::button::{ButtonSize, ButtonVariant, MaterialButton, PressState};

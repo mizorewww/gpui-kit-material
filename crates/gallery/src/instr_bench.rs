@@ -4,7 +4,7 @@
 //!
 //! ```sh
 //! MATERIAL_INSTR_OUTPUT=/tmp/g.json MATERIAL_INSTR_ENTRY=button MATERIAL_INSTR_TAB=specs \
-//! MATERIAL_INSTR_MODE=scroll cargo run --release -p gpui-kit-material --example gallery \
+//! MATERIAL_INSTR_MODE=scroll cargo run --release -p gpui-kit-material-gallery \
 //!     --features instruction-bench
 //! ```
 //!
@@ -16,7 +16,7 @@ use gpui::*;
 use serde_json::{Value, json};
 use std::{cell::Cell, path::PathBuf, time::Duration};
 
-#[path = "../support/perf_counters.rs"]
+#[path = "../../bench/src/perf_counters.rs"]
 mod perf_counters;
 use perf_counters::{Counters, CountingAllocator};
 

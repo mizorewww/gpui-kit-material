@@ -1,0 +1,24 @@
+[package]
+name = "gpui-kit-material-bench"
+description = "Standalone frame benchmarks for gpui-kit-material: component_bench and engine_bench"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+# Draws with the Gallery's Roboto (OFL-1.1, crates/gallery/fonts/roboto).
+license = "MIT AND Apache-2.0 AND OFL-1.1"
+repository.workspace = true
+authors.workspace = true
+publish = false
+
+[features]
+default = ["gpui-fast", "embedded-symbols"]
+gpui-fast = ["gpui-kit/gpui-fast", "gpui-kit-material/gpui-fast"]
+embedded-symbols = ["gpui-kit-material/embedded-symbols"]
+frame-profiler = ["gpui-kit/profiler"]
+
+[target.'cfg(not(target_family = "wasm"))'.dependencies]
+anyhow.workspace = true
+gpui-base.workspace = true
+gpui-kit.workspace = true
+gpui-kit-material = { path = "../material", default-features = false, features = ["full", "serde"] }
+serde_json.workspace = true

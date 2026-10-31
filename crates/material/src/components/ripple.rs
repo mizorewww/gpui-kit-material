@@ -9,7 +9,7 @@
 //!
 //! Timing comes from the reference's captured ripple (`button/ripple.rs`), and
 //! reduced motion follows it there.
-use super::button::ButtonRipple;
+use super::interaction::ButtonRipple;
 use crate::{color::ColorRole, theme::color};
 use gpui::{prelude::*, *};
 
@@ -112,5 +112,16 @@ impl RenderOnce for Ripple {
             ripple = ripple.touch_pressed(pressed, cx);
         }
         ripple
+    }
+}
+
+/// Uniform ripple clip corners.
+pub(crate) fn ripple_corners(radius: Pixels) -> Corners<AbsoluteLength> {
+    let radius = AbsoluteLength::from(radius);
+    Corners {
+        top_left: radius,
+        top_right: radius,
+        bottom_right: radius,
+        bottom_left: radius,
     }
 }

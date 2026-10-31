@@ -1,0 +1,46 @@
+[package]
+name = "gpui-kit-material-gallery"
+description = "The shared desktop and WASM Gallery of gpui-kit-material"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+# Bundles IBM Plex Sans and Roboto under OFL-1.1 (their licenses sit beside them in
+# fonts/), and serves or embeds Material Symbols under Apache-2.0.
+license = "MIT AND Apache-2.0 AND OFL-1.1"
+repository.workspace = true
+authors.workspace = true
+publish = false
+
+[[bin]]
+name = "gallery"
+path = "src/main.rs"
+
+[features]
+default = ["gpui-fast", "embedded-symbols"]
+gpui-fast = ["gpui-kit/gpui-fast", "gpui-kit-material/gpui-fast", "dep:gpui-fast-web"]
+# The browser downloads the two styles it draws; see crates/gallery-web.
+embedded-symbols = ["gpui-kit-material/embedded-symbols"]
+# scripts/profile-gallery.py's per-frame report: `performance.rs`, `interactions.rs`.
+frame-profiler = ["gpui-kit/profiler"]
+# Per-frame instruction counts; see `src/instr_bench.rs`.
+instruction-bench = ["gpui-fast"]
+
+[dependencies]
+gpui-base.workspace = true
+gpui-kit.workspace = true
+gpui-kit-material = { path = "../material", default-features = false, features = ["full", "serde"] }
+
+[target.'cfg(not(target_family = "wasm"))'.dependencies]
+anyhow.workspace = true
+# `render_to_image`, which `--capture` draws with, is behind test-support.
+gpui-kit = { workspace = true, features = ["test-support"] }
+serde_json.workspace = true
+
+[target.'cfg(target_family = "wasm")'.dependencies]
+# The Gallery's frame counters read the engine's dev-only frame observation, which a
+# consumer's web backends leave off. Kit already links these crates, and its normalized
+# manifest keeps their threading off too.
+gpui-pre-web = { version = "=0.3.10", default-features = false, features = ["frame-observation"] }
+gpui-fast-web = { version = "0.1.12", default-features = false, features = ["frame-observation"], optional = true }
+wasm-bindgen = "=0.2.129"
+web-sys = { version = "=0.3.106", features = ["Window", "Location", "EventTarget"] }

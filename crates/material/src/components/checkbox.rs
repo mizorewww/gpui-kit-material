@@ -8,7 +8,7 @@
 //! once and keeps the short fill fade. Base owns activation (pointer, Space,
 //! Enter), focus and the checkbox role with its mixed state.
 use super::InteractionPreview;
-use super::button::ButtonFocusRing;
+use super::interaction::ButtonFocusRing;
 use super::labeled::{ControlLabel, LabelPosition, required_label};
 use super::radio::selection_paint;
 use super::ripple::Ripple;

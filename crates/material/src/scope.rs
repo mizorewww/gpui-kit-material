@@ -533,5 +533,5 @@ impl Element for ReplayElement {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "full"))]
 mod tests;

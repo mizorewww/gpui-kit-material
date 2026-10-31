@@ -5,9 +5,6 @@ extern crate gpui_kit as gpui;
 #[cfg(target_family = "wasm")]
 mod frame_counters;
 #[cfg(target_family = "wasm")]
-#[path = "../../material/examples/gallery/mod.rs"]
-mod gallery;
-#[cfg(target_family = "wasm")]
 mod motion_preference;
 
 /// Supplies one symbol asset by its file name. The page downloads the styles the
@@ -54,7 +51,7 @@ pub fn run() {
     );
     let http_client = std::sync::Arc::new(platform.fetch_http_client());
     let application = gpui::Application::with_platform(platform).with_http_client(http_client);
-    gallery::run(application, |cx| {
+    gpui_kit_material_gallery::run(application, |cx| {
         motion_preference::install(cx);
         frame_counters::install(cx);
     });

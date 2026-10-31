@@ -4,7 +4,7 @@ from fontTools.ttLib import TTFont
 from fontTools.varLib.instancer import instantiateVariableFont
 from pathlib import Path
 import json,hashlib,fontTools
-root=Path(__file__).resolve().parents[1]/'crates/material/examples/gallery/fonts/conformance'
+root=Path(__file__).resolve().parents[1]/'crates/gallery/fonts/conformance'
 p=root/'SOURCES.json';data=json.loads(p.read_text());derived=[]
 for folder,name in [('notosansarabic','NotoSansArabic'),('notosanshebrew','NotoSansHebrew'),('notoemoji','NotoEmoji')]:
  source=next(path for path in (root/folder).glob('*.ttf') if '[' in path.name)

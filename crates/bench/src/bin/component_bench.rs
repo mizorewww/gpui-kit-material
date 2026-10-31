@@ -3,7 +3,7 @@
 //! instances of one component. One binary, runtime flags, one number per frame.
 //!
 //! ```sh
-//! cargo run --release -p gpui-kit-material --example component_bench -- \
+//! cargo run --release -p gpui-kit-material-bench --bin component_bench -- \
 //!     --content material-list --mode scroll --frames 300 --out /tmp/m.json
 //! ```
 //!
@@ -18,7 +18,7 @@
 extern crate gpui_kit as gpui;
 
 #[cfg(not(target_family = "wasm"))]
-#[path = "support/perf_counters.rs"]
+#[path = "../perf_counters.rs"]
 mod perf_counters;
 
 #[cfg(not(target_family = "wasm"))]
@@ -642,10 +642,10 @@ mod bench {
                 cx.text_system()
                     .add_fonts(vec![
                         std::borrow::Cow::Borrowed(include_bytes!(
-                            "gallery/fonts/roboto/Roboto-Regular.ttf"
+                            "../../../gallery/fonts/roboto/Roboto-Regular.ttf"
                         )),
                         std::borrow::Cow::Borrowed(include_bytes!(
-                            "gallery/fonts/roboto/Roboto-Medium.ttf"
+                            "../../../gallery/fonts/roboto/Roboto-Medium.ttf"
                         )),
                     ])
                     .expect("Failed to load the Roboto fonts");

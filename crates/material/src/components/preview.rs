@@ -77,7 +77,7 @@ impl InteractionPreview {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "full"))]
 mod tests {
     use super::InteractionPreview::*;
     use crate::tokens::state;

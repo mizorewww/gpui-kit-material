@@ -8,7 +8,7 @@ backend=default
 args=(build --locked -p gpui-kit-material-gallery-web --target wasm32-unknown-unknown)
 for option in "$@"; do
   case "$option" in
-    --release) profile=release; args+=(--release) ;;
+    --release) profile=wasm-release; args+=(--profile wasm-release) ;;
     --fast) backend=fast ;;
     --upstream) backend=upstream ;;
     *) echo "Usage: $0 [--release] [--fast | --upstream]" >&2; exit 2 ;;
@@ -33,11 +33,19 @@ if [[ "$(wasm-bindgen --version)" != "wasm-bindgen $bindgen_version" ]]; then
   exit 1
 fi
 
+source_state="$(python3 scripts/site_stamp.py state)"
+
+# A panic location names its source file: neither the builder's home directory nor the
+# registry's path belongs in a published module, and each costs bytes.
+if [[ "$profile" == wasm-release ]]; then
+  cargo_home="${CARGO_HOME:-$HOME/.cargo}"
+  export RUSTFLAGS="${RUSTFLAGS:-} --remap-path-prefix=$cargo_home/registry/src= --remap-path-prefix=$cargo_home/git/checkouts= --remap-path-prefix=$workspace_dir="
+fi
 cargo "${args[@]}"
 target_dir="$(cargo metadata --no-deps --format-version 1 | python3 -c 'import json,sys; print(json.load(sys.stdin)["target_directory"])')"
 out_dir=crates/gallery-web/www/wasm
 bindgen_args=(--target web --no-typescript --out-dir "$out_dir")
-if [[ "$profile" == release ]]; then
+if [[ "$profile" == wasm-release ]]; then
   bindgen_args+=(--remove-name-section --remove-producers-section)
 fi
 wasm-bindgen "$target_dir/wasm32-unknown-unknown/$profile/gpui_kit_material_gallery_web.wasm" "${bindgen_args[@]}"
@@ -51,7 +59,7 @@ cp "$symbols_dir/MaterialSymbolsOutlined.ttf" "$symbols_dir/MaterialSymbolsRound
 
 # Binaryen is optional here, but a 2 MB smaller module is what keeps the page under
 # the host's 25 MiB per-file limit (scripts/deploy-site.sh enforces it).
-if [[ "$profile" == release ]]; then
+if [[ "$profile" == wasm-release ]]; then
   if command -v wasm-opt >/dev/null; then
     wasm="$out_dir/gpui_kit_material_gallery_web_bg.wasm"
     # Exactly the features the Rust target emits, so the output needs no newer browser.
@@ -64,3 +72,4 @@ if [[ "$profile" == release ]]; then
     echo "wasm-opt not found (brew install binaryen): skipping the size pass." >&2
   fi
 fi
+python3 scripts/site_stamp.py module "$out_dir" "$profile" "$source_state"

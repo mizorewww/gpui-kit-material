@@ -34,7 +34,7 @@ use super::date_parts::{
     Activate, CalendarDay, DAY_CELL, DayRange, GRID_WEEKS, LIST_ITEM_HEIGHT, PickerListItem,
     PickerMenuButton, YearChip, add_months, first_of_month, month_weeks, week_days,
 };
-use super::text_field::type_style;
+use super::text::type_style;
 use super::{
     ButtonVariant, IconButton, IconButtonWidth, InteractionPreview, TextField, material_button,
 };

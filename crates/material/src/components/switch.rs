@@ -1,7 +1,7 @@
 //! M3 switch composed over GPUI Base's switch behavior.
 //! Reference playground: <https://md3.io/components/switch/>.
 use super::InteractionPreview;
-use super::button::ButtonFocusRing;
+use super::interaction::ButtonFocusRing;
 use super::labeled::{ControlLabel, LabelPosition, required_label};
 use super::ripple::Ripple;
 use crate::{

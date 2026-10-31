@@ -1,7 +1,7 @@
 //! Focus presentation for composed controls, and scrolling that reveals
 //! newly focused rows without pinning them during manual scrolling.
 use super::InteractionPreview;
-use super::button::ButtonFocusRing;
+use super::interaction::ButtonFocusRing;
 use crate::tokens::{shape::RADIUS_FULL, typography::rem};
 use gpui::{prelude::*, *};
 

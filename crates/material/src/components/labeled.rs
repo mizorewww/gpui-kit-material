@@ -4,7 +4,7 @@
 //! text, a label position and a required mark. The control keeps its own
 //! accessible name; this row adds the text beside it and makes it a second
 //! activation target, as an HTML `<label>` is.
-use super::text_field::type_style;
+use super::text::type_style;
 use crate::{
     color::ColorRole,
     theme::color,

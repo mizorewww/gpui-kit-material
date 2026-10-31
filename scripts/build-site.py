@@ -2,7 +2,7 @@
 """Assemble the static site (docs, WASM gallery, API docs) into one directory.
 
 Run through scripts/build-site.sh, which builds the inputs and supplies the
-`markdown` dependency. Fails when any internal link or heading anchor on a
+`markdown` and `brotli` dependencies. Fails when any internal link or heading anchor on a
 generated page does not resolve.
 """
 import argparse
@@ -16,10 +16,13 @@ import subprocess
 from pathlib import Path
 from urllib.parse import urlsplit
 
+import brotli
 import markdown
 from markdown.extensions import Extension
 from markdown.extensions.toc import TocExtension
 from markdown.treeprocessors import Treeprocessor
+
+from site_stamp import write_site
 
 ROOT = Path(__file__).resolve().parent.parent
 REPOSITORY = "https://github.com/mizorewww/gpui-kit-material"
@@ -275,7 +278,7 @@ def build_assets(output):
     """The stylesheet and font, named by content so they can be cached forever."""
     fonts = output / "fonts"
     fonts.mkdir(parents=True)
-    source = ROOT / "crates/material/examples/gallery/fonts/roboto"
+    source = ROOT / "crates/gallery/fonts/roboto"
     font = (source / "Roboto-latin-wght.woff2").read_bytes()
     font_name = f"roboto-latin-wght.{content_hash(font)}.woff2"
     (fonts / font_name).write_bytes(font)
@@ -300,7 +303,7 @@ def symbols_checkout():
 
 def build_licenses(output):
     """Publish the license of everything the site serves, and return its page."""
-    fonts = ROOT / "crates/material/examples/gallery/fonts"
+    fonts = ROOT / "crates/gallery/fonts"
     symbols = symbols_checkout()
     groups = (
         ("This project", (
@@ -380,6 +383,18 @@ def build_docs(output, stylesheet, commit):
     (output / "404.html").write_text(missing)
 
 
+def write_with_brotli(path, data):
+    """Write an asset and the copy deploy/site/worker.js serves in its place. Highest
+    quality, and a window as long as the module: the build pays for it once and every
+    visitor saves it. Cloudflare compressed the same module to 7.5 MB, against 5.3 MB here."""
+    path.write_bytes(data)
+    compressed = brotli.compress(data, quality=11, lgwin=24)
+    if brotli.decompress(compressed) != data:
+        raise SystemExit(f"{path.name}: Brotli did not round-trip")
+    path.with_name(path.name + ".br").write_bytes(compressed)
+    print(f"{path.name}: {len(data) / 2**20:.2f} MiB, {len(compressed) / 2**20:.2f} MiB with Brotli")
+
+
 def build_gallery(output):
     """Copy the gallery with content-hashed bindings; every path stays relative,
     so the page works under /gallery/ as well as at a local server's root."""
@@ -392,13 +407,13 @@ def build_gallery(output):
     glue = (www / "wasm" / GLUE).read_bytes()
     wasm_name = f"gallery.{content_hash(wasm)}.wasm"
     glue_name = f"gallery.{content_hash(glue)}.js"
-    (target / "wasm" / wasm_name).write_bytes(wasm)
-    (target / "wasm" / glue_name).write_bytes(glue)
+    write_with_brotli(target / "wasm" / wasm_name, wasm)
+    write_with_brotli(target / "wasm" / glue_name, glue)
     symbols, symbol_bytes = {}, {}
     for name in SYMBOLS:
         font = (www / "wasm" / name).read_bytes()
         hashed = f"{Path(name).stem}.{content_hash(font)}.ttf"
-        (target / "wasm" / hashed).write_bytes(font)
+        write_with_brotli(target / "wasm" / hashed, font)
         symbols[name] = f"./wasm/{hashed}"
         symbol_bytes[name] = len(font)
     assets = json.dumps({"glue": f"./wasm/{glue_name}", "wasm": f"./wasm/{wasm_name}",
@@ -451,6 +466,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("output", type=Path)
     parser.add_argument("--api-docs", type=Path, required=True, help="cargo doc output directory")
+    parser.add_argument("--source-state", type=json.loads, required=True,
+                        help="`site_stamp.py state` from before the build started")
     args = parser.parse_args()
     output = args.output
     shutil.rmtree(output, ignore_errors=True)
@@ -465,6 +482,7 @@ def main():
     check_links(output)
     files = [path for path in output.rglob("*") if path.is_file()]
     print(f"{output}: {len(files)} files, {sum(path.stat().st_size for path in files) / 1e6:.1f} MB")
+    write_site(output, ROOT / "crates/gallery-web/www/wasm", args.source_state)
 
 
 if __name__ == "__main__":

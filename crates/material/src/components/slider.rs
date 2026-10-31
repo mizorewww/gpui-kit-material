@@ -7,7 +7,7 @@
 //! Figma kit's Standard/Centered/Range slider sets, and
 //! <https://md3.io/components/slider/> for the classic slider.
 use super::InteractionPreview;
-use super::button::ButtonFocusRing;
+use super::interaction::ButtonFocusRing;
 use crate::{
     color::ColorRole,
     icons::Icon,

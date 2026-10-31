@@ -20,7 +20,9 @@
 use super::InteractionPreview;
 use super::focus::{RingPlacement, RingedButton};
 use super::roving::{Direction, target};
-use super::text_field::{TextField, TextFieldDensity, TextFieldVariant, type_style};
+use super::text::type_style;
+#[cfg(feature = "inputs")]
+use super::text_field::{TextField, TextFieldDensity, TextFieldVariant};
 use crate::{
     color::ColorRole,
     icons::{Icon, Symbol},
@@ -1447,6 +1449,7 @@ impl RenderOnce for MenuPopup {
 }
 
 /// The M3 exposed dropdown menu: a text field that opens a menu of options.
+#[cfg(feature = "inputs")]
 #[derive(gpui::IntoElement)]
 pub struct ExposedDropdown {
     id: ElementId,
@@ -1468,6 +1471,7 @@ pub struct ExposedDropdown {
     on_select: Option<Select>,
 }
 
+#[cfg(feature = "inputs")]
 impl ExposedDropdown {
     pub fn new(id: impl Into<ElementId>, label: impl Into<SharedString>) -> Self {
         Self {
@@ -1563,6 +1567,7 @@ impl ExposedDropdown {
     }
 }
 
+#[cfg(feature = "inputs")]
 impl RenderOnce for ExposedDropdown {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let id = self.id.clone();

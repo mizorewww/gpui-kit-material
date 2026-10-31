@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/color", "crates/material", "crates/gallery-web"]
+members = ["crates/color", "crates/material", "crates/gallery", "crates/gallery-web", "crates/bench"]
 exclude = ["vendor/gpui-kit", "vendor/gpui-base", "vendor/gpui-pre", "vendor/gpui-pre-web", "vendor/gpui-pre-apple", "vendor/gpui-fast", "vendor/gpui-fast-web", "vendor/gpui-fast-apple", "vendor/gpui-fast-macos", "vendor/gpui-pre-macos", "vendor/gpui-fast-linux", "vendor/gpui-fast-wgpu", "vendor/gpui-fast-windows", "vendor/gpui-pre-linux", "vendor/gpui-pre-wgpu", "vendor/gpui-pre-windows", "vendor/wgpu"]
 
 [workspace.package]
@@ -12,7 +12,7 @@ repository = "https://github.com/mizorewww/gpui-kit-material"
 authors = ["mizorewww"]
 
 [workspace.dependencies]
-gpui-kit-material-color = { path = "crates/color", version = "0.1.0" }
+gpui-kit-material-color = { path = "crates/color", version = "0.1.0", default-features = false }
 
 # Kit owns application initialization and the Component layer, at the audited
 # revision of vendor/gpui-kit; GPUI and the patched Base must be shared.
@@ -34,6 +34,13 @@ opt-level = 3
 # gpui-fast is the default backend; keep its dev builds as fast as gpui-pre.
 [profile.dev.package.gpui-fast]
 opt-level = 3
+
+# The browser module only (scripts/build-gallery-web.sh --release): a host caps the file
+# at 25 MiB, and every byte is downloaded. The default `release` stays as profiles measure it.
+[profile.wasm-release]
+inherits = "release"
+lto = "fat"
+codegen-units = 1
 
 [patch.crates-io]
 gpui-fast-macos = { path = "vendor/gpui-fast-macos" }
