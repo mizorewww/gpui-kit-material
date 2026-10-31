@@ -183,8 +183,13 @@ const TAB_PADDING: f32 = 16.;
 
 /// A side of a tab: the kit's padding, which grows to center the content in a
 /// wide tab and gives way before the label does in a narrow one, so that a label
-/// that fits the tab is never cut off.
-fn tab_padding() -> Div {
+/// that fits the tab is never cut off. A scrollable tab has no share of a width
+/// to fit into: it is as wide as its content and the whole padding, which a flex
+/// basis alone adds nothing to.
+fn tab_padding(scrollable: bool) -> Div {
+    if scrollable {
+        return div().w(rem(TAB_PADDING)).flex_shrink_0();
+    }
     div()
         .flex_basis(rem(TAB_PADDING))
         .flex_grow(1.)
@@ -523,9 +528,9 @@ impl RenderOnce for MaterialTabs {
                 .when(cfg!(test), |tab| {
                     tab.debug_selector(move || format!("material-tab-{index}"))
                 })
-                .child(tab_padding())
+                .child(tab_padding(scrollable))
                 .child(content)
-                .child(tab_padding())
+                .child(tab_padding(scrollable))
                 .when(fallback && !primary && is_selected, |tab| {
                     tab.child(indicator_bar().left_0().right_0())
                 })
