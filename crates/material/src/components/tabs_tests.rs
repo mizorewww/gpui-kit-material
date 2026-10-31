@@ -355,5 +355,7 @@ fn the_padding_gives_way_before_the_label(cx: &mut TestAppContext) {
     let view = cx.update(|window, _| window.root::<Narrow>().flatten().unwrap());
     view.update(cx, |view, _| view.width = f32::from(room) * 3.);
     draw(cx);
-    assert_eq!(cx.debug_bounds("tab-label-1").unwrap().size.width, whole);
+    // Up to layout's rounding to whole device pixels.
+    let narrow = cx.debug_bounds("tab-label-1").unwrap().size.width;
+    assert!((narrow - whole).abs() <= px(1.), "{narrow:?} of {whole:?}");
 }
