@@ -65,8 +65,15 @@ jobs:
       - name: Frame submission rules
         run: |
           # Selecting a backend is what turns frame-observation on in the engine.
-          cargo test --locked -p gpui-pre -p gpui-pre-macos --lib frame_submission
-          cargo test --locked -p gpui-fast -p gpui-fast-macos --lib frame_submission
+          # The -macos crates are only in the dependency graph on macOS; naming
+          # them elsewhere panics Cargo's feature resolver.
+          if [ "$RUNNER_OS" = "macOS" ]; then
+            cargo test --locked -p gpui-pre -p gpui-pre-macos --lib frame_submission
+            cargo test --locked -p gpui-fast -p gpui-fast-macos --lib frame_submission
+          else
+            cargo test --locked -p gpui-pre --lib frame_submission
+            cargo test --locked -p gpui-fast --lib frame_submission
+          fi
       - name: Engine rules with frame observation off, as a consumer builds them
         working-directory: gpui-kit-material/crates/consumer-check
         run: |
