@@ -56,6 +56,9 @@ struct ScaffoldState {
     dragging: Option<f32>,
     /// Where the handle was pressed: a release there is a click.
     pressed_at: f32,
+    /// While the handle is held: the window losing activation lets it go,
+    /// because the release may then never arrive here.
+    drag_activation: Option<Subscription>,
 
     history_len: Option<usize>,
     focus_stack: Vec<FocusHandle>,
@@ -64,6 +67,23 @@ struct ScaffoldState {
 }
 
 impl ScaffoldState {
+    /// Settle a drag whose release was lost at the anchor nearest its last
+    /// position. It is no click, wherever it was pressed.
+    fn abandon_drag(&mut self, anchors: &[PaneAnchor], width: f32, spacer: f32) {
+        let Some(x) = self.dragging else {
+            return;
+        };
+        let position = closest_pane_anchor(anchors, width, x).unwrap_or(x);
+        self.settle_at(position, spacer);
+    }
+
+    /// Move to a settled handle position: the first pane's width from its center.
+    fn settle_at(&mut self, position: f32, spacer: f32) {
+        self.first_pane_width = Some((position - (spacer / 2.).trunc()).max(0.));
+        self.dragging = None;
+        self.drag_activation = None;
+    }
+
     fn sample(&self, role: usize, now: Instant) -> (Option<PaneRect>, bool) {
         let Some(run) = self.runs[role] else {
             return (self.targets[role], false);
@@ -179,7 +199,7 @@ impl<K: Clone + PartialEq + 'static> PaneScaffold<K> {
 
 const PANE_SELECTORS: [&str; 3] = ["pane-primary", "pane-secondary", "pane-tertiary"];
 
-/// Move to a settled handle position: the first pane's width from its center.
+/// [`ScaffoldState::settle_at`], and draw it.
 fn settle_handle(
     state: &Entity<ScaffoldState>,
     position: f32,
@@ -187,8 +207,7 @@ fn settle_handle(
     window_notify: &mut App,
 ) {
     state.update(window_notify, |state, cx| {
-        state.first_pane_width = Some((position - (spacer / 2.).trunc()).max(0.));
-        state.dragging = None;
+        state.settle_at(position, spacer);
         cx.notify();
     });
 }
@@ -243,6 +262,7 @@ impl<K: Clone + PartialEq + 'static> RenderOnce for PaneScaffold<K> {
                                 runs: [None; 3],
                                 first_pane_width: None,
                                 dragging: None,
+                                drag_activation: None,
                                 pressed_at: 0.,
 
                                 history_len: None,
@@ -493,12 +513,23 @@ fn drag_handle(
     };
     let press = {
         let state = state.clone();
+        let anchors = anchors.clone();
         move |event: &MouseDownEvent, window: &mut Window, cx: &mut App| {
             let focus = state.read(cx).handle_focus.clone();
             focus.focus(window, cx);
+            let anchors = anchors.clone();
             state.update(cx, |state, cx| {
                 state.dragging = Some(offset);
                 state.pressed_at = local(event.position.x);
+                state.drag_activation = Some(cx.observe_window_activation(
+                    window,
+                    move |state, window, cx| {
+                        if !window.is_window_active() {
+                            state.abandon_drag(&anchors, width, spacer);
+                            cx.notify();
+                        }
+                    },
+                ));
                 cx.notify();
             });
             cx.stop_propagation();
@@ -528,14 +559,17 @@ fn drag_handle(
             |_, _, _| {},
             move |_, _, window, _| {
                 let moving = state.clone();
+                let lost = anchors.clone();
                 window.on_mouse_event(move |event: &MouseMoveEvent, phase, _, cx| {
-                    if phase == DispatchPhase::Capture
-                        && event.dragging()
-                        && moving.read(cx).dragging.is_some()
-                    {
+                    if phase == DispatchPhase::Capture && moving.read(cx).dragging.is_some() {
                         let x = local(event.position.x);
                         moving.update(cx, |state, cx| {
-                            state.dragging = Some(x);
+                            if event.dragging() {
+                                state.dragging = Some(x);
+                            } else {
+                                // The button came up where we could not see it.
+                                state.abandon_drag(&lost, width, spacer);
+                            }
                             cx.notify();
                         });
                     }
@@ -964,6 +998,51 @@ mod tests {
         let back = cx.update(|window, cx| window.focused(cx));
         assert!(back.is_some());
         assert_ne!(back, focused);
+    }
+
+    fn held_handle(view: &Entity<Screen>, cx: &mut gpui::VisualTestContext) {
+        cx.update(|_, cx| view.update(cx, |view, _| view.handle = true));
+        draw(cx);
+        let handle = cx.debug_bounds("pane-drag-handle").unwrap().center();
+        cx.simulate_mouse_down(handle, MouseButton::Left, Modifiers::none());
+        draw(cx);
+        let target = point(px(520.), handle.y);
+        cx.simulate_mouse_move(target, MouseButton::Left, Modifiers::none());
+        draw(cx);
+        assert_eq!(
+            cx.debug_bounds("pane-drag-handle").unwrap().center().x,
+            px(520.)
+        );
+    }
+
+    #[gpui::test]
+    fn a_held_handle_settles_when_the_window_is_deactivated(cx: &mut gpui::TestAppContext) {
+        let (view, cx) = open(cx, 1000., true);
+        cx.update(|window, _| window.activate_window());
+        cx.run_until_parked();
+        held_handle(&view, cx);
+        cx.deactivate_window();
+        draw(cx);
+        assert_eq!(
+            cx.debug_bounds("pane-drag-handle").unwrap().center().x,
+            px(500.),
+            "it let go, onto the nearest anchor"
+        );
+    }
+
+    #[gpui::test]
+    fn a_held_handle_settles_when_its_release_was_lost(cx: &mut gpui::TestAppContext) {
+        let (view, cx) = open(cx, 1000., true);
+        held_handle(&view, cx);
+        // A move with no button: the release went somewhere else.
+        let away = point(px(900.), px(10.));
+        cx.simulate_mouse_move(away, None::<MouseButton>, Modifiers::none());
+        draw(cx);
+        assert_eq!(
+            cx.debug_bounds("pane-drag-handle").unwrap().center().x,
+            px(500.),
+            "it does not follow the pointer anywhere further"
+        );
     }
 
     #[gpui::test]

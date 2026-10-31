@@ -207,6 +207,10 @@ impl Icon {
         self.directional = directional;
         self
     }
+    #[cfg(test)]
+    pub(crate) fn is_directional(&self) -> bool {
+        self.directional
+    }
 }
 impl From<IconName> for Icon {
     fn from(name: IconName) -> Self {

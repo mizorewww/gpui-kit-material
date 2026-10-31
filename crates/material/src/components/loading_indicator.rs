@@ -367,8 +367,12 @@ impl RenderOnce for LoadingIndicator {
         let slot = div().size_full();
         match self.playback {
             // GPUI's stock repeating animation: its clock, and holding the
-            // first frame under reduced motion, are the element's own.
-            None => root.child(slot.with_animation(self.id, animation, paint)),
+            // first frame under reduced motion, are the element's own. It draws
+            // inside its bounds, so nothing calls for frames while it is clipped.
+            None => root.child(
+                slot.with_animation(self.id, animation, paint)
+                    .repeat_when_visible(),
+            ),
             Some(playback) => root.child(
                 slot.with_animation(self.id, animation, paint)
                     .with_repeat_playback(playback)
@@ -382,6 +386,35 @@ impl RenderOnce for LoadingIndicator {
 mod tests {
     use super::*;
     use core::prelude::v1::test;
+
+    struct Clipped {
+        offscreen: bool,
+    }
+    impl gpui::Render for Clipped {
+        fn render(&mut self, _: &mut Window, _: &mut gpui::Context<Self>) -> impl IntoElement {
+            // A scroller's clip with the indicator below it, or inside it.
+            div().w(px(100.)).h(px(100.)).overflow_hidden().child(
+                div()
+                    .mt(px(if self.offscreen { 400. } else { 0. }))
+                    .child(LoadingIndicator::new("loading", "Loading")),
+            )
+        }
+    }
+
+    fn frames_requested(cx: &mut gpui::TestAppContext, offscreen: bool) -> usize {
+        let (_, cx) = cx.add_window_view(|_, _| Clipped { offscreen });
+        cx.update(|window, cx| {
+            window.refresh();
+            window.draw(cx).clear(cx);
+            window.simulate_next_frame(cx)
+        })
+    }
+
+    #[gpui::test]
+    fn an_indicator_scrolled_out_of_view_asks_for_no_frames(cx: &mut gpui::TestAppContext) {
+        assert_eq!(frames_requested(cx, true), 0, "clipped away");
+        assert!(frames_requested(cx, false) > 0, "in view, it runs");
+    }
 
     #[test]
     fn the_loop_morphs_through_seven_shapes_and_closes_seamlessly() {

@@ -587,6 +587,36 @@ fn equal_slot(
         .into_any_element()
 }
 
+/// The press wave over an option, clipped to its corners along the group's axis.
+fn option_ripple(
+    option: impl IntoElement,
+    index: usize,
+    paint: &OptionPaint,
+    vertical: bool,
+) -> super::Ripple {
+    let (start, end) = (paint.left_radius, paint.right_radius);
+    super::Ripple::new(
+        ElementId::NamedInteger("option-ripple".into(), index as u64),
+        option,
+    )
+    .corners(if vertical {
+        Corners {
+            top_left: start,
+            top_right: start,
+            bottom_right: end,
+            bottom_left: end,
+        }
+    } else {
+        Corners {
+            top_left: start,
+            top_right: end,
+            bottom_right: end,
+            bottom_left: start,
+        }
+    })
+    .ink(paint.foreground)
+}
+
 /// The focus handle of each option, created on first sight (see
 /// [`super::roving::sync_handles`]).
 fn sync_handles(
@@ -646,16 +676,31 @@ impl RenderOnce for ConnectedButtonGroup {
         let vertical = self.vertical;
         metrics.vertical = vertical;
         let equal = self.equal_widths && !vertical && !self.full_width;
+        // A slot measures no less than the widest width it is given, so what
+        // makes an option's own width change has to start the measure over.
+        let measured_for = equal.then(|| {
+            use std::hash::{Hash, Hasher};
+            let mut hash = std::collections::hash_map::DefaultHasher::new();
+            f32::from(window.rem_size()).to_bits().hash(&mut hash);
+            for (index, option) in self.options.iter().enumerate() {
+                option.label.hash(&mut hash);
+                if self.labels == GroupLabels::Selected {
+                    is_checked(index, &option.value).hash(&mut hash);
+                }
+            }
+            hash.finish()
+        });
         let widths = window
             .use_keyed_state((self.id.clone(), "equal-widths"), cx, |_, _| {
-                Vec::<Rc<std::cell::Cell<f32>>>::new()
+                (None::<u64>, Vec::<Rc<std::cell::Cell<f32>>>::new())
             })
-            .update(cx, |widths, _| {
+            .update(cx, |(signature, widths), _| {
                 widths.resize_with(self.options.len(), Rc::default);
-                if !equal {
+                if !equal || *signature != measured_for {
                     // Re-measure from natural widths when equal widths return.
                     widths.iter().for_each(|width| width.set(0.));
                 }
+                *signature = measured_for;
                 widths.clone()
             });
         // Equal options share the widest measured width, which holds while
@@ -801,14 +846,11 @@ impl RenderOnce for ConnectedButtonGroup {
                         callback(&value, window, cx);
                     }
                 });
-                lane = lane.child(focus_ring(
-                    tab,
-                    &focus,
-                    option_disabled,
-                    forced_focus,
-                    paint,
-                    vertical,
-                ));
+                let tab = option_ripple(tab, index, &paint, vertical)
+                    .disabled(option_disabled)
+                    .specimen(preview.is_some());
+                let ring = focus_ring(tab, &focus, option_disabled, forced_focus, paint, vertical);
+                lane = lane.child(equal_slot(ring, &widths[index], equal, widest));
             } else if toggles || self.selection == GroupSelection::None {
                 let click_focus = focus.clone();
                 let on_toggle = self.on_toggle.clone();
@@ -871,29 +913,9 @@ impl RenderOnce for ConnectedButtonGroup {
                     })
                     .into_any_element()
                 };
-                let (start, end) = (paint.left_radius, paint.right_radius);
-                let option = super::Ripple::new(
-                    ElementId::NamedInteger("option-ripple".into(), index as u64),
-                    option,
-                )
-                .corners(if vertical {
-                    Corners {
-                        top_left: start,
-                        top_right: start,
-                        bottom_right: end,
-                        bottom_left: end,
-                    }
-                } else {
-                    Corners {
-                        top_left: start,
-                        top_right: end,
-                        bottom_right: end,
-                        bottom_left: start,
-                    }
-                })
-                .ink(paint.foreground)
-                .disabled(option_disabled)
-                .specimen(preview.is_some());
+                let option = option_ripple(option, index, &paint, vertical)
+                    .disabled(option_disabled)
+                    .specimen(preview.is_some());
                 let ring = focus_ring(
                     option,
                     &focus,
@@ -931,6 +953,9 @@ impl RenderOnce for ConnectedButtonGroup {
                         callback(&value, window, cx);
                     }
                 });
+                let radio = option_ripple(radio, index, &paint, vertical)
+                    .disabled(option_disabled)
+                    .specimen(preview.is_some());
                 let ring = focus_ring(
                     radio,
                     &focus,
@@ -2134,5 +2159,122 @@ mod mode_tests {
         cx.simulate_click(at, Modifiers::none());
         draw(cx);
         assert!(option(cx, 0).size.width > bare.size.width, "revealed");
+    }
+
+    struct Relabelled {
+        long: bool,
+    }
+    impl Render for Relabelled {
+        fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+            window.set_rem_size(px(14.));
+            let last = if self.long {
+                "A much much much longer label"
+            } else {
+                "Short"
+            };
+            div().flex().items_start().p(px(40.)).child(
+                ConnectedButtonGroup::new("group", "Format")
+                    .button_size(ButtonSize::Small)
+                    .options([("a", "One"), ("b", last)])
+                    .equal_widths(true),
+            )
+        }
+    }
+
+    #[gpui::test]
+    fn equal_widths_shrink_with_their_labels(cx: &mut TestAppContext) {
+        cx.update(|cx| {
+            gpui_base::init(cx);
+            cx.set_reduce_motion(true);
+        });
+        let (view, cx) = cx.add_window_view(|_, _| Relabelled { long: true });
+        draw(cx);
+        let wide = option(cx, 0).size.width;
+        view.update(cx, |view, cx| {
+            view.long = false;
+            cx.notify();
+        });
+        draw(cx);
+        let narrow = option(cx, 0).size.width;
+        assert!(narrow < wide - px(50.), "{wide:?} then {narrow:?}");
+        assert_eq!(narrow, option(cx, 1).size.width, "still equal");
+    }
+
+    struct EqualTabs;
+    impl Render for EqualTabs {
+        fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+            window.set_rem_size(px(14.));
+            div().flex().items_start().p(px(40.)).child(
+                ConnectedButtonGroup::new("group", "Format")
+                    .button_size(ButtonSize::Small)
+                    .options([("a", "One"), ("b", "A much longer label")])
+                    .selected("a")
+                    .tabs()
+                    .equal_widths(true),
+            )
+        }
+    }
+
+    #[gpui::test]
+    fn tabs_take_equal_widths_too(cx: &mut TestAppContext) {
+        cx.update(|cx| {
+            gpui_base::init(cx);
+            cx.set_reduce_motion(true);
+        });
+        let (_, cx) = cx.add_window_view(|_, _| EqualTabs);
+        draw(cx);
+        assert_eq!(option(cx, 0).size.width, option(cx, 1).size.width);
+    }
+
+    struct RadioGroup;
+    impl Render for RadioGroup {
+        fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+            window.set_rem_size(px(14.));
+            div().flex().items_start().p(px(40.)).child(
+                ConnectedButtonGroup::new("group", "Format")
+                    .button_size(ButtonSize::Small)
+                    .options([("a", "One"), ("b", "Two")])
+                    .selected("a")
+                    .required(true),
+            )
+        }
+    }
+
+    struct TabGroup;
+    impl Render for TabGroup {
+        fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+            window.set_rem_size(px(14.));
+            div().flex().items_start().p(px(40.)).child(
+                ConnectedButtonGroup::new("group", "Format")
+                    .button_size(ButtonSize::Small)
+                    .options([("a", "One"), ("b", "Two")])
+                    .selected("a")
+                    .tabs(),
+            )
+        }
+    }
+
+    #[gpui::test]
+    fn every_kind_of_option_ripples(cx: &mut TestAppContext) {
+        use crate::components::button::waves_painted;
+        cx.update(|cx| {
+            gpui_base::init(cx);
+            cx.set_reduce_motion(true);
+        });
+        let (_, cx) = cx.add_window_view(|_, _| RadioGroup);
+        draw(cx);
+        let center = option(cx, 1).center();
+        let before = waves_painted();
+        cx.simulate_mouse_down(center, gpui::MouseButton::Left, Modifiers::none());
+        draw(cx);
+        assert!(waves_painted() > before, "a radio option");
+        cx.simulate_mouse_up(center, gpui::MouseButton::Left, Modifiers::none());
+        let (_, cx) = cx.cx.add_window_view(|_, _| TabGroup);
+        draw(cx);
+        let center = option(cx, 1).center();
+        let before = waves_painted();
+        cx.simulate_mouse_down(center, gpui::MouseButton::Left, Modifiers::none());
+        draw(cx);
+        assert!(waves_painted() > before, "a tab option");
     }
 }

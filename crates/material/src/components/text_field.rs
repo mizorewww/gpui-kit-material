@@ -608,23 +608,49 @@ fn label_width(text: &SharedString, window: &Window) -> f32 {
     (line.width.as_f32() / rem.as_f32() + tracking) * 14.
 }
 
-/// Bring a live input into line with `input_type`, once per change of type.
+/// The input a field last applied a type to, and that type.
+type AppliedInputType = Option<(WeakEntity<InputState>, TextFieldInputType)>;
+
+/// Bring a live input into line with `input_type`, once per change of input or
+/// of type. A field that stops asking for a type undoes what it applied, to the
+/// input it applied it to, and leaves alone an input it never touched: that
+/// input's caller may have masked it or given it a validator of its own.
 fn apply_input_type(
     id: &ElementId,
     state: &Entity<InputState>,
-    input_type: TextFieldInputType,
+    input_type: Option<TextFieldInputType>,
     window: &mut Window,
     cx: &mut App,
 ) {
-    let applied = window.use_keyed_state((id.clone(), "input-type"), cx, |_, _| None);
-    if *applied.read(cx) == Some(input_type) {
-        return;
-    }
-    applied.update(cx, |applied, _| *applied = Some(input_type));
-    state.update(cx, |state, cx| {
-        state.set_masked(input_type.masked(), window, cx);
-        state.set_validator(move |text, _| input_type.accepts(text), cx);
+    let applied = window.use_keyed_state((id.clone(), "input-type"), cx, |_, _| {
+        AppliedInputType::None
     });
+    let current = match (applied.read(cx), input_type) {
+        (None, None) => return,
+        (Some((input, applied)), Some(input_type))
+            if input.entity_id() == state.entity_id() && *applied == input_type =>
+        {
+            return;
+        }
+        (current, _) => current.clone(),
+    };
+    applied.update(cx, |applied, _| {
+        *applied = input_type.map(|input_type| (state.downgrade(), input_type));
+    });
+    match input_type {
+        Some(input_type) => state.update(cx, |state, cx| {
+            state.set_masked(input_type.masked(), window, cx);
+            state.set_validator(move |text, _| input_type.accepts(text), cx);
+        }),
+        None => {
+            if let Some(previous) = current.and_then(|(input, _)| input.upgrade()) {
+                previous.update(cx, |state, cx| {
+                    state.set_masked(false, window, cx);
+                    state.set_validator(|_, _| true, cx);
+                });
+            }
+        }
+    }
 }
 
 impl RenderOnce for TextField {
@@ -633,8 +659,8 @@ impl RenderOnce for TextField {
         if self.required {
             self.label = self.label.map(|label| required_label(&label, true));
         }
-        if let (FieldInput::Single(state), Some(input_type)) = (&self.input, self.input_type) {
-            apply_input_type(&id, state, input_type, window, cx);
+        if let FieldInput::Single(state) = &self.input {
+            apply_input_type(&id, state, self.input_type, window, cx);
         }
         let (value, focus) = match &self.input {
             FieldInput::Single(state) => (read_value(state, cx), Some(focus_handle(state, cx))),

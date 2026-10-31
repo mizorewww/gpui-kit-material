@@ -537,11 +537,9 @@ impl RenderOnce for PullToRefresh {
             let scroll = scroll.clone();
             canvas(
                 move |bounds, window, _| window.insert_hitbox(bounds, HitboxBehavior::Normal),
-                move |_, hitbox, window, cx| {
-                    let pressed = state.read(cx).mouse.is_some();
+                move |_, hitbox, window, _| {
                     pull_listeners(
-                        hitbox, state, scroll, enabled, refreshing, mouse_drag, pressed,
-                        on_refresh, window,
+                        hitbox, state, scroll, enabled, refreshing, mouse_drag, on_refresh, window,
                     );
                 },
             )
@@ -701,7 +699,6 @@ fn pull_listeners(
     enabled: bool,
     refreshing: bool,
     mouse_drag: bool,
-    pressed: bool,
     on_refresh: Option<Refresh>,
     window: &mut Window,
 ) {
@@ -832,14 +829,11 @@ fn pull_listeners(
             }
         });
     }
-    // Only a press in progress listens for its moves and release. A release
-    // that beats this frame is cleaned up by the next move or press.
-    if !pressed {
-        return;
-    }
+    // These listen whether or not a press is in progress: a press changes
+    // nothing on screen, so a frame painted after it may never come.
     {
         let state = state.clone();
-        window.on_mouse_event(move |event: &MouseMoveEvent, phase, _, cx| {
+        window.on_mouse_event(move |event: &MouseMoveEvent, phase, window, cx| {
             if phase != DispatchPhase::Capture {
                 return;
             }
@@ -847,7 +841,13 @@ fn pull_listeners(
                 return;
             };
             if !event.dragging() {
+                // The release went elsewhere. Nothing confirms it was meant
+                // as one, so a pull in progress lets go without refreshing.
+                let pulling = state.read(cx).pulling;
                 state.update(cx, |state, _| state.mouse = None);
+                if pulling {
+                    finish_pull(&state, false, refreshing, None, window, cx);
+                }
                 return;
             }
             let y = f32::from(event.position.y);
@@ -1170,6 +1170,70 @@ mod tests {
         // A plain click still reaches the content.
         cx.simulate_click(start, Modifiers::none());
         assert_eq!(clicks.get(), 1);
+    }
+
+    /// Nothing in here reacts to a press, so a press draws nothing.
+    struct Inert {
+        refreshes: Rc<Cell<usize>>,
+    }
+    impl Render for Inert {
+        fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+            let refreshes = self.refreshes.clone();
+            div().size(px(400.)).child(
+                PullToRefresh::new("pull", "Refreshing")
+                    .on_refresh(move |_, _| refreshes.set(refreshes.get() + 1))
+                    .child(div().h(px(2000.)).w_full()),
+            )
+        }
+    }
+
+    #[gpui::test]
+    fn a_mouse_pull_starts_on_content_that_does_not_redraw(cx: &mut gpui::TestAppContext) {
+        cx.update(|cx| cx.set_reduce_motion(true));
+        let refreshes: Rc<Cell<usize>> = Rc::default();
+        let (_, cx) = cx.add_window_view({
+            let refreshes = refreshes.clone();
+            move |_, _| Inert { refreshes }
+        });
+        draw(cx);
+        // The pointer is already there, as it is before any press.
+        let start = point(px(200.), px(100.));
+        cx.simulate_mouse_move(start, None::<MouseButton>, Modifiers::none());
+        draw(cx);
+        // No draw between the press and the move: nothing in the press asks
+        // for one, so the move has to be heard from the frame before it.
+        cx.simulate_mouse_down(start, MouseButton::Left, Modifiers::none());
+        let end = point(px(200.), px(320.));
+        cx.simulate_mouse_move(end, MouseButton::Left, Modifiers::none());
+        draw(cx);
+        assert!(indicator_top(cx).is_some(), "the move started a pull");
+        cx.simulate_mouse_up(end, MouseButton::Left, Modifiers::none());
+        draw(cx);
+        assert_eq!(refreshes.get(), 1);
+    }
+
+    #[gpui::test]
+    fn a_lost_release_ends_the_pull_without_refreshing(cx: &mut gpui::TestAppContext) {
+        let (view, cx) = open(cx);
+        let start = point(px(200.), px(100.));
+        cx.simulate_mouse_down(start, MouseButton::Left, Modifiers::none());
+        draw(cx);
+        let end = point(px(200.), px(320.));
+        cx.simulate_mouse_move(end, MouseButton::Left, Modifiers::none());
+        draw(cx);
+        assert!(indicator_top(cx).is_some());
+        // The release landed outside the window: the next move has no button.
+        cx.simulate_mouse_move(end, None::<MouseButton>, Modifiers::none());
+        draw(cx);
+        assert_eq!(indicator_top(cx), None, "the pull let go");
+        let (refreshes, clicks) =
+            view.read_with(cx, |view, _| (view.refreshes.clone(), view.clicks.clone()));
+        assert_eq!(refreshes.get(), 0, "a lost release does not commit");
+        // Nothing occludes the content and the next click is only a click.
+        cx.simulate_click(start, Modifiers::none());
+        draw(cx);
+        assert_eq!(refreshes.get(), 0, "the click after it does not commit");
+        assert_eq!(clicks.get(), 1, "the click reaches the content");
     }
 
     #[gpui::test]

@@ -153,21 +153,18 @@ impl TimePickerState {
             field.set_time(time, window, cx);
             field
         });
-        let subscription = cx.subscribe_in(
-            &field,
-            window,
-            |this, field, event: &TimeFieldEvent, window, cx| {
+        let subscription =
+            cx.subscribe_in(&field, window, |this, _, event: &TimeFieldEvent, _, cx| {
                 let TimeFieldEvent::Change(typed) = *event;
-                // A typed time outside the limits lands on the nearest one.
+                // A typed time outside the limits lands on the nearest one for
+                // the caller. The field keeps what was typed until focus leaves
+                // it: writing to it now would drop the first digit of a pair,
+                // and "1 5" could not get past a limit of 09:00.
                 let time = this.clamp(typed);
-                if time != typed {
-                    field.update(cx, |field, cx| field.set_time(time, window, cx));
-                }
                 this.apply(time);
                 cx.emit(TimePickerEvent::Change(time));
                 cx.notify();
-            },
-        );
+            });
         let mut state = Self {
             labels: Rc::new(labels),
             time,
@@ -718,6 +715,9 @@ impl ClockDial {
         };
         let mut face = div()
             .id(self.id.clone())
+            .when(cfg!(test), |face| {
+                face.debug_selector(|| "clock-dial".into())
+            })
             .relative()
             .flex_shrink_0()
             .size(rem(DIAL_SIZE))
@@ -787,35 +787,48 @@ impl ClockDial {
                     state.update(cx, |s, cx| s.pick(o, window, cx));
                 }
             })
-            .on_mouse_move({
-                let (state, bounds, pressed) = (state.clone(), bounds.clone(), pressed.clone());
-                move |e, window, cx| {
-                    if *pressed.read(cx) && e.pressed_button == Some(MouseButton::Left) {
-                        let o = offset(e.position, bounds.get());
-                        state.update(cx, |s, cx| s.pick(o, window, cx));
-                    }
-                }
-            })
-            .on_mouse_up(MouseButton::Left, {
-                let (state, pressed) = (state.clone(), pressed.clone());
-                move |_, _, cx| {
-                    if *pressed.read(cx) {
-                        pressed.update(cx, |p, _| *p = false);
-                        state.update(cx, |s, cx| {
-                            // Releasing moves on to the next unit.
-                            let next = match s.unit {
-                                TimeUnit::Hour => TimeUnit::Minute,
-                                TimeUnit::Minute if s.shows_seconds() => TimeUnit::Second,
-                                unit => unit,
-                            };
-                            s.set_unit(next, cx)
+            // A drag belongs to the dial wherever the pointer goes, so these
+            // listen to the window. They are in place before the press draws.
+            .child(
+                canvas(|_, _, _| {}, {
+                    let (state, bounds, pressed) = (state.clone(), bounds.clone(), pressed.clone());
+                    move |_, _, window, _| {
+                        let (moving, moved) = (state.clone(), pressed.clone());
+                        window.on_mouse_event(move |e: &MouseMoveEvent, phase, window, cx| {
+                            if phase != DispatchPhase::Capture || !*moved.read(cx) {
+                                return;
+                            }
+                            if e.dragging() {
+                                let o = offset(e.position, bounds.get());
+                                moving.update(cx, |s, cx| s.pick(o, window, cx));
+                            } else {
+                                // The release was lost; there is nothing to move on from.
+                                moved.update(cx, |p, _| *p = false);
+                            }
+                        });
+                        window.on_mouse_event(move |e: &MouseUpEvent, phase, _, cx| {
+                            if phase != DispatchPhase::Capture
+                                || e.button != MouseButton::Left
+                                || !*pressed.read(cx)
+                            {
+                                return;
+                            }
+                            pressed.update(cx, |p, _| *p = false);
+                            state.update(cx, |s, cx| {
+                                // Releasing moves on to the next unit.
+                                let next = match s.unit {
+                                    TimeUnit::Hour => TimeUnit::Minute,
+                                    TimeUnit::Minute if s.shows_seconds() => TimeUnit::Second,
+                                    unit => unit,
+                                };
+                                s.set_unit(next, cx)
+                            });
                         });
                     }
-                }
-            })
-            .on_mouse_up_out(MouseButton::Left, move |_, _, cx| {
-                pressed.update(cx, |p, _| *p = false);
-            })
+                })
+                .absolute()
+                .size_0(),
+            )
             .on_key_down(move |e, window, cx| {
                 let delta = match e.keystroke.key.as_str() {
                     "up" | "right" => 1,
@@ -905,7 +918,11 @@ impl RenderOnce for TimeSelector {
             .read(cx)
             .clone();
         let ripple_id = ElementId::NamedChild(self.id.clone().into(), "ripple".into());
+        let debug_name = cfg!(test).then(|| format!("{:?}", self.id));
         let mut button = gpui_base::Button::new(self.id)
+            .when_some(debug_name, |button, name| {
+                button.debug_selector(move || name)
+            })
             .accessibility_label(self.label)
             .disabled(disabled)
             .w(rem(if self.compact { COMPACT_SELECTOR } else { 96. }))
@@ -1240,6 +1257,10 @@ impl RenderOnce for TimePicker {
                     label,
                 ))
             });
+        // A clock reads hours first whatever the text around it does.
+        let time_row = crate::scope::Scope::new(named(&id, "time-row"))
+            .direction(LayoutDirection::Ltr)
+            .child(time_row);
         let dial = if specimen {
             ClockDial::specimen(named(&id, "dial"), labels.clone(), time, unit, format)
         } else {
@@ -1334,6 +1355,9 @@ impl RenderOnce for TimePicker {
         match mode {
             TimeInputMode::Input => {
                 let field_focused = field.read(cx).focus_handle(cx).is_focused(window);
+                if !field_focused && field.read(cx).time() != time {
+                    field.update(cx, |field, cx| field.set_time(time, window, cx));
+                }
                 let editing = field.read(cx).selected_segment();
                 let segment_labels = labels.clone();
                 let period_state = self.state.clone();

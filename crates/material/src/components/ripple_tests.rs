@@ -289,3 +289,32 @@ fn an_idle_ripple_writes_nothing_when_drawn_or_on_global_events(cx: &mut TestApp
     cx.simulate_mouse_up(at, MouseButton::Left, Modifiers::default());
     assert!(ripple_writes() > pressed, "a held press is released");
 }
+
+#[gpui::test]
+fn deactivating_the_window_releases_a_held_press(cx: &mut TestAppContext) {
+    cx.update(|cx| {
+        gpui_kit::init(cx);
+        crate::init(cx);
+        cx.set_reduce_motion(true);
+    });
+    let (_, cx) = cx.add_window_view(|_, _| Controls);
+    cx.update(|window, _| window.activate_window());
+    cx.run_until_parked();
+    draw(cx);
+    let slot = cx.debug_bounds("checkbox").unwrap();
+    let on_box = point(slot.left() + px(20.), slot.center().y);
+    cx.simulate_mouse_down(on_box, MouseButton::Left, Modifiers::default());
+    draw(cx);
+    let painted = waves_painted();
+    draw(cx);
+    assert!(waves_painted() > painted, "the press holds its wave");
+    cx.deactivate_window();
+    // The release may never come; the wave fades and goes without it.
+    cx.executor()
+        .advance_clock(std::time::Duration::from_secs(2));
+    cx.run_until_parked();
+    draw(cx);
+    let settled = waves_painted();
+    draw(cx);
+    assert_eq!(waves_painted(), settled, "no wave is left held");
+}

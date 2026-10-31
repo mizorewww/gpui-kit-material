@@ -279,3 +279,79 @@ fn input_types_filter_partial_values() {
     assert!(T::Text.accepts("anything at all"));
     assert!(T::Password.masked() && !T::Text.masked());
 }
+
+struct TypedField {
+    state: Entity<InputState>,
+    input_type: Option<TextFieldInputType>,
+}
+
+impl Render for TypedField {
+    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        let field = TextField::new("typed", &self.state).label("Label");
+        match self.input_type {
+            Some(input_type) => field.input_type(input_type),
+            None => field,
+        }
+    }
+}
+
+fn is_masked(state: &Entity<InputState>, cx: &mut VisualTestContext) -> bool {
+    cx.update(|_, cx| state.read(cx).presentation().is_masked())
+}
+
+fn init_kit(cx: &mut TestAppContext) {
+    cx.update(|cx| {
+        gpui_kit::init(cx);
+        crate::init(cx);
+    });
+}
+
+#[gpui::test]
+fn a_password_field_masks_whichever_input_it_is_given(cx: &mut TestAppContext) {
+    init_kit(cx);
+    let (view, cx) = cx.add_window_view(|window, cx| TypedField {
+        state: cx.new(|cx| InputState::new(window, cx)),
+        input_type: Some(TextFieldInputType::Password),
+    });
+    draw(cx);
+    let first = view.read_with(cx, |view, _| view.state.clone());
+    assert!(is_masked(&first, cx));
+    // The same element and type with a new input: the secret must not show.
+    let second = cx.update(|window, cx| cx.new(|cx| InputState::new(window, cx)));
+    view.update(cx, |view, cx| {
+        view.state = second.clone();
+        cx.notify();
+    });
+    draw(cx);
+    assert!(is_masked(&second, cx), "the new input is masked too");
+}
+
+#[gpui::test]
+fn removing_the_input_type_undoes_it(cx: &mut TestAppContext) {
+    init_kit(cx);
+    let (view, cx) = cx.add_window_view(|window, cx| TypedField {
+        state: cx.new(|cx| InputState::new(window, cx)),
+        input_type: Some(TextFieldInputType::Password),
+    });
+    draw(cx);
+    let state = view.read_with(cx, |view, _| view.state.clone());
+    assert!(is_masked(&state, cx));
+    view.update(cx, |view, cx| {
+        view.input_type = None;
+        cx.notify();
+    });
+    draw(cx);
+    assert!(!is_masked(&state, cx), "no type, no mask");
+}
+
+#[gpui::test]
+fn a_field_without_a_type_leaves_its_callers_mask_alone(cx: &mut TestAppContext) {
+    init_kit(cx);
+    let (view, cx) = cx.add_window_view(|window, cx| TypedField {
+        state: cx.new(|cx| InputState::new(window, cx).masked(true)),
+        input_type: None,
+    });
+    draw(cx);
+    let state = view.read_with(cx, |view, _| view.state.clone());
+    assert!(is_masked(&state, cx));
+}

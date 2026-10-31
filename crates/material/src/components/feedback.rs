@@ -698,6 +698,9 @@ impl RenderOnce for MaterialCard {
         if grabbed {
             // While held, follow the pointer anywhere in the window.
             let follow = drag.clone();
+            // The offset lands in `left`, which layout mirrors along with the
+            // card's place: turn the pointer around to keep the card under it.
+            let rtl = crate::scope::is_rtl(window);
             root = root.child(
                 canvas(
                     |_, _, _| (),
@@ -711,7 +714,7 @@ impl RenderOnce for MaterialCard {
                                 let Some((start, from)) = drag.grab else {
                                     return;
                                 };
-                                let delta = event.position - start;
+                                let mut delta = event.position - start;
                                 if !draggable {
                                     return;
                                 }
@@ -720,6 +723,9 @@ impl RenderOnce for MaterialCard {
                                     || delta.y.abs() > CARD_DRAG_SLOP
                                 {
                                     drag.moved = true;
+                                    if rtl {
+                                        delta.x = -delta.x;
+                                    }
                                     drag.offset = from + delta;
                                 }
                             });

@@ -344,7 +344,7 @@ impl RenderOnce for MaterialSwitch {
             left: rem(layer_origin.0.max(0.)),
             right: rem((TRACK_WIDTH - 2. * TRACK_OUTLINE - layer_origin.0 - STATE_LAYER).max(0.)),
         };
-        let action = self.on_change;
+        let action = self.on_change.filter(|_| live);
         let label = required_label(&self.label, self.required);
         let visible_label = self.show_label.then(|| {
             let next = !self.checked;

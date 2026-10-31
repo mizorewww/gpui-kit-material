@@ -827,6 +827,8 @@ impl RenderOnce for MaterialDialog {
                 .h(area.size.height)
                 .top(area.size.height * (1. - frame.spatial))
                 .opacity(opacity)
+                // A press on the surface is not a press on the scrim under it.
+                .occlude()
                 .child(self.full_screen_surface(dismiss.filter(|_| open)))
                 .into_any_element()
         } else {
@@ -844,7 +846,9 @@ impl RenderOnce for MaterialDialog {
             let positioned = div()
                 .relative()
                 .top(rem(slide_offset(animation, frame.spatial)))
-                .opacity(opacity);
+                .opacity(opacity)
+                // A press on the surface is not a press on the scrim under it.
+                .occlude();
             match measured.filter(|_| scaling) {
                 Some(size) => {
                     let (clip, offset) = scale_clip(size, frame.spatial.max(0.));
@@ -871,8 +875,12 @@ impl RenderOnce for MaterialDialog {
             // The scrim occludes the host's backdrop layer (so the pointer
             // and wheel never reach the page behind), so it dismisses itself.
             .close_on_backdrop_press(false)
-            // Enter activates the focused action; it never dismisses.
-            .on_ok(|_, _, _| false)
+            // Enter activates the focused action; it never dismisses. The binding
+            // would stop the key there, so it lets the action have it.
+            .on_ok(|_, _, cx| {
+                cx.propagate();
+                false
+            })
             .on_cancel(move |_, window, cx| {
                 if open && let Some(dismiss) = &cancel_dismiss {
                     dismiss(window, cx);
@@ -1026,6 +1034,7 @@ mod tests {
         // Enter activates the action and does not dismiss.
         key(cx, "enter");
         draw(cx);
+        assert_eq!(actions.get(), 1, "enter activated the focused action");
         assert_eq!(dismissals.get(), 0);
         key(cx, "escape");
         draw(cx);
@@ -1039,8 +1048,46 @@ mod tests {
                 "focus returned to the trigger"
             );
         });
-        let _ = actions.get();
-        let _ = Modifiers::default();
+    }
+
+    #[gpui::test]
+    fn a_press_inside_the_dialog_does_not_dismiss_it(cx: &mut TestAppContext) {
+        cx.update(|cx| {
+            gpui_base::init(cx);
+            cx.set_reduce_motion(true);
+        });
+        let dismissals = Rc::new(Cell::new(0));
+        let actions = Rc::new(Cell::new(0));
+        let (_, cx) = cx.add_window_view({
+            let (dismissals, actions) = (dismissals.clone(), actions.clone());
+            move |_, cx| Harness {
+                open: true,
+                dismissals,
+                actions,
+                trigger: cx.focus_handle(),
+                action: cx.focus_handle(),
+            }
+        });
+        draw(cx);
+        draw(cx);
+        let action = cx.debug_bounds("dialog-action").unwrap();
+        // The dialog's padding, beside its action.
+        let beside = action.center() - gpui::point(px(40.), px(0.));
+        cx.simulate_click(beside, Modifiers::default());
+        draw(cx);
+        assert_eq!(dismissals.get(), 0, "the surface is not the scrim");
+        // Nor does pressing an action and dragging off it dismiss.
+        cx.simulate_mouse_down(
+            action.center(),
+            gpui::MouseButton::Left,
+            Modifiers::default(),
+        );
+        draw(cx);
+        assert_eq!(dismissals.get(), 0, "an action's press is not the scrim's");
+        let away = action.center() + gpui::point(px(0.), px(300.));
+        cx.simulate_mouse_up(away, gpui::MouseButton::Left, Modifiers::default());
+        draw(cx);
+        assert_eq!((dismissals.get(), actions.get()), (0, 0));
     }
 
     #[test]

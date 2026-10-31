@@ -25,6 +25,7 @@ impl Render for Screen {
                     .width(412.)
                     .items([CarouselItem::new().label("Beach").supporting("Summer")]),
             )
+            .child(MaterialTooltip::plain("tip", "Save a copy").trigger(div().size(px(20.))))
             .child(progress_with_label("copy", "Copy", 0.25, window, cx))
             .child(indeterminate_progress_with_label("index", "Index", cx))
             .child(
@@ -149,5 +150,10 @@ fn overlays_rows_and_items_announce_names_and_states(cx: &mut TestAppContext) {
     let copy = labelled(&all, "progressIndicator", "Copy", &tree);
     assert_eq!(copy["numeric_value"], 25.0, "{copy}");
     labelled(&all, "progressIndicator", "Index", &tree);
+    // A hidden tooltip still describes its trigger.
+    assert!(
+        all.iter().any(|node| node["description"] == "Save a copy"),
+        "{tree}"
+    );
     println!("{MARKER}");
 }

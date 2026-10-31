@@ -589,6 +589,12 @@ pub fn three_pane_layout(input: &PaneLayoutInput) -> PaneLayout {
             for pane in expanded.iter_mut() {
                 pane.width = (pane.width * scale).trunc();
             }
+            // Compose truncates whole pixels and these are fractional dp: what
+            // the truncation lost goes to the last pane, or the panes fall short.
+            let used: f32 = expanded.iter().map(|pane| pane.width).sum();
+            if let Some(last) = expanded.last_mut() {
+                last.width += (allocatable.max(0.) - used).max(0.);
+            }
         }
         let mut x = 0.;
         for pane in expanded.iter_mut() {
@@ -928,8 +934,8 @@ impl PaneAnchor {
     pub fn position(self, width: f32) -> f32 {
         match self {
             Self::Proportion(fraction) => (width * fraction).round().clamp(0., width.max(0.)),
-            Self::FromStart(offset) => offset.round(),
-            Self::FromEnd(offset) => width - offset.round(),
+            Self::FromStart(offset) => offset.round().clamp(0., width.max(0.)),
+            Self::FromEnd(offset) => (width - offset.round()).clamp(0., width.max(0.)),
         }
     }
 }
@@ -1309,5 +1315,25 @@ mod tests {
         assert_eq!(previous_pane_anchor(&anchors, 1000., 500.), Some(240.));
         assert_eq!(previous_pane_anchor(&anchors, 1000., 0.), Some(1000.));
         assert_eq!(closest_pane_anchor(&[], 1000., 300.), None);
+    }
+
+    #[test]
+    fn a_shrunk_pane_still_fills_the_scaffold() {
+        for width in [113., 181., 226., 250.] {
+            let panes = layout(width, 800., &[PaneRole::Secondary]);
+            let total: f32 = panes.panes.iter().flatten().map(|pane| pane.width).sum();
+            assert_eq!(total, width, "{panes:?}");
+        }
+    }
+
+    #[test]
+    fn offset_anchors_stay_inside_the_scaffold() {
+        assert_eq!(PaneAnchor::FromStart(240.).position(200.), 200.);
+        assert_eq!(PaneAnchor::FromEnd(240.).position(200.), 0.);
+        assert_eq!(
+            next_pane_anchor(&DEFAULT_PANE_ANCHORS, 200., 200.),
+            Some(0.),
+            "the handle wraps rather than sticks"
+        );
     }
 }

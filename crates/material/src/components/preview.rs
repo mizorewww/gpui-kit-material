@@ -195,4 +195,61 @@ mod tests {
             px(16.)
         );
     }
+
+    use std::{cell::Cell, rc::Rc};
+
+    struct LiveSpecimens(Rc<Cell<usize>>);
+    impl gpui::Render for LiveSpecimens {
+        fn render(&mut self, _: &mut Window, _: &mut gpui::Context<Self>) -> impl IntoElement {
+            use crate::components::{MaterialCheckbox, MaterialRadio, MaterialSwitch};
+            let preview = InteractionPreview::Hovered;
+            let (a, b, c) = (self.0.clone(), self.0.clone(), self.0.clone());
+            div()
+                .flex()
+                .flex_col()
+                .child(
+                    div().debug_selector(|| "c".into()).child(
+                        MaterialCheckbox::new("c", "C")
+                            .preview_state(preview)
+                            .on_change(move |_, _, _| a.set(a.get() + 1)),
+                    ),
+                )
+                .child(
+                    div().debug_selector(|| "r".into()).child(
+                        MaterialRadio::new("r", "R")
+                            .preview_state(preview)
+                            .on_change(move |_, _, _| b.set(b.get() + 1)),
+                    ),
+                )
+                .child(
+                    div().debug_selector(|| "s".into()).child(
+                        MaterialSwitch::new("s", "S")
+                            .preview_state(preview)
+                            .on_change(move |_, _, _| c.set(c.get() + 1)),
+                    ),
+                )
+        }
+    }
+
+    #[gpui::test]
+    fn a_specimen_is_not_operated(cx: &mut gpui::TestAppContext) {
+        cx.update(|cx| {
+            gpui_base::init(cx);
+            cx.set_reduce_motion(true);
+        });
+        let changes = Rc::new(Cell::new(0));
+        let (_, cx) = cx.add_window_view({
+            let changes = changes.clone();
+            move |_, _| LiveSpecimens(changes)
+        });
+        cx.update(|window, cx| {
+            window.refresh();
+            window.draw(cx).clear(cx);
+        });
+        for name in ["c", "r", "s"] {
+            let center = cx.debug_bounds(name).unwrap().center();
+            cx.simulate_click(center, gpui::Modifiers::default());
+        }
+        assert_eq!(changes.get(), 0);
+    }
 }

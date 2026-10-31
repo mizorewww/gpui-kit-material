@@ -45,11 +45,30 @@ pub(crate) fn width_deltas(natural: &[f32], pressed: Option<usize>) -> Vec<f32> 
     if neighbours.is_empty() {
         return deltas;
     }
-    let growth = natural[pressed] * EXPANDED_RATIO;
-    deltas[pressed] = growth;
-    for index in &neighbours {
-        deltas[*index] = -growth / neighbours.len() as f32;
+    // The neighbours pay evenly as far as each can, and the group's extent stays
+    // put: the press gains only what they can give up.
+    let wanted = natural[pressed] * EXPANDED_RATIO;
+    let mut paying: Vec<usize> = neighbours;
+    let mut left = wanted;
+    while !paying.is_empty() && left > 0. {
+        let share = left / paying.len() as f32;
+        let (spent, rest): (Vec<usize>, Vec<usize>) = paying
+            .iter()
+            .partition(|index| natural[**index] + deltas[**index] <= share);
+        if spent.is_empty() {
+            for index in &paying {
+                deltas[*index] -= share;
+            }
+            left = 0.;
+        } else {
+            for index in &spent {
+                left -= natural[*index] + deltas[*index];
+                deltas[*index] = -natural[*index];
+            }
+            paying = rest;
+        }
     }
+    deltas[pressed] = wanted - left;
     deltas
 }
 
@@ -466,5 +485,21 @@ mod layout_tests {
         );
         assert_eq!(a.size.width, c.size.width);
         assert_eq!(a.size.height, px(36.));
+    }
+
+    #[core::prelude::v1::test]
+    fn a_neighbour_is_not_pushed_below_nothing() {
+        let deltas = super::width_deltas(&[48., 400.], Some(1));
+        assert!(deltas[0] >= -48., "{deltas:?}");
+        let total: f32 = deltas.iter().sum();
+        assert!(
+            total.abs() < 0.001,
+            "the group's extent stays put: {deltas:?}"
+        );
+        // A wide neighbour beside a narrow one takes up what it cannot.
+        let deltas = super::width_deltas(&[10., 400., 300.], Some(1));
+        assert!(deltas[0] >= -10., "{deltas:?}");
+        let total: f32 = deltas.iter().sum();
+        assert!(total.abs() < 0.001, "{deltas:?}");
     }
 }

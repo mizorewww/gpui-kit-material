@@ -1,6 +1,13 @@
 //! The 48dp target of a compact button (the reference's XS/S pseudo-element): the
 //! Base root is the target, its negative margins keep it out of layout, and what the
 //! button paints is a child. Hit testing, clipping and occlusion are then GPUI's own.
+//!
+//! One thing shows: GPUI's scroll range follows the bounds of a scroller's direct
+//! children, not their margin boxes. A compact button that is a scroller's own first
+//! or last child adds its overhang to the range at that end: 8dp for extra small, 4dp
+//! for small. It keeps the strip reachable, and a button inside a row of its own adds
+//! nothing. Taking it out would cost every compact button a wrapper's layout node, so
+//! `a_scrollers_range_grows_by_the_overhang` holds the amount instead.
 use gpui::{
     AbsoluteLength, DefiniteLength, Edges, Length, Overflow, Pixels, Rems, SizeRefinement,
     StyleRefinement,
@@ -31,7 +38,8 @@ fn absolute(length: AbsoluteLength, rem_size: Pixels) -> Pixels {
 
 impl Target {
     /// `None` when there is nothing to extend: the button is 48dp already, clips
-    /// itself, or has a height or margin only layout can resolve.
+    /// itself, or has a height or margin only layout can resolve, which a minimum
+    /// or maximum height is: only layout knows whether it applies.
     ///
     /// Layout snaps each metric to the device pixel grid on its own, so these are snapped
     /// here, and the height is what the snapped parts add up to: at a fractional rem the
@@ -44,6 +52,9 @@ impl Target {
     ) -> Option<Self> {
         let clips = |overflow: Option<Overflow>| overflow.is_some_and(|o| o != Overflow::Visible);
         if clips(style.overflow.x) || clips(style.overflow.y) {
+            return None;
+        }
+        if style.min_size.height.is_some() || style.max_size.height.is_some() {
             return None;
         }
         let painted = match style.size.height {
@@ -104,20 +115,13 @@ pub(super) fn take_layout(style: &mut StyleRefinement) -> StyleRefinement {
     }
 }
 
-/// The heights [`take_layout`] moved, for the surface they size. The root keeps the
+/// The height [`take_layout`] moved, for the surface it sizes. The root keeps the
 /// target's own height, which callers of this set after refining with the layout.
+/// A minimum or maximum height never gets here: [`Target::resolve`] declines them.
 pub(super) fn height_of(layout: &StyleRefinement) -> StyleRefinement {
     StyleRefinement {
         size: SizeRefinement {
             height: layout.size.height,
-            width: None,
-        },
-        min_size: SizeRefinement {
-            height: layout.min_size.height,
-            width: None,
-        },
-        max_size: SizeRefinement {
-            height: layout.max_size.height,
             width: None,
         },
         ..Default::default()
@@ -169,6 +173,16 @@ mod tests {
         );
         assert_eq!(
             Target::resolve(32., &refinement(|b| b.h_full()), rem_size, |p| p),
+            None
+        );
+        // Only layout knows whether these apply, and a root height of 48dp
+        // would make a minimum above it, or a maximum below it, wrong.
+        assert_eq!(
+            Target::resolve(32., &refinement(|b| b.min_h(px(44.))), rem_size, |p| p),
+            None
+        );
+        assert_eq!(
+            Target::resolve(40., &refinement(|b| b.max_h(px(36.))), rem_size, |p| p),
             None
         );
     }
@@ -372,21 +386,79 @@ mod layout_tests {
         }
     }
 
-    /// The target's lower strip overhangs a scroller's last row, and GPUI's scroll range
-    /// follows children's bounds, so the range grows by the overhang at most.
+    /// See the module's note: exactly the overhang, and nothing past a row.
     #[gpui::test]
-    fn a_scrollers_range_grows_at_most_by_the_overhang(cx: &mut TestAppContext) {
+    fn a_scrollers_range_grows_by_the_overhang(cx: &mut TestAppContext) {
         cx.update(gpui_base::init);
-        let scroll = ScrollHandle::new();
-        let (_, cx) = cx.add_window_view({
-            let scroll = scroll.clone();
-            move |_, _| Scroller {
-                scroll,
-                size: ButtonSize::ExtraSmall,
-            }
-        });
+        // The column is sized to fit an extra small button, so a small one
+        // overflows by 8 before its 4dp overhang.
+        for (size, range) in [(ButtonSize::ExtraSmall, 8.), (ButtonSize::Small, 8. + 4.)] {
+            let scroll = ScrollHandle::new();
+            let (_, cx) = cx.add_window_view({
+                let scroll = scroll.clone();
+                move |_, _| Scroller { scroll, size }
+            });
+            cx.update(|window, cx| window.draw(cx).clear(cx));
+            let measured: Pixels = scroll.max_offset().y;
+            assert_eq!(measured, px(range), "{size:?}");
+        }
+    }
+
+    struct Bounded;
+    impl Render for Bounded {
+        fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+            window.set_rem_size(px(14.));
+            div()
+                .p(px(40.))
+                .flex()
+                .flex_col()
+                .items_start()
+                .child(
+                    MaterialButton::new("tall")
+                        .button_size(ButtonSize::ExtraSmall)
+                        .min_h(px(60.))
+                        .debug_selector(|| "tall".into())
+                        .child("Label"),
+                )
+                .child(
+                    div()
+                        .h(px(10.))
+                        .w(px(100.))
+                        .debug_selector(|| "under-tall".into()),
+                )
+                .child(
+                    MaterialButton::new("short")
+                        .button_size(ButtonSize::Small)
+                        .max_h(px(30.))
+                        .debug_selector(|| "short".into())
+                        .child("Label"),
+                )
+                .child(
+                    div()
+                        .h(px(10.))
+                        .w(px(100.))
+                        .debug_selector(|| "under-short".into()),
+                )
+        }
+    }
+
+    #[gpui::test]
+    fn a_minimum_or_maximum_height_takes_its_space_in_layout(cx: &mut TestAppContext) {
+        cx.update(gpui_base::init);
+        let (_, cx) = cx.add_window_view(|_, _| Bounded);
         cx.update(|window, cx| window.draw(cx).clear(cx));
-        let range: Pixels = scroll.max_offset().y;
-        assert!(range <= px(8.), "{range:?}");
+        let tall = cx.debug_bounds("tall").unwrap();
+        assert_eq!(tall.size.height, px(60.));
+        assert_eq!(
+            cx.debug_bounds("under-tall").unwrap().top(),
+            tall.bottom(),
+            "what follows comes after the whole button"
+        );
+        let short = cx.debug_bounds("short").unwrap();
+        assert_eq!(short.size.height, px(30.));
+        assert_eq!(
+            cx.debug_bounds("under-short").unwrap().top(),
+            short.bottom()
+        );
     }
 }

@@ -603,7 +603,13 @@ impl RenderOnce for MaterialSlider {
         let live = !disabled && preview.is_none();
         let forced = |s| !disabled && preview == Some(s);
         let hovered = forced(InteractionPreview::Hovered);
+        // Nothing would hear the release of a press that outlives being live.
+        if !live && *press.read(cx) {
+            press.update(cx, |pressed, _| *pressed = false);
+        }
         let pressed = forced(InteractionPreview::Pressed) || (live && *press.read(cx));
+        #[cfg(test)]
+        SLIDER_PRESSED.with(|cell| cell.set(pressed));
 
         let state = self.state.read(cx);
         let value = state.value();
@@ -716,7 +722,7 @@ impl RenderOnce for MaterialSlider {
                 let thumb = SliderThumb::new(&self.state)
                     .axis(self.axis)
                     .start(start)
-                    .disabled(disabled)
+                    .disabled(!live)
                     .absolute()
                     .when(is_range, |thumb| {
                         // Each range thumb is a focusable slider of its own.
@@ -878,7 +884,7 @@ impl RenderOnce for MaterialSlider {
             };
             SliderTrack::new(&self.state)
                 .axis(self.axis)
-                .disabled(disabled)
+                .disabled(!live)
                 .relative()
                 .size_full()
                 .child(
@@ -923,12 +929,31 @@ impl RenderOnce for MaterialSlider {
         let slider = Slider::new(&self.state)
             .axis(self.axis)
             .accessibility_label(label)
-            .disabled(disabled)
+            // A specimen is not operated, whichever state it shows.
+            .disabled(!live)
             .when(live && !is_range, |slider| slider.track_focus(&focus))
             .size_full()
             .child(track_view);
         let state_entity = self.state.clone();
         let (release, release_out) = (press.clone(), press.clone());
+        // A release can go where no listener hears it: a move with no button
+        // says it happened. Only a press in progress listens to the window.
+        let lost_release = (live && *press.read(cx)).then(|| {
+            let press = press.clone();
+            canvas(
+                |_, _, _| {},
+                move |_, _, window, _| {
+                    window.on_mouse_event(move |event: &MouseMoveEvent, phase, window, cx| {
+                        if phase == DispatchPhase::Capture && !event.dragging() && *press.read(cx) {
+                            press.update(cx, |pressed, _| *pressed = false);
+                            window.refresh();
+                        }
+                    });
+                },
+            )
+            .absolute()
+            .size_0()
+        });
         div()
             .id(id)
             .flex_shrink_0()
@@ -995,6 +1020,7 @@ impl RenderOnce for MaterialSlider {
                 })
             })
             .child(slider)
+            .children(lost_release)
             .into_any_element()
     }
 }
@@ -1052,6 +1078,12 @@ fn classic_track(
         .child(bar)
         .child(thumbs)
         .into_any_element()
+}
+
+#[cfg(test)]
+thread_local! {
+    /// Whether the slider last rendered on this thread shows a press.
+    static SLIDER_PRESSED: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
 }
 
 #[cfg(test)]
@@ -1407,5 +1439,91 @@ mod tests {
         draw(cx);
         let slider = cx.debug_bounds("slider").unwrap();
         assert_eq!(slider.size.height, px(44.), "the XSmall handle height");
+    }
+
+    #[gpui::test]
+    fn a_lost_release_lets_go_of_the_handle(cx: &mut TestAppContext) {
+        cx.update(gpui_base::init);
+        let (_, cx) = cx.add_window_view(|_, cx| {
+            SliderHarness(
+                cx.new(|_| SliderState::new().max(100.).default_value(30.)),
+                None,
+            )
+        });
+        draw(cx);
+        let center = cx.debug_bounds("slider").unwrap().center();
+        cx.simulate_mouse_down(center, MouseButton::Left, Modifiers::default());
+        draw(cx);
+        assert!(SLIDER_PRESSED.with(|p| p.get()), "pressed");
+        cx.simulate_mouse_move(
+            point(px(5.), px(5.)),
+            None::<MouseButton>,
+            Modifiers::default(),
+        );
+        draw(cx);
+        assert!(!SLIDER_PRESSED.with(|p| p.get()), "it let go");
+    }
+
+    #[gpui::test]
+    fn disabling_during_a_press_ends_it(cx: &mut TestAppContext) {
+        struct Toggled(Entity<SliderState>, bool);
+        impl Render for Toggled {
+            fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+                window.set_rem_size(px(14.));
+                div().w(px(200.)).p(px(60.)).child(
+                    div()
+                        .debug_selector(|| "slider".into())
+                        .child(MaterialSlider::new(&self.0, "Level").disabled(self.1)),
+                )
+            }
+        }
+        cx.update(gpui_base::init);
+        let (view, cx) = cx.add_window_view(|_, cx| {
+            Toggled(
+                cx.new(|_| SliderState::new().max(100.).default_value(50.)),
+                false,
+            )
+        });
+        draw(cx);
+        let center = cx.debug_bounds("slider").unwrap().center();
+        cx.simulate_mouse_down(center, MouseButton::Left, Modifiers::default());
+        draw(cx);
+        view.update(cx, |view, cx| {
+            view.1 = true;
+            cx.notify();
+        });
+        draw(cx);
+        cx.simulate_mouse_up(center, MouseButton::Left, Modifiers::default());
+        draw(cx);
+        view.update(cx, |view, cx| {
+            view.1 = false;
+            cx.notify();
+        });
+        draw(cx);
+        assert!(
+            !SLIDER_PRESSED.with(|p| p.get()),
+            "enabled again, it is not held"
+        );
+    }
+
+    #[gpui::test]
+    fn a_specimen_slider_does_not_move(cx: &mut TestAppContext) {
+        cx.update(gpui_base::init);
+        let (view, cx) = cx.add_window_view(|_, cx| {
+            SliderHarness(
+                cx.new(|_| SliderState::new().max(100.).default_value(30.)),
+                Some(InteractionPreview::Hovered),
+            )
+        });
+        draw(cx);
+        let before = view.read_with(cx, |view, cx| view.0.read(cx).value());
+        let bounds = cx.debug_bounds("slider").unwrap();
+        let spot = point(bounds.left() + px(5.), bounds.center().y);
+        cx.simulate_click(spot, Modifiers::default());
+        draw(cx);
+        assert_eq!(
+            view.read_with(cx, |view, cx| view.0.read(cx).value()),
+            before
+        );
     }
 }
