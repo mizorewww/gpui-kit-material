@@ -36,8 +36,8 @@
       "upstream_sha256": "f56cc07dda43678903e2907b8c8c6028ae5fa80f0a637b8f065054a4c55b391d"
     },
     "src/input/base/state.rs": {
-      "local_sha256": "dcb51db7e117a6567fe28bc70ea9fdf613379b31f5a7bf1e90d34d8fc73bc6ad",
-      "reason": "Caller caret colour that wins over the projected editor style, set_caret_color (motion-patch.md); the IME anchor (ime-anchor-patch.md).",
+      "local_sha256": "9accae1333235bf245ba112ed3321004958eb7748155f552368cb21c545ff7fb",
+      "reason": "The IME anchor (ime-anchor-patch.md).",
       "upstream_sha256": "39296e195f6dabbb581b8f72ee06809b13fae3b328c4a71b48768dbff5c81c53"
     },
     "src/lib.rs": {
