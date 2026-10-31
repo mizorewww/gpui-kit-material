@@ -1200,6 +1200,7 @@ pub struct MenuPopup {
     submenu: Option<(usize, MaterialMenu)>,
     submenu_open: bool,
     on_submenu_change: Option<OpenChange>,
+    full_width: bool,
 }
 
 impl MenuPopup {
@@ -1215,7 +1216,13 @@ impl MenuPopup {
             submenu: None,
             submenu_open: false,
             on_submenu_change: None,
+            full_width: false,
         }
+    }
+    /// Fill the parent's width, with the menu as wide as the trigger.
+    fn full_width(mut self, full_width: bool) -> Self {
+        self.full_width = full_width;
+        self
     }
     /// Close the menu when an item (other than a sub-menu) is activated
     /// (default). Off, the menu stays open, e.g. to toggle several items.
@@ -1357,14 +1364,19 @@ impl RenderOnce for MenuPopup {
             })
             .read(cx)
             .clone();
-        // The trigger's height in design px, measured as it prepaints,
-        // places a side popup's top at the trigger's top.
-        let trigger_height = window
+        // The trigger's size in design px, measured as it prepaints: its height
+        // places a side popup's top at the trigger's top, and its width is a
+        // full-width menu's.
+        let trigger_size = window
             .use_keyed_state((self.id.clone(), "menu-popup-trigger"), cx, |_, _| {
-                Rc::new(std::cell::Cell::new(0f32))
+                Rc::new(std::cell::Cell::new((0f32, 0f32)))
             })
             .read(cx)
             .clone();
+        let full_width = self.full_width;
+        if full_width {
+            self.menu = self.menu.width(trigger_size.get().0);
+        }
         let style = self.menu.style;
         let height = self.menu.visible_height();
         let anchor = self.anchor;
@@ -1529,7 +1541,7 @@ impl RenderOnce for MenuPopup {
         // Kit centers a side popup on the trigger; the margin moves the
         // menu's top to the trigger's top.
         let side_offset = if side {
-            ((height * shown).max(cascade_height) - trigger_height.get()).max(0.)
+            ((height * shown).max(cascade_height) - trigger_size.get().1).max(0.)
         } else {
             0.
         };
@@ -1549,7 +1561,7 @@ impl RenderOnce for MenuPopup {
             .children(cascade);
         let surface = std::cell::RefCell::new(Some(crate::scope::current_scope(content)));
         let open = self.open;
-        let measure = trigger_height;
+        let measure = trigger_size;
         // Material buttons block the mouse for the elements under them, so
         // Kit's popover never sees a press on such a trigger. A window
         // listener toggles the menu instead (a press while open closes it
@@ -1579,14 +1591,17 @@ impl RenderOnce for MenuPopup {
         .size_full();
         let trigger = div()
             .relative()
+            .when(full_width, |trigger| trigger.w_full())
             .child(self.trigger)
             .child(super::prepaint_bounds(press, move |bounds, window, _| {
-                measure.set(
-                    f32::from(bounds.size.height) * crate::tokens::typography::BASE_PX
-                        / f32::from(window.rem_size()),
-                );
+                let design = |pixels: Pixels| {
+                    f32::from(pixels) * crate::tokens::typography::BASE_PX
+                        / f32::from(window.rem_size())
+                };
+                measure.set((design(bounds.size.width), design(bounds.size.height)));
             }));
         Popover::new(self.id.clone())
+            .when(full_width, |popover| popover.w_full())
             .appearance(false)
             .anchor(if crate::scope::is_rtl(window) {
                 mirrored_anchor(anchor)
@@ -1636,6 +1651,7 @@ pub struct ExposedDropdown {
     style: MenuStyle,
     width: f32,
     menu_max_height: Option<f32>,
+    full_width: bool,
     on_open_change: Option<OpenChange>,
     on_select: Option<Select>,
 }
@@ -1661,6 +1677,7 @@ impl ExposedDropdown {
             style: MenuStyle::Baseline,
             width: 210.,
             menu_max_height: None,
+            full_width: false,
             on_open_change: None,
             on_select: None,
         }
@@ -1729,6 +1746,12 @@ impl ExposedDropdown {
         self.menu_max_height = Some(height);
         self
     }
+    /// Fill the parent's width instead of [`Self::width`], with the menu as
+    /// wide as the field, like a text field in the same form.
+    pub fn full_width(mut self) -> Self {
+        self.full_width = true;
+        self
+    }
     pub fn on_open_change(
         mut self,
         handler: impl Fn(&bool, &mut Window, &mut App) + 'static,
@@ -1779,7 +1802,13 @@ impl RenderOnce for ExposedDropdown {
             .trailing_icon(arrow)
             .error(self.error)
             .disabled(self.disabled)
-            .w(rem(self.width));
+            .map(|field| {
+                if self.full_width {
+                    field.w_full()
+                } else {
+                    field.w(rem(self.width))
+                }
+            });
         if let Some(leading) = self.leading {
             field = field.leading_icon(leading);
         }
@@ -1804,6 +1833,7 @@ impl RenderOnce for ExposedDropdown {
         let trigger = div()
             .id((id.clone(), "trigger"))
             .debug_selector(|| "dropdown-trigger".into())
+            .when(self.full_width, |trigger| trigger.w_full())
             .role(Role::ComboBox)
             .aria_label(super::labeled::required_label(&self.label, self.required))
             .aria_value(value)
@@ -1845,6 +1875,7 @@ impl RenderOnce for ExposedDropdown {
             return trigger.into_any_element();
         }
         MenuPopup::new((id, "popup"), trigger, menu)
+            .full_width(self.full_width)
             .open(open)
             .on_open_change(move |next, window, cx| toggle(*next, window, cx))
             .into_any_element()
