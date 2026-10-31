@@ -49,6 +49,7 @@ const DRAWER_PADDING: f32 = 12.;
 const ITEM_HEIGHT: f32 = 56.;
 /// The dense height.
 const DENSE_ITEM_HEIGHT: f32 = 48.;
+const ITEM_LEADING_BARE: f32 = 24.;
 const ITEM_LEADING: f32 = 16.;
 const ITEM_TRAILING: f32 = 24.;
 const ITEM_GAP: f32 = 12.;
@@ -70,7 +71,38 @@ pub(crate) struct DrawerPaint {
     pub label: Rgba,
     pub indicator: Rgba,
     pub hover: Rgba,
+    pub focus: Rgba,
     pub press: Rgba,
+}
+
+/// A destination's label and large badge: emphasized once selected, as in the
+/// kit's `Nav item`.
+fn drawer_label_scale(selected: bool) -> crate::tokens::typography::TypeScale {
+    let scale = TypeRole::LabelLarge;
+    if selected {
+        scale.emphasized()
+    } else {
+        scale.scale()
+    }
+}
+
+/// The kit's leading padding: 16dp before an icon, 24dp before a bare label.
+const fn drawer_leading(icon: bool) -> f32 {
+    if icon {
+        ITEM_LEADING
+    } else {
+        ITEM_LEADING_BARE
+    }
+}
+
+/// A type role's size and spacing, for a weight of the caller's.
+fn type_role_sized<E: Styled>(element: E, role: TypeRole) -> E {
+    let scale = role.scale();
+    element
+        .font_family(scale.font_family)
+        .text_size(scale.font_size)
+        .letter_spacing(scale.letter_spacing)
+        .line_height(scale.line_height)
 }
 
 /// `fade` is the fast effects amount, 0 unselected and 1 selected.
@@ -83,6 +115,7 @@ pub(crate) fn drawer_paint(selected: bool, fade: f32, disabled: bool) -> DrawerP
             label: ink,
             indicator: color(ColorRole::ON_SURFACE).opacity(state::DISABLED_CONTAINER * fade),
             hover: Rgba::default(),
+            focus: Rgba::default(),
             press: Rgba::default(),
         };
     }
@@ -98,6 +131,7 @@ pub(crate) fn drawer_paint(selected: bool, fade: f32, disabled: bool) -> DrawerP
         label: blend(rest, active, fade),
         indicator: color(ColorRole::SECONDARY_CONTAINER).opacity(fade),
         hover: layer.opacity(state::HOVER),
+        focus: layer.opacity(state::FOCUS),
         press: layer.opacity(state::PRESS),
     }
 }
@@ -265,11 +299,16 @@ impl DrawerRow {
         let focus = self
             .focus
             .tab_stop(self.tab_stop && enabled && preview.is_none());
+        let keyboard_focus = enabled
+            && preview.is_none()
+            && focus.is_focused(window)
+            && window.last_input_was_keyboard();
         let layer = div()
             .id("drawer-state-layer")
             .absolute()
             .inset_0()
             .rounded_full()
+            .when(keyboard_focus, |layer| layer.bg(paint.focus))
             .map(|layer| match preview {
                 _ if disabled => layer,
                 None => layer
@@ -277,8 +316,10 @@ impl DrawerRow {
                     .group_active(ITEM_GROUP, move |style| style.bg(paint.press)),
                 Some(InteractionPreview::Hovered) => layer.bg(paint.hover),
                 Some(InteractionPreview::Pressed) => layer.bg(paint.press),
+                Some(InteractionPreview::Focused) => layer.bg(paint.focus),
                 Some(_) => layer,
             });
+        let label_scale = drawer_label_scale(selected);
         let indicator = (paint.indicator.a > 0.001).then(|| {
             div()
                 .absolute()
@@ -293,7 +334,8 @@ impl DrawerRow {
                 div()
                     .flex_shrink_0()
                     .text_color(paint.label)
-                    .map(|text| type_role(text, TypeRole::LabelLarge))
+                    .font_weight(FontWeight(label_scale.font_weight as f32))
+                    .map(|text| type_role_sized(text, TypeRole::LabelLarge))
                     .child(text.clone())
                     .into_any_element(),
             ),
@@ -306,7 +348,7 @@ impl DrawerRow {
             .flex()
             .items_center()
             .gap(rem(ITEM_GAP))
-            .pl(rem(ITEM_LEADING))
+            .pl(rem(drawer_leading(self.icon)))
             .pr(rem(ITEM_TRAILING))
             .rounded_full()
             .when(cfg!(test), |content| {
@@ -330,7 +372,8 @@ impl DrawerRow {
                     .whitespace_nowrap()
                     .text_ellipsis()
                     .text_color(paint.label)
-                    .map(|label| type_role(label, TypeRole::LabelLarge))
+                    .font_weight(FontWeight(label_scale.font_weight as f32))
+                    .map(|label| type_role_sized(label, TypeRole::LabelLarge))
                     .child(item.label().clone()),
             )
             .children(badge);
