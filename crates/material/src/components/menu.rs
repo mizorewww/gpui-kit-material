@@ -818,6 +818,15 @@ fn submenu_icon(size: f32) -> Icon {
         .size(rem(size))
 }
 
+/// One line of an item's text: too long for the menu, it ends in an ellipsis
+/// rather than stopping mid-letter at the item's edge.
+fn item_text(role: TypeRole, ink: Rgba, text: SharedString) -> Div {
+    type_style(div(), role)
+        .text_color(ink)
+        .truncate()
+        .child(text)
+}
+
 fn render_item(
     id: impl Into<ElementId>,
     item: MaterialMenuItem,
@@ -910,20 +919,11 @@ fn render_item(
                 .flex_col()
                 .flex_1()
                 .min_w_0()
-                .child(
-                    type_style(div(), label_role)
-                        .text_color(fade(paint.label))
-                        .whitespace_nowrap()
-                        .overflow_hidden()
-                        .child(item.label),
-                )
-                .children(item.supporting.map(|text| {
-                    type_style(div(), supporting_role)
-                        .text_color(fade(paint.supporting))
-                        .whitespace_nowrap()
-                        .overflow_hidden()
-                        .child(text)
-                })),
+                .child(item_text(label_role, fade(paint.label), item.label))
+                .children(
+                    item.supporting
+                        .map(|text| item_text(supporting_role, fade(paint.supporting), text)),
+                ),
         )
         .children(item.trailing_text.map(|text| {
             type_style(div().flex_shrink_0(), TypeRole::LabelLarge)

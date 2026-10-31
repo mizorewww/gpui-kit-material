@@ -97,6 +97,48 @@ fn a_closing_popup_paints_until_both_channels_settle() {
     assert!(!popup_visible(false, 0., 0.));
 }
 
+#[test]
+fn item_text_too_long_for_the_menu_ends_in_an_ellipsis() {
+    let mut line = item_text(
+        TypeRole::LabelLarge,
+        color(ColorRole::ON_SURFACE),
+        "A label".into(),
+    );
+    let style = line.style();
+    assert!(matches!(
+        style.text.text_overflow,
+        Some(TextOverflow::Truncate(_))
+    ));
+    assert_eq!(style.text.white_space, Some(WhiteSpace::Nowrap));
+}
+
+struct LongLabel;
+
+impl Render for LongLabel {
+    fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        window.set_rem_size(px(14.));
+        MaterialMenu::new("menu").width(160.).item(
+            MaterialMenuItem::new("A label far too long for this menu to hold on one line")
+                .supporting_text("Supporting text that is also far too long for this menu")
+                .trailing(div().debug_selector(|| "trailing".into()).size_full()),
+        )
+    }
+}
+
+#[gpui::test]
+fn a_long_label_leaves_the_trailing_slot_inside_the_menu(cx: &mut TestAppContext) {
+    cx.update(|cx| {
+        gpui_kit::init(cx);
+        crate::init(cx);
+    });
+    let (_, cx) = cx.add_window_view(|_, _| LongLabel);
+    draw(cx);
+    let menu = cx.debug_bounds("material-menu").expect("the menu drew");
+    let trailing = cx.debug_bounds("trailing").expect("the slot drew");
+    assert!(trailing.right() <= menu.right());
+    assert!(trailing.size.width > px(0.));
+}
+
 struct PopupHarness {
     open: bool,
     picked: Rc<RefCell<Vec<usize>>>,
