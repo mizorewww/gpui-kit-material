@@ -248,8 +248,8 @@
       },
       "src/elements/div.rs": {
         "upstream_sha256": "fa6378a65d066a46670dea1b65d305c25e2e7f06c1ced9f7a4175e1adb1aa8dc",
-        "local_sha256": "cb2ac094d9bd1c909124d646371a88415bfb9e2d308a1efd14165e57e0a9b5b2",
-        "reason": "Material performance patch: the scroll-wheel listener ignores a wheel that cannot move the offset (already at that end, incl. a vertical wheel mapped onto a horizontal-only box): no notify, retained-subtree invalidation or note_scrolled, which repainted the enclosing scroll layer on every wheel event. scroll_max factored out of clamp_scroll_position."
+        "local_sha256": "8546042e0a578b0003b55a6d04ab63ff20319362712073c561c6893f5fe647ba",
+        "reason": "Material performance patch: the scroll-wheel listener ignores a wheel that cannot move the offset (already at that end, incl. a vertical wheel mapped onto a horizontal-only box): no notify, retained-subtree invalidation or note_scrolled, which repainted the enclosing scroll layer on every wheel event. scroll_max factored out of clamp_scroll_position. A wheel's hover freeze holds hover listeners of any input modality while a frame is drawn, so a row scrolled under a still pointer starts no transition that keeps a list off its layer, and the row under it does not stop hovering (hover_freeze::holds_listeners; docs/ARCHITECTURE.md)."
       },
       "src/fast/layers/reuse.rs": {
         "upstream_sha256": "8259c4c5b53a8d9818786dbdedc377b8da4a8b1c84baafa65dd89cfb562b3f3f",
@@ -353,8 +353,8 @@
       },
       "src/text_system/line_wrapper.rs": {
         "upstream_sha256": "4c0ce82fba13490ec6494245971a6a4a322fc55ca2944c60e708fdbcd5dcee8e",
-        "local_sha256": "3b513ee70515dfa102825632acb0a580192b23265c315985559b25449d578e69",
-        "reason": "Hanging overflow space: a space that overflows a row after content no longer starts the next row; it hangs past the edge and the following word is the break (LineWrapper::wrap_line, the multi-line truncation that replicates it in Fast, LineLayout::compute_wrap_boundaries), with tests (vendor/gpui-pre/hanging-space-patch.md). Letter spacing state (vendor/gpui-pre/letter-spacing-patch.md)."
+        "local_sha256": "7ea78f55f0017c16b09dc32ca18b5d97364d636fc6f25fe0ed11cf2dc76ef7d1",
+        "reason": "Hanging overflow space: a space that overflows a row after content no longer starts the next row; it hangs past the edge and the following word is the break (LineWrapper::wrap_line, the multi-line truncation that replicates it in Fast, LineLayout::compute_wrap_boundaries), with tests (vendor/gpui-pre/hanging-space-patch.md). Letter spacing state (vendor/gpui-pre/letter-spacing-patch.md). A line does not start with ? or !, half or full width (vendor/gpui-pre/line-start-marks-patch.md)."
       },
       "Cargo.toml": {
         "upstream_sha256": "1f8d49e1f08e320cf393fcacb2ac402044ddb7aaf8dffc4572e31aa3d5a9e7ea",
@@ -370,6 +370,21 @@
         "upstream_sha256": "131164fada000e865db0a14855e4eab5446f89b45e70a1904414408cd0cdb6b0",
         "local_sha256": "6e1ffcb4bb847e0d8bbd501c85d36c2a7133ad29c43120027ccd76f64e63bc05",
         "reason": "A render lease is not a change unless it notifies (vendor/gpui-pre/render-lease-patch.md)."
+      },
+      "src/fast/layers/hover_freeze.rs": {
+        "upstream_sha256": "a8273a396988f3c420a9008525b20dbb8056d4751b4df395200f35ae4a9913d8",
+        "local_sha256": "7603b4afd6c8701d89a6356a8d522d129c51c891241be50a00e7825a3df92c9d",
+        "reason": "Doc: the freeze covers hover listeners for any input modality."
+      },
+      "src/fast/tests/layers_lists.rs": {
+        "upstream_sha256": "d6cdd3cece19db6931bbcf2dcf5d7cda980eab7a507fee79f6f55444da53d0cf",
+        "local_sha256": "e380cc1b43900872919dd5969ebc380cf1b22436fe1dd6d9fe1ce95e885bc63d",
+        "reason": "Test: hover held still reaches no input-modality-independent listener."
+      },
+      "src/fast/line_break.rs": {
+        "upstream_sha256": "09da7204a25f0ad3276a5fcf82ebb48f35de4170e613f90411e272ee02debc7c",
+        "local_sha256": "f6e763a49b2f87c049182fbb9e54e315a7b1fec9f61ae3f859e650da5db432ca",
+        "reason": "Comment: a break before / is what lets a URL wrap, not one before ? (vendor/gpui-pre/line-start-marks-patch.md)."
       }
     },
     "added": {
@@ -408,6 +423,6 @@
         "reason": "Package-level lockfile not retained; the workspace Cargo.lock owns resolution."
       }
     },
-    "unchanged_file_count": 143
+    "unchanged_file_count": 140
   }
 }

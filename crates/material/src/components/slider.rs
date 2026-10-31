@@ -535,6 +535,8 @@ fn default_format(value: f32) -> SharedString {
 /// Expressive slider's focus, keyboard, press, preview, axis and range
 /// handling; only the geometry differs.
 const CLASSIC_TARGET: f32 = 48.;
+/// A classic track's mark for a step.
+const CLASSIC_STOP: f32 = 2.;
 const CLASSIC_STATE_LAYER: f32 = 40.;
 
 /// Keyboard stepping: arrows by one step, Page keys by a tenth of the range
@@ -844,7 +846,16 @@ impl RenderOnce for MaterialSlider {
             });
 
         let track_view = if classic {
-            classic_track(&self.state, self.axis, disabled, &handles, &paint, thumbs)
+            classic_track(
+                &self.state,
+                self.axis,
+                disabled,
+                &handles,
+                self.centered,
+                steps,
+                &paint,
+                thumbs,
+            )
         } else {
             let scale = f32::from(rem(1.).to_pixels(window.rem_size()));
             let track = TrackPaint {
@@ -1025,25 +1036,70 @@ impl RenderOnce for MaterialSlider {
     }
 }
 
-/// The classic track: a 4dp inactive bar with the active part from the
-/// start (or between a range's thumbs), along either axis.
+/// The fractions of a classic track its active part spans: from the start, or
+/// from the middle when `centered`, to the thumb; a range's between its thumbs.
+fn classic_active_span(handles: &[f32], centered: bool) -> (f32, f32) {
+    match handles {
+        [start, end] => (*start, *end),
+        [end] if centered => (end.min(0.5), end.max(0.5)),
+        [end] => (0., *end),
+        _ => (0., 0.),
+    }
+}
+
+/// The classic track: a 4dp inactive bar with the active part from the start or
+/// the middle (or between a range's thumbs), and a 2dp mark per step, along either
+/// axis.
+#[allow(clippy::too_many_arguments)]
 fn classic_track(
     state: &Entity<SliderState>,
     axis: Axis,
     disabled: bool,
     handles: &[f32],
+    centered: bool,
+    steps: Option<usize>,
     paint: &SliderPaint,
     thumbs: impl IntoIterator<Item = AnyElement>,
 ) -> AnyElement {
     let track = slider_geometry(SliderAppearance::Classic).0;
     let inset = rem((CLASSIC_TARGET - track) / 2.);
-    let (from, to) = match handles {
-        [start, end] => (*start, *end),
-        [end] => (0., *end),
-        _ => (0., 0.),
-    };
+    let (from, to) = classic_active_span(handles, centered);
     let horizontal = axis == Axis::Horizontal;
-    let active = div().absolute().rounded_full().bg(paint.active);
+    let stop = rem(CLASSIC_STOP);
+    let stops = steps.into_iter().flat_map(|count| {
+        (0..=count).map(move |index| {
+            let at = index as f32 / count as f32;
+            let on_active = at >= from && at <= to;
+            let mark = div()
+                .absolute()
+                .size(stop)
+                .rounded_full()
+                .bg(if on_active {
+                    paint.on_active
+                } else {
+                    paint.on_inactive
+                })
+                .when(cfg!(test), |mark| {
+                    mark.debug_selector(move || format!("classic-stop-{index}"))
+                });
+            if horizontal {
+                mark.top(rem((track - CLASSIC_STOP) / 2.))
+                    .left(relative(at))
+                    .ml(rem(-CLASSIC_STOP / 2.))
+            } else {
+                mark.left(rem((track - CLASSIC_STOP) / 2.))
+                    .bottom(relative(at))
+                    .mb(rem(-CLASSIC_STOP / 2.))
+            }
+        })
+    });
+    let active = div()
+        .absolute()
+        .rounded_full()
+        .bg(paint.active)
+        .when(cfg!(test), |active| {
+            active.debug_selector(|| "classic-active".into())
+        });
     let active = if horizontal {
         active
             .top_0()
@@ -1062,7 +1118,11 @@ fn classic_track(
         .absolute()
         .rounded_full()
         .bg(paint.inactive)
-        .child(active);
+        .when(cfg!(test), |bar| {
+            bar.debug_selector(|| "classic-track".into())
+        })
+        .child(active)
+        .children(stops);
     let bar = if horizontal {
         bar.left_0().top(inset).w_full().h(rem(track))
     } else {
@@ -1292,6 +1352,38 @@ mod tests {
         cx.update(|window, cx| window.focus_next(cx));
         cx.simulate_keystrokes("right right");
         assert_eq!(state.read_with(cx, |s, _| s.value().end()), 32.);
+    }
+
+    /// The classic track honors `centered`: its active part runs from the middle
+    /// to the thumb, on either side.
+    #[gpui::test]
+    fn a_centered_classic_slider_grows_from_the_middle(cx: &mut TestAppContext) {
+        let (_, cx) = configured(cx, SliderState::new().max(100.).default_value(75.), |s| {
+            s.appearance(SliderAppearance::Classic).centered(true)
+        });
+        let track = cx.debug_bounds("classic-track").unwrap();
+        let active = cx.debug_bounds("classic-active").unwrap();
+        assert!(
+            (active.left() - track.center().x).abs() <= px(1.),
+            "{active:?} in {track:?}"
+        );
+        assert!(
+            (active.right() - (track.left() + track.size.width * 0.75)).abs() <= px(1.),
+            "{active:?} in {track:?}"
+        );
+    }
+
+    /// The classic track honors `stops`: one mark per step.
+    #[gpui::test]
+    fn a_classic_slider_with_stops_marks_each_step(cx: &mut TestAppContext) {
+        let (_, cx) = configured(
+            cx,
+            SliderState::new().max(100.).step(10.).default_value(30.),
+            |s| s.appearance(SliderAppearance::Classic).stops(true),
+        );
+        assert!(cx.debug_bounds("classic-stop-0").is_some());
+        assert!(cx.debug_bounds("classic-stop-10").is_some());
+        assert!(cx.debug_bounds("classic-stop-11").is_none());
     }
 
     #[gpui::test]

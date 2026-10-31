@@ -2,12 +2,14 @@
 //! of list rows, overlays, carousel items and progress, read from the tree
 //! GPUI Fast builds when assistive technology is active.
 use super::*;
-use gpui::{Context, IntoElement, Render, TestAppContext, Window, div, prelude::*, px};
+use gpui::{
+    Context, Entity, IntoElement, Render, SharedString, TestAppContext, Window, div, prelude::*, px,
+};
 use serde_json::Value;
 
 const MARKER: &str = "material-a11y-names-verified";
 
-struct Screen;
+struct Screen(Entity<TimePickerState>);
 impl Render for Screen {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         div()
@@ -39,6 +41,7 @@ impl Render for Screen {
                     .open(true)
                     .headline("Details"),
             )
+            .child(TimePicker::new("time", &self.0))
             .child(
                 MaterialBottomSheet::new("bottom")
                     .modal(true)
@@ -46,6 +49,25 @@ impl Render for Screen {
                     .label("Filters")
                     .child(div().h(px(100.))),
             )
+    }
+}
+
+fn time_labels() -> TimePickerLabels {
+    let s = SharedString::new_static;
+    TimePickerLabels {
+        select_title: s("Select time"),
+        enter_title: s("Enter time"),
+        hour: s("Hour"),
+        minute: s("Minute"),
+        am: s("AM"),
+        pm: s("PM"),
+        confirm: s("OK"),
+        cancel: s("Cancel"),
+        switch_to_input: s("Keyboard"),
+        switch_to_dial: s("Dial"),
+        number: std::rc::Rc::new(|n| n.to_string().into()),
+        two_digits: std::rc::Rc::new(|n| format!("{n:02}").into()),
+        separator: s(":"),
     }
 }
 
@@ -111,9 +133,14 @@ fn overlays_rows_and_items_announce_names_and_states(cx: &mut TestAppContext) {
         gpui_base::init(cx);
         cx.set_reduce_motion(true);
     });
-    let (_, cx) = cx.add_window_view(|window, _| {
+    let (_, cx) = cx.add_window_view(|window, cx| {
         window.set_rem_size(px(crate::tokens::typography::BASE_PX));
-        Screen
+        Screen(cx.new(|cx| {
+            let time = chrono::NaiveTime::from_hms_opt(7, 0, 0).unwrap();
+            let mut picker = TimePickerState::new(time_labels(), time, window, cx);
+            picker.toggle_mode(window, cx);
+            picker
+        }))
     });
     for _ in 0..3 {
         cx.update(|window, cx| {
@@ -141,6 +168,8 @@ fn overlays_rows_and_items_announce_names_and_states(cx: &mut TestAppContext) {
     labelled(&all, "dialog", "Discard draft?", &tree);
     labelled(&all, "dialog", "Details", &tree);
     labelled(&all, "dialog", "Filters", &tree);
+    // A time picker is named for the mode it is in, here the input.
+    labelled(&all, "dialog", "Enter time", &tree);
 
     // Carousel items are list items named by their label.
     let item = labelled(&all, "listItem", "Beach", &tree);

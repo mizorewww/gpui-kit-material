@@ -57,6 +57,10 @@ The local compatibility surface is restricted to:
   caller's headline, typically) is set on the host; without it nothing
   changes. Test: `a_dialog_takes_an_accessible_name`.
 
+- `src/time_field.rs`: `TimeField::separator`. The field writes `:` between its
+  segments, a string its caller cannot change, and some locales write `7.05`. The
+  default stays `:`. Test: `the_time_separator_comes_from_the_labels` in Material.
+
 These patches require source unification for both the Kit Git dependency and
 any registry Base dependency in the consuming workspace. Cargo patches are not
 inherited by downstream consumers of a published Material crate.

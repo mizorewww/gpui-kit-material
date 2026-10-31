@@ -156,6 +156,7 @@ fn labels(title: SharedString) -> TimePickerLabels {
         switch_to_dial: s("Switch to clock"),
         number: Rc::new(|n| n.to_string().into()),
         two_digits: Rc::new(|n| format!("{n:02}").into()),
+        separator: s(":"),
     }
 }
 

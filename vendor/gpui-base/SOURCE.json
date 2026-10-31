@@ -14,6 +14,7 @@
     "src/lib.rs",
     "src/motion.rs",
     "src/slider.rs",
+    "src/time_field.rs",
     "src/toolbar.rs"
   ],
   "local_patch_sha256": {
@@ -21,6 +22,11 @@
       "local_sha256": "950592bd13881d5540885528eb6aa197cf39adcb245109b102ba6abb683e30f1",
       "reason": "Dialog::accessibility_label names the Role::Dialog host for accessibility clients (motion-patch.md).",
       "upstream_sha256": "f56cc07dda43678903e2907b8c8c6028ae5fa80f0a637b8f065054a4c55b391d"
+    },
+    "src/input/base/element.rs": {
+      "local_sha256": "e932cb10f87c8089a0145b145fcff5ddcc1fd899f113d228540e4ef6d1562be0",
+      "reason": "Tell the platform when the caret moves, so a browser IME panel opens at it (ime-anchor-patch.md). An input moved by its parent is notified only while focused (input-move-patch.md).",
+      "upstream_sha256": "2d0697813d4e13f705d03c35c575e798754756c0528e013014e98aebfb67c5d5"
     },
     "src/input/base/state.rs": {
       "local_sha256": "9accae1333235bf245ba112ed3321004958eb7748155f552368cb21c545ff7fb",
@@ -42,15 +48,15 @@
       "reason": "Step snapping counted from min, AT Increment/Decrement that move only a range's end, and Slider::track_focus for a focusable slider node (motion-patch.md). Right-to-left pointer math on a horizontal slider (motion-patch.md).",
       "upstream_sha256": "71b801a92588d12f7931a5a9e1745fb62f4283ae87d651d4004ae9b41ad72da3"
     },
+    "src/time_field.rs": {
+      "local_sha256": "c25c9a63303979086d8762d6ea997e9206bd701fae4dec5b1e5c25d12819f14a",
+      "reason": "TimeField::separator: the text between segments, `:` by default, for a caller showing a time in its own locale (motion-patch.md).",
+      "upstream_sha256": "6500dace005377ac8202604c4ff844e327de67bc8dee1cf978308a9d2aa107d4"
+    },
     "src/toolbar.rs": {
       "local_sha256": "2eb0d4560dac01d2c278354bc3c2f6d745dcf8f2f09d3c9b948c4e90bcf17716",
       "reason": "Settable axis: Up/Down roving and a vertical accessibility orientation for vertical toolbars (motion-patch.md).",
       "upstream_sha256": "4c992d9765bf6638952ff9c897d7706c6fad5f54eaa8dc428fd568f8fe6323fe"
-    },
-    "src/input/base/element.rs": {
-      "local_sha256": "cbcc1edd60471e71c47c5598976eff8ae1b185c6facc91be0b685d825d801d36",
-      "reason": "Tell the platform when the caret moves, so a browser IME panel opens at it (ime-anchor-patch.md).",
-      "upstream_sha256": "2d0697813d4e13f705d03c35c575e798754756c0528e013014e98aebfb67c5d5"
     }
   },
   "lockfile_policy": "No stale package-level lockfile. The consuming workspace Cargo.lock owns resolution.",
@@ -84,7 +90,8 @@
   "provenance_files": [
     "SOURCE.json",
     "ime-anchor-patch.md",
-    "motion-patch.md"
+    "motion-patch.md",
+    "input-move-patch.md"
   ],
   "repository": "https://github.com/longbridge/gpui-kit",
   "revision": "bb85882e1faab845d9e7be33b69a152879a90f69",

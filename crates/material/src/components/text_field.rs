@@ -98,8 +98,9 @@ impl TextFieldVariant {
 }
 
 /// What a single-line field edits: md3.io's type options. The type masks a
-/// password and filters what can be typed; platforms without a soft keyboard
-/// have nothing further to switch.
+/// password and filters what can be typed. It does not choose a soft keyboard:
+/// a phone's browser shows its text keyboard for every type, since the engine's
+/// input offers no way to ask for another.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub enum TextFieldInputType {
     #[default]

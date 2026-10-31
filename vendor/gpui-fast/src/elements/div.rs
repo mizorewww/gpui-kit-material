@@ -3253,7 +3253,13 @@ impl Interactivity {
                 };
                 let hover_listener_mode = self.hover_listener_mode;
 
-                if has_mouse_down.borrow().is_none() {
+                // While a wheel holds hover still, a listener hears nothing: a row
+                // scrolled under the pointer does not start hovering, and one
+                // hovering does not stop, either of which could start a transition
+                // that keeps a list off its layer. See `hover_freeze`.
+                if has_mouse_down.borrow().is_none()
+                    && !crate::fast::layers::hover_freeze::holds_listeners(window)
+                {
                     let is_hovered =
                         !cx.has_active_drag() && hover_listener_mode.is_hovered(hitbox, window);
                     if is_hovered != *was_hovered.borrow() {

@@ -214,6 +214,7 @@ fn preview(
     }
     div()
         .debug_selector(|| "playground-tooltip".into())
+        .flex()
         .child(tooltip.trigger(trigger))
         .into_any_element()
 }
@@ -223,6 +224,7 @@ mod tests {
     use super::super::test_support::*;
     use super::*;
     use core::prelude::v1::test;
+    use gpui::px;
 
     #[test]
     fn positions_map_to_a_side_and_alignment() {
@@ -270,6 +272,9 @@ mod tests {
         set(&state, &mut cx, "action", Value::Text("Learn more".into()));
         set(&state, &mut cx, "show_delay", Value::Number(1000.));
         let target = element_bounds(&mut cx, "playground-tooltip-target");
+        // A block parent would stretch the target far past its button, and a pointer
+        // in the middle of that would miss the button that blocks the mouse.
+        assert!(target.size.width < px(100.), "on the button: {target:?}");
         cx.simulate_mouse_move(target.center(), None, gpui::Modifiers::none());
         settle(&mut cx);
         cx.executor().advance_clock(Duration::from_millis(900));

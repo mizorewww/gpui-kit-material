@@ -272,9 +272,9 @@ impl RenderOnce for MaterialSwitch {
             .use_keyed_state((self.id.clone(), "focus"), cx, |_, cx| cx.focus_handle())
             .read(cx)
             .clone();
+        // A press is a press, by mouse or touch; a held row carries every keyed state on
+        // every frame of a scroll.
         let press_state = window.use_keyed_state((self.id.clone(), "pressed"), cx, |_, _| false);
-        let touch_press =
-            window.use_keyed_state((self.id.clone(), "touch-pressed"), cx, |_, _| false);
         let preview = self.preview;
         let disabled = self.disabled || preview.is_some_and(|p| p.is_disabled());
         let enabled = !disabled;
@@ -288,8 +288,7 @@ impl RenderOnce for MaterialSwitch {
         if !live && *press_state.read(cx) {
             press_state.update(cx, |pressed, _| *pressed = false);
         }
-        let pressed = forced(InteractionPreview::Pressed)
-            || (live && (*press_state.read(cx) || *touch_press.read(cx)));
+        let pressed = forced(InteractionPreview::Pressed) || (live && *press_state.read(cx));
         let icon = self.icons.shows(self.checked);
         // Position and size follow separate fast spatial springs, so a press
         // during a toggle retargets only the size, from where it is.
@@ -364,6 +363,7 @@ impl RenderOnce for MaterialSwitch {
                 activate,
             }
         });
+        let touch_press = press_state.clone();
         let release = press_state.clone();
         let release_out = press_state.clone();
         let switch = gpui_base::Switch::new(self.id)
@@ -404,7 +404,6 @@ impl RenderOnce for MaterialSwitch {
                 Ripple::new(
                     (ripple_id, "ripple"),
                     div()
-                        .id("state-layer")
                         .absolute()
                         .left(rem(layer_origin.0))
                         .top(rem(layer_origin.1))
@@ -421,7 +420,6 @@ impl RenderOnce for MaterialSwitch {
                         })
                         .child(
                             div()
-                                .id("handle")
                                 .when(cfg!(test), |handle| {
                                     handle.debug_selector(|| "switch-handle".into())
                                 })
@@ -470,6 +468,40 @@ impl RenderOnce for MaterialSwitch {
 mod tests {
     use super::*;
     use core::prelude::v1::test;
+
+    /// A held row carries every keyed state on every frame of a scroll, so a press by
+    /// touch shares the state of a press by mouse.
+    #[gpui::test]
+    fn a_switch_keeps_one_press_state(cx: &mut gpui::TestAppContext) {
+        struct Probe(std::rc::Rc<std::cell::Cell<bool>>);
+        impl gpui::Render for Probe {
+            fn render(
+                &mut self,
+                window: &mut Window,
+                cx: &mut gpui::Context<Self>,
+            ) -> impl IntoElement {
+                let switch = MaterialSwitch::new("switch", "Switch");
+                let switch = gpui::RenderOnce::render(switch, window, cx).into_any_element();
+                let absent = self.0.clone();
+                window.use_keyed_state((ElementId::from("switch"), "touch-pressed"), cx, |_, _| {
+                    absent.set(true);
+                    false
+                });
+                switch
+            }
+        }
+        cx.update(gpui_base::init);
+        let absent = std::rc::Rc::new(std::cell::Cell::new(false));
+        let (_, cx) = cx.add_window_view({
+            let absent = absent.clone();
+            move |_, _| Probe(absent)
+        });
+        cx.update(|window, cx| {
+            window.refresh();
+            window.draw(cx).clear(cx);
+        });
+        assert!(absent.get(), "the switch keeps no second press state");
+    }
 
     #[test]
     fn the_handle_stays_inside_the_outline_through_overshoot() {

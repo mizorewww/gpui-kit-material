@@ -529,6 +529,9 @@ struct Drag {
     start: f32,
     offset: f32,
     moved: bool,
+    /// Where a settle had the sheet when the press caught it: the drag goes on
+    /// from there, and without a drag the settle goes on from there.
+    from: f32,
 }
 
 /// A snap after release: the residual offset eases from `from` to 0.
@@ -554,6 +557,41 @@ struct BottomSheetState {
     /// Whether the sheet was expanded before a detent change it has yet to
     /// move for, once its rest positions are known.
     moved_from: Option<bool>,
+}
+
+impl BottomSheetState {
+    /// How far a settle still has the sheet from its rest position.
+    fn settle_residual(&self, now: Instant, reduced: bool) -> f32 {
+        self.settle.map_or(0., |settle| {
+            let elapsed = now.saturating_duration_since(settle.started);
+            settle.from * (1. - settle_progress(elapsed.as_secs_f32(), reduced))
+        })
+    }
+
+    /// A press on the sheet may become a drag. It catches a settle where it is.
+    /// The handle and the layer under it both hear a press on the handle.
+    fn press(&mut self, y: f32, now: Instant, reduced: bool) {
+        let from = match self.drag {
+            Some(drag) if drag.start == y && !drag.moved => drag.from,
+            _ => self.settle_residual(now, reduced),
+        };
+        self.drag = Some(Drag {
+            start: y,
+            offset: 0.,
+            moved: false,
+            from,
+        });
+        self.dragged = false;
+        self.settle = None;
+    }
+
+    /// The settle back to the rest position from where `drag` left the sheet.
+    fn settle_from(&mut self, drag: Drag, now: Instant) {
+        let from = drag.from + if drag.moved { drag.offset } else { 0. };
+        if from != 0. {
+            self.settle = Some(Settle { from, started: now });
+        }
+    }
 }
 
 /// A bottom sheet's rest position (md3.io's State).
@@ -842,6 +880,8 @@ impl RenderOnce for MaterialBottomSheet {
             .partial
             .map(|partial| f32::from(partial.to_pixels(window.rem_size())));
         // A detent changed: move from where the sheet is instead of jumping.
+        // The executor's clock, which a test controls.
+        let now = cx.background_executor().now();
         if let Some(was_expanded) = state.read(cx).moved_from {
             let height = f32::from(state.read(cx).height);
             let rest_at = |expanded: bool| match partial {
@@ -849,14 +889,11 @@ impl RenderOnce for MaterialBottomSheet {
                 _ => 0.,
             };
             state.update(cx, |state, _| {
-                let residual = state.settle.map_or(0., |settle| {
-                    let t = settle_progress(settle.started.elapsed().as_secs_f32(), reduced);
-                    settle.from * (1. - t)
-                });
+                let residual = state.settle_residual(now, reduced);
                 state.moved_from = None;
                 state.settle = Some(Settle {
                     from: rest_at(was_expanded) + residual - rest_at(state.expanded),
-                    started: Instant::now(),
+                    started: now,
                 });
             });
         }
@@ -876,9 +913,11 @@ impl RenderOnce for MaterialBottomSheet {
         };
         let rest = height - visible;
         let residual = match (drag, settle) {
-            (Some(drag), _) if drag.moved => drag.offset,
+            (Some(drag), _) if drag.moved => drag.from + drag.offset,
+            (Some(drag), _) if drag.from != 0. => drag.from,
             (_, Some(settle)) => {
-                let t = settle_progress(settle.started.elapsed().as_secs_f32(), reduced);
+                let elapsed = now.saturating_duration_since(settle.started);
+                let t = settle_progress(elapsed.as_secs_f32(), reduced);
                 if t >= 1. {
                     state.update(cx, |state, _| state.settle = None);
                     0.
@@ -932,15 +971,8 @@ impl RenderOnce for MaterialBottomSheet {
                         // under it does not see presses on the button.
                         .on_mouse_down(MouseButton::Left, move |event, window, cx| {
                             let y = f32::from(event.position.y);
-                            press.update(cx, |state, _| {
-                                state.drag = Some(Drag {
-                                    start: y,
-                                    offset: 0.,
-                                    moved: false,
-                                });
-                                state.dragged = false;
-                                state.settle = None;
-                            });
+                            let now = cx.background_executor().now();
+                            press.update(cx, |state, _| state.press(y, now, reduced));
                             window.refresh();
                         })
                         .on_click(move |event, window, cx| {
@@ -989,15 +1021,8 @@ impl RenderOnce for MaterialBottomSheet {
                         return;
                     }
                     let y = f32::from(event.position.y);
-                    starter.update(cx, |state, _| {
-                        state.drag = Some(Drag {
-                            start: y,
-                            offset: 0.,
-                            moved: false,
-                        });
-                        state.dragged = false;
-                        state.settle = None;
-                    });
+                    let now = cx.background_executor().now();
+                    starter.update(cx, |state, _| state.press(y, now, reduced));
                     window.refresh();
                 });
             },
@@ -1040,18 +1065,14 @@ impl RenderOnce for MaterialBottomSheet {
                                         if phase != DispatchPhase::Bubble {
                                             return;
                                         }
+                                        let now = cx.background_executor().now();
                                         moving.update(cx, |state, _| {
                                             if !event.dragging() {
                                                 // The button came up where we could not
                                                 // see it: nothing was decided, so the
                                                 // sheet goes back to where it rested.
-                                                if let Some(drag) = state.drag.take()
-                                                    && drag.moved
-                                                {
-                                                    state.settle = Some(Settle {
-                                                        from: drag.offset,
-                                                        started: Instant::now(),
-                                                    });
+                                                if let Some(drag) = state.drag.take() {
+                                                    state.settle_from(drag, now);
                                                 }
                                             } else if let Some(drag) = state.drag.as_mut() {
                                                 let delta =
@@ -1080,10 +1101,14 @@ impl RenderOnce for MaterialBottomSheet {
                                         };
                                         window.refresh();
                                         if !drag.moved {
+                                            let now = cx.background_executor().now();
+                                            releasing.update(cx, |state, _| {
+                                                state.settle_from(drag, now)
+                                            });
                                             return;
                                         }
                                         releasing.update(cx, |state, _| state.dragged = true);
-                                        let position = (rest + drag.offset).max(0.);
+                                        let position = (rest + drag.from + drag.offset).max(0.);
                                         let target = snap_target(position, height, partial);
                                         let new_rest = match target {
                                             SnapTarget::Expanded => 0.,
@@ -1092,6 +1117,7 @@ impl RenderOnce for MaterialBottomSheet {
                                             }
                                             SnapTarget::Dismiss => height,
                                         };
+                                        let now = cx.background_executor().now();
                                         releasing.update(cx, |state, _| {
                                             // A dismissal is the caller's to make: until it
                                             // closes the sheet, the sheet rests where it did.
@@ -1104,10 +1130,7 @@ impl RenderOnce for MaterialBottomSheet {
                                                 } else {
                                                     new_rest
                                                 };
-                                            state.settle = Some(Settle {
-                                                from,
-                                                started: Instant::now(),
-                                            });
+                                            state.settle = Some(Settle { from, started: now });
                                         });
                                         match target {
                                             SnapTarget::Dismiss => {
@@ -1718,6 +1741,63 @@ mod tests {
             body,
             "still open and still expanded, as the caller holds it"
         );
+    }
+
+    /// A press during a settle catches the sheet where it is: it neither jumps to
+    /// its rest position nor, once the pointer moves, to under the pointer's travel.
+    #[gpui::test]
+    fn a_press_during_a_settle_catches_the_sheet_where_it_is(cx: &mut TestAppContext) {
+        let (_, cx) = detents(cx, BottomSheetDetent::Expanded, false);
+        // Let it finish opening.
+        cx.executor()
+            .advance_clock(std::time::Duration::from_secs(2));
+        draw(cx);
+        draw(cx);
+        let rest = cx.debug_bounds("detent-body").unwrap().top();
+        let end = handle_drag(cx, 60.);
+        cx.simulate_mouse_up(end, MouseButton::Left, Modifiers::default());
+        draw(cx);
+        let settling = cx.debug_bounds("detent-body").unwrap().top();
+        assert!(
+            settling > rest + px(30.),
+            "{settling:?} settling, {rest:?} rest"
+        );
+
+        let handle = cx.debug_bounds("drag-handle").unwrap().center();
+        cx.simulate_mouse_down(handle, MouseButton::Left, Modifiers::default());
+        draw(cx);
+        let pressed = cx.debug_bounds("detent-body").unwrap().top();
+        assert_eq!(pressed, settling, "the press does not move it");
+
+        let moved = point(handle.x, handle.y + px(20.));
+        cx.simulate_mouse_move(moved, Some(MouseButton::Left), Modifiers::default());
+        draw(cx);
+        let dragged = cx.debug_bounds("detent-body").unwrap().top();
+        assert!(
+            (dragged - (pressed + px(20.))).abs() < px(1.),
+            "dragged to {dragged:?} from {pressed:?}"
+        );
+
+        // A press that does not become a drag lets the settle finish.
+        cx.simulate_mouse_up(moved, MouseButton::Left, Modifiers::default());
+        draw(cx);
+        let handle = cx.debug_bounds("drag-handle").unwrap().center();
+        cx.simulate_mouse_down(handle, MouseButton::Left, Modifiers::default());
+        draw(cx);
+        let held = cx.debug_bounds("detent-body").unwrap().top();
+        assert!(held > rest, "{held:?} held off its rest at {rest:?}");
+        cx.simulate_mouse_move(handle, None::<MouseButton>, Modifiers::default());
+        draw(cx);
+        assert_eq!(
+            cx.debug_bounds("detent-body").unwrap().top(),
+            held,
+            "it goes on from there"
+        );
+        cx.executor()
+            .advance_clock(std::time::Duration::from_secs(2));
+        draw(cx);
+        draw(cx);
+        assert_eq!(cx.debug_bounds("detent-body").unwrap().top(), rest);
     }
 
     #[gpui::test]

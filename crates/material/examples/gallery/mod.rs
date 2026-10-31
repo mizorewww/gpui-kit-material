@@ -1192,13 +1192,15 @@ mod window_tests {
             }
             let rendered = cx.read(|cx| gallery.read(cx).renders.get());
             let mut visual = gpui::VisualTestContext::from_window(window.into(), cx);
+            // A test window draws as soon as a wheel leaves it dirty, one draw for each
+            // event as on a screen. A second draw with nothing dirty would find what the
+            // first one's paint wrote, and rebuild for that.
             for _ in 0..4 {
                 visual.simulate_event(gpui::ScrollEvent {
                     position: gpui::point(px(800.), px(500.)),
                     delta: gpui::ScrollDelta::Pixels(gpui::point(px(0.), px(-8.))),
                     ..Default::default()
                 });
-                visual.update(|window, cx| window.draw(cx).clear(cx));
                 visual.run_until_parked();
             }
             assert_eq!(

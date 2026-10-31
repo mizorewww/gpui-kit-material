@@ -75,6 +75,9 @@ pub struct TimePickerLabels {
     pub number: Format,
     /// A two-digit field value ("07", "05").
     pub two_digits: Format,
+    /// What stands between a time's hours and minutes (":", or "." in some
+    /// locales).
+    pub separator: SharedString,
 }
 
 /// 12-hour (with a period selector) or 24-hour.
@@ -213,7 +216,9 @@ impl TimePickerState {
         self
     }
     /// Snap the dial and its arrow keys to every `step` minutes (e.g. 5 or
-    /// 15; 0 and 1 mean every minute).
+    /// 15; 0 and 1 mean every minute). Its marks count from 0 and the last
+    /// wraps to 0, whether or not the step divides 60: every 7 minutes ends at
+    /// :56, and the next mark is :00.
     pub fn minute_step(mut self, step: u32) -> Self {
         self.minute_step = step.clamp(1, 30);
         self
@@ -355,8 +360,7 @@ impl TimePickerState {
     fn pick(&mut self, offset: Point<f32>, window: &mut Window, cx: &mut Context<Self>) {
         let mut time = dial_pick(self.time, self.unit, self.format, offset);
         if self.unit == TimeUnit::Minute && self.minute_step > 1 {
-            let step = self.minute_step as f32;
-            let minute = ((time.minute() as f32 / step).round() * step) as u32 % 60;
+            let minute = snap_minute(time.minute(), self.minute_step);
             time = time.with_minute(minute).unwrap_or(time);
         }
         self.set_time(time, window, cx);
@@ -392,17 +396,36 @@ pub(crate) fn clamp_time(time: NaiveTime, limits: Option<(NaiveTime, NaiveTime)>
     }
 }
 
+/// How many marks a `step`-minute grid has in an hour, counting from :00.
+fn minute_marks(step: i32) -> i32 {
+    (60 + step - 1) / step
+}
+
 /// Step `minute` by `delta` marks of a `step`-minute grid: an off-grid
-/// minute first moves to the neighboring mark in the step's direction.
+/// minute first moves to the neighboring mark in the step's direction. Past its
+/// last mark the grid wraps to :00, even when the step does not divide 60.
 pub(crate) fn step_minutes(minute: u32, step: u32, delta: i32) -> u32 {
     let (minute, step) = (minute as i32, step.max(1) as i32);
-    let floor = minute.div_euclid(step) * step;
-    let next = if floor == minute || delta > 0 {
-        floor + step * delta
+    let floor = minute.div_euclid(step);
+    let next = if floor * step == minute || delta > 0 {
+        floor + delta
     } else {
-        floor + step * (delta + 1)
+        floor + delta + 1
     };
-    next.rem_euclid(60) as u32
+    (next.rem_euclid(minute_marks(step)) * step) as u32
+}
+
+/// The mark of a `step`-minute grid nearest `minute`, which past the last mark
+/// may be the :00 it wraps to.
+pub(crate) fn snap_minute(minute: u32, step: u32) -> u32 {
+    let step = step.max(1);
+    let (below, above) = (minute / step * step, (minute / step + 1) * step);
+    let nearest = if minute - below < above.min(60) - minute {
+        below
+    } else {
+        above
+    };
+    if nearest >= 60 { 0 } else { nearest }
 }
 
 /// Whether some time in hour `hour` (or, for minutes and seconds, `time`
@@ -1232,7 +1255,13 @@ impl RenderOnce for TimePicker {
                 .justify_center()
                 .text_color(color(ColorRole::ON_SURFACE))
                 .map(|d| type_style(d, TypeRole::DisplayLarge))
-                .child(":")
+                .child(
+                    div()
+                        .when(cfg!(test), |text| {
+                            text.debug_selector(|| "time-separator".into())
+                        })
+                        .child(labels.separator.clone()),
+                )
         };
         let time_row = div()
             .flex()
@@ -1277,7 +1306,7 @@ impl RenderOnce for TimePicker {
             .px(rem(24.))
             .text_color(color(ColorRole::ON_SURFACE_VARIANT))
             .map(|d| type_style(d, TypeRole::LabelMedium))
-            .child(title);
+            .child(title.clone());
         let (mode_icon, mode_label) = match mode {
             TimeInputMode::Dial => ("keyboard", labels.switch_to_input.clone()),
             TimeInputMode::Input => ("schedule", labels.switch_to_dial.clone()),
@@ -1351,7 +1380,7 @@ impl RenderOnce for TimePicker {
             .rounded(rem(28.))
             .bg(color(ColorRole::SURFACE_CONTAINER_HIGH))
             .role(Role::Dialog)
-            .aria_label(labels.select_title.clone());
+            .aria_label(title.clone());
         match mode {
             TimeInputMode::Input => {
                 let field_focused = field.read(cx).focus_handle(cx).is_focused(window);
@@ -1364,6 +1393,7 @@ impl RenderOnce for TimePicker {
                 let period_labels = labels.clone();
                 let pm = time.hour() >= 12;
                 let input = TimeField::new(named(&id, "field"), &field)
+                    .separator(labels.separator.clone())
                     .disabled(specimen)
                     .flex()
                     .items_start()
@@ -1414,6 +1444,16 @@ impl RenderOnce for TimePicker {
                         };
                         segment
                             .clear_children()
+                            .when(cfg!(test), |segment| {
+                                segment.debug_selector(move || {
+                                    match which {
+                                        TimeSegment::Hour => "time-field-hour",
+                                        TimeSegment::Second => "time-field-second",
+                                        _ => "time-field-minute",
+                                    }
+                                    .into()
+                                })
+                            })
                             .flex()
                             .flex_col()
                             .gap(rem(7.))
@@ -1451,6 +1491,10 @@ impl RenderOnce for TimePicker {
                             )
                             .into_any_element()
                     });
+                // Hours first here too, as on the dial.
+                let input = crate::scope::Scope::new(named(&id, "field-direction"))
+                    .direction(LayoutDirection::Ltr)
+                    .child(input);
                 surface
                     .gap(rem(20.))
                     .child(header)

@@ -20,6 +20,7 @@ pub(crate) fn labels() -> TimePickerLabels {
         switch_to_dial: s("Dial"),
         number: Rc::new(|n| n.to_string().into()),
         two_digits: Rc::new(|n| format!("{n:02}").into()),
+        separator: s(":"),
     }
 }
 
@@ -90,6 +91,34 @@ fn steps_wrap_within_the_period_or_day() {
     assert_eq!(step_time(t(5, 59), TimeUnit::Minute, h24, 1), t(5, 0));
 }
 
+/// The time reads hours first in every direction, typed as on the dial.
+#[gpui::test]
+fn the_time_field_keeps_hours_first_in_a_right_to_left_scope(cx: &mut TestAppContext) {
+    struct Rtl(Entity<TimePickerState>);
+    impl Render for Rtl {
+        fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+            window.set_rem_size(px(14.));
+            crate::scope::Scope::new("rtl")
+                .direction(LayoutDirection::Rtl)
+                .child(TimePicker::new("picker", &self.0))
+        }
+    }
+    cx.update(|cx| {
+        gpui_kit::init(cx);
+        crate::init(cx);
+        cx.set_reduce_motion(true);
+    });
+    let (view, cx) = cx.add_window_view(|window, cx| {
+        Rtl(cx.new(|cx| TimePickerState::new(labels(), t(7, 0), window, cx)))
+    });
+    let state = view.read_with(cx, |h, _| h.0.clone());
+    cx.update(|window, cx| state.update(cx, |s, cx| s.toggle_mode(window, cx)));
+    draw(cx);
+    let hour = cx.debug_bounds("time-field-hour").unwrap();
+    let minute = cx.debug_bounds("time-field-minute").unwrap();
+    assert!(hour.right() <= minute.left(), "{hour:?} {minute:?}");
+}
+
 struct Harness(Entity<TimePickerState>);
 impl Render for Harness {
     fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
@@ -150,6 +179,42 @@ fn typing_in_input_mode_updates_the_time(cx: &mut TestAppContext) {
     draw(cx);
     cx.simulate_keystrokes("2 0 3 5");
     assert_eq!(state.read_with(cx, |s, _| s.time()), t(20, 35));
+}
+
+/// A step that does not divide 60 has its marks from 0 and wraps to 0 past the last,
+/// in both directions and for a pointer past the last mark.
+#[gpui::test]
+fn a_minute_step_that_does_not_divide_sixty_keeps_its_grid(cx: &mut TestAppContext) {
+    assert_eq!(step_minutes(56, 7, 1), 0, "past the last mark");
+    assert_eq!(step_minutes(0, 7, -1), 56, "back from 0");
+    assert_eq!(step_minutes(49, 7, 1), 56);
+    assert_eq!(step_minutes(58, 7, 1), 0, "off grid past the last mark");
+    assert_eq!(step_minutes(58, 7, -1), 56);
+    assert_eq!(step_minutes(40, 25, 1), 50);
+    assert_eq!(step_minutes(50, 25, 1), 0);
+    assert_eq!(step_minutes(0, 25, -1), 50);
+
+    cx.update(|cx| {
+        gpui_kit::init(cx);
+        crate::init(cx);
+    });
+    let (view, cx) = cx.add_window_view(|window, cx| {
+        Harness(cx.new(|cx| TimePickerState::new(labels(), t(7, 0), window, cx).minute_step(7)))
+    });
+    let state = view.read_with(cx, |h, _| h.0.clone());
+    // The fifty-ninth minute on the dial is nearer 0 than 56.
+    let pick = |minute: f32, cx: &mut VisualTestContext| {
+        let angle = minute / 60. * std::f32::consts::TAU;
+        cx.update(|window, cx| {
+            state.update(cx, |s, cx| {
+                s.set_unit(TimeUnit::Minute, cx);
+                s.pick(point(angle.sin() * 100., -angle.cos() * 100.), window, cx);
+            });
+        });
+        state.read_with(cx, |s, _| s.time().minute())
+    };
+    assert_eq!(pick(59., cx), 0);
+    assert_eq!(pick(57., cx), 56);
 }
 
 #[test]
@@ -322,4 +387,42 @@ fn the_time_reads_hours_first_right_to_left(cx: &mut TestAppContext) {
     let hour = cx.debug_bounds(name("hour").leak()).unwrap();
     let minute = cx.debug_bounds(name("minute").leak()).unwrap();
     assert!(hour.left() < minute.left(), "{hour:?} {minute:?}");
+}
+
+struct Separated(Entity<TimePickerState>);
+impl Render for Separated {
+    fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        window.set_rem_size(px(14.));
+        div().size_full().child(TimePicker::new("picker", &self.0))
+    }
+}
+
+/// The separator is the caller's in both modes: some locales write `7.05`.
+#[gpui::test]
+fn the_time_separator_comes_from_the_labels(cx: &mut TestAppContext) {
+    cx.update(|cx| {
+        gpui_kit::init(cx);
+        crate::init(cx);
+        cx.set_reduce_motion(true);
+    });
+    let mut widths = Vec::new();
+    for separator in [":", "::::"] {
+        let (view, cx) = cx.add_window_view(move |window, cx| {
+            let labels = TimePickerLabels {
+                separator: separator.into(),
+                ..labels()
+            };
+            Separated(cx.new(|cx| TimePickerState::new(labels, t(7, 0), window, cx)))
+        });
+        let state = view.read_with(cx, |h, _| h.0.clone());
+        draw(cx);
+        let dial = cx.debug_bounds("time-separator").unwrap().size.width;
+        cx.update(|window, cx| state.update(cx, |s, cx| s.toggle_mode(window, cx)));
+        draw(cx);
+        let hour = cx.debug_bounds("time-field-hour").unwrap();
+        let minute = cx.debug_bounds("time-field-minute").unwrap();
+        widths.push((dial, minute.left() - hour.right()));
+    }
+    assert!(widths[1].0 > widths[0].0, "dial {widths:?}");
+    assert!(widths[1].1 > widths[0].1, "field {widths:?}");
 }

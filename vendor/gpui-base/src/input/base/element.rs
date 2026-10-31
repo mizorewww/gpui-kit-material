@@ -3860,13 +3860,29 @@ impl<M: InputModeKind> Element for TextElement<M> {
             cx,
         );
 
+        let focused = self.state.read(cx).focus_handle.is_focused(window);
         self.state.update(cx, |state, cx| {
-            let geometry_changed = state.last_bounds != Some(bounds)
-                || state.input_bounds != input_bounds
+            // What the input draws depends on where it is only through what
+            // reads its caret, as an open menu does, and only a focused input
+            // has one of those. Otherwise a list scrolling inputs would render
+            // each of them again on every frame.
+            let origin = state.last_bounds.map(|last| last.origin);
+            let moved = origin != Some(bounds.origin);
+            let caret_in = |caret: Option<Bounds<Pixels>>, origin: Point<Pixels>| {
+                caret.map(|caret| Bounds::new(caret.origin - origin, caret.size))
+            };
+            let geometry_changed = (focused && moved)
+                || state.last_bounds.map(|last| last.size) != Some(bounds.size)
+                || state.input_bounds.size != input_bounds.size
+                || origin.is_none_or(|origin| {
+                    state.input_bounds.origin - origin != input_bounds.origin - bounds.origin
+                })
                 || state.scroll_size != prepaint.scroll_size
                 || state.last_layout.as_ref().is_none_or(|layout| {
-                    layout.cursor_bounds != prepaint.last_layout.cursor_bounds
-                        || layout.line_height != prepaint.last_layout.line_height
+                    origin.is_none_or(|origin| {
+                        caret_in(layout.cursor_bounds, origin)
+                            != caret_in(prepaint.last_layout.cursor_bounds, bounds.origin)
+                    }) || layout.line_height != prepaint.last_layout.line_height
                 });
             state.last_layout = Some(prepaint.last_layout.clone());
             state.last_bounds = Some(bounds);

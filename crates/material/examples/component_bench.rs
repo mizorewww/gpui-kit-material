@@ -660,6 +660,8 @@ mod bench {
                         // The bench runs unfocused on a shared desktop; it must
                         // not be throttled like an inactive window.
                         inactive_frame_interval: None,
+                        // Nor stop: a window another app covers gets no frames.
+                        kind: WindowKind::PopUp,
                         window_bounds: Some(WindowBounds::Windowed(Bounds::centered(
                             None,
                             size(px(options.width), px(options.height)),

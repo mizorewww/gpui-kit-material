@@ -72,7 +72,7 @@ fn never_starts_line(c: char) -> bool {
 /// character only after a space, so in Latin text, code and URLs, where `(`
 /// is followed by a letter, nothing changes, while `(` no longer ends a line
 /// before the CJK text it opens. ASCII closing punctuation is left out, since
-/// a break before `)` or `?` is what lets a long path or URL wrap at all.
+/// a break before `/` is what lets a long path or URL wrap at all.
 fn never_ends_line(c: char) -> bool {
     matches!(
         c,

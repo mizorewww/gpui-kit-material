@@ -1172,36 +1172,43 @@ mod tests {
         assert_eq!(clicks.get(), 1);
     }
 
-    /// Nothing in here reacts to a press, so a press draws nothing.
-    struct Inert {
+    /// Its content takes every press for itself, so a press draws nothing: the
+    /// pull's own stateful elements ask for a frame only as a press bubbles to
+    /// them, and it never does.
+    struct PressTaken {
         refreshes: Rc<Cell<usize>>,
     }
-    impl Render for Inert {
+    impl Render for PressTaken {
         fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
             let refreshes = self.refreshes.clone();
             div().size(px(400.)).child(
                 PullToRefresh::new("pull", "Refreshing")
                     .on_refresh(move |_, _| refreshes.set(refreshes.get() + 1))
-                    .child(div().h(px(2000.)).w_full()),
+                    .child(
+                        div()
+                            .h(px(2000.))
+                            .w_full()
+                            .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation()),
+                    ),
             )
         }
     }
 
     #[gpui::test]
-    fn a_mouse_pull_starts_on_content_that_does_not_redraw(cx: &mut gpui::TestAppContext) {
+    fn a_mouse_pull_starts_on_content_that_takes_the_press(cx: &mut gpui::TestAppContext) {
         cx.update(|cx| cx.set_reduce_motion(true));
         let refreshes: Rc<Cell<usize>> = Rc::default();
         let (_, cx) = cx.add_window_view({
             let refreshes = refreshes.clone();
-            move |_, _| Inert { refreshes }
+            move |_, _| PressTaken { refreshes }
         });
         draw(cx);
         // The pointer is already there, as it is before any press.
         let start = point(px(200.), px(100.));
         cx.simulate_mouse_move(start, None::<MouseButton>, Modifiers::none());
         draw(cx);
-        // No draw between the press and the move: nothing in the press asks
-        // for one, so the move has to be heard from the frame before it.
+        // A test window draws as soon as it is dirty, so a press that asked for
+        // a frame would hide the listeners missing from the frame before it.
         cx.simulate_mouse_down(start, MouseButton::Left, Modifiers::none());
         let end = point(px(200.), px(320.));
         cx.simulate_mouse_move(end, MouseButton::Left, Modifiers::none());
