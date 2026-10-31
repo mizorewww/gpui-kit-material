@@ -1,7 +1,9 @@
 //! The 48dp target of a compact button (the reference's XS/S pseudo-element): the
 //! Base root is the target, its negative margins keep it out of layout, and what the
 //! button paints is a child. Hit testing, clipping and occlusion are then GPUI's own.
-use gpui::{AbsoluteLength, DefiniteLength, Edges, Length, Overflow, Pixels, Rems, StyleRefinement};
+use gpui::{
+    AbsoluteLength, DefiniteLength, Edges, Length, Overflow, Pixels, Rems, StyleRefinement,
+};
 
 use crate::tokens::typography::rem;
 
@@ -142,7 +144,9 @@ mod tests {
         let rem_size = px(14.);
         let dense = refinement(|b| b.h(px(30.)));
         assert_eq!(
-            Target::resolve(40., &dense, rem_size, |p| p).unwrap().margin_top,
+            Target::resolve(40., &dense, rem_size, |p| p)
+                .unwrap()
+                .margin_top,
             px(-9.)
         );
         let margin = refinement(|b| b.mt(px(6.)).mb(px(2.)));
@@ -193,7 +197,12 @@ mod layout_tests {
                         .items_start()
                         .debug_selector(|| "column".into())
                         .when(self.clip, |column| column.overflow_hidden())
-                        .child(div().h(px(10.)).w(px(100.)).debug_selector(|| "above".into()))
+                        .child(
+                            div()
+                                .h(px(10.))
+                                .w(px(100.))
+                                .debug_selector(|| "above".into()),
+                        )
                         .child(
                             MaterialButton::new("compact")
                                 .button_size(self.size)
@@ -203,7 +212,12 @@ mod layout_tests {
                                 .child("Label")
                                 .on_click(move |_, _, _| clicks.set(clicks.get() + 1)),
                         )
-                        .child(div().h(px(10.)).w(px(100.)).debug_selector(|| "below".into())),
+                        .child(
+                            div()
+                                .h(px(10.))
+                                .w(px(100.))
+                                .debug_selector(|| "below".into()),
+                        ),
                 )
                 .when(self.cover, |root| {
                     root.child(
@@ -221,7 +235,10 @@ mod layout_tests {
         }
     }
 
-    fn setup(cx: &mut TestAppContext, size: ButtonSize) -> (gpui::Entity<Column>, &mut VisualTestContext) {
+    fn setup(
+        cx: &mut TestAppContext,
+        size: ButtonSize,
+    ) -> (gpui::Entity<Column>, &mut VisualTestContext) {
         cx.update(gpui_base::init);
         let (view, cx) = cx.add_window_view(|_, _| Column {
             size,
@@ -252,14 +269,30 @@ mod layout_tests {
             let column = cx.debug_bounds("column").unwrap();
             assert_eq!(button.size.height, px(painted));
             assert_eq!(button.origin.y, above.origin.y + px(10.), "no space above");
-            assert_eq!(below.origin.y, button.origin.y + px(painted), "no space below");
-            assert_eq!(column.size.height, px(painted + 20.), "the parent does not grow");
+            assert_eq!(
+                below.origin.y,
+                button.origin.y + px(painted),
+                "no space below"
+            );
+            assert_eq!(
+                column.size.height,
+                px(painted + 20.),
+                "the parent does not grow"
+            );
             let reach = (48. - painted) / 2.;
             let x = button.center().x;
             let clicks = view.read_with(cx, |view, _| view.clicks.clone());
             for (y, expected, why) in [
-                (button.origin.y - px(reach - 1.), 1, "inside the upper strip"),
-                (button.bottom() + px(reach - 1.), 2, "inside the lower strip"),
+                (
+                    button.origin.y - px(reach - 1.),
+                    1,
+                    "inside the upper strip",
+                ),
+                (
+                    button.bottom() + px(reach - 1.),
+                    2,
+                    "inside the lower strip",
+                ),
                 (button.center().y, 3, "on the surface"),
                 (button.origin.y - px(reach + 1.), 3, "past the upper strip"),
                 (button.bottom() + px(reach + 1.), 3, "past the lower strip"),
@@ -275,11 +308,15 @@ mod layout_tests {
         let (view, cx) = setup(cx, ButtonSize::ExtraSmall);
         let button = cx.debug_bounds("compact").unwrap();
         let edge = point(button.center().x, button.origin.y - px(4.));
-        let (clicks, covers) = view.read_with(cx, |view, _| (view.clicks.clone(), view.covers.clone()));
+        let (clicks, covers) =
+            view.read_with(cx, |view, _| (view.clicks.clone(), view.covers.clone()));
         view.update(cx, |view, _| view.clip = true);
         redraw(cx);
         // The strip above the first child is outside a clipping column.
-        let above_column = point(button.center().x, cx.debug_bounds("column").unwrap().origin.y - px(1.));
+        let above_column = point(
+            button.center().x,
+            cx.debug_bounds("column").unwrap().origin.y - px(1.),
+        );
         cx.simulate_click(above_column, Modifiers::default());
         assert_eq!(clicks.get(), 0, "an ancestor's clip cuts the target");
         view.update(cx, |view, _| {
@@ -289,7 +326,11 @@ mod layout_tests {
         redraw(cx);
         let covered = point(button.center().x, px(44.));
         cx.simulate_click(covered, Modifiers::default());
-        assert_eq!((clicks.get(), covers.get()), (0, 1), "a later element occludes it");
+        assert_eq!(
+            (clicks.get(), covers.get()),
+            (0, 1),
+            "a later element occludes it"
+        );
         view.update(cx, |view, _| {
             view.cover = false;
             view.disabled = true;

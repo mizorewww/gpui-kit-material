@@ -790,7 +790,7 @@ mod tests {
         cx: &mut gpui::TestAppContext,
     ) {
         let (page, shared, mut cx) = open(cx);
-        cx.update(|window, cx| {
+        cx.update(|_, cx| {
             page.update(cx, |page, cx| {
                 page.variant = Variant::Vibrant;
                 page.spec = SpecVersion::Spec2025;
@@ -816,11 +816,11 @@ mod tests {
         assert_eq!(theme::scheme(), forest);
 
         // So does the page's own button, with nothing else to trigger a repaint.
-        cx.update(|window, cx| {
+        cx.update(|_, cx| {
             page.update(cx, |page, cx| page.apply_seed(cx));
         });
         assert_eq!(theme::scheme(), expected);
-        cx.update(|window, cx| {
+        cx.update(|_, cx| {
             page.update(cx, |page, cx| page.clear_seed(cx));
         });
         assert_eq!(theme::scheme(), forest);

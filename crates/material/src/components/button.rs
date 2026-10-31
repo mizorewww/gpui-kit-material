@@ -1194,7 +1194,9 @@ fn pointer_observer(pressed: &Entity<PressState>, touch_enabled: bool) -> impl I
                 window.on_mouse_event(move |_: &ScrollEvent, phase, window, cx| {
                     if phase == DispatchPhase::Capture
                         && window.last_input_was_touch()
-                        && scrolled.upgrade().is_some_and(|state| state.read(cx).pointer)
+                        && scrolled
+                            .upgrade()
+                            .is_some_and(|state| state.read(cx).pointer)
                     {
                         let _ = scrolled.update(cx, touch_release);
                     }
@@ -1404,7 +1406,9 @@ impl RenderOnce for MaterialButton {
         };
         // A compact button's root is its 48dp target, so what it paints moves to a
         // child; the caller's layout stays on the root.
-        let root_layout = target.is_some().then(|| hit_target::take_layout(&mut self.style));
+        let root_layout = target
+            .is_some()
+            .then(|| hit_target::take_layout(&mut self.style));
         let variant = self.variant;
         let palette = self.palette;
         let direction = self.direction;
