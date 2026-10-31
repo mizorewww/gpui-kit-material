@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/color", "crates/material", "crates/gallery-web"]
+members = ["crates/color", "crates/material", "crates/gallery", "crates/gallery-web", "crates/bench"]
 exclude = ["vendor/gpui-kit", "vendor/gpui-base", "vendor/gpui-pre", "vendor/gpui-pre-web", "vendor/gpui-pre-apple", "vendor/gpui-fast", "vendor/gpui-fast-web", "vendor/gpui-fast-apple", "vendor/gpui-fast-macos", "vendor/gpui-pre-macos", "vendor/gpui-fast-linux", "vendor/gpui-fast-wgpu", "vendor/gpui-fast-windows", "vendor/gpui-pre-linux", "vendor/gpui-pre-wgpu", "vendor/gpui-pre-windows", "vendor/wgpu"]
 
 [workspace.package]

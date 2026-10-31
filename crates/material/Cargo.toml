@@ -12,9 +12,6 @@ authors.workspace = true
 readme = "../../README.md"
 keywords = ["material", "material-design", "gpui", "ui", "desktop"]
 categories = ["gui"]
-# The gallery and benchmarks stay in the repository: the gallery bundles OFL-1.1
-# fonts, which the library does not use. gpui-kit-material-gallery-web declares them.
-exclude = ["examples/"]
 
 [package.metadata.docs.rs]
 targets = ["x86_64-unknown-linux-gnu"]
@@ -23,10 +20,8 @@ targets = ["x86_64-unknown-linux-gnu"]
 default = ["serde", "embedded-symbols", "gpui-fast"]
 embedded-symbols = ["gpui-material-symbols/embed-assets"]
 serde = ["gpui-kit-material-color/serde"]
-frame-profiler = ["gpui-kit/profiler"]
 gpui-fast = ["gpui-kit/gpui-fast"]
-# The Gallery's per-frame instruction counts; see `examples/gallery/instr_bench.rs`.
-instruction-bench = ["gpui-fast"]
+full = []
 
 [dependencies]
 gpui-kit-material-color.workspace = true
@@ -40,12 +35,9 @@ chrono = { version = "0.4.38", default-features = false, features = ["clock"] }
 web-time = "1"
 
 [dev-dependencies]
-# Only the icon asset-source test and the native gallery example use anyhow.
+# Only the icon asset-source test uses anyhow.
 anyhow.workspace = true
 
 [target.'cfg(not(target_family = "wasm"))'.dev-dependencies]
 serde_json.workspace = true
 gpui-kit = { workspace = true, features = ["test-support"] }
-
-[[example]]
-name = "gallery"
