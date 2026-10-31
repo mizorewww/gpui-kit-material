@@ -38,6 +38,7 @@
     "src/linux/xdg_desktop_portal.rs": "2e3a8eb44718dbd31b21fc368ad2f5c2105b340ef04f7e002ee0029adb9f3cc1"
   },
   "local_patches": [
+    "Cargo.toml",
     "src/linux/wayland/window.rs",
     "src/linux/x11/window.rs"
   ],
@@ -51,11 +52,16 @@
       "upstream_sha256": "87b737ecda518123196c3f60369120c6a8fb8021b43a4830cc21bf7834eda438",
       "local_sha256": "6928ea781625d01a5a28612804c4bb0317ef3f6f65f2971a1a74bc606a2df710",
       "reason": "successful_frame_submissions, vsync_status, set_vsync; draw moved into draw_frame to record successful presentations (MATERIAL-PATCHES.md)."
+    },
+    "Cargo.toml": {
+      "upstream_sha256": "aaded2b8958b427d5457c4501bd5d56a889ef17dfadd25a1c0d0c16cbbb961fd",
+      "local_sha256": "11b5c4f7855f40571c9d304a96b1bb159baa63c786e74bdb37b30796bcfbf72d",
+      "reason": "Turns on the engine's dev-only frame-observation feature for this overlay (MATERIAL-PATCHES.md)."
     }
   },
   "added_files": {},
   "removed_files": {},
-  "unchanged_file_count": 29,
+  "unchanged_file_count": 28,
   "provenance_files": [
     "MATERIAL-PATCHES.md",
     "SOURCE.json"

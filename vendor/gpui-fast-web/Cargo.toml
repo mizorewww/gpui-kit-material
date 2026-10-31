@@ -40,6 +40,7 @@ resolver = "2"
 
 [features]
 default = ["multithreaded"]
+frame-observation = ["gpui/frame-observation"]
 multithreaded = [
     "dep:wasm_thread",
     "scheduler/wasm-threads",

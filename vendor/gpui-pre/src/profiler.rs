@@ -952,6 +952,7 @@ pub struct PresentTiming {
     pub present_start: Instant,
     /// When the platform submission completed.
     pub present_end: Instant,
+    #[cfg(feature = "frame-observation")]
     /// Whether this attempt successfully submitted a newly drawn generation.
     /// `None` means the backend could not establish success (including a counter
     /// reset); `Some(false)` includes failure and re-presenting an already
@@ -973,7 +974,7 @@ impl PresentTiming {
 }
 
 /// Entry point whose complete synchronous main-thread work was measured.
-#[cfg(feature = "profiler")]
+#[cfg(all(feature = "profiler", feature = "frame-observation"))]
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum CpuFrameSource {
     /// An accepted platform frame callback, including next-frame callbacks.
@@ -988,7 +989,7 @@ pub enum CpuFrameSource {
 /// This is elapsed CPU-side wall time, not GPU completion or display latency.
 /// Initial draw and later platform submission remain separate samples: an idle
 /// interval between them must never be counted as CPU work or silently joined.
-#[cfg(feature = "profiler")]
+#[cfg(all(feature = "profiler", feature = "frame-observation"))]
 #[derive(Debug, Copy, Clone)]
 pub struct CpuFrameTiming {
     /// Window whose outer frame work was measured.
@@ -1019,7 +1020,7 @@ pub struct CpuFrameTiming {
     pub presentation_waits: usize,
 }
 
-#[cfg(feature = "profiler")]
+#[cfg(all(feature = "profiler", feature = "frame-observation"))]
 impl CpuFrameTiming {
     /// Complete elapsed synchronous main-thread work for this scope.
     pub fn duration(&self) -> Duration {
@@ -1027,7 +1028,7 @@ impl CpuFrameTiming {
     }
 }
 
-#[cfg(feature = "profiler")]
+#[cfg(all(feature = "profiler", feature = "frame-observation"))]
 thread_local! {
     static CPU_FRAMES: std::cell::RefCell<SmallVec<[CpuFrameTiming; 4]>> = {
         std::cell::RefCell::new(SmallVec::new())
@@ -1035,7 +1036,7 @@ thread_local! {
 }
 
 /// Created before other callback guards so its drop includes their teardown.
-#[cfg(feature = "profiler")]
+#[cfg(all(feature = "profiler", feature = "frame-observation"))]
 pub(crate) struct CpuFrameScope {
     index: Option<usize>,
     completed: bool,
@@ -1043,7 +1044,7 @@ pub(crate) struct CpuFrameScope {
     _main_thread: std::marker::PhantomData<std::rc::Rc<()>>,
 }
 
-#[cfg(feature = "profiler")]
+#[cfg(all(feature = "profiler", feature = "frame-observation"))]
 impl CpuFrameScope {
     pub(crate) fn new(window_id: WindowId, source: CpuFrameSource) -> Self {
         let index = trace_enabled().then(|| {
@@ -1085,6 +1086,7 @@ impl CpuFrameScope {
     }
 }
 
+#[cfg(feature = "frame-observation")]
 /// Report time a platform backend blocked inside frame presentation, such as
 /// waiting for the next drawable. Attributed to the innermost open CPU frame
 /// scope on this thread; ignored when tracing is disabled or no scope is open.
@@ -1103,6 +1105,7 @@ pub fn record_presentation_wait(waited: Duration) {
     let _ = waited;
 }
 
+#[cfg(feature = "frame-observation")]
 /// GPU execution of one submitted command buffer, timed by the GPU driver.
 /// Material patch: whole-frame evidence reports GPU time separately from CPU.
 #[derive(Debug, Copy, Clone)]
@@ -1119,12 +1122,15 @@ pub struct GpuExecution {
     pub completed: bool,
 }
 
+#[cfg(feature = "frame-observation")]
 /// Bounded so a forgotten capture cannot grow without limit; overflow is counted.
 const GPU_EXECUTION_CAPACITY: usize = 1 << 16;
 
+#[cfg(feature = "frame-observation")]
 static GPU_EXECUTIONS: std::sync::Mutex<(Vec<GpuExecution>, u64)> =
     std::sync::Mutex::new((Vec::new(), 0));
 
+#[cfg(feature = "frame-observation")]
 /// Record a completed command buffer's GPU timestamps. Callable from any
 /// thread (Metal completion handlers run off the main thread). Ignored when
 /// profiler tracing is disabled.
@@ -1140,6 +1146,7 @@ pub fn record_gpu_execution(execution: GpuExecution) {
     }
 }
 
+#[cfg(feature = "frame-observation")]
 /// Take all recorded GPU executions and the number dropped at capacity since
 /// the previous call.
 pub fn take_gpu_executions() -> (Vec<GpuExecution>, u64) {
@@ -1148,7 +1155,7 @@ pub fn take_gpu_executions() -> (Vec<GpuExecution>, u64) {
     (std::mem::take(&mut executions.0), dropped)
 }
 
-#[cfg(feature = "profiler")]
+#[cfg(all(feature = "profiler", feature = "frame-observation"))]
 fn note_cpu_phase(window_id: WindowId, start: Instant, draw: bool) {
     if !trace_enabled() {
         return;
@@ -1170,7 +1177,7 @@ fn note_cpu_phase(window_id: WindowId, start: Instant, draw: bool) {
     });
 }
 
-#[cfg(feature = "profiler")]
+#[cfg(all(feature = "profiler", feature = "frame-observation"))]
 impl Drop for CpuFrameScope {
     fn drop(&mut self) {
         let Some(index) = self.index else { return };
@@ -1194,6 +1201,7 @@ impl Drop for CpuFrameScope {
 #[derive(Debug, Copy, Clone)]
 pub enum FrameEvent {
     /// Complete synchronous CPU-side frame work, including outer cleanup.
+    #[cfg(feature = "frame-observation")]
     Complete(CpuFrameTiming),
     /// A window frame was drawn.
     Draw(FrameTiming),
@@ -1576,6 +1584,7 @@ impl WindowProfiler {
     pub fn begin_draw(&mut self) {
         journal::begin_foreground_turn();
         let started_at = Instant::now();
+        #[cfg(feature = "frame-observation")]
         note_cpu_phase(self.window_id, started_at, true);
         journal::record_frame_pending(self.window_id, started_at);
         self.active_activities
@@ -1659,6 +1668,7 @@ impl WindowProfiler {
         window_active: bool,
         next_frame_scheduled: bool,
     ) {
+        #[cfg(feature = "frame-observation")]
         self.record_present_with_outcome(
             present_start,
             present_end,
@@ -1666,8 +1676,16 @@ impl WindowProfiler {
             next_frame_scheduled,
             None,
         );
+        #[cfg(not(feature = "frame-observation"))]
+        self.record_present_at_with_outcome(
+            present_start,
+            present_end,
+            window_active,
+            next_frame_scheduled,
+        );
     }
 
+    #[cfg(feature = "frame-observation")]
     /// Records a raw submission with the Window's existing success decision.
     /// Unknown outcomes retain the legacy entry point's behavior.
     pub(crate) fn record_present_with_outcome(
@@ -1733,12 +1751,20 @@ impl WindowProfiler {
         window_active: bool,
         next_frame_scheduled: bool,
     ) {
+        #[cfg(feature = "frame-observation")]
         self.record_present_at_with_outcome(
             present_start,
             present_end,
             window_active,
             next_frame_scheduled,
             None,
+        );
+        #[cfg(not(feature = "frame-observation"))]
+        self.record_present_at_with_outcome(
+            present_start,
+            present_end,
+            window_active,
+            next_frame_scheduled,
         );
     }
 
@@ -1748,7 +1774,7 @@ impl WindowProfiler {
         present_end: Instant,
         window_active: bool,
         next_frame_scheduled: bool,
-        successful_new_frame: Option<bool>,
+        #[cfg(feature = "frame-observation")] successful_new_frame: Option<bool>,
     ) {
         let mut responded_to_input = false;
         if let Some(first_input_at) = self.first_input_at.take()
@@ -1787,12 +1813,14 @@ impl WindowProfiler {
             window_id: self.window_id,
             present_start,
             present_end,
+            #[cfg(feature = "frame-observation")]
             successful_new_frame,
             animation_interval,
         };
         journal::record_present(present_timing, frame);
         // Raw submissions describe actual CPU work, including re-presentations
         // and draws excluded from latency statistics by visibility/power changes.
+        #[cfg(feature = "frame-observation")]
         record_frame_event(FrameEvent::Present(present_timing));
 
         let Some(frame) = frame else {
@@ -1814,6 +1842,9 @@ impl WindowProfiler {
                 .record(animation_interval.as_nanos() as u64)
                 .ok();
         }
+        #[cfg(not(feature = "frame-observation"))]
+        record_frame_event(FrameEvent::Present(present_timing));
+
         self.last_present_at = Some(present_end);
         self.animating_at_last_present = next_frame_scheduled && window_active;
     }
@@ -2185,7 +2216,7 @@ mod tests {
     }
 
     #[test]
-    fn records_present_events_including_represented_frames() {
+    fn records_present_events_for_newly_drawn_frames() {
         let _trace_test_guard = TraceTestGuard::new();
         set_trace_enabled(true);
         let window_id = WindowId::from(0xA11E);
@@ -2213,13 +2244,21 @@ mod tests {
                 _ => None,
             })
             .collect::<Vec<_>>();
+        #[cfg(feature = "frame-observation")]
         let [first_present, second_present, repeated_present] = present_timings.as_slice() else {
             panic!("expected exactly three present events, got {present_timings:?}");
         };
+        #[cfg(not(feature = "frame-observation"))]
+        let [first_present, second_present] = present_timings.as_slice() else {
+            panic!("expected exactly two present events, got {present_timings:?}");
+        };
         assert_eq!(first_present.animation_interval, None);
         assert_eq!(second_present.animation_interval, Some(FRAME));
-        assert_eq!(repeated_present.animation_interval, None);
-        assert_eq!(repeated_present.present_start, start + FRAME + FRAME / 2);
+        #[cfg(feature = "frame-observation")]
+        {
+            assert_eq!(repeated_present.animation_interval, None);
+            assert_eq!(repeated_present.present_start, start + FRAME + FRAME / 2);
+        }
 
         #[cfg(feature = "profiler")]
         {
@@ -2234,6 +2273,7 @@ mod tests {
         }
     }
 
+    #[cfg(feature = "frame-observation")]
     #[test]
     fn records_raw_present_when_visibility_invalidates_latency_sample() {
         let _trace_test_guard = TraceTestGuard::new();
@@ -2465,6 +2505,7 @@ mod tests {
         assert!(!trace_enabled());
     }
 
+    #[cfg(feature = "frame-observation")]
     #[test]
     fn complete_cpu_frame_covers_late_cleanup_and_keeps_exact_phase_timestamps() {
         let _guard = TraceTestGuard::new();
@@ -2522,6 +2563,7 @@ mod tests {
         assert!(frame.end >= cleanup_at.get().unwrap());
     }
 
+    #[cfg(feature = "frame-observation")]
     #[test]
     fn complete_cpu_frames_keep_initial_and_present_only_work_separate() {
         let _guard = TraceTestGuard::new();
@@ -2615,6 +2657,7 @@ mod tests {
 
     fn event_matches_window(event: FrameEvent, window_id: WindowId) -> bool {
         match event {
+            #[cfg(feature = "frame-observation")]
             FrameEvent::Complete(timing) => timing.window_id == window_id,
             FrameEvent::Draw(timing) => timing.window_id == window_id,
             FrameEvent::Present(timing) => timing.window_id == window_id,

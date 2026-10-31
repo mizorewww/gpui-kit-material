@@ -36,6 +36,7 @@ zed-rev = "08cbb88a152c3751a43e853425a70e9f631a5918"
 
 [features]
 default = ["multithreaded"]
+frame-observation = ["gpui/frame-observation"]
 multithreaded = [
     "dep:wasm_thread",
     "scheduler/wasm-threads",

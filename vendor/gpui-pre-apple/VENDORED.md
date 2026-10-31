@@ -15,14 +15,8 @@ The package-level `Cargo.lock` is not retained; the workspace lockfile owns
 resolution.
 
 Text patches (`src/text_system.rs`, `src/open_type.rs`, added
-`tests/detailed_layout.rs`; `Cargo.toml` adds `unicode-bidi = "0.3.18"` and the
-`detailed_layout` `[[test]]`):
+`tests/font_fallback.rs`; `Cargo.toml` adds the `font_fallback` `[[test]]`):
 
-- `layout_line_with_options` implements the opt-in GPUI API
-  (`vendor/gpui-pre/line-layout-options-patch.md`): it preserves CoreText's
-  glyph positions, explicit paragraph direction (`CTParagraphStyle`), shaping
-  clusters and visual caret intervals (`CTLineEnumerateCaretOffsets`).
-  Existing layout calls continue using the upstream path.
 - Fonts without an `m` glyph are no longer skipped at load (valid non-Latin
   fonts); GPUI measures `em`/`ch` through fallback instead.
 - App-private fallback fonts are placed in the CoreText cascade from their
@@ -31,9 +25,8 @@ Text patches (`src/text_system.rs`, `src/open_type.rs`, added
   IDs still used by shaped frames.
 - Color-bitmap glyph support is detected once per font ID from the presence of
   an `sbix` table instead of matching the Apple Color Emoji PostScript names.
-- `unicode-bidi` resolves bidi levels for the detailed path.
 
-Presentation patches (`src/metal_renderer.rs`). `draw_with_status` reports
+Presentation patches (`src/metal_renderer.rs`), behind the crate's dev-only `frame-observation` feature; with it off, `draw` is upstream's. `draw_with_status` reports
 actual command-buffer submission (`draw` delegates to it). Its per-call autorelease pool drains temporary Metal
 references before returning to the presentation timer, including early returns;
 demand frames need not wait for the enclosing Cocoa event-loop pool.
@@ -48,14 +41,3 @@ GPU timing patch: while profiler tracing is enabled, `attach_gpu_timing` adds a
 command-buffer completion handler that reports `GPUStartTime`, `GPUEndTime`,
 status and the CPU commit time through `gpui::profiler::record_gpu_execution`.
 Rendering and presentation are unchanged.
-
-## Off-main-thread drawable acquisition
-
-`src/drawable_prefetch.rs` (added) keeps at most one `CAMetalDrawable`
-acquired by a renderer-owned thread. `src/metal_renderer.rs`
-`draw_with_status` takes it without blocking; only when none is ready (live
-resize, stale size, failed acquisition) does it wait, and that wait is still
-reported through `record_presentation_wait`. `drawable_ready_or_wake` and
-`set_drawable_waker` let the platform window skip a frame until a drawable is
-ready. `src/gpui_apple.rs` declares the module and re-exports `DrawableWaker`.
-Identical in `gpui-fast-apple`.

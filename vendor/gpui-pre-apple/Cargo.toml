@@ -32,6 +32,7 @@ zed-version = "0.1.0"
 zed-rev = "08cbb88a152c3751a43e853425a70e9f631a5918"
 
 [features]
+frame-observation = ["gpui/frame-observation"]
 bench-support = ["gpui/bench-support"]
 default = []
 font-kit = [
@@ -288,9 +289,6 @@ priority = -1
 level = "allow"
 priority = 0
 
-[dependencies.unicode-bidi]
-version = "0.3.18"
-
 [[test]]
-name = "detailed_layout"
-path = "tests/detailed_layout.rs"
+name = "font_fallback"
+path = "tests/font_fallback.rs"

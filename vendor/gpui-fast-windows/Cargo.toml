@@ -55,6 +55,7 @@ doctest = false
 version = "^0.1.12"
 default-features = false
 package = "gpui-fast"
+features = ["frame-observation"]
 
 [target.'cfg(target_os = "windows")'.dependencies.accesskit]
 version = "0.24.0"

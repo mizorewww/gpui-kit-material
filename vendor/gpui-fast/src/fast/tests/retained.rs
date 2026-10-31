@@ -2677,37 +2677,3 @@ fn an_element_no_longer_drawn_leaves_the_debug_bounds_of_a_retained_frame() {
     );
     assert_eq!(bounds(&mut cx, "kept"), Some(kept));
 }
-
-#[test]
-fn font_registration_rebuilds_cached_views_without_entity_notification() {
-    let mut cx = TestAppContext::single();
-    let (window, _, builds) = window(&mut cx);
-    draw(&mut cx, window);
-    notify_parent(&mut cx, window);
-    draw(&mut cx, window);
-    let before = builds.get();
-    notify_parent(&mut cx, window);
-    draw(&mut cx, window);
-    assert_eq!(
-        builds.get(),
-        before,
-        "first prove the child is actually retained"
-    );
-    cx.update_window(window.into(), |_, window, _| {
-        window.text_system().add_fonts(Vec::new()).unwrap();
-    })
-    .unwrap();
-    draw(&mut cx, window);
-    assert!(
-        builds.get() > before,
-        "font changes must invalidate cached rendering"
-    );
-    let rebuilt = builds.get();
-    notify_parent(&mut cx, window);
-    draw(&mut cx, window);
-    assert_eq!(
-        builds.get(),
-        rebuilt,
-        "retention resumes after the new font epoch"
-    );
-}

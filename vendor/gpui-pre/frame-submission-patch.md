@@ -1,5 +1,7 @@
 # Frame submission statistics, vsync control and throttle retry
 
+**Dev-only.** Everything here is behind the `frame-observation` Cargo feature, which is off for a consumer; see "Consumer patch set" in `docs/ARCHITECTURE.md`.
+
 Source: the published Apache-2.0 `gpui-pre` 0.3.10 package (`SOURCE.json`).
 Files: `src/platform.rs`, `src/window.rs`, `src/platform/test/window.rs`.
 
@@ -36,7 +38,7 @@ window exposes `periodic_frame_source` for
 `test_periodic_source_throttle_waits_and_resumes`.
 
 Backend implementations: `gpui-pre-macos`/`gpui-fast-macos` (Metal display
-sync, demand waker, counts), `gpui-pre-web`/`gpui-fast-web` (counts only;
+sync, demand waker, counts), `gpui-pre-web`/`gpui-fast-web` (counts only, behind their own feature;
 browser-controlled vsync stays `Unsupported`), `gpui-*-linux` through `gpui-*-wgpu`
 and `wgpu` (present-status counts, `PresentMode` control) and `gpui-*-windows`
 (`S_OK` counts, DXGI sync interval). Each has its own `MATERIAL-PATCHES.md`.

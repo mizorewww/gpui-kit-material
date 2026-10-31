@@ -7,3 +7,4 @@ __pycache__/
 /deploy/site/node_modules
 .cloudflare/
 .playwright-cli/
+/crates/consumer-check/target

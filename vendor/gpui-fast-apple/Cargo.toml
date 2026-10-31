@@ -39,6 +39,7 @@ repository = "https://github.com/longbridge/gpui-fast"
 resolver = "2"
 
 [features]
+frame-observation = ["gpui/frame-observation"]
 bench-support = ["gpui/bench-support"]
 default = []
 font-kit = [
@@ -277,9 +278,6 @@ default-features = false
 level = "allow"
 priority = 0
 
-[dependencies.unicode-bidi]
-version = "0.3.18"
-
 [[test]]
-name = "detailed_layout"
-path = "tests/detailed_layout.rs"
+name = "font_fallback"
+path = "tests/font_fallback.rs"

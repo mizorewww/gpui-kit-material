@@ -163,7 +163,7 @@ pub use resizable::{
     ResizeHandle, ResizeHandleContext, ResizeHandleRenderer, ResizeHandleState, h_resizable,
     resizable_panel, resize_handle, v_resizable,
 };
-pub use root::{Root, RootPlugin, Tab as RootTab, TabPrev as RootTabPrev};
+pub use root::{Root, RootPlugin};
 pub use scroll_bounce::{ScrollBounce, ScrollBounceMotion};
 pub use scrollable_mask::{
     HorizontalScrollClaim, RoundedFrameCover, ScrollableMask, last_horizontal_scroll_claim,

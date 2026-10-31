@@ -32,10 +32,7 @@ The local compatibility surface is restricted to:
   clock and interruption/reversal history across unmounts (for virtualized
   rows) using the same sampler as `transition_with_status`; it retains no
   view, window or scheduled callback.
-- `src/lib.rs`: public exports `ReducedMotion` and `TransitionPlayback`, and
-  `RootTab`/`RootTabPrev` aliases for the `root::Tab`/`TabPrev` actions (the
-  `root` module is private upstream), so an app can handle Root's focus-cycling
-  keys itself, as the virtualized Gallery does.
+- `src/lib.rs`: public exports `ReducedMotion` and `TransitionPlayback`.
 - `src/text_selection.rs`: `Hitbox` literals add `additional_bounds: None`,
   required by the GPUI `Hitbox` field patch
   (`vendor/gpui-pre/hitbox-extension-patch.md`). No behavior change.
@@ -57,16 +54,15 @@ The local compatibility surface is restricted to:
   under GPUI's right-to-left layout direction, and pointer math then measures a
   horizontal slider from its right edge. Layout mirrors the thumb and indicator.
 - `src/slider.rs`: three narrow corrections. Dragging snapped with
-  `(value / step).round() * step`, so a zero step produced NaN and steps were
-  counted from 0 rather than `min` (a 3..100 slider with step 5 landed on
-  10, not 8 or 13); values now snap to `min + k * step` inside the range,
-  and a step that is not positive and finite leaves the value continuous.
+  `(value / step).round() * step`, so steps were counted from 0 rather than
+  `min` (a 3..100 slider with step 5 landed on 10, not 8 or 13); values now
+  snap to `min + k * step` inside the range.
   The accessibility Increment/Decrement actions set a single value, which
   collapsed a range; they now move only the range's end (never past its
   start). `Slider::track_focus(&FocusHandle)` makes the `Role::Slider` node
   itself focusable (observed by `test_support`), so keyboard focus and
   assistive technology land on the slider instead of an unnamed wrapper.
-  Tests: `dragging_snaps_from_min_and_a_zero_step_stays_continuous`,
+  Tests: `dragging_snaps_from_min`,
   `accessibility_steps_move_only_a_ranges_end`.
 
 - `src/dialog.rs`: `Dialog::accessibility_label`. The dialog host is the

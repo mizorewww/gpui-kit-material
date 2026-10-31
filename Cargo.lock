@@ -2199,7 +2199,6 @@ dependencies = [
  "taffy",
  "thiserror 2.0.21",
  "ttf-parser",
- "unicode-segmentation",
  "url",
  "usvg 0.46.0",
  "uuid",
@@ -2246,7 +2245,6 @@ dependencies = [
  "pathfinder_geometry",
  "smallvec",
  "thiserror 2.0.21",
- "unicode-bidi",
  "zed-font-kit",
 ]
 
@@ -2499,8 +2497,10 @@ name = "gpui-kit-material-gallery-web"
 version = "0.1.0"
 dependencies = [
  "gpui-base",
+ "gpui-fast-web",
  "gpui-kit",
  "gpui-kit-material",
+ "gpui-pre-web",
  "wasm-bindgen",
  "web-sys",
 ]
@@ -2574,7 +2574,6 @@ dependencies = [
  "taffy",
  "thiserror 2.0.21",
  "ttf-parser",
- "unicode-segmentation",
  "url",
  "usvg 0.46.0",
  "uuid",
@@ -2621,7 +2620,6 @@ dependencies = [
  "pathfinder_geometry",
  "smallvec",
  "thiserror 2.0.21",
- "unicode-bidi",
  "zed-font-kit",
 ]
 

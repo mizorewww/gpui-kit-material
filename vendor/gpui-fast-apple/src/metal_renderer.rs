@@ -144,8 +144,6 @@ pub struct MetalRenderer {
     #[cfg(any(test, feature = "bench-support", feature = "test-support"))]
     headless_render_target: Option<metal::Texture>,
     pub(crate) fast_layers: crate::fast::layers::TileCache,
-    /// Material patch: acquires the next drawable off the main thread.
-    drawable_prefetch: Option<crate::drawable_prefetch::DrawablePrefetch>,
 }
 
 #[repr(C)]
@@ -419,9 +417,6 @@ impl MetalRenderer {
             CFRetained::from_raw(ptr::NonNull::new(cache).expect("CoreVideo returned a null cache"))
         };
 
-        let drawable_prefetch = layer
-            .clone()
-            .map(crate::drawable_prefetch::DrawablePrefetch::new);
         Self {
             device,
             layer,
@@ -448,7 +443,6 @@ impl MetalRenderer {
             #[cfg(any(test, feature = "bench-support", feature = "test-support"))]
             headless_render_target: None,
             fast_layers: crate::fast::layers::TileCache::default(),
-            drawable_prefetch,
         }
     }
 
@@ -472,40 +466,11 @@ impl MetalRenderer {
         if let Some(layer) = &self.layer {
             layer.set_presents_with_transaction(presents_with_transaction);
         }
-        // Material patch: live resize presents synchronously in a CA
-        // transaction with a drawable of the new size; prefetch resumes after.
-        if let Some(prefetch) = &self.drawable_prefetch {
-            prefetch.set_paused(presents_with_transaction);
-        }
-    }
-
-    /// Material patch: sets what wakes the owning window, from any thread,
-    /// once a drawable a skipped frame waited for is ready.
-    pub fn set_drawable_waker(&self, waker: Option<crate::drawable_prefetch::DrawableWaker>) {
-        if let Some(prefetch) = &self.drawable_prefetch {
-            prefetch.set_waker(waker);
-        }
-    }
-
-    /// Material patch: whether a frame drawn now gets its drawable without
-    /// blocking the main thread. When it would not, the drawable waker is
-    /// called once it would, and the caller should skip this frame request.
-    pub fn drawable_ready_or_wake(&self) -> bool {
-        self.drawable_prefetch
-            .as_ref()
-            .is_none_or(|prefetch| prefetch.ready_or_wake())
     }
 
     pub fn update_drawable_size(&mut self, size: Size<DevicePixels>) {
         if let Some(layer) = &self.layer {
             layer.set_drawable_size(CGSize::new(size.width.0 as f64, size.height.0 as f64));
-        }
-        // Material patch: have a drawable of the new size ready for the next frame.
-        if let Some(prefetch) = &self.drawable_prefetch
-            && size.width.0 > 0
-            && size.height.0 > 0
-        {
-            prefetch.request();
         }
         self.update_path_intermediate_textures(size);
         crate::fast::layers::TileCache::clear(&mut self.fast_layers);
@@ -560,10 +525,56 @@ impl MetalRenderer {
         // nothing to do
     }
 
+    #[cfg(not(feature = "frame-observation"))]
+    pub fn draw(&mut self, scene: &Scene) {
+        let layer = match &self.layer {
+            Some(l) => l.clone(),
+            None => {
+                log::error!(
+                    "draw() called on headless renderer - use render_scene_to_image() instead"
+                );
+                return;
+            }
+        };
+        let viewport_size = layer.drawable_size();
+        let viewport_size: Size<DevicePixels> = size(
+            (viewport_size.width.ceil() as i32).into(),
+            (viewport_size.height.ceil() as i32).into(),
+        );
+        let drawable = if let Some(drawable) = layer.next_drawable() {
+            drawable
+        } else {
+            log::error!(
+                "failed to retrieve next drawable, drawable size: {:?}",
+                viewport_size
+            );
+            return;
+        };
+
+        let command_buffer = match self.render_frame(scene, drawable.texture(), viewport_size) {
+            Ok(command_buffer) => command_buffer,
+            Err(error) => {
+                log::error!("failed to render: {error:#}");
+                return;
+            }
+        };
+
+        if self.presents_with_transaction {
+            command_buffer.commit();
+            command_buffer.wait_until_scheduled();
+            drawable.present();
+        } else {
+            command_buffer.present_drawable(drawable);
+            command_buffer.commit();
+        }
+    }
+
+    #[cfg(feature = "frame-observation")]
     pub fn draw(&mut self, scene: &Scene) {
         self.draw_with_status(scene);
     }
 
+    #[cfg(feature = "frame-observation")]
     /// Submit a drawable and report whether a real command buffer/presentation
     /// was issued. This is not GPU completion or display presentation timing.
     pub fn draw_with_status(&mut self, scene: &Scene) -> bool {
@@ -586,31 +597,13 @@ impl MetalRenderer {
                 (viewport_size.width.ceil() as i32).into(),
                 (viewport_size.height.ceil() as i32).into(),
             );
-            // Material patch: take the drawable the prefetch thread acquired.
-            // Only when none is ready does this frame wait (for that thread,
-            // or for nextDrawable itself while prefetching is paused); that
-            // wait is reported separately from CPU work.
-            let (width, height) = (viewport_size.width.0 as u64, viewport_size.height.0 as u64);
-            let prefetched = self
-                .drawable_prefetch
-                .as_ref()
-                .and_then(|prefetch| prefetch.take(width, height));
-            let next_drawable = match prefetched {
-                Some(drawable) => Some(drawable),
-                None => {
-                    let wait_started =
-                        gpui::profiler::trace_enabled().then(std::time::Instant::now);
-                    let drawable = self
-                        .drawable_prefetch
-                        .as_ref()
-                        .and_then(|prefetch| prefetch.wait_take(width, height))
-                        .or_else(|| layer.next_drawable().map(|drawable| drawable.to_owned()));
-                    if let Some(wait_started) = wait_started {
-                        gpui::profiler::record_presentation_wait(wait_started.elapsed());
-                    }
-                    drawable
-                }
-            };
+            // Material patch: nextDrawable can block until the compositor
+            // releases a drawable. Report that wait separately from CPU work.
+            let wait_started = gpui::profiler::trace_enabled().then(std::time::Instant::now);
+            let next_drawable = layer.next_drawable();
+            if let Some(wait_started) = wait_started {
+                gpui::profiler::record_presentation_wait(wait_started.elapsed());
+            }
             let drawable = if let Some(drawable) = next_drawable {
                 drawable
             } else {
@@ -635,7 +628,7 @@ impl MetalRenderer {
                 command_buffer.wait_until_scheduled();
                 drawable.present();
             } else {
-                command_buffer.present_drawable(&drawable);
+                command_buffer.present_drawable(drawable);
                 command_buffer.commit();
             }
             true
@@ -1832,7 +1825,7 @@ impl gpui::PlatformHeadlessRenderer for MetalHeadlessRenderer {
     }
 }
 
-
+#[cfg(feature = "frame-observation")]
 /// Material patch: while profiler tracing is enabled, report the driver's
 /// GPUStartTime/GPUEndTime for a command buffer committed after this call.
 pub(crate) fn attach_gpu_timing(command_buffer: &metal::CommandBufferRef, kind: &'static str) {

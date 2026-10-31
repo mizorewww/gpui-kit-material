@@ -1,0 +1,38 @@
+# Not a workspace member: this is what a downstream application's manifest looks
+# like. It proves the library builds against the patches a consumer needs, including
+# the web backends' IME position, without the dev-only frame observation, and that
+# Kit's FPS HUD builds beside it.
+[package]
+name = "consumer-check"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[features]
+default = []
+gpui-fast = ["gpui-kit/gpui-fast", "gpui-kit-material/gpui-fast", "gpui-fps/gpui-fast"]
+
+[dependencies]
+gpui-kit = { git = "https://github.com/longbridge/gpui-kit", branch = "main" }
+gpui-fps = { git = "https://github.com/longbridge/gpui-kit", branch = "main" }
+gpui-kit-material = { path = "../material", default-features = false, features = ["serde", "embedded-symbols", "frame-profiler"] }
+
+# Lets `cargo test -p consumer-check -p gpui-pre --lib` run the engine tests with
+# frame observation off.
+[dev-dependencies]
+gpui-kit = { git = "https://github.com/longbridge/gpui-kit", branch = "main", features = ["test-support"] }
+
+[workspace]
+
+[patch.crates-io]
+gpui-base = { path = "../../vendor/gpui-base" }
+gpui-pre = { path = "../../vendor/gpui-pre" }
+gpui-pre-apple = { path = "../../vendor/gpui-pre-apple" }
+gpui-pre-web = { path = "../../vendor/gpui-pre-web" }
+gpui-fast = { path = "../../vendor/gpui-fast" }
+gpui-fast-apple = { path = "../../vendor/gpui-fast-apple" }
+gpui-fast-web = { path = "../../vendor/gpui-fast-web" }
+
+[patch."https://github.com/longbridge/gpui-kit"]
+gpui-kit = { path = "../../vendor/gpui-kit" }
+gpui-base = { path = "../../vendor/gpui-base" }

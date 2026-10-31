@@ -35,7 +35,6 @@ mod text_system;
 mod viewport;
 #[cfg(target_family = "wasm")]
 mod window;
-mod canvas_size;
 
 #[cfg(target_family = "wasm")]
 pub use dispatcher::WebDispatcher;

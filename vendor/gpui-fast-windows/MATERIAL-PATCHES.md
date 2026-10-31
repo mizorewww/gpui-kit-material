@@ -1,5 +1,7 @@
 # gpui-fast-windows source
 
+**Dev-only overlay.** This crate is vendored only for the gallery's and the profiler's frame observation, and its manifest turns on the engine's `frame-observation` feature. A consumer does not patch it; see "Consumer patch set" in `docs/ARCHITECTURE.md`.
+
 Complete published package, verified against its crates.io archive. `SOURCE.json`
 records the archive SHA-256, every original file hash, and the original and patched
 hash of each changed file.

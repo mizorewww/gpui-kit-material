@@ -114,34 +114,52 @@ adjacent `../gpui-material-symbols` checkout is never substituted implicitly.
 One GPUI and one Base implementation are shared across Material, Kit and
 Symbols. Git and registry packages with equal versions are still different
 identities, so the root `[patch]` tables redirect every source to `vendor/`.
-**These patches apply only inside this workspace**; downstream workspaces need
-the same patches until fixes land upstream. A patched Zed checkout overriding
-`gpui-pre` overrides it for this kit too.
+**These patches apply only inside this workspace**; a downstream workspace needs
+the consumer patch set below until fixes land upstream. A patched Zed checkout
+overriding `gpui-pre` overrides it for this kit too.
+
+### Consumer patch set
+
+A consumer patches `gpui-kit`, `gpui-base`, `gpui-pre`, `gpui-fast`,
+`gpui-pre-apple`, `gpui-fast-apple`, `gpui-pre-web` and `gpui-fast-web`, exactly as
+[crates/consumer-check/Cargo.toml](../crates/consumer-check/Cargo.toml) does; CI
+builds that crate on every target and both backends, beside upstream's `gpui-fps`.
+Its engine has upstream's `FrameEvent`, `PlatformWindow` and frame path.
+
+| Consumer crate | Why a consumer needs it |
+| --- | --- |
+| `gpui-kit` | Normalized manifest that keeps WASM single-threaded by default. |
+| `gpui-base` | Component behavior Material relies on, and the input reporting its caret. |
+| `gpui-pre`, `gpui-fast` | Layout direction, letter spacing, touch observation, hitbox extensions and the other engine rules in the table below. |
+| `gpui-pre-apple`, `gpui-fast-apple` | Non-Latin and app-private fallback fonts. |
+| `gpui-pre-web`, `gpui-fast-web` | The browser's IME panel opens at the caret; upstream's `update_ime_position` does nothing. Only matters on `wasm32`. |
+
+Everything else in `vendor/` is a **dev-only overlay**, marked in the table below,
+for the Gallery's FPS display
+and vsync switch, `engine_bench` and `scripts/profile-gallery.py`: frame statistics,
+vsync control, CPU scopes, presentation timing and GPU time. `gpui-pre` and
+`gpui-fast` gate them behind the `frame-observation` Cargo feature, and only the
+overlay's backend manifests (`gpui-*-macos`, `-linux`, `-windows`) turn it on. The
+web crates are not overlays, so their manifests leave it off and offer a
+`frame-observation` feature of their own, which only `crates/gallery-web` selects
+for its browser frame counters. No library code may use them; `crates/consumer-check` fails to build if it does.
+Inside this workspace the feature is therefore always on, so upstream's `gpui-fps`
+does not compile here (`E0004`, `FrameEvent::Complete`) and is not used here.
 
 | Vendored | Source | Why |
 | --- | --- | --- |
 | `gpui-kit` | Git `main` at audited `bb85882`, unchanged source | Normalized manifest disables implicit WASM threading (`multithreaded-web` restores it). Hashes in `SOURCE.md`/`SOURCE.json`. |
-| `gpui-base` | Git `bb85882` (`crates/base`) + patches (`SOURCE.json`, `motion-patch.md`) | CSS transition reversal, per-transition reduced motion, `TransitionPlayback`, toggle focus policy, busy accessibility state; `RootTab`/`RootTabPrev` exports; `Hitbox.additional_bounds` follow-up in `text_selection.rs`; input caller caret color; vertical `Toolbar` axis; slider step snapping from min, assistive Increment/Decrement that move only a range's end, `Slider::track_focus`, right-to-left pointer math; `Dialog::accessibility_label`; the input reports its caret to the platform when it moves (`ime-anchor-patch.md`). |
-| `gpui-pre` (GPUI `=0.3.10`) | crates.io + patches (`SOURCE.json`, `*-patch.md`) | Layout direction; letter spacing; passive raw touch observation; hitbox extensions independent of layout; animation visibility and repeat playback; complete CPU frame scopes, presentation wait, GPU time and submission outcome in the profiler; submission statistics, vsync control and throttle retry; opt-in paragraph layout with clusters (`unicode-segmentation` pinned); lazy tab-stop index; overflowing spaces hang instead of starting a wrapped row; test-harness repairs; `Window::focused_input_selection_bounds` (`focused-input-bounds-patch.md`). |
-| `gpui-pre-apple` | crates.io + patches (`SOURCE.json`, `VENDORED.md`) | Detailed CoreText layout (direction, clusters, carets); non-Latin and app-private fallback fonts; `draw_with_status` with a per-draw autorelease pool, drawable-wait and GPU timestamps; off-main-thread drawable acquisition. |
-| `gpui-pre-web` | crates.io + patches (`SOURCE.json`, `MATERIAL-PATCHES.md`) | Keeps CSS viewport size separate from backing-store pixels (CSS × DPR fallback); successful submission count; moves the hidden IME input to the caret, where a browser opens its candidate window. |
-| `gpui-fast`, `-apple`, `-web` | 0.1.12 + patches (`MATERIAL-MIGRATION.json`, per-file `local_changes`) | The GPUI, Apple and web patches above carried through Fast retained/scroll replay and composition (touch observers, extended hit targets, font-generation invalidation); explicit single-threaded web defaults. |
-| `gpui-pre-macos`, `gpui-fast-macos` | crates.io + patches (`SOURCE.json`, `MATERIAL-PATCHES.md`) | Vsync control, demand waker, periodic-source report and submission statistics (below). |
-| `gpui-pre-linux`, `gpui-fast-linux`, `gpui-pre-wgpu`, `gpui-fast-wgpu`, `wgpu` | crates.io + patches (`SOURCE.json`, `MATERIAL-PATCHES.md`) | Submission statistics from the present status `wgpu` otherwise discards, and vsync control through `PresentMode` (below). |
-| `gpui-pre-windows`, `gpui-fast-windows` | crates.io + patches (`SOURCE.json`, `MATERIAL-PATCHES.md`) | Submission statistics counting only `S_OK` presents, and vsync control through the DXGI sync interval (below). |
+| `gpui-base` | Git `bb85882` (`crates/base`) + patches (`SOURCE.json`, `motion-patch.md`) | CSS transition reversal, per-transition reduced motion, `TransitionPlayback`, toggle focus policy, busy accessibility state; `Hitbox.additional_bounds` follow-up in `text_selection.rs`; input caller caret color; vertical `Toolbar` axis; slider step snapping from min, assistive Increment/Decrement that move only a range's end, `Slider::track_focus`, right-to-left pointer math; `Dialog::accessibility_label`; the input reports its caret to the platform when it moves (`ime-anchor-patch.md`). |
+| `gpui-pre` (GPUI `=0.3.10`) | crates.io + patches (`SOURCE.json`, `*-patch.md`) | Layout direction; letter spacing; passive raw touch observation; hitbox extensions independent of layout; animation visibility and repeat playback; complete CPU frame scopes, presentation wait, GPU time and submission outcome in the profiler; submission statistics, vsync control and throttle retry; `em`/`ch` metrics for fonts without `m`; overflowing spaces hang instead of starting a wrapped row (`hanging-space-patch.md`); test-harness repairs; `Window::focused_input_selection_bounds` (`focused-input-bounds-patch.md`). |
+| `gpui-pre-apple` | crates.io + patches (`SOURCE.json`, `VENDORED.md`) | Non-Latin and app-private fallback fonts; `draw_with_status` with a per-draw autorelease pool, drawable-wait and GPU timestamps. |
+| `gpui-pre-web` | crates.io + patches (`SOURCE.json`, `MATERIAL-PATCHES.md`) | Moves the hidden IME input to the caret, where a browser opens its candidate window (consumers need this); successful submission count, behind the crate's own `frame-observation` feature. |
+| `gpui-fast`, `-apple`, `-web` | 0.1.12 + patches (`MATERIAL-MIGRATION.json`, per-file `local_changes`) | The GPUI, Apple and web patches above carried through Fast retained/scroll replay and composition (touch observers, extended hit targets); explicit single-threaded web defaults. |
+| `gpui-pre-macos`, `gpui-fast-macos` (dev-only) | crates.io + patches (`SOURCE.json`, `MATERIAL-PATCHES.md`) | Vsync control, demand waker, periodic-source report and submission statistics (below). |
+| `gpui-pre-linux`, `gpui-fast-linux`, `gpui-pre-wgpu`, `gpui-fast-wgpu`, `wgpu` (dev-only) | crates.io + patches (`SOURCE.json`, `MATERIAL-PATCHES.md`) | Submission statistics from the present status `wgpu` otherwise discards, and vsync control through `PresentMode` (below). |
+| `gpui-pre-windows`, `gpui-fast-windows` (dev-only) | crates.io + patches (`SOURCE.json`, `MATERIAL-PATCHES.md`) | Submission statistics counting only `S_OK` presents, and vsync control through the DXGI sync interval (below). |
 
 Touch patches leave gesture recognition, scrolling and activation in GPUI while
 letting Material start a ripple on touch-down and release it on cancellation.
-
-**Off-main-thread drawable acquisition.** Each vendored Metal renderer keeps one
-drawable acquired ahead by its own thread (`src/drawable_prefetch.rs`), and the
-macOS window skips a frame request until one is ready, so the main thread does
-not block in `nextDrawable`.
-
-**Lazy tab stops.** `TabStopMap` records insertions during paint and builds the
-order and focus lookup on the first query after a change
-(`vendor/gpui-pre/tab-stop-index-patch.md`). Upstream updated both per insertion,
-which took about 27% of a Material list scroll frame.
 
 **Backend selection.** Material and gallery-web expose `gpui-fast`, forwarding
 to Kit's backend feature; it is on by default. Material's `gpui` alias points to
@@ -150,6 +168,8 @@ packages additively; they do not define the facade's public types. Disable
 default features to compare against upstream.
 
 ## Frame observation
+
+Dev-only: see [Consumer patch set](#consumer-patch-set).
 
 Submission statistics count attempts and, separately, successfully submitted
 **new** draw generations; FPS uses only the latter. Backends without a success

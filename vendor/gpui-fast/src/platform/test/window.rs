@@ -49,6 +49,7 @@ pub(crate) struct TestWindowState {
     request_frame_callback: Option<Box<dyn FnMut(RequestFrameOptions)>>,
     frame_wake_count: Rc<Cell<usize>>,
     frame_scheduled: bool,
+    #[cfg(feature = "frame-observation")]
     pub(crate) periodic_frame_source: bool,
     frame_callback_pending: bool,
     input_handler: Option<PlatformInputHandler>,
@@ -124,6 +125,7 @@ impl TestWindow {
             request_frame_callback: None,
             frame_wake_count: Rc::new(Cell::new(0)),
             frame_scheduled: false,
+            #[cfg(feature = "frame-observation")]
             periodic_frame_source: false,
             frame_callback_pending: false,
             input_handler: None,
@@ -479,6 +481,7 @@ impl PlatformWindow for TestWindow {
         self.0.lock().is_fullscreen
     }
 
+    #[cfg(feature = "frame-observation")]
     fn has_periodic_frame_source(&self) -> bool {
         self.0.lock().periodic_frame_source
     }

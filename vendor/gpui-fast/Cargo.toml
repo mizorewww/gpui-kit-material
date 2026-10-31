@@ -48,6 +48,7 @@ repository = "https://github.com/longbridge/gpui-fast"
 resolver = "2"
 
 [features]
+frame-observation = []
 bench = ["bench-support"]
 bench-support = [
     "profiler",
@@ -535,10 +536,3 @@ optional = true
 [lints.rust.unexpected_cfgs]
 level = "allow"
 priority = 0
-
-[dependencies.unicode-segmentation]
-version = "=1.13.3"
-
-[[test]]
-name = "line_layout_options"
-path = "tests/line_layout_options.rs"

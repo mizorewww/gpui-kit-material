@@ -28,8 +28,6 @@
   },
   "local_patches": [
     "Cargo.toml",
-    "src/drawable_prefetch.rs",
-    "src/gpui_apple.rs",
     "src/metal_renderer.rs",
     "src/open_type.rs",
     "src/text_system.rs"
@@ -37,13 +35,13 @@
   "modified_files": {
     "Cargo.toml": {
       "upstream_sha256": "4122e9ce7929cf5a8b568dff13ec7a167e030d341d3289f9c92f0dcb80e5950d",
-      "local_sha256": "639ca37cfb42e90adcfeb05810646e4b2f7d740dc7bc12923e8bcb75f9bb0ca5",
-      "reason": "Adds unicode-bidi 0.3.18 and the detailed_layout [[test]] (VENDORED.md)."
+      "local_sha256": "ae219575b1968d4f9600debc3dbd79363e4ee437989dff62d602c1d40dad0e1e",
+      "reason": "The font_fallback [[test]] and the dev-only frame-observation feature (VENDORED.md)."
     },
     "src/metal_renderer.rs": {
       "upstream_sha256": "d3cdb56263ad992c11263c9de9cc23aeccf202fe85ab42312f22549b44864b75",
-      "local_sha256": "835b66b7e7fe47257a5bfdfdaf812b6b7cff375c0e0746b169e2ab484125f0e6",
-      "reason": "draw_with_status with per-draw autorelease pool, nextDrawable presentation-wait reporting, attach_gpu_timing GPU timestamps (VENDORED.md). Material presentation patch: drawable acquisition moved off the main thread (src/drawable_prefetch.rs); draw_with_status takes the prefetched drawable and only waits (reported as presentation wait) when none is ready; prefetch pauses during transactional presentation and is requested on drawable-size changes; set_drawable_waker/drawable_ready_or_wake for the platform window."
+      "local_sha256": "2dd03b6482b93f92d872f32542cb9b346679d10899d5b57ce602ca6b2ee2749c",
+      "reason": "Behind frame-observation only: draw_with_status with per-draw autorelease pool, nextDrawable presentation wait and attach_gpu_timing (VENDORED.md). With the feature off, draw is upstream's."
     },
     "src/open_type.rs": {
       "upstream_sha256": "bc827c157fdce50125b158adb595b665d82f38b62fc6b3a9693c65abae640453",
@@ -52,23 +50,14 @@
     },
     "src/text_system.rs": {
       "upstream_sha256": "932774c521b1bfd99a2552572cf09769e0dd39b2b2e306a3f6df80f57522b375",
-      "local_sha256": "eed9cc05b1d164ea606ac7eb3f0e56a2fb81a1b49f983e6550360f7483d0a266",
-      "reason": "layout_line_with_options detailed CoreText layout, fonts without 'm' accepted, fallback cascade rebuild after registration, sbix color-bitmap detection (VENDORED.md)."
-    },
-    "src/gpui_apple.rs": {
-      "upstream_sha256": "3980037e516f788bbf4ba952bea2a0cbddf5c90ca2b6f4d5a007509f700ea276",
-      "local_sha256": "a10cf0ad3032ee21db1140d12b0b0edde50219e610c01b4bbd8a8ab0eeff3b33",
-      "reason": "Declares the drawable_prefetch module and re-exports DrawableWaker (Material presentation patch)."
+      "local_sha256": "57858975de866c42909792188a900543ad8098ec907935593f0b110bd4d38796",
+      "reason": "Fonts without 'm', fallback cascade rebuild and sbix detection (VENDORED.md)."
     }
   },
   "added_files": {
-    "tests/detailed_layout.rs": {
-      "sha256": "3759e317a8566b16c91438ce335946f6edd1b83a5d2d5eb3f58387a0ce7d2d05",
-      "reason": "Added: detailed-layout integration tests (VENDORED.md)."
-    },
-    "src/drawable_prefetch.rs": {
-      "sha256": "4acaa95afa5363c84098321747e4ac59be5b4cac6c91e171a968aa0efc0ba17b",
-      "reason": "Added: per-renderer drawable prefetch thread holding at most one acquired CAMetalDrawable, with a thread-safe window waker (Material presentation patch)."
+    "tests/font_fallback.rs": {
+      "sha256": "4ca77731fbd3a6e716a2c0eac5a59b2e60ad845c5d39fe5bbad96b4cc6c81eb2",
+      "reason": "Added: tests of the kept font patches (VENDORED.md)."
     }
   },
   "removed_files": {
@@ -77,7 +66,7 @@
       "reason": "Package-level lockfile not retained; the workspace Cargo.lock owns resolution."
     }
   },
-  "unchanged_file_count": 13,
+  "unchanged_file_count": 14,
   "provenance_files": [
     "SOURCE.json",
     "VENDORED.md"

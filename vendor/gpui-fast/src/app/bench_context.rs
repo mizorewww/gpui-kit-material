@@ -147,6 +147,7 @@ impl BenchReport {
         for event in events {
             match event {
                 // Outer CPU samples are consumed separately from these legacy phase metrics.
+                #[cfg(feature = "frame-observation")]
                 FrameEvent::Complete(_) => {}
                 FrameEvent::Draw(timing) => {
                     snapshot

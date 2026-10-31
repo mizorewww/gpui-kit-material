@@ -28,40 +28,35 @@
     "src/window.rs": "eda543e585912fcb012e2a3559d8fb2e9ad7570ba58746747af380d044085cb8"
   },
   "local_patches": [
-    "src/gpui_web.rs",
+    "Cargo.toml",
     "src/ime_mirror.rs",
     "src/window.rs"
   ],
   "modified_files": {
-    "src/gpui_web.rs": {
-      "upstream_sha256": "51360d028a5f0e495557732e7e257ccfd5de960a17a9a57487aeaa8562b10979",
-      "local_sha256": "94847c66838eb4bc59f907e78f368be5744d238f741b9439e3c005ed5f22b2dd",
-      "reason": "Declare the canvas_size module (MATERIAL-PATCHES.md)."
-    },
     "src/window.rs": {
       "upstream_sha256": "eda543e585912fcb012e2a3559d8fb2e9ad7570ba58746747af380d044085cb8",
-      "local_sha256": "4a1b7858b06032f5c67f25ae261c40ed954653a98886113e41de3f47a90cbe06",
-      "reason": "Resize observer uses canvas_dimensions and reacts to DPR/logical-size changes; successful_frame_submissions from WgpuRenderer::draw (MATERIAL-PATCHES.md)."
+      "local_sha256": "1c4bfbbf07461009f1f29aff563056467051a8e4df3d5c3fc88c5bf8a9667e72",
+      "reason": "update_ime_position moves the IME mirror to the caret, always on; successful_frame_submissions for the WindowSubmissionStats patch, behind the crate's frame-observation feature (MATERIAL-PATCHES.md)."
     },
     "src/ime_mirror.rs": {
       "upstream_sha256": "4061ebd319b5928c2a25f659c4f1db9adb193d5873bbbfeba36468ca2706895d",
       "local_sha256": "092f950bc0c7020ff699a92943bbd4ea39941222f948fb7c647fe9cc1f16e099",
-      "reason": "Moves the hidden input to the caret for update_ime_position, so a browser IME panel opens there (identical in both web crates)."
+      "reason": "Moves the hidden input to the caret for update_ime_position, so a browser IME panel opens there. A consumer needs it (identical in both web crates)."
+    },
+    "Cargo.toml": {
+      "upstream_sha256": "da6d7e9f6bc0a2de9020cb81aeebea4b6e7d989dccade83f0c22440ed68164ce",
+      "local_sha256": "7a7633b850bcfeaeac1007c48d422629a83f578ac0db89e9190ff2d8a14dc11b",
+      "reason": "A frame-observation feature, off by default, forwarding to the engine's; only the Gallery turns it on (MATERIAL-PATCHES.md)."
     }
   },
-  "added_files": {
-    "src/canvas_size.rs": {
-      "sha256": "0c30b53010e38d1e9bb79e744d2936a5e19ce202ade2bbcdde9b8e11087db1c0",
-      "reason": "Added: CSS viewport vs backing-store sizing with DPR-consistency fallback, plus unit tests (MATERIAL-PATCHES.md)."
-    }
-  },
+  "added_files": {},
   "removed_files": {
     "Cargo.lock": {
       "upstream_sha256": "792e390642e5b0454af698408f60902a7ec856eaf73649f3d2006acf7380e2bb",
       "reason": "Package-level lockfile not retained; the workspace Cargo.lock owns resolution."
     }
   },
-  "unchanged_file_count": 17,
+  "unchanged_file_count": 16,
   "provenance_files": [
     "MATERIAL-PATCHES.md",
     "SOURCE.json"

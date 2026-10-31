@@ -24,8 +24,10 @@ python3 -m http.server 8080 --bind 127.0.0.1 --directory crates/gallery-web/www
 ```
 
 The single-threaded build needs no cross-origin isolation headers. Generated
-bindings stay out of Git. Check canvas allocation at 1×/1.25×/1.5×/2× DPR
-(requires `agent-browser`; validates allocation only, not pixels):
+bindings stay out of Git. Check canvas allocation at real 1×/1.25×/1.5×/2×/3× device
+scale factors (requires `agent-browser` and Chromium; validates allocation only,
+not pixels). CDP device-metrics emulation reports a device-pixel box that
+disagrees with `devicePixelRatio`, so do not use it to judge canvas size:
 
 ```sh
 python3 scripts/check-gallery-dpr.py http://127.0.0.1:8080 /tmp/material-gallery-dpr
@@ -115,13 +117,8 @@ counts, the lowest FPS over ≥ 250 ms windows, and draw-associated submission
 attempt gaps as a diagnostic. Runs whose rate sits near or below the display
 refresh while VSync reads disabled are marked (`observed_rate_near_or_below_refresh`).
 
-Drawable acquisition runs off the main thread: each vendored Metal renderer
-(`gpui-{pre,fast}-apple`, `src/drawable_prefetch.rs`) keeps one drawable
-acquired ahead by its own thread, and the macOS window skips a frame request
-until one is ready instead of blocking in `nextDrawable` (see the crates'
-`MATERIAL-PATCHES.md`/`MATERIAL-MIGRATION.json`). Any remaining main-thread
-wait (live resize, a stale drawable size, a failed prefetch) is still timed
-and reported separately as `presentation_wait_*`/`drawable_wait`. GPU time
+Drawable acquisition runs on the main thread, as upstream. Its wait is timed and
+reported separately as `presentation_wait_*`/`drawable_wait`. GPU time
 (Metal `GPUStartTime`/`GPUEndTime`, macOS only) is reported per frame under
 `gpu` and never counts toward the CPU budget; other backends report null with
 a reason.
@@ -287,7 +284,7 @@ into `conformance/reference/`. Figma kit token fixtures (`figma-*.json`) come fr
 ## Vendored engine tests
 
 ```sh
-cargo test -p gpui-pre --test line_layout_options
+cargo test -p gpui-pre-apple --test font_fallback
 cargo test -p gpui-pre --lib text_system
 cargo test -p gpui-kit-material -p gpui-fast --features gpui-kit-material/gpui-fast,gpui-kit-material/frame-profiler --lib
 ```

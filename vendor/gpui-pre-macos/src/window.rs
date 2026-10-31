@@ -829,13 +829,10 @@ impl MacWindowState {
             return;
         };
         let data = self.native_view.as_ptr() as *mut c_void;
-        let source = self
-            .frame_source
-            .get_or_insert_with(|| WindowFrameSource::new(data, step));
-        source.start(display_id).log_err();
-        // Material patch: the renderer wakes the window once a drawable a
-        // skipped frame waited for is ready (see `step`).
-        self.renderer.set_drawable_waker(Some(source.waker()));
+        self.frame_source
+            .get_or_insert_with(|| WindowFrameSource::new(data, step))
+            .start(display_id)
+            .log_err();
     }
 
     fn stop_display_link(&mut self) {
@@ -3419,13 +3416,6 @@ extern "C" fn step(view: *mut c_void) {
     let view = view as *mut AnyObject;
     let window_state = unsafe { get_window_state(&*view) };
     let mut lock = window_state.lock();
-
-    // Material patch: never draw into a drawable the main thread would wait
-    // for. Until the renderer's prefetch thread has one, skip this request;
-    // the renderer wakes this source once it is ready.
-    if !lock.renderer.drawable_ready_or_wake() {
-        return;
-    }
 
     if let Some(mut callback) = lock.request_frame_callback.take() {
         let (signal_at, signal_source) = lock

@@ -1,4 +1,5 @@
 mod app_menu;
+#[cfg(feature = "frame-observation")]
 mod frame_submission;
 mod keyboard;
 mod keystroke;
@@ -81,6 +82,7 @@ use strum::EnumIter;
 use uuid::Uuid;
 
 pub use app_menu::*;
+#[cfg(feature = "frame-observation")]
 pub use frame_submission::*;
 pub use keyboard::*;
 pub use keystroke::*;
@@ -1209,6 +1211,7 @@ impl WindowInsets {
     }
 }
 
+#[cfg(feature = "frame-observation")]
 /// Whether the platform can control display synchronization for this window.
 /// This describes presentation synchronization, not frame-request pacing.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -1296,6 +1299,7 @@ pub trait PlatformWindow: HasWindowHandle + HasDisplayHandle {
     fn zoom(&self);
     fn toggle_fullscreen(&self);
     fn is_fullscreen(&self) -> bool;
+    #[cfg(feature = "frame-observation")]
     /// Whether a currently running periodic source will request another frame
     /// without an explicit wake. Throttled demand may wait for that source;
     /// demand-only backends must retain the default to avoid stranding work.
@@ -1305,10 +1309,12 @@ pub trait PlatformWindow: HasWindowHandle + HasDisplayHandle {
     fn frame_waker(&self) -> Option<Rc<dyn Fn()>> {
         None
     }
+    #[cfg(feature = "frame-observation")]
     /// Read the actual backend setting; unsupported platforms do not emulate it.
     fn vsync_status(&self) -> VsyncStatus {
         VsyncStatus::Unsupported
     }
+    #[cfg(feature = "frame-observation")]
     /// Change presentation synchronization, leaving frame-request pacing intact.
     fn set_vsync(&mut self, _enabled: bool) -> Result<()> {
         anyhow::bail!("presentation synchronization control is unsupported on this platform")
@@ -1334,6 +1340,7 @@ pub trait PlatformWindow: HasWindowHandle + HasDisplayHandle {
     fn on_button_layout_changed(&self, _callback: Box<dyn FnMut()>) {}
     fn draw(&self, scene: &Scene);
 
+    #[cfg(feature = "frame-observation")]
     /// Monotonic successful frame submissions, after obtaining drawable resources
     /// and submitting render work. This is not GPU completion or scanout. Return
     /// None when the backend cannot establish success; never count attempts.
@@ -1586,17 +1593,6 @@ pub trait PlatformTextSystem: Send + Sync {
     ) -> Result<(Size<DevicePixels>, Vec<u8>)>;
     /// Layout a line of text with the given font runs.
     fn layout_line(&self, text: &str, font_size: Pixels, runs: &[FontRun]) -> LineLayout;
-    /// Layout a single paragraph with explicit direction and reliable clusters.
-    /// The opt-in API must not silently fall back to legacy glyph-only layout.
-    fn layout_line_with_options(
-        &self,
-        _text: &str,
-        _font_size: Pixels,
-        _runs: &[FontRun],
-        _options: crate::LineLayoutOptions,
-    ) -> Result<crate::DetailedLineLayout> {
-        anyhow::bail!("this text backend does not support paragraph layout with cluster metadata")
-    }
     /// Returns the recommended text rendering mode for the given font and size.
     fn recommended_rendering_mode(&self, _font_id: FontId, _font_size: Pixels)
     -> TextRenderingMode;

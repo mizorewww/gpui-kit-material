@@ -58,6 +58,7 @@ doctest = false
 version = "=0.3.10"
 default-features = false
 package = "gpui-pre"
+features = ["frame-observation"]
 
 [target.'cfg(target_os = "macos")'.dependencies.accesskit]
 version = "0.24.0"
@@ -106,6 +107,7 @@ version = "0.3.34"
 [target.'cfg(target_os = "macos")'.dependencies.gpui_apple]
 version = "=0.3.10"
 package = "gpui-pre-apple"
+features = ["frame-observation"]
 
 [target.'cfg(target_os = "macos")'.dependencies.gpui_util]
 version = "=0.3.10"

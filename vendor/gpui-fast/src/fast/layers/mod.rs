@@ -128,7 +128,6 @@ pub(crate) fn active(window: &Window, cx: &App) -> bool {
         && window.fast_layers.enabled
         && window.retained_state.view_retention
         && !window.refreshing
-        && window.retained_state.font_generation == window.text_system().font_generation()
         && !cx.has_active_drag()
         && !crate::fast::a11y::stale(&window.a11y)
         && !window.is_inspector_picking(cx)

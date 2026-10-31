@@ -22,24 +22,30 @@
     "src/window_appearance.rs": "c1ea31769bfd6b324339525b8ffec3be0f59a24495a7e491c1df66bd43db5b75"
   },
   "local_patches": [
+    "Cargo.toml",
     "src/display_link.rs",
     "src/window.rs"
   ],
   "modified_files": {
     "src/display_link.rs": {
       "upstream_sha256": "088f3e0b8dd9b242a1f6c090a2c79ef081857cc917564673d61d84a48c6cf1cc",
-      "local_sha256": "26ad65fcdc41f05100e1578c39f0e78e94c704f6f4ee8f51c3b8d3bab74dae72",
-      "reason": "WindowFrameSource::is_running and wake: one coalesced demand request on the existing main-thread source (MATERIAL-PATCHES.md). Material presentation patch: WindowFrameSource::waker, a Send + Sync wake for the renderer's prefetch thread."
+      "local_sha256": "0254d01fe67a54f8d23b53f2dc649cc99e94629bcd310262c4f81d27f42a376e",
+      "reason": "WindowFrameSource::is_running and wake: one coalesced demand request on the existing main-thread source (MATERIAL-PATCHES.md)."
     },
     "src/window.rs": {
       "upstream_sha256": "1b256befa6b96cdb6d5888f1192aba9773311cd4d2c508165531401fcc15e21f",
-      "local_sha256": "b1e36abc2042597e79ce9faba3dcbc6ae9fb4067c7842a61683692931ee168a7",
-      "reason": "vsync_status/set_vsync, successful_frame_submissions via draw_with_status, has_periodic_frame_source, weak-owner demand frame_waker, unconditional anyhow::Result import (MATERIAL-PATCHES.md). Material presentation patch: step() skips a frame request until the renderer has a prefetched drawable (drawable_ready_or_wake) and start_display_link hands the renderer the frame source's thread-safe waker."
+      "local_sha256": "fc5e1f02cc99deec68609588b0ee945b325cfa3e697a8c4f4cba428ab8796200",
+      "reason": "vsync_status/set_vsync, successful_frame_submissions via draw_with_status, has_periodic_frame_source, weak-owner demand frame_waker, unconditional anyhow::Result import (MATERIAL-PATCHES.md)."
+    },
+    "Cargo.toml": {
+      "upstream_sha256": "eeb056b8615d694ae8fee0252c1804f80f10811742b9f78a43c36d4761729ee7",
+      "local_sha256": "1f0cdb46181e8bcce6091ed04b915fb3038065c31598a8444a258baaaa647cb4",
+      "reason": "Turns on the engine's dev-only frame-observation feature for this overlay (MATERIAL-PATCHES.md)."
     }
   },
   "added_files": {},
   "removed_files": {},
-  "unchanged_file_count": 13,
+  "unchanged_file_count": 12,
   "provenance_files": [
     "MATERIAL-PATCHES.md",
     "SOURCE.json"

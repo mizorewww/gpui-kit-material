@@ -42,8 +42,8 @@
       "upstream_sha256": "39296e195f6dabbb581b8f72ee06809b13fae3b328c4a71b48768dbff5c81c53"
     },
     "src/lib.rs": {
-      "local_sha256": "8f96ea188790fdf5e91939021eab1c1092167dea37067b79ad9e88bec29a5205",
-      "reason": "Public exports ReducedMotion and TransitionPlayback (motion), plus RootTab/RootTabPrev aliases for the otherwise private root::Tab/TabPrev actions (motion-patch.md).",
+      "local_sha256": "1801bc21617235d0d0e5170df8a19fdca5b0ade3e2f7f2323dfca34201e91b8c",
+      "reason": "Public exports ReducedMotion and TransitionPlayback (motion) (motion-patch.md).",
       "upstream_sha256": "7692fadcb738947c529f338208facea785a5172298064eef8fb34365e452e876"
     },
     "src/motion.rs": {
@@ -52,8 +52,8 @@
       "upstream_sha256": "cfbcc4cbe63aeb5bb6ffc27af0505b59c5fec3054310beaf29e947e14cf6424e"
     },
     "src/slider.rs": {
-      "local_sha256": "4f511765c3ff0d7bd9fb1d80c61b70868a5703038974e5124d90424a4946670d",
-      "reason": "Step snapping counted from min with no snap for a non-positive step, AT Increment/Decrement that move only a range's end, and Slider::track_focus for a focusable slider node (motion-patch.md). Right-to-left pointer math on a horizontal slider (motion-patch.md).",
+      "local_sha256": "732c3aff910fd205c6581112a4d798d6e2d3c4e8a78cda4fcd48579a2b44b9e8",
+      "reason": "Step snapping counted from min, AT Increment/Decrement that move only a range's end, and Slider::track_focus for a focusable slider node (motion-patch.md). Right-to-left pointer math on a horizontal slider (motion-patch.md).",
       "upstream_sha256": "71b801a92588d12f7931a5a9e1745fb62f4283ae87d651d4004ae9b41ad72da3"
     },
     "src/text_selection.rs": {
@@ -98,7 +98,7 @@
     }
   },
   "package_version": "0.8.1",
-  "patch_application": "The original five patch files were three-way merged (upstream Git / published registry 0.8.1 base / local patched registry files) without conflicts. src/text_selection.rs (Hitbox follow-up) and the TransitionPlayback, RootTab and RootTabPrev additions were made directly on this checkout afterwards.",
+  "patch_application": "The original five patch files were three-way merged (upstream Git / published registry 0.8.1 base / local patched registry files) without conflicts. src/text_selection.rs (Hitbox follow-up) and the TransitionPlayback addition were made directly on this checkout afterwards.",
   "patch_base": {
     "package": "gpui-base",
     "registry_source_revision": "99576db58ec8103417c41a092e891b4022d24e7e",
