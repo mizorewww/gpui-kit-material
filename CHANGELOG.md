@@ -24,6 +24,13 @@ Distribution is by Git revision for now; see the [quick start](README.md#quick-s
   16 ms first-frame limits are gone, and the first frame and Material list are judged
   against Kit.
 
+- Breaking: `ChipSetItem::new` takes a key first. It stays with the chip as the set is
+  reordered, and the chip's focus is kept under it.
+- Breaking: `TimePickerLabels` has a required `separator` field, for what stands between
+  a time's hours and minutes.
+- Text wrapping: `?` and `!` stay off the start of a line, as other closing marks do. A
+  long URL no longer wraps before `?`; it still wraps at `/` and `&`.
+
 ### Fixed
 
 - Each crate ships the MIT text its `license` names, and the Apache notices.

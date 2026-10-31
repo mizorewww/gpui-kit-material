@@ -51,13 +51,18 @@ type DragPreview = Rc<dyn Fn(&mut Window, &mut App) -> AnyElement>;
 
 /// One chip in a [`ChipSet`].
 pub struct ChipSetItem {
+    key: ElementId,
     chip: AnyElement,
     drag_preview: Option<DragPreview>,
 }
 
 impl ChipSetItem {
-    pub fn new(chip: impl IntoElement) -> Self {
+    /// `key` names what this chip stands for and stays with it as the set is
+    /// reordered: the chip's state, its keyboard focus above all, lives under
+    /// it. Keys must be unique within the set.
+    pub fn new(key: impl Into<ElementId>, chip: impl IntoElement) -> Self {
         Self {
+            key: key.into(),
             chip: chip.into_any_element(),
             drag_preview: None,
         }
@@ -132,8 +137,8 @@ impl ChipSet {
     /// set. Called with the moved chip's position and where it was dropped.
     ///
     /// The keyboard reorders them too: Alt with an arrow along the set moves
-    /// the chip holding focus one place, which calls this the same way. Key
-    /// each chip by what it stands for, so its focus moves with it.
+    /// the chip holding focus one place, which calls this the same way. Focus
+    /// moves with the chip, by the [`key`](ChipSetItem::new) of its item.
     pub fn on_reorder(mut self, f: impl Fn(usize, usize, &mut Window, &mut App) + 'static) -> Self {
         self.on_reorder = Some(Rc::new(f));
         self
@@ -183,7 +188,7 @@ impl RenderOnce for ChipSet {
             let scope = scope.clone();
             let movable = movable.clone();
             div()
-                .id(("chip-slot", position))
+                .id(item.key)
                 .when_some(preview, |slot, preview| {
                     let dragged = DraggedChip {
                         set: set.clone(),
@@ -284,6 +289,7 @@ mod tests {
                 .vertical(true)
                 .items((0..3).map(|i| {
                     ChipSetItem::new(
+                        i,
                         div()
                             .size(px(40.))
                             .debug_selector(move || format!("chip-{i}")),
@@ -335,8 +341,11 @@ mod tests {
                 .child(
                     ChipSet::new("set", "Filters")
                         .item(
-                            ChipSetItem::new(div().size(px(40.)).debug_selector(|| "chip".into()))
-                                .drag_preview(move |_, _| Probe(seen.clone()).into_any_element()),
+                            ChipSetItem::new(
+                                "chip",
+                                div().size(px(40.)).debug_selector(|| "chip".into()),
+                            )
+                            .drag_preview(move |_, _| Probe(seen.clone()).into_any_element()),
                         )
                         .on_reorder(|_, _, _, _| {}),
                 )
@@ -380,7 +389,7 @@ mod tests {
             let set = ChipSet::new("set", "Filters")
                 .vertical(self.vertical)
                 .items((0..3).map(|i| {
-                    let item = ChipSetItem::new(div().size(px(40.)).track_focus(&self.focus[i]));
+                    let item = ChipSetItem::new(i, div().size(px(40.)).track_focus(&self.focus[i]));
                     if self.draggable[i] {
                         item.drag_preview(|_, _| div().size(px(40.)).into_any_element())
                     } else {
@@ -459,5 +468,52 @@ mod tests {
         let (view, cx) = keyed(cx, false, false, [true, false, true]);
         assert_eq!(press_on(&view, cx, 0, "alt-right"), []);
         assert_eq!(press_on(&view, cx, 1, "alt-right"), []);
+    }
+    /// Chips in the caller's order, each owning its focus the way a real chip
+    /// does: in keyed state under the set, not in this view.
+    struct Reordering {
+        order: Vec<&'static str>,
+    }
+    impl Render for Reordering {
+        fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+            let view = cx.entity();
+            ChipSet::new("set", "Filters")
+                .items(self.order.iter().map(|&name| {
+                    ChipSetItem::new(name, crate::components::AssistChip::new(name, name))
+                        .drag_preview(|_, _| div().into_any_element())
+                }))
+                .on_reorder(move |from, to, _, cx| {
+                    view.update(cx, |this, cx| {
+                        let chip = this.order.remove(from);
+                        this.order.insert(to, chip);
+                        cx.notify();
+                    });
+                })
+        }
+    }
+
+    #[gpui::test]
+    fn focus_stays_on_a_chip_moved_again_and_again(cx: &mut TestAppContext) {
+        let (view, cx) = cx.add_window_view(|_, _| Reordering {
+            order: vec!["a", "b", "c", "d"],
+        });
+        let moved = cx.update(|window, cx| {
+            window.draw(cx).clear(cx);
+            window.focus_next(cx);
+            window.draw(cx).clear(cx);
+            window.focused(cx).expect("the first chip takes focus")
+        });
+        for expected in [
+            ["b", "a", "c", "d"],
+            ["b", "c", "a", "d"],
+            ["b", "c", "d", "a"],
+        ] {
+            cx.simulate_keystrokes("alt-right");
+            cx.update(|window, cx| window.draw(cx).clear(cx));
+            view.read_with(cx, |view, _| assert_eq!(view.order, expected));
+            cx.update(|window, cx| {
+                assert_eq!(window.focused(cx), Some(moved.clone()), "focus moved along");
+            });
+        }
     }
 }
