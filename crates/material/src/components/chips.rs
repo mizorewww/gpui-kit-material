@@ -3,8 +3,9 @@
 //!
 //! All chips are 32dp tall with 8dp corners, a label-large label and 18dp
 //! icons 8dp from the label. Hover, focus and press are state layers of the
-//! chip's content color over its container (focus also darkens a flat
-//! chip's outline); a dragged chip lifts to level 4 under the drag layer.
+//! on-surface-variant or on-secondary-container role over the container, or
+//! over the surface for a flat chip; a dragged chip lifts to level 4 under the
+//! drag layer, and hovering lifts a raised or selected chip by one.
 //! A filter chip's check slides in from its leading edge on the fast
 //! spatial spring as it is selected, and out as it is cleared.
 use super::InteractionPreview;
@@ -31,6 +32,8 @@ const AVATAR_EDGE: f32 = 4.;
 /// Elevated chips rest at level 1; a dragged chip lifts to level 4.
 const ELEVATED_LEVEL: u8 = 1;
 const HOVERED_LEVEL: u8 = 2;
+/// A flat chip that is selected lifts this far when hovered.
+const SELECTED_HOVERED_LEVEL: u8 = 1;
 const DRAGGED_LEVEL: u8 = 4;
 
 /// The container of an M3 assist chip: its geometry, small corners and
@@ -82,7 +85,13 @@ struct ChipPaint {
     trailing: Rgba,
     /// The state layers' content color.
     layer: Rgba,
+    /// The drag layer's content color.
+    drag_layer: Rgba,
+    /// What the state layers lie over: the surface, under a flat chip.
+    under: Rgba,
     elevation: u8,
+    /// The elevation while hovered.
+    hovered_elevation: u8,
 }
 
 fn clear() -> Rgba {
@@ -96,23 +105,33 @@ fn clear() -> Rgba {
 
 /// M3 chip colors. Selected filter, input and suggestion chips sit on the
 /// secondary container without an outline; disabled chips use on-surface at
-/// [`state::DISABLED_CONTAINER`] for containers and outlines and at
-/// [`state::DISABLED_CONTENT`] for content, and elevated ones lie flat.
+/// [`state::DISABLED_CONTAINER`] for outlines, on-surface-variant at it for
+/// containers, on-surface at [`state::DISABLED_CONTENT`] for content, and
+/// elevated ones lie flat.
 fn chip_paint(kind: ChipKind, style: ChipStyle, selected: bool, disabled: bool) -> ChipPaint {
     let selected = selected && kind != ChipKind::Assist;
     let elevated = style == ChipStyle::Elevated;
     let on_surface = color(ON_SURFACE);
     if disabled {
         let content = state::disabled(on_surface);
-        let faint = on_surface.opacity(state::DISABLED_CONTAINER);
+        let fill = color(ON_SURFACE_VARIANT).opacity(state::DISABLED_CONTAINER);
+        let stroke = on_surface.opacity(state::DISABLED_CONTAINER);
+        let container = if selected || elevated { fill } else { clear() };
         return ChipPaint {
-            container: if selected || elevated { faint } else { clear() },
-            outline: if selected || elevated { clear() } else { faint },
+            container,
+            outline: if selected || elevated {
+                clear()
+            } else {
+                stroke
+            },
             label: content,
             leading: content,
             trailing: content,
             layer: on_surface,
+            drag_layer: on_surface,
+            under: container,
             elevation: 0,
+            hovered_elevation: 0,
         };
     }
     let elevation = if elevated { ELEVATED_LEVEL } else { 0 };
@@ -129,7 +148,14 @@ fn chip_paint(kind: ChipKind, style: ChipStyle, selected: bool, disabled: bool) 
             },
             trailing: ink,
             layer: ink,
+            drag_layer: ink,
+            under: color(SECONDARY_CONTAINER),
             elevation,
+            hovered_elevation: if elevated {
+                HOVERED_LEVEL
+            } else {
+                SELECTED_HOVERED_LEVEL
+            },
         };
     }
     let (label, leading) = match kind {
@@ -137,23 +163,26 @@ fn chip_paint(kind: ChipKind, style: ChipStyle, selected: bool, disabled: bool) 
         ChipKind::Filter | ChipKind::Suggestion => (ON_SURFACE_VARIANT, PRIMARY),
         ChipKind::Input => (ON_SURFACE_VARIANT, ON_SURFACE_VARIANT),
     };
-    let label = color(label);
+    let container = if elevated {
+        color(SURFACE_CONTAINER_LOW)
+    } else {
+        clear()
+    };
     ChipPaint {
-        container: if elevated {
-            color(SURFACE_CONTAINER_LOW)
-        } else {
-            clear()
-        },
+        container,
         outline: if elevated {
             clear()
         } else {
             color(OUTLINE_VARIANT)
         },
-        label,
+        label: color(label),
         leading: color(leading),
         trailing: color(ON_SURFACE_VARIANT),
-        layer: label,
+        layer: color(ON_SURFACE_VARIANT),
+        drag_layer: on_surface,
+        under: if elevated { container } else { color(SURFACE) },
         elevation,
+        hovered_elevation: if elevated { HOVERED_LEVEL } else { 0 },
     }
 }
 
@@ -232,36 +261,24 @@ impl ChipBase {
         };
         let check = if check.is_finite() { check.max(0.) } else { 0. };
         let base = if dragged {
-            // A lifted flat chip gets the elevated container, so its shadow
-            // does not show through.
-            let lifted = if paint.container.a > 0. {
-                paint.container
-            } else {
-                color(SURFACE_CONTAINER_LOW)
-            };
-            state::layer(lifted, paint.layer, state::DRAG)
+            state::layer(paint.under, paint.drag_layer, state::DRAG)
         } else if keyboard_focus {
-            state::layer(paint.container, paint.layer, state::FOCUS)
+            state::layer(paint.under, paint.layer, state::FOCUS)
         } else {
             paint.container
         };
         let (hover, press) = (
-            state::hovered(paint.container, paint.layer),
-            state::pressed(paint.container, paint.layer),
+            state::hovered(paint.under, paint.layer),
+            state::pressed(paint.under, paint.layer),
         );
         let elevation = if dragged {
             DRAGGED_LEVEL
-        } else if paint.elevation > 0 && forced(InteractionPreview::Hovered) {
-            HOVERED_LEVEL
+        } else if forced(InteractionPreview::Hovered) {
+            paint.hovered_elevation
         } else {
             paint.elevation
         };
-        // M3 darkens a flat chip's outline while it has focus.
-        let outline = if keyboard_focus && paint.outline.a > 0. {
-            color(ON_SURFACE_VARIANT)
-        } else {
-            paint.outline
-        };
+        let outline = paint.outline;
         let left = if self.avatar.is_some() {
             AVATAR_EDGE
         } else if self.leading.is_some() {
@@ -405,6 +422,9 @@ impl ChipBase {
                 })
             })
             .state_layers(hover, press)
+            .hover_elevation(
+                (paint.hovered_elevation != elevation).then_some(paint.hovered_elevation),
+            )
             .ripple(paint.layer)
             .disabled(disabled)
             .when_some(preview, |button, preview| button.preview_state(preview))
@@ -622,21 +642,41 @@ mod tests {
         assert_eq!(suggestion.label, c(ON_SURFACE_VARIANT));
         let disabled = chip_paint(ChipKind::Assist, ChipStyle::Flat, false, true);
         assert_eq!(disabled.label, state::disabled(c(ON_SURFACE)));
-        assert_eq!(
-            disabled.outline,
-            c(ON_SURFACE).opacity(state::DISABLED_CONTAINER)
-        );
+        assert_eq!(disabled.outline, c(ON_SURFACE).opacity(0.10));
         let disabled = chip_paint(ChipKind::Filter, ChipStyle::Elevated, true, true);
-        assert_eq!(
-            disabled.container,
-            c(ON_SURFACE).opacity(state::DISABLED_CONTAINER)
-        );
+        assert_eq!(disabled.container, c(ON_SURFACE_VARIANT).opacity(0.10));
         assert_eq!(disabled.elevation, 0, "disabled chips lie flat");
         assert_eq!(
             chip_paint(ChipKind::Assist, ChipStyle::Flat, true, false),
             assist,
             "assist chips have no selection"
         );
+    }
+
+    /// The kit's `State=Hovered`, `Focused`, `Pressed` and `Dragged` chips.
+    #[test]
+    fn state_layers_lie_over_the_kits_container_in_the_kits_roles() {
+        let c = crate::theme::color;
+        let flat = chip_paint(ChipKind::Assist, ChipStyle::Flat, false, false);
+        assert_eq!(flat.under, c(SURFACE), "a flat chip fills while it reacts");
+        assert_eq!(
+            flat.layer,
+            c(ON_SURFACE_VARIANT),
+            "even with on-surface text"
+        );
+        assert_eq!(flat.drag_layer, c(ON_SURFACE));
+        assert_eq!(flat.hovered_elevation, 0);
+        let elevated = chip_paint(ChipKind::Filter, ChipStyle::Elevated, false, false);
+        assert_eq!(elevated.under, c(SURFACE_CONTAINER_LOW));
+        assert_eq!(elevated.hovered_elevation, 2);
+        let selected = chip_paint(ChipKind::Filter, ChipStyle::Flat, true, false);
+        assert_eq!(selected.under, c(SECONDARY_CONTAINER));
+        assert_eq!(selected.drag_layer, c(ON_SECONDARY_CONTAINER));
+        assert_eq!(selected.hovered_elevation, 1);
+        let raised = chip_paint(ChipKind::Filter, ChipStyle::Elevated, true, false);
+        assert_eq!(raised.hovered_elevation, 2);
+        let disabled = chip_paint(ChipKind::Filter, ChipStyle::Elevated, true, true);
+        assert_eq!(disabled.hovered_elevation, 0);
     }
 
     struct ChipHarness {

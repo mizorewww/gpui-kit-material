@@ -89,6 +89,8 @@ pub struct RingedButton {
     /// Hover and press state-layer backgrounds, installed as live styles or
     /// painted directly for a forced preview.
     layers: Option<(Rgba, Rgba)>,
+    /// The level hovering lifts the button to, if it does.
+    hover_elevation: Option<u8>,
     ripple: Option<Rgba>,
     preview: Option<InteractionPreview>,
 }
@@ -103,6 +105,7 @@ impl RingedButton {
             placement,
             disabled: false,
             layers: None,
+            hover_elevation: None,
             ripple: None,
             preview: None,
         }
@@ -118,6 +121,12 @@ impl RingedButton {
     /// the pointer hover and active styles; a preview paints the one it forces.
     pub(crate) fn state_layers(mut self, hover: Rgba, press: Rgba) -> Self {
         self.layers = Some((hover, press));
+        self
+    }
+
+    /// The elevation level of a live hover, if it changes the button's.
+    pub(crate) fn hover_elevation(mut self, level: Option<u8>) -> Self {
+        self.hover_elevation = level;
         self
     }
 
@@ -210,10 +219,17 @@ impl RenderOnce for RingedButton {
                 button.cursor_default()
             }
         });
+        let hover_elevation = self.hover_elevation;
         if let Some((hover, press)) = self.layers.filter(|_| enabled) {
             button = match self.preview {
                 None => button
-                    .hover(move |style| style.bg(hover))
+                    .hover(move |style| {
+                        let style = style.bg(hover);
+                        match hover_elevation {
+                            Some(level) => style.shadow(crate::tokens::elevation::level(level)),
+                            None => style,
+                        }
+                    })
                     .active(move |style| style.bg(press)),
                 Some(InteractionPreview::Hovered) => button.bg(hover),
                 Some(InteractionPreview::Pressed) => button.bg(press),
