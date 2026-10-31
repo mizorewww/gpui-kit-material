@@ -353,8 +353,8 @@
       },
       "src/text_system/line_wrapper.rs": {
         "upstream_sha256": "4c0ce82fba13490ec6494245971a6a4a322fc55ca2944c60e708fdbcd5dcee8e",
-        "local_sha256": "3b513ee70515dfa102825632acb0a580192b23265c315985559b25449d578e69",
-        "reason": "Hanging overflow space: a space that overflows a row after content no longer starts the next row; it hangs past the edge and the following word is the break (LineWrapper::wrap_line, the multi-line truncation that replicates it in Fast, LineLayout::compute_wrap_boundaries), with tests (vendor/gpui-pre/hanging-space-patch.md). Letter spacing state (vendor/gpui-pre/letter-spacing-patch.md)."
+        "local_sha256": "7ea78f55f0017c16b09dc32ca18b5d97364d636fc6f25fe0ed11cf2dc76ef7d1",
+        "reason": "Hanging overflow space: a space that overflows a row after content no longer starts the next row; it hangs past the edge and the following word is the break (LineWrapper::wrap_line, the multi-line truncation that replicates it in Fast, LineLayout::compute_wrap_boundaries), with tests (vendor/gpui-pre/hanging-space-patch.md). Letter spacing state (vendor/gpui-pre/letter-spacing-patch.md). A line does not start with ? or !, half or full width (vendor/gpui-pre/line-start-marks-patch.md)."
       },
       "Cargo.toml": {
         "upstream_sha256": "1f8d49e1f08e320cf393fcacb2ac402044ddb7aaf8dffc4572e31aa3d5a9e7ea",
@@ -380,6 +380,11 @@
         "upstream_sha256": "d6cdd3cece19db6931bbcf2dcf5d7cda980eab7a507fee79f6f55444da53d0cf",
         "local_sha256": "411261b1ee8cfa2f6bb717a271f2b41195b1e82d6e9161ff39345dd1658154ca",
         "reason": "Test: hover held still reaches no input-modality-independent listener."
+      },
+      "src/fast/line_break.rs": {
+        "upstream_sha256": "09da7204a25f0ad3276a5fcf82ebb48f35de4170e613f90411e272ee02debc7c",
+        "local_sha256": "f6e763a49b2f87c049182fbb9e54e315a7b1fec9f61ae3f859e650da5db432ca",
+        "reason": "Comment: a break before / is what lets a URL wrap, not one before ? (vendor/gpui-pre/line-start-marks-patch.md)."
       }
     },
     "added": {
@@ -418,6 +423,6 @@
         "reason": "Package-level lockfile not retained; the workspace Cargo.lock owns resolution."
       }
     },
-    "unchanged_file_count": 141
+    "unchanged_file_count": 140
   }
 }

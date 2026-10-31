@@ -555,9 +555,11 @@ impl LineWrapper {
         // Closing punctuation never starts a line (UAX #14 LB13: no break
         // before `!`, `)`, `]`, `}`, closing quotes or an ellipsis) — `plz!`,
         // `see)`, `quoted”` wrap as one word instead of orphaning the mark on
-        // the next line. `/` and `?` stay break opportunities so long paths
-        // and URLs (`a/b`, `foo?b=2`) can wrap.
-        matches!(c, '!' | ')' | ']' | '}' | '"' | '”' | '»' | '…') ||
+        // the next line. `/` stays a break opportunity so long paths and URLs
+        // (`a/b`) can wrap.
+        matches!(c, '!' | '?' | ')' | ']' | '}' | '"' | '”' | '»' | '…') ||
+        // The full-width marks too (UAX #14 class EX): `好？` stays together.
+        matches!(c, '！' | '？') ||
         // `⋯` character is special used in Zed, to keep this at the end of the line.
         matches!(c, '⋯') ||
 
@@ -1226,6 +1228,82 @@ mod tests {
         perform_test("abcdefgh…", &[4, 4, 4], &[4, 4, 3]);
     }
 
+    /// Unicode's EX class: a line never starts with `?` or `!`, half or full
+    /// width. The mark stays on its word's line, whichever wrapper breaks it.
+    #[test]
+    fn question_and_exclamation_marks_do_not_start_a_line() {
+        let mut wrapper = build_wrapper();
+        for text in ["aa bbbb?", "aa bbbb!", "aa bbbb？", "aa bbbb！"] {
+            let boundaries: Vec<_> = wrapper
+                .wrap_line(
+                    &[LineFragment::text(text)],
+                    px(72.),
+                    IndentAdjustment::default(),
+                )
+                .collect();
+            assert_eq!(boundaries, &[Boundary::new(3, 0)], "{text}");
+        }
+        for text in ["好好好好好好好好？", "好好好好好好好好！"] {
+            for width in [40., 72., 90., 120.] {
+                let lines: Vec<_> = wrapper
+                    .wrap_line(
+                        &[LineFragment::text(text)],
+                        px(width),
+                        IndentAdjustment::default(),
+                    )
+                    .collect();
+                for boundary in lines {
+                    let next = text[boundary.ix..].chars().next().unwrap();
+                    assert!(next == '好', "{text} at {width} starts a line with {next}");
+                }
+            }
+        }
+    }
+
+    #[cfg(target_os = "macos")]
+    #[crate::test]
+    fn a_shaped_line_keeps_question_and_exclamation_marks_on_their_word(cx: &mut TestAppContext) {
+        cx.update(|cx| {
+            let text_system = WindowTextSystem::new(cx.text_system().clone());
+            for text in [
+                "Delete this item?",
+                "Delete this item!",
+                "删除这个项目？",
+                "删除这个项目！",
+            ] {
+                // Narrower than a word, a line breaks where it overflows.
+                for width in (60..200).step_by(3) {
+                    let run = TextRun {
+                        len: text.len(),
+                        font: font("Helvetica"),
+                        color: Default::default(),
+                        underline: Default::default(),
+                        ..Default::default()
+                    };
+                    let lines = text_system
+                        .shape_text(
+                            text.to_string().into(),
+                            px(16.),
+                            &[run],
+                            Some(px(width as f32)),
+                            None,
+                        )
+                        .unwrap();
+                    let layout = &lines[0].layout;
+                    for boundary in layout.wrap_boundaries() {
+                        let glyph = &layout.unwrapped_layout.runs[boundary.run_ix].glyphs
+                            [boundary.glyph_ix];
+                        let next = text[glyph.index..].chars().next().unwrap();
+                        assert!(
+                            !matches!(next, '?' | '!' | '？' | '！'),
+                            "{text} at {width} starts a line with {next}"
+                        );
+                    }
+                }
+            }
+        });
+    }
+
     #[test]
     fn test_is_word_char() {
         #[track_caller]
@@ -1267,6 +1345,8 @@ mod tests {
         assert_word("see)");
         assert_word("quoted”");
         assert_word("well…");
+        assert_word("really?");
+        assert_word("？！");
 
         // Space
         assert_not_word("foo bar");
@@ -1276,7 +1356,7 @@ mod tests {
         assert_not_word("zed-industries/zed");
         assert_not_word("zed-industries\\zed");
         assert_not_word("a=1&b=2");
-        assert_not_word("foo?b=2");
+        assert_word("foo?b=2");
 
         // Latin-1 Supplement
         assert_word("ÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏ");

@@ -288,8 +288,8 @@
     },
     "src/text_system/line_wrapper.rs": {
       "upstream_sha256": "58feea87a0f1e150d8d733886fe9601d5afcd37f91b00c80d6717d5e9b7272ed",
-      "local_sha256": "936df139d615d1c6329521bddf8494bbc90aa06b7022276f8abad959a2c916be",
-      "reason": "Hanging overflow space: a space that overflows a row after content no longer starts the next row; it hangs past the edge and the following word is the break (LineWrapper::wrap_line, the multi-line truncation that replicates it in Fast, LineLayout::compute_wrap_boundaries), with tests (hanging-space-patch.md). Letter spacing state (letter-spacing-patch.md)."
+      "local_sha256": "535bebc56d0e324d5e6d418a07d62ba5ab82ceb251984a875ad58b80c9739929",
+      "reason": "Hanging overflow space: a space that overflows a row after content no longer starts the next row; it hangs past the edge and the following word is the break (LineWrapper::wrap_line, the multi-line truncation that replicates it in Fast, LineLayout::compute_wrap_boundaries), with tests (hanging-space-patch.md). Letter spacing state (letter-spacing-patch.md). A line does not start with ? or !, half or full width (line-start-marks-patch.md)."
     },
     "Cargo.toml": {
       "upstream_sha256": "17c581884c21901f604eec93d32171dd17518606ce726fd7e59f9a442abc07de",
@@ -349,7 +349,8 @@
     "quiet-global-swap-patch.md",
     "render-lease-patch.md",
     "tab-stop-index-patch.md",
-    "test-harness-patch.md"
+    "test-harness-patch.md",
+    "line-start-marks-patch.md"
   ],
   "verification": "Archive downloaded from archive_url; its SHA-256 equals the crates.io index cksum and ~/.cargo/registry/cache. upstream_files are hashes of the extracted archive (excluding Cargo's .cargo-ok marker). Recompute: extract the .crate and compare with sha256 of each vendor file.",
   "validation": "source identity and per-file hashes verified; runtime acceptance is tracked separately"
