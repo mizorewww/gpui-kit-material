@@ -488,9 +488,10 @@ impl RenderOnce for MaterialTooltip {
                         if measure.read(cx).bounds != Some(bounds) {
                             measure.update(cx, |tip, _| tip.bounds = Some(bounds));
                             // A shown tooltip follows a moved trigger in the
-                            // next frame; settled bounds stop the refreshes.
+                            // next frame (`refresh` is ignored while drawing);
+                            // settled bounds stop asking.
                             if shown {
-                                window.refresh();
+                                window.request_animation_frame();
                             }
                         }
                     },
@@ -516,6 +517,9 @@ impl RenderOnce for MaterialTooltip {
         let placed = state.read(cx).placed.clone();
         let side = placed.get().unwrap_or(placement);
         let away = rem(TOOLTIP_TRAVEL * (1. - travel));
+        // `left` mirrors with the layout's direction; the sides do not.
+        let rtl = crate::scope::is_rtl(window);
+        let (leftward, rightward) = if rtl { (away, -away) } else { (-away, away) };
         let tip = div()
             .id("tooltip-motion")
             .when(cfg!(test), |tip| {
@@ -526,8 +530,8 @@ impl RenderOnce for MaterialTooltip {
             .map(|tip| match side {
                 Placement::Top => tip.top(-away),
                 Placement::Bottom => tip.top(away),
-                Placement::Left => tip.left(-away),
-                Placement::Right => tip.left(away),
+                Placement::Left => tip.left(leftward),
+                Placement::Right => tip.left(rightward),
             })
             .when_some(tip_focus, |tip, focus| {
                 let escape = tip_state.clone();
@@ -562,6 +566,13 @@ impl RenderOnce for MaterialTooltip {
                 .absolute()
                 .size_0()
             });
+        // Above or below its trigger a tooltip aligns along the reading direction,
+        // which the positioner does not know: its start is the left edge.
+        let align = match (placement, align) {
+            (Placement::Top | Placement::Bottom, Align::Start) if rtl => Align::End,
+            (Placement::Top | Placement::Bottom, Align::End) if rtl => Align::Start,
+            (_, align) => align,
+        };
         let positioner = gpui_base::Positioner::side(bounds)
             .placement(placement)
             .align(align)
@@ -759,6 +770,132 @@ mod tests {
         assert!(
             popup.top() >= trigger.bottom() + px(TOOLTIP_OFFSET),
             "a tooltip flipped below its trigger moved up into it: {popup:?} vs {trigger:?}"
+        );
+    }
+
+    struct MovableHarness {
+        top: f32,
+    }
+    impl Render for MovableHarness {
+        fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+            window.set_rem_size(px(16.));
+            div().pl(px(100.)).pt(px(self.top)).child(
+                MaterialTooltip::plain("tip", "Save")
+                    .force_visible(true)
+                    .trigger(div().debug_selector(|| "trigger".into()).size(px(40.))),
+            )
+        }
+    }
+
+    /// `refresh` is ignored while a frame is drawn, so only a requested
+    /// animation frame brings the tooltip along with a trigger that moved.
+    #[gpui::test]
+    fn a_shown_tooltip_follows_its_trigger_in_the_next_frame(cx: &mut TestAppContext) {
+        cx.update(|cx| {
+            gpui_base::init(cx);
+            cx.set_reduce_motion(true);
+        });
+        let (view, cx) = cx.add_window_view(|_, _| MovableHarness { top: 200. });
+        draw(cx);
+        draw(cx);
+        let before = cx.debug_bounds("tooltip-popup").expect("shown");
+        view.update(cx, |view, cx| {
+            view.top = 300.;
+            cx.notify();
+        });
+        // The frame that moved the trigger, then the one it asks for: no one
+        // else draws again here.
+        cx.update(|window, cx| window.draw(cx).clear(cx));
+        let requested = cx.update(|window, cx| window.simulate_next_frame(cx));
+        assert!(requested > 0, "a moved trigger asks for another frame");
+        cx.update(|window, cx| window.draw(cx).clear(cx));
+        let after = cx.debug_bounds("tooltip-popup").expect("shown");
+        assert_eq!(after.top() - before.top(), px(100.), "it moved along");
+    }
+
+    struct RtlHarness {
+        placement: Placement,
+        align: Align,
+        visible: bool,
+    }
+    impl Render for RtlHarness {
+        fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+            window.set_rem_size(px(14.));
+            crate::scope::Scope::new("rtl")
+                .direction(LayoutDirection::Rtl)
+                .child(
+                    div()
+                        .size_full()
+                        .flex()
+                        .items_center()
+                        .justify_center()
+                        .child(
+                            MaterialTooltip::plain("tip", "Save a long description")
+                                .placement(self.placement)
+                                .align(self.align)
+                                .force_visible(self.visible)
+                                .trigger(div().debug_selector(|| "trigger".into()).size(px(40.))),
+                        ),
+                )
+        }
+    }
+
+    #[gpui::test]
+    fn right_to_left_a_tooltip_travels_away_and_aligns_from_the_start(cx: &mut TestAppContext) {
+        cx.update(|cx| gpui_base::init(cx));
+        for side in [Placement::Right, Placement::Left] {
+            let (view, vcx) = cx.add_window_view(move |_, _| RtlHarness {
+                placement: side,
+                align: Align::Center,
+                visible: false,
+            });
+            draw(vcx);
+            view.update(vcx, |view, cx| {
+                view.visible = true;
+                cx.notify();
+            });
+            // Mid-entrance: the motion clock does not advance between draws.
+            for _ in 0..3 {
+                vcx.update(|window, cx| {
+                    window.refresh();
+                    window.draw(cx).clear(cx);
+                });
+            }
+            let trigger = vcx.debug_bounds("trigger").unwrap();
+            let popup = vcx.debug_bounds("tooltip-popup").expect("shown");
+            let gap = if side == Placement::Right {
+                popup.left() - trigger.right()
+            } else {
+                trigger.left() - popup.right()
+            };
+            assert!(
+                gap > px(TOOLTIP_OFFSET),
+                "{side:?}: it travels from farther away, not into the trigger: {gap:?}"
+            );
+        }
+        let (_, vcx) = cx.add_window_view(|_, _| RtlHarness {
+            placement: Placement::Bottom,
+            align: Align::Start,
+            visible: true,
+        });
+        draw(vcx);
+        draw(vcx);
+        let trigger = vcx.debug_bounds("trigger").unwrap();
+        let popup = vcx.debug_bounds("tooltip-popup").expect("shown");
+        assert_eq!(popup.right(), trigger.right(), "start is the right edge");
+        let (_, vcx) = vcx.cx.add_window_view(|_, _| RtlHarness {
+            placement: Placement::Right,
+            align: Align::Start,
+            visible: true,
+        });
+        draw(vcx);
+        draw(vcx);
+        let trigger = vcx.debug_bounds("trigger").unwrap();
+        let popup = vcx.debug_bounds("tooltip-popup").expect("shown");
+        assert_eq!(
+            popup.top(),
+            trigger.top(),
+            "beside it, start is still the top"
         );
     }
 
