@@ -455,3 +455,11 @@ fn the_period_of_an_input_specimen_does_not_change_the_time(cx: &mut TestAppCont
     draw(cx);
     assert_eq!(state.read_with(cx, |state, _| state.time()), t(9, 30));
 }
+
+#[test]
+fn dial_numbers_hover_in_the_kits_roles() {
+    let ink = color(ColorRole::ON_SURFACE);
+    assert_eq!(dial_number_hover(false), ink.opacity(0.08));
+    let selected = color(ColorRole::ON_PRIMARY_CONTAINER);
+    assert_eq!(dial_number_hover(true), selected.opacity(0.08));
+}

@@ -549,3 +549,9 @@ fn setting_a_value_reveals_its_month(cx: &mut TestAppContext) {
     let after = state.read_with(cx, |s, _| offset(s));
     assert_ne!(before, after, "the list moved to the new month");
 }
+
+#[test]
+fn the_selection_row_is_padded_as_the_kit_has_it() {
+    assert_eq!(selection_row_padding(DatePickerView::Year), (48., 48.));
+    assert_eq!(selection_row_padding(DatePickerView::Month), (48., 54.));
+}
