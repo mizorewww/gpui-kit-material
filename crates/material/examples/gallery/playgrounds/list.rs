@@ -176,7 +176,7 @@ pub static PLAYGROUND: Playground = Playground {
                 Control::Select {
                     id: "leading",
                     label: "Leading",
-                    options: &["none", "icon", "avatar", "image", "video"],
+                    options: &["none", "icon", "tinted", "avatar", "image", "video"],
                     default: 1,
                 },
                 Control::Select {
@@ -325,6 +325,7 @@ fn preview(
             }
             item = item.leading(match config.option("leading") {
                 "icon" => ListLeading::Icon(symbol(icon, 24.)),
+                "tinted" => ListLeading::Tinted(symbol(icon, 24.), Tint::Teal, 40.),
                 "avatar" => ListLeading::Monogram(
                     headline
                         .chars()

@@ -3,7 +3,7 @@
 //! Reference themes use the complete md3.io color role set. Compatibility
 //! constants map older names onto the same role storage; application-specific
 //! status containers and selection colors remain explicit extensions.
-use crate::{Color, PaletteId};
+use crate::{Color, PaletteId, dynamic::blend::harmonize};
 
 macro_rules! roles {
     ($($(#[$doc:meta])* $name:ident),+ $(,)?) => {
@@ -84,7 +84,102 @@ roles!(
     FIND_CURRENT_LINE,
     SELECTION,
     READING_SELECTION,
+    /// The container of [`TintFamily::Orange`].
+    TINT_ORANGE,
+    /// The icon on [`ColorRole::TINT_ORANGE`].
+    ON_TINT_ORANGE,
+    /// The container of [`TintFamily::Blue`].
+    TINT_BLUE,
+    /// The icon on [`ColorRole::TINT_BLUE`].
+    ON_TINT_BLUE,
+    /// The container of [`TintFamily::Teal`].
+    TINT_TEAL,
+    /// The icon on [`ColorRole::TINT_TEAL`].
+    ON_TINT_TEAL,
+    /// The container of [`TintFamily::Amber`].
+    TINT_AMBER,
+    /// The icon on [`ColorRole::TINT_AMBER`].
+    ON_TINT_AMBER,
+    /// The container of [`TintFamily::Green`].
+    TINT_GREEN,
+    /// The icon on [`ColorRole::TINT_GREEN`].
+    ON_TINT_GREEN,
+    /// The container of [`TintFamily::Pink`].
+    TINT_PINK,
+    /// The icon on [`ColorRole::TINT_PINK`].
+    ON_TINT_PINK,
+    /// The container of [`TintFamily::Purple`].
+    TINT_PURPLE,
+    /// The icon on [`ColorRole::TINT_PURPLE`].
+    ON_TINT_PURPLE,
 );
+
+/// A hue family for telling categories apart, in the manner of Material's custom
+/// colors: each family's design color is harmonized toward the scheme's primary,
+/// and its container and content are derived from the scheme's surface and text.
+/// A scheme's own container roles cannot do this: the source palettes derive all of
+/// them from one accent, so they would all be one color.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum TintFamily {
+    Orange,
+    Blue,
+    Teal,
+    Amber,
+    Green,
+    Pink,
+    Purple,
+}
+
+impl TintFamily {
+    pub const ALL: [Self; 7] = [
+        Self::Orange,
+        Self::Blue,
+        Self::Teal,
+        Self::Amber,
+        Self::Green,
+        Self::Pink,
+        Self::Purple,
+    ];
+
+    /// The family's design color, before harmonizing.
+    const fn design_color(self) -> u32 {
+        match self {
+            Self::Orange => 0xd9692b,
+            Self::Blue => 0x2f6fe0,
+            Self::Teal => 0x1b8ea6,
+            Self::Amber => 0xc79a12,
+            Self::Green => 0x2f9a52,
+            Self::Pink => 0xc7428a,
+            Self::Purple => 0x7a5cc7,
+        }
+    }
+
+    /// The family's container role and the content role on it.
+    pub const fn roles(self) -> (ColorRole, ColorRole) {
+        match self {
+            Self::Orange => (ColorRole::TINT_ORANGE, ColorRole::ON_TINT_ORANGE),
+            Self::Blue => (ColorRole::TINT_BLUE, ColorRole::ON_TINT_BLUE),
+            Self::Teal => (ColorRole::TINT_TEAL, ColorRole::ON_TINT_TEAL),
+            Self::Amber => (ColorRole::TINT_AMBER, ColorRole::ON_TINT_AMBER),
+            Self::Green => (ColorRole::TINT_GREEN, ColorRole::ON_TINT_GREEN),
+            Self::Pink => (ColorRole::TINT_PINK, ColorRole::ON_TINT_PINK),
+            Self::Purple => (ColorRole::TINT_PURPLE, ColorRole::ON_TINT_PURPLE),
+        }
+    }
+
+    /// The container and content over `surface`, with `text` as the scheme's text.
+    /// The mix keeps the content's contrast on the container in light and dark.
+    fn derive(self, surface: Color, text: Color, primary: Color, dark: bool) -> (Color, Color) {
+        let hue = Color::argb(harmonize(
+            0xff00_0000 | self.design_color(),
+            primary.to_argb(),
+        ));
+        (
+            surface.blend(hue, if dark { 0.30 } else { 0.24 }),
+            hue.blend(text, if dark { 0.5 } else { 0.45 }),
+        )
+    }
+}
 
 // Compatibility names share storage with their semantic M3 role. Application
 // extensions above remain independent; they are not claimed as M3 scheme roles.
@@ -245,8 +340,40 @@ impl Scheme {
             ColorRole::INFO => hex(p.accent),
             ColorRole::ON_INFO => hex(p.on_accent),
             ColorRole::SHADOW | ColorRole::SCRIM => hex(0),
+            // `with_tints` below derives these from the finished roles.
+            ColorRole::TINT_ORANGE
+            | ColorRole::ON_TINT_ORANGE
+            | ColorRole::TINT_BLUE
+            | ColorRole::ON_TINT_BLUE
+            | ColorRole::TINT_TEAL
+            | ColorRole::ON_TINT_TEAL
+            | ColorRole::TINT_AMBER
+            | ColorRole::ON_TINT_AMBER
+            | ColorRole::TINT_GREEN
+            | ColorRole::ON_TINT_GREEN
+            | ColorRole::TINT_PINK
+            | ColorRole::ON_TINT_PINK
+            | ColorRole::TINT_PURPLE
+            | ColorRole::ON_TINT_PURPLE => hex(0),
         });
-        Self { colors, dark }
+        Self { colors, dark }.with_tints()
+    }
+
+    /// Derive every [`TintFamily`]'s roles from the scheme's surface, text and primary.
+    fn with_tints(mut self) -> Self {
+        let (surface, text, primary) = (
+            self.get(ColorRole::SURFACE),
+            self.get(ColorRole::ON_SURFACE),
+            self.get(ColorRole::PRIMARY),
+        );
+        for family in TintFamily::ALL {
+            let (container, content) = family.derive(surface, text, primary, self.dark);
+            let (container_role, content_role) = family.roles();
+            self = self
+                .with_role(container_role, container)
+                .with_role(content_role, content);
+        }
+        self
     }
 
     /// Construct an exact reference scheme and derive only the kit-specific
@@ -285,6 +412,7 @@ impl Scheme {
                 ColorRole::READING_SELECTION,
                 accent.alpha(if dark { 0.42 } else { 0.30 }),
             )
+            .with_tints()
     }
 
     pub fn get(&self, role: ColorRole) -> Color {
@@ -310,6 +438,61 @@ impl Scheme {
 mod tests {
     use super::*;
     use crate::palette::ALL;
+
+    /// Every scheme a family can land in: the palettes, a reference theme and a seed.
+    fn every_kind_of_scheme() -> Vec<(String, Scheme)> {
+        let mut schemes: Vec<_> = ALL
+            .into_iter()
+            .map(|id| (id.name().to_owned(), Scheme::from_palette(id)))
+            .collect();
+        for dark in [false, true] {
+            let mode = if dark {
+                crate::themes::ThemeMode::Dark
+            } else {
+                crate::themes::ThemeMode::Light
+            };
+            schemes.push((
+                format!("baseline {dark}"),
+                crate::themes::ThemeId::Baseline.scheme(mode, crate::themes::Contrast::Standard),
+            ));
+            schemes.push((
+                format!("seed {dark}"),
+                crate::dynamic::SeedScheme::new(0x6750a4)
+                    .dark(dark)
+                    .scheme(),
+            ));
+        }
+        schemes
+    }
+
+    #[test]
+    fn tint_families_stay_apart_and_their_icons_read_in_every_scheme() {
+        for (name, scheme) in every_kind_of_scheme() {
+            let surface = scheme.get(ColorRole::SURFACE);
+            for (index, family) in TintFamily::ALL.into_iter().enumerate() {
+                let (container, content) = family.roles();
+                let (container, content) = (scheme.get(container), scheme.get(content));
+                assert_ne!(container, surface, "{name} {family:?}");
+                assert!(
+                    contrast(container, content) >= 3.,
+                    "{name} {family:?}: {}",
+                    contrast(container, content)
+                );
+                for other in &TintFamily::ALL[index + 1..] {
+                    assert_ne!(
+                        container,
+                        scheme.get(other.roles().0),
+                        "{name}: {family:?} and {other:?}"
+                    );
+                }
+            }
+        }
+    }
+
+    fn contrast(a: Color, b: Color) -> f32 {
+        let (a, b) = (a.luminance() + 0.05, b.luminance() + 0.05);
+        a.max(b) / a.min(b)
+    }
 
     #[test]
     fn layers_stay_distinct_and_text_reads_against_surfaces() {

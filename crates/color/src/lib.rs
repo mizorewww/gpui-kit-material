@@ -22,4 +22,4 @@ pub mod themes;
 
 pub use color::Color;
 pub use palette::{Appearance, Palette, PaletteId, ThemePreferences};
-pub use scheme::{ColorRole, Scheme};
+pub use scheme::{ColorRole, Scheme, TintFamily};

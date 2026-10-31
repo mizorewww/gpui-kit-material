@@ -1,6 +1,6 @@
 //! Single choice among tiles: a choice tile with tonal selection and the
 //! shared M3 radio indicator, and category tints.
-use crate::color::ColorRole;
+use crate::color::{ColorRole, scheme::TintFamily};
 use crate::icons::Icon;
 use crate::theme::{blend, color};
 use crate::tokens::{layout::*, shape::*, state, typography::*};
@@ -343,25 +343,17 @@ mod choice_tile {
     }
 }
 
-/// A distinct color family for a category icon: a tonal container role and
-/// the content role that pairs with it. The names are the families' usual
-/// hues; the exact colors follow the current scheme, so every palette keeps
-/// its own ground and contrast.
+/// A distinct color family for a category icon. Each is a [`TintFamily`], so the
+/// families stay apart in every palette, reference theme and seed scheme, while the
+/// exact colors follow that scheme's primary, surface and text.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Tint {
-    /// Error container.
     Orange,
-    /// Primary container.
     Blue,
-    /// Secondary container.
     Teal,
-    /// Warning container.
     Amber,
-    /// Success container.
     Green,
-    /// Tertiary fixed.
     Pink,
-    /// Tertiary container.
     Purple,
 }
 
@@ -379,22 +371,13 @@ impl Tint {
     /// The container role and the content role on it.
     pub const fn roles(self) -> (ColorRole, ColorRole) {
         match self {
-            Tint::Orange => (ColorRole::ERROR_CONTAINER, ColorRole::ON_ERROR_CONTAINER),
-            Tint::Blue => (
-                ColorRole::PRIMARY_CONTAINER,
-                ColorRole::ON_PRIMARY_CONTAINER,
-            ),
-            Tint::Teal => (
-                ColorRole::SECONDARY_CONTAINER,
-                ColorRole::ON_SECONDARY_CONTAINER,
-            ),
-            Tint::Amber => (ColorRole::WARNING_BG, ColorRole::WARNING),
-            Tint::Green => (ColorRole::SUCCESS_BG, ColorRole::SUCCESS),
-            Tint::Pink => (ColorRole::TERTIARY_FIXED, ColorRole::ON_TERTIARY_FIXED),
-            Tint::Purple => (
-                ColorRole::TERTIARY_CONTAINER,
-                ColorRole::ON_TERTIARY_CONTAINER,
-            ),
+            Tint::Orange => TintFamily::Orange.roles(),
+            Tint::Blue => TintFamily::Blue.roles(),
+            Tint::Teal => TintFamily::Teal.roles(),
+            Tint::Amber => TintFamily::Amber.roles(),
+            Tint::Green => TintFamily::Green.roles(),
+            Tint::Pink => TintFamily::Pink.roles(),
+            Tint::Purple => TintFamily::Purple.roles(),
         }
     }
 
@@ -435,6 +418,15 @@ mod tests {
     use crate::components::focus::test_rings;
     use core::prelude::v1::test;
     use gpui::{Context, Modifiers, TestAppContext, VisualTestContext};
+
+    #[test]
+    fn tints_paint_their_own_families_in_a_source_palette() {
+        let containers: Vec<_> = Tint::ALL.iter().map(|tint| tint.container()).collect();
+        for (index, container) in containers.iter().enumerate() {
+            assert!(!containers[index + 1..].contains(container), "{index}");
+            assert_ne!(*container, color(ColorRole::SURFACE));
+        }
+    }
 
     #[test]
     fn selection_paints_the_secondary_container_and_keeps_its_state_layers() {
