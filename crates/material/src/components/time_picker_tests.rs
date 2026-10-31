@@ -236,3 +236,90 @@ fn seconds_steps_and_limits_shape_the_state(cx: &mut TestAppContext) {
     );
     draw(cx);
 }
+
+fn init_picker(cx: &mut TestAppContext) {
+    cx.update(|cx| {
+        gpui_kit::init(cx);
+        crate::init(cx);
+        cx.set_reduce_motion(true);
+    });
+}
+
+#[gpui::test]
+fn limits_do_not_get_in_the_way_of_typing(cx: &mut TestAppContext) {
+    init_picker(cx);
+    let (view, cx) = cx.add_window_view(|window, cx| {
+        Harness(cx.new(|cx| {
+            TimePickerState::new(labels(), t(10, 0), window, cx)
+                .format(TimeFormat::TwentyFourHour, window, cx)
+                .limits(t(9, 0), t(17, 0), window, cx)
+                .input_mode()
+        }))
+    });
+    let state = view.read_with(cx, |h, _| h.0.clone());
+    draw(cx);
+    let handle = state.read_with(cx, |s, cx| s.field().read(cx).focus_handle(cx));
+    cx.update(|window, cx| handle.focus(window, cx));
+    draw(cx);
+    // The 1 alone would be 01:00, outside the limits: wait for the 5.
+    cx.simulate_keystrokes("1 5");
+    assert_eq!(state.read_with(cx, |s, _| s.time()), t(15, 0));
+    // A value that stays outside lands inside for the caller, at once, and
+    // on the field once typing leaves it.
+    cx.simulate_keystrokes("left 2 0");
+    assert_eq!(state.read_with(cx, |s, _| s.time()), t(17, 0));
+    let dial = state.read_with(cx, |s, _| s.dial_focus().clone());
+    cx.update(|window, cx| dial.focus(window, cx));
+    draw(cx);
+    let field = state.read_with(cx, |s, _| s.field().clone());
+    assert_eq!(field.read_with(cx, |f, _| f.time()), t(17, 0));
+}
+
+#[gpui::test]
+fn a_dial_drag_follows_the_pointer_past_the_dial(cx: &mut TestAppContext) {
+    init_picker(cx);
+    let (view, cx) = cx.add_window_view(|window, cx| {
+        Harness(cx.new(|cx| TimePickerState::new(labels(), t(7, 0), window, cx)))
+    });
+    let state = view.read_with(cx, |h, _| h.0.clone());
+    draw(cx);
+    let dial = cx.debug_bounds("clock-dial").unwrap();
+    let top = gpui::point(dial.center().x, dial.top() + px(10.));
+    cx.simulate_mouse_down(top, MouseButton::Left, Modifiers::default());
+    draw(cx);
+    assert_eq!(state.read_with(cx, |s, _| s.time()).hour(), 0, "12 o'clock");
+    let beyond = gpui::point(dial.right() + px(300.), dial.center().y);
+    cx.simulate_mouse_move(beyond, MouseButton::Left, Modifiers::default());
+    draw(cx);
+    assert_eq!(state.read_with(cx, |s, _| s.time()).hour(), 3, "3 o'clock");
+    cx.simulate_mouse_up(beyond, MouseButton::Left, Modifiers::default());
+    draw(cx);
+    assert_eq!(
+        state.read_with(cx, |s, _| s.unit),
+        TimeUnit::Minute,
+        "the release moves on, wherever it was"
+    );
+}
+
+struct Mirrored(Entity<TimePickerState>);
+impl Render for Mirrored {
+    fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        window.set_rem_size(px(14.));
+        crate::scope::Scope::new("rtl-time")
+            .direction(gpui::LayoutDirection::Rtl)
+            .child(div().size_full().child(TimePicker::new("picker", &self.0)))
+    }
+}
+
+#[gpui::test]
+fn the_time_reads_hours_first_right_to_left(cx: &mut TestAppContext) {
+    init_picker(cx);
+    let (_, cx) = cx.add_window_view(|window, cx| {
+        Mirrored(cx.new(|cx| TimePickerState::new(labels(), t(7, 30), window, cx)))
+    });
+    draw(cx);
+    let name = |unit| format!("{:?}", named(&ElementId::from("picker"), unit));
+    let hour = cx.debug_bounds(name("hour").leak()).unwrap();
+    let minute = cx.debug_bounds(name("minute").leak()).unwrap();
+    assert!(hour.left() < minute.left(), "{hour:?} {minute:?}");
+}
