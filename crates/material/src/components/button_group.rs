@@ -389,8 +389,7 @@ fn option_paint(
         count,
         height,
         disabled,
-        ButtonVariant::Tonal,
-        ButtonTone::Standard,
+        (ButtonVariant::Tonal, ButtonTone::Standard),
         Metrics::compact(f32::from(height)),
     )
 }
@@ -401,8 +400,7 @@ fn option_paint_with(
     count: usize,
     height: Pixels,
     disabled: bool,
-    variant: ButtonVariant,
-    tone: ButtonTone,
+    (variant, tone): (ButtonVariant, ButtonTone),
     metrics: Metrics,
 ) -> OptionPaint {
     let t = selection.clamp(0., 1.);
@@ -780,8 +778,7 @@ impl RenderOnce for ConnectedButtonGroup {
                 count,
                 item_height,
                 option_disabled,
-                variant,
-                tone,
+                (variant, tone),
                 metrics,
             );
             #[cfg(test)]
@@ -1437,8 +1434,7 @@ mod tests {
                 3,
                 px(40.),
                 false,
-                ButtonVariant::Tonal,
-                tone,
+                (ButtonVariant::Tonal, tone),
                 metrics,
             )
         };
