@@ -4,8 +4,8 @@
 //! Source: neither the Figma kit nor md3.io defines size classes, so the
 //! breakpoints are m3e's (`packages/m3e-motion/src/window-size-class.ts`,
 //! from androidx `WindowSizeClass` at
-//! `19991f2c0858aadfcb442ce02b2c8e4743c96898`). Width: 0 / 600 / 840 / 1200 /
-//! 1600 dp. Height: 0 / 480 / 900 dp. A logical GPUI pixel is a dp here, and
+//! `19991f2c0858aadfcb442ce02b2c8e4743c96898`, Apache-2.0: `LICENSE-androidx` in
+//! this directory). Width: 0 / 600 / 840 / 1200 / 1600 dp. Height: 0 / 480 / 900 dp. A logical GPUI pixel is a dp here, and
 //! the classes ignore the text scale: they describe the window, not its text.
 use gpui::{prelude::*, *};
 
