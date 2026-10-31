@@ -1605,7 +1605,7 @@ pub fn material_button(id: impl Into<ElementId>, variant: ButtonVariant) -> Mate
 mod tests {
     #[test]
     fn tones_change_the_roles_and_only_where_they_mean_something() {
-        use super::ColorRole as C;
+        use super::{ButtonTone, ButtonVariant, ColorRole as C};
         let targets = |variant, tone| {
             let (bg, fg, edge) = super::toned_color_targets(variant, tone);
             (bg.resolve(), fg.resolve(), edge.resolve())

@@ -1428,6 +1428,7 @@ mod tests {
     /// Unselected: neutral container, ink content; only outer ends are round.
     #[test]
     fn a_neutral_group_keeps_its_color_for_the_selected_option() {
+        use super::{ButtonTone, ButtonVariant, Metrics, option_paint_with};
         let metrics = Metrics::compact(40.);
         let paint = |selection, tone| {
             option_paint_with(
