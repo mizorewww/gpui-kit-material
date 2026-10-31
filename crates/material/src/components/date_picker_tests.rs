@@ -355,6 +355,38 @@ fn typing_a_complete_date_does_not_close_the_picker(cx: &mut TestAppContext) {
     assert_eq!(dismissals.get(), 1);
 }
 
+/// Choosing the selected date again changes nothing, and says so; on a closing
+/// picker it still closes, since a person picked a date.
+#[gpui::test]
+fn selecting_the_selected_date_reports_no_change(cx: &mut TestAppContext) {
+    init_picker(cx);
+    let (view, cx) =
+        cx.add_window_view(|_, cx| {
+            Harness(cx.new(|cx| {
+                DatePickerState::new(labels(), d(2025, 8, 18), cx).close_on_selection(true)
+            }))
+        });
+    let state = view.read_with(cx, |h, _| h.0.clone());
+    draw(cx);
+    use std::cell::Cell;
+    let (changes, dismissals) = (Rc::new(Cell::new(0)), Rc::new(Cell::new(0)));
+    cx.update(|_, cx| {
+        let (c, x) = (changes.clone(), dismissals.clone());
+        cx.subscribe(&state, move |_, event: &DatePickerEvent, _| match event {
+            DatePickerEvent::Change(_) => c.set(c.get() + 1),
+            DatePickerEvent::Dismiss(_) => x.set(x.get() + 1),
+        })
+        .detach();
+    });
+    assert!(state.update(cx, |s, cx| s.select(d(2025, 8, 19), cx)));
+    cx.run_until_parked();
+    assert_eq!((changes.get(), dismissals.get()), (1, 1));
+    assert!(!state.update(cx, |s, cx| s.select(d(2025, 8, 19), cx)));
+    cx.run_until_parked();
+    assert_eq!(changes.get(), 1, "nothing changed");
+    assert_eq!(dismissals.get(), 2, "the pick still closes it");
+}
+
 #[gpui::test]
 fn empty_inputs_take_the_selection_rather_than_clear_it(cx: &mut TestAppContext) {
     init_picker(cx);

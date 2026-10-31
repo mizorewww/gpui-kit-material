@@ -451,23 +451,30 @@ impl DatePickerState {
     /// Select `date` as a person would: a single picker replaces its date; a
     /// range starts, completes (when `date` is not before the start) or
     /// restarts, as in `gpui_base::CalendarState::select_date`. Disabled
-    /// dates are ignored. Returns whether the selection changed.
+    /// dates are ignored. Returns whether the selection changed; choosing the
+    /// selected date again changes nothing, but still closes a closing picker.
     pub fn select(&mut self, date: NaiveDate, cx: &mut Context<Self>) -> bool {
         // An adjacent month's day can lie past the offered years, where the
         // grid cannot show it.
         if self.is_disabled(date) || !self.years.contains(&date.year()) {
             return false;
         }
-        self.selection = next_selection(self.selection, date);
+        let previous = self.selection;
+        self.selection = next_selection(previous, date);
+        let changed = self.selection != previous;
         self.cursor = date;
         if (date.year(), date.month()) != (self.year, self.month)
             && self.view == DatePickerView::Day
         {
             self.show_month(date.year(), date.month(), cx);
         }
-        self.report_change(cx);
+        if changed {
+            self.report_change(cx);
+        } else if self.close_on_selection && self.selection.is_complete() {
+            cx.emit(DatePickerEvent::Dismiss(self.selection));
+        }
         cx.notify();
-        true
+        changed
     }
 
     /// Clear the selection (keeping single or range).
