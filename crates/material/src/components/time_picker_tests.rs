@@ -91,6 +91,34 @@ fn steps_wrap_within_the_period_or_day() {
     assert_eq!(step_time(t(5, 59), TimeUnit::Minute, h24, 1), t(5, 0));
 }
 
+/// The time reads hours first in every direction, typed as on the dial.
+#[gpui::test]
+fn the_time_field_keeps_hours_first_in_a_right_to_left_scope(cx: &mut TestAppContext) {
+    struct Rtl(Entity<TimePickerState>);
+    impl Render for Rtl {
+        fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+            window.set_rem_size(px(14.));
+            crate::scope::Scope::new("rtl")
+                .direction(LayoutDirection::Rtl)
+                .child(TimePicker::new("picker", &self.0))
+        }
+    }
+    cx.update(|cx| {
+        gpui_kit::init(cx);
+        crate::init(cx);
+        cx.set_reduce_motion(true);
+    });
+    let (view, cx) = cx.add_window_view(|window, cx| {
+        Rtl(cx.new(|cx| TimePickerState::new(labels(), t(7, 0), window, cx)))
+    });
+    let state = view.read_with(cx, |h, _| h.0.clone());
+    cx.update(|window, cx| state.update(cx, |s, cx| s.toggle_mode(window, cx)));
+    draw(cx);
+    let hour = cx.debug_bounds("time-field-hour").unwrap();
+    let minute = cx.debug_bounds("time-field-minute").unwrap();
+    assert!(hour.right() <= minute.left(), "{hour:?} {minute:?}");
+}
+
 struct Harness(Entity<TimePickerState>);
 impl Render for Harness {
     fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {

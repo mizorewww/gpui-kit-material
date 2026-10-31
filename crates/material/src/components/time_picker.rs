@@ -1488,6 +1488,10 @@ impl RenderOnce for TimePicker {
                             )
                             .into_any_element()
                     });
+                // Hours first here too, as on the dial.
+                let input = crate::scope::Scope::new(named(&id, "field-direction"))
+                    .direction(LayoutDirection::Ltr)
+                    .child(input);
                 surface
                     .gap(rem(20.))
                     .child(header)
