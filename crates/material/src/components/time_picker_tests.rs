@@ -20,6 +20,7 @@ pub(crate) fn labels() -> TimePickerLabels {
         switch_to_dial: s("Dial"),
         number: Rc::new(|n| n.to_string().into()),
         two_digits: Rc::new(|n| format!("{n:02}").into()),
+        separator: s(":"),
     }
 }
 
@@ -358,4 +359,42 @@ fn the_time_reads_hours_first_right_to_left(cx: &mut TestAppContext) {
     let hour = cx.debug_bounds(name("hour").leak()).unwrap();
     let minute = cx.debug_bounds(name("minute").leak()).unwrap();
     assert!(hour.left() < minute.left(), "{hour:?} {minute:?}");
+}
+
+struct Separated(Entity<TimePickerState>);
+impl Render for Separated {
+    fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        window.set_rem_size(px(14.));
+        div().size_full().child(TimePicker::new("picker", &self.0))
+    }
+}
+
+/// The separator is the caller's in both modes: some locales write `7.05`.
+#[gpui::test]
+fn the_time_separator_comes_from_the_labels(cx: &mut TestAppContext) {
+    cx.update(|cx| {
+        gpui_kit::init(cx);
+        crate::init(cx);
+        cx.set_reduce_motion(true);
+    });
+    let mut widths = Vec::new();
+    for separator in [":", "::::"] {
+        let (view, cx) = cx.add_window_view(move |window, cx| {
+            let labels = TimePickerLabels {
+                separator: separator.into(),
+                ..labels()
+            };
+            Separated(cx.new(|cx| TimePickerState::new(labels, t(7, 0), window, cx)))
+        });
+        let state = view.read_with(cx, |h, _| h.0.clone());
+        draw(cx);
+        let dial = cx.debug_bounds("time-separator").unwrap().size.width;
+        cx.update(|window, cx| state.update(cx, |s, cx| s.toggle_mode(window, cx)));
+        draw(cx);
+        let hour = cx.debug_bounds("time-field-hour").unwrap();
+        let minute = cx.debug_bounds("time-field-minute").unwrap();
+        widths.push((dial, minute.left() - hour.right()));
+    }
+    assert!(widths[1].0 > widths[0].0, "dial {widths:?}");
+    assert!(widths[1].1 > widths[0].1, "field {widths:?}");
 }

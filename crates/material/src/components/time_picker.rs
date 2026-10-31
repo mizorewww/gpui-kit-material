@@ -75,6 +75,9 @@ pub struct TimePickerLabels {
     pub number: Format,
     /// A two-digit field value ("07", "05").
     pub two_digits: Format,
+    /// What stands between a time's hours and minutes (":", or "." in some
+    /// locales).
+    pub separator: SharedString,
 }
 
 /// 12-hour (with a period selector) or 24-hour.
@@ -1249,7 +1252,13 @@ impl RenderOnce for TimePicker {
                 .justify_center()
                 .text_color(color(ColorRole::ON_SURFACE))
                 .map(|d| type_style(d, TypeRole::DisplayLarge))
-                .child(":")
+                .child(
+                    div()
+                        .when(cfg!(test), |text| {
+                            text.debug_selector(|| "time-separator".into())
+                        })
+                        .child(labels.separator.clone()),
+                )
         };
         let time_row = div()
             .flex()
@@ -1381,6 +1390,7 @@ impl RenderOnce for TimePicker {
                 let period_labels = labels.clone();
                 let pm = time.hour() >= 12;
                 let input = TimeField::new(named(&id, "field"), &field)
+                    .separator(labels.separator.clone())
                     .disabled(specimen)
                     .flex()
                     .items_start()
@@ -1431,6 +1441,16 @@ impl RenderOnce for TimePicker {
                         };
                         segment
                             .clear_children()
+                            .when(cfg!(test), |segment| {
+                                segment.debug_selector(move || {
+                                    match which {
+                                        TimeSegment::Hour => "time-field-hour",
+                                        TimeSegment::Second => "time-field-second",
+                                        _ => "time-field-minute",
+                                    }
+                                    .into()
+                                })
+                            })
                             .flex()
                             .flex_col()
                             .gap(rem(7.))
