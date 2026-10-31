@@ -504,6 +504,7 @@ impl<T: 'static> Entity<T> {
 
     /// Leases the entity to build elements from it. The same as [`Self::update`]
     /// here; GPUI Fast's retained subtrees do not count it as a change.
+    #[cfg(feature = "frame-observation")]
     #[inline]
     pub fn update_for_render<R>(
         &self,

@@ -603,6 +603,22 @@ impl LineLayoutCache {
         curr_frame.used_wrapped_lines_by_hash.clear();
     }
 
+    pub fn layout_wrapped_line<Text>(
+        &self,
+        text: Text,
+        font_size: Pixels,
+        runs: &[FontRun],
+        wrap_width: Option<Pixels>,
+        max_lines: Option<usize>,
+    ) -> Arc<WrappedLineLayout>
+    where
+        Text: AsRef<str>,
+        SharedString: From<Text>,
+    {
+        self.layout_wrapped_line_spaced(text, font_size, runs, wrap_width, max_lines, px(0.))
+    }
+
+    /// [`Self::layout_wrapped_line`] with `letter_spacing` after each character.
     pub fn layout_wrapped_line_spaced<Text>(
         &self,
         text: Text,

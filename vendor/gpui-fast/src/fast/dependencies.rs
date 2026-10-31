@@ -819,6 +819,7 @@ pub(crate) fn query<T: 'static, R>(
     result
 }
 
+#[cfg(feature = "frame-observation")]
 impl<T: 'static> Entity<T> {
     /// Leases the entity to build elements from it, as rendering a view does:
     /// its `Context` gives listeners and focus handles. Unlike [`Entity::update`],

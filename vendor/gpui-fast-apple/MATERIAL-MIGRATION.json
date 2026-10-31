@@ -73,7 +73,7 @@
     }
   ],
   "conflicts": [],
-  "validation": "source migration only; no build/tests",
+  "validation": "source migration, since built by this workspace CI (.github/workflows/ci.yml)",
   "manifest_changes": [
     "font_fallback test"
   ],

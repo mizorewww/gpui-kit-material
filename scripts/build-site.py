@@ -287,10 +287,63 @@ def build_assets(output):
     return f"/fonts/{style_name}"
 
 
+def symbols_checkout():
+    """The pinned Symbols repository Cargo checked out for the browser gallery."""
+    metadata = subprocess.run(
+        ["cargo", "metadata", "--locked", "--format-version", "1",
+         "--filter-platform", "wasm32-unknown-unknown"],
+        cwd=ROOT, check=True, capture_output=True, text=True).stdout
+    manifest = next(package["manifest_path"] for package in json.loads(metadata)["packages"]
+                    if package["name"] == "gpui-material-symbols")
+    return Path(manifest).parent
+
+
+def build_licenses(output):
+    """Publish the license of everything the site serves, and return its page."""
+    fonts = ROOT / "crates/material/examples/gallery/fonts"
+    symbols = symbols_checkout()
+    groups = (
+        ("This project", (
+            ("gpui-kit-material", "MIT", ROOT / "LICENSE"),
+            ("androidx rules (navigation suite, size classes, shapes)", "Apache-2.0",
+             ROOT / "crates/material/src/components/LICENSE-androidx"),
+            ("floor/material motion", "MIT", ROOT / "crates/material/src/motion/LICENSE-material"),
+            ("material-color-utilities", "Apache-2.0", ROOT / "crates/color/licenses/material-color-utilities.txt"),
+            ("Catppuccin palette", "MIT", ROOT / "crates/color/licenses/catppuccin.txt"),
+            ("Nord palette", "MIT", ROOT / "crates/color/licenses/nord.txt"),
+            ("Tokyo Night palette", "Apache-2.0", ROOT / "crates/color/licenses/tokyo-night.txt"),
+        )),
+        ("Fonts", (
+            ("IBM Plex Sans", "OFL-1.1", fonts / "OFL.txt"),
+            ("Roboto", "OFL-1.1", fonts / "roboto/OFL.txt"),
+        )),
+        ("Material Symbols", (
+            ("gpui-material-symbols", "Apache-2.0", symbols / "LICENSE"),
+            ("gpui-material-symbols notice", "NOTICE", symbols / "NOTICE"),
+            ("Material Symbols fonts", "Apache-2.0", symbols / "assets/LICENSE"),
+        )),
+    )
+    directory = output / "licenses"
+    directory.mkdir(parents=True)
+    body = ["<h1>Licenses</h1>"]
+    for heading, entries in groups:
+        rows = []
+        for name, license_name, source in entries:
+            text = source.read_bytes()
+            published = f"{github_slug(name, '-')}.{content_hash(text)}.txt"
+            (directory / published).write_bytes(text)
+            rows.append(f'<tr><td>{html.escape(name)}</td><td><a href="/licenses/{published}">'
+                        f"{html.escape(license_name)}</a></td></tr>")
+        body.append(f"<h2>{html.escape(heading)}</h2>"
+                    '<div class="table"><table><thead><tr><th>Component</th><th>License</th></tr></thead>'
+                    f"<tbody>{''.join(rows)}</tbody></table></div>")
+    return "".join(body)
+
+
 def build_docs(output, stylesheet, commit):
     present = {source: page for source, page in PAGES.items() if (ROOT / source).exists()}
     published = {source: url for source, (url, _) in present.items()}
-    navigation = [(url, label) for url, label in present.values()]
+    navigation = [(url, label) for url, label in present.values()] + [("/licenses/", "Licenses")]
     common = dict(stylesheet=stylesheet, commit=commit, short_commit=commit[:7])
     for source, (url, label) in present.items():
         converter = markdown.Markdown(extensions=[
@@ -317,6 +370,9 @@ def build_docs(output, stylesheet, commit):
                body=("<h1>API documentation</h1>"
                      '<div class="table"><table><thead><tr><th>Crate</th><th>Purpose</th></tr></thead>'
                      f"<tbody>{rows}</tbody></table></div>"))
+    write_page(output, "/licenses/", title="Licenses · gpui-kit-material",
+               side=side_navigation(navigation, "/licenses/"), **common,
+               body=build_licenses(output))
     missing = TEMPLATE.format(
         repository=REPOSITORY, title="Not found · gpui-kit-material",
         side=side_navigation(navigation, "/404"), **common,

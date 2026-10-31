@@ -1,7 +1,7 @@
 {
   "schema": "material-kit-reuse-audit-v1",
   "scope": "read-only source audit; deletion candidates are conditional, not executed replacements or visual/performance PASS",
-  "implementation_commit": "45de656278b1c86685574ea4397c0fb306445c5c",
+  "implementation_commit": "0f56b40f05e09e95d3cdad19f6d8e8df3d4b09f7",
   "upstream": {
     "repository": "https://github.com/longbridge/gpui-kit",
     "commit": "bb85882e1faab845d9e7be33b69a152879a90f69",
@@ -92,31 +92,25 @@
       "disposition": "retain-pending-equivalence",
       "priority": "P0",
       "local_paths": [
-        "vendor/gpui-base/src/a11y_disabled.rs",
-        "vendor/gpui-base/src/button.rs",
         "vendor/gpui-base/src/dialog.rs",
+        "vendor/gpui-base/src/input/base/element.rs",
         "vendor/gpui-base/src/input/base/state.rs",
         "vendor/gpui-base/src/lib.rs",
         "vendor/gpui-base/src/motion.rs",
         "vendor/gpui-base/src/slider.rs",
-        "vendor/gpui-base/src/text_selection.rs",
-        "vendor/gpui-base/src/toggle.rs",
         "vendor/gpui-base/src/toolbar.rs"
       ],
       "upstream_paths": [
-        "crates/base/src/a11y_disabled.rs",
-        "crates/base/src/button.rs",
         "crates/base/src/dialog.rs",
+        "crates/base/src/input/base/element.rs",
         "crates/base/src/input/base/state.rs",
         "crates/base/src/lib.rs",
         "crates/base/src/motion.rs",
         "crates/base/src/slider.rs",
-        "crates/base/src/text_selection.rs",
-        "crates/base/src/toggle.rs",
         "crates/base/src/toolbar.rs"
       ],
-      "action": "Keep narrow busy/focus/transition fixes while aligning the Git Base dependency.",
-      "conditions": "Same 0.8.1 version is not equivalence; upstream lacks the patched busy, focusable/disabled focus and reversal/reduced-motion behavior."
+      "action": "Keep narrow transition, slider, dialog, toolbar and IME-anchor fixes while pinning the Git Base dependency. The busy, toggle-focus and caret patches are gone, replaced by Material code (docs/ARCHITECTURE.md).",
+      "conditions": "Same 0.8.1 version is not equivalence; upstream lacks reversal and per-transition reduced motion, the slider's snapping and assistive actions, Dialog::accessibility_label, a vertical Toolbar and the caret report behind a browser's IME panel."
     },
     {
       "id": "material-motion",
@@ -159,7 +153,7 @@
       "upstream_paths": [
         "Cargo.toml"
       ],
-      "action": "Keep the original-hitbox extension and passive touch fixes until the selected runtime supplies equivalent behavior.",
+      "action": "Keep the engine's remaining compatibility patches until the selected runtime supplies equivalent behavior. The original-hitbox extension and passive touch fixes are gone: the 48dp target and touch press are Material code (components/button/hit_target.rs, the shared ripple).",
       "conditions": "Kit still depends on unpatched gpui-pre 0.3.10. Inspect actual runtime source and repeat regressions; do not remove entire vendor trees based on package names."
     },
     {
@@ -175,7 +169,7 @@
         "crates/fps/src/sampler.rs"
       ],
       "action": "Keep complete CPU scope and raw first-frame evidence; upstream FPS HUD is supplementary.",
-      "conditions": "Upstream sampler excludes warmup/backlog and uses draw timing; it cannot prove whole-gallery <=2ms including first frame."
+      "conditions": "Upstream sampler excludes warmup/backlog and uses draw timing; it cannot give the raw per-frame timings and maxima AGENTS.md's targets are judged from."
     },
     {
       "id": "web-reduced-motion",
@@ -373,7 +367,7 @@
         "Cargo.toml"
       ],
       "action": "Keep the vendored gpui-fast 0.1.12 (default backend) with the gpui-pre compatibility patches carried forward; see its MATERIAL-MIGRATION.json.",
-      "conditions": "Preserves raw touch observers and extended hitboxes through retained/scroll replay, full CPU profiler scopes and repeat playback. Kit selects unpatched crates.io gpui-fast; remove only after each patch has an upstream equivalent and the regressions pass. Frame observation in this crate sits behind the dev-only frame-observation feature; crates/consumer-check builds it off."
+      "conditions": "Carries the gpui-pre patches through retained/scroll replay, including full CPU profiler scopes and repeat playback, plus its own wheel guard and tracked-entity update. Kit selects unpatched crates.io gpui-fast; remove only after each patch has an upstream equivalent and the regressions pass. Frame observation in this crate sits behind the dev-only frame-observation feature; crates/consumer-check builds it off."
     },
     {
       "id": "vendor-gpui-fast-apple",
@@ -412,7 +406,7 @@
         "Cargo.toml"
       ],
       "action": "Dev-only overlay; a consumer does not patch this. Keep presentation-synchronization control, the weak-owner demand waker and renderer-outcome submission counting; see MATERIAL-PATCHES.md and SOURCE.json.",
-      "conditions": "The >=500 FPS scroll gate counts only successful newly drawn submissions with vertical sync disabled; the published crate cannot report or disable this. Does not guarantee a target FPS."
+      "conditions": "Successful-new-frame counts feed the Gallery's FPS display and the reported metrics with vertical sync disabled; the published crate cannot report or disable this. AGENTS.md sets no FPS target."
     },
     {
       "id": "vendor-gpui-pre-macos",
@@ -917,5 +911,5 @@
   "runtime_migration_status": "pending",
   "component_conformance_status": "unreviewed",
   "performance_status": "unverified",
-  "review_scope": "Three independent source audits cover components; facade/theme/icons/gallery; runtime patches/motion/performance. No runtime migration or deletion was executed in this audit. Entries added at implementation_commit (components newer than the original audit, vendor-gpui-kit) come from one source read of the imports and the public Component builders and have not been independently reviewed."
+  "review_scope": "Three independent source audits cover components; facade/theme/icons/gallery; runtime patches/motion/performance. No runtime migration or deletion was executed in this audit. Entries added at implementation_commit (components newer than the original audit, vendor-gpui-kit) come from one source read of the imports and the public Component builders and have not been independently reviewed. At 0f56b40 one source read rechecked every local and upstream path and the entries that named removed patches or retired performance limits (base-compatibility, gpui-text-hitbox-dpr, performance-evidence, vendor-gpui-fast, vendor-gpui-fast-macos); that read has not been independently reviewed, and the other entries keep their earlier review."
 }

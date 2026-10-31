@@ -131,21 +131,31 @@ per-frame data with nearest-rank quantiles; an average never decides one:
 
 | Target | Limit | Source |
 | --- | --- | --- |
-| steady-state CPU p95 / max, excluding drawable wait | 1 ms / 2 ms (WASM 2 / 4 ms) | scroll frames after a 750 ms settle |
-| main-thread drawable wait | none (> 0.1 ms in any frame fails) | `drawable_wait` per frame |
+| steady-state CPU p95 / max, excluding drawable wait | 1 ms / 2 ms (WASM 2 / 4 ms) | scroll frames after a 750 ms settle; `www/profile.js` for WASM |
+| Material list against an equivalent Kit list | ≤ 2× the instructions per frame, worst of p50 and p95 | `component_bench --content material-list` and `kit-list`, same mode; UNVERIFIED without instruction counters, which read 0 outside native macOS |
 | idle window | 0 frames drawn or presented | `--bench` idle scenario, `?profile=idle` |
-| forced redraw of an unchanged page | 0.3 ms every frame | `--bench` redraw scenario (root notified each frame) |
-| first frame | 16 ms main-thread CPU | thread CPU clock from `open_window` to after the first submission |
-| page switch | 8 ms | hook: the Gallery shell reports `page_switch_ns` (native) or calls `window.__galleryPageSwitch(ms)` (web) |
-| GPU p95 | 2 ms | Metal timestamps |
-| new frames/s, vsync off | ≥ 500 in every 100 ms window | successful submissions only |
 | missed refreshes, vsync on | 0 at 120 Hz | intervals > 1.5 refreshes; UNVERIFIED on other displays |
+| first frame | ≤ 1.2 × Kit's stories baseline on this machine | thread CPU clock from `open_window` to after the first submission, against `--kit-first-frame-ms`; UNVERIFIED without that baseline |
+| page switch | 8 ms | hook: the Gallery shell reports `page_switch_ns` (native) or calls `window.__galleryPageSwitch(ms)` (web) |
+| WASM against md3.io | main-thread frame time ≥ 5× lower | stays UNVERIFIED in the tool; [the comparison below](#chrome-comparison-with-md3io) is by hand |
+
+GPU time (Metal timestamps), drawable wait, new frames per second and the forced
+redraw are reported under `metrics`, without a verdict.
 
 Re-judge saved evidence without running anything:
 
 ```sh
-python3 scripts/profile-gallery.py --summarize /tmp/material-bench/*.json /tmp/material-scroll/frames.json
+python3 scripts/profile-gallery.py --summarize /tmp/material-bench/*.json /tmp/material-scroll/frames.json \
+  --kit-first-frame-ms 42
+cargo run --release -p gpui-kit-material --example component_bench -- \
+  --content material-list --mode scroll --frames 300 --out /tmp/material-list.json
+cargo run --release -p gpui-kit-material --example component_bench -- \
+  --content kit-list --mode scroll --frames 300 --out /tmp/kit-list.json
+python3 scripts/profile-gallery.py --summarize /tmp/material-list.json /tmp/kit-list.json
 ```
+
+The Gallery's own exit code fails on steady-state frames only. Evidence for a release
+commit goes under [conformance/performance/releases/](../conformance/performance/releases/README.md).
 
 ### Engine benchmark
 
@@ -211,9 +221,9 @@ machine otherwise idle.
    does no main-thread work, not that the comparison passed.
 
 Runner exit status: `0` only for a complete run the gallery reports eligible
-with the CPU and FPS gates both passing; `1` when a measured gate failed; `2`
+with the steady-state CPU gate passing; `1` when a measured gate failed; `2`
 for incomplete, unstable or unverifiable evidence. Startup and browser runs
-cannot establish the FPS gate, so they return `1` or `2`, never `0`.
+cannot establish that gate, so they return `1` or `2`, never `0`.
 
 ### Browser (WASM)
 

@@ -2,6 +2,7 @@
 # like. It proves the library builds against the patches a consumer needs, including
 # the web backends' IME position and the lazy tab-stop index (tested by CI's engine rules
 # step), without the dev-only frame observation, and that Kit's FPS HUD builds beside it.
+# It reads them from this checkout; CI's git-consumer job builds the same set from Git.
 [package]
 name = "consumer-check"
 version = "0.0.0"
@@ -13,14 +14,14 @@ default = []
 gpui-fast = ["gpui-kit/gpui-fast", "gpui-kit-material/gpui-fast", "gpui-fps/gpui-fast"]
 
 [dependencies]
-gpui-kit = { git = "https://github.com/longbridge/gpui-kit", branch = "main" }
-gpui-fps = { git = "https://github.com/longbridge/gpui-kit", branch = "main" }
+gpui-kit = { git = "https://github.com/longbridge/gpui-kit", rev = "bb85882e1faab845d9e7be33b69a152879a90f69" }
+gpui-fps = { git = "https://github.com/longbridge/gpui-kit", rev = "bb85882e1faab845d9e7be33b69a152879a90f69" }
 gpui-kit-material = { path = "../material", default-features = false, features = ["serde", "embedded-symbols", "frame-profiler"] }
 
 # Lets `cargo test -p consumer-check -p gpui-pre --lib` run the engine tests with
 # frame observation off.
 [dev-dependencies]
-gpui-kit = { git = "https://github.com/longbridge/gpui-kit", branch = "main", features = ["test-support"] }
+gpui-kit = { git = "https://github.com/longbridge/gpui-kit", rev = "bb85882e1faab845d9e7be33b69a152879a90f69", features = ["test-support"] }
 
 [workspace]
 

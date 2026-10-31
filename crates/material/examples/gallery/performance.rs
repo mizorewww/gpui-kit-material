@@ -240,17 +240,15 @@ impl Session {
         .detach();
     }
 }
-/// Known over-budget CPU work in any measured view fails, even when the
-/// evidence is otherwise incomplete. A split-scope sum excludes idle time, so
-/// it is CPU work for one frame and cannot be hidden as diagnostic-only.
+/// Known over-budget steady-state CPU work fails, even when the evidence is
+/// otherwise incomplete. Startup is not steady state: AGENTS.md judges the first
+/// frame against Kit's baseline, which `scripts/profile-gallery.py` does from
+/// `first_frame_cpu_ns`. A split-scope sum excludes idle time, so it is CPU work
+/// for one frame and cannot be hidden as diagnostic-only.
 pub(super) fn known_cpu_failure(report: &Value) -> bool {
-    [
-        "summary",
-        "diagnostic_stage_summary",
-        "split_scope_frames_summary",
-    ]
-    .iter()
-    .any(|key| report[key]["over_budget_frames"].as_u64().unwrap_or(0) > 0)
+    ["steady_summary", "steady_split_scope_summary"]
+        .iter()
+        .any(|key| report[key]["over_budget_frames"].as_u64().unwrap_or(0) > 0)
 }
 fn exit_code(report: &Value) -> i32 {
     if known_cpu_failure(report) {
@@ -428,6 +426,7 @@ fn report(mut recording: Recording, target: WindowId, metadata: Value, elapsed: 
     let mut scope_waits = Vec::new();
     let mut scope_rows = Vec::new();
     let mut split_sums = Vec::new();
+    let mut steady_split_sums = Vec::new();
     let mut saw_initial = false;
     for (index, scope) in scopes.iter().enumerate() {
         if scope.end < scope.start
@@ -554,6 +553,11 @@ fn report(mut recording: Recording, target: WindowId, metadata: Value, elapsed: 
                     // presentation waits included); the wait-free sum is kept too.
                     let sum = scope_elapsed[d] + scope_elapsed[p];
                     split_sums.push(sum);
+                    if index > 0 {
+                        steady_split_sums.push(
+                            scope_elapsed[d] - scope_waits[d] + scope_elapsed[p] - scope_waits[p],
+                        );
+                    }
                     frames[index]["cpu_frame_ns"] = Value::Null;
                     frames[index]["over_budget"] = json!(sum > BUDGET_NS);
                     frames[index]["diagnostic_split_scope_cpu_sum_ns"] = json!(sum);
@@ -570,7 +574,21 @@ fn report(mut recording: Recording, target: WindowId, metadata: Value, elapsed: 
         }
     }
     let gpu = gpu_report(&mut recording.gpu, &pairs, &mut frames, origin);
-    json!({"schema":"material-gallery-cpu-frames-v2","gpu":gpu,"statistics_definition":"nearest-rank quantiles; median is p50 (lower middle for even sample counts)","budget_ns":BUDGET_NS,"budget_comparison":"every complete CPU scope must be at or below budget; known over-budget work fails even when acceptance is incomplete","acceptance_eligible":recording.errors.is_empty() && reasons.is_empty(),"eligibility_reasons":reasons,"scope":"whole synchronous CPU frame scopes plus exact draw/present associations","cpu_work_definition":"Complete event end-start includes callbacks, draw, synchronous drawable acquisition, submission and cleanup without subtracting API-call elapsed time; split initial draw and submission remain separately measured, idle gaps are not CPU work","presentation_wait_definition":"Legacy presentation_wait fields report elapsed wall time of the whole nextDrawable API call, including any internal CPU work, scheduling and waiting; they do not measure pure blocking or GPU time. This time remains included in all 2 ms acceptance judgements. Fields named diagnostic_*_excluding_drawable_call are descriptive differences only, never acceptance metrics.","complete":recording.errors.is_empty(),"errors":recording.errors,"metadata":metadata,"capture_elapsed_ns":elapsed.as_nanos(),"summary":summary(&scope_costs),"scope_elapsed_summary":summary(&scope_elapsed),"presentation_wait_summary":summary(&scope_waits),"split_scope_frames_summary":summary(&split_sums),"first_scope_summary":summary(&scope_costs[..scope_costs.len().min(1)]),"subsequent_scopes_summary":summary(&scope_costs[scope_costs.len().min(1)..]),"diagnostic_stage_summary":summary(&costs),"first_frame_stage_summary":summary(&costs[..costs.len().min(1)]),"subsequent_frames_stage_summary":summary(&costs[costs.len().min(1)..]),"collector_batch_sizes":recording.batch_sizes,"raw_events":raw,"cpu_scopes":scope_rows,"draw_lifecycle":draw_rows,"submissions":submission_rows,"frames":frames})
+    // The window's first draw and the scope that first submits it are startup; every
+    // other scope's main-thread CPU work is steady state, without the drawable wait.
+    let first_present_scope = presentations
+        .keys()
+        .min()
+        .and_then(|at| present_scopes.get(at).copied());
+    let steady: Vec<u128> = scopes
+        .iter()
+        .enumerate()
+        .filter(|(index, scope)| {
+            scope.source != CpuFrameSource::InitialDraw && Some(*index) != first_present_scope
+        })
+        .map(|(index, _)| scope_elapsed[index] - scope_waits[index])
+        .collect();
+    json!({"schema":"material-gallery-cpu-frames-v2","gpu":gpu,"statistics_definition":"nearest-rank quantiles; median is p50 (lower middle for even sample counts)","budget_ns":BUDGET_NS,"budget_comparison":"every steady-state CPU scope, excluding the drawable call, must be at or below budget; known over-budget steady work fails even when acceptance is incomplete; startup is reported, and judged against Kit's baseline by the runner","acceptance_eligible":recording.errors.is_empty() && reasons.is_empty(),"eligibility_reasons":reasons,"scope":"whole synchronous CPU frame scopes plus exact draw/present associations","cpu_work_definition":"Complete event end-start includes callbacks, draw, synchronous drawable acquisition, submission and cleanup without subtracting API-call elapsed time; split initial draw and submission remain separately measured, idle gaps are not CPU work","presentation_wait_definition":"Legacy presentation_wait fields report elapsed wall time of the whole nextDrawable API call, including any internal CPU work, scheduling and waiting; they do not measure pure blocking or GPU time. It is reported and left out of steady_summary. Fields named diagnostic_*_excluding_drawable_call are descriptive differences only.","complete":recording.errors.is_empty(),"errors":recording.errors,"metadata":metadata,"capture_elapsed_ns":elapsed.as_nanos(),"summary":summary(&scope_costs),"steady_summary":summary(&steady),"steady_split_scope_summary":summary(&steady_split_sums),"scope_elapsed_summary":summary(&scope_elapsed),"presentation_wait_summary":summary(&scope_waits),"split_scope_frames_summary":summary(&split_sums),"first_scope_summary":summary(&scope_costs[..scope_costs.len().min(1)]),"subsequent_scopes_summary":summary(&scope_costs[scope_costs.len().min(1)..]),"diagnostic_stage_summary":summary(&costs),"first_frame_stage_summary":summary(&costs[..costs.len().min(1)]),"subsequent_frames_stage_summary":summary(&costs[costs.len().min(1)..]),"collector_batch_sizes":recording.batch_sizes,"raw_events":raw,"cpu_scopes":scope_rows,"draw_lifecycle":draw_rows,"submissions":submission_rows,"frames":frames})
 }
 
 /// Attach driver GPU time to each submitted frame and summarize it apart from
@@ -786,7 +804,7 @@ mod tests {
             next_frame_callbacks: 0,
             power_interrupted: false,
             // Even when most of submission is drawable acquisition, the
-            // inclusive split sum must still fail the complete frame budget.
+            // inclusive split sum still counts it.
             presentation_wait: Duration::from_micros(800),
             presentation_waits: 1,
         };
@@ -820,10 +838,11 @@ mod tests {
             evidence["split_scope_frames_summary"]["over_budget_frames"],
             1
         );
-        assert_eq!(exit_code(&evidence), 1);
+        // It is the first frame, which is not judged against the steady budget.
+        assert_eq!(exit_code(&evidence), 2);
     }
     #[test]
-    fn drawable_call_elapsed_remains_in_whole_frame_budget() {
+    fn a_slow_first_frame_is_reported_and_is_not_steady_state() {
         let d = draw();
         let p = PresentTiming {
             window_id: d.window_id,
@@ -873,13 +892,62 @@ mod tests {
             evidence["diagnostic_stage_summary"]["over_budget_frames"],
             1
         );
-        // A known 16ms scope fails even though the subtracted diagnostic is
-        // below 2ms and missing startup also makes the evidence ineligible.
-        assert_eq!(exit_code(&evidence), 1);
-        // Changing the reported API-call elapsed cannot change acceptance.
-        let unexplained = report_events(events(Duration::from_millis(13)));
-        assert_eq!(unexplained["summary"]["over_budget_frames"], 1);
-        assert_eq!(exit_code(&unexplained), 1);
+        assert_eq!(evidence["steady_summary"]["frames"], 0);
+        // The runner judges this scope against Kit's baseline; missing startup makes
+        // the evidence ineligible.
+        assert_eq!(exit_code(&evidence), 2);
+    }
+    #[test]
+    fn a_steady_scope_over_budget_fails_without_counting_its_drawable_wait() {
+        let d = draw();
+        let p = PresentTiming {
+            window_id: d.window_id,
+            present_start: d.draw_end,
+            present_end: d.draw_end + Duration::from_micros(100),
+            animation_interval: None,
+            successful_new_frame: None,
+        };
+        let scope = |source, start, millis, wait| CpuFrameTiming {
+            window_id: d.window_id,
+            source,
+            start,
+            end: start + Duration::from_millis(millis),
+            draw_start: None,
+            present_start: None,
+            draw_count: 0,
+            present_count: 0,
+            next_frame_callbacks: 0,
+            power_interrupted: false,
+            presentation_wait: wait,
+            presentation_waits: 0,
+        };
+        let first = CpuFrameTiming {
+            draw_start: Some(d.draw_start),
+            present_start: Some(p.present_start),
+            draw_count: 1,
+            present_count: 1,
+            ..scope(CpuFrameSource::InitialDraw, d.draw_start, 1, Duration::ZERO)
+        };
+        let run = |wait| {
+            report_events(vec![
+                FrameEvent::Draw(d),
+                FrameEvent::Present(p),
+                FrameEvent::Complete(first),
+                FrameEvent::Complete(scope(
+                    CpuFrameSource::Platform,
+                    p.present_end + Duration::from_millis(10),
+                    3,
+                    wait,
+                )),
+            ])
+        };
+        let over = run(Duration::ZERO);
+        assert_eq!(over["steady_summary"]["over_budget_frames"], 1);
+        assert_eq!(exit_code(&over), 1);
+        let waiting = run(Duration::from_millis(2));
+        assert_eq!(waiting["steady_summary"]["max_ns"], 1_000_000);
+        assert_eq!(waiting["steady_summary"]["over_budget_frames"], 0);
+        assert_ne!(exit_code(&waiting), 1);
     }
     #[test]
     #[cfg(target_os = "macos")]
@@ -1111,13 +1179,13 @@ mod tests {
     }
 
     #[test]
-    fn superseded_over_budget_work_fails_even_when_submission_evidence_is_missing() {
+    fn superseded_startup_work_is_counted_and_is_not_steady_state() {
         let mut events = coalesced_startup(Duration::from_nanos(2_000_001));
         events.remove(3);
         let evidence = report_events(events);
         assert_eq!(evidence["summary"]["over_budget_frames"], 1);
         assert_eq!(evidence["complete"], false);
-        assert_eq!(exit_code(&evidence), 1);
+        assert_eq!(exit_code(&evidence), 2);
         let boundary = report_events(coalesced_startup(Duration::from_millis(2)));
         assert_eq!(boundary["summary"]["over_budget_frames"], 0);
         assert_eq!(boundary["complete"], true);

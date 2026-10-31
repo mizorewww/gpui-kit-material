@@ -1,8 +1,8 @@
 name: CI
-# Hosted runners check formatting, lints, tests and the WASM build only. The
-# Gallery frame-budget (<= 2 ms CPU per frame) and scroll (>= 500 FPS) gates
-# are measured with scripts/profile-gallery.py on real hardware, because shared
-# virtual runners give neither stable timing nor a real display.
+# Hosted runners check formatting, lints, tests, packaging and the WASM build only.
+# AGENTS.md's performance targets are measured with scripts/profile-gallery.py on
+# real hardware, because shared virtual runners give neither stable timing nor a
+# real display.
 on:
   push:
     branches: [main]
@@ -103,6 +103,72 @@ jobs:
           cargo test --locked -p gpui-pre --lib text_system
           cargo test --locked -p gpui-kit-material -p gpui-fast --features gpui-kit-material/gpui-fast,gpui-kit-material/frame-profiler --lib
           cargo test --locked -p gpui-fast-apple --test font_fallback
+
+  # consumer-check reads the library and its patches from this checkout, so it says
+  # nothing about what a downstream application gets from Git. This job builds the
+  # README's quick start from the pushed commit, with a fresh resolve and no lockfile.
+  git-consumer:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            target: ""
+          - os: ubuntu-latest
+            target: ""
+          - os: windows-latest
+            target: ""
+          - os: ubuntu-latest
+            target: wasm32-unknown-unknown
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: gpui-kit-material
+      # rust-toolchain.toml pins the exact compiler, components and targets.
+      - name: Install the pinned toolchain
+        run: |
+          rustup toolchain install
+          rustc --version
+      - name: Linux libraries
+        if: runner.os == 'Linux' && matrix.target == ''
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libxkbcommon-dev libxkbcommon-x11-dev libwayland-dev libvulkan-dev libx11-xcb-dev libxcb1-dev libfontconfig-dev libfreetype-dev
+      - name: Build the quick start from Git
+        env:
+          TARGET: ${{ matrix.target }}
+        run: |
+          scripts/check-git-consumer.sh \
+            --repo "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" \
+            --rev "$GITHUB_SHA" \
+            --dir "$RUNNER_TEMP/git-consumer" \
+            ${TARGET:+--target "$TARGET"}
+
+  # Packaging and dependency policy read manifests, not the platform, so one OS is enough.
+  package:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: gpui-kit-material
+      # rust-toolchain.toml pins the exact compiler, components and targets.
+      - name: Install the pinned toolchain
+        run: |
+          rustup toolchain install
+          rustc --version
+      - name: What each package ships
+        run: scripts/check-package.sh
+      # gpui-kit-material has Git dependencies until the crate split and cannot publish.
+      - name: Publish dry run of the crate without Git dependencies
+        run: cargo publish --locked --dry-run -p gpui-kit-material-color
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-deny@0.20.2
+      - name: Licenses, sources, advisories and bans
+        run: cargo deny --locked check
 
   wasm:
     runs-on: ubuntu-latest

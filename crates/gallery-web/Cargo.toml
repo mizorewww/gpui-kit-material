@@ -2,7 +2,11 @@
 name = "gpui-kit-material-gallery-web"
 version.workspace = true
 edition.workspace = true
-license.workspace = true
+rust-version.workspace = true
+# The shared gallery bundles IBM Plex Sans and Roboto under OFL-1.1 (their licenses
+# sit beside them in crates/material/examples/gallery/fonts), and serves Material
+# Symbols under Apache-2.0.
+license = "MIT AND Apache-2.0 AND OFL-1.1"
 publish = false
 
 [lib]

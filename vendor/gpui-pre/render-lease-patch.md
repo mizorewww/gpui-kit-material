@@ -13,3 +13,7 @@ no retained subtrees, it is `update`.
 Rows that need an entity's `Context` for their listeners had only `update`, and each
 row built that way invalidated every retained row that read the entity. Depends on no
 other local patch.
+
+Dev-only: the method exists behind `frame-observation`, for the Gallery's rows
+(`examples/gallery/page.rs`). No library code uses it, and a consumer's engine does
+not have it.

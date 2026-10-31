@@ -1,0 +1,24 @@
+[package]
+name = "external-consumer"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+gpui-kit = { git = "https://github.com/longbridge/gpui-kit", rev = "bb85882e1faab845d9e7be33b69a152879a90f69" }
+gpui-kit-material = { git = "@REPO@", rev = "@REV@" }
+
+[patch.crates-io]
+gpui-base = { git = "@REPO@", rev = "@REV@" }
+gpui-pre = { git = "@REPO@", rev = "@REV@" }
+gpui-pre-apple = { git = "@REPO@", rev = "@REV@" }
+gpui-pre-web = { git = "@REPO@", rev = "@REV@" }
+gpui-fast = { git = "@REPO@", rev = "@REV@" }
+gpui-fast-apple = { git = "@REPO@", rev = "@REV@" }
+gpui-fast-web = { git = "@REPO@", rev = "@REV@" }
+
+[patch."https://github.com/longbridge/gpui-kit"]
+gpui-kit = { git = "@REPO@", rev = "@REV@" }
+gpui-base = { git = "@REPO@", rev = "@REV@" }
+
+[workspace]

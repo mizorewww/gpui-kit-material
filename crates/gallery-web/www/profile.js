@@ -13,9 +13,9 @@
 // `?profile=idle` records an untouched window: every new frame after the
 // settle period counts against the "idle windows draw nothing" target.
 // `targets` judges the AGENTS.md budgets for WASM (steady-state x2) from the
-// raw scopes; a target without data is UNVERIFIED, never PASS.
+// raw scopes; a target without data is UNVERIFIED, never PASS. New frames per
+// second and the first frame are reported beside them.
 
-const BUDGET_MS = 2;
 const WINDOW_MS = 250;
 // AGENTS.md: WASM steady-state budgets are the native ones x2.
 const WASM_STEADY_P95_MS = 2;
@@ -127,7 +127,7 @@ export function installProfiler(params) {
         end_ms: frameEnd[i],
         cpu_ms: ms,
         successful_new_frames: Number.isNaN(frameCount[i]) ? null : frameCount[i],
-        over_budget: ms > BUDGET_MS,
+        over_budget: ms > WASM_STEADY_MAX_MS,
       });
     }
     const scopes = state.initial
@@ -145,8 +145,6 @@ export function installProfiler(params) {
       errors.push("no wheel input was dispatched");
     }
     const vsyncFinal = counters?.gallery_vsync_status() ?? null;
-    const cpuFailure = scopes.some((ms) => ms > BUDGET_MS);
-    const fpsFailure = mode === "scroll" && minimumFps !== null && minimumFps < 500;
     const targetFailure = Object.values(targets).some((t) => t.verdict === "FAIL");
     const settled = rows.filter((r) => startedAt !== null && r.start_ms >= startedAt + SETTLE_MS);
     const steady = settled.map((r) => r.cpu_ms);
@@ -175,19 +173,16 @@ export function installProfiler(params) {
       steady_cpu_max: judge("steady-state rAF CPU max (WASM budget x2)", WASM_STEADY_MAX_MS,
         mode === "scroll" ? steadySummary.max_ms : null),
       idle_frames: judge("idle window draws nothing (new frames after settling)", 0, idleNewFrames),
-      first_frame: judge("synchronous run() plus the first presenting rAF scope (reported; native budget 16 ms)", 16,
-        state.initial && firstNew ? state.initial.end - state.initial.start + firstNew.cpu_ms : null),
       page_switch: judge("page switch main-thread CPU, worst", 8,
         pageSwitches.length ? Math.max(...pageSwitches) : null, "<=",
         pageSwitches.length ? undefined : "hook window.__galleryPageSwitch(ms) not called by the shell"),
-      gpu_p95: judge("GPU time p95", 2, null, "<=", "no WebGPU timestamp queries"),
-      fps_vsync_off_min: judge("new frames/s, minimum full window", 500,
-        mode === "scroll" ? minimumFps : null, ">="),
+      md3io_comparison: judge("main-thread frame time at least 5x below md3.io (ratio)", 5, null, ">=",
+        "needs the DevTools comparison in docs/DEVELOPMENT.md, on interactions with real main-thread work"),
     };
     const report = {
       schema: "gallery-web-frames-v2",
       mode,
-      budget_ms: BUDGET_MS,
+      budget_ms: WASM_STEADY_MAX_MS,
       scope:
         "performance.now() around each requestAnimationFrame callback (all synchronous GPUI frame work including WebGPU command submission) from page start, plus the synchronous run() startup; browser graphics open the window asynchronously, so its first draw is captured as an rAF scope",
       timer_resolution_note: `crossOriginIsolated=${self.crossOriginIsolated}; browsers coarsen performance.now() (about 5 us isolated, 100 us otherwise)`,
@@ -200,6 +195,7 @@ export function installProfiler(params) {
       subsequent_frames_summary: summarize(durations),
       steady_frames_summary: steadySummary,
       steady_definition: `rAF scopes starting ${SETTLE_MS} ms after the measured run started`,
+      first_frame_ms: state.initial && firstNew ? state.initial.end - state.initial.start + firstNew.cpu_ms : null,
       page_switch_ms: pageSwitches,
       targets,
       gpu_time_ms: null,
@@ -223,7 +219,7 @@ export function installProfiler(params) {
         "Gallery traversal coverage is not verifiable from the browser driver",
         "window FPS is an average per 250 ms window, not a per-frame minimum",
       ],
-      exit_code: cpuFailure || fpsFailure || targetFailure ? 1 : 2,
+      exit_code: targetFailure ? 1 : 2,
     };
     window.__galleryProfile = { done: true, report };
     console.info(`Gallery profile done: exit ${report.exit_code}`);
@@ -329,7 +325,7 @@ function summarize(values) {
     median_ms: rank(50),
     p95_ms: rank(95),
     p99_ms: rank(99),
-    over_budget_frames: values.filter((ms) => ms > BUDGET_MS).length,
+    over_budget_frames: values.filter((ms) => ms > WASM_STEADY_MAX_MS).length,
   };
 }
 

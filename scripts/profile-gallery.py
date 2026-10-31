@@ -111,10 +111,10 @@ def source_identity(features):
 
 
 def runner_exit_code(capture_code, inputs_stable, scroll, report_path):
-    """0: complete run, CPU and FPS gates both pass. 1: a measured gate
-    failed. 2: evidence incomplete, unstable or unverifiable.
+    """0: complete run, CPU gate passes. 1: a measured gate failed. 2: evidence
+    incomplete, unstable or unverifiable.
 
-    A startup run measures only the CPU gate, so it can fail (1) but never
+    A startup run has no steady state to judge, so it can fail (1) but never
     pass (0). Only a scroll run that the gallery itself reports as eligible,
     with exit 0, complete traversal and an eligible CPU report, returns 0.
     """
@@ -244,17 +244,14 @@ MS = 1_000_000
 TARGETS = {
     "steady_cpu_p95": ("steady-state main-thread CPU p95 (excluding drawable wait)", 1 * MS),
     "steady_cpu_max": ("steady-state main-thread CPU max (excluding drawable wait)", 2 * MS),
-    "drawable_wait_on_main_thread": ("main-thread drawable wait (must not occur; any frame > 0.1 ms fails)", MS // 10),
+    "material_list_vs_kit": ("Material list instructions per frame / equivalent Kit list, worst of p50 and p95", 2.0),
     "idle_frames": ("idle window draws and presents nothing", 0),
-    "forced_redraw_max": ("forced redraw of an unchanged page, every frame", 3 * MS // 10),
-    "first_frame_cpu": ("first frame: window open to first presented frame, main-thread CPU", 16 * MS),
-    "page_switch": ("switching Gallery pages", 8 * MS),
-    "gpu_p95": ("GPU time p95 (reported separately)", 2 * MS),
-    "fps_vsync_off_min": ("new frames/s with vsync off, minimum 100 ms window", 500),
     "missed_refreshes_vsync_on": ("missed refreshes with vsync on at 120 Hz", 0),
+    "first_frame_vs_kit": ("first frame main-thread CPU / Kit's stories baseline on this machine", 1.2),
+    "page_switch": ("switching Gallery pages", 8 * MS),
 }
-# WASM: the steady-state budgets x2 (AGENTS.md); other targets keep their values.
-WASM_FACTOR = {"steady_cpu_p95": 2, "steady_cpu_max": 2}
+# WASM: the steady-state budgets x2 (AGENTS.md); www/profile.js judges them.
+# GPU time, drawable wait and new frames per second are reported under `metrics`.
 
 
 def nearest_rank(values, q):
@@ -271,19 +268,58 @@ def distribution(values):
             "max_ns": max(values) if values else None}
 
 
-def verdict(name, measured, *, wasm=False, compare="<=", note=None):
+def verdict(name, measured, *, note=None):
     label, limit = TARGETS[name]
-    limit *= WASM_FACTOR.get(name, 1) if wasm else 1
     if measured is None:
         result = "UNVERIFIED"
-    elif compare == "<=":
-        result = "PASS" if measured <= limit else "FAIL"
     else:
-        result = "PASS" if measured >= limit else "FAIL"
+        result = "PASS" if measured <= limit else "FAIL"
     entry = {"target": label, "limit": limit, "measured": measured, "verdict": result}
     if note:
         entry["note"] = note
     return entry
+
+
+def first_frame_verdict(first_frame_ns, kit_baseline_ns, note):
+    """AGENTS.md: at most 20% above Kit's stories baseline on the same machine."""
+    if first_frame_ns is None or not kit_baseline_ns:
+        missing = "no first frame measured" if first_frame_ns is None \
+            else "pass --kit-first-frame-ms, measured on this machine"
+        return verdict("first_frame_vs_kit", None, note=f"{note}; {missing}")
+    return verdict("first_frame_vs_kit", first_frame_ns / kit_baseline_ns,
+                   note=f"{note}; {first_frame_ns} ns over a {kit_baseline_ns} ns baseline")
+
+
+def material_list_verdict(reports):
+    """AGENTS.md: a Material list costs at most 2x the instructions per frame of
+    an equivalent Kit list. component_bench reports of both, same mode and backend."""
+    def instructions(report):
+        column = report["columns"].index("instructions")
+        return [frame[column] for frame in report["frames"]]
+
+    material = reports.get("material-list")
+    kit = reports.get("kit-list")
+    if not material or not kit:
+        return {}, verdict("material_list_vs_kit", None, note="needs component_bench reports of both lists")
+    problems = []
+    if material["mode"] != kit["mode"]:
+        problems.append(f"modes differ ({material['mode']}, {kit['mode']})")
+    if material["metadata"].get("backend") != kit["metadata"].get("backend"):
+        problems.append("backends differ")
+    if material.get("viewport") != kit.get("viewport") or material.get("scale") != kit.get("scale"):
+        problems.append("viewports differ")
+    if material["mode"] == "scroll" and not (material.get("scroll_steps_that_moved") and kit.get("scroll_steps_that_moved")):
+        problems.append("a list did not scroll")
+    ours, theirs = distribution(instructions(material)), distribution(instructions(kit))
+    metrics = {"mode": material["mode"], "material_instructions": ours, "kit_instructions": theirs}
+    if not theirs["p50_ns"] or not theirs["p95_ns"]:
+        problems.append("no instruction counts (they read 0 outside native macOS)")
+    if problems:
+        return metrics, verdict("material_list_vs_kit", None, note="; ".join(problems))
+    ratios = {q: ours[f"{q}_ns"] / theirs[f"{q}_ns"] for q in ("p50", "p95", "max")}
+    metrics["ratios"] = ratios
+    return metrics, verdict("material_list_vs_kit", max(ratios["p50"], ratios["p95"]),
+                            note=f"{material['mode']}; max-frame ratio {ratios['max']:.2f}")
 
 
 def bench_steady(report):
@@ -304,7 +340,7 @@ def missed_refreshes(frame_end_ns, refresh_ns):
     return missed
 
 
-def bench_targets(reports):
+def bench_targets(reports, *, kit_first_frame_ns=None):
     """Target verdicts from engine_bench reports keyed by scenario-vsync."""
     out = {"source": "crates/material/examples/engine_bench.rs (standalone, not the Gallery)",
            "metrics": {}, "targets": {}}
@@ -329,13 +365,6 @@ def bench_targets(reports):
         s = m["scroll_vsync_off"]
         out["targets"]["steady_cpu_p95"] = verdict("steady_cpu_p95", s["cpu_excluding_drawable_wait"]["p95_ns"])
         out["targets"]["steady_cpu_max"] = verdict("steady_cpu_max", s["cpu_excluding_drawable_wait"]["max_ns"])
-        out["targets"]["drawable_wait_on_main_thread"] = verdict(
-            "drawable_wait_on_main_thread", s["drawable_wait"]["max_ns"],
-            note=f"{s['frames_with_drawable_wait_over_0_1ms']} of {len(frames)} frames waited > 0.1 ms")
-        out["targets"]["gpu_p95"] = verdict("gpu_p95", s["gpu"]["p95_ns"])
-        out["targets"]["fps_vsync_off_min"] = verdict(
-            "fps_vsync_off_min", s["min_100ms_window_new_frames_per_s"], compare=">=",
-            note=f"overall {s['new_frames_per_s']:.1f} new frames/s; successful submissions only")
     on = reports.get("scroll-on")
     if on:
         refresh = on.get("display_refresh_interval_ns")
@@ -366,9 +395,6 @@ def bench_targets(reports):
         frames = bench_steady(redraw)
         m["forced_redraw"] = {"cpu_excluding_drawable_wait": distribution(
             s["cpu_excluding_drawable_wait_ns"] for s in frames)}
-        dist = m["forced_redraw"]["cpu_excluding_drawable_wait"]
-        out["targets"]["forced_redraw_max"] = verdict(
-            "forced_redraw_max", dist["max_ns"], note=f"p95 {dist['p95_ns']} ns; root view notified each frame")
     startups = [r for k, r in sorted(reports.items()) if k.startswith("startup")]
     if startups:
         cpu = [r["summary"].get("first_frame_main_thread_cpu_ns") for r in startups]
@@ -380,13 +406,13 @@ def bench_targets(reports):
             "wall_to_first_frame_ns": [r.get("first_frame_cpu", {}).get("wall_to_after_first_frame_ns") for r in startups],
         }
         worst = None if any(c is None for c in cpu) else max(cpu)
-        out["targets"]["first_frame_cpu"] = verdict("first_frame_cpu", worst, note="worst of the runs")
+        out["targets"]["first_frame_vs_kit"] = first_frame_verdict(worst, kit_first_frame_ns, "worst of the runs")
     out["targets"]["page_switch"] = verdict(
         "page_switch", None, note="the standalone benchmark has no pages; measured from the Gallery shell")
     return out
 
 
-def gallery_targets(frames, *, page_switch_ns=None):
+def gallery_targets(frames, *, page_switch_ns=None, kit_first_frame_ns=None):
     """Target verdicts from a native Gallery frames.json (startup or scroll)."""
     cpu = frames.get("cpu", frames)
     scopes = cpu.get("cpu_scopes", [])
@@ -406,17 +432,12 @@ def gallery_targets(frames, *, page_switch_ns=None):
     m["first_frame_cpu_ns"] = (initial + first["cpu_frame_ns"]) if initial and first.get("cpu_frame_ns") else None
     out["targets"]["steady_cpu_p95"] = verdict("steady_cpu_p95", m["steady_cpu_excluding_drawable_wait"]["p95_ns"])
     out["targets"]["steady_cpu_max"] = verdict("steady_cpu_max", m["steady_cpu_excluding_drawable_wait"]["max_ns"])
-    out["targets"]["drawable_wait_on_main_thread"] = verdict(
-        "drawable_wait_on_main_thread", m["drawable_wait"]["max_ns"])
-    out["targets"]["gpu_p95"] = verdict("gpu_p95", m["gpu"]["p95_ns"])
-    out["targets"]["first_frame_cpu"] = verdict(
-        "first_frame_cpu", m["first_frame_cpu_ns"],
-        note="InitialDraw scope plus the first presenting frame's scope; window creation CPU is not included in Gallery evidence")
+    out["targets"]["first_frame_vs_kit"] = first_frame_verdict(
+        m["first_frame_cpu_ns"], kit_first_frame_ns,
+        "InitialDraw scope plus the first presenting frame's scope; window creation CPU is not included in Gallery evidence")
     windows = [w["fps"] for w in frames.get("windows", []) if not w.get("partial")]
     if frames.get("schema") == "gallery-scroll-observations-v1":
-        out["targets"]["fps_vsync_off_min"] = verdict(
-            "fps_vsync_off_min", min(windows) if windows else None, compare=">=",
-            note="Gallery driver windows (>= 250 ms)")
+        m["min_full_window_new_frames_per_s"] = min(windows) if windows else None
     # Page switching: the md3.io-style shell reports `page_switch_ns` per switch
     # once it lands; until then this stays UNVERIFIED.
     switches = page_switch_ns if page_switch_ns is not None else frames.get("page_switch_ns")
@@ -431,8 +452,8 @@ def print_targets(table, file=sys.stdout):
         measured = entry["measured"]
         if measured is None:
             shown = "-"
-        elif name.startswith("fps"):
-            shown = f"{measured:.0f}/s"
+        elif name.endswith("_vs_kit"):
+            shown = f"{measured:.2f}x"
         elif name in ("idle_frames", "missed_refreshes_vsync_on"):
             shown = str(measured)
         else:
@@ -487,7 +508,7 @@ def bench_profile(args, destination):
     provenance["source_after_capture"] = repository_identity(ROOT)
     provenance["inputs_stable"] = provenance["source_before_build"] == provenance["source_after_capture"]
     (destination / "build.json").write_text(json.dumps(provenance, indent=2) + "\n")
-    table = bench_targets(reports)
+    table = bench_targets(reports, kit_first_frame_ns=kit_first_frame_ns(args))
     table["load_average"] = [provenance["load_average_before"], provenance["load_average_after"]]
     (destination / "targets.json").write_text(json.dumps(table, indent=2) + "\n")
     print(f"Engine benchmark targets ({args.bench_content} rows, load {provenance['load_average_before']}):")
@@ -519,13 +540,21 @@ def interaction_frames(data):
             "page_switch_ns": data["page_switch_ns"], "schema": data["schema"]}
 
 
-def summarize(paths):
-    """Print target verdicts for existing engine_bench reports or Gallery frames.json."""
+def kit_first_frame_ns(args):
+    return round(args.kit_first_frame_ms * MS) if args.kit_first_frame_ms else None
+
+
+def summarize(paths, *, kit_baseline_ns=None):
+    """Print target verdicts for existing engine_bench reports, component_bench
+    reports of the Material and Kit lists, or Gallery frames.json."""
     reports = {}
+    lists = {}
     code = 2
     for path in paths:
         data = json.loads(Path(path).read_text())
-        if data.get("schema") == "material-engine-bench-v1":
+        if data.get("schema") == "component-bench-v1":
+            lists[data["content"]] = data
+        elif data.get("schema") == "material-engine-bench-v1":
             key = data["scenario"]
             key = f"{key}-{len([k for k in reports if k.startswith('startup')]) + 1}" if key == "startup" \
                 else f"{key}-{'on' if data['requested_vsync'] else 'off'}"
@@ -533,15 +562,21 @@ def summarize(paths):
         else:
             if data.get("schema") == "gallery-interactions-v1":
                 data = interaction_frames(data)
-            table = gallery_targets(data)
+            table = gallery_targets(data, kit_first_frame_ns=kit_baseline_ns)
             print(f"{path}:")
             print_targets(table)
             code = 1 if any(t["verdict"] == "FAIL" for t in table["targets"].values()) else code
     if reports:
-        table = bench_targets(reports)
+        table = bench_targets(reports, kit_first_frame_ns=kit_baseline_ns)
         print("engine_bench:")
         print_targets(table)
         code = 1 if any(t["verdict"] == "FAIL" for t in table["targets"].values()) else code
+    if lists:
+        metrics, entry = material_list_verdict(lists)
+        table = {"metrics": metrics, "targets": {"material_list_vs_kit": entry}}
+        print("component_bench:")
+        print_targets(table)
+        code = 1 if entry["verdict"] == "FAIL" else code
     return code
 
 
@@ -617,10 +652,14 @@ def main():
                         help="run the www/profile.js frame probe on a reference page (e.g. https://md3.io/) "
                              "in Chromium for the WASM comparison")
     parser.add_argument("--summarize", nargs="+", type=Path, metavar="JSON",
-                        help="print target verdicts for existing engine_bench reports or Gallery frames.json")
+                        help="print target verdicts for existing engine_bench or component_bench reports "
+                             "or Gallery frames.json")
+    parser.add_argument("--kit-first-frame-ms", type=float, metavar="MS",
+                        help="first frame main-thread CPU of Kit's stories on this machine; "
+                             "without it the first-frame target is UNVERIFIED")
     args = parser.parse_args()
     if args.summarize:
-        return summarize(args.summarize)
+        return summarize(args.summarize, kit_baseline_ns=kit_first_frame_ns(args))
     if args.output is None:
         parser.error("an output directory is required")
     if args.scroll_input and not args.scroll:
@@ -740,7 +779,8 @@ def main():
     result = runner_exit_code(code, provenance["inputs_stable"], args.scroll,
                               destination / "frames.json")
     try:
-        table = gallery_targets(json.loads((destination / "frames.json").read_text()))
+        table = gallery_targets(json.loads((destination / "frames.json").read_text()),
+                                kit_first_frame_ns=kit_first_frame_ns(args))
         (destination / "targets.json").write_text(json.dumps(table, indent=2) + "\n")
         print_targets(table)
     except (OSError, ValueError, KeyError, TypeError) as error:

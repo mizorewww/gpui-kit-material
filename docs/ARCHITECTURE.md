@@ -72,9 +72,11 @@ fields keep Component's mode behavior.
 It is an element that re-enters around each drawing phase of its subtree, while
 `theme::color` answers from it and Kit's theme globals hold its projection.
 Material's overlays wrap what they defer in `current_scope`, which brings it back in.
-Swapping the globals notifies their observers, none of which redraws, but GPUI Fast
-stamps them as changed, so while a scheme scope is on screen a draw rebuilds retained
-subtrees that read Kit's theme. Its limits are listed in `src/scope.rs`.
+It swaps the globals quietly (`App::swap_global_quietly`): no observer is notified and
+GPUI Fast does not stamp them as changed, so nothing outside the scope rebuilds for
+them. The view holding the scope reads a marker global that drawing the scope stamps,
+so only that view rebuilds, and a view nested in it rebuilds through it, in the scope.
+Its limits are listed in `src/scope.rs`.
 
 `theme::color` is context-free and thread-local, so helpers stay plain
 functions; GPUI paints on one UI thread.
@@ -121,23 +123,27 @@ overriding `gpui-pre` overrides it for this kit too.
 ### Consumer patch set
 
 A consumer patches `gpui-kit`, `gpui-base`, `gpui-pre`, `gpui-fast`,
-`gpui-pre-apple`, `gpui-fast-apple`, `gpui-pre-web` and `gpui-fast-web`, exactly as
-[crates/consumer-check/Cargo.toml](../crates/consumer-check/Cargo.toml) does; CI
-builds that crate on every target and both backends, beside upstream's `gpui-fps`.
+`gpui-pre-apple`, `gpui-fast-apple`, `gpui-pre-web` and `gpui-fast-web`, as the
+[quick start](../README.md#quick-start) shows, from this repository at the same revision
+as the dependency. CI builds that manifest from Git at the pushed commit
+(`scripts/check-git-consumer.sh`) on every target, and
+[crates/consumer-check/Cargo.toml](../crates/consumer-check/Cargo.toml), the same patches
+from this checkout, on every target and both backends, beside upstream's `gpui-fps`.
 Its engine has upstream's `FrameEvent`, `PlatformWindow` and frame path.
 
 | Consumer crate | Why a consumer needs it |
 | --- | --- |
 | `gpui-kit` | Normalized manifest that keeps WASM single-threaded by default. |
 | `gpui-base` | Slider, dialog and toolbar corrections, transition behavior, and the input reporting its caret. |
-| `gpui-pre`, `gpui-fast` | Layout direction, letter spacing, the lazy tab-stop index, repeat playback and visibility, and the other engine rules in the table below. |
+| `gpui-pre`, `gpui-fast` | Layout direction, letter spacing, the lazy tab-stop index, repeat playback and visibility, the quiet global swap, the focused input's caret, and the other engine rules in the table below. An application with a scrolling form on a phone needs that caret to keep it above the keyboard, as the Gallery shell does; upstream has no other way to find it. |
 | `gpui-pre-apple`, `gpui-fast-apple` | Non-Latin and app-private fallback fonts. |
 | `gpui-pre-web`, `gpui-fast-web` | The browser's IME panel opens at the caret; upstream's `update_ime_position` does nothing. Only matters on `wasm32`. |
 
 Everything else in `vendor/` is a **dev-only overlay**, marked in the table below,
 for the Gallery's FPS display
 and vsync switch, `engine_bench` and `scripts/profile-gallery.py`: frame statistics,
-vsync control, CPU scopes, presentation timing and GPU time. `gpui-pre` and
+vsync control, CPU scopes, presentation timing and GPU time, and the render lease the
+Gallery's rows build through. `gpui-pre` and
 `gpui-fast` gate them behind the `frame-observation` Cargo feature, and only the
 overlay's backend manifests (`gpui-*-macos`, `-linux`, `-windows`) turn it on. The
 web crates are not overlays, so their manifests leave it off and offer a
@@ -148,12 +154,12 @@ does not compile here (`E0004`, `FrameEvent::Complete`) and is not used here.
 
 | Vendored | Source | Why |
 | --- | --- | --- |
-| `gpui-kit` | Git `main` at audited `bb85882`, unchanged source | Normalized manifest disables implicit WASM threading (`multithreaded-web` restores it). Hashes in `SOURCE.md`/`SOURCE.json`. |
+| `gpui-kit` | Git at audited `bb85882`, unchanged source | Normalized manifest disables implicit WASM threading (`multithreaded-web` restores it). Hashes in `SOURCE.md`/`SOURCE.json`. |
 | `gpui-base` | Git `bb85882` (`crates/base`) + patches (`SOURCE.json`, `motion-patch.md`) | CSS transition reversal, per-transition reduced motion, `TransitionPlayback`; vertical `Toolbar` axis; slider step snapping from min, assistive Increment/Decrement that move only a range's end, `Slider::track_focus`, right-to-left pointer math; `Dialog::accessibility_label`; the input reports its caret to the platform when it moves (`ime-anchor-patch.md`). |
-| `gpui-pre` (GPUI `=0.3.10`) | crates.io + patches (`SOURCE.json`, `*-patch.md`) | Layout direction; letter spacing; animation visibility and repeat playback; complete CPU frame scopes, presentation wait, GPU time and submission outcome in the profiler; submission statistics, vsync control and throttle retry; `em`/`ch` metrics for fonts without `m`; lazy tab-stop index (`tab-stop-index-patch.md`); `Entity::update_for_render` (`render-lease-patch.md`); overflowing spaces hang instead of starting a wrapped row (`hanging-space-patch.md`); test-harness repairs; `Window::focused_input_selection_bounds` (`focused-input-bounds-patch.md`). |
+| `gpui-pre` (GPUI `=0.3.10`) | crates.io + patches (`SOURCE.json`, `*-patch.md`) | Layout direction; letter spacing; animation visibility and repeat playback; complete CPU frame scopes, presentation wait, GPU time and submission outcome in the profiler; submission statistics, vsync control and throttle retry; `em`/`ch` metrics for fonts without `m`; lazy tab-stop index (`tab-stop-index-patch.md`); `App::swap_global_quietly`, which a scope's theme and the text field's caret need (`quiet-global-swap-patch.md`); `Entity::update_for_render`, dev-only behind `frame-observation` (`render-lease-patch.md`); overflowing spaces hang instead of starting a wrapped row (`hanging-space-patch.md`); test-harness repairs; `Window::focused_input_selection_bounds` (`focused-input-bounds-patch.md`). |
 | `gpui-pre-apple` | crates.io + patches (`SOURCE.json`, `VENDORED.md`) | Non-Latin and app-private fallback fonts; `draw_with_status` with a per-draw autorelease pool, drawable-wait and GPU timestamps. |
 | `gpui-pre-web` | crates.io + patches (`SOURCE.json`, `MATERIAL-PATCHES.md`) | Moves the hidden IME input to the caret, where a browser opens its candidate window (consumers need this); successful submission count, behind the crate's own `frame-observation` feature. |
-| `gpui-fast`, `-apple`, `-web` | 0.1.12 + patches (`MATERIAL-MIGRATION.json`, per-file `local_changes`) | The GPUI, Apple and web patches above carried through Fast retained/scroll replay and composition; explicit single-threaded web defaults. |
+| `gpui-fast`, `-apple`, `-web` | 0.1.12 + patches (`MATERIAL-MIGRATION.json`, per-file `local_changes`) | The GPUI, Apple and web patches above carried through Fast retained/scroll replay and composition; explicit single-threaded web defaults. Two of its own for performance: a wheel that cannot move its box does not notify or mark it scrolled (`src/elements/div.rs`, `crates/material/tests/wheel_guard.rs`), and `App::record_entities_accessed` touches only the entities that entered or left the tracked set (`src/app.rs`). |
 | `gpui-pre-macos`, `gpui-fast-macos` (dev-only) | crates.io + patches (`SOURCE.json`, `MATERIAL-PATCHES.md`) | Vsync control, demand waker, periodic-source report and submission statistics (below). |
 | `gpui-pre-linux`, `gpui-fast-linux`, `gpui-pre-wgpu`, `gpui-fast-wgpu`, `wgpu` (dev-only) | crates.io + patches (`SOURCE.json`, `MATERIAL-PATCHES.md`) | Submission statistics from the present status `wgpu` otherwise discards, and vsync control through `PresentMode` (below). |
 | `gpui-pre-windows`, `gpui-fast-windows` (dev-only) | crates.io + patches (`SOURCE.json`, `MATERIAL-PATCHES.md`) | Submission statistics counting only `S_OK` presents, and vsync control through the DXGI sync interval (below). |
@@ -207,8 +213,8 @@ surface's `wgpu::PresentMode` (X11 starts on `Fifo`, Wayland on `Mailbox`); Wind
 to the DXGI sync interval (upstream's 0, so it starts `Disabled`). Unsupported
 backends return an error rather than a pretend value. On Linux and Windows frame
 requests stay paced by the display (X11 refresh timer, Wayland frame callback,
-`DwmFlush`), so vsync off cannot exceed its refresh rate there and the 500 FPS gate
-is not measurable until those backends gain a demand-driven frame source. With vsync off, real frame
+`DwmFlush`), so vsync off cannot exceed its refresh rate there until those backends
+gain a demand-driven frame source. With vsync off, real frame
 demand drives the coalescing main-thread source; the display link remains only
 as a safety throttle, so clean windows gain no render loop.
 

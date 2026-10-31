@@ -12,11 +12,10 @@ licenses, and the generated local manifest. `LICENSE-APACHE` and
 
 The local `Cargo.toml` expands the source workspace's edition, Clippy lints and
 dependency declarations. Source workspace siblings (`gpui-base`,
-`gpui-component`, `gpui-kit-assets`) use the original Git repository's `main`
-source rather than crates.io; the consuming root lockfile must retain the
-matching pinned revision. This preserves source identity with the consuming
-application and symbols adapter. Updating that lockfile to another revision
-requires reviewing or refreshing the facade copy as well.
+`gpui-component`, `gpui-kit-assets`) use the original Git repository at the pinned
+revision rather than crates.io, so a consumer without this workspace's lockfile
+still gets Component at the revision the facade was copied from. Moving to another
+revision means refreshing the facade copy and this pin together.
 
 The behavioral manifest changes are limited to platform feature selection:
 

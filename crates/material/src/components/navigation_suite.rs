@@ -6,7 +6,8 @@
 //! (`packages/m3e-motion/src/window-size-class.ts`, `navigation-suite.ts`,
 //! `packages/m3e-css/src/navigation-suite.css`,
 //! `navigation-suite-defaults.css`, from androidx
-//! `19991f2c0858aadfcb442ce02b2c8e4743c96898`). The bar, rail and drawer keep
+//! `19991f2c0858aadfcb442ce02b2c8e4743c96898`, Apache-2.0: `LICENSE-androidx` in
+//! this directory). The bar, rail and drawer keep
 //! their own Figma-sourced values. Showing and hiding plays the default spatial
 //! token, the same as the rail and drawer it moves: m3e's fixed 0.9 / 700 spring
 //! is that token under the Standard scheme.

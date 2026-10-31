@@ -79,6 +79,7 @@ fn a_subtree_built_again_reading_the_same_takes_the_list_it_had() {
 
 /// A lease to build from an entity leaves what read it alone; an update, or a
 /// notify during the lease, builds it again.
+#[cfg(feature = "frame-observation")]
 #[test]
 fn a_render_lease_is_not_a_change_unless_it_notifies() {
     use crate::{

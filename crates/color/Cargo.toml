@@ -3,12 +3,17 @@ name = "gpui-kit-material-color"
 description = "Material 3 color roles, built-in palettes and scheme derivation for gpui-kit-material, without a GPUI dependency"
 version.workspace = true
 edition.workspace = true
-# MIT, plus the Apache-2.0 port of material-color-utilities in src/dynamic.
+rust-version.workspace = true
+# MIT (LICENSE), plus the Apache-2.0 port of material-color-utilities in src/dynamic
+# (licenses/material-color-utilities.txt) and the palette notices in licenses/.
 license = "MIT AND Apache-2.0"
 repository.workspace = true
 authors.workspace = true
 keywords = ["material", "color", "theme", "gpui"]
 categories = ["gui"]
+
+[package.metadata.docs.rs]
+all-features = true
 
 [features]
 default = ["serde"]

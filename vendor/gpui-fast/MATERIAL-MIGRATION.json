@@ -308,13 +308,13 @@
       },
       "src/text_system/line_layout.rs": {
         "upstream_sha256": "757c2672c0831f9f848845c6ac74dece3c6e0401613b1e00325129cbf1548c08",
-        "local_sha256": "e8a428f8f02b05f307c0743f0b8d646ba68fc40ec6593cf08fe6ad08e69fa89f",
-        "reason": "Fields pub(crate) for Fast's text-cache carry-over. Spaced line layouts in the cache key and apply_letter_spacing (vendor/gpui-pre/letter-spacing-patch.md). Hanging overflow space in compute_wrap_boundaries (vendor/gpui-pre/hanging-space-patch.md)."
+        "local_sha256": "a67f2f34e3a0c44823bf246238ae03d41304c0f3c80fff36340e1aa50157ad51",
+        "reason": "Spaced line layouts in the cache key and apply_letter_spacing; layout_wrapped_line stays as the zero-spacing form (vendor/gpui-pre/letter-spacing-patch.md). Hanging overflow space in compute_wrap_boundaries (vendor/gpui-pre/hanging-space-patch.md)."
       },
       "src/window.rs": {
         "upstream_sha256": "d3f00c28cc47446f6c73be67d00830446e0e3a9a7fadefdf54fff9e5ccadee0b",
         "local_sha256": "f5ca5a1c0bb9f76821053e6c25173acc91cc37e0a24005a3824772fcbbbd0380",
-        "reason": "Same GPUI window patches as vendor/gpui-pre (CPU frame scope, submission stats/vsync/throttle retry, present outcome); FrameDirtyAccumulator made pub(crate) for Fast layer reuse. Layout direction on the window, recorded per layout node (vendor/gpui-pre/layout-direction-patch.md)."
+        "reason": "Same GPUI window patches as vendor/gpui-pre (CPU frame scope, submission stats/vsync/throttle retry, present outcome, focused_input_selection_bounds); FrameDirtyAccumulator made pub(crate) to match the public field holding it, used nowhere else. Layout direction on the window, recorded per layout node (vendor/gpui-pre/layout-direction-patch.md)."
       },
       "src/tab_stop.rs": {
         "upstream_sha256": "0c14aec0196ad632601015e166dfcd3df72228292646120bbc3857c3631cd680",
@@ -363,12 +363,12 @@
       },
       "src/fast/dependencies.rs": {
         "upstream_sha256": "8f230852f0585bec1f92608aec4fcc3d8fb3f00ad4736cba8a8d05f736e84cc5",
-        "local_sha256": "5529a863e4edfb2d3b164dbac494fedd5fb1fdbf1786d51e5312ba6baed3ed91",
-        "reason": "Entity::update_for_render, the public form of dependencies::query (vendor/gpui-pre/render-lease-patch.md)."
+        "local_sha256": "31dae8069a989ee77ec61753c22bba96f6af0ea291511291723bf1fa5e4cf1e4",
+        "reason": "Entity::update_for_render, the public form of dependencies::query, behind frame-observation (vendor/gpui-pre/render-lease-patch.md)."
       },
       "src/fast/tests/dependencies.rs": {
         "upstream_sha256": "131164fada000e865db0a14855e4eab5446f89b45e70a1904414408cd0cdb6b0",
-        "local_sha256": "9e69cccb259c6531194158b892e3641fef5f09e86dea403eb6c381d1795b737d",
+        "local_sha256": "6e1ffcb4bb847e0d8bbd501c85d36c2a7133ad29c43120027ccd76f64e63bc05",
         "reason": "A render lease is not a change unless it notifies (vendor/gpui-pre/render-lease-patch.md)."
       }
     },

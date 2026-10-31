@@ -48,17 +48,32 @@ Icons come from
 
 ## Quick start
 
+The library is distributed by Git revision, and a downstream workspace needs the
+engine patches below until they land upstream. All of them must use one revision:
+
 ```toml
 [dependencies]
-gpui-kit = { git = "https://github.com/longbridge/gpui-kit", branch = "main" }
-gpui-kit-material = { git = "https://github.com/mizorewww/gpui-kit-material" }
+gpui-kit = { git = "https://github.com/longbridge/gpui-kit", rev = "bb85882e1faab845d9e7be33b69a152879a90f69" }
+gpui-kit-material = { git = "https://github.com/mizorewww/gpui-kit-material", rev = "d4776a29b7fc3b9a6bc5c14f840b34cb0ec64048" }
+
+[patch.crates-io]
+gpui-base = { git = "https://github.com/mizorewww/gpui-kit-material", rev = "d4776a29b7fc3b9a6bc5c14f840b34cb0ec64048" }
+gpui-pre = { git = "https://github.com/mizorewww/gpui-kit-material", rev = "d4776a29b7fc3b9a6bc5c14f840b34cb0ec64048" }
+gpui-pre-apple = { git = "https://github.com/mizorewww/gpui-kit-material", rev = "d4776a29b7fc3b9a6bc5c14f840b34cb0ec64048" }
+gpui-pre-web = { git = "https://github.com/mizorewww/gpui-kit-material", rev = "d4776a29b7fc3b9a6bc5c14f840b34cb0ec64048" }
+gpui-fast = { git = "https://github.com/mizorewww/gpui-kit-material", rev = "d4776a29b7fc3b9a6bc5c14f840b34cb0ec64048" }
+gpui-fast-apple = { git = "https://github.com/mizorewww/gpui-kit-material", rev = "d4776a29b7fc3b9a6bc5c14f840b34cb0ec64048" }
+gpui-fast-web = { git = "https://github.com/mizorewww/gpui-kit-material", rev = "d4776a29b7fc3b9a6bc5c14f840b34cb0ec64048" }
+
+[patch."https://github.com/longbridge/gpui-kit"]
+gpui-kit = { git = "https://github.com/mizorewww/gpui-kit-material", rev = "d4776a29b7fc3b9a6bc5c14f840b34cb0ec64048" }
+gpui-base = { git = "https://github.com/mizorewww/gpui-kit-material", rev = "d4776a29b7fc3b9a6bc5c14f840b34cb0ec64048" }
 ```
 
-> The workspace patches GPUI, GPUI Base and GPUI Fast (see `[patch]` in
-> [Cargo.toml](Cargo.toml) and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#engine-patches)).
-> Downstream workspaces need only the patches listed in
-> [crates/consumer-check/Cargo.toml](crates/consumer-check/Cargo.toml) until they
-> land upstream; the rest of `vendor/` is dev-only frame observation for the Gallery.
+> `[patch]` is read only from the top-level manifest, so it goes in your workspace root.
+> [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#consumer-patch-set) says why each patch
+> exists. The rest of `vendor/` is dev-only frame observation for the Gallery. CI builds
+> this manifest from Git at every pushed commit (`scripts/check-git-consumer.sh`).
 
 ```rust
 use gpui_kit_material::{color::themes::{Contrast, ThemeId, ThemeMode}, icons::Assets, theme};
@@ -127,7 +142,8 @@ python3 -m http.server 8080 --bind 127.0.0.1 --directory crates/gallery-web/www
 ```
 
 The title bar shows FPS of newly drawn frames; **Settings → Vertical sync**
-toggles Metal display sync on macOS. Headless capture, profiling and fixture
+toggles Metal display sync on macOS, the surface's `PresentMode` on Linux and the
+DXGI sync interval on Windows. Headless capture, profiling and fixture
 tooling are described in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
 
 ## References
@@ -144,14 +160,15 @@ tooling). These are targets; acceptance evidence is still open.
 
 | Target | Limit |
 | --- | --- |
-| Steady-state main-thread CPU | p95 ≤ 1 ms, max ≤ 2 ms (WASM ×2) |
-| Main-thread drawable wait | none |
+| Steady-state main-thread CPU (scrolling, hover, animations, typing) | p95 ≤ 1 ms, max ≤ 2 ms (WASM ×2) |
+| Material list against an equivalent Kit list | ≤ 2× the instructions per frame |
 | Idle window | draws nothing |
-| Forced redraw of an unchanged page | ≤ 0.3 ms |
-| First frame / page switch | ≤ 16 ms CPU / ≤ 8 ms |
-| GPU time | p95 ≤ 2 ms, reported separately |
-| Scrolling, vsync off | ≥ 500 new frames/s |
-| Scrolling, vsync on | no missed refreshes at 120 Hz |
+| Vertical sync on | no missed refreshes at 120 Hz |
+| First frame | ≤ 20% above Kit's stories baseline on the same machine |
+| Gallery page switch | ≤ 8 ms |
+| WASM against md3.io in Chrome, interactions with real main-thread work | main-thread frame time ≥ 5× lower |
+
+GPU time is reported separately.
 
 ## Develop
 
@@ -181,4 +198,9 @@ MIT, except files ported from Apache-2.0 sources, which keep their notices.
 Palette sources and licenses: [crates/color/PALETTES.md](crates/color/PALETTES.md).
 Material Symbols assets are Apache-2.0, retained in the pinned
 [Symbols repository](https://github.com/mizorewww/gpui-material-symbols/tree/593aa15a46076f3e2870c23c0e4fd79f94f105bd).
-Roboto and IBM Plex Sans gallery fonts are SIL OFL, bundled with their licenses.
+The gallery's fonts are SIL OFL 1.1, each beside its license in
+[crates/material/examples/gallery/fonts](crates/material/examples/gallery/fonts): Roboto
+and IBM Plex Sans, which it bundles, and Noto Sans Arabic, Noto Sans Hebrew, Noto Emoji
+and Noto Color Emoji, kept for conformance captures only and not bundled. None of them
+is part of the library's package. The published site lists every license at
+[/licenses/](https://material.mizore.blog/licenses/).

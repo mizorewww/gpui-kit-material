@@ -25,9 +25,8 @@ cosmic-text, the web) gets the same result from one implementation.
   `apply_letter_spacing` returns at once.
 - `LineLayoutCache::layout_line_spaced` and `layout_wrapped_line_spaced` add the
   spacing to the cache key, so a spaced line is shaped once and reused like any
-  other. `layout_line` keeps its signature and passes zero, as does `shape_text`, and zero
-  leaves the layout untouched. `layout_wrapped_line`, whose one caller is
-  `shape_text_spaced`, became the spaced form.
+  other. `layout_line` and `layout_wrapped_line` keep their signatures and pass zero,
+  as does `shape_text`, and zero leaves the layout untouched.
 - `WindowTextSystem::shape_text_spaced`, used by the text element.
 - `LineWrapper::letter_spacing`, added to each character's width by truncation, so
   a truncated line is measured as it paints. A pooled wrapper's handle starts at
