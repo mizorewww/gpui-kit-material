@@ -53,6 +53,8 @@ pub struct Page {
     outlined_email: Entity<InputState>,
     bio: Entity<TextareaState>,
     outlined_bio: Entity<TextareaState>,
+    hero: Entity<InputState>,
+    rounded: Entity<InputState>,
 }
 
 impl GalleryPage for Page {
@@ -74,6 +76,8 @@ impl GalleryPage for Page {
         let outlined_name = input("");
         let outlined_amount = input("");
         let outlined_email = input("not-an-email");
+        let hero = input("");
+        let rounded = input("");
         let bio = cx.new(|cx| TextareaState::new(window, cx).auto_grow(1, 5));
         let outlined_bio = cx.new(|cx| TextareaState::new(window, cx).auto_grow(1, 5));
         // Errors and counters follow the text; observing keeps them current.
@@ -99,11 +103,13 @@ impl GalleryPage for Page {
             outlined_email,
             bio,
             outlined_bio,
+            hero,
+            rounded,
         }
     }
 
     fn row_count(&self, _: &Window) -> usize {
-        BOARDS.len() + 3
+        BOARDS.len() + 4
     }
 
     fn interactive(&self, row: usize) -> bool {
@@ -117,6 +123,35 @@ impl GalleryPage for Page {
         match row - BOARDS.len() {
             0 => self.live_row("live-filled", TextFieldVariant::Filled, cx),
             1 => self.live_row("live-outlined", TextFieldVariant::Outlined, cx),
+            2 => spec::demo(
+                "live-hero",
+                "A hero field with its action, and rounded corners",
+                spec::demo_row()
+                    .items_start()
+                    .child(
+                        TextField::new("hero", &self.hero)
+                            .hero()
+                            .label("Video link")
+                            .placeholder("Paste a link")
+                            .leading_icon(symbol("link", false))
+                            .trailing_icon(
+                                material_button("hero-action", ButtonVariant::Tonal)
+                                    .icon(symbol("visibility", false))
+                                    .child("Preview"),
+                            )
+                            .w(rem(480.)),
+                    )
+                    .child(
+                        TextField::new("rounded", &self.rounded)
+                            .outlined()
+                            .shape(TextFieldShape::Rounded)
+                            .label("Name")
+                            .placeholder("First and last")
+                            .float_label(true)
+                            .w(rem(240.)),
+                    ),
+            )
+            .into_any_element(),
             _ => spec::demo(
                 "live-multi-line",
                 "Multi-line fields with character counters",

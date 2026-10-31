@@ -20,7 +20,7 @@ use crate::{
     motion::{self, MotionToken},
     theme::{blend, color},
     tokens::{
-        shape::RADIUS_EXTRA_SMALL,
+        shape::{RADIUS_EXTRA_SMALL, RADIUS_MEDIUM},
         state,
         typography::{TypeRole, rem},
     },
@@ -79,20 +79,60 @@ impl TextFieldDensity {
     }
 }
 
-/// The two M3 text field styles.
+/// The two M3 text field styles, and a hero field for a page's one main input.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub enum TextFieldVariant {
     #[default]
     Filled,
     Outlined,
+    /// A 72dp pill on surface, with a 2dp ring while focused or populated and no ring at
+    /// rest. It has no floating label: the label is its accessible name and the
+    /// placeholder says what to enter. Its trailing slot takes a labeled button, so the
+    /// field's action reads as part of the input.
+    Hero,
 }
 
 impl TextFieldVariant {
-    pub const ALL: [Self; 2] = [Self::Filled, Self::Outlined];
+    pub const ALL: [Self; 3] = [Self::Filled, Self::Outlined, Self::Hero];
     pub const fn name(self) -> &'static str {
         match self {
             Self::Filled => "Filled",
             Self::Outlined => "Outlined",
+            Self::Hero => "Hero",
+        }
+    }
+}
+
+/// The container height of a hero field.
+pub const HERO_FIELD_HEIGHT: f32 = 72.;
+/// The hero field's ring, always laid out so the text never moves.
+const HERO_RING: f32 = 2.;
+const HERO_PADDING_START: f32 = 24.;
+const HERO_PADDING_END: f32 = 8.;
+const HERO_GAP: f32 = 12.;
+
+/// The corners of a filled or outlined field. A hero field is always a pill.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+pub enum TextFieldShape {
+    /// The M3 extra-small corners.
+    #[default]
+    Standard,
+    /// Medium corners (12dp), for a form that rounds its fields with its surfaces.
+    Rounded,
+}
+
+impl TextFieldShape {
+    pub const ALL: [Self; 2] = [Self::Standard, Self::Rounded];
+    pub const fn name(self) -> &'static str {
+        match self {
+            Self::Standard => "Standard",
+            Self::Rounded => "Rounded",
+        }
+    }
+    fn radius(self) -> f32 {
+        match self {
+            Self::Standard => RADIUS_EXTRA_SMALL.as_f32(),
+            Self::Rounded => RADIUS_MEDIUM.as_f32(),
         }
     }
 }
@@ -168,6 +208,7 @@ pub struct TextField {
     input: FieldInput,
     variant: TextFieldVariant,
     density: TextFieldDensity,
+    shape: TextFieldShape,
     label: Option<SharedString>,
     placeholder: Option<SharedString>,
     leading: Option<AnyElement>,
@@ -209,6 +250,7 @@ impl TextField {
             input,
             variant: TextFieldVariant::Filled,
             density: TextFieldDensity::Default,
+            shape: TextFieldShape::Standard,
             label: None,
             placeholder: None,
             leading: None,
@@ -239,6 +281,15 @@ impl TextField {
     }
     pub fn outlined(self) -> Self {
         self.variant(TextFieldVariant::Outlined)
+    }
+    /// The page's one main input: see [`TextFieldVariant::Hero`].
+    pub fn hero(self) -> Self {
+        self.variant(TextFieldVariant::Hero)
+    }
+    /// The corners of a filled or outlined field.
+    pub fn shape(mut self, shape: TextFieldShape) -> Self {
+        self.shape = shape;
+        self
     }
     /// The label: inside the field at rest, floating above the text while
     /// the field is focused or populated. It is also the accessible name.
@@ -363,16 +414,58 @@ fn alpha(mut c: Rgba, a: f32) -> Rgba {
     c
 }
 
+/// A hero field's ring: error, or primary while `emphasized` (focused or populated), or
+/// the container's own color, so the ring is invisible without moving the text.
+fn hero_ring(error: bool, emphasized: bool, disabled: bool) -> Rgba {
+    if disabled {
+        alpha(color(ColorRole::ON_SURFACE), state::DISABLED_CONTAINER)
+    } else if error {
+        color(ColorRole::ERROR)
+    } else if emphasized {
+        color(ColorRole::PRIMARY)
+    } else {
+        color(ColorRole::SURFACE)
+    }
+}
+
 /// M3 text field colors (`md.comp.{filled,outlined}-text-field.*`).
 pub(crate) fn field_paint(variant: TextFieldVariant, s: FieldState) -> FieldPaint {
     use ColorRole as C;
     let filled = variant == TextFieldVariant::Filled;
+    let hero = variant == TextFieldVariant::Hero;
     let on_surface = color(C::ON_SURFACE);
     let variant_ink = color(C::ON_SURFACE_VARIANT);
+    if hero && !s.disabled {
+        return FieldPaint {
+            container: color(C::SURFACE),
+            indicator: hero_ring(s.error, s.focused, false),
+            indicator_width: HERO_RING,
+            label: variant_ink,
+            input: on_surface,
+            placeholder: variant_ink,
+            leading: if s.error {
+                color(C::ERROR)
+            } else {
+                variant_ink
+            },
+            trailing: variant_ink,
+            supporting: if s.error {
+                color(C::ERROR)
+            } else {
+                variant_ink
+            },
+            state_layer: alpha(on_surface, 0.),
+            caret: if s.error {
+                color(C::ERROR)
+            } else {
+                color(C::PRIMARY)
+            },
+        };
+    }
     if s.disabled {
         let content = state::disabled(on_surface);
         return FieldPaint {
-            container: if filled {
+            container: if filled || hero {
                 alpha(on_surface, 0.04)
             } else {
                 alpha(on_surface, 0.)
@@ -546,7 +639,9 @@ pub(crate) fn density_label_geometry(
         PADDING
     };
     let (float_left, float_top) = match variant {
-        TextFieldVariant::Filled => (rest_left, FILLED_FLOAT_TOP - density.lift()),
+        TextFieldVariant::Filled | TextFieldVariant::Hero => {
+            (rest_left, FILLED_FLOAT_TOP - density.lift())
+        }
         // Centered on the top outline, at the content's leading edge.
         TextFieldVariant::Outlined => (PADDING, -8.),
     };
@@ -676,13 +771,20 @@ impl RenderOnce for TextField {
         };
         let hovered_preview = preview.is_some_and(InteractionPreview::is_hovered);
         let populated = !value.is_empty();
-        let has_label = self.label.is_some();
+        // A hero field's label only names it; its placeholder shows at rest.
+        let has_label = self.label.is_some() && self.variant != TextFieldVariant::Hero;
         let floating = focused || populated || self.float_label || !has_label;
         let variant = self.variant;
         let filled = variant == TextFieldVariant::Filled;
+        let hero = variant == TextFieldVariant::Hero;
         let leading = self.leading.is_some();
         let density = self.density;
-        let height = density.height();
+        let height = if hero {
+            HERO_FIELD_HEIGHT
+        } else {
+            density.height()
+        };
+        let radius = self.shape.radius();
 
         // Motion: float on the fast spatial token, focus emphasis on fast effects.
         let float_t = motion::token_value(
@@ -748,10 +850,13 @@ impl RenderOnce for TextField {
             .when(multi_line, |this| this.items_start())
             .when(!multi_line, |this| this.items_center())
             .map(|this| match variant {
-                TextFieldVariant::Filled => this
-                    .rounded_t(rem(RADIUS_EXTRA_SMALL.as_f32()))
-                    .bg(rest.container),
-                TextFieldVariant::Outlined => this.rounded(rem(RADIUS_EXTRA_SMALL.as_f32())),
+                TextFieldVariant::Filled => this.rounded_t(rem(radius)).bg(rest.container),
+                TextFieldVariant::Outlined => this.rounded(rem(radius)),
+                TextFieldVariant::Hero => this
+                    .rounded_full()
+                    .bg(rest.container)
+                    .border(px(HERO_RING))
+                    .border_color(hero_ring(self.error, focused || populated, disabled)),
             })
             .when(!disabled, |this| this.cursor_text());
         if let Some(focus) = focus.clone().filter(|_| !disabled && preview.is_none()) {
@@ -761,12 +866,14 @@ impl RenderOnce for TextField {
         }
 
         // The filled hover state layer.
-        if filled {
+        if hero {
+            // The ring is the container's border.
+        } else if filled {
             container = container.child(
                 div()
                     .absolute()
                     .inset_0()
-                    .rounded_t(rem(RADIUS_EXTRA_SMALL.as_f32()))
+                    .rounded_t(rem(radius))
                     .bg(rest.state_layer)
                     .when(live_hover, |this| {
                         let layer = hover_paint.state_layer;
@@ -817,24 +924,35 @@ impl RenderOnce for TextField {
             container = container.children(outline(
                 start,
                 width,
+                radius,
                 indicator,
                 outline_width,
                 live_hover.then_some((group.clone(), hover_paint.indicator)),
             ));
         }
 
-        let pad_left = if leading { ICON_PADDING } else { PADDING };
-        let pad_right = if self.trailing.is_some() {
+        let pad_left = if hero {
+            HERO_PADDING_START
+        } else if leading {
             ICON_PADDING
         } else {
             PADDING
         };
-        let input_top = if filled && has_label {
+        let pad_right = if hero {
+            HERO_PADDING_END
+        } else if self.trailing.is_some() {
+            ICON_PADDING
+        } else {
+            PADDING
+        };
+        let input_top = if hero {
+            0.
+        } else if filled && has_label {
             FILLED_INPUT_TOP - density.lift()
         } else {
             (height - 24.) / 2.
         };
-        let input_bottom = height - 24. - input_top;
+        let input_bottom = if hero { 0. } else { height - 24. - input_top };
         let show_content = floating || !has_label;
         let show_placeholder = !populated && show_content;
 
@@ -949,7 +1067,7 @@ impl RenderOnce for TextField {
                 .when(multi_line, |this| this.items_start())
                 .pl(rem(pad_left))
                 .pr(rem(pad_right))
-                .gap(rem(ICON_GAP))
+                .gap(rem(if hero { HERO_GAP } else { ICON_GAP }))
                 .children(self.leading.map(|icon| icon_slot(icon, rest.leading)))
                 .child(
                     div()
@@ -961,14 +1079,25 @@ impl RenderOnce for TextField {
                         .child(input_row),
                 )
                 .children(self.trailing.map(|icon| {
-                    icon_slot(icon, mix(rest.trailing, active.trailing)).when(live_hover, |this| {
+                    let slot = if hero {
+                        // A labeled action keeps its own width.
+                        div()
+                            .flex()
+                            .flex_shrink_0()
+                            .items_center()
+                            .text_color(rest.trailing)
+                            .child(icon)
+                    } else {
+                        icon_slot(icon, mix(rest.trailing, active.trailing))
+                    };
+                    slot.when(live_hover, |this| {
                         let ink = hover_paint.trailing;
                         this.group_hover(group.clone(), move |s| s.text_color(ink))
                     })
                 })),
         );
 
-        if let Some(label) = self.label.clone() {
+        if let Some(label) = self.label.clone().filter(|_| !hero) {
             let (left, top, size, line) =
                 density_label_geometry(variant, density, leading, float_t);
             container = container.child(
@@ -1002,7 +1131,7 @@ impl RenderOnce for TextField {
                 .flex()
                 .justify_between()
                 .gap(rem(16.))
-                .px(rem(PADDING))
+                .px(rem(if hero { HERO_PADDING_START } else { PADDING }))
                 .pt(rem(4.))
                 .text_color(rest.supporting)
                 .child(
@@ -1032,11 +1161,12 @@ impl RenderOnce for TextField {
 fn outline(
     start: f32,
     width: f32,
+    radius: f32,
     ink: Rgba,
     weight: f32,
     hover: Option<(SharedString, Rgba)>,
 ) -> Vec<AnyElement> {
-    let radius = rem(RADIUS_EXTRA_SMALL.as_f32());
+    let radius = rem(radius);
     let weight = px(weight);
     let outline_hover = hover.clone();
     let hovering = move |el: Div| match outline_hover.clone() {

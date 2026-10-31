@@ -13,6 +13,11 @@ Distribution is by Git revision for now; see the [quick start](README.md#quick-s
 - `rust-version` 1.99.1, the toolchain this workspace is verified with.
 - `[package.metadata.docs.rs]`, `deny.toml`, and CI checks of what each package ships.
 
+- `TextFieldVariant::Hero`: a page's one main input, a 72dp pill with a ring while focused
+  or populated, whose trailing slot takes a labeled button.
+- `TextFieldShape`, on `TextField` and `ExposedDropdown`: medium corners for a form that
+  rounds its fields with its surfaces.
+
 ### Changed
 
 - Kit is pinned by revision (`bb85882`) instead of `branch = "main"`, so a consumer

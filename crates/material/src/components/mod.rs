@@ -185,8 +185,8 @@ pub use text::{
     semantic_label, supporting_info,
 };
 pub use text_field::{
-    TEXT_FIELD_HEIGHT, TEXT_FIELD_WIDTH, TextField, TextFieldDensity, TextFieldInputType,
-    TextFieldVariant,
+    HERO_FIELD_HEIGHT, TEXT_FIELD_HEIGHT, TEXT_FIELD_WIDTH, TextField, TextFieldDensity,
+    TextFieldInputType, TextFieldShape, TextFieldVariant,
 };
 pub use tile::{
     TileGroup, TileScale, disclosure_chevron, list_tile, tile, tile_chevron, tile_info,
