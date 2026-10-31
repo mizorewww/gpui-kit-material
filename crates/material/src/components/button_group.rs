@@ -7,7 +7,9 @@
 //! fast spatial spring. Groups lay out horizontally or vertically, with
 //! density steps, equal widths, and labels shown always, only on selected
 //! options (revealed with the selection) or never (icon options).
-use super::{ButtonDensity, ButtonShape, ButtonSize, ButtonVariant, InteractionPreview};
+use super::{
+    ButtonDensity, ButtonShape, ButtonSize, ButtonTone, ButtonVariant, InteractionPreview,
+};
 use crate::color::ColorRole;
 use crate::icons::Icon;
 use crate::theme::{blend, color};
@@ -85,6 +87,7 @@ pub struct ConnectedButtonGroup {
     reveal_in: Option<ScrollHandle>,
     previews: BTreeMap<SharedString, InteractionPreview>,
     variant: ButtonVariant,
+    tone: ButtonTone,
     size: Option<ButtonSize>,
     shape: ButtonShape,
     selection: GroupSelection,
@@ -116,6 +119,7 @@ impl ConnectedButtonGroup {
             reveal_in: None,
             previews: BTreeMap::new(),
             variant: ButtonVariant::Tonal,
+            tone: ButtonTone::Standard,
             size: None,
             shape: ButtonShape::Round,
             selection: GroupSelection::Single,
@@ -191,6 +195,12 @@ impl ConnectedButtonGroup {
     /// kit's connected group), or filled, elevated or outlined.
     pub fn variant(mut self, variant: ButtonVariant) -> Self {
         self.variant = variant;
+        self
+    }
+    /// The roles of the unselected options. With [`ButtonTone::Neutral`] they sit back in a
+    /// neutral container, so the selected option's color stands alone.
+    pub fn tone(mut self, tone: ButtonTone) -> Self {
+        self.tone = tone;
         self
     }
     /// An M3 Expressive button size (XS–XL): the options take that button's
@@ -380,6 +390,7 @@ fn option_paint(
         height,
         disabled,
         ButtonVariant::Tonal,
+        ButtonTone::Standard,
         Metrics::compact(f32::from(height)),
     )
 }
@@ -391,6 +402,7 @@ fn option_paint_with(
     height: Pixels,
     disabled: bool,
     variant: ButtonVariant,
+    tone: ButtonTone,
     metrics: Metrics,
 ) -> OptionPaint {
     let t = selection.clamp(0., 1.);
@@ -415,7 +427,10 @@ fn option_paint_with(
         };
     }
     // The toggle button's own unselected and selected colors.
-    let (rest_bg, rest_fg) = super::button::toggle_colors(variant, false);
+    let (rest_bg, rest_fg) = match tone {
+        ButtonTone::Standard => super::button::toggle_colors(variant, false),
+        tone => super::button::toned_colors(variant, tone),
+    };
     let (on_bg, on_fg) = super::button::toggle_colors(variant, true);
     let background = blend(rest_bg, on_bg, t);
     let foreground = blend(rest_fg, on_fg, t);
@@ -717,6 +732,7 @@ impl RenderOnce for ConnectedButtonGroup {
         let fill = self.full_width;
         let icon_size = rem(metrics.icon);
         let variant = self.variant;
+        let tone = self.tone;
         let selection_root: std::sync::Arc<ElementId> =
             std::sync::Arc::new((self.id.clone(), "selection").into());
         let debug_kind = if fill { "full" } else { "content" };
@@ -765,6 +781,7 @@ impl RenderOnce for ConnectedButtonGroup {
                 item_height,
                 option_disabled,
                 variant,
+                tone,
                 metrics,
             );
             #[cfg(test)]
@@ -1409,6 +1426,35 @@ mod tests {
     }
 
     /// Unselected: neutral container, ink content; only outer ends are round.
+    #[test]
+    fn a_neutral_group_keeps_its_color_for_the_selected_option() {
+        use super::{ButtonTone, ButtonVariant, Metrics, option_paint_with};
+        let metrics = Metrics::compact(40.);
+        let paint = |selection, tone| {
+            option_paint_with(
+                selection,
+                1,
+                3,
+                px(40.),
+                false,
+                ButtonVariant::Tonal,
+                tone,
+                metrics,
+            )
+        };
+        let neutral = paint(0., ButtonTone::Neutral);
+        assert!(same(
+            neutral.background,
+            token(ColorRole::SURFACE_CONTAINER_HIGHEST)
+        ));
+        assert!(same(neutral.foreground, token(ColorRole::ON_SURFACE)));
+        let (selected, standard) = (
+            paint(1., ButtonTone::Neutral),
+            paint(1., ButtonTone::Standard),
+        );
+        assert!(same(selected.background, standard.background));
+    }
+
     fn assert_unselected(name: &str, index: usize, count: usize, height: Pixels) {
         let paint = painted(name);
         assert_eq!(
