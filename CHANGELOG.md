@@ -9,6 +9,9 @@ Distribution is by Git revision for now; see the [quick start](README.md#quick-s
 
 ### Added
 
+- `MaterialMenu::max_height` and `ExposedDropdown::menu_max_height`: past it a menu
+  scrolls, with the keyboard's item kept in view and the selected item shown on open.
+  A `MenuPopup` also scrolls rather than outgrow its window.
 - A published `[patch]` block for downstream workspaces, built from Git by CI.
 - `rust-version` 1.99.1, the toolchain this workspace is verified with.
 - `[package.metadata.docs.rs]`, `deny.toml`, and CI checks of what each package ships.

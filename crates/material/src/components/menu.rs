@@ -17,6 +17,10 @@
 //! visuals and the open/close motion: the surface reveals from its top on the
 //! default spatial token while fading on fast effects, and plays the same
 //! motion back on close, retargeting from wherever it is.
+//!
+//! A menu taller than [`MaterialMenu::max_height`] scrolls, and a popup never
+//! outgrows its window. The keyboard's item stays in view and an open menu
+//! starts at its selected item.
 use super::InteractionPreview;
 use super::focus::{RingPlacement, RingedButton};
 use super::roving::{Direction, target};
@@ -28,7 +32,7 @@ use crate::{
     theme::color,
     tokens::{
         elevation, state,
-        typography::{TypeRole, rem},
+        typography::{BASE_PX, TypeRole, rem},
     },
 };
 use gpui::{prelude::*, *};
@@ -399,6 +403,50 @@ where
 struct MenuFocus {
     root: FocusHandle,
     items: Vec<FocusHandle>,
+    scroll: ScrollHandle,
+    /// Whether a scrolling menu has been brought to its selected item.
+    placed: bool,
+}
+
+/// `pixels` in design px at the window's rem size.
+fn design_px(pixels: Pixels, rem_size: Pixels) -> f32 {
+    f32::from(pixels) * BASE_PX / f32::from(rem_size)
+}
+
+/// How far down a scrolling menu shows, in design px.
+fn scrolled(scroll: &ScrollHandle, rem_size: Pixels) -> f32 {
+    design_px(-scroll.offset().y, rem_size)
+}
+
+fn scroll_to(scroll: &ScrollHandle, offset: f32, rem_size: Pixels) {
+    scroll.set_offset(point(px(0.), -rem(offset).to_pixels(rem_size)));
+}
+
+/// The offset that shows the row `top..bottom` in a `viewport` tall menu,
+/// moving as little as possible.
+pub(crate) fn reveal_offset(current: f32, (top, bottom): (f32, f32), viewport: f32) -> f32 {
+    if top < current {
+        top
+    } else if bottom > current + viewport {
+        bottom - viewport
+    } else {
+        current
+    }
+}
+
+/// The offset that centers the row `top..bottom`, as far as the menu's
+/// `natural` height allows.
+pub(crate) fn centered_offset((top, bottom): (f32, f32), viewport: f32, natural: f32) -> f32 {
+    ((top + bottom - viewport) / 2.).clamp(0., (natural - viewport).max(0.))
+}
+
+/// How much of the window a popup can fill, in design px: Base keeps it 8px
+/// from each edge of the content.
+fn window_room(window: &Window) -> f32 {
+    const POPUP_MARGIN: Pixels = px(8.);
+    let frame = window.client_inset().unwrap_or(px(0.));
+    let room = window.viewport_size().height - (POPUP_MARGIN + frame) * 2.;
+    design_px(room, window.rem_size()).max(0.)
 }
 
 /// An M3 menu surface. Use [`MenuPopup`] to open it from a trigger.
@@ -409,6 +457,8 @@ pub struct MaterialMenu {
     density: MenuDensity,
     groups: Vec<MenuGroup>,
     width: Option<f32>,
+    max_height: Option<f32>,
+    scroll: Option<ScrollHandle>,
     elevated: bool,
     focus: Option<FocusHandle>,
     on_dismiss: Option<Notify>,
@@ -425,6 +475,8 @@ impl MaterialMenu {
             density: MenuDensity::Default,
             groups: Vec::new(),
             width: None,
+            max_height: None,
+            scroll: None,
             elevated: true,
             focus: None,
             on_dismiss: None,
@@ -464,6 +516,21 @@ impl MaterialMenu {
     /// Width in design px (default 200 baseline, 208 Expressive).
     pub fn width(mut self, width: f32) -> Self {
         self.width = Some(width);
+        self
+    }
+    /// The tallest the menu grows, in design px; past it the menu scrolls.
+    /// [`MenuPopup`] also keeps it inside the window without being asked.
+    ///
+    /// GPUI clips to rectangles, so a scrolling Expressive menu paints one
+    /// rounded container behind its groups instead of one for each, which
+    /// would show square corners where they are cut off.
+    pub fn max_height(mut self, height: f32) -> Self {
+        self.max_height = Some(height);
+        self
+    }
+    /// Lower [`Self::max_height`] to `room` if it is taller.
+    fn fit(mut self, room: f32) -> Self {
+        self.max_height = Some(self.max_height.map_or(room, |height| height.min(room)));
         self
     }
     /// Paint the menu's level 2 shadow (default). A popup paints it on its
@@ -516,20 +583,31 @@ impl MaterialMenu {
         )
     }
 
+    /// The height the menu shows in design px: its natural height, or
+    /// [`Self::max_height`] if that is less.
+    pub fn visible_height(&self) -> f32 {
+        let natural = self.natural_height();
+        self.max_height.map_or(natural, |max| natural.min(max))
+    }
+
     /// The bottom of the item at flat `index` (its row without a divider
     /// below it), in design px from the menu's top.
     pub fn item_bottom(&self, index: usize) -> Option<f32> {
-        let item = self.groups.iter().flat_map(|g| &g.items).nth(index)?;
-        let height = item_height(self.style, self.density, item.supporting.is_some(), false);
-        Some(self.item_top(index)? + height)
+        self.item_rows().get(index).map(|row| row.1)
     }
 
     /// The top of the item at flat `index` (its row, with an Expressive
     /// row's insets), in design px from the menu's top.
     pub fn item_top(&self, index: usize) -> Option<f32> {
+        self.item_rows().get(index).map(|row| row.0)
+    }
+
+    /// Each item's `(top, bottom)` by flat index, as [`Self::item_top`] and
+    /// [`Self::item_bottom`] give them.
+    fn item_rows(&self) -> Vec<(f32, f32)> {
         let expressive = self.style.expressive();
         let mut top = if expressive { 0. } else { BASELINE_PADDING };
-        let mut flat = 0;
+        let mut rows = Vec::new();
         for (group_ix, group) in self.groups.iter().enumerate() {
             if group_ix > 0 {
                 top += if expressive {
@@ -545,22 +623,16 @@ impl MaterialMenu {
                 top += GROUP_LABEL;
             }
             for item in &group.items {
-                if flat == index {
-                    return Some(top);
-                }
-                top += item_height(
-                    self.style,
-                    self.density,
-                    item.supporting.is_some(),
-                    item.divider,
-                );
-                flat += 1;
+                let supporting = item.supporting.is_some();
+                let row = item_height(self.style, self.density, supporting, false);
+                rows.push((top, top + row));
+                top += item_height(self.style, self.density, supporting, item.divider);
             }
             if expressive {
                 top += EXPRESSIVE_INSET_Y;
             }
         }
-        None
+        rows
     }
 }
 
@@ -569,10 +641,23 @@ impl RenderOnce for MaterialMenu {
         let style = self.style;
         let density = self.density;
         let count: usize = self.groups.iter().map(|g| g.items.len()).sum();
+        let natural = self.natural_height();
+        // Only a menu that outgrows its limit scrolls, and only it needs its rows.
+        let scrolling = self
+            .max_height
+            .filter(|max| natural > *max)
+            .map(|viewport| (viewport, Rc::<[(f32, f32)]>::from(self.item_rows())));
+        let selected = self
+            .groups
+            .iter()
+            .flat_map(|g| &g.items)
+            .position(|item| item.selected);
         let state =
             window.use_keyed_state((self.id.clone(), "menu-focus"), cx, |_, cx| MenuFocus {
                 root: cx.focus_handle(),
                 items: Vec::new(),
+                scroll: ScrollHandle::new(),
+                placed: false,
             });
         state.update(cx, |state, cx| {
             while state.items.len() < count {
@@ -585,6 +670,17 @@ impl RenderOnce for MaterialMenu {
             .clone()
             .unwrap_or_else(|| state.read(cx).root.clone());
         let handles = state.read(cx).items.clone();
+        let scroll = self
+            .scroll
+            .clone()
+            .unwrap_or_else(|| state.read(cx).scroll.clone());
+        if let Some((viewport, rows)) = &scrolling {
+            let placed = state.update(cx, |state, _| std::mem::replace(&mut state.placed, true));
+            if !placed && let Some(row) = selected.and_then(|ix| rows.get(ix)) {
+                let offset = centered_offset(*row, *viewport, natural);
+                scroll_to(&scroll, offset, window.rem_size());
+            }
+        }
         if let Some(handle) = self.focus_item.and_then(|ix| handles.get(ix)) {
             handle.focus(window, cx);
         }
@@ -662,10 +758,27 @@ impl RenderOnce for MaterialMenu {
         let navigate = {
             let handles = handles.clone();
             let skip = skip.clone();
+            let scrolling = scrolling.clone();
+            let scroll = scroll.clone();
             move |direction: Direction, window: &mut Window, cx: &mut App| {
                 let current = handles.iter().position(|h| h.is_focused(window));
                 if let Some(ix) = target(&skip, current, direction) {
                     handles[ix].focus(window, cx);
+                    if let Some((viewport, rows)) = &scrolling {
+                        let (top, bottom) = rows[ix];
+                        // The ends take the menu's padding with them.
+                        let row = (
+                            if ix == 0 { 0. } else { top },
+                            if ix + 1 == rows.len() {
+                                natural
+                            } else {
+                                bottom
+                            },
+                        );
+                        let rem_size = window.rem_size();
+                        let current = scrolled(&scroll, rem_size);
+                        scroll_to(&scroll, reveal_offset(current, row, *viewport), rem_size);
+                    }
                 }
             }
         };
@@ -724,7 +837,7 @@ impl RenderOnce for MaterialMenu {
                     .flex_col()
                     .w_full()
                     .py(rem(EXPRESSIVE_INSET_Y))
-                    .bg(container)
+                    .when(scrolling.is_none(), |group| group.bg(container))
                     .rounded_t(rem(top))
                     .rounded_b(rem(bottom))
                     .children(label)
@@ -783,15 +896,43 @@ impl RenderOnce for MaterialMenu {
             .w(rem(width))
             .map(|this| {
                 if style.expressive() {
-                    this.gap(rem(GROUP_GAP)).rounded(rem(MENU_RADIUS))
+                    this.rounded(rem(MENU_RADIUS))
                 } else {
-                    this.py(rem(BASELINE_PADDING))
-                        .rounded(rem(BASELINE_RADIUS))
-                        .bg(container)
+                    this.rounded(rem(BASELINE_RADIUS)).bg(container)
                 }
             })
             .when(self.elevated, |this| this.shadow(elevation::level(2)))
-            .children(groups)
+            .map(|this| match scrolling {
+                None => group_spacing(this, style).children(groups),
+                Some((viewport, _)) => this
+                    .relative()
+                    .h(rem(viewport))
+                    .bg(container)
+                    .child(
+                        div()
+                            .id((self.id.clone(), "menu-scroll"))
+                            .size_full()
+                            .overflow_y_scroll()
+                            .track_scroll(&scroll)
+                            .child(
+                                group_spacing(div().flex().flex_col().w_full(), style)
+                                    .children(groups),
+                            ),
+                    )
+                    .child(
+                        gpui_base::Scrollbar::vertical(&scroll)
+                            .id((self.id.clone(), "menu-scrollbar")),
+                    ),
+            })
+    }
+}
+
+/// What separates a menu's groups from its edges and each other.
+fn group_spacing<E: Styled>(this: E, style: MenuStyle) -> E {
+    if style.expressive() {
+        this.gap(rem(GROUP_GAP))
+    } else {
+        this.py(rem(BASELINE_PADDING))
     }
 }
 
@@ -1177,7 +1318,12 @@ fn reveal_surface(
 }
 
 impl RenderOnce for MenuPopup {
-    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
+    fn render(mut self, window: &mut Window, cx: &mut App) -> impl IntoElement {
+        // Base keeps a popup inside the window; a menu taller than the window
+        // would still lose its end there, so it scrolls instead.
+        let room = window_room(window);
+        self.menu = self.menu.fit(room);
+        self.submenu = self.submenu.map(|(index, menu)| (index, menu.fit(room)));
         let (reveal, fade) = open_motion(&self.id, self.open, window, cx);
         let visible = popup_visible(self.open, reveal, fade);
         let focus = window
@@ -1195,7 +1341,7 @@ impl RenderOnce for MenuPopup {
             .read(cx)
             .clone();
         let style = self.menu.style;
-        let height = self.menu.natural_height();
+        let height = self.menu.visible_height();
         let anchor = self.anchor;
         let upward = opens_upward(anchor);
         let side = matches!(anchor, Anchor::LeftCenter | Anchor::RightCenter);
@@ -1208,8 +1354,30 @@ impl RenderOnce for MenuPopup {
             }
         });
         let submenu_index = self.submenu.as_ref().map(|(index, _)| *index);
-        let submenu_top = submenu_index.and_then(|index| self.menu.item_top(index));
-        let submenu_bottom = submenu_index.and_then(|index| self.menu.item_bottom(index));
+        // A sub-menu stays beside its owner wherever the menu has scrolled to, so
+        // a popup with one holds the scroll handle where it can read it.
+        let scrolled_by = if submenu_index.is_some() {
+            let scroll = window
+                .use_keyed_state((self.id.clone(), "menu-popup-scroll"), cx, |_, _| {
+                    ScrollHandle::new()
+                })
+                .read(cx)
+                .clone();
+            if !visible {
+                scroll.set_offset(Point::default());
+            }
+            let offset = scrolled(&scroll, window.rem_size());
+            self.menu.scroll = Some(scroll);
+            offset
+        } else {
+            0.
+        };
+        let submenu_top = submenu_index
+            .and_then(|index| self.menu.item_top(index))
+            .map(|top| top - scrolled_by);
+        let submenu_bottom = submenu_index
+            .and_then(|index| self.menu.item_bottom(index))
+            .map(|bottom| bottom - scrolled_by);
         // The reserved cascade column's height below the trigger.
         let cascade_height = self.submenu.as_ref().map_or(0., |(_, submenu)| {
             let first_row = if submenu.style.expressive() {
@@ -1217,7 +1385,7 @@ impl RenderOnce for MenuPopup {
             } else {
                 BASELINE_PADDING
             };
-            (submenu_top.unwrap_or(0.) - first_row).max(0.) + submenu.natural_height()
+            (submenu_top.unwrap_or(0.) - first_row).max(0.) + submenu.visible_height()
         });
         // Closing the sub-menu by keyboard returns focus to its owner item.
         let restore = window
@@ -1274,7 +1442,7 @@ impl RenderOnce for MenuPopup {
             }
             was_open.set(open);
             let sub_style = submenu.style;
-            let sub_height = submenu.natural_height();
+            let sub_height = submenu.visible_height();
             let collapse: Notify = {
                 let change = self.on_submenu_change.clone();
                 let parent = focus.clone();
@@ -1441,6 +1609,7 @@ pub struct ExposedDropdown {
     supporting: Option<SharedString>,
     style: MenuStyle,
     width: f32,
+    menu_max_height: Option<f32>,
     on_open_change: Option<OpenChange>,
     on_select: Option<Select>,
 }
@@ -1464,6 +1633,7 @@ impl ExposedDropdown {
             // The kit's menus anchored to a text field are baseline menus.
             style: MenuStyle::Baseline,
             width: 210.,
+            menu_max_height: None,
             on_open_change: None,
             on_select: None,
         }
@@ -1525,6 +1695,11 @@ impl ExposedDropdown {
     /// Field and menu width in design px (default 210).
     pub fn width(mut self, width: f32) -> Self {
         self.width = width;
+        self
+    }
+    /// The tallest the menu grows, in design px; see [`MaterialMenu::max_height`].
+    pub fn menu_max_height(mut self, height: f32) -> Self {
+        self.menu_max_height = Some(height);
         self
     }
     pub fn on_open_change(
@@ -1623,7 +1798,7 @@ impl RenderOnce for ExposedDropdown {
         let selected = self.selected;
         let on_select = self.on_select.clone();
         let disabled_options = self.disabled_options;
-        let menu = MaterialMenu::new((id.clone(), "menu"))
+        let mut menu = MaterialMenu::new((id.clone(), "menu"))
             .style(self.style)
             .width(self.width)
             .items(self.options.into_iter().enumerate().map(|(ix, option)| {
@@ -1637,6 +1812,7 @@ impl RenderOnce for ExposedDropdown {
                         }
                     })
             }));
+        menu.max_height = self.menu_max_height;
         if self.disabled {
             return trigger.into_any_element();
         }

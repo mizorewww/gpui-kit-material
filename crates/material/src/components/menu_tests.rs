@@ -602,3 +602,220 @@ fn an_exposed_dropdown_opens_a_baseline_menu() {
         MenuStyle::Baseline
     );
 }
+
+#[test]
+fn a_scrolling_menu_moves_only_as_far_as_a_row_needs() {
+    assert_eq!(reveal_offset(0., (48., 96.), 200.), 0., "already in view");
+    assert_eq!(reveal_offset(0., (192., 240.), 200.), 40., "below the view");
+    assert_eq!(reveal_offset(100., (48., 96.), 200.), 48., "above the view");
+    assert_eq!(centered_offset((480., 528.), 200., 960.), 404.);
+    assert_eq!(
+        centered_offset((0., 48.), 200., 960.),
+        0.,
+        "clamped at the top"
+    );
+    assert_eq!(
+        centered_offset((912., 960.), 200., 960.),
+        760.,
+        "and at the end"
+    );
+}
+
+struct ScrollingHarness {
+    open: bool,
+    items: usize,
+    max_height: Option<f32>,
+    selected: Option<usize>,
+    submenu: Option<usize>,
+    submenu_open: bool,
+    picked: Rc<RefCell<Vec<usize>>>,
+}
+
+impl Render for ScrollingHarness {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        window.set_rem_size(px(14.));
+        let selected = self.selected;
+        let submenu = self.submenu;
+        let view = cx.entity();
+        let mut menu = MaterialMenu::new("menu").items((0..self.items).map(|ix| {
+            let picked = self.picked.clone();
+            let view = view.clone();
+            MaterialMenuItem::new("Item")
+                .leading(
+                    div()
+                        .debug_selector(move || format!("item-{ix}"))
+                        .size_full(),
+                )
+                .selected(selected == Some(ix))
+                .submenu(submenu == Some(ix))
+                .on_click(move |_, _, cx| {
+                    picked.borrow_mut().push(ix);
+                    if submenu == Some(ix) {
+                        view.update(cx, |this, cx| {
+                            this.submenu_open = true;
+                            cx.notify();
+                        });
+                    }
+                })
+        }));
+        if let Some(height) = self.max_height {
+            menu = menu.max_height(height);
+        }
+        let mut popup = MenuPopup::new("popup", div().size(px(40.)), menu)
+            .open(self.open)
+            .on_open_change(cx.listener(|this, open: &bool, _, cx| {
+                this.open = *open;
+                cx.notify();
+            }));
+        if let Some(owner) = self.submenu {
+            popup = popup.submenu(
+                owner,
+                MaterialMenu::new("submenu").item(
+                    MaterialMenuItem::new("Sub")
+                        .leading(div().debug_selector(|| "sub-item".into()).size_full()),
+                ),
+                self.submenu_open,
+            );
+        }
+        div().p(px(20.)).child(popup)
+    }
+}
+
+fn scrolling(
+    cx: &mut TestAppContext,
+    harness: ScrollingHarness,
+) -> (Entity<ScrollingHarness>, &mut VisualTestContext) {
+    cx.update(|cx| {
+        gpui_kit::init(cx);
+        crate::init(cx);
+        cx.set_reduce_motion(true);
+    });
+    let (view, cx) = cx.add_window_view(move |_, _| harness);
+    settle(cx);
+    (view, cx)
+}
+
+fn tall_menu(items: usize, max_height: Option<f32>) -> ScrollingHarness {
+    ScrollingHarness {
+        open: true,
+        items,
+        max_height,
+        selected: None,
+        submenu: None,
+        submenu_open: false,
+        picked: Rc::default(),
+    }
+}
+
+fn assert_shown(cx: &mut VisualTestContext, ix: usize) {
+    let surface = cx.debug_bounds("menu-popup-surface").unwrap();
+    let item = cx
+        .debug_bounds(Box::leak(format!("item-{ix}").into_boxed_str()))
+        .unwrap();
+    assert!(
+        item.top() >= surface.top() && item.bottom() <= surface.bottom(),
+        "item {ix} at {item:?} is outside {surface:?}"
+    );
+}
+
+#[gpui::test]
+fn a_menu_past_its_max_height_scrolls_with_the_keyboard(cx: &mut TestAppContext) {
+    let harness = tall_menu(20, Some(200.));
+    let picked = harness.picked.clone();
+    let (_, cx) = scrolling(cx, harness);
+    let surface = cx.debug_bounds("menu-popup-surface").unwrap();
+    assert_eq!(surface.size.height, px(200.));
+    let below = cx.debug_bounds("item-12").unwrap();
+    assert!(below.top() > surface.bottom(), "item 12 starts out of view");
+    for _ in 0..13 {
+        cx.simulate_keystrokes("down");
+    }
+    draw(cx);
+    assert_shown(cx, 12);
+    cx.simulate_keystrokes("end");
+    draw(cx);
+    assert_shown(cx, 19);
+    cx.simulate_keystrokes("home");
+    draw(cx);
+    assert_shown(cx, 0);
+    for _ in 0..13 {
+        cx.simulate_keystrokes("down");
+    }
+    draw(cx);
+    let item = cx.debug_bounds("item-12").unwrap().center();
+    cx.simulate_click(item, Modifiers::default());
+    settle(cx);
+    assert_eq!(
+        *picked.borrow(),
+        vec![12],
+        "a scrolled item takes its press"
+    );
+}
+
+#[gpui::test]
+fn a_popup_taller_than_its_window_scrolls_inside_it(cx: &mut TestAppContext) {
+    let (_, cx) = scrolling(cx, tall_menu(200, None));
+    let surface = cx.debug_bounds("menu-popup-surface").unwrap();
+    let viewport = cx.update(|window, _| window.viewport_size());
+    assert!(surface.top() >= px(0.));
+    assert!(surface.bottom() <= viewport.height);
+}
+
+#[gpui::test]
+fn a_scrolling_menu_opens_at_its_selected_item(cx: &mut TestAppContext) {
+    let mut harness = tall_menu(20, Some(200.));
+    harness.selected = Some(15);
+    let (_, cx) = scrolling(cx, harness);
+    assert_shown(cx, 15);
+}
+
+#[gpui::test]
+fn a_menu_within_its_max_height_keeps_its_natural_height(cx: &mut TestAppContext) {
+    let (_, cx) = scrolling(cx, tall_menu(3, Some(400.)));
+    let surface = cx.debug_bounds("menu-popup-surface").unwrap();
+    assert_eq!(surface.size.height, px(3. * 48. + 4.));
+}
+
+#[gpui::test]
+fn a_sub_menu_opens_beside_its_owner_in_a_scrolled_menu(cx: &mut TestAppContext) {
+    let mut harness = tall_menu(20, Some(200.));
+    harness.submenu = Some(12);
+    let (_, cx) = scrolling(cx, harness);
+    for _ in 0..13 {
+        cx.simulate_keystrokes("down");
+    }
+    draw(cx);
+    cx.simulate_keystrokes("right");
+    settle(cx);
+    let owner = cx.debug_bounds("item-12").unwrap().center().y;
+    let sub = cx.debug_bounds("sub-item").unwrap().center().y;
+    assert!(
+        (owner - sub).abs() < px(1.),
+        "owner {owner:?}, sub-menu {sub:?}"
+    );
+}
+
+struct LongDropdown;
+
+impl Render for LongDropdown {
+    fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        window.set_rem_size(px(14.));
+        ExposedDropdown::new("dropdown", "Folder")
+            .options((0..40).map(|ix| format!("Folder {ix}")))
+            .menu_max_height(240.)
+            .open(true)
+    }
+}
+
+#[gpui::test]
+fn an_exposed_dropdown_limits_its_menu(cx: &mut TestAppContext) {
+    cx.update(|cx| {
+        gpui_kit::init(cx);
+        crate::init(cx);
+        cx.set_reduce_motion(true);
+    });
+    let (_, cx) = cx.add_window_view(|_, _| LongDropdown);
+    settle(cx);
+    let surface = cx.debug_bounds("menu-popup-surface").unwrap();
+    assert_eq!(surface.size.height, px(240.));
+}
