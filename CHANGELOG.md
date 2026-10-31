@@ -16,6 +16,10 @@ Distribution is by Git revision for now; see the [quick start](README.md#quick-s
 - `TintFamily`, and `ColorRole`s for its seven container and content pairs: hue families
   harmonized toward each scheme's primary, as Material's custom colors are.
 - `ListLeading::Tinted`: a `tinted_icon` as a list item's leading element.
+- `TextFieldVariant::Hero`: a page's one main input, a 72dp pill with a ring while focused
+  or populated, whose trailing slot takes a labeled button.
+- `TextFieldShape`, on `TextField` and `ExposedDropdown`: medium corners for a form that
+  rounds its fields with its surfaces.
 
 ### Changed
 
