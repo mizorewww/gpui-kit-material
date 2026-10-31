@@ -1,5 +1,5 @@
 // Serves the Brotli copies scripts/build-site.py writes beside the Gallery's module and
-// fonts: Cloudflare's own compression of them is worse (7.5 MB against 6.6 MB for the
+// fonts: Cloudflare's own compression of them is worse (7.5 MB against 5.3 MB for the
 // module). `encodeBody: "manual"` passes them through as they are. `no-transform` keeps
 // the edge from compressing them again. Only /gallery/wasm/* runs this Worker
 // (`runWorkerFirst` in cloudflare.config.ts); every other path stays a plain asset.

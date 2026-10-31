@@ -386,7 +386,7 @@ def build_docs(output, stylesheet, commit):
 def write_with_brotli(path, data):
     """Write an asset and the copy deploy/site/worker.js serves in its place. Highest
     quality, and a window as long as the module: the build pays for it once and every
-    visitor saves it. Cloudflare's own compression of the module is about 14% larger."""
+    visitor saves it. Cloudflare compressed the same module to 7.5 MB, against 5.3 MB here."""
     path.write_bytes(data)
     compressed = brotli.compress(data, quality=11, lgwin=24)
     if brotli.decompress(compressed) != data:
