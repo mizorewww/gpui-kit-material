@@ -177,7 +177,6 @@
     "src/app.rs",
     "src/app/bench_context.rs",
     "src/elements/animation.rs",
-    "src/elements/div.rs",
     "src/elements/text.rs",
     "src/geometry.rs",
     "src/platform.rs",
@@ -211,11 +210,6 @@
       "upstream_sha256": "117a4b1a580382b21accce30308f0480853c1e9372220566748dcb5f74d5793e",
       "local_sha256": "da466d2d926998f334aac8b4871d807a4eda8b972f8df8c9ea05abc0fe382a2d",
       "reason": "Executor-clock sampling, repeat_when_visible and RepeatAnimationPlayback (animation-visibility-patch.md)."
-    },
-    "src/elements/div.rs": {
-      "upstream_sha256": "3e3fada72485b0dea4987feab7eab7827b476dd91ad83845f8b2aa92565fcd30",
-      "local_sha256": "3f004bd798b123d78bd7ef340df79b999e3a023dc9b024b7b752d1fa0ac3a2fb",
-      "reason": "hitbox_extension builder and contains_pointer hit testing (hitbox-extension-patch.md)."
     },
     "src/platform.rs": {
       "upstream_sha256": "d5a1f49466edafc882f2646c0d97b7febcec61aa2a3df43f08035a812c9be7b5",
@@ -264,8 +258,8 @@
     },
     "src/window.rs": {
       "upstream_sha256": "83bace5e5cf503b21c789c4ca7bc3b11965c2256cb5a2398f2b70e5baf7aa1bb",
-      "local_sha256": "12c7ac7161882031a3170e7d289fffdd776dd726488a20f3bd571ad6ce3c1679",
-      "reason": "Hitbox.additional_bounds/contains_pointer/insert_hitbox_with_extension (hitbox-extension-patch.md); CPU frame scope (cpu-frame-scope-patch.md); WindowSubmissionStats, vsync, throttle retry (frame-submission-patch.md); present outcome (presentation-timing-patch.md). Layout direction on the window, recorded per layout node (layout-direction-patch.md)."
+      "local_sha256": "aefaed05b756eba58b93227cdc48d083c7f0da3e94ce07e4d8a798f543fd1406",
+      "reason": "CPU frame scope (cpu-frame-scope-patch.md); WindowSubmissionStats, vsync, throttle retry (frame-submission-patch.md); present outcome (presentation-timing-patch.md). Layout direction on the window, recorded per layout node (layout-direction-patch.md)."
     },
     "src/tab_stop.rs": {
       "upstream_sha256": "0c14aec0196ad632601015e166dfcd3df72228292646120bbc3857c3631cd680",
@@ -340,7 +334,7 @@
       "reason": "Not retained; Cargo.toml is the normalized manifest Cargo builds (test-harness-patch.md)."
     }
   },
-  "unchanged_file_count": 141,
+  "unchanged_file_count": 142,
   "provenance_files": [
     "SOURCE.json",
     "animation-visibility-patch.md",
@@ -349,7 +343,6 @@
     "focused-input-bounds-patch.md",
     "frame-submission-patch.md",
     "hanging-space-patch.md",
-    "hitbox-extension-patch.md",
     "layout-direction-patch.md",
     "letter-spacing-patch.md",
     "presentation-timing-patch.md",

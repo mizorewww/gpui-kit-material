@@ -101,10 +101,6 @@ impl LayerInput {
                 origin: hitbox.bounds.origin + delta,
                 size: hitbox.bounds.size,
             },
-            additional_bounds: hitbox.additional_bounds.map(|bounds| Bounds {
-                origin: bounds.origin + delta,
-                size: bounds.size,
-            }),
             content_mask: ContentMask {
                 bounds: Bounds {
                     origin: hitbox.content_mask.bounds.origin + delta,
@@ -415,41 +411,4 @@ pub(crate) fn moved(
         origin: bounds.origin + delta,
         size: bounds.size,
     })
-}
-
-#[cfg(all(test, feature = "test-support"))]
-mod extension_tests {
-    use super::*;
-    use crate::{HitboxBehavior, HitboxId, point, px, size};
-
-    #[test]
-    fn translated_extension_keeps_identity_gap_and_viewport_clip() {
-        let hitbox = Hitbox {
-            id: HitboxId::placeholder(),
-            bounds: Bounds::new(point(px(20.), px(20.)), size(px(10.), px(10.))),
-            additional_bounds: Some(Bounds::new(point(px(20.), px(40.)), size(px(10.), px(10.)))),
-            content_mask: ContentMask {
-                bounds: Bounds::new(point(px(0.), px(0.)), size(px(100.), px(100.))),
-            },
-            behavior: HitboxBehavior::BlockMouseExceptScroll,
-        };
-        let viewport = Bounds::new(point(px(0.), px(0.)), size(px(100.), px(40.)));
-        let moved = LayerInput::hitboxes_at(
-            std::slice::from_ref(&hitbox),
-            point(px(5.), px(-5.)),
-            viewport,
-        )
-        .next()
-        .unwrap();
-        assert_eq!(moved.id, hitbox.id);
-        assert_eq!(moved.bounds.origin, point(px(25.), px(15.)));
-        assert_eq!(
-            moved.additional_bounds.unwrap().origin,
-            point(px(25.), px(35.))
-        );
-        assert!(moved.contains_pointer(&point(px(27.), px(37.))));
-        assert!(!moved.contains_pointer(&point(px(22.), px(42.))));
-        assert!(!moved.contains_pointer(&point(px(27.), px(42.))));
-        assert!(!moved.contains_pointer(&point(px(27.), px(30.))));
-    }
 }

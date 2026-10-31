@@ -836,19 +836,7 @@ fn draw(
                             bounds.size.width.as_f32(),
                             bounds.size.height.as_f32(),
                             hitbox.behavior
-                        ) + &hitbox
-                            .additional_bounds
-                            .map(|additional| {
-                                let additional = additional.intersect(&hitbox.content_mask.bounds);
-                                format!(
-                                    " extra ({:.3}, {:.3}) {:.3} × {:.3}",
-                                    additional.origin.x.as_f32(),
-                                    additional.origin.y.as_f32(),
-                                    additional.size.width.as_f32(),
-                                    additional.size.height.as_f32()
-                                )
-                            })
-                            .unwrap_or_default()
+                        )
                     })
                     .collect();
                 format!(

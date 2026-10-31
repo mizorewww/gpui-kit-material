@@ -29,9 +29,6 @@ The local compatibility surface is restricted to:
   rows) using the same sampler as `transition_with_status`; it retains no
   view, window or scheduled callback.
 - `src/lib.rs`: public exports `ReducedMotion` and `TransitionPlayback`.
-- `src/text_selection.rs`: `Hitbox` literals add `additional_bounds: None`,
-  required by the GPUI `Hitbox` field patch
-  (`vendor/gpui-pre/hitbox-extension-patch.md`). No behavior change.
 - `src/toolbar.rs`: `Toolbar::axis(Axis)`. Upstream handles only Left/Right
   and always reports a horizontal orientation, so a vertical toolbar needed
   a private copy of the subtree-constrained focus walk and still announced

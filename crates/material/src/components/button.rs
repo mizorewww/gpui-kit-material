@@ -535,6 +535,7 @@ pub struct MaterialButton {
     loading: Option<(bool, SharedString)>,
     progress_playback: Option<ButtonProgressPlayback>,
     transition_playback: Option<ButtonTransitionPlayback>,
+    selector: Option<String>,
     preview: Option<InteractionPreview>,
     form: Form,
     palette: Option<Palette>,
@@ -564,6 +565,7 @@ impl MaterialButton {
             icon: None,
             icon_position: ButtonIconPosition::Leading,
             direction: ButtonDirection::Ltr,
+            selector: None,
             variant: ButtonVariant::Filled,
             size: ButtonSize::Small,
             shape: ButtonShape::Round,
@@ -784,6 +786,11 @@ impl ParentElement for MaterialButton {
 impl InteractiveElement for MaterialButton {
     fn interactivity(&mut self) -> &mut Interactivity {
         self.base.interactivity()
+    }
+    /// Names what the button paints, which a compact button's target root is not.
+    fn debug_selector(mut self, f: impl FnOnce() -> String) -> Self {
+        self.selector = Some(f());
+        self
     }
 }
 impl StatefulInteractiveElement for MaterialButton {
@@ -1148,21 +1155,12 @@ fn touch_release(state: &mut PressState, cx: &mut Context<PressState>) {
 }
 
 /// Passive pointer/touch observer. A window exit must clear a held press even
-/// after the pointer has left the button. Its non-occluding hitbox (the Base
-/// border box captured in prepaint) only locates passive touch presses.
-fn pointer_observer(
-    pressed: &Entity<PressState>,
-    touch_enabled: bool,
-    target: hit_target::SharedTarget,
-) -> impl IntoElement {
+/// after the pointer has left the button. Its non-occluding hitbox, the Base root,
+/// only locates passive touch presses.
+fn pointer_observer(pressed: &Entity<PressState>, touch_enabled: bool) -> impl IntoElement {
     let weak = pressed.downgrade();
     canvas(
-        move |bounds, window, _| {
-            target
-                .get()
-                .unwrap_or_else(|| hit_target::ResolvedTarget::new(bounds, None, window))
-                .insert(window)
-        },
+        move |bounds, window, _| window.insert_hitbox(bounds, HitboxBehavior::Normal),
         move |_, hitbox, window, cx| {
             let moving_hitbox = hitbox.clone();
             let touch = weak.clone();
@@ -1360,31 +1358,14 @@ impl RenderOnce for MaterialButton {
         let Interaction { focus, pressed, .. } = interaction;
         let expanded_target = matches!(self.size, ButtonSize::ExtraSmall | ButtonSize::Small)
             && matches!(self.form, Form::Label | Form::Icon(_) | Form::Segment(_));
-        // Capture the actual Base border box during its prepaint. A positioned
-        // child has padding-box geometry, so it cannot independently reconstruct
-        // the target when callers supply asymmetric borders.
-        let target_geometry = hit_target::SharedTarget::default();
-        let target_writer = target_geometry.clone();
-        let base = self
-            .base
-            .track_focus(&focus)
-            .hitbox_extension(move |bounds, style, window| {
-                let extension = expanded_target
-                    .then(|| hit_target::extra_bounds(bounds, style, window))
-                    .flatten();
-                target_writer.set(Some(hit_target::ResolvedTarget::new(
-                    bounds, extension, window,
-                )));
-                extension
+        let target = expanded_target
+            .then(|| {
+                hit_target::Target::resolve(g.height, &self.style, window.rem_size(), |p| {
+                    window.pixel_snap(p)
+                })
             })
-            .children(leading)
-            .children(self.children)
-            .children(trailing)
-            .child(pointer_observer(
-                &pressed,
-                !self.disabled,
-                target_geometry.clone(),
-            ));
+            .flatten();
+        let base = self.base.track_focus(&focus);
         let base = observe_press(base, &pressed, &focus, self.disabled, self.focusable);
         let base = bridge_hover(
             base,
@@ -1393,7 +1374,11 @@ impl RenderOnce for MaterialButton {
             self.caller_hover_mode,
             window,
             cx,
-        );
+        )
+        .when(!self.disabled && self.preview.is_none(), |b| {
+            b.cursor_pointer()
+        });
+        let observer = pointer_observer(&pressed, !self.disabled);
         let SampledColors { bg, fg, border, .. } = colors;
         // A split segment: full outer ends, animated inner corners.
         let corners = match self.form {
@@ -1417,67 +1402,124 @@ impl RenderOnce for MaterialButton {
             }
             _ => None,
         };
-        let mut base = base
-            .flex()
-            .flex_row()
-            .when(self.direction == ButtonDirection::Rtl, |b| {
-                b.flex_row_reverse()
-            })
-            .items_center()
-            .justify_center()
-            .flex_shrink_0()
-            .min_w(rem(g.min_width))
-            .when_some(g.width, |b, width| b.w(rem(width)))
-            .h(rem(g.height))
-            .pl(rem(left_padding))
-            .pr(rem(right_padding))
-            .gap(rem(g.gap))
-            .map(|b| match corners {
-                Some(corners) => b
-                    .rounded_tl(corners.top_left)
-                    .rounded_tr(corners.top_right)
-                    .rounded_br(corners.bottom_right)
-                    .rounded_bl(corners.bottom_left),
-                None => b.rounded(rem(effects.radius)),
-            })
-            .bg(state::layer(bg, fg, effects.opacity))
-            .text_color(fg)
-            .font_family(ty.font_family)
-            .text_size(ty.font_size)
-            .letter_spacing(ty.letter_spacing)
-            .line_height(ty.line_height)
-            .font_weight(FontWeight(ty.font_weight as f32))
-            .when(
-                self.variant == ButtonVariant::Outlined && self.palette.is_none(),
-                |b| b.border(rem(g.outline)).border_color(border),
-            )
-            .shadow(effects.shadows.into_shadows())
-            .when(!self.disabled && self.preview.is_none(), |b| {
-                b.cursor_pointer()
-            })
-            .refine_style(&self.style);
-        let mut painted_style = Style::default();
-        painted_style.refine(base.style());
-        let (ripple_color, ripple_visible) = ripple_ink(&painted_style, fg);
-        let base = ripple::ButtonRipple::new(
-            base,
-            self.id,
-            self.ripple && self.preview.is_none(),
-            !self.disabled && ripple_visible,
-            painted_style.corner_radii,
-            painted_style.border_widths,
-            ripple_color,
-            window,
-            cx,
-        )
-        .hit_target(target_geometry);
+        // A compact button's root is its 48dp target, so what it paints moves to a
+        // child; the caller's layout stays on the root.
+        let root_layout = target.is_some().then(|| hit_target::take_layout(&mut self.style));
+        let variant = self.variant;
+        let palette = self.palette;
+        let direction = self.direction;
+        let style = self.style;
+        // The painted surface, whichever element it is.
+        macro_rules! surface {
+            ($element:expr) => {
+                $element
+                    .flex()
+                    .flex_row()
+                    .when(direction == ButtonDirection::Rtl, |b| b.flex_row_reverse())
+                    .items_center()
+                    .justify_center()
+                    .pl(rem(left_padding))
+                    .pr(rem(right_padding))
+                    .gap(rem(g.gap))
+                    .map(|b| match corners {
+                        Some(corners) => b
+                            .rounded_tl(corners.top_left)
+                            .rounded_tr(corners.top_right)
+                            .rounded_br(corners.bottom_right)
+                            .rounded_bl(corners.bottom_left),
+                        None => b.rounded(rem(effects.radius)),
+                    })
+                    .bg(state::layer(bg, fg, effects.opacity))
+                    .text_color(fg)
+                    .font_family(ty.font_family)
+                    .text_size(ty.font_size)
+                    .letter_spacing(ty.letter_spacing)
+                    .line_height(ty.line_height)
+                    .font_weight(FontWeight(ty.font_weight as f32))
+                    .when(
+                        variant == ButtonVariant::Outlined && palette.is_none(),
+                        |b| b.border(rem(g.outline)).border_color(border),
+                    )
+                    .shadow(effects.shadows.into_shadows())
+                    .refine_style(&style)
+            };
+        }
+        let ripple_on = self.ripple && self.preview.is_none();
         let forced_focus = self.preview == Some(InteractionPreview::Focused);
         let ring_enabled = !self.disabled && (self.focusable || forced_focus);
-        match corners {
-            Some(corners) => ButtonFocusRing::with_corners(base, focus, ring_enabled, corners),
-            None => ButtonFocusRing::new(base, focus, ring_enabled, rem(effects.radius)),
+        let radius = rem(effects.radius);
+        let selector = self.selector;
+        let ring = move |child: ripple::ButtonRipple, focus: FocusHandle| {
+            match corners {
+                Some(corners) => ButtonFocusRing::with_corners(child, focus, ring_enabled, corners),
+                None => ButtonFocusRing::new(child, focus, ring_enabled, radius),
+            }
+            .forced(forced_focus)
+        };
+        let id = self.id;
+        let enabled = !self.disabled;
+        if let (Some(target), Some(layout)) = (target, root_layout) {
+            let visual = surface!(div().flex_grow(1.).min_w(px(0.)))
+                .h(rem(g.height))
+                .refine_style(&hit_target::height_of(&layout))
+                .children(leading)
+                .children(self.children)
+                .children(trailing)
+                .when_some(selector, |b, name| b.debug_selector(move || name));
+            let mut painted_style = Style::default();
+            let mut visual = visual;
+            painted_style.refine(visual.style());
+            let (ripple_color, ripple_visible) = ripple_ink(&painted_style, fg);
+            let surface = ripple::ButtonRipple::new(
+                visual,
+                id,
+                ripple_on,
+                enabled && ripple_visible,
+                painted_style.corner_radii,
+                painted_style.border_widths,
+                ripple_color,
+                window,
+                cx,
+            )
+            .hit_extension(target.extension());
+            base.flex_shrink_0()
+                .min_w(rem(g.min_width))
+                .when_some(g.width, |b, width| b.w(rem(width)))
+                .refine_style(&layout)
+                .h(target.height)
+                .mt(target.margin_top)
+                .mb(target.margin_bottom)
+                .child(ring(surface, focus))
+                .child(observer)
+                .into_any_element()
+        } else {
+            let mut base = surface!(
+                base.flex_shrink_0()
+                    .min_w(rem(g.min_width))
+                    .when_some(g.width, |b, width| b.w(rem(width)))
+                    .h(rem(g.height))
+            )
+            .children(leading)
+            .children(self.children)
+            .children(trailing)
+            .child(observer)
+            .when_some(selector, |b, name| b.debug_selector(move || name));
+            let mut painted_style = Style::default();
+            painted_style.refine(base.style());
+            let (ripple_color, ripple_visible) = ripple_ink(&painted_style, fg);
+            let surface = ripple::ButtonRipple::new(
+                base,
+                id,
+                ripple_on,
+                enabled && ripple_visible,
+                painted_style.corner_radii,
+                painted_style.border_widths,
+                ripple_color,
+                window,
+                cx,
+            );
+            ring(surface, focus).into_any_element()
         }
-        .forced(forced_focus)
     }
 }
 /// Convenience constructor with caller-supplied content and activation.

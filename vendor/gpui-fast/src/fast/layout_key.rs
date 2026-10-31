@@ -162,8 +162,8 @@ impl Window {
         let mut lines = self.rendered_frame.scene.describe();
         lines.extend(self.rendered_frame.hitboxes.iter().map(|hitbox| {
             format!(
-                "hitbox {:?} {:?} {:?} {:?}",
-                hitbox.bounds, hitbox.additional_bounds, hitbox.content_mask, hitbox.behavior
+                "hitbox {:?} {:?} {:?}",
+                hitbox.bounds, hitbox.content_mask, hitbox.behavior
             )
         }));
         lines

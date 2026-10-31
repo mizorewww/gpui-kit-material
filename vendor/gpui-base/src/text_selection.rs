@@ -3691,7 +3691,6 @@ mod tests {
                 self.selection.clone(),
                 TextSelectionRegistration::new(
                     Hitbox {
-                        additional_bounds: None,
                         id: HitboxId::placeholder(),
                         bounds,
                         content_mask: ContentMask { bounds },
@@ -3851,7 +3850,6 @@ mod tests {
     fn public_selection_data_uses_builders_and_readers(cx: &mut TestAppContext) {
         let bounds = Bounds::new(point(px(1.), px(2.)), size(px(30.), px(10.)));
         let hitbox = Hitbox {
-            additional_bounds: None,
             id: HitboxId::placeholder(),
             bounds,
             content_mask: ContentMask { bounds },
@@ -4738,7 +4736,6 @@ mod tests {
                         participant.selection.clone(),
                         TextSelectionRegistration::new(
                             Hitbox {
-                                additional_bounds: None,
                                 id: HitboxId::placeholder(),
                                 bounds: collapsed,
                                 content_mask: ContentMask { bounds: collapsed },
@@ -4902,7 +4899,6 @@ mod tests {
             selection.set_local_selection(true, cx);
             let bounds = Bounds::new(point(px(0.), px(0.)), size(px(100.), px(20.)));
             let hitbox = Hitbox {
-                additional_bounds: None,
                 id: HitboxId::placeholder(),
                 bounds,
                 content_mask: ContentMask { bounds },
