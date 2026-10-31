@@ -646,16 +646,31 @@ impl RenderOnce for ConnectedButtonGroup {
         let vertical = self.vertical;
         metrics.vertical = vertical;
         let equal = self.equal_widths && !vertical && !self.full_width;
+        // A slot measures no less than the widest width it is given, so what
+        // makes an option's own width change has to start the measure over.
+        let measured_for = equal.then(|| {
+            use std::hash::{Hash, Hasher};
+            let mut hash = std::collections::hash_map::DefaultHasher::new();
+            f32::from(window.rem_size()).to_bits().hash(&mut hash);
+            for (index, option) in self.options.iter().enumerate() {
+                option.label.hash(&mut hash);
+                if self.labels == GroupLabels::Selected {
+                    is_checked(index, &option.value).hash(&mut hash);
+                }
+            }
+            hash.finish()
+        });
         let widths = window
             .use_keyed_state((self.id.clone(), "equal-widths"), cx, |_, _| {
-                Vec::<Rc<std::cell::Cell<f32>>>::new()
+                (None::<u64>, Vec::<Rc<std::cell::Cell<f32>>>::new())
             })
-            .update(cx, |widths, _| {
+            .update(cx, |(signature, widths), _| {
                 widths.resize_with(self.options.len(), Rc::default);
-                if !equal {
+                if !equal || *signature != measured_for {
                     // Re-measure from natural widths when equal widths return.
                     widths.iter().for_each(|width| width.set(0.));
                 }
+                *signature = measured_for;
                 widths.clone()
             });
         // Equal options share the widest measured width, which holds while
@@ -801,14 +816,8 @@ impl RenderOnce for ConnectedButtonGroup {
                         callback(&value, window, cx);
                     }
                 });
-                lane = lane.child(focus_ring(
-                    tab,
-                    &focus,
-                    option_disabled,
-                    forced_focus,
-                    paint,
-                    vertical,
-                ));
+                let ring = focus_ring(tab, &focus, option_disabled, forced_focus, paint, vertical);
+                lane = lane.child(equal_slot(ring, &widths[index], equal, widest));
             } else if toggles || self.selection == GroupSelection::None {
                 let click_focus = focus.clone();
                 let on_toggle = self.on_toggle.clone();
@@ -2134,5 +2143,70 @@ mod mode_tests {
         cx.simulate_click(at, Modifiers::none());
         draw(cx);
         assert!(option(cx, 0).size.width > bare.size.width, "revealed");
+    }
+
+    struct Relabelled {
+        long: bool,
+    }
+    impl Render for Relabelled {
+        fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+            window.set_rem_size(px(14.));
+            let last = if self.long {
+                "A much much much longer label"
+            } else {
+                "Short"
+            };
+            div().flex().items_start().p(px(40.)).child(
+                ConnectedButtonGroup::new("group", "Format")
+                    .button_size(ButtonSize::Small)
+                    .options([("a", "One"), ("b", last)])
+                    .equal_widths(true),
+            )
+        }
+    }
+
+    #[gpui::test]
+    fn equal_widths_shrink_with_their_labels(cx: &mut TestAppContext) {
+        cx.update(|cx| {
+            gpui_base::init(cx);
+            cx.set_reduce_motion(true);
+        });
+        let (view, cx) = cx.add_window_view(|_, _| Relabelled { long: true });
+        draw(cx);
+        let wide = option(cx, 0).size.width;
+        view.update(cx, |view, cx| {
+            view.long = false;
+            cx.notify();
+        });
+        draw(cx);
+        let narrow = option(cx, 0).size.width;
+        assert!(narrow < wide - px(50.), "{wide:?} then {narrow:?}");
+        assert_eq!(narrow, option(cx, 1).size.width, "still equal");
+    }
+
+    struct EqualTabs;
+    impl Render for EqualTabs {
+        fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+            window.set_rem_size(px(14.));
+            div().flex().items_start().p(px(40.)).child(
+                ConnectedButtonGroup::new("group", "Format")
+                    .button_size(ButtonSize::Small)
+                    .options([("a", "One"), ("b", "A much longer label")])
+                    .selected("a")
+                    .tabs()
+                    .equal_widths(true),
+            )
+        }
+    }
+
+    #[gpui::test]
+    fn tabs_take_equal_widths_too(cx: &mut TestAppContext) {
+        cx.update(|cx| {
+            gpui_base::init(cx);
+            cx.set_reduce_motion(true);
+        });
+        let (_, cx) = cx.add_window_view(|_, _| EqualTabs);
+        draw(cx);
+        assert_eq!(option(cx, 0).size.width, option(cx, 1).size.width);
     }
 }
