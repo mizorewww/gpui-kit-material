@@ -13,8 +13,14 @@ Distribution is by Git revision for now; see the [quick start](README.md#quick-s
 - `rust-version` 1.99.1, the toolchain this workspace is verified with.
 - `[package.metadata.docs.rs]`, `deny.toml`, and CI checks of what each package ships.
 
+- `TintFamily`, and `ColorRole`s for its seven container and content pairs: hue families
+  harmonized toward each scheme's primary, as Material's custom colors are.
+- `ListLeading::Tinted`: a `tinted_icon` as a list item's leading element.
+
 ### Changed
 
+- `Tint` paints its own `TintFamily`. Its old mapping onto the container roles gave one
+  color for blue, teal, pink and purple in every source palette.
 - Kit is pinned by revision (`bb85882`) instead of `branch = "main"`, so a consumer
   without this workspace's lockfile gets Component at the same revision as Base.
 - `Entity::update_for_render` is dev-only, behind `frame-observation`; a consumer's

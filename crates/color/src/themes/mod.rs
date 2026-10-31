@@ -345,8 +345,8 @@ mod tests {
         assert_eq!(unique.len(), 52);
         assert_eq!(
             ROLE_COUNT,
-            52 + 10,
-            "52 reference roles plus ten documented application extensions"
+            52 + 10 + 14,
+            "52 reference roles, ten documented application extensions and seven tint pairs"
         );
         for (old, new) in [
             (ColorRole::ACCENT, ColorRole::PRIMARY),
