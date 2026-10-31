@@ -16,15 +16,16 @@ fn items(count: usize) -> Vec<NavItem> {
 
 #[test]
 fn selected_items_use_secondary_roles_and_state_layers() {
-    let rest = item_paint(false, 0., 0., false);
+    let rest = item_paint(NavItemLayout::Vertical, false, 0., 0., false);
     let ink = color(ColorRole::ON_SURFACE_VARIANT);
     assert_eq!(rest.icon, ink);
     assert_eq!(rest.label, ink);
     assert_eq!(rest.indicator.a, 0.);
-    assert_eq!(rest.hover, ink.opacity(state::HOVER));
-    assert_eq!(rest.press, ink.opacity(state::PRESS));
+    let layer = color(ColorRole::ON_SURFACE);
+    assert_eq!(rest.hover, layer.opacity(state::HOVER));
+    assert_eq!(rest.press, layer.opacity(state::PRESS));
 
-    let selected = item_paint(true, 1., 1., false);
+    let selected = item_paint(NavItemLayout::Vertical, true, 1., 1., false);
     assert_eq!(selected.icon, color(ColorRole::ON_SECONDARY_CONTAINER));
     assert_eq!(selected.label, color(ColorRole::SECONDARY));
     assert_eq!(selected.indicator, color(ColorRole::SECONDARY_CONTAINER));
@@ -34,7 +35,7 @@ fn selected_items_use_secondary_roles_and_state_layers() {
         color(ColorRole::ON_SECONDARY_CONTAINER).opacity(state::HOVER)
     );
 
-    let disabled = item_paint(true, 1., 1., true);
+    let disabled = item_paint(NavItemLayout::Vertical, true, 1., 1., true);
     assert_eq!(disabled.icon, state::disabled(color(ColorRole::ON_SURFACE)));
     assert_eq!(disabled.hover.a, 0., "no state layer when disabled");
 }
@@ -482,4 +483,35 @@ fn hidden_collapsed_rails_open_from_zero_width(cx: &mut TestAppContext) {
     });
     settle(cx);
     assert!(cx.debug_bounds("nav-pill-rd0").is_none());
+}
+
+/// The kit's `Vertical nav item`, `Horizontal nav item` for the bar and for the
+/// expanded rail.
+#[test]
+fn selected_labels_and_state_layers_follow_the_items_layout() {
+    let c = color;
+    let paint = |layout, selected| {
+        let amount = if selected { 1. } else { 0. };
+        item_paint(layout, selected, amount, amount, false)
+    };
+    for (layout, label) in [
+        (NavItemLayout::Vertical, ColorRole::SECONDARY),
+        (NavItemLayout::Horizontal, ColorRole::ON_SECONDARY_CONTAINER),
+        (NavItemLayout::Expanded, ColorRole::ON_SECONDARY_CONTAINER),
+    ] {
+        assert_eq!(paint(layout, true).label, c(label), "{layout:?}");
+        let selected = c(ColorRole::ON_SECONDARY_CONTAINER);
+        assert_eq!(paint(layout, true).hover, selected.opacity(state::HOVER));
+        assert_eq!(paint(layout, true).press, selected.opacity(state::PRESS));
+    }
+    for layout in [NavItemLayout::Vertical, NavItemLayout::Expanded] {
+        let rest = c(ColorRole::ON_SURFACE);
+        assert_eq!(paint(layout, false).hover, rest.opacity(0.08), "{layout:?}");
+        assert_eq!(paint(layout, false).press, rest.opacity(0.10), "{layout:?}");
+    }
+    let bar = c(ColorRole::ON_SECONDARY_CONTAINER);
+    assert_eq!(
+        paint(NavItemLayout::Horizontal, false).hover,
+        bar.opacity(0.08)
+    );
 }
