@@ -349,6 +349,24 @@ fn update_tip(
         .detach();
 }
 
+/// A layer over a trigger or popup that reports the pointer entering and leaving
+/// it. A control blocks the mouse from what is under it, so an `on_hover` on the
+/// control's parent never fires while the pointer is on the control. This
+/// layer is above the control, and blocks nothing: the control below takes its
+/// hover, press and cursor as usual.
+fn hover_layer(
+    id: impl Into<ElementId>,
+    changed: impl Fn(bool, &mut Window, &mut App) + 'static,
+) -> impl IntoElement {
+    div()
+        .id(id.into())
+        .absolute()
+        .top_0()
+        .left_0()
+        .size_full()
+        .on_hover(move |hovered, window, cx| changed(*hovered, window, cx))
+}
+
 impl RenderOnce for MaterialTooltip {
     fn render(mut self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let Some(trigger) = self.trigger.take() else {
@@ -425,13 +443,6 @@ impl RenderOnce for MaterialTooltip {
             .track_focus(&focus)
             .tab_stop(false)
             .aria_description(description)
-            .on_hover(move |hovered, window, cx| {
-                let hovered = *hovered;
-                update_tip(&hover_state, window, cx, |tip| {
-                    tip.pointer_over = hovered;
-                    tip.trigger_hovered = hovered && tip.timing.on_hover;
-                });
-            })
             .on_key_down(move |event, window, cx| {
                 if event.keystroke.key == "escape" && escape_state.read(cx).visible {
                     escape_state.update(cx, |tip, _| {
@@ -444,6 +455,15 @@ impl RenderOnce for MaterialTooltip {
                 }
             })
             .child(trigger)
+            .child(hover_layer(
+                (id.clone(), "tooltip-trigger-hover"),
+                move |hovered, window, cx| {
+                    update_tip(&hover_state, window, cx, |tip| {
+                        tip.pointer_over = hovered;
+                        tip.trigger_hovered = hovered && tip.timing.on_hover;
+                    });
+                },
+            ))
             .child(
                 canvas(
                     move |bounds, window, cx| {
@@ -491,16 +511,18 @@ impl RenderOnce for MaterialTooltip {
                 Placement::Left => tip.left(-away),
                 Placement::Right => tip.left(away),
             })
-            .when(interactive, |tip| {
-                tip.on_hover(move |hovered, window, cx| {
-                    let hovered = *hovered;
-                    update_tip(&tip_state, window, cx, |tip| tip.tip_hovered = hovered);
-                })
-            })
             .child(container(
-                ElementId::NamedChild(std::sync::Arc::new(id), "popup".into()),
+                ElementId::NamedChild(std::sync::Arc::new(id.clone()), "popup".into()),
                 self.content,
             ))
+            .when(interactive, |tip| {
+                tip.child(hover_layer(
+                    (id, "tooltip-popup-hover"),
+                    move |hovered, window, cx| {
+                        update_tip(&tip_state, window, cx, |tip| tip.tip_hovered = hovered);
+                    },
+                ))
+            })
             .child({
                 // The side is known only once positioned (before this
                 // prepaints): draw again when it changed.
