@@ -86,6 +86,7 @@ mod ripple_tests;
 mod roving;
 mod search;
 mod sheets;
+mod stepper;
 mod tabs;
 mod text;
 mod text_field;
@@ -179,6 +180,7 @@ pub use progress::{
 pub use radio::{MaterialRadio, MaterialRadioGroup};
 pub use ripple::Ripple;
 pub use sheets::{BottomSheetDetent, MaterialBottomSheet, MaterialSideSheet, SideSheetEdge};
+pub use stepper::{STEPPER_DOT_SIZE, Stepper};
 pub use tabs::{MaterialTabs, TabItem, TabsVariant};
 pub use text::{
     accessible_text, error_text, info_callout, page_heading, section_heading, section_title,
