@@ -192,7 +192,7 @@ jobs:
         run: scripts/check-package.sh
       - name: The site Worker's rules
         run: node --test deploy/site/
-      # gpui-kit-material has Git dependencies until the crate split and cannot publish.
+      # gpui-kit-material has Git dependencies and [patch] needs, so it cannot publish yet.
       - name: Publish dry run of the crate without Git dependencies
         run: cargo publish --locked --dry-run -p gpui-kit-material-color
       - uses: taiki-e/install-action@v2

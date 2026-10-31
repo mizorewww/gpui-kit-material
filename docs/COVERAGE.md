@@ -154,6 +154,8 @@ Status of each [production criterion](PRODUCTION.md) across all components.
 
 Release criteria not met: `gpui-kit-material` needs `[patch]` tables and Git
 dependencies, so it is distributed by Git revision and cannot publish to crates.io.
-`gpui-kit-material-color` has a publish dry run in CI. In place: `rust-version`,
+`gpui-kit-material-color` has a publish dry run in CI. The Gallery, gallery-web and the
+benches are separate `publish = false` crates, and the library's components are in
+feature groups, each checked alone in CI. In place: `rust-version`,
 `CHANGELOG.md`, `[package.metadata.docs.rs]`, `deny.toml`, and CI on the three desktop
 systems and WASM, including a downstream build from Git.

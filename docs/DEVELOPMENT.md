@@ -6,13 +6,23 @@ its own.
 
 ## Backends
 
-Material, the gallery and gallery-web default to Kit's **GPUI Fast** backend.
+Material, the Gallery, gallery-web and the benches default to Kit's **GPUI Fast** backend.
 For comparison, run the upstream backend:
 
 ```sh
 cargo run -p gpui-kit-material-gallery --no-default-features --features embedded-symbols
 ./scripts/build-gallery-web.sh --upstream   # or --fast (default)
 ```
+
+## Feature combinations
+
+```sh
+scripts/check-features.sh                                  # defaults, nothing, full, each group alone
+scripts/check-features.sh --target wasm32-unknown-unknown
+```
+
+CI's `features` job runs both. Adding a component to a group, or making one use another
+group, is where this fails; the groups are in the [README](../README.md#crates).
 
 ## Browser gallery
 
@@ -57,6 +67,21 @@ the docs at `/`, the release Gallery at `/gallery/` with content-hashed assets, 
 heading anchor. Links to repository files that are not published go to GitHub. It
 needs [`uv`](https://docs.astral.sh/uv/) for the Markdown dependency; pass
 `--skip-wasm` to reuse the bindings already in `crates/gallery-web/www/wasm`.
+
+`--release` builds with the `wasm-release` profile (fat LTO, one codegen unit, source
+paths remapped); `release` stays what performance profiles measure. A `.br` copy at
+highest quality sits beside the module, its bindings and the icon fonts, and
+`deploy/site/worker.js` serves it for `/gallery/wasm/*` with `encodeBody: "manual"`,
+which Cloudflare's own compression loses to. Everything else stays a plain asset, and
+only those requests count as Worker invocations. `node --test deploy/site/` tests the
+Worker's rules, and `npx cf dev` in `deploy/site` with `SITE_DIR` set runs it locally;
+its dev proxy rewrites `Accept-Encoding`, so a client without Brotli cannot be tried there.
+
+`scripts/deploy-site.sh` refuses a site not built from the current commit: it reads the
+record `scripts/site_stamp.py` writes beside `target/site`. HEAD and a clean tree must
+match the site's record, the module must be a `wasm-release` build whose compiled inputs
+have not changed since (so `--skip-wasm` still serves a documentation change), and the
+directory must be unchanged since the build. `--check` stops after these checks.
 
 ```sh
 ./scripts/build-site.sh
