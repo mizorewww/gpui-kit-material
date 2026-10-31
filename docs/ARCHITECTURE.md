@@ -129,8 +129,8 @@ Its engine has upstream's `FrameEvent`, `PlatformWindow` and frame path.
 | Consumer crate | Why a consumer needs it |
 | --- | --- |
 | `gpui-kit` | Normalized manifest that keeps WASM single-threaded by default. |
-| `gpui-base` | Component behavior Material relies on, and the input reporting its caret. |
-| `gpui-pre`, `gpui-fast` | Layout direction, letter spacing, touch observation, hitbox extensions, the lazy tab-stop index and the other engine rules in the table below. |
+| `gpui-base` | Slider, dialog and toolbar corrections, transition behavior, and the input reporting its caret. |
+| `gpui-pre`, `gpui-fast` | Layout direction, letter spacing, the lazy tab-stop index, repeat playback and visibility, and the other engine rules in the table below. |
 | `gpui-pre-apple`, `gpui-fast-apple` | Non-Latin and app-private fallback fonts. |
 | `gpui-pre-web`, `gpui-fast-web` | The browser's IME panel opens at the caret; upstream's `update_ime_position` does nothing. Only matters on `wasm32`. |
 
@@ -149,17 +149,34 @@ does not compile here (`E0004`, `FrameEvent::Complete`) and is not used here.
 | Vendored | Source | Why |
 | --- | --- | --- |
 | `gpui-kit` | Git `main` at audited `bb85882`, unchanged source | Normalized manifest disables implicit WASM threading (`multithreaded-web` restores it). Hashes in `SOURCE.md`/`SOURCE.json`. |
-| `gpui-base` | Git `bb85882` (`crates/base`) + patches (`SOURCE.json`, `motion-patch.md`) | CSS transition reversal, per-transition reduced motion, `TransitionPlayback`, toggle focus policy, busy accessibility state; `Hitbox.additional_bounds` follow-up in `text_selection.rs`; input caller caret color; vertical `Toolbar` axis; slider step snapping from min, assistive Increment/Decrement that move only a range's end, `Slider::track_focus`, right-to-left pointer math; `Dialog::accessibility_label`; the input reports its caret to the platform when it moves (`ime-anchor-patch.md`). |
-| `gpui-pre` (GPUI `=0.3.10`) | crates.io + patches (`SOURCE.json`, `*-patch.md`) | Layout direction; letter spacing; passive raw touch observation; hitbox extensions independent of layout; animation visibility and repeat playback; complete CPU frame scopes, presentation wait, GPU time and submission outcome in the profiler; submission statistics, vsync control and throttle retry; `em`/`ch` metrics for fonts without `m`; lazy tab-stop index (`tab-stop-index-patch.md`); overflowing spaces hang instead of starting a wrapped row (`hanging-space-patch.md`); test-harness repairs; `Window::focused_input_selection_bounds` (`focused-input-bounds-patch.md`). |
+| `gpui-base` | Git `bb85882` (`crates/base`) + patches (`SOURCE.json`, `motion-patch.md`) | CSS transition reversal, per-transition reduced motion, `TransitionPlayback`; vertical `Toolbar` axis; slider step snapping from min, assistive Increment/Decrement that move only a range's end, `Slider::track_focus`, right-to-left pointer math; `Dialog::accessibility_label`; the input reports its caret to the platform when it moves (`ime-anchor-patch.md`). |
+| `gpui-pre` (GPUI `=0.3.10`) | crates.io + patches (`SOURCE.json`, `*-patch.md`) | Layout direction; letter spacing; animation visibility and repeat playback; complete CPU frame scopes, presentation wait, GPU time and submission outcome in the profiler; submission statistics, vsync control and throttle retry; `em`/`ch` metrics for fonts without `m`; lazy tab-stop index (`tab-stop-index-patch.md`); `Entity::update_for_render` (`render-lease-patch.md`); overflowing spaces hang instead of starting a wrapped row (`hanging-space-patch.md`); test-harness repairs; `Window::focused_input_selection_bounds` (`focused-input-bounds-patch.md`). |
 | `gpui-pre-apple` | crates.io + patches (`SOURCE.json`, `VENDORED.md`) | Non-Latin and app-private fallback fonts; `draw_with_status` with a per-draw autorelease pool, drawable-wait and GPU timestamps. |
 | `gpui-pre-web` | crates.io + patches (`SOURCE.json`, `MATERIAL-PATCHES.md`) | Moves the hidden IME input to the caret, where a browser opens its candidate window (consumers need this); successful submission count, behind the crate's own `frame-observation` feature. |
-| `gpui-fast`, `-apple`, `-web` | 0.1.12 + patches (`MATERIAL-MIGRATION.json`, per-file `local_changes`) | The GPUI, Apple and web patches above carried through Fast retained/scroll replay and composition (touch observers, extended hit targets); explicit single-threaded web defaults. |
+| `gpui-fast`, `-apple`, `-web` | 0.1.12 + patches (`MATERIAL-MIGRATION.json`, per-file `local_changes`) | The GPUI, Apple and web patches above carried through Fast retained/scroll replay and composition; explicit single-threaded web defaults. |
 | `gpui-pre-macos`, `gpui-fast-macos` (dev-only) | crates.io + patches (`SOURCE.json`, `MATERIAL-PATCHES.md`) | Vsync control, demand waker, periodic-source report and submission statistics (below). |
 | `gpui-pre-linux`, `gpui-fast-linux`, `gpui-pre-wgpu`, `gpui-fast-wgpu`, `wgpu` (dev-only) | crates.io + patches (`SOURCE.json`, `MATERIAL-PATCHES.md`) | Submission statistics from the present status `wgpu` otherwise discards, and vsync control through `PresentMode` (below). |
 | `gpui-pre-windows`, `gpui-fast-windows` (dev-only) | crates.io + patches (`SOURCE.json`, `MATERIAL-PATCHES.md`) | Submission statistics counting only `S_OK` presents, and vsync control through the DXGI sync interval (below). |
 
-Touch patches leave gesture recognition, scrolling and activation in GPUI while
-letting Material start a ripple on touch-down and release it on cancellation.
+**Replaced by Material code.** No engine patch remains for these:
+
+- **Touch press.** A button and its ripple observe the unclaimed `TouchDragEvent` GPUI
+  offers at touch start. GPUI has no public signal for a system cancel of a still
+  finger, so that press ends at a 5 s hold limit.
+- **48dp target of XS and S buttons.** The Base root is the target, negative margins
+  keep it out of layout, and the painted surface is its child
+  (`components/button/hit_target.rs`). A caller's `.hover()`, `.focus()` or `.active()`
+  style lands on the root, not the surface. A button with `overflow_hidden`, or a height
+  only layout can resolve, has no extended target.
+- **Toggle focus policy.** Base Button with `aria_toggled`.
+- **Error caret.** The field lays out Kit's Input with its caret in the theme.
+- **Busy state.** Material marks its own control root, which only `accesskit_windows`
+  reads.
+
+**Audit results for transition extras.** These stay, because removing them changes
+reference parity or the budget: reversal, per-transition reduced motion,
+`TransitionPlayback`, `RepeatAnimationPlayback` and `repeat_when_visible`. No Examples
+page uses a playback handle. The Gallery's are in its buttons and loading pages.
 
 **Lazy tab stops.** `TabStopMap` records insertions during paint and builds the
 order and focus lookup on the first query after a change. Upstream's per-insertion
