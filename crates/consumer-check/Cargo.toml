@@ -17,7 +17,7 @@ gpui-fast = ["gpui-kit/gpui-fast", "gpui-kit-material/gpui-fast", "gpui-fps/gpui
 # `profiler` is what the engine rules in CI's consumer step test.
 gpui-kit = { git = "https://github.com/longbridge/gpui-kit", rev = "bb85882e1faab845d9e7be33b69a152879a90f69", features = ["profiler"] }
 gpui-fps = { git = "https://github.com/longbridge/gpui-kit", rev = "bb85882e1faab845d9e7be33b69a152879a90f69" }
-gpui-kit-material = { path = "../material", default-features = false, features = ["serde", "embedded-symbols"] }
+gpui-kit-material = { path = "../material", default-features = false, features = ["full", "serde", "embedded-symbols"] }
 
 # Lets `cargo test -p consumer-check -p gpui-pre --lib` run the engine tests with
 # frame observation off.

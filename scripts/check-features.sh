@@ -37,7 +37,11 @@ check() {
 
 check -p gpui-kit-material
 check -p gpui-kit-material --no-default-features
-check -p gpui-kit-material --no-default-features --lib --tests
+# Dev-dependencies are native only.
+if [ ${#target[@]} = 0 ]; then
+    check -p gpui-kit-material --no-default-features --lib --tests
+    check -p gpui-kit-material-color --no-default-features --all-targets
+fi
 check -p gpui-kit-material --no-default-features --features full
 check -p gpui-kit-material --no-default-features --features full,gpui-fast
 for group in $groups; do

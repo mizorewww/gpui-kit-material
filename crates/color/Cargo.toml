@@ -26,3 +26,19 @@ serde = { workspace = true, optional = true }
 
 [dev-dependencies]
 serde_json.workspace = true
+
+[[test]]
+name = "dynamic_hct"
+required-features = ["dynamic"]
+
+[[test]]
+name = "dynamic_palettes"
+required-features = ["dynamic"]
+
+[[test]]
+name = "dynamic_schemes"
+required-features = ["dynamic"]
+
+[[test]]
+name = "dynamic_timing"
+required-features = ["dynamic"]
