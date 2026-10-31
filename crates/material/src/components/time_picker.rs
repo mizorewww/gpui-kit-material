@@ -216,7 +216,9 @@ impl TimePickerState {
         self
     }
     /// Snap the dial and its arrow keys to every `step` minutes (e.g. 5 or
-    /// 15; 0 and 1 mean every minute).
+    /// 15; 0 and 1 mean every minute). Its marks count from 0 and the last
+    /// wraps to 0, whether or not the step divides 60: every 7 minutes ends at
+    /// :56, and the next mark is :00.
     pub fn minute_step(mut self, step: u32) -> Self {
         self.minute_step = step.clamp(1, 30);
         self
@@ -400,7 +402,8 @@ fn minute_marks(step: i32) -> i32 {
 }
 
 /// Step `minute` by `delta` marks of a `step`-minute grid: an off-grid
-/// minute first moves to the neighboring mark in the step's direction.
+/// minute first moves to the neighboring mark in the step's direction. Past its
+/// last mark the grid wraps to :00, even when the step does not divide 60.
 pub(crate) fn step_minutes(minute: u32, step: u32, delta: i32) -> u32 {
     let (minute, step) = (minute as i32, step.max(1) as i32);
     let floor = minute.div_euclid(step);
