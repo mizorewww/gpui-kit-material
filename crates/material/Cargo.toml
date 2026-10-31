@@ -3,12 +3,21 @@ name = "gpui-kit-material"
 description = "Material 3 design tokens, motion and component adapters for Longbridge GPUI Kit"
 version.workspace = true
 edition.workspace = true
+rust-version.workspace = true
+# MIT (LICENSE, src/motion/LICENSE-material), plus Apache-2.0 for the rules ported
+# from androidx (src/components/LICENSE-androidx, src/shapes/LICENSE-androidx).
 license = "MIT AND Apache-2.0"
 repository.workspace = true
 authors.workspace = true
 readme = "../../README.md"
 keywords = ["material", "material-design", "gpui", "ui", "desktop"]
 categories = ["gui"]
+# The gallery and benchmarks stay in the repository: the gallery bundles OFL-1.1
+# fonts, which the library does not use. gpui-kit-material-gallery-web declares them.
+exclude = ["examples/"]
+
+[package.metadata.docs.rs]
+targets = ["x86_64-unknown-linux-gnu"]
 
 [features]
 default = ["serde", "embedded-symbols", "gpui-fast"]

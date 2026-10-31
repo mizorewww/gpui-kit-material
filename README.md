@@ -183,4 +183,9 @@ MIT, except files ported from Apache-2.0 sources, which keep their notices.
 Palette sources and licenses: [crates/color/PALETTES.md](crates/color/PALETTES.md).
 Material Symbols assets are Apache-2.0, retained in the pinned
 [Symbols repository](https://github.com/mizorewww/gpui-material-symbols/tree/593aa15a46076f3e2870c23c0e4fd79f94f105bd).
-Roboto and IBM Plex Sans gallery fonts are SIL OFL, bundled with their licenses.
+The gallery's fonts are SIL OFL 1.1, each beside its license in
+[crates/material/examples/gallery/fonts](crates/material/examples/gallery/fonts): Roboto
+and IBM Plex Sans, which it bundles, and Noto Sans Arabic, Noto Sans Hebrew, Noto Emoji
+and Noto Color Emoji, kept for conformance captures only and not bundled. None of them
+is part of the library's package. The published site lists every license at
+[/licenses/](https://material.mizore.blog/licenses/).
