@@ -572,10 +572,9 @@ impl RenderOnce for SliderThumbnail {
 impl Gallery {
     /// One overview group: its heading over the reflowing card grid.
     pub(super) fn render_overview_group(
-        &self,
         group: Group,
+        gallery: &WeakEntity<Gallery>,
         window: &mut Window,
-        cx: &mut Context<Self>,
     ) -> AnyElement {
         let columns = columns(spec::content_width(window));
         let entries: Vec<usize> = CATALOG
@@ -588,7 +587,11 @@ impl Gallery {
             div()
                 .flex()
                 .gap(rem(CARD_GAP))
-                .children(chunk.iter().map(|index| self.overview_card(*index, cx)))
+                .children(
+                    chunk
+                        .iter()
+                        .map(|index| Self::overview_card(*index, gallery)),
+                )
                 // Keep the last row's cards in the grid's columns.
                 .children(
                     (chunk.len()..columns).map(|_| div().flex_1().min_w_0().into_any_element()),
@@ -610,7 +613,7 @@ impl Gallery {
             .into_any_element()
     }
 
-    fn overview_card(&self, index: usize, cx: &mut Context<Self>) -> AnyElement {
+    fn overview_card(index: usize, gallery: &WeakEntity<Gallery>) -> AnyElement {
         let entry = &CATALOG[index];
         let on_surface = color(ColorRole::ON_SURFACE);
         let outline = color(ColorRole::OUTLINE_VARIANT);
@@ -669,7 +672,12 @@ impl Gallery {
             .cursor_pointer()
             .hover(move |style| style.bg(on_surface.opacity(0.08)))
             .focus_visible(move |style| style.border_3().border_color(ring))
-            .on_click(cx.listener(move |this, _, _, cx| this.navigate(index, cx)));
+            .on_click({
+                let gallery = gallery.clone();
+                move |_, _, cx| {
+                    let _ = gallery.update(cx, |this, cx| this.navigate(index, cx));
+                }
+            });
         div()
             .relative()
             .flex_1()

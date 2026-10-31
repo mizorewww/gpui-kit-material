@@ -15,7 +15,7 @@ gpui-fast = ["gpui-kit/gpui-fast", "gpui-kit-material/gpui-fast", "dep:gpui-fast
 # Shared Gallery source contains native-only profiling code. This acknowledges
 # that source's cfg without advertising a browser frame collector.
 [lints.rust]
-unexpected_cfgs = { level = "warn", check-cfg = ['cfg(feature, values("frame-profiler"))'] }
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(feature, values("frame-profiler", "instruction-bench"))'] }
 
 [target.'cfg(target_family = "wasm")'.dependencies]
 gpui-kit.workspace = true

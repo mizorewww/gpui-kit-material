@@ -1382,15 +1382,12 @@ impl RenderOnce for MenuPopup {
         .size_full();
         let trigger = div()
             .relative()
-            .child(press)
-            .on_children_prepainted(move |bounds, window, _| {
-                if let Some(bounds) = bounds.first() {
-                    measure.set(
-                        f32::from(bounds.size.height) * crate::tokens::typography::BASE_PX
-                            / f32::from(window.rem_size()),
-                    );
-                }
-            })
+            .child(super::prepaint_bounds(press, move |bounds, window, _| {
+                measure.set(
+                    f32::from(bounds.size.height) * crate::tokens::typography::BASE_PX
+                        / f32::from(window.rem_size()),
+                );
+            }))
             .child(self.trigger);
         Popover::new(self.id.clone())
             .appearance(false)

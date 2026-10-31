@@ -16,6 +16,8 @@ embedded-symbols = ["gpui-material-symbols/embed-assets"]
 serde = ["gpui-kit-material-color/serde"]
 frame-profiler = ["gpui-kit/profiler"]
 gpui-fast = ["gpui-kit/gpui-fast"]
+# The Gallery's per-frame instruction counts; see `examples/gallery/instr_bench.rs`.
+instruction-bench = ["gpui-fast"]
 
 [dependencies]
 gpui-kit-material-color.workspace = true

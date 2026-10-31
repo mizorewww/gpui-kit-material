@@ -436,8 +436,12 @@ impl RenderOnce for NavigationDrawer {
         // Opening a modal drawer moves focus into it.
         let was_open =
             window.use_keyed_state((self.id.clone(), "drawer-was-open"), cx, |_, _| false);
-        let opened = open && !*was_open.read(cx);
-        was_open.update(cx, |was, _| *was = open);
+        let previous = *was_open.read(cx);
+        let opened = open && !previous;
+        // Only a change is written: a write would mark what read it as changed.
+        if previous != open {
+            was_open.update(cx, |was, _| *was = open);
+        }
         if modal
             && opened
             && self.focus_on_open

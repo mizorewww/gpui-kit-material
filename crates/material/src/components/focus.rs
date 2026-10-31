@@ -359,60 +359,58 @@ impl RenderOnce for RevealFocus {
             seen: None,
         });
         let focus = state.read(cx).container.clone();
-        div()
-            .on_children_prepainted(move |bounds, window, cx| {
-                let Some(bounds) = bounds.first().copied() else {
-                    return;
-                };
-                let seen = (window.focused(cx), window.rem_size(), window.bounds().size);
-                if state.read(cx).seen.as_ref() == Some(&seen) {
-                    return;
-                }
-                let state = state.clone();
-                let scroll = self.scroll.clone();
-                // Focus ancestry is only reliable after this frame has committed:
-                // prepaint moves reused subtrees out of the previous dispatch tree.
-                window.defer(cx, move |window, cx| {
-                    let focused = window
-                        .focused(cx)
-                        .filter(|_| state.read(cx).container.contains_focused(window, cx));
-                    let geometry_changed = state
-                        .read(cx)
-                        .seen
-                        .as_ref()
-                        .is_none_or(|(_, rem, size)| (*rem, *size) != (seen.1, seen.2));
-                    state.update(cx, |state, _| {
-                        let reveal =
-                            focused.is_some() && (state.focused != focused || geometry_changed);
-                        state.focused = focused;
-                        state.seen = Some(seen);
-                        if !reveal {
-                            return;
-                        }
-                        let viewport = scroll.viewport();
-                        if viewport.size.height <= px(0.) {
-                            return;
-                        }
-                        let delta = reveal_delta(
-                            f32::from(bounds.top()),
-                            f32::from(bounds.bottom()),
-                            f32::from(viewport.top()) + 8.,
-                            f32::from(viewport.bottom()) - 8.,
-                        );
-                        if delta != 0. {
-                            scroll.scroll_by(px(delta));
-                            window.refresh();
-                        }
-                    });
+        let (id, full_width, child, scroll) = (self.id, self.full_width, self.child, self.scroll);
+        let child = super::prepaint_bounds(child, move |bounds, window, cx| {
+            let seen = (window.focused(cx), window.rem_size(), window.bounds().size);
+            if state.read(cx).seen.as_ref() == Some(&seen) {
+                return;
+            }
+            let state = state.clone();
+            let scroll = scroll.clone();
+            // Focus ancestry is only reliable after this frame has committed:
+            // prepaint moves reused subtrees out of the previous dispatch tree.
+            window.defer(cx, move |window, cx| {
+                let focused = window
+                    .focused(cx)
+                    .filter(|_| state.read(cx).container.contains_focused(window, cx));
+                let geometry_changed = state
+                    .read(cx)
+                    .seen
+                    .as_ref()
+                    .is_none_or(|(_, rem, size)| (*rem, *size) != (seen.1, seen.2));
+                state.update(cx, |state, _| {
+                    let reveal =
+                        focused.is_some() && (state.focused != focused || geometry_changed);
+                    state.focused = focused;
+                    state.seen = Some(seen);
+                    if !reveal {
+                        return;
+                    }
+                    let viewport = scroll.viewport();
+                    if viewport.size.height <= px(0.) {
+                        return;
+                    }
+                    let delta = reveal_delta(
+                        f32::from(bounds.top()),
+                        f32::from(bounds.bottom()),
+                        f32::from(viewport.top()) + 8.,
+                        f32::from(viewport.bottom()) - 8.,
+                    );
+                    if delta != 0. {
+                        scroll.scroll_by(px(delta));
+                        window.refresh();
+                    }
                 });
-            })
-            .id(self.id)
+            });
+        });
+        div()
+            .id(id)
             .track_focus(&focus)
             .tab_stop(false)
             .flex_shrink_0()
-            .when(self.full_width, |view| view.w_full())
+            .when(full_width, |view| view.w_full())
             .min_w_0()
-            .child(self.child)
+            .child(child)
     }
 }
 

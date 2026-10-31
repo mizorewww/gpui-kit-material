@@ -142,7 +142,7 @@ fn effective_curve(token: MotionToken, cx: &App) -> MotionCurve {
     })
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq)]
 struct RunningCurve {
     curve: MotionCurve,
     running: bool,
@@ -259,20 +259,63 @@ where
 {
     let id = id.into();
     let requested = effective_curve(token, cx);
-    let state = window.use_keyed_state((id.clone(), "material-motion-curve"), cx, |_, _| {
-        RunningCurve {
-            curve: requested,
-            running: false,
-        }
-    });
-    let active = state.read(cx);
-    let resolved = active.resolve(requested);
-    let sample =
-        gpui_base::transition_with_status(id, target, token_policy(resolved, token), window, cx);
-    state.update(cx, |state, _| {
-        state.record(resolved, sample.status);
-    });
+    let running = running_curve(&id, window);
+    let resolved = running.unwrap_or(requested);
+    let sample = gpui_base::transition_with_status(
+        id.clone(),
+        target,
+        token_policy(resolved, token),
+        window,
+        cx,
+    );
+    let active = matches!(
+        sample.status,
+        gpui_base::MotionStatus::Running | gpui_base::MotionStatus::Delayed
+    );
+    if active != running.is_some() {
+        record_running_curve(id, active.then_some(resolved), window);
+    }
     sample.value
+}
+
+thread_local! {
+    /// The curve of each channel that is running. Only a running channel holds
+    /// on to a curve, so this is empty while nothing animates; keyed state for
+    /// it would cost every settled control an entity and an element state that
+    /// a scrolling list's held rows carry on every frame.
+    static RUNNING_CURVES: std::cell::RefCell<std::collections::HashMap<GlobalElementId, MotionCurve>> =
+        std::cell::RefCell::default();
+}
+/// Past this many, entries left by channels unmounted while running are dropped.
+/// Dropping a live one only lets its next sample take the current scheme's curve.
+const RUNNING_CURVES_LIMIT: usize = 4096;
+
+fn running_curve(id: &ElementId, window: &mut Window) -> Option<MotionCurve> {
+    if RUNNING_CURVES.with(|curves| curves.borrow().is_empty()) {
+        return None;
+    }
+    window.with_global_id(id.clone(), |id, _| {
+        RUNNING_CURVES.with(|curves| curves.borrow().get(id).copied())
+    })
+}
+
+fn record_running_curve(id: ElementId, curve: Option<MotionCurve>, window: &mut Window) {
+    window.with_global_id(id, |id, _| {
+        RUNNING_CURVES.with(|curves| {
+            let mut curves = curves.borrow_mut();
+            match curve {
+                Some(curve) => {
+                    if curves.len() >= RUNNING_CURVES_LIMIT {
+                        curves.clear();
+                    }
+                    curves.insert(id.clone(), curve);
+                }
+                None => {
+                    curves.remove(id);
+                }
+            }
+        })
+    });
 }
 
 /// Short fades, e.g. a menu's entrance.

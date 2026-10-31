@@ -293,33 +293,16 @@ impl Gallery {
             .map(|(index, _)| index)
     }
 
-    /// Let the shown page forward controlled changes to playbacks of
-    /// unmounted rows.
-    pub(super) fn after_layout(&self, rendered: &[usize], cx: &mut App) {
-        let Some(built) = self
-            .current_page()
-            .and_then(|index| self.pages[index].as_ref())
-        else {
-            return;
-        };
-        // Run after list prepaint, when measurements are current. Fast can
-        // carry visible rows without calling the builder; current intersection
-        // protects those too. A preview's live demos are mounted in its card.
-        let viewport = self.list.viewport_bounds();
-        let demos = self.preview_demos(cx);
-        let visible = |row: usize| {
-            if demos.as_ref().is_some_and(|demos| demos.contains(&row)) {
-                return true;
-            }
-            built.rows.global(row).is_some_and(|global| {
-                rendered.contains(&global)
-                    || self.list.bounds_for_item(global).is_some_and(|bounds| {
-                        let overlap = bounds.intersect(&viewport);
-                        overlap.size.width > px(0.) && overlap.size.height > px(0.)
-                    })
-            })
-        };
-        built.page.after_layout(&visible, cx);
+    /// What forwards controlled changes to playbacks of unmounted rows, for a
+    /// page that has any. Copied out, so that running it does not write the Gallery.
+    pub(super) fn layout_observer(&self, cx: &App) -> Option<LayoutObserver> {
+        let built = self.pages[self.current_page()?].as_ref()?;
+        built.page.observes_layout().then(|| LayoutObserver {
+            page: built.page.clone(),
+            rows: built.rows.clone(),
+            list: self.list.clone(),
+            demos: self.preview_demos(cx),
+        })
     }
 
     /// The spec page rows a playground-less component shows in its preview:
@@ -449,6 +432,8 @@ impl Gallery {
     }
 
     pub(super) fn render_navigation(&self, cx: &mut Context<Self>) -> Stateful<Div> {
+        #[cfg(all(not(target_family = "wasm"), feature = "instruction-bench"))]
+        super::instr_bench::note(super::instr_bench::Count::Navigation);
         let searching = !self.query.trim().is_empty();
         let section = CATALOG[self.current].group.section();
         let mut groups: Vec<AnyElement> = Vec::new();
@@ -559,31 +544,36 @@ impl Gallery {
         )
     }
 
-    pub(super) fn render_row(
-        &mut self,
-        index: usize,
-        window: &mut Window,
-        cx: &mut Context<Self>,
-    ) -> AnyElement {
-        let gutter = ShellLayout::of(window).gutter();
-        let content = match self.rows[index] {
-            Row::Lead => self.lead.clone().into_any_element(),
-            Row::Spec(row) => self.render_spec_row(index, row, window, cx),
-            Row::Group(group) => self.render_overview_group(group, window, cx),
+    /// What list row `index` shows, copied out so that building it only reads
+    /// the Gallery, like [`Self::lead_props`].
+    fn row_parts(&self, index: usize, window: &Window, cx: &App) -> RowParts {
+        let kind = match self.rows[index] {
+            Row::Lead => RowKind::Lead(self.lead.clone()),
+            Row::Group(group) => RowKind::Group(group),
+            Row::Spec(row) => match self
+                .current_page()
+                .and_then(|page| self.pages[page].as_ref())
+            {
+                Some(built) => RowKind::Spec {
+                    page: built.page.clone(),
+                    row,
+                    gap: if index == 1 {
+                        32.
+                    } else {
+                        built.page.row_gap(row, cx)
+                    },
+                },
+                None => RowKind::Empty,
+            },
         };
-        div()
-            .id(("gallery-row", index))
-            .when(index == 0, |row| {
-                row.debug_selector(|| "gallery-first-row".into())
-            })
-            .track_focus(&self.row_focus[index])
-            .tab_stop(false)
-            .w_full()
-            .px(rem(gutter))
-            .when(index == 0, |row| row.pt(rem(24.)))
-            .when(index + 1 == self.rows.len(), |row| row.pb(rem(40.)))
-            .child(div().w_full().max_w(rem(CONTENT_MAX_WIDTH)).child(content))
-            .into_any_element()
+        RowParts {
+            index,
+            count: self.rows.len(),
+            current: self.current,
+            kind,
+            focus: self.row_focus[index].clone(),
+            layout: ShellLayout::of(window),
+        }
     }
 
     /// md3.io's page header: breadcrumb, title and description.
@@ -927,53 +917,6 @@ impl Gallery {
             .into_any_element()
     }
 
-    /// A spec page row framed as a slice of its card.
-    fn render_spec_row(
-        &mut self,
-        index: usize,
-        row: usize,
-        window: &mut Window,
-        cx: &mut Context<Self>,
-    ) -> AnyElement {
-        let Some(built) = self
-            .current_page()
-            .and_then(|page| self.pages[page].as_ref())
-        else {
-            return div().into_any_element();
-        };
-        let content = built.page.render_row(row, window, cx);
-        let first = index == 1;
-        let last = index + 1 == self.rows.len();
-        // Component Specs continue the card the lead row opened; a document
-        // page's card starts with its first row.
-        let opens_card = first && matches!(CATALOG[self.current].kind, Kind::Document);
-        let gap = if first {
-            32.
-        } else {
-            built.page.row_gap(row, cx)
-        };
-        let padding = ShellLayout::of(window).spec_padding();
-        let radius = rem(CARD_RADIUS);
-        div()
-            .when(first, |panel| {
-                let id = CATALOG[self.current].id;
-                panel.debug_selector(move || format!("specs-{id}"))
-            })
-            .w_full()
-            .bg(card_background())
-            .border_l_1()
-            .border_r_1()
-            .border_color(outline())
-            .px(rem(padding))
-            .pt(rem(gap))
-            .when(opens_card, |panel| panel.border_t_1().rounded_t(radius))
-            .when(last, |panel| {
-                panel.border_b_1().rounded_b(radius).pb(rem(32.))
-            })
-            .child(content)
-            .into_any_element()
-    }
-
     // The public traversal API exposes the rendered tab order, not candidate
     // enumeration. Scan at most one cycle, as Base Root does for focus traps.
     pub(super) fn focus_row(
@@ -1126,6 +1069,256 @@ pub(crate) fn preview_canvas(
         .into_any_element()
 }
 
+/// What a list row shows: see [`Gallery::row_parts`].
+struct RowParts {
+    index: usize,
+    count: usize,
+    current: usize,
+    kind: RowKind,
+    focus: FocusHandle,
+    layout: ShellLayout,
+}
+
+enum RowKind {
+    Lead(Entity<LeadView>),
+    Spec {
+        page: Rc<dyn AnyPage>,
+        row: usize,
+        gap: f32,
+    },
+    Group(Group),
+    Empty,
+}
+
+fn render_row(
+    parts: RowParts,
+    gallery: &WeakEntity<Gallery>,
+    window: &mut Window,
+    cx: &mut App,
+) -> AnyElement {
+    let RowParts {
+        index,
+        count,
+        current,
+        kind,
+        focus,
+        layout,
+    } = parts;
+    let content = match kind {
+        RowKind::Lead(lead) => lead.into_any_element(),
+        RowKind::Spec { page, row, gap } => {
+            let content = page.render_row(row, window, cx);
+            render_spec_row(index, count, current, gap, layout, content)
+        }
+        RowKind::Group(group) => Gallery::render_overview_group(group, gallery, window),
+        RowKind::Empty => div().into_any_element(),
+    };
+    div()
+        .id(("gallery-row", index))
+        .when(index == 0, |row| {
+            row.debug_selector(|| "gallery-first-row".into())
+        })
+        .track_focus(&focus)
+        .tab_stop(false)
+        .w_full()
+        .px(rem(layout.gutter()))
+        .when(index == 0, |row| row.pt(rem(24.)))
+        .when(index + 1 == count, |row| row.pb(rem(40.)))
+        .child(div().w_full().max_w(rem(CONTENT_MAX_WIDTH)).child(content))
+        .into_any_element()
+}
+
+/// A spec page row framed as a slice of its card.
+fn render_spec_row(
+    index: usize,
+    count: usize,
+    current: usize,
+    gap: f32,
+    layout: ShellLayout,
+    content: AnyElement,
+) -> AnyElement {
+    let first = index == 1;
+    let last = index + 1 == count;
+    // Component Specs continue the card the lead row opened; a document
+    // page's card starts with its first row.
+    let opens_card = first && matches!(CATALOG[current].kind, Kind::Document);
+    let radius = rem(CARD_RADIUS);
+    div()
+        .when(first, |panel| {
+            let id = CATALOG[current].id;
+            panel.debug_selector(move || format!("specs-{id}"))
+        })
+        .w_full()
+        .bg(card_background())
+        .border_l_1()
+        .border_r_1()
+        .border_color(outline())
+        .px(rem(layout.spec_padding()))
+        .pt(rem(gap))
+        .when(opens_card, |panel| panel.border_t_1().rounded_t(radius))
+        .when(last, |panel| {
+            panel.border_b_1().rounded_b(radius).pb(rem(32.))
+        })
+        .child(content)
+        .into_any_element()
+}
+
+/// Forwards controlled changes to playbacks of unmounted rows: see
+/// [`GalleryPage::after_layout`](super::page::GalleryPage::after_layout).
+pub(super) struct LayoutObserver {
+    page: Rc<dyn AnyPage>,
+    rows: PageRows,
+    list: ListState,
+    demos: Option<Vec<usize>>,
+}
+
+impl LayoutObserver {
+    fn run(self, rendered: &[usize], cx: &mut App) {
+        // Run after list prepaint, when measurements are current. Fast can
+        // carry visible rows without calling the builder; current intersection
+        // protects those too. A preview's live demos are mounted in its card.
+        let viewport = self.list.viewport_bounds();
+        let visible = |row: usize| {
+            if self
+                .demos
+                .as_ref()
+                .is_some_and(|demos| demos.contains(&row))
+            {
+                return true;
+            }
+            self.rows.global(row).is_some_and(|global| {
+                rendered.contains(&global)
+                    || self.list.bounds_for_item(global).is_some_and(|bounds| {
+                        let overlap = bounds.intersect(&viewport);
+                        overlap.size.width > px(0.) && overlap.size.height > px(0.)
+                    })
+            })
+        };
+        self.page.after_layout(&visible, cx);
+    }
+}
+
+/// The content list, or the scrolling lead of a page without one, as a view.
+///
+/// A wheel event notifies the view holding what it scrolls. Held by the Gallery,
+/// each would render the Gallery, its navigation and, as that notifies its
+/// observers, the lead row. This view renders alone and is spliced between the
+/// Gallery's retained elements; it follows the Gallery, its invalidation owner.
+/// It only reads the Gallery while drawing, as [`LeadView`] does.
+pub(crate) struct ContentView {
+    gallery: WeakEntity<Gallery>,
+    _observe: Subscription,
+}
+
+impl ContentView {
+    pub(super) fn new(gallery: Entity<Gallery>, cx: &mut Context<Self>) -> Self {
+        let observe = cx.observe(&gallery, |_, _, cx| cx.notify());
+        Self {
+            gallery: gallery.downgrade(),
+            _observe: observe,
+        }
+    }
+}
+
+impl Render for ContentView {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let Some(gallery) = self.gallery.upgrade() else {
+            return div().into_any_element();
+        };
+        // Here rather than in the Gallery's render: what a page's rows write as
+        // they are built would otherwise change what the Gallery read, and it
+        // would render again, and its rows after it, on the next frame.
+        if gallery.read(cx).layout_stale(window, cx) {
+            gallery.update(cx, |gallery, cx| gallery.sync_layout(window, cx));
+        }
+        // The shown page keeps playbacks and keyed animations alive even
+        // while none of its rows is mounted.
+        let page = {
+            let gallery = gallery.read(cx);
+            gallery
+                .current_page()
+                .and_then(|index| gallery.pages[index].as_ref())
+                .map(|built| built.page.clone())
+        };
+        if let Some(page) = page {
+            #[cfg(all(not(target_family = "wasm"), feature = "instruction-bench"))]
+            super::instr_bench::note(super::instr_bench::Count::Prepare);
+            page.prepare(window, cx);
+        }
+        let (list, lead_scroll, lead_only, rendered_rows) = {
+            let gallery = gallery.read(cx);
+            (
+                gallery.list.clone(),
+                gallery.lead_scroll.clone(),
+                gallery.shows_lead_only(),
+                gallery.rendered_rows.clone(),
+            )
+        };
+        // Reused across frames: the builder records this frame's rows.
+        rendered_rows.borrow_mut().clear();
+        let lead_row = lead_only.then(|| {
+            let parts = gallery.read(cx).row_parts(0, window, cx);
+            render_row(parts, &self.gallery, window, cx)
+        });
+        let view = self.gallery.clone();
+        let sync_view = self.gallery.clone();
+        let list_rows = rendered_rows.clone();
+        div()
+            .id("gallery-content")
+            .flex_1()
+            .min_w_0()
+            .min_h_0()
+            .h_full()
+            .bg(spec::page_background())
+            .text_color(color(ColorRole::ON_SURFACE))
+            .font_family("Roboto")
+            .when_some(lead_row, |content, row| {
+                content.child(
+                    div()
+                        .id("gallery-lead-scroll")
+                        .size_full()
+                        .overflow_y_scroll()
+                        .track_scroll(&lead_scroll)
+                        .child(row),
+                )
+            })
+            .when(!lead_only, |content| {
+                content.child(
+                    gpui::list(list, move |index, window, cx| {
+                        #[cfg(all(not(target_family = "wasm"), feature = "instruction-bench"))]
+                        super::instr_bench::note(super::instr_bench::Count::Row);
+                        list_rows.borrow_mut().push(index);
+                        let Some(gallery) = view.upgrade() else {
+                            return div().into_any_element();
+                        };
+                        let parts = gallery.read(cx).row_parts(index, window, cx);
+                        render_row(parts, &view, window, cx)
+                    })
+                    .size_full(),
+                )
+            })
+            .child(
+                gpui::canvas(
+                    move |_, _, cx| {
+                        #[cfg(all(not(target_family = "wasm"), feature = "instruction-bench"))]
+                        super::instr_bench::note(super::instr_bench::Count::AfterLayout);
+                        let observer = sync_view
+                            .upgrade()
+                            .and_then(|gallery| gallery.read(cx).layout_observer(cx));
+                        if let Some(observer) = observer {
+                            observer.run(&rendered_rows.borrow(), cx);
+                        }
+                    },
+                    |_, _, _, _| {},
+                )
+                .absolute()
+                .w(px(0.))
+                .h(px(0.)),
+            )
+            .into_any_element()
+    }
+}
+
 /// What [`LeadView`] draws: a snapshot of the Gallery's state for this row.
 struct LeadProps {
     current: usize,
@@ -1166,6 +1359,8 @@ impl Render for LeadView {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         #[cfg(test)]
         self.renders.set(self.renders.get() + 1);
+        #[cfg(all(not(target_family = "wasm"), feature = "instruction-bench"))]
+        super::instr_bench::note(super::instr_bench::Count::Lead);
         let Some(gallery) = self.gallery.upgrade() else {
             return div().into_any_element();
         };

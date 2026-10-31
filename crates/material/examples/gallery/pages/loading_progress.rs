@@ -62,6 +62,8 @@ impl GalleryPage for Page {
         5
     }
 
+    const PREPARES: bool = true;
+
     fn prepare(&mut self, _: &mut Window, cx: &mut Context<Self>) {
         self.circular.observe_reduced_motion(cx);
     }

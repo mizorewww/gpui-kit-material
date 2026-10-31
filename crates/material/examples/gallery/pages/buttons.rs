@@ -433,6 +433,9 @@ impl GalleryPage for Page {
         )
     }
 
+    const PREPARES: bool = true;
+    const OBSERVES_LAYOUT: bool = true;
+
     fn prepare(&mut self, _: &mut Window, cx: &mut Context<Self>) {
         let inputs = (self.progress, self.loading, self.effects_disabled);
         for playback in &self.progress_playbacks {

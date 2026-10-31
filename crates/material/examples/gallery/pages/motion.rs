@@ -104,6 +104,8 @@ impl GalleryPage for Page {
     // virtual rows. An offscreen target change still runs its finite
     // transition (and requests frames until settled); remounting never
     // restarts it.
+    const PREPARES: bool = true;
+
     fn prepare(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let target = if self.target { 1. } else { 0. };
         self.values = std::array::from_fn(|index| {

@@ -28,7 +28,7 @@ mod preview_tests;
 mod ripple;
 pub(crate) use ripple::ButtonRipple;
 #[cfg(test)]
-pub(crate) use ripple::waves_painted;
+pub(crate) use ripple::{ripple_writes, waves_painted};
 mod ripple_clip;
 mod shadow;
 #[cfg(test)]
@@ -926,12 +926,20 @@ impl MaterialButton {
         });
         let pressed = press_state(self.id.clone(), &focus, window, cx);
         if self.disabled || !self.focusable || !focus.is_focused(window) {
-            pressed.update(cx, |state, _| {
-                if self.disabled {
-                    state.pointer = false;
-                }
-                state.keyboard = false;
-            });
+            // Nothing to clear on almost every render: only read, as a write
+            // would mark what read this state as changed.
+            let held = {
+                let state = pressed.read(cx);
+                state.keyboard || (self.disabled && state.pointer)
+            };
+            if held {
+                pressed.update(cx, |state, _| {
+                    if self.disabled {
+                        state.pointer = false;
+                    }
+                    state.keyboard = false;
+                });
+            }
         }
         if let Some(preview) = self.preview {
             return Interaction {
@@ -1137,35 +1145,44 @@ fn pointer_observer(
                         cx.notify();
                     });
                 }
-                TouchPhase::Ended | TouchPhase::Cancelled => {
+                TouchPhase::Ended | TouchPhase::Cancelled
+                    if touch.upgrade().is_some_and(|state| state.read(cx).pointer) =>
+                {
                     let _ = touch.update(cx, |state, cx| {
-                        if state.pointer {
-                            state.pointer = false;
-                            state.hovered = false;
-                            cx.notify();
-                        }
+                        state.pointer = false;
+                        state.hovered = false;
+                        cx.notify();
                     });
                 }
                 _ => {}
             });
             let moving = weak.clone();
             window.on_mouse_event(move |event: &MouseMoveEvent, phase, window, cx| {
-                if phase == DispatchPhase::Capture {
+                // Every button hears every move: only a held or returning one writes.
+                if phase == DispatchPhase::Capture
+                    && moving.upgrade().is_some_and(|state| {
+                        let state = state.read(cx);
+                        state.pointer || state.outside_window
+                    })
+                {
                     let _ = moving.update(cx, |state, cx| {
-                        if state.pointer || state.outside_window {
-                            state.outside_window = false;
-                            let hovered = moving_hitbox.is_hovered_at(event.position, window)
-                                && !window.last_input_was_touch();
-                            if state.hovered != hovered {
-                                state.hovered = hovered;
-                                cx.notify();
-                            }
+                        state.outside_window = false;
+                        let hovered = moving_hitbox.is_hovered_at(event.position, window)
+                            && !window.last_input_was_touch();
+                        if state.hovered != hovered {
+                            state.hovered = hovered;
+                            cx.notify();
                         }
                     });
                 }
             });
             window.on_mouse_event(move |_: &MouseExitEvent, phase, _, cx| {
-                if phase == DispatchPhase::Capture {
+                if phase == DispatchPhase::Capture
+                    && weak.upgrade().is_some_and(|state| {
+                        let state = state.read(cx);
+                        !state.outside_window || state.pointer || state.hovered
+                    })
+                {
                     let _ = weak.update(cx, |state, cx| {
                         // A deferred native hover check can still see the last
                         // in-window mouse position after exit. Keep it suppressed

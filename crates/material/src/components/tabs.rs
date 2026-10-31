@@ -249,6 +249,8 @@ struct TabGeometry {
     contents: Vec<(f32, f32)>,
     /// Absolute content spans written by this frame's probes.
     probed: Vec<(f32, f32)>,
+    /// Each tab's bounds, written by this frame's probes.
+    slots: Vec<Bounds<Pixels>>,
 }
 
 #[cfg(test)]
@@ -288,10 +290,14 @@ impl RenderOnce for MaterialTabs {
         let geometry = window.use_keyed_state((self.id.clone(), "tab-geometry"), cx, |_, _| {
             TabGeometry::default()
         });
-        geometry.update(cx, |geometry, _| {
-            geometry.probed.clear();
-            geometry.probed.resize(count, (0., 0.));
-        });
+        // Each tab's probe overwrites its slot in prepaint; only the row's size
+        // changes it here, so a settled row is not written while drawing.
+        if geometry.read(cx).probed.len() != count {
+            geometry.update(cx, |geometry, _| {
+                geometry.probed.resize(count, (0., 0.));
+                geometry.slots.resize(count, Bounds::default());
+            });
+        }
 
         let selected = self
             .items
@@ -374,51 +380,6 @@ impl RenderOnce for MaterialTabs {
         let fallback = sliding.is_none();
 
         let mut lane = div()
-            .on_children_prepainted({
-                let geometry = geometry.clone();
-                move |bounds, window, cx| {
-                    // Offsets from the first tab along the reading direction:
-                    // the indicator's `left` mirrors with everything else.
-                    let (first, sign) = if crate::scope::is_rtl(window) {
-                        (bounds.first().map(|b| f32::from(b.right())), -1.)
-                    } else {
-                        (bounds.first().map(|b| f32::from(b.left())), 1.)
-                    };
-                    let Some(first) = first else {
-                        return;
-                    };
-                    let along = |left: f32, width: f32| {
-                        if sign < 0. {
-                            first - (left + width)
-                        } else {
-                            left - first
-                        }
-                    };
-                    let tabs: Vec<(f32, f32)> = bounds
-                        .iter()
-                        .take(count)
-                        .map(|b| {
-                            let (left, width) = (f32::from(b.left()), f32::from(b.size.width));
-                            (along(left, width), width)
-                        })
-                        .collect();
-                    let changed = geometry.update(cx, |geometry, _| {
-                        let contents: Vec<(f32, f32)> = geometry
-                            .probed
-                            .iter()
-                            .map(|(left, width)| (along(*left, *width), *width))
-                            .collect();
-                        let changed = spans_moved(&geometry.tabs, &tabs)
-                            || spans_moved(&geometry.contents, &contents);
-                        geometry.tabs = tabs;
-                        geometry.contents = contents;
-                        changed
-                    });
-                    if changed {
-                        window.defer(cx, |window, _| window.refresh());
-                    }
-                }
-            })
             .id((self.id.clone(), "tab-lane"))
             .relative()
             .w_full()
@@ -472,11 +433,14 @@ impl RenderOnce for MaterialTabs {
             let probe_geometry = geometry.clone();
             let probe = canvas(
                 move |bounds, _, cx| {
-                    probe_geometry.update(cx, |geometry, _| {
-                        if let Some(slot) = geometry.probed.get_mut(index) {
-                            *slot = (f32::from(bounds.left()), f32::from(bounds.size.width));
-                        }
-                    })
+                    let probed = (f32::from(bounds.left()), f32::from(bounds.size.width));
+                    if probe_geometry.read(cx).probed.get(index) != Some(&probed) {
+                        probe_geometry.update(cx, |geometry, _| {
+                            if let Some(slot) = geometry.probed.get_mut(index) {
+                                *slot = probed;
+                            }
+                        })
+                    }
                 },
                 |_, _, _, _| {},
             )
@@ -576,7 +540,8 @@ impl RenderOnce for MaterialTabs {
             )
             .inward()
             .forced(preview == Some(InteractionPreview::Focused));
-            lane = lane.child(
+            let slot_geometry = geometry.clone();
+            lane = lane.child(super::prepaint_bounds(
                 div()
                     .h_full()
                     .flex()
@@ -588,9 +553,74 @@ impl RenderOnce for MaterialTabs {
                         }
                     })
                     .child(ring),
-            );
+                move |bounds, _, cx| {
+                    if slot_geometry.read(cx).slots.get(index) != Some(&bounds) {
+                        slot_geometry.update(cx, |geometry, _| {
+                            if let Some(slot) = geometry.slots.get_mut(index) {
+                                *slot = bounds;
+                            }
+                        });
+                    }
+                },
+            ));
         }
-        let lane = lane.children(sliding);
+        let lane = {
+            let geometry = geometry.clone();
+            // Once every tab has reported, as the lane finishes prepainting.
+            super::prepaint_bounds(lane.children(sliding), move |_, window, cx| {
+                // Offsets from the first tab along the reading direction:
+                // the indicator's `left` mirrors with everything else.
+                let bounds = geometry.read(cx).slots.clone();
+                let (first, sign) = if crate::scope::is_rtl(window) {
+                    (bounds.first().map(|b| f32::from(b.right())), -1.)
+                } else {
+                    (bounds.first().map(|b| f32::from(b.left())), 1.)
+                };
+                let Some(first) = first else {
+                    return;
+                };
+                let along = |left: f32, width: f32| {
+                    if sign < 0. {
+                        first - (left + width)
+                    } else {
+                        left - first
+                    }
+                };
+                let tabs: Vec<(f32, f32)> = bounds
+                    .iter()
+                    .take(count)
+                    .map(|b| {
+                        let (left, width) = (f32::from(b.left()), f32::from(b.size.width));
+                        (along(left, width), width)
+                    })
+                    .collect();
+                let contents: Vec<(f32, f32)> = geometry
+                    .read(cx)
+                    .probed
+                    .iter()
+                    .map(|(left, width)| (along(*left, *width), *width))
+                    .collect();
+                let current = geometry.read(cx);
+                let moved =
+                    spans_moved(&current.tabs, &tabs) || spans_moved(&current.contents, &contents);
+                if current.tabs != tabs || current.contents != contents {
+                    geometry.update(cx, |geometry, _| {
+                        geometry.tabs = tabs;
+                        geometry.contents = contents;
+                    });
+                }
+                // Draw the indicator at the measured place: the state's
+                // notification reaches the view holding this row, not the whole
+                // window. Only a real move does: layout rounding alone would
+                // redraw forever (see `spans_moved`).
+                if moved {
+                    let measured = geometry.clone();
+                    window.defer(cx, move |_, cx| {
+                        measured.update(cx, |_, cx| cx.notify());
+                    });
+                }
+            })
+        };
         let list = gpui_base::Tabs::new(self.id)
             .aria_label(self.label)
             .relative()
