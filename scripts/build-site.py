@@ -2,7 +2,7 @@
 """Assemble the static site (docs, WASM gallery, API docs) into one directory.
 
 Run through scripts/build-site.sh, which builds the inputs and supplies the
-`markdown` dependency. Fails when any internal link or heading anchor on a
+`markdown` and `brotli` dependencies. Fails when any internal link or heading anchor on a
 generated page does not resolve.
 """
 import argparse
@@ -16,6 +16,7 @@ import subprocess
 from pathlib import Path
 from urllib.parse import urlsplit
 
+import brotli
 import markdown
 from markdown.extensions import Extension
 from markdown.extensions.toc import TocExtension
@@ -380,6 +381,18 @@ def build_docs(output, stylesheet, commit):
     (output / "404.html").write_text(missing)
 
 
+def write_with_brotli(path, data):
+    """Write an asset and the copy deploy/site/worker.js serves in its place. Highest
+    quality, and a window as long as the module: the build pays for it once and every
+    visitor saves it. Cloudflare's own compression of the module is about 14% larger."""
+    path.write_bytes(data)
+    compressed = brotli.compress(data, quality=11, lgwin=24)
+    if brotli.decompress(compressed) != data:
+        raise SystemExit(f"{path.name}: Brotli did not round-trip")
+    path.with_name(path.name + ".br").write_bytes(compressed)
+    print(f"{path.name}: {len(data) / 2**20:.2f} MiB, {len(compressed) / 2**20:.2f} MiB with Brotli")
+
+
 def build_gallery(output):
     """Copy the gallery with content-hashed bindings; every path stays relative,
     so the page works under /gallery/ as well as at a local server's root."""
@@ -392,13 +405,13 @@ def build_gallery(output):
     glue = (www / "wasm" / GLUE).read_bytes()
     wasm_name = f"gallery.{content_hash(wasm)}.wasm"
     glue_name = f"gallery.{content_hash(glue)}.js"
-    (target / "wasm" / wasm_name).write_bytes(wasm)
-    (target / "wasm" / glue_name).write_bytes(glue)
+    write_with_brotli(target / "wasm" / wasm_name, wasm)
+    write_with_brotli(target / "wasm" / glue_name, glue)
     symbols, symbol_bytes = {}, {}
     for name in SYMBOLS:
         font = (www / "wasm" / name).read_bytes()
         hashed = f"{Path(name).stem}.{content_hash(font)}.ttf"
-        (target / "wasm" / hashed).write_bytes(font)
+        write_with_brotli(target / "wasm" / hashed, font)
         symbols[name] = f"./wasm/{hashed}"
         symbol_bytes[name] = len(font)
     assets = json.dumps({"glue": f"./wasm/{glue_name}", "wasm": f"./wasm/{wasm_name}",

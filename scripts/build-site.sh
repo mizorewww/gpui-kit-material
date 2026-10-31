@@ -25,5 +25,5 @@ fi
 # Remove earlier output so that only these two crates are published.
 rm -rf "$target_dir/doc"
 cargo doc --locked --no-deps -p gpui-kit-material -p gpui-kit-material-color
-uv run --no-project --with 'markdown==3.10' python3 scripts/build-site.py \
+uv run --no-project --with 'markdown==3.10' --with 'brotli==1.2.0' python3 scripts/build-site.py \
   "$target_dir/site" --api-docs "$target_dir/doc"

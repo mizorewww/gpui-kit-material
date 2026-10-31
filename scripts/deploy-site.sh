@@ -25,6 +25,11 @@ if [[ -n "$(find "$site_dir" -name .cloudflare -print -quit)" ]]; then
   echo "Refusing to publish a .cloudflare directory from $site_dir." >&2
   exit 1
 fi
+wasm_path="$(cd "$site_dir" && find gallery/wasm -name 'gallery.*.wasm')"
+if [[ ! -f "$site_dir/$wasm_path.br" ]]; then
+  echo "$wasm_path has no Brotli copy for the Worker to serve." >&2
+  exit 1
+fi
 commit="$(git rev-parse --short HEAD)"
 
 (
@@ -40,4 +45,8 @@ for path in / /gallery/ /api/; do
   echo "$code $origin$path"
   [[ "$code" == 200 ]] || status=1
 done
+# The Worker's copy, not Cloudflare's recompression, reached the visitor.
+encoding="$(curl -sS -o /dev/null -D - -H 'Accept-Encoding: br' "$origin/$wasm_path" | tr -d '\r' | awk 'tolower($1) == "content-encoding:" { print $2 }')"
+echo "content-encoding: ${encoding:-none} $origin/$wasm_path"
+[[ "$encoding" == br ]] || status=1
 exit "$status"
