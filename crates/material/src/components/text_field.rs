@@ -15,6 +15,7 @@
 //! motion through [`crate::motion`].
 use super::InteractionPreview;
 use super::labeled::required_label;
+use super::text::type_style;
 use crate::{
     color::ColorRole,
     motion::{self, MotionToken},
@@ -571,17 +572,6 @@ pub(crate) fn notch(label_px: f32, t: f32) -> (f32, f32) {
     let center = PADDING - NOTCH_PADDING + full / 2.;
     let width = full * t;
     (center - width / 2., width)
-}
-
-/// Apply an M3 type role's family, size, line height and weight.
-pub(crate) fn type_style<E: Styled>(element: E, role: TypeRole) -> E {
-    let scale = role.scale();
-    element
-        .font_family(scale.font_family)
-        .text_size(scale.font_size)
-        .letter_spacing(scale.letter_spacing)
-        .line_height(scale.line_height)
-        .font_weight(FontWeight(scale.font_weight as f32))
 }
 
 fn read_value<M: InputModeKind>(state: &Entity<InputBaseState<M>>, cx: &App) -> SharedString {

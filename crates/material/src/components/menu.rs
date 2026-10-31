@@ -20,7 +20,8 @@
 use super::InteractionPreview;
 use super::focus::{RingPlacement, RingedButton};
 use super::roving::{Direction, target};
-use super::text_field::{TextField, TextFieldDensity, TextFieldVariant, type_style};
+use super::text::type_style;
+use super::text_field::{TextField, TextFieldDensity, TextFieldVariant};
 use crate::{
     color::ColorRole,
     icons::{Icon, Symbol},

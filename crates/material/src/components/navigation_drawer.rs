@@ -22,11 +22,11 @@
 //! Behavior is shared with the navigation rail: each destination is a GPUI
 //! Base `Tab` in a vertical Base `Tabs` list inside a navigation landmark;
 //! arrow keys rove focus (see [`super::roving`]), Enter or Space activates.
-use super::button::{ButtonFocusRing, ButtonRipple};
+use super::interaction::{ButtonFocusRing, ButtonRipple};
 use super::navigation::{
-    ClickHandler, ITEM_GROUP, NavBadge, NavItem, destinations, item_click, ripple_corners,
-    type_role,
+    ClickHandler, ITEM_GROUP, NavBadge, NavItem, destinations, item_click, type_role,
 };
+use super::ripple::ripple_corners;
 use super::roving::{Change, Orientation};
 use super::{InteractionPreview, small_badge};
 use crate::color::ColorRole;
