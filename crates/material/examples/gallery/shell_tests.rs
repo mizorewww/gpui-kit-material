@@ -528,6 +528,212 @@ fn every_preview_fits_its_canvas_at_every_width(cx: &mut TestAppContext) {
     assert!(overflows.is_empty(), "{}", overflows.join("\n"));
 }
 
+/// A preview that fills its parent has one with a width of its own: the canvas
+/// centers previews at their own width, where a percentage or a flexible width
+/// inside a shrink-wrapped column resolves against its content and collapses.
+/// Each (page, element, widest design width) fills the canvas up to its widest.
+#[gpui::test]
+fn previews_that_fill_their_width_take_the_canvas_width(cx: &mut TestAppContext) {
+    const FILLING: [(&str, &str, f32); 11] = [
+        ("slider", "playground-slider", 360.),
+        ("progress", "playground-progress-track", 352.),
+        ("divider", "playground-divider", 360.),
+        ("list", "playground-list", 360.),
+        ("search", "playground-search", 360.),
+        ("tabs", "playground-tabs", 360.),
+        ("carousel", "playground-carousel", 360.),
+        ("navigation-bar", "playground-navigation-bar", 360.),
+        ("top-app-bar", "playground-top-app-bar", 360.),
+        ("bottom-app-bar", "playground-bottom-app-bar", 360.),
+        ("pull-to-refresh", "playground-pull-to-refresh", 360.),
+    ];
+    let (window, mut cx) = open(cx);
+    let mut collapsed = Vec::new();
+    for width in [1600., 1000., 390.] {
+        cx.simulate_resize(size(px(width), px(1200.)));
+        settle(&window, &mut cx);
+        for (id, element, widest) in FILLING {
+            go(&window, &mut cx, id);
+            let canvas = bounds(&mut cx, "preview-canvas");
+            let drawn = bounds(&mut cx, element);
+            // The canvas's padding at most, up to the preview's own widest.
+            let expected = (canvas.size.width - px(2. * 24.)).min(px(widest));
+            if drawn.size.width < expected {
+                collapsed.push(format!(
+                    "{id} at {width}: {element} is {:?} wide in a {:?} canvas",
+                    drawn.size.width, canvas.size.width
+                ));
+            }
+        }
+    }
+    assert!(collapsed.is_empty(), "{}", collapsed.join("\n"));
+}
+
+/// The playground's state on the shown page, to set values as a control would.
+fn set_value(
+    window: &WindowHandle<Gallery>,
+    cx: &mut VisualTestContext,
+    id: &'static str,
+    value: Value,
+) {
+    window
+        .update(cx, |gallery, window, cx| {
+            let state = gallery.entries[gallery.current].playground.clone().unwrap();
+            state.update(cx, |state, cx| state.set_value(id, value, window, cx));
+        })
+        .unwrap();
+    settle(window, cx);
+}
+
+/// The default tooltip in the real shell: hovering its target shows it after
+/// the show delay, and keyboard focus shows it at once.
+#[gpui::test]
+fn the_tooltip_preview_shows_on_hover_and_on_focus(cx: &mut TestAppContext) {
+    use std::time::Duration;
+    let (window, mut cx) = open(cx);
+    cx.update(|_, cx| cx.set_reduce_motion(true));
+    go(&window, &mut cx, "tooltip");
+    // A rich tooltip's action is an element the test can find.
+    set_value(&window, &mut cx, "variant", Value::Choice(2));
+    set_value(&window, &mut cx, "action", Value::Text("Learn more".into()));
+    let target = bounds(&mut cx, "playground-tooltip-target");
+    cx.simulate_mouse_move(target.center(), None, Modifiers::none());
+    settle(&window, &mut cx);
+    assert!(
+        cx.debug_bounds("playground-tooltip-action").is_none(),
+        "not before the show delay"
+    );
+    cx.executor().advance_clock(Duration::from_millis(400));
+    settle(&window, &mut cx);
+    assert!(
+        cx.debug_bounds("playground-tooltip-action").is_some(),
+        "shown after the show delay"
+    );
+    // Moving away hides it after the hide delay.
+    cx.simulate_mouse_move(point(px(4.), px(4.)), None, Modifiers::none());
+    settle(&window, &mut cx);
+    cx.executor().advance_clock(Duration::from_millis(400));
+    settle(&window, &mut cx);
+    assert!(cx.debug_bounds("playground-tooltip-action").is_none());
+    // Keyboard focus shows it without a delay. A press focuses the target without
+    // showing it, being no keyboard focus; Tab away and back then does.
+    cx.simulate_click(target.center(), Modifiers::none());
+    cx.simulate_mouse_move(point(px(4.), px(4.)), None, Modifiers::none());
+    settle(&window, &mut cx);
+    cx.executor().advance_clock(Duration::from_millis(400));
+    settle(&window, &mut cx);
+    cx.simulate_keystrokes("tab");
+    settle(&window, &mut cx);
+    assert!(
+        cx.debug_bounds("playground-tooltip-action").is_none(),
+        "focus left the target"
+    );
+    cx.simulate_keystrokes("shift-tab");
+    settle(&window, &mut cx);
+    assert!(
+        cx.debug_bounds("playground-tooltip-action").is_some(),
+        "keyboard focus shows the tooltip"
+    );
+}
+
+/// On a phone the sample field stays inside its card.
+#[gpui::test]
+fn the_typography_sample_fits_a_phone(cx: &mut TestAppContext) {
+    let (window, mut cx) = open(cx);
+    cx.simulate_resize(size(px(390.), px(844.)));
+    settle(&window, &mut cx);
+    go(&window, &mut cx, "typography");
+    let sample = bounds(&mut cx, "type-sample-input");
+    assert!(
+        sample.right() <= px(390. - 12.),
+        "the sample ends at {:?}",
+        sample.right()
+    );
+}
+
+/// On a phone a canonical layout takes its compact, single pane form, whatever
+/// "Width" asks for, with nothing cut off.
+#[gpui::test]
+fn a_canonical_layout_is_single_pane_on_a_phone(cx: &mut TestAppContext) {
+    let (window, mut cx) = open(cx);
+    cx.update(|_, cx| cx.set_reduce_motion(true));
+    go(&window, &mut cx, "canonical-layouts");
+    assert!(
+        cx.debug_bounds("detail-pane").is_some(),
+        "two panes when wide"
+    );
+    cx.simulate_resize(size(px(390.), px(844.)));
+    settle(&window, &mut cx);
+    let frame = bounds(&mut cx, "playground-canonical-layouts");
+    let list = bounds(&mut cx, "list-pane");
+    assert!(cx.debug_bounds("detail-pane").is_none(), "one pane");
+    assert!(
+        list.size.width >= frame.size.width - px(2.),
+        "{list:?} in {frame:?}"
+    );
+}
+
+/// An expanded standard rail leaves its content a usable pane, or overlays it
+/// where it can't.
+#[gpui::test]
+fn an_expanded_rail_leaves_its_content_usable_on_a_phone(cx: &mut TestAppContext) {
+    let (window, mut cx) = open(cx);
+    cx.update(|_, cx| cx.set_reduce_motion(true));
+    go(&window, &mut cx, "navigation-rail");
+    cx.simulate_resize(size(px(390.), px(844.)));
+    settle(&window, &mut cx);
+    set_value(&window, &mut cx, "expanded", Value::Bool(true));
+    let frame = bounds(&mut cx, "playground-navigation-rail");
+    let content = bounds(&mut cx, "playground-rail-content");
+    assert!(
+        content.size.width >= px(160.),
+        "{content:?} in {frame:?} stacks its title"
+    );
+}
+
+/// A device too scaled down to use says so; Phone, the default, needs no label
+/// on a phone.
+#[gpui::test]
+fn a_device_scaled_for_a_phone_is_labelled(cx: &mut TestAppContext) {
+    let (window, mut cx) = open(cx);
+    go(&window, &mut cx, "examples");
+    cx.simulate_resize(size(px(390.), px(844.)));
+    settle(&window, &mut cx);
+    assert_eq!(config(&window, &mut cx).option("device"), "Phone");
+    settle(&window, &mut cx);
+    assert!(cx.debug_bounds("example-device-scale").is_none());
+    for device in [1, 2] {
+        set_value(&window, &mut cx, "device", Value::Choice(device));
+        settle(&window, &mut cx);
+        assert!(
+            cx.debug_bounds("example-device-scale").is_some(),
+            "{device}"
+        );
+    }
+}
+
+/// At 200% text on a phone the card's tabs take the card's full width, so that
+/// "Live preview" and "Specs" fit whole.
+#[gpui::test]
+fn the_card_tabs_are_flush_with_the_card_on_a_phone(cx: &mut TestAppContext) {
+    let (window, mut cx) = open(cx);
+    go(&window, &mut cx, "button");
+    cx.simulate_resize(size(px(390.), px(844.)));
+    window
+        .update(&mut cx, |_, window, _| {
+            window.set_rem_size(px(gpui_kit_material::tokens::typography::BASE_PX * 2.))
+        })
+        .unwrap();
+    settle(&window, &mut cx);
+    let tabs = bounds(&mut cx, "card-tabs");
+    let canvas = bounds(&mut cx, "preview-canvas");
+    assert!(
+        (tabs.left() - canvas.left()).abs() <= px(0.5)
+            && (tabs.right() - canvas.right()).abs() <= px(0.5),
+        "{tabs:?} over {canvas:?}"
+    );
+}
+
 /// A contained overlay's screen keeps its height in the growing canvas.
 #[gpui::test]
 fn overlay_screens_keep_their_height(cx: &mut TestAppContext) {
