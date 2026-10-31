@@ -26,6 +26,7 @@ Distribution is by Git revision for now; see the [quick start](README.md#quick-s
   card and dialog that sit on the surface, for a page whose ground is a step below it.
 - `ListItem::switch_icons`: the handle icons of a list item's switch.
 - `Stepper`: numbered steps joined by hairlines, for a flow a person walks through once.
+- `status_chip_outlined`: one of several facts in a row, filled only where it needs attention.
 
 ### Changed
 

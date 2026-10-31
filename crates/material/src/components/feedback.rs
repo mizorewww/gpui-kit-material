@@ -114,6 +114,74 @@ pub fn status_chip(kind: StatusKind) -> Div {
 /// The status icon shares the chip's text ruler.
 const STATUS_ICON: Rems = rem(16.);
 
+/// The paint of an outlined status chip: text, container, edge, and the icon with its color.
+fn outlined_chip_paint(
+    kind: StatusKind,
+) -> (
+    ColorRole,
+    Option<ColorRole>,
+    ColorRole,
+    Option<(IconName, ColorRole)>,
+) {
+    match kind {
+        StatusKind::Success => (
+            ON_SURFACE,
+            None,
+            OUTLINE_VARIANT,
+            Some((IconName::Check, SUCCESS)),
+        ),
+        StatusKind::Warning => (
+            WARNING,
+            Some(WARNING_BG),
+            WARNING,
+            Some((IconName::Warning, WARNING)),
+        ),
+        StatusKind::Danger => (
+            ERROR,
+            Some(ERROR_CONTAINER),
+            ERROR,
+            Some((IconName::Error, ERROR)),
+        ),
+        StatusKind::Progress | StatusKind::Tonal => (
+            ON_SECONDARY_CONTAINER,
+            Some(SECONDARY_CONTAINER),
+            SECONDARY_CONTAINER,
+            None,
+        ),
+        StatusKind::Neutral => (ON_SURFACE, None, OUTLINE_VARIANT, None),
+    }
+}
+
+/// One of several facts in a row, such as the checks of a diagnosis or the steps of a task.
+/// A row of [`status_chip`]s reads as many results; here the row stays quiet, with a
+/// colored icon where a fact is fine, and only the fact that needs attention is filled.
+/// Callers append the label, and a progress spinner where one applies.
+pub fn status_chip_outlined(kind: StatusKind) -> Div {
+    let (text, container, edge, icon) = outlined_chip_paint(kind);
+    let mut view = div()
+        .flex()
+        .items_center()
+        .flex_shrink_0()
+        .gap(rem(4.))
+        .min_h(rem(24.))
+        .px(rem(10.))
+        .py(rem(3.))
+        .rounded(RADIUS_SMALL)
+        .border_1()
+        .border_color(color(edge))
+        .text_color(color(text))
+        .text_size(TEXT_AUX)
+        .font_weight(FontWeight::MEDIUM)
+        .whitespace_nowrap();
+    if let Some(container) = container {
+        view = view.bg(color(container));
+    }
+    if let Some((icon, ink)) = icon {
+        view = view.child(icon.icon().size(STATUS_ICON).color(color(ink)));
+    }
+    view
+}
+
 /// A status label; same as [`status_chip`], kept under its earlier name.
 #[deprecated(
     note = "a status chip, not an M3 badge: use `status_chip` (M3 badges are `small_badge` and `large_badge`)"
@@ -816,6 +884,15 @@ mod tests {
     // `#[gpui::test]` expands to.
     use core::prelude::v1::test;
     use gpui::{Context, TestAppContext};
+
+    #[test]
+    fn an_outlined_status_chip_fills_only_what_needs_attention() {
+        let filled = |kind| super::outlined_chip_paint(kind).1.is_some();
+        assert!(!filled(StatusKind::Success));
+        assert!(!filled(StatusKind::Neutral));
+        assert!(filled(StatusKind::Warning));
+        assert!(filled(StatusKind::Danger));
+    }
 
     #[test]
     fn card_variants_use_m3_container_roles_elevation_and_outline() {
