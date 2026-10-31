@@ -314,7 +314,7 @@ impl RenderOnce for MaterialRadio {
             radio = radio.set_position(position, size);
         }
         radio
-            .when_some(on_select, |radio, on_select| {
+            .when_some(on_select.filter(|_| live), |radio, on_select| {
                 radio.on_change(move |value, _, window, cx| on_select(&value, window, cx))
             })
             .group(RADIO_GROUP_STYLE)

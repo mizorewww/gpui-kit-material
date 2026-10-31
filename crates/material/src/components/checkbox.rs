@@ -438,7 +438,7 @@ impl RenderOnce for MaterialCheckbox {
             .state(self.state)
             .disabled(disabled)
             .tab_stop(self.tab_stop && preview.is_none())
-            .when_some(on_change, |checkbox, on_change| {
+            .when_some(on_change.filter(|_| live), |checkbox, on_change| {
                 checkbox.on_change(move |next, _, window, cx| on_change(&next, window, cx))
             })
             .group(CHECKBOX_GROUP)
