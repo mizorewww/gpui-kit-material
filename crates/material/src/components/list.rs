@@ -16,7 +16,7 @@
 //! so the whole row is the one target, as M3 specifies.
 use super::InteractionPreview;
 use super::focus::{RingPlacement, RingedButton};
-use super::{CheckboxState, MaterialCheckbox, MaterialRadio, MaterialSwitch};
+use super::{CheckboxState, MaterialCheckbox, MaterialRadio, MaterialSwitch, Tint, tinted_icon};
 use crate::{
     color::ColorRole,
     icons::Icon,
@@ -47,6 +47,10 @@ pub enum ListLeading {
     Monogram(SharedString),
     /// A 24dp icon in on-surface-variant.
     Icon(Icon),
+    /// An icon in a round tonal container of this `size` in dp (see
+    /// [`tinted_icon`]). A selected item paints the circle in surface, so the icon
+    /// keeps its color on the selection.
+    Tinted(Icon, Tint, f32),
     /// A 56dp square thumbnail; `None` paints the placeholder container.
     Image(Option<AnyElement>),
     /// A 114×64 video thumbnail; `None` paints the placeholder container.
@@ -429,6 +433,12 @@ impl ListItem {
                 .flex_shrink_0()
                 .size(rem(24.))
                 .child(icon.size(rem(24.)).color(ink))
+                .into_any_element(),
+            ListLeading::Tinted(icon, tint, size) => tinted_icon(icon, tint, rem(size))
+                .when(self.selected && !disabled, |circle| {
+                    circle.bg(color(ColorRole::SURFACE))
+                })
+                .when(disabled, |circle| circle.opacity(state::DISABLED_CONTENT))
                 .into_any_element(),
             ListLeading::Image(content) => thumbnail(56., 56., content).into_any_element(),
             ListLeading::Video(content) => thumbnail(114., 64., content).into_any_element(),
