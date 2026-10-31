@@ -203,6 +203,9 @@ pub enum CardVariant {
     Filled,
     /// Surface with a 1dp outline-variant edge, flat.
     Outlined,
+    /// Surface, flat, no edge: for a page whose ground is a step below its surface,
+    /// where the tone separates the card by itself.
+    Surface,
 }
 
 /// The resolved paint of a card variant.
@@ -229,6 +232,11 @@ fn card_style(variant: CardVariant) -> CardStyle {
             container: SURFACE,
             elevation: 0,
             outline: Some(OUTLINE_VARIANT),
+        },
+        CardVariant::Surface => CardStyle {
+            container: SURFACE,
+            elevation: 0,
+            outline: None,
         },
     }
 }

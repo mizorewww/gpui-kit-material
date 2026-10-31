@@ -218,3 +218,13 @@ fn a_disabled_bar_takes_no_input(cx: &mut TestAppContext) {
     draw(cx);
     cx.update(|_, cx| assert_eq!(view.read(cx).state.read(cx).value().as_ref(), ""));
 }
+
+#[test]
+fn search_field_styles_paint_their_containers() {
+    assert_eq!(SearchFieldStyle::default().container(), SEARCH_CONTAINER);
+    assert_eq!(SearchFieldStyle::Surface.container(), ColorRole::SURFACE);
+    assert_eq!(
+        SearchFieldStyle::Tonal.container(),
+        ColorRole::SURFACE_CONTAINER_HIGHEST
+    );
+}
