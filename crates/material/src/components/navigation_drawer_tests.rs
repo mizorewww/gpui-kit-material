@@ -230,3 +230,111 @@ fn modal_drawers_float_over_a_dismissing_scrim(cx: &mut TestAppContext) {
     settle(cx);
     cx.update(|_, cx| assert_eq!(view.read(cx).dismissed, 2));
 }
+
+struct Trapped {
+    open: bool,
+    dismissed: usize,
+    trigger: FocusHandle,
+}
+
+impl Render for Trapped {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        window.set_rem_size(px(14.));
+        let dismiss = cx.entity().downgrade();
+        div()
+            .relative()
+            .w(px(800.))
+            .h(px(600.))
+            .child(
+                div()
+                    .id("opener")
+                    .track_focus(&self.trigger)
+                    .tab_stop(true)
+                    .size(px(20.)),
+            )
+            .child(
+                NavigationDrawer::new("drawer", "Main")
+                    .items(items(3))
+                    .selected("d0")
+                    .open(self.open)
+                    .modal(true)
+                    .on_dismiss(move |_, cx| {
+                        let _ = dismiss.update(cx, |this, cx| {
+                            this.open = false;
+                            this.dismissed += 1;
+                            cx.notify();
+                        });
+                    }),
+            )
+    }
+}
+
+fn trapped(cx: &mut TestAppContext, reduced: bool) -> (Entity<Trapped>, &mut VisualTestContext) {
+    cx.update(|cx| {
+        gpui_base::init(cx);
+        super::super::roving::init(cx);
+        cx.set_reduce_motion(reduced);
+    });
+    cx.add_window_view(|_, cx| Trapped {
+        open: false,
+        dismissed: 0,
+        trigger: cx.focus_handle().tab_stop(true),
+    })
+}
+
+fn settle_open(cx: &mut VisualTestContext) {
+    for _ in 0..3 {
+        draw(cx);
+        cx.run_until_parked();
+    }
+}
+
+#[gpui::test]
+fn a_modal_drawer_traps_focus_and_returns_it_to_its_opener(cx: &mut TestAppContext) {
+    let (view, cx) = trapped(cx, true);
+    settle_open(cx);
+    cx.update(|window, cx| view.read(cx).trigger.clone().focus(window, cx));
+    settle_open(cx);
+    view.update(cx, |view, cx| {
+        view.open = true;
+        cx.notify();
+    });
+    settle_open(cx);
+    cx.update(|window, cx| {
+        assert!(
+            gpui_base::active_focus_trap(window, cx).is_some(),
+            "focus is confined to the open drawer"
+        );
+        assert!(!view.read(cx).trigger.is_focused(window));
+    });
+    view.update(cx, |view, cx| {
+        view.open = false;
+        cx.notify();
+    });
+    settle_open(cx);
+    cx.update(|window, cx| {
+        assert!(
+            view.read(cx).trigger.is_focused(window),
+            "focus went back to what opened the drawer"
+        );
+    });
+}
+
+#[gpui::test]
+fn a_closing_drawer_does_not_dismiss_again(cx: &mut TestAppContext) {
+    let (view, cx) = trapped(cx, false);
+    settle_open(cx);
+    view.update(cx, |view, cx| {
+        view.open = true;
+        cx.notify();
+    });
+    settle_open(cx);
+    cx.executor().advance_clock(Duration::from_secs(2));
+    settle_open(cx);
+    let scrim = gpui::point(px(700.), px(300.));
+    cx.simulate_click(scrim, Modifiers::default());
+    draw(cx);
+    cx.simulate_click(scrim, Modifiers::default());
+    draw(cx);
+    assert_eq!(view.read_with(cx, |view, _| view.dismissed), 1);
+}

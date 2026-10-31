@@ -38,6 +38,7 @@ use crate::tokens::{
     typography::{TypeRole, rem},
 };
 use gpui::{prelude::FluentBuilder as _, *};
+use gpui_base::FocusTrapElement as _;
 use std::rc::Rc;
 
 /// The M3 drawer width (360dp maximum).
@@ -418,6 +419,9 @@ impl RenderOnce for NavigationDrawer {
         DRAWER_OPEN.with(|cell| cell.set((visible, width)));
         let modal = self.modal;
         let end = self.position == DrawerPosition::End;
+        // Remembers what had focus when it opens and gives it back when it
+        // closes, so this runs whether or not there is anything to draw.
+        let trap = modal.then(|| super::dialog::modal_focus(&self.id, open, window, cx));
         // Fully closed: nothing to draw, focus or block the content with.
         if !open && visible < 0.001 {
             return div()
@@ -494,7 +498,9 @@ impl RenderOnce for NavigationDrawer {
             );
         }
         let lane = list.roving.install(lane);
-        let on_dismiss = self.on_dismiss.filter(|_| modal);
+        // A closing drawer keeps its scrim until it settles: only an open one
+        // has anything left to dismiss.
+        let on_dismiss = self.on_dismiss.filter(|_| modal && open);
         let sheet = div()
             .id((self.id.clone(), "drawer-sheet"))
             .when(cfg!(test), |sheet| {
@@ -538,7 +544,7 @@ impl RenderOnce for NavigationDrawer {
                 .role(Role::Navigation)
                 .aria_label(self.label.clone())
         };
-        if modal {
+        if let Some(trap) = trap {
             let offset = rem((-(1. - amount) * width).min(0.));
             let scrim = div()
                 .id((self.id.clone(), "drawer-scrim"))
@@ -552,7 +558,7 @@ impl RenderOnce for NavigationDrawer {
                 .when_some(on_dismiss, |scrim, dismiss| {
                     scrim.on_click(move |event, window, cx| dismiss(event, window, cx))
                 });
-            landmark(div().id(self.id))
+            landmark(div().id(self.id.clone()))
                 .absolute()
                 .inset_0()
                 .overflow_hidden()
@@ -569,7 +575,12 @@ impl RenderOnce for NavigationDrawer {
                                 frame.left(offset)
                             }
                         })
-                        .child(sheet),
+                        .child(
+                            sheet
+                                .track_focus(&trap)
+                                .tab_stop(false)
+                                .focus_trap((self.id.clone(), "drawer-trap"), &trap),
+                        ),
                 )
                 .into_any_element()
         } else {
