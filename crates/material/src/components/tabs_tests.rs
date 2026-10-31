@@ -359,3 +359,46 @@ fn the_padding_gives_way_before_the_label(cx: &mut TestAppContext) {
     let narrow = cx.debug_bounds("tab-label-1").unwrap().size.width;
     assert!((narrow - whole).abs() <= px(1.), "{narrow:?} of {whole:?}");
 }
+
+struct Scrolling;
+
+impl gpui::Render for Scrolling {
+    fn render(&mut self, window: &mut Window, _: &mut gpui::Context<Self>) -> impl IntoElement {
+        window.set_rem_size(px(14.));
+        div().w(px(390.)).child(
+            MaterialTabs::new("scrolling", "Sections")
+                .scrollable(true)
+                .items([
+                    TabItem::new("a", "Inbox"),
+                    TabItem::new("b", "Favorites"),
+                    TabItem::new("c", "Sent"),
+                ])
+                .selected("a"),
+        )
+    }
+}
+
+/// A scrollable tab is its label and the kit's 16dp on each side, however
+/// narrow the row: nothing asks it to share the width.
+#[gpui::test]
+fn a_scrollable_tab_keeps_its_whole_padding(cx: &mut TestAppContext) {
+    cx.update(crate::init);
+    let (_, cx) = cx.add_window_view(|_, _| Scrolling);
+    draw(cx);
+    draw(cx);
+    let mut before: Option<Bounds<Pixels>> = None;
+    let labels = ["tab-label-0", "tab-label-1", "tab-label-2"];
+    for (index, label) in labels.into_iter().enumerate() {
+        let at = tab(cx, index);
+        let label = cx.debug_bounds(label).unwrap();
+        assert!(
+            (at.size.width - label.size.width - px(32.)).abs() <= px(1.),
+            "tab {index}: {at:?} around {label:?}"
+        );
+        assert!((label.left() - at.left() - px(16.)).abs() <= px(1.));
+        if let Some(before) = before {
+            assert_eq!(at.left(), before.right(), "tabs do not overlap");
+        }
+        before = Some(at);
+    }
+}

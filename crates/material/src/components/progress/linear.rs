@@ -14,9 +14,10 @@ pub const PROGRESS_THICK_THICKNESS: Pixels = px(8.);
 const TRACK_GAP: f32 = 4.;
 /// The stop indicator at the track's end.
 const STOP_SIZE: f32 = 4.;
-/// The wave's peak offset from the centerline: a 10dp wave height for the
-/// 4dp indicator and 14dp for the thick one.
-pub(super) const WAVE_AMPLITUDE: f32 = 3.;
+/// The wave's peak offset from the centerline. The kit names its wave segment
+/// "Wave height=12": that is the zigzag its path is rounded from, whose rounded
+/// ink is 9.54dp tall on the 4dp indicator and 13.54dp on the 8dp one.
+pub(super) const WAVE_AMPLITUDE: f32 = 2.77;
 /// Determinate and indeterminate wavelengths.
 const DETERMINATE_WAVELENGTH: f32 = 40.;
 const INDETERMINATE_WAVELENGTH: f32 = 20.;
@@ -84,9 +85,9 @@ pub struct LinearProgress {
     playback: Option<RepeatAnimationPlayback>,
 }
 
-/// Disabled indicators: on-surface at 38%, the track at 12%.
+/// Disabled indicators: on-surface at 38%, the track at 10%.
 pub(super) const DISABLED_INK: f32 = 0.38;
-pub(super) const DISABLED_TRACK: f32 = 0.12;
+pub(super) const DISABLED_TRACK: f32 = crate::tokens::state::DISABLED_CONTAINER;
 
 /// The (indicator, track) colors.
 pub(super) fn progress_colors(muted: bool, disabled: bool) -> (Rgba, Rgba) {
@@ -161,7 +162,7 @@ impl LinearProgress {
         self
     }
 
-    /// A disabled indicator paints in on-surface at 38% over a 12% track.
+    /// A disabled indicator paints in on-surface at 38% over a 10% track.
     pub fn disabled(mut self, disabled: bool) -> Self {
         self.disabled = disabled;
         self
@@ -500,7 +501,13 @@ mod linear_tests {
         assert_eq!(wave_amplitude(0.1), 0.);
         assert_eq!(wave_amplitude(0.5), WAVE_AMPLITUDE);
         assert_eq!(wave_amplitude(0.95), 0.);
-        assert_eq!(WAVE_AMPLITUDE * 2. + 4., 10.);
-        assert_eq!(WAVE_AMPLITUDE * 2. + 8., 14.);
+    }
+
+    /// `.Building Blocks/Progress indicator/Width 4/Segment - wave`, measured.
+    #[test]
+    fn the_wave_is_as_tall_as_the_kits_rendered_segment() {
+        let ink = |thickness: f32| 2. * WAVE_AMPLITUDE + thickness;
+        assert!((ink(4.) - 9.54).abs() < 0.01, "{}", ink(4.));
+        assert!((ink(8.) - 13.54).abs() < 0.01, "{}", ink(8.));
     }
 }

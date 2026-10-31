@@ -426,3 +426,40 @@ fn the_time_separator_comes_from_the_labels(cx: &mut TestAppContext) {
     assert!(widths[1].0 > widths[0].0, "dial {widths:?}");
     assert!(widths[1].1 > widths[0].1, "field {widths:?}");
 }
+
+struct InputSpecimen(Entity<TimePickerState>);
+impl Render for InputSpecimen {
+    fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        window.set_rem_size(px(14.));
+        div()
+            .size_full()
+            .child(TimePicker::new("picker", &self.0).specimen())
+    }
+}
+
+/// The dial's specimen is static, and the input's has to be as well.
+#[gpui::test]
+fn the_period_of_an_input_specimen_does_not_change_the_time(cx: &mut TestAppContext) {
+    init_picker(cx);
+    let (view, cx) = cx.add_window_view(|window, cx| {
+        let picker = cx.new(|cx| TimePickerState::new(labels(), t(9, 30), window, cx).input_mode());
+        InputSpecimen(picker)
+    });
+    let state = view.read_with(cx, |view, _| view.0.clone());
+    draw(cx);
+    draw(cx);
+    let period = cx.debug_bounds("time-period").expect("a period selector");
+    // The lower half of a vertical selector is PM.
+    let spot = gpui::point(period.center().x, period.bottom() - gpui::px(4.));
+    cx.simulate_click(spot, Modifiers::default());
+    draw(cx);
+    assert_eq!(state.read_with(cx, |state, _| state.time()), t(9, 30));
+}
+
+#[test]
+fn dial_numbers_hover_in_the_kits_roles() {
+    let ink = color(ColorRole::ON_SURFACE);
+    assert_eq!(dial_number_hover(false), ink.opacity(0.08));
+    let selected = color(ColorRole::ON_PRIMARY_CONTAINER);
+    assert_eq!(dial_number_hover(true), selected.opacity(0.08));
+}

@@ -395,3 +395,24 @@ fn keyboard_focus_scrolls_its_row_into_the_sheet(cx: &mut TestAppContext) {
         "the wheel took the focused row away and it stays away"
     );
 }
+
+/// The kit's `Building Blocks / Nav item`, selected and not, with and without an
+/// icon, focused.
+#[test]
+fn items_follow_the_kits_nav_item() {
+    assert_eq!(
+        drawer_label_scale(true).font_weight,
+        TypeRole::LabelLarge.emphasized().font_weight
+    );
+    assert_eq!(
+        drawer_label_scale(false).font_weight,
+        TypeRole::LabelLarge.scale().font_weight
+    );
+    assert_eq!(drawer_leading(true), 16.);
+    assert_eq!(drawer_leading(false), 24.);
+    let selected = drawer_paint(true, 1., false);
+    let ink = color(ColorRole::ON_SECONDARY_CONTAINER);
+    assert_eq!(selected.focus, ink.opacity(0.10));
+    let rest = drawer_paint(false, 0., false);
+    assert_eq!(rest.focus, color(ColorRole::ON_SURFACE).opacity(0.10));
+}

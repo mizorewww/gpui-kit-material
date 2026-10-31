@@ -846,13 +846,18 @@ impl RenderOnce for MaterialCarousel {
                             tile.child(
                                 div()
                                     .absolute()
+                                    .top_0()
                                     .left_0()
                                     .right_0()
                                     .bottom_0()
                                     .flex()
                                     .flex_col()
+                                    .justify_end()
                                     .gap(rem(4.))
                                     .p(rem(16.))
+                                    .when(cfg!(test), |content| {
+                                        content.debug_selector(|| "carousel-content".into())
+                                    })
                                     .opacity(text)
                                     .bg(linear_gradient(
                                         180.,
@@ -885,6 +890,7 @@ impl RenderOnce for MaterialCarousel {
         let grab = state.clone();
         let snaps = self.snap;
         let dragging = state.read(cx).drag.is_some();
+        let swiped = dragging && state.read(cx).swiped;
         let fixed = self.width.is_some();
         let keyboard_focus = focus.is_focused(window) && window.last_input_was_keyboard();
         let carousel = div()
@@ -974,6 +980,14 @@ impl RenderOnce for MaterialCarousel {
                 });
                 window.refresh();
             })
+            .children(items)
+            // A swipe has taken the pointer from the items: none is hovered, and
+            // a release over one is a release outside it.
+            .when(swiped, |carousel| {
+                carousel.child(div().absolute().inset_0().occlude().cursor_grabbing())
+            })
+            // Drawn after the items, for them to hear the release first in Capture
+            // and for this to stop it reaching them as a click in Bubble.
             .when(dragging, |carousel| {
                 let follow = state.clone();
                 carousel.cursor_grabbing().child(
@@ -1007,16 +1021,22 @@ impl RenderOnce for MaterialCarousel {
                             let dropping = follow.clone();
                             window.on_mouse_event(
                                 move |event: &MouseUpEvent, phase, window, cx| {
-                                    if phase != DispatchPhase::Capture
-                                        || event.button != MouseButton::Left
-                                    {
+                                    if event.button != MouseButton::Left {
                                         return;
                                     }
-                                    // A swipe's release clicks nothing under it.
-                                    if dropping.read(cx).swiped {
-                                        cx.stop_propagation();
+                                    match phase {
+                                        // Every listener hears the release: an item
+                                        // lets go of its press whatever we do here.
+                                        DispatchPhase::Capture => {
+                                            end_swipe(&dropping, snaps, step, max, window, cx);
+                                        }
+                                        // A swipe's release clicks nothing under it.
+                                        DispatchPhase::Bubble => {
+                                            if dropping.read(cx).swiped {
+                                                cx.stop_propagation();
+                                            }
+                                        }
                                     }
-                                    end_swipe(&dropping, snaps, step, max, window, cx);
                                 },
                             );
                         },
@@ -1025,7 +1045,6 @@ impl RenderOnce for MaterialCarousel {
                     .size_0(),
                 )
             })
-            .children(items)
             .when(keyboard_focus, |carousel| {
                 // The M3 focus indicator: a 3dp secondary ring.
                 carousel.child(
@@ -1714,6 +1733,74 @@ mod tests {
         assert_eq!(clicks.get(), 1, "the swipe's release did not click");
     }
 
+    struct Pressable {
+        hovers: std::rc::Rc<std::cell::RefCell<Vec<bool>>>,
+        released_out: std::rc::Rc<std::cell::Cell<usize>>,
+    }
+    impl gpui::Render for Pressable {
+        fn render(&mut self, window: &mut Window, _: &mut gpui::Context<Self>) -> impl IntoElement {
+            window.set_rem_size(px(BASE_PX));
+            let (hovers, released_out) = (self.hovers.clone(), self.released_out.clone());
+            MaterialCarousel::new("carousel", "Photos")
+                .width(412.)
+                .snap(false)
+                .items((0..8).map(move |i| {
+                    let (hovers, released_out) = (hovers.clone(), released_out.clone());
+                    CarouselItem::new().content(
+                        div()
+                            .id(("content", i as usize))
+                            .debug_selector(move || format!("item-{i}"))
+                            .size_full()
+                            .on_click(|_, _, _| {})
+                            .on_hover(move |hovered, _, _| hovers.borrow_mut().push(*hovered))
+                            .on_mouse_up_out(gpui::MouseButton::Left, move |_, _, _| {
+                                released_out.set(released_out.get() + 1);
+                            }),
+                    )
+                }))
+        }
+    }
+
+    /// An item's ripple, active style and hover all let go in the release's
+    /// capture phase, or when it is not under the pointer.
+    #[gpui::test]
+    fn a_swipes_release_still_reaches_the_item_it_began_on(cx: &mut gpui::TestAppContext) {
+        use gpui::{Modifiers, MouseButton};
+        cx.update(|cx| {
+            gpui_base::init(cx);
+            cx.set_reduce_motion(true);
+        });
+        let hovers = std::rc::Rc::new(std::cell::RefCell::new(Vec::new()));
+        let released_out = std::rc::Rc::new(std::cell::Cell::new(0));
+        let (_, cx) = cx.add_window_view({
+            let (hovers, released_out) = (hovers.clone(), released_out.clone());
+            move |_, _| Pressable {
+                hovers,
+                released_out,
+            }
+        });
+        redraw(cx);
+        let start = cx.debug_bounds("item-1").unwrap().center();
+        cx.simulate_mouse_move(start, None, Modifiers::none());
+        redraw(cx);
+        assert_eq!(hovers.borrow().last(), Some(&true), "over the item");
+        cx.simulate_mouse_down(start, MouseButton::Left, Modifiers::none());
+        redraw(cx);
+        let to = start - point(px(40.), px(0.));
+        cx.simulate_mouse_move(to, Some(MouseButton::Left), Modifiers::none());
+        redraw(cx);
+        cx.simulate_mouse_up(to, MouseButton::Left, Modifiers::none());
+        redraw(cx);
+        assert!(
+            released_out.get() > 0,
+            "the item took it as a release outside"
+        );
+        // The item let go of its press: it hovers again when the pointer moves.
+        cx.simulate_mouse_move(start + point(px(1.), px(0.)), None, Modifiers::none());
+        redraw(cx);
+        assert_eq!(hovers.borrow().last(), Some(&true), "hover came back");
+    }
+
     struct Uncontrolled(std::rc::Rc<std::cell::Cell<usize>>);
     impl gpui::Render for Uncontrolled {
         fn render(&mut self, window: &mut Window, _: &mut gpui::Context<Self>) -> impl IntoElement {
@@ -1745,5 +1832,30 @@ mod tests {
         cx.simulate_keystrokes("right");
         redraw(cx);
         assert_eq!(reports.get(), 1);
+    }
+
+    struct Labelled;
+    impl gpui::Render for Labelled {
+        fn render(&mut self, window: &mut Window, _: &mut gpui::Context<Self>) -> impl IntoElement {
+            window.set_rem_size(px(BASE_PX));
+            MaterialCarousel::new("carousel", "Photos")
+                .width(412.)
+                .items((0..4).map(|_| CarouselItem::new().label("Title")))
+        }
+    }
+
+    /// The kit's item `Content`: its gradient covers the whole item, with the text
+    /// at the bottom.
+    #[gpui::test]
+    fn an_items_label_gradient_covers_the_item(cx: &mut gpui::TestAppContext) {
+        cx.update(|cx| {
+            gpui_base::init(cx);
+            cx.set_reduce_motion(true);
+        });
+        let (_, cx) = cx.add_window_view(|_, _| Labelled);
+        redraw(cx);
+        redraw(cx);
+        let content = cx.debug_bounds("carousel-content").expect("a label");
+        assert!(content.size.height > px(120.), "{content:?}");
     }
 }

@@ -362,8 +362,8 @@ impl RoundedPolygon {
     /// given, by its entry in `per_vertex`. `center` defaults to the
     /// vertices' average.
     ///
-    /// `None` with fewer than three vertices, a non-finite coordinate, or a
-    /// `per_vertex` of the wrong length.
+    /// `None` with fewer than three vertices, a non-finite coordinate, radius or
+    /// smoothing, or a `per_vertex` of the wrong length.
     pub fn from_vertices(
         vertices: &[(f32, f32)],
         rounding: CornerRounding,
@@ -375,7 +375,11 @@ impl RoundedPolygon {
             || vertices
                 .iter()
                 .any(|v| !v.0.is_finite() || !v.1.is_finite())
+            || center.is_some_and(|c| !c.0.is_finite() || !c.1.is_finite())
             || per_vertex.is_some_and(|rounds| rounds.len() != n)
+            || std::iter::once(&rounding)
+                .chain(per_vertex.into_iter().flatten())
+                .any(|round| !round.radius.is_finite() || !round.smoothing.is_finite())
         {
             return None;
         }
@@ -603,7 +607,8 @@ impl RoundedPolygon {
     }
 
     /// This polygon moved and scaled so its [`Self::bounds`] are centered in
-    /// a 0-1 box, which the longer side fills.
+    /// a 0-1 box, which the longer side fills. Those are the source's bounds, so a
+    /// polygon wholly in negative coordinates falls short of filling it.
     pub fn normalized(&self) -> Self {
         let [left, top, right, bottom] = self.bounds(true);
         let (width, height) = (right - left, bottom - top);
@@ -910,5 +915,21 @@ mod tests {
             cubics.last().map(Cubic::anchor1),
             cubics.first().map(Cubic::anchor0)
         );
+    }
+
+    #[test]
+    fn invalid_rounding_or_center_makes_no_polygon() {
+        let triangle = [(0., 0.), (1., 0.), (0., 1.)];
+        let sharp = CornerRounding::new(0.);
+        for bad in [f32::NAN, f32::INFINITY] {
+            let rounding = CornerRounding::new(bad);
+            assert!(RoundedPolygon::from_vertices(&triangle, rounding, None, None).is_none());
+            let each = [sharp, rounding, sharp];
+            assert!(RoundedPolygon::from_vertices(&triangle, sharp, Some(&each), None).is_none());
+            assert!(
+                RoundedPolygon::from_vertices(&triangle, sharp, None, Some((bad, 0.))).is_none()
+            );
+        }
+        assert!(RoundedPolygon::from_vertices(&triangle, sharp, None, None).is_some());
     }
 }

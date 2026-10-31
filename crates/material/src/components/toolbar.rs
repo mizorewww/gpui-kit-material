@@ -129,7 +129,7 @@ pub(crate) fn button_paint(
     let on_surface = color(ColorRole::ON_SURFACE);
     if disabled {
         return ButtonPaint {
-            container: on_surface.opacity(DISABLED_CONTAINER),
+            container: on_surface.opacity(state::DISABLED_CONTAINER),
             ink: state::disabled(on_surface),
             layer: Rgba::default(),
         };
@@ -166,9 +166,6 @@ pub(crate) fn button_paint(
         layer: ink,
     }
 }
-
-/// The kit's disabled toolbar-button container: on-surface at 10%.
-const DISABLED_CONTAINER: f32 = 0.10;
 
 type ClickHandler = Rc<dyn Fn(&ClickEvent, &mut Window, &mut App)>;
 

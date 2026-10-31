@@ -126,11 +126,15 @@ fn checkbox_paint(selected: bool, enabled: bool, error: bool) -> CheckboxPaint {
         outline_active: outline.ink_active,
         hover: layers.hover,
         focus: layers.focus,
-        press: layers.press,
-        ripple: if selected {
+        // The kit's checkbox presses in its hover layer's role, and ripples in
+        // the other one (the radio button has them the other way around).
+        press: layers.focus,
+        ripple: if error {
             color(accent)
+        } else if selected {
+            color(ColorRole::ON_SURFACE)
         } else {
-            outline.ink_active
+            color(accent)
         },
     }
 }
@@ -673,5 +677,30 @@ mod tests {
         draw(cx);
         let (_, morph) = MARK.with(|mark| mark.get());
         assert!(morph > 0. && morph < 1., "morphing at {morph}");
+    }
+
+    /// The kit's `State=Pressed` checkboxes: the layer's role is the hover's,
+    /// and the ripple the other one.
+    #[test]
+    fn a_press_layers_like_a_hover_and_ripples_the_other_way() {
+        let (primary, on_surface) = (color(ColorRole::PRIMARY), color(ColorRole::ON_SURFACE));
+        let clear = gpui::Rgba {
+            r: 0.,
+            g: 0.,
+            b: 0.,
+            a: 0.,
+        };
+        let selected = checkbox_paint(true, true, false);
+        assert_eq!(selected.press, state::layer(clear, primary, 0.10));
+        assert_eq!(selected.ripple, on_surface);
+        let unselected = checkbox_paint(false, true, false);
+        assert_eq!(unselected.press, state::layer(clear, on_surface, 0.10));
+        assert_eq!(unselected.ripple, primary);
+        let error = color(ColorRole::ERROR);
+        for selected in [false, true] {
+            let paint = checkbox_paint(selected, true, true);
+            assert_eq!(paint.press, state::layer(clear, error, 0.10));
+            assert_eq!(paint.ripple, error);
+        }
     }
 }

@@ -1803,7 +1803,7 @@ pub enum HoverListenerMode {
 }
 
 impl HoverListenerMode {
-    fn is_hovered(self, hitbox: &Hitbox, window: &Window) -> bool {
+    pub(crate) fn is_hovered(self, hitbox: &Hitbox, window: &Window) -> bool {
         match self {
             Self::InputModalityAware => hitbox.is_hovered(window),
             Self::InputModalityIndependent => hitbox.id.is_hovered_ignoring_last_input(window),
@@ -3241,17 +3241,23 @@ impl Interactivity {
                     .pending_mouse_down
                     .get_or_insert_with(Default::default)
                     .clone();
-                let hover_listener = Rc::new(hover_listener);
-                let hover_listener_state = was_hovered.clone();
-                let update_hover = move |is_hovered: bool, window: &mut Window, cx: &mut App| {
-                    let mut was_hovered = hover_listener_state.borrow_mut();
-                    if is_hovered != *was_hovered {
-                        *was_hovered = is_hovered;
-                        drop(was_hovered);
-                        hover_listener(&is_hovered, window, cx);
-                    }
-                };
+                let hover_listener: Rc<dyn Fn(&bool, &mut Window, &mut App)> =
+                    Rc::new(hover_listener);
                 let hover_listener_mode = self.hover_listener_mode;
+                let tracked = crate::fast::layers::hover_freeze::HoveredListener {
+                    was_hovered: was_hovered.clone(),
+                    has_mouse_down: has_mouse_down.clone(),
+                    listener: hover_listener.clone(),
+                    hitbox: hitbox.clone(),
+                    mode: hover_listener_mode,
+                };
+                // A listener hearing it is hovered is painted with this hitbox now.
+                if *was_hovered.borrow() {
+                    crate::fast::layers::hover_freeze::note_hovered(window, &tracked);
+                }
+                let update_hover = move |is_hovered: bool, window: &mut Window, cx: &mut App| {
+                    tracked.update(is_hovered, window, cx);
+                };
 
                 // While a wheel holds hover still, a listener hears nothing: a row
                 // scrolled under the pointer does not start hovering, and one

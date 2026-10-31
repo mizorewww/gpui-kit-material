@@ -56,6 +56,7 @@ jobs:
           cargo clippy --locked -p gpui-kit-material --all-targets --no-default-features --features full,serde,embedded-symbols -- -D warnings
           cargo test --locked -p gpui-kit-material --no-default-features --features full,serde,embedded-symbols
           cargo clippy --locked -p gpui-kit-material-gallery -p gpui-kit-material-bench --all-targets --no-default-features --features gpui-kit-material-gallery/embedded-symbols,gpui-kit-material-gallery/frame-profiler,gpui-kit-material-bench/embedded-symbols,gpui-kit-material-bench/frame-profiler -- -D warnings
+          cargo test --locked -p gpui-kit-material-gallery --no-default-features --features embedded-symbols
       - name: Check the Gallery's profiler and instruction counters
         run: |
           cargo clippy --locked -p gpui-kit-material-gallery -p gpui-kit-material-bench --all-targets --features gpui-kit-material-gallery/frame-profiler,gpui-kit-material-gallery/instruction-bench,gpui-kit-material-bench/frame-profiler -- -D warnings

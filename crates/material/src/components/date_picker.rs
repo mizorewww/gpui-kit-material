@@ -445,6 +445,7 @@ impl DatePickerState {
     pub fn set_value(&mut self, selection: DateSelection, cx: &mut Context<Self>) {
         self.apply(selection);
         self.inputs_stale = self.inputs.is_some();
+        self.reveal_cursor();
         cx.notify();
     }
 
@@ -463,6 +464,7 @@ impl DatePickerState {
         self.selection = next_selection(previous, date);
         let changed = self.selection != previous;
         self.cursor = date;
+        self.inputs_stale = self.inputs.is_some();
         if (date.year(), date.month()) != (self.year, self.month)
             && self.view == DatePickerView::Day
         {
@@ -485,6 +487,7 @@ impl DatePickerState {
             DateSelection::Single(None)
         };
         self.invalid = (false, false);
+        self.inputs_stale = self.inputs.is_some();
         cx.emit(DatePickerEvent::Change(self.selection));
         cx.notify();
     }
@@ -801,6 +804,15 @@ pub(crate) enum CursorStep {
 
 const YEAR_COLUMNS: usize = 3;
 
+/// The kit's `Selection Row` over a month or year list: 48dp at the start, and 54dp
+/// at the end over months, whose year sits apart, or 48dp over years.
+const fn selection_row_padding(view: DatePickerView) -> (f32, f32) {
+    match view {
+        DatePickerView::Month => (48., 54.),
+        _ => (48., 48.),
+    }
+}
+
 /// Where `step` moves the cursor in `view`: days and weeks in the day grid,
 /// years in rows of three in the year grid, and one row in the docked lists.
 pub(crate) fn cursor_target(
@@ -818,6 +830,10 @@ pub(crate) fn cursor_target(
         }
     };
     match (view, step) {
+        // The month list shows one year, which a choice in it is taken in.
+        (DatePickerView::Month, PreviousMonth) if cursor.month() == 1 => cursor,
+        (DatePickerView::Month, NextMonth) if cursor.month() == 12 => cursor,
+        (DatePickerView::Month, PreviousYear | NextYear) => cursor,
         (_, PreviousMonth) => add_months(cursor, -1),
         (_, NextMonth) => add_months(cursor, 1),
         (_, PreviousYear) => add_months(cursor, -12),
@@ -1741,7 +1757,9 @@ impl PickerCx {
             .items_center()
             .justify_between()
             .when(view != DatePickerView::Day, |row| {
-                row.px(rem(40.))
+                let (left, right) = selection_row_padding(view);
+                row.pl(rem(left))
+                    .pr(rem(right))
                     .border_b(rem(1.))
                     .border_color(color(ColorRole::OUTLINE_VARIANT))
             })

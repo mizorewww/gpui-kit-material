@@ -602,3 +602,80 @@ fn an_exposed_dropdown_opens_a_baseline_menu() {
         MenuStyle::Baseline
     );
 }
+
+/// With motion on, a menu stays on screen as it closes: a second click or Enter
+/// finds its items still there.
+#[gpui::test]
+fn a_closing_menu_does_not_activate_again(cx: &mut TestAppContext) {
+    cx.update(|cx| {
+        gpui_kit::init(cx);
+        crate::init(cx);
+    });
+    let (view, cx) = cx.add_window_view(|_, _| PopupHarness {
+        open: true,
+        picked: Rc::default(),
+        changes: Rc::default(),
+    });
+    draw(cx);
+    settle(cx);
+    let surface = cx.debug_bounds("menu-popup-surface").expect("open");
+    let spot = surface.origin + gpui::point(gpui::px(20.), gpui::px(20.));
+    cx.simulate_click(spot, gpui::Modifiers::none());
+    draw(cx);
+    let picked = view.read_with(cx, |view, _| view.picked.borrow().len());
+    assert_eq!(picked, 1);
+    assert!(
+        cx.debug_bounds("menu-popup-surface").is_some(),
+        "still closing"
+    );
+    cx.simulate_click(spot, gpui::Modifiers::none());
+    draw(cx);
+    assert_eq!(view.read_with(cx, |view, _| view.picked.borrow().len()), 1);
+}
+
+/// A caller that only remembers what it was last told still ends up with the
+/// sub-menu closed when the parent closes.
+#[gpui::test]
+fn closing_the_parent_reports_the_submenu_closed(cx: &mut TestAppContext) {
+    let (view, cx) = cascade(cx, Anchor::BottomLeft);
+    view.update(cx, |view, cx| {
+        view.submenu = true;
+        cx.notify();
+    });
+    draw(cx);
+    settle(cx);
+    view.update(cx, |view, cx| {
+        // Closed from outside, without the harness resetting it.
+        view.open = false;
+        cx.notify();
+    });
+    draw(cx);
+    cx.run_until_parked();
+    assert!(
+        !view.read_with(cx, |view, _| view.submenu),
+        "told it closed"
+    );
+}
+
+/// What a menu's height is worked out from is what its divider takes up.
+#[gpui::test]
+fn an_expressive_dividers_height_is_what_it_renders(cx: &mut TestAppContext) {
+    let height = |divider| item_height(MenuStyle::Standard, MenuDensity::default(), false, divider);
+    assert_eq!(height(true) - height(false), 5.);
+    assert_eq!(EXPRESSIVE_DIVIDER, 2. + 1. + 2.);
+    struct Divider;
+    impl Render for Divider {
+        fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+            window.set_rem_size(px(14.));
+            div().flex().items_start().child(
+                div()
+                    .w(px(100.))
+                    .debug_selector(|| "line".into())
+                    .child(divider_line(true).mt_0()),
+            )
+        }
+    }
+    let (_, cx) = cx.add_window_view(|_, _| Divider);
+    draw(cx);
+    assert_eq!(cx.debug_bounds("line").unwrap().size.height, px(5.));
+}

@@ -333,7 +333,8 @@ pub(crate) fn container_role(style: MenuStyle) -> ColorRole {
 const EXPRESSIVE_ITEM: f32 = 44.;
 const EXPRESSIVE_INSET_Y: f32 = 2.;
 const EXPRESSIVE_INSET_X: f32 = 4.;
-const EXPRESSIVE_DIVIDER: f32 = 8.;
+/// `divider_line`: a 1dp line with 2dp above and below.
+const EXPRESSIVE_DIVIDER: f32 = 5.;
 const GROUP_LABEL: f32 = 32.;
 const GROUP_GAP: f32 = 2.;
 const GROUP_RADIUS: f32 = 8.;
@@ -420,6 +421,15 @@ pub struct MaterialMenu {
 }
 
 impl MaterialMenu {
+    /// Leave every item as it looks, with nothing to activate.
+    fn make_inert(&mut self) {
+        for group in &mut self.groups {
+            for item in &mut group.items {
+                item.on_click = None;
+            }
+        }
+    }
+
     pub fn new(id: impl Into<ElementId>) -> Self {
         Self {
             id: id.into(),
@@ -1179,9 +1189,22 @@ fn reveal_surface(
 }
 
 impl RenderOnce for MenuPopup {
-    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
+    fn render(mut self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let (reveal, fade) = open_motion(&self.id, self.open, window, cx);
         let visible = popup_visible(self.open, reveal, fade);
+        // A menu on its way out shows its items, and activates none of them.
+        if !self.open {
+            self.menu.make_inert();
+            if let Some((_, submenu)) = self.submenu.as_mut() {
+                submenu.make_inert();
+            }
+            // A sub-menu goes with its parent, and does not come back with it.
+            if self.submenu_open
+                && let Some(change) = self.on_submenu_change.clone()
+            {
+                window.defer(cx, move |window, cx| change(&false, window, cx));
+            }
+        }
         let focus = window
             .use_keyed_state((self.id.clone(), "menu-popup-focus"), cx, |_, cx| {
                 cx.focus_handle()

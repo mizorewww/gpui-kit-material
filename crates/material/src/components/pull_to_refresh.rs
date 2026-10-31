@@ -335,6 +335,7 @@ pub struct PullToRefresh {
     threshold: f32,
     mouse_drag: bool,
     scroll: Option<ScrollHandle>,
+    nested: Vec<ScrollHandle>,
     content: Vec<AnyElement>,
     on_refresh: Option<Refresh>,
 }
@@ -351,6 +352,7 @@ impl PullToRefresh {
             threshold: PULL_TO_REFRESH_THRESHOLD,
             mouse_drag: true,
             scroll: None,
+            nested: Vec::new(),
             content: Vec::new(),
             on_refresh: None,
         }
@@ -391,6 +393,14 @@ impl PullToRefresh {
     /// own; pass one to read or move the content's position.
     pub fn track_scroll(mut self, scroll: &ScrollHandle) -> Self {
         self.scroll = Some(scroll.clone());
+        self
+    }
+
+    /// A scroller inside the content that takes the wheel before a pull does: no
+    /// pull starts until it is at its top. Nothing else tells this element about
+    /// one, since a wheel event reaches every scroller under the pointer.
+    pub fn nested_scroll(mut self, scroll: &ScrollHandle) -> Self {
+        self.nested.push(scroll.clone());
         self
     }
 
@@ -529,9 +539,24 @@ impl RenderOnce for PullToRefresh {
         }
 
         let enabled = !self.disabled && !refreshing;
+        // Nothing listens from here on, so what is under way will not be heard
+        // to end, and must not be taken for still under way when it listens again.
+        if !enabled && !pulling {
+            let stale = {
+                let current = state.read(cx);
+                current.gesture || current.mouse.is_some()
+            };
+            if stale {
+                state.update(cx, |state, _| {
+                    state.gesture = false;
+                    state.mouse = None;
+                });
+            }
+        }
         let on_refresh = self.on_refresh;
         let mouse_drag = self.mouse_drag;
         // Nothing to listen for when no pull can start or is running.
+        let nested: Rc<[ScrollHandle]> = self.nested.into();
         let events = (enabled || pulling).then(|| {
             let state = state.clone();
             let scroll = scroll.clone();
@@ -539,7 +564,8 @@ impl RenderOnce for PullToRefresh {
                 move |bounds, window, _| window.insert_hitbox(bounds, HitboxBehavior::Normal),
                 move |_, hitbox, window, _| {
                     pull_listeners(
-                        hitbox, state, scroll, enabled, refreshing, mouse_drag, on_refresh, window,
+                        hitbox, state, scroll, enabled, refreshing, mouse_drag, on_refresh, nested,
+                        window,
                     );
                 },
             )
@@ -670,6 +696,8 @@ impl RenderOnce for PullToRefresh {
             .relative()
             .size_full()
             .overflow_hidden()
+            // First, for its listeners to hear a wheel after what is under the pointer.
+            .children(events)
             .child(
                 div()
                     .id((self.id, "pull-content"))
@@ -679,7 +707,6 @@ impl RenderOnce for PullToRefresh {
                     .track_scroll(&scroll)
                     .children(self.content),
             )
-            .children(events)
             // During a pull nothing beneath takes a hover or the release's click.
             .when(pulling, |root| {
                 root.child(div().absolute().inset_0().occlude())
@@ -700,8 +727,11 @@ fn pull_listeners(
     refreshing: bool,
     mouse_drag: bool,
     on_refresh: Option<Refresh>,
+    nested: Rc<[ScrollHandle]>,
     window: &mut Window,
 ) {
+    // A pull running when its pull-to-refresh is disabled lets go without refreshing.
+    let may_commit = enabled || refreshing;
     {
         let state = state.clone();
         let scroll = scroll.clone();
@@ -714,30 +744,29 @@ fn pull_listeners(
             let now = cx.background_executor().now();
             let current = state.read(cx);
             let pulling = current.pulling;
+            // An end is heard wherever the pointer went: a gesture left running
+            // would make what follows look like more of it.
+            if matches!(event.touch_phase, TouchPhase::Ended | TouchPhase::Cancelled) {
+                state.update(cx, |state, _| {
+                    state.gesture = false;
+                    state.last_packet = Some(now);
+                });
+                if pulling {
+                    let commit = event.touch_phase == TouchPhase::Ended && may_commit;
+                    finish_pull(&state, commit, refreshing, on_refresh.as_ref(), window, cx);
+                    cx.stop_propagation();
+                }
+                return;
+            }
             if !pulling && !hitbox.should_handle_scroll(window) {
                 return;
             }
-            match event.touch_phase {
-                TouchPhase::Started => {
-                    state.update(cx, |state, _| {
-                        state.gesture = true;
-                        state.last_packet = Some(now);
-                    });
-                    return;
-                }
-                TouchPhase::Ended | TouchPhase::Cancelled => {
-                    state.update(cx, |state, _| {
-                        state.gesture = false;
-                        state.last_packet = Some(now);
-                    });
-                    if pulling {
-                        let commit = event.touch_phase == TouchPhase::Ended;
-                        finish_pull(&state, commit, refreshing, on_refresh.as_ref(), window, cx);
-                        cx.stop_propagation();
-                    }
-                    return;
-                }
-                TouchPhase::Moved => {}
+            if event.touch_phase == TouchPhase::Started {
+                state.update(cx, |state, _| {
+                    state.gesture = true;
+                    state.last_packet = Some(now);
+                });
+                return;
             }
             // A wheel notch never pulls.
             let ScrollDelta::Pixels(delta) = event.delta else {
@@ -753,7 +782,8 @@ fn pull_listeners(
                     .last_packet
                     .is_none_or(|last| now.saturating_duration_since(last) > GESTURE_GAP);
             let phaseless = !current.gesture;
-            let at_top = scroll.offset().y >= px(0.);
+            let at_top = scroll.offset().y >= px(0.)
+                && nested.iter().all(|nested| nested.offset().y >= px(0.));
             let start = !pulling && enabled && at_top && dy > 0. && fresh;
             state.update(cx, |state, _| state.last_packet = Some(now));
             if !pulling && !start {
@@ -793,7 +823,7 @@ fn pull_listeners(
                                         state.update(cx, |state, _| state.timer = false);
                                         finish_pull(
                                             &state,
-                                            true,
+                                            may_commit,
                                             refreshing,
                                             on_refresh.as_ref(),
                                             window,
@@ -834,7 +864,10 @@ fn pull_listeners(
     {
         let state = state.clone();
         window.on_mouse_event(move |event: &MouseMoveEvent, phase, window, cx| {
-            if phase != DispatchPhase::Capture {
+            // A pull under way takes the move on the way down. One to start waits
+            // for the way back up, for what is under the press to take the drag.
+            let pulling = state.read(cx).pulling;
+            if pulling != (phase == DispatchPhase::Capture) {
                 return;
             }
             let Some((press, last)) = state.read(cx).mouse else {
@@ -853,6 +886,10 @@ fn pull_listeners(
             let y = f32::from(event.position.y);
             let pulling = state.read(cx).pulling;
             if !pulling && y - press < MOUSE_SLOP {
+                return;
+            }
+            // Something under the press took the drag for itself.
+            if !pulling && cx.has_active_drag() {
                 return;
             }
             state.update(cx, |state, cx| {
@@ -876,7 +913,14 @@ fn pull_listeners(
         let pulling = current.pulling;
         state.update(cx, |state, _| state.mouse = None);
         if pulling {
-            finish_pull(&state, true, refreshing, on_refresh.as_ref(), window, cx);
+            finish_pull(
+                &state,
+                may_commit,
+                refreshing,
+                on_refresh.as_ref(),
+                window,
+                cx,
+            );
         }
     });
 }
@@ -1267,5 +1311,146 @@ mod tests {
         cx.executor().advance_clock(SETTLE_SPRING.duration());
         draw(cx);
         assert_eq!(indicator_top(cx), Some(target));
+    }
+
+    /// A packet a nested scroller takes is not a pull; one it cannot take is.
+    struct Nested {
+        inner: ScrollHandle,
+        refreshes: Rc<Cell<usize>>,
+    }
+    impl Render for Nested {
+        fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+            window.set_rem_size(px(crate::tokens::typography::BASE_PX));
+            let refreshes = self.refreshes.clone();
+            div().size(px(400.)).child(
+                PullToRefresh::new("ptr", "Refreshing")
+                    .nested_scroll(&self.inner)
+                    .on_refresh(move |_, _| refreshes.set(refreshes.get() + 1))
+                    .child(
+                        div()
+                            .id("inner")
+                            .h(px(400.))
+                            .w_full()
+                            .overflow_y_scroll()
+                            .track_scroll(&self.inner)
+                            .child(div().h(px(2000.)).w_full()),
+                    ),
+            )
+        }
+    }
+
+    #[gpui::test]
+    fn a_nested_scroller_takes_the_wheel_before_a_pull(cx: &mut gpui::TestAppContext) {
+        cx.update(|cx| cx.set_reduce_motion(true));
+        let (view, cx) = cx.add_window_view(|_, _| Nested {
+            inner: ScrollHandle::default(),
+            refreshes: Rc::default(),
+        });
+        draw(cx);
+        let inner = view.read_with(cx, |view, _| view.inner.clone());
+        scroll(cx, TouchPhase::Started, 0.);
+        scroll(cx, TouchPhase::Moved, -300.);
+        assert!(inner.offset().y < px(0.), "the nested list scrolled");
+        scroll(cx, TouchPhase::Moved, 50.);
+        assert_eq!(indicator_top(cx), None, "it had room to move: no pull");
+        assert_eq!(inner.offset().y, px(-250.));
+        scroll(cx, TouchPhase::Moved, 250.);
+        assert_eq!(inner.offset().y, px(0.));
+        assert_eq!(indicator_top(cx), None);
+        scroll(cx, TouchPhase::Moved, 80.);
+        assert!(indicator_top(cx).is_some(), "at its top, a pull starts");
+    }
+
+    /// Refreshing removes the listeners, so a gesture ending meanwhile goes
+    /// unheard. The next stream starts fresh, and a pause releases it.
+    #[gpui::test]
+    fn a_gesture_interrupted_by_a_refresh_is_forgotten(cx: &mut gpui::TestAppContext) {
+        let (view, cx) = open(cx);
+        scroll(cx, TouchPhase::Started, 0.);
+        cx.update(|_, cx| view.update(cx, |view, _| view.refreshing = true));
+        draw(cx);
+        scroll(cx, TouchPhase::Ended, 0.);
+        cx.update(|_, cx| view.update(cx, |view, _| view.refreshing = false));
+        draw(cx);
+        cx.executor().advance_clock(GESTURE_GAP * 2);
+        draw(cx);
+        scroll(cx, TouchPhase::Moved, 300.);
+        assert!(indicator_top(cx).is_some());
+        cx.executor().advance_clock(GESTURE_GAP * 2);
+        cx.run_until_parked();
+        draw(cx);
+        assert_eq!(indicator_top(cx), None, "the pause ended the pull");
+    }
+
+    #[gpui::test]
+    fn disabling_a_running_pull_lets_it_go_without_refreshing(cx: &mut gpui::TestAppContext) {
+        let (view, cx) = open(cx);
+        scroll(cx, TouchPhase::Started, 0.);
+        scroll(cx, TouchPhase::Moved, 300.);
+        assert!(indicator_top(cx).is_some());
+        cx.update(|_, cx| view.update(cx, |view, _| view.disabled = true));
+        draw(cx);
+        scroll(cx, TouchPhase::Ended, 0.);
+        assert_eq!(view.read_with(cx, |view, _| view.refreshes.get()), 0);
+    }
+
+    #[derive(Clone)]
+    struct Dragged;
+    impl Render for Dragged {
+        fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+            div()
+        }
+    }
+    struct DragChild {
+        refreshes: Rc<Cell<usize>>,
+    }
+    impl Render for DragChild {
+        fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+            window.set_rem_size(px(crate::tokens::typography::BASE_PX));
+            let refreshes = self.refreshes.clone();
+            div().size(px(400.)).child(
+                PullToRefresh::new("ptr", "Refreshing")
+                    .mouse_drag(true)
+                    .on_refresh(move |_, _| refreshes.set(refreshes.get() + 1))
+                    .child(
+                        div()
+                            .id("draggable")
+                            .debug_selector(|| "draggable".into())
+                            .h(px(200.))
+                            .w_full()
+                            .on_drag(Dragged, |_, _, _, cx| cx.new(|_| Dragged)),
+                    ),
+            )
+        }
+    }
+
+    /// A slider's thumb, say: what takes the drag keeps it, as far as it moves.
+    #[gpui::test]
+    fn a_mouse_pull_leaves_a_drag_to_what_takes_it(cx: &mut gpui::TestAppContext) {
+        use gpui::{Modifiers, MouseButton};
+        cx.update(|cx| cx.set_reduce_motion(true));
+        let (view, cx) = cx.add_window_view(|_, _| DragChild {
+            refreshes: Rc::default(),
+        });
+        draw(cx);
+        let start = cx.debug_bounds("draggable").unwrap().center();
+        cx.simulate_mouse_down(start, MouseButton::Left, Modifiers::none());
+        draw(cx);
+        for y in [20., 80., 200.] {
+            cx.simulate_mouse_move(
+                start + point(px(10.), px(y)),
+                Some(MouseButton::Left),
+                Modifiers::none(),
+            );
+            draw(cx);
+        }
+        assert_eq!(indicator_top(cx), None, "no pull under a drag");
+        cx.simulate_mouse_up(
+            start + point(px(10.), px(200.)),
+            MouseButton::Left,
+            Modifiers::none(),
+        );
+        draw(cx);
+        assert_eq!(view.read_with(cx, |view, _| view.refreshes.get()), 0);
     }
 }

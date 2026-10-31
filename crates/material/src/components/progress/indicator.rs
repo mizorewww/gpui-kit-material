@@ -88,7 +88,7 @@ impl CircularProgress {
         self
     }
 
-    /// A disabled indicator paints in on-surface at 38% over a 12% track.
+    /// A disabled indicator paints in on-surface at 38% over a 10% track.
     pub fn disabled(mut self, disabled: bool) -> Self {
         self.disabled = disabled;
         self

@@ -17,11 +17,17 @@
 //! reaches its handler. When the wheel stops the window is drawn again, and
 //! hover follows the pointer as before. A pointer that moves ends the freeze
 //! at once.
+//!
+//! A listener that was hovered may not be painted again: a wheel can scroll its
+//! row out of a list while it hears nothing, and only painting asks it. So the
+//! listeners that last heard `true` are tracked, and the first frame drawn
+//! without the freeze tells those no longer under the pointer. See
+//! [`HoveredListener`].
 
 use scheduler::Instant;
-use std::time::Duration;
+use std::{cell::RefCell, rc::Rc, time::Duration};
 
-use crate::{App, Pixels, Point, Window};
+use crate::{App, Hitbox, HoverListenerMode, MouseDownEvent, Pixels, Point, Window};
 
 /// How long after the last wheel event hover stays held still.
 pub(crate) const HOVER_FREEZE: Duration = Duration::from_millis(100);
@@ -32,6 +38,72 @@ pub(crate) struct HoverFreeze {
     /// Off in the crate's own tests, which scroll under a still pointer to
     /// test what hover does as rows move; see [`set_enabled`].
     enabled: bool,
+    /// The hover listeners that last heard `true`.
+    hovered: Vec<HoveredListener>,
+}
+
+/// A hover listener, with what it takes to tell it hover has ended without
+/// painting it.
+#[derive(Clone)]
+pub(crate) struct HoveredListener {
+    pub(crate) was_hovered: Rc<RefCell<bool>>,
+    pub(crate) has_mouse_down: Rc<RefCell<Option<MouseDownEvent>>>,
+    pub(crate) listener: Rc<dyn Fn(&bool, &mut Window, &mut App)>,
+    /// The hitbox it was last painted with.
+    pub(crate) hitbox: Hitbox,
+    pub(crate) mode: HoverListenerMode,
+}
+
+impl HoveredListener {
+    /// Tells the listener a change of hover, tracking it while it is hovered.
+    pub(crate) fn update(&self, is_hovered: bool, window: &mut Window, cx: &mut App) {
+        if is_hovered == *self.was_hovered.borrow() {
+            return;
+        }
+        *self.was_hovered.borrow_mut() = is_hovered;
+        if is_hovered {
+            note_hovered(window, self);
+        } else {
+            let hovered = &mut window.fast_layers.hover_freeze.hovered;
+            hovered.retain(|listener| !Rc::ptr_eq(&listener.was_hovered, &self.was_hovered));
+        }
+        (self.listener)(&is_hovered, window, cx);
+    }
+
+    /// Whether a frame drawn now would leave the listener hovered.
+    fn still_hovered(&self, window: &Window, cx: &App) -> bool {
+        self.has_mouse_down.borrow().is_some()
+            || (!cx.has_active_drag() && self.mode.is_hovered(&self.hitbox, window))
+    }
+}
+
+/// Keeps `listener` as a hovered one, with the hitbox it was just painted with.
+pub(crate) fn note_hovered(window: &mut Window, listener: &HoveredListener) {
+    let hovered = &mut window.fast_layers.hover_freeze.hovered;
+    match hovered
+        .iter_mut()
+        .find(|held| Rc::ptr_eq(&held.was_hovered, &listener.was_hovered))
+    {
+        Some(held) => *held = listener.clone(),
+        None => hovered.push(listener.clone()),
+    }
+}
+
+/// Tells a hovered listener that a frame just drawn without the freeze left off
+/// the pointer, painted or not, that it no longer is. A listener painted in that
+/// frame has been told already, or will be by what it deferred, and the telling
+/// is idempotent. Runs after the frame is in place, with hit testing on it.
+pub(crate) fn release_unhovered(window: &mut Window, cx: &mut App) {
+    if window.fast_layers.hover_freeze.hovered.is_empty() || frozen(window) {
+        return;
+    }
+    for index in 0..window.fast_layers.hover_freeze.hovered.len() {
+        let held = &window.fast_layers.hover_freeze.hovered[index];
+        if !held.still_hovered(window, cx) {
+            let held = held.clone();
+            window.defer(cx, move |window, cx| held.update(false, window, cx));
+        }
+    }
 }
 
 impl Default for HoverFreeze {
@@ -39,6 +111,7 @@ impl Default for HoverFreeze {
         Self {
             last_wheel: None,
             enabled: !cfg!(test),
+            hovered: Vec::new(),
         }
     }
 }
@@ -103,5 +176,12 @@ impl Window {
     pub(crate) fn set_hover_freeze(&mut self, enabled: bool) {
         self.fast_layers.hover_freeze.enabled = enabled;
         self.fast_layers.hover_freeze.last_wheel = None;
+    }
+}
+
+#[cfg(test)]
+impl HoverFreeze {
+    pub(crate) fn end_for_test(&mut self) {
+        self.last_wheel = None;
     }
 }

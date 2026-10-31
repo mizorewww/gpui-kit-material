@@ -384,7 +384,7 @@ impl RenderOnce for Snackbar {
         } else {
             surface
                 .items_center()
-                .gap(rem(4.))
+                .gap(rem(single_line_gap(has_close, has_buttons)))
                 .pl(rem(16.))
                 .pr(rem(if has_close {
                     0.
@@ -424,6 +424,11 @@ impl RenderOnce for Snackbar {
                 .into_any_element(),
         }
     }
+}
+
+/// The gap in a one-line snackbar: none between its text and a lone close icon.
+const fn single_line_gap(has_close: bool, has_buttons: bool) -> f32 {
+    if has_close && !has_buttons { 0. } else { 4. }
 }
 
 #[cfg(test)]
@@ -582,5 +587,12 @@ mod tests {
         let (_, cx) = open(cx, false);
         assert!(cx.debug_bounds("snackbar-action").is_none());
         assert!(cx.debug_bounds("snackbar-close").is_none());
+    }
+
+    #[test]
+    fn a_lone_close_icon_follows_the_text_without_a_gap() {
+        assert_eq!(single_line_gap(true, false), 0.);
+        assert_eq!(single_line_gap(true, true), 4.);
+        assert_eq!(single_line_gap(false, true), 4.);
     }
 }

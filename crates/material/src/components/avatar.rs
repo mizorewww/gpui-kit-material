@@ -92,7 +92,7 @@ impl Avatar {
         self.selected = selected;
         self
     }
-    /// Paint the M3 disabled container and content (on-surface at 12% and
+    /// Paint the M3 disabled container and content (on-surface at 10% and
     /// 38%). Images fade to 38%.
     pub fn disabled(mut self, disabled: bool) -> Self {
         self.disabled = disabled;
@@ -151,6 +151,7 @@ impl RenderOnce for Avatar {
                         .font_weight(FontWeight(type_scale.font_weight as f32))
                         .text_size(rem(16. * scale))
                         .line_height(rem(24. * scale))
+                        .letter_spacing(rem(MONOGRAM_TRACKING * scale))
                         .text_color(ink)
                         .child(monogram_initials(&text))
                         .into_any_element()
@@ -181,6 +182,9 @@ impl RenderOnce for Avatar {
     }
 }
 
+/// The kit's monogram tracks at 0.1, tighter than the title it is otherwise set in.
+const MONOGRAM_TRACKING: f32 = 0.1;
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -210,7 +214,13 @@ mod tests {
         assert_eq!(ink, color(ColorRole::ON_PRIMARY_CONTAINER));
         let (container, ink) = Avatar::new("a", "A").disabled(true).colors();
         let on_surface = color(ColorRole::ON_SURFACE);
-        assert_eq!(container, on_surface.opacity(state::DISABLED_CONTAINER));
+        assert_eq!(container, on_surface.opacity(0.10));
         assert_eq!(ink, on_surface.opacity(state::DISABLED_CONTENT));
+    }
+
+    /// The kit's `Avatars`, `Monogram`.
+    #[test]
+    fn a_monogram_tracks_at_the_kits_value() {
+        assert_eq!(MONOGRAM_TRACKING, 0.1);
     }
 }

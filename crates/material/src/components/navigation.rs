@@ -238,7 +238,13 @@ pub(crate) struct ItemPaint {
 
 /// `selection` is the fast spatial amount (indicator size) and `fade` the
 /// fast effects amount (colors), each 0 unselected and 1 selected.
-pub(crate) fn item_paint(selected: bool, selection: f32, fade: f32, disabled: bool) -> ItemPaint {
+pub(crate) fn item_paint(
+    layout: NavItemLayout,
+    selected: bool,
+    selection: f32,
+    fade: f32,
+    disabled: bool,
+) -> ItemPaint {
     let fade = fade.clamp(0., 1.);
     let rest = color(ColorRole::ON_SURFACE_VARIANT);
     if disabled {
@@ -252,14 +258,23 @@ pub(crate) fn item_paint(selected: bool, selection: f32, fade: f32, disabled: bo
             press: Rgba::default(),
         };
     }
-    let layer = if selected {
+    // The kit's nav items: a medium bar's item hovers in its selected role
+    // whether or not it is selected, the others in on-surface until they are.
+    let layer = if selected || layout == NavItemLayout::Horizontal {
         color(ColorRole::ON_SECONDARY_CONTAINER)
     } else {
-        rest
+        color(ColorRole::ON_SURFACE)
+    };
+    // A label inside the pill takes the pill's content role; under it, its own.
+    let selected_label = match layout {
+        NavItemLayout::Vertical => color(ColorRole::SECONDARY),
+        NavItemLayout::Horizontal | NavItemLayout::Expanded => {
+            color(ColorRole::ON_SECONDARY_CONTAINER)
+        }
     };
     ItemPaint {
         icon: blend(rest, color(ColorRole::ON_SECONDARY_CONTAINER), fade),
-        label: blend(rest, color(ColorRole::SECONDARY), fade),
+        label: blend(rest, selected_label, fade),
         indicator: color(ColorRole::SECONDARY_CONTAINER).opacity(fade),
         indicator_scale: selection.max(0.),
         hover: layer.opacity(state::HOVER),
@@ -413,7 +428,7 @@ impl RenderOnce for NavigationItem {
             window,
             cx,
         );
-        let paint = item_paint(selected, selection, fade, disabled);
+        let paint = item_paint(self.layout, selected, selection, fade, disabled);
         #[cfg(test)]
         PAINTED.with(|painted| painted.borrow_mut().insert(format!("{:?}", self.id), paint));
         let focus = self.focus.unwrap_or_else(|| {
@@ -583,6 +598,7 @@ pub(crate) fn destinations(
     let state = window.use_keyed_state((id.clone(), "nav-focus-handles"), cx, |_, _| {
         BTreeMap::<SharedString, FocusHandle>::new()
     });
+    roving::keep_focus_in_handles(&state, items, |item| &item.value, window, cx);
     let handles: Rc<[FocusHandle]> = state
         .update(cx, |handles, cx| {
             roving::sync_handles(handles, items, |item| &item.value, || cx.focus_handle())

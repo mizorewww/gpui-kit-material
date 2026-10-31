@@ -767,6 +767,11 @@ impl ClockDial {
                     .flex()
                     .items_center()
                     .justify_center()
+                    .rounded_full()
+                    .when(self.state.is_some(), |number| {
+                        let layer = dial_number_hover(value == selected);
+                        number.hover(move |style| style.bg(layer))
+                    })
                     .text_color(if value == selected {
                         on_primary
                     } else {
@@ -1195,6 +1200,25 @@ fn symbol(name: &str) -> Icon {
     Icon::from(Symbol::named(name).expect("a Material Symbol in the pinned catalog"))
 }
 
+fn filled_symbol(name: &str) -> Icon {
+    Icon::from(
+        Symbol::named(name)
+            .expect("a Material Symbol in the pinned catalog")
+            .icon()
+            .filled(true),
+    )
+}
+
+/// The hover layer of a dial number: the kit's `Hour`, on-surface unselected and
+/// on-primary-container selected, as its hover and focus variants are.
+fn dial_number_hover(selected: bool) -> Rgba {
+    if selected {
+        color(ColorRole::ON_PRIMARY_CONTAINER).opacity(state::HOVER)
+    } else {
+        color(ColorRole::ON_SURFACE).opacity(state::HOVER)
+    }
+}
+
 impl RenderOnce for TimePicker {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let s = self.state.read(cx);
@@ -1307,12 +1331,13 @@ impl RenderOnce for TimePicker {
             .text_color(color(ColorRole::ON_SURFACE_VARIANT))
             .map(|d| type_style(d, TypeRole::LabelMedium))
             .child(title.clone());
+        // Dial picker / Actions: the filled keyboard.
         let (mode_icon, mode_label) = match mode {
-            TimeInputMode::Dial => ("keyboard", labels.switch_to_input.clone()),
-            TimeInputMode::Input => ("schedule", labels.switch_to_dial.clone()),
+            TimeInputMode::Dial => (filled_symbol("keyboard"), labels.switch_to_input.clone()),
+            TimeInputMode::Input => (symbol("schedule"), labels.switch_to_dial.clone()),
         };
         let toggle = update(TimePickerState::toggle_mode);
-        let mut mode_button = IconButton::new(named(&id, "mode"), symbol(mode_icon), mode_label)
+        let mut mode_button = IconButton::new(named(&id, "mode"), mode_icon, mode_label)
             .on_click(move |_, window, cx| toggle(window, cx));
         if let Some(p) = preview {
             mode_button = mode_button.preview_state(p);
@@ -1406,9 +1431,12 @@ impl RenderOnce for TimePicker {
                             let state = period_state.clone();
                             return segment
                                 .clear_children()
+                                .when(cfg!(test), |segment| {
+                                    segment.debug_selector(|| "time-period".into())
+                                })
                                 .ml(rem(12.))
-                                .child(
-                                    PeriodSelector::new(
+                                .child({
+                                    let period = PeriodSelector::new(
                                         "period",
                                         period_labels.am.clone(),
                                         period_labels.pm.clone(),
@@ -1419,8 +1447,13 @@ impl RenderOnce for TimePicker {
                                         move |pm, window, cx| {
                                             state.update(cx, |s, cx| s.set_pm(pm, window, cx))
                                         },
-                                    ),
-                                )
+                                    );
+                                    if specimen {
+                                        period.preview_state(pm, InteractionPreview::Enabled)
+                                    } else {
+                                        period
+                                    }
+                                })
                                 .into_any_element();
                         }
                         let selected = which == editing;

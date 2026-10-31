@@ -196,6 +196,11 @@ pub static PLAYGROUND: Playground = Playground {
                     label: "Subheader",
                     default: false,
                 },
+                Control::Switch {
+                    id: "expressive",
+                    label: "Expressive",
+                    default: false,
+                },
             ],
         },
         Section {
@@ -308,6 +313,7 @@ fn preview(
             let mut item =
                 ListItem::new(SharedString::from(format!("list-item-{index}")), *headline)
                     .selected(on && selection != "none")
+                    .expressive(config.bool("expressive"))
                     .disabled(config.bool("disable_last") && index + 1 == count)
                     .container(if segmented {
                         ColorRole::SURFACE_CONTAINER

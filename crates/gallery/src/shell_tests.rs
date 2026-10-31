@@ -920,6 +920,8 @@ mod examples {
     /// row, which must not read the playground state for it. The hint still
     /// arrives, both ways, without a refresh, and a settled page keeps a
     /// preview frame to itself.
+    // Fast retains views: upstream builds every view under a notified one again.
+    #[cfg(feature = "gpui-fast")]
     #[gpui::test]
     fn a_device_rearranges_the_panes_without_the_lead_row_reading_the_state(
         cx: &mut TestAppContext,
@@ -1202,6 +1204,8 @@ fn the_preview_controls_stay_in_the_card(cx: &mut TestAppContext) {
 
 /// The preview's scope is its view's, so a preview in its own theme, mode or
 /// direction still keeps an animation frame to itself.
+// Fast retains views: upstream builds every view under a notified one again.
+#[cfg(feature = "gpui-fast")]
 #[gpui::test]
 fn a_scoped_preview_keeps_a_frame_to_itself(cx: &mut TestAppContext) {
     use gpui_kit_material::color::themes::ThemeMode;

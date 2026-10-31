@@ -89,6 +89,10 @@ pub struct RingedButton {
     /// Hover and press state-layer backgrounds, installed as live styles or
     /// painted directly for a forced preview.
     layers: Option<(Rgba, Rgba)>,
+    /// The level hovering lifts the button to, if it does.
+    hover_elevation: Option<u8>,
+    /// The corners a live press or keyboard focus rounds it to, if they do.
+    active_radius: Option<Pixels>,
     ripple: Option<Rgba>,
     preview: Option<InteractionPreview>,
 }
@@ -103,6 +107,8 @@ impl RingedButton {
             placement,
             disabled: false,
             layers: None,
+            hover_elevation: None,
+            active_radius: None,
             ripple: None,
             preview: None,
         }
@@ -118,6 +124,18 @@ impl RingedButton {
     /// the pointer hover and active styles; a preview paints the one it forces.
     pub(crate) fn state_layers(mut self, hover: Rgba, press: Rgba) -> Self {
         self.layers = Some((hover, press));
+        self
+    }
+
+    /// The elevation level of a live hover, if it changes the button's.
+    pub(crate) fn hover_elevation(mut self, level: Option<u8>) -> Self {
+        self.hover_elevation = level;
+        self
+    }
+
+    /// The corners of a live press and keyboard focus, if they change the button's.
+    pub(crate) fn active_radius(mut self, radius: Option<Pixels>) -> Self {
+        self.active_radius = radius;
         self
     }
 
@@ -210,11 +228,28 @@ impl RenderOnce for RingedButton {
                 button.cursor_default()
             }
         });
+        let hover_elevation = self.hover_elevation;
+        let active_radius = self.active_radius;
         if let Some((hover, press)) = self.layers.filter(|_| enabled) {
             button = match self.preview {
                 None => button
-                    .hover(move |style| style.bg(hover))
-                    .active(move |style| style.bg(press)),
+                    .hover(move |style| {
+                        let style = style.bg(hover);
+                        match hover_elevation {
+                            Some(level) => style.shadow(crate::tokens::elevation::level(level)),
+                            None => style,
+                        }
+                    })
+                    .active(move |style| {
+                        let style = style.bg(press);
+                        match active_radius {
+                            Some(radius) => style.rounded(radius),
+                            None => style,
+                        }
+                    })
+                    .when_some(active_radius, |button, radius| {
+                        button.focus_visible(move |style| style.rounded(radius))
+                    }),
                 Some(InteractionPreview::Hovered) => button.bg(hover),
                 Some(InteractionPreview::Pressed) => button.bg(press),
                 Some(_) => button,

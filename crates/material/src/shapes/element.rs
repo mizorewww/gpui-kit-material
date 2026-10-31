@@ -245,7 +245,14 @@ fn animated_frame(
     let history = window.use_keyed_state((id.clone(), "material-shape-history"), cx, |_, _| {
         ShapeHistory::new(kind)
     });
-    let generation = history.update(cx, |history, _| history.advance(kind));
+    // Only a new shape writes: a write would rebuild every retained subtree that
+    // read the history, this one included, on every frame.
+    let held = history.read(cx);
+    let generation = if held.current() == kind {
+        held.generation
+    } else {
+        history.update(cx, |history, _| history.advance(kind))
+    };
     let shown = motion::token_value(
         (id.clone(), "material-shape-morph"),
         generation as f32,
@@ -531,6 +538,81 @@ mod tests {
     }
 
     /// Draw a new shape and return the frame drawn just after the change.
+    /// Draws an animated shape, and lends out the history it keeps.
+    #[cfg(feature = "gpui-fast")]
+    struct ShapeWriter(std::rc::Rc<std::cell::RefCell<Option<Entity<ShapeHistory>>>>);
+    #[cfg(feature = "gpui-fast")]
+    impl Render for ShapeWriter {
+        fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+            let id = ElementId::from("probe");
+            animated_frame(
+                &id,
+                ShapeKind::Circle,
+                MotionToken::DefaultSpatial,
+                window,
+                cx,
+            );
+            let history =
+                window.use_keyed_state((id, "material-shape-history"), cx, |_, _| unreachable!());
+            *self.0.borrow_mut() = Some(history);
+            div()
+        }
+    }
+    /// A retained view that reads the history and counts its renders.
+    #[cfg(feature = "gpui-fast")]
+    struct ShapeReader(
+        std::rc::Rc<std::cell::RefCell<Option<Entity<ShapeHistory>>>>,
+        std::rc::Rc<std::cell::Cell<usize>>,
+    );
+    #[cfg(feature = "gpui-fast")]
+    impl Render for ShapeReader {
+        fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+            self.1.set(self.1.get() + 1);
+            if let Some(history) = self.0.borrow().as_ref() {
+                history.read(cx);
+            }
+            div()
+        }
+    }
+    #[cfg(feature = "gpui-fast")]
+    struct ShapeViews(Entity<ShapeWriter>, Entity<ShapeReader>);
+    #[cfg(feature = "gpui-fast")]
+    impl Render for ShapeViews {
+        fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+            div().child(self.0.clone()).child(self.1.clone())
+        }
+    }
+
+    /// A still shape writes nothing while it is drawn: to the engine a write is a
+    /// change, which draws again whatever retained subtree read the shape.
+    #[cfg(feature = "gpui-fast")]
+    #[gpui::test]
+    fn drawing_a_still_animated_shape_is_not_a_change_to_it(cx: &mut gpui::TestAppContext) {
+        let renders = std::rc::Rc::new(std::cell::Cell::new(0));
+        let (views, cx) = cx.add_window_view({
+            let renders = renders.clone();
+            move |_, cx| {
+                let history = std::rc::Rc::default();
+                ShapeViews(
+                    cx.new(|_| ShapeWriter(std::rc::Rc::clone(&history))),
+                    cx.new(|_| ShapeReader(history, renders)),
+                )
+            }
+        });
+        let reader = views.read_with(cx, |views, _| views.1.clone());
+        let writer = views.read_with(cx, |views, _| views.0.clone());
+        cx.update(|window, cx| window.draw(cx).clear(cx));
+        // The reader takes in the history, now that it has been lent.
+        reader.update(cx, |_, cx| cx.notify());
+        cx.update(|window, cx| window.draw(cx).clear(cx));
+        let settled = renders.get();
+        for _ in 0..3 {
+            writer.update(cx, |_, cx| cx.notify());
+            cx.update(|window, cx| window.draw(cx).clear(cx));
+        }
+        assert_eq!(renders.get(), settled, "the shape did not change");
+    }
+
     fn change_shape(cx: &mut gpui::TestAppContext, reduced: bool) -> ShapeFrame {
         cx.update(|cx| cx.set_reduce_motion(reduced));
         let (view, cx) = cx.add_window_view(|_, _| Harness {

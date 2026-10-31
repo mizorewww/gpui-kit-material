@@ -412,7 +412,8 @@ fn preview(
             let slot = div()
                 .debug_selector(move || CHIP_IDS[position].into())
                 .child(element);
-            ChipSetItem::new(slot).drag_preview(move |_, _| look.dragged(position))
+            ChipSetItem::new(("chip-item", index), slot)
+                .drag_preview(move |_, _| look.dragged(position))
         });
     let reorder = state.clone();
     let set = ChipSet::new("chip-set", config.text("group_label"))
