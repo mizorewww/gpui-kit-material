@@ -813,19 +813,7 @@ impl HitboxId {
         if window.captured_hitbox == Some(self) {
             return true;
         }
-        // Keyboard input does not hide hover here, but a wheel holding hover
-        // still while a frame is drawn does; see `hover_freeze`.
-        if !window.invalidator.not_drawing() && crate::fast::layers::hover_freeze::frozen(window) {
-            return false;
-        }
         self.hit_test(window)
-    }
-
-    /// Whether the cursor this hitbox asks for applies: it has captured the
-    /// pointer or is under it. A wheel holding hover still leaves the cursor
-    /// alone, and a frame sets the cursor while it is drawn.
-    fn sets_cursor(self, window: &Window) -> bool {
-        window.captured_hitbox == Some(self) || self.hit_test(window)
     }
 
     pub(crate) fn hit_test(self, window: &Window) -> bool {
@@ -1191,7 +1179,9 @@ impl Frame {
             .fold_while(None, |style, request| match request.hitbox_id {
                 None => Done(Some(request.style)),
                 Some(hitbox_id) => Continue(style.or_else(|| {
-                    hitbox_id.sets_cursor(window).then_some(request.style)
+                    hitbox_id
+                        .is_hovered_ignoring_last_input(window)
+                        .then_some(request.style)
                 })),
             })
             .into_inner()

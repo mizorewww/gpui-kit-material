@@ -3038,9 +3038,9 @@ mod rows {
 
     /// A hover listener that also hears hover after keyboard input, as a
     /// Material button's, is held still with the rest: a row scrolled under a
-    /// still pointer does not start hovering, which could start a transition
-    /// that keeps the list off its layer. A pointer that moves reports it at
-    /// once.
+    /// still pointer does not start hovering, and the row the pointer was on
+    /// does not stop, which could start a transition that keeps the list off
+    /// its layer. A pointer that moves reports it at once.
     #[crate::test]
     fn hover_held_still_reaches_no_input_modality_independent_listener(cx: &mut TestAppContext) {
         use crate::{HoverListenerMode, InteractiveElement as _};
@@ -3062,11 +3062,7 @@ mod rows {
                             .h(px(40.))
                             .bg(row_color(ix))
                             .hover_listener_mode(HoverListenerMode::InputModalityIndependent)
-                            .on_hover(move |hovered, _, _| {
-                                if *hovered {
-                                    *hovers.borrow_mut() += 1;
-                                }
-                            })
+                            .on_hover(move |_, _, _| *hovers.borrow_mut() += 1)
                             .into_any_element()
                     })
                     .w(px(VIEWPORT_WIDTH))
