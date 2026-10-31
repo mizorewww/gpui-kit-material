@@ -1303,7 +1303,7 @@ impl RenderOnce for TimePicker {
             .px(rem(24.))
             .text_color(color(ColorRole::ON_SURFACE_VARIANT))
             .map(|d| type_style(d, TypeRole::LabelMedium))
-            .child(title);
+            .child(title.clone());
         let (mode_icon, mode_label) = match mode {
             TimeInputMode::Dial => ("keyboard", labels.switch_to_input.clone()),
             TimeInputMode::Input => ("schedule", labels.switch_to_dial.clone()),
@@ -1377,7 +1377,7 @@ impl RenderOnce for TimePicker {
             .rounded(rem(28.))
             .bg(color(ColorRole::SURFACE_CONTAINER_HIGH))
             .role(Role::Dialog)
-            .aria_label(labels.select_title.clone());
+            .aria_label(title.clone());
         match mode {
             TimeInputMode::Input => {
                 let field_focused = field.read(cx).focus_handle(cx).is_focused(window);
