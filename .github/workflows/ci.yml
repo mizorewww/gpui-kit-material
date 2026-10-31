@@ -52,6 +52,7 @@ jobs:
         run: |
           cargo clippy --locked -p gpui-kit-material --all-targets --no-default-features --features serde,embedded-symbols,frame-profiler -- -D warnings
           cargo test --locked -p gpui-kit-material --no-default-features --features serde,embedded-symbols,frame-profiler
+          cargo test --locked -p gpui-kit-material --example gallery --no-default-features --features serde,embedded-symbols,frame-profiler
       - name: Check and test the Fast backend
         run: |
           cargo clippy --locked --workspace --all-targets --features gpui-kit-material/gpui-fast,gpui-kit-material/frame-profiler -- -D warnings

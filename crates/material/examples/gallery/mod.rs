@@ -1086,6 +1086,8 @@ mod window_tests {
         }
     }
 
+    // Fast retains views: upstream builds every view under a notified one again.
+    #[cfg(feature = "gpui-fast")]
     #[gpui::test]
     fn preview_updates_render_neither_the_gallery_nor_the_lead_row(cx: &mut TestAppContext) {
         cx.update(|cx| {
@@ -1154,6 +1156,8 @@ mod window_tests {
     /// A wheel event notifies the view holding what it scrolls. That must be the
     /// content view: the Gallery holds the navigation, whose rebuild on each frame
     /// of a scroll would cost more than the scroll does.
+    // Fast retains views: upstream builds every view under a notified one again.
+    #[cfg(feature = "gpui-fast")]
     #[gpui::test]
     fn scrolling_the_content_renders_neither_the_gallery_nor_the_navigation(
         cx: &mut TestAppContext,
@@ -1278,6 +1282,8 @@ mod window_tests {
         );
     }
 
+    // Fast retains views: upstream builds every view under a notified one again.
+    #[cfg(feature = "gpui-fast")]
     #[gpui::test]
     fn fps_updates_render_only_the_title_bar(cx: &mut TestAppContext) {
         cx.update(|cx| {
