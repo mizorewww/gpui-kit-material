@@ -12,6 +12,8 @@ use gpui_base::slider::{SliderEvent, SliderState, SliderValue};
 const SIZES: [SliderSize; 5] = SliderSize::ALL;
 const COLORS: [SliderColor; 4] = SliderColor::ALL;
 const STEPS: [f32; 3] = [1., 5., 10.];
+/// md3.io's horizontal track, where the canvas has room.
+const TRACK_WIDTH: f32 = 360.;
 
 pub static PLAYGROUND: Playground = Playground {
     scenarios: &[
@@ -223,11 +225,14 @@ fn preview(
             if vertical {
                 track.h(rem(240.))
             } else {
-                track.w_full().max_w(rem(360.))
+                track.w_full()
             }
         })
         .child(material);
+    // The canvas centers a preview at its own width, so a track that fills its
+    // parent needs a parent with a width of its own.
     div()
+        .when(!vertical, |column| column.w_full().max_w(rem(TRACK_WIDTH)))
         .flex()
         .flex_col()
         .items_start()

@@ -173,8 +173,8 @@ fn preview(
     } else {
         div()
             .debug_selector(|| "playground-progress-track".into())
-            .w_full()
-            .max_w(rem(LINEAR_WIDTH))
+            .flex_1()
+            .min_w_0()
             .child(
                 LinearProgress::new("playground-progress-linear", label)
                     .value(fraction)
@@ -199,6 +199,9 @@ fn preview(
     });
     div()
         .debug_selector(|| "playground-progress".into())
+        // The canvas centers a preview at its own width, so the linear track
+        // that fills this row needs the row to have a width of its own.
+        .when(!circular, |row| row.w_full().max_w(rem(LINEAR_WIDTH)))
         .flex()
         .items_center()
         .gap(rem(16.))
@@ -236,6 +239,7 @@ mod tests {
         // The percentage label follows the track.
         toggle_switch(&mut cx, "percentage");
         assert!(config(&state, &mut cx).bool("percentage"));
+        let linear = element_bounds(&mut cx, "playground-progress-track");
         let label = element_bounds(&mut cx, "playground-progress-percentage");
         assert!(label.left() >= linear.right());
         set(&state, &mut cx, "percentage", Value::Bool(false));
