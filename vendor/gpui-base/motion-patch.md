@@ -20,10 +20,6 @@ standalone; the upstream package also excludes these examples from publication.
 
 The local compatibility surface is restricted to:
 
-- `src/a11y_disabled.rs`: transparent accessibility state presentation for
-  disabled and busy controls.
-- `src/button.rs`: caller-controlled `busy(bool)`, independent of disabled.
-- `src/toggle.rs`: busy state and the nonfocusable activation/focus corrections.
 - `src/motion.rs`: CSS reversing-adjusted start values, reversal duration and
   negative-delay scaling, plus explicit per-transition reduced-motion policy.
   The default finishes transitions immediately under reduced motion; callers
@@ -33,16 +29,6 @@ The local compatibility surface is restricted to:
   rows) using the same sampler as `transition_with_status`; it retains no
   view, window or scheduled callback.
 - `src/lib.rs`: public exports `ReducedMotion` and `TransitionPlayback`.
-- `src/text_selection.rs`: `Hitbox` literals add `additional_bounds: None`,
-  required by the GPUI `Hitbox` field patch
-  (`vendor/gpui-pre/hitbox-extension-patch.md`). No behavior change.
-- `src/input/base/state.rs`: `InputBaseState::set_caret_color(Option<Hsla>)`,
-  a caller caret colour that wins over the projected editor style. Kit's
-  `Input`/`Textarea` re-project the whole style from the Component theme on
-  every render, so a field whose caret follows its own state (Material's
-  error caret) had no way to paint it. `None` restores the projected caret;
-  nothing else in the style changes. Test:
-  `a_caller_caret_color_wins_over_the_projected_style`.
 - `src/toolbar.rs`: `Toolbar::axis(Axis)`. Upstream handles only Left/Right
   and always reports a horizontal orientation, so a vertical toolbar needed
   a private copy of the subtree-constrained focus walk and still announced

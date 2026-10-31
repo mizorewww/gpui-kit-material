@@ -200,12 +200,6 @@ pub(crate) fn carry_paint_records(
             .iter_mut()
             .map(|listener| listener.take()),
     );
-    next.touch_observers.extend(
-        rendered.touch_observers
-            [range.start.touch_observers_index..range.end.touch_observers_index]
-            .iter_mut()
-            .map(|observer| observer.take()),
-    );
     if element_states {
         next.accessed_element_states.extend(
             rendered.accessed_element_states[range.start.accessed_element_states_index
@@ -308,8 +302,6 @@ pub(crate) fn follow_paint(window: &mut Window, from: &Range<PaintIndex>, to: &P
             && b.fast.window_control_hitboxes <= d.fast.window_control_hitboxes
             && a.mouse_listeners_index >= c.mouse_listeners_index
             && b.mouse_listeners_index <= d.mouse_listeners_index
-            && a.touch_observers_index >= c.touch_observers_index
-            && b.touch_observers_index <= d.touch_observers_index
             && a.input_handlers_index >= c.input_handlers_index
             && b.input_handlers_index <= d.input_handlers_index
             && a.cursor_styles_index >= c.cursor_styles_index

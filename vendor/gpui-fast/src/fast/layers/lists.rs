@@ -717,7 +717,8 @@ impl ForetoldHitTest {
         if self.blocked {
             return;
         }
-        if hitbox.contains_pointer(&position) {
+        let bounds = hitbox.bounds.intersect(&hitbox.content_mask.bounds);
+        if bounds.contains(&position) {
             self.ids.push(hitbox.id);
             if self.hover_count.is_none()
                 && hitbox.behavior == crate::HitboxBehavior::BlockMouseExceptScroll

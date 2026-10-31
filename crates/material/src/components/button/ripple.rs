@@ -8,7 +8,7 @@ const LIFETIME: Duration = Duration::from_millis(450);
 /// How long a held touch can go without an end before its wave is released. GPUI
 /// reports a tap's end and a pan's scroll publicly, but not a system cancel of a
 /// still finger; this keeps that wave from staying on screen.
-const TOUCH_HOLD_LIMIT: Duration = Duration::from_secs(5);
+pub(super) const TOUCH_HOLD_LIMIT: Duration = Duration::from_secs(5);
 #[derive(Clone)]
 struct Wave {
     id: u64,
@@ -189,7 +189,6 @@ pub(crate) struct ButtonRipple {
     border: Edges<AbsoluteLength>,
     color: Rgba,
     waves: Vec<PaintedWave>,
-    target: Option<super::hit_target::SharedTarget>,
     centered: bool,
     extension: Edges<Rems>,
 }
@@ -284,7 +283,6 @@ impl ButtonRipple {
             border,
             color,
             waves,
-            target: None,
             centered: false,
             extension: Edges::all(rems(0.)),
         }
@@ -312,11 +310,6 @@ impl ButtonRipple {
             self.state
                 .update(cx, |state, _| state.touch_pressed = Some(pressed));
         }
-        self
-    }
-
-    pub(super) fn hit_target(mut self, target: super::hit_target::SharedTarget) -> Self {
-        self.target = Some(target);
         self
     }
 }
@@ -356,9 +349,6 @@ impl Element for ButtonRipple {
         // Base occludes earlier pointer targets. Register this passive observer
         // above its own child, while later siblings still occlude both together.
         self.child.prepaint(window, cx);
-        // Base has just resolved interaction styles and its complete content
-        // mask, including focus/hover border or overflow overrides. Reuse that
-        // result rather than reconstructing a second target from render styles.
         let rem_size = window.rem_size();
         let extended = (self.extension != Edges::all(rems(0.))).then(|| {
             let edges = self.extension.map(|edge| edge.to_pixels(rem_size));
@@ -370,14 +360,7 @@ impl Element for ButtonRipple {
                 ),
             )
         });
-        if let Some(extended) = extended {
-            return window.insert_hitbox(extended, HitboxBehavior::Normal);
-        }
-        self.target
-            .as_ref()
-            .and_then(|target| target.get())
-            .unwrap_or_else(|| super::hit_target::ResolvedTarget::new(bounds, None, window))
-            .insert(window)
+        window.insert_hitbox(extended.unwrap_or(bounds), HitboxBehavior::Normal)
     }
     fn paint(
         &mut self,
@@ -630,7 +613,10 @@ mod tests {
     impl Render for Harness {
         fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
             window.set_rem_size(px(14.));
+            // Medium has no target beyond what it paints, so this ripple around the
+            // whole button sees the bounds a button's own ripple does.
             let button = MaterialButton::new("ripple-button")
+                .button_size(crate::components::button::ButtonSize::Medium)
                 .ripple(false)
                 .disabled(self.disabled)
                 .child("Wave")
@@ -1174,8 +1160,6 @@ mod target_tests {
         ancestor_clip: bool,
         overlap: bool,
         focus: gpui::FocusHandle,
-        focus_clip: bool,
-        focus_border: bool,
         occlude: bool,
         scrolls: usize,
         clicks: [usize; 2],
@@ -1188,12 +1172,6 @@ mod target_tests {
             let button = MaterialButton::new("target")
                 .button_size(self.size)
                 .track_focus(&self.focus)
-                .when(self.focus_clip, |button| {
-                    button.focus(|style| style.overflow_hidden())
-                })
-                .when(self.focus_border, |button| {
-                    button.focus(|style| style.border_l(px(10.)))
-                })
                 .when(self.occlude, |button| button.occlude())
                 .variant(if self.outlined {
                     ButtonVariant::Outlined
@@ -1258,8 +1236,6 @@ mod target_tests {
             ancestor_clip: false,
             overlap: false,
             focus: cx.focus_handle(),
-            focus_clip: false,
-            focus_border: false,
             occlude: false,
             scrolls: 0,
             clicks: [0; 2],
@@ -1353,14 +1329,6 @@ mod target_tests {
         });
         draw(cx);
         let bounds = cx.debug_bounds("target").unwrap();
-        let strip = point(bounds.origin.x + px(0.25), bounds.origin.y - px(2.));
-        cx.simulate_click(strip, Modifiers::default());
-        assert_eq!(
-            wave_count(&view, cx, "target"),
-            0,
-            "outlined extension excludes the border strip"
-        );
-        assert_eq!(view.read_with(cx, |view, _| view.clicks[0]), 0);
         for own in [true, false] {
             view.update(cx, |view, cx| {
                 view.own_clip = own;
@@ -1426,31 +1394,6 @@ mod target_tests {
         }
         assert_eq!(view.read_with(cx, |view, _| view.clicks[0]), 1);
     }
-    #[gpui::test]
-    fn passive_target_uses_base_resolved_focus_border_and_overflow(cx: &mut TestAppContext) {
-        let (view, cx) = setup(cx);
-        let focus = view.read_with(cx, |view, _| view.focus.clone());
-        cx.update(|window, cx| window.focus(&focus, cx));
-        for clip in [true, false] {
-            view.update(cx, |view, cx| {
-                view.focus_clip = clip;
-                view.focus_border = !clip;
-                cx.notify();
-            });
-            draw(cx);
-            let bounds = cx.debug_bounds("target").unwrap();
-            let edge = point(bounds.origin.x + px(5.), bounds.origin.y - px(2.));
-            cx.simulate_click(edge, Modifiers::default());
-            assert_eq!(view.read_with(cx, |view, _| view.clicks[0]), 0);
-            assert_eq!(
-                wave_count(&view, cx, "target"),
-                0,
-                "resolved focus style must constrain ripple identically to Base"
-            );
-            assert!(!press(&view, cx).0);
-        }
-    }
-
     #[gpui::test]
     fn caller_occlusion_can_block_scroll_beyond_material_default(cx: &mut TestAppContext) {
         let (view, cx) = setup(cx);

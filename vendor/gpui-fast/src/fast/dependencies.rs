@@ -819,6 +819,23 @@ pub(crate) fn query<T: 'static, R>(
     result
 }
 
+impl<T: 'static> Entity<T> {
+    /// Leases the entity to build elements from it, as rendering a view does:
+    /// its `Context` gives listeners and focus handles. Unlike [`Entity::update`],
+    /// this does not count as changing what the entity holds, so retained subtrees
+    /// that read it stay valid, unless it notifies during the lease. Anything else
+    /// written during the lease is not seen as a change: it must not be something
+    /// another subtree reads.
+    #[inline]
+    pub fn update_for_render<R>(
+        &self,
+        cx: &mut App,
+        build: impl FnOnce(&mut T, &mut Context<T>) -> R,
+    ) -> R {
+        query(self, cx, build)
+    }
+}
+
 /// Where a recording started by [`App::begin_recording_dependencies`] begins.
 #[derive(Clone, Copy)]
 pub(crate) struct DependencyRecording {

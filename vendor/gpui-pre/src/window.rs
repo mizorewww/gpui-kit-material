@@ -845,9 +845,6 @@ pub struct Hitbox {
     /// The bounds of the hitbox.
     #[deref]
     pub bounds: Bounds<Pixels>,
-    /// An optional additional pointer target, sharing this hitbox identity and content mask.
-    /// This does not change visual bounds, layout, or event anchor geometry.
-    pub additional_bounds: Option<Bounds<Pixels>>,
     /// The content mask when the hitbox was inserted.
     pub content_mask: ContentMask<Pixels>,
     /// Flags that specify hitbox behavior.
@@ -855,19 +852,6 @@ pub struct Hitbox {
 }
 
 impl Hitbox {
-    /// Tests the pointer target geometry, including the extension and content mask.
-    /// Unlike `is_hovered_at`, this does not test occlusion by other elements.
-    pub fn contains_pointer(&self, position: &Point<Pixels>) -> bool {
-        self.bounds
-            .intersect(&self.content_mask.bounds)
-            .contains(position)
-            || self.additional_bounds.is_some_and(|additional| {
-                additional
-                    .intersect(&self.content_mask.bounds)
-                    .contains(position)
-            })
-    }
-
     /// Checks if the hitbox is currently hovered. Returns `false` during keyboard input modality
     /// so that keyboard navigation suppresses hover highlights. Except when handling
     /// `ScrollEvent`, this is typically what you want when determining whether to handle mouse
@@ -1059,7 +1043,6 @@ pub(crate) struct DeferredDraw {
     paint_range: Range<PaintIndex>,
 }
 
-type TouchObserver = Box<dyn FnMut(&TouchEvent, &mut Window, &mut App)>;
 
 pub(crate) struct Frame {
     pub(crate) focus: Option<FocusId>,
@@ -1067,7 +1050,6 @@ pub(crate) struct Frame {
     pub(crate) element_states: FxHashMap<(GlobalElementId, TypeId), ElementStateBox>,
     accessed_element_states: Vec<(GlobalElementId, TypeId)>,
     pub(crate) mouse_listeners: Vec<Option<AnyMouseListener>>,
-    touch_observers: Vec<Option<TouchObserver>>,
     pub(crate) dispatch_tree: DispatchTree,
     pub(crate) scene: Scene,
     pub(crate) hitboxes: Vec<Hitbox>,
@@ -1103,7 +1085,6 @@ pub(crate) struct PaintIndex {
     #[cfg(any(test, feature = "test-support"))]
     debug_bounds_index: usize,
     mouse_listeners_index: usize,
-    touch_observers_index: usize,
     input_handlers_index: usize,
     cursor_styles_index: usize,
     accessed_element_states_index: usize,
@@ -1125,7 +1106,6 @@ impl Frame {
             element_states: FxHashMap::default(),
             accessed_element_states: Vec::new(),
             mouse_listeners: Vec::new(),
-            touch_observers: Vec::new(),
             dispatch_tree,
             scene: Scene::default(),
             hitboxes: Vec::new(),
@@ -1153,7 +1133,6 @@ impl Frame {
         self.element_states.clear();
         self.accessed_element_states.clear();
         self.mouse_listeners.clear();
-        self.touch_observers.clear();
         self.dispatch_tree.clear();
         self.scene.clear();
         self.input_handlers.clear();
@@ -1197,7 +1176,8 @@ impl Frame {
         let mut set_hover_hitbox_count = false;
         let mut hit_test = HitTest::default();
         for hitbox in self.hitboxes.iter().rev() {
-            if hitbox.contains_pointer(&position) {
+            let bounds = hitbox.bounds.intersect(&hitbox.content_mask.bounds);
+            if bounds.contains(&position) {
                 hit_test.ids.push(hitbox.id);
                 if !set_hover_hitbox_count
                     && hitbox.behavior == HitboxBehavior::BlockMouseExceptScroll
@@ -4259,7 +4239,6 @@ impl Window {
             #[cfg(any(test, feature = "test-support"))]
             debug_bounds_index: self.next_frame.debug_bounds_records.len(),
             mouse_listeners_index: self.next_frame.mouse_listeners.len(),
-            touch_observers_index: self.next_frame.touch_observers.len(),
             input_handlers_index: self.next_frame.input_handlers.len(),
             cursor_styles_index: self.next_frame.cursor_styles.len(),
             accessed_element_states_index: self.next_frame.accessed_element_states.len(),
@@ -4294,12 +4273,6 @@ impl Window {
                 [range.start.mouse_listeners_index..range.end.mouse_listeners_index]
                 .iter_mut()
                 .map(|listener| listener.take()),
-        );
-        self.next_frame.touch_observers.extend(
-            self.rendered_frame.touch_observers
-                [range.start.touch_observers_index..range.end.touch_observers_index]
-                .iter_mut()
-                .map(|observer| observer.take()),
         );
         self.next_frame.accessed_element_states.extend(
             self.rendered_frame.accessed_element_states[range.start.accessed_element_states_index
@@ -5508,19 +5481,6 @@ impl Window {
     ///
     /// This method should only be called as part of the prepaint phase of element drawing.
     pub fn insert_hitbox(&mut self, bounds: Bounds<Pixels>, behavior: HitboxBehavior) -> Hitbox {
-        self.insert_hitbox_with_extension(bounds, None, behavior)
-    }
-
-    /// Inserts one hitbox whose pointer target includes an additional rectangle.
-    /// Both rectangles obey the current content mask. The returned visual bounds
-    /// remain unchanged, and both targets share one identity and event handlers.
-    /// This method must only be called during prepaint.
-    pub fn insert_hitbox_with_extension(
-        &mut self,
-        bounds: Bounds<Pixels>,
-        additional_bounds: Option<Bounds<Pixels>>,
-        behavior: HitboxBehavior,
-    ) -> Hitbox {
         self.invalidator.debug_assert_prepaint();
 
         let content_mask = self.content_mask();
@@ -5529,7 +5489,6 @@ impl Window {
         let hitbox = Hitbox {
             id,
             bounds,
-            additional_bounds,
             content_mask,
             behavior,
         };
@@ -5693,23 +5652,6 @@ impl Window {
                 }
             },
         )));
-    }
-
-    /// Observe raw touch input without claiming a gesture or suppressing a tap.
-    ///
-    /// Register during paint, just like a mouse listener. Observers are retained
-    /// for cached paint and removed with their element. Every observer sees each
-    /// touch once, before gesture recognition. Propagation and default-prevention
-    /// changes made by an observer are discarded; use gesture handlers to consume
-    /// input. Hitbox::is_hovered_at can test the event position and occlusion.
-    pub fn observe_touch_event(
-        &mut self,
-        observer: impl FnMut(&TouchEvent, &mut Window, &mut App) + 'static,
-    ) {
-        self.invalidator.debug_assert_paint();
-        self.next_frame
-            .touch_observers
-            .push(Some(Box::new(observer)));
     }
 
     /// Register a key event listener on this node for the next frame. The type of event
@@ -6083,15 +6025,6 @@ impl Window {
         if self.invalidator.is_dirty() {
             self.draw(cx).clear(cx);
         }
-        let mut observers = std::mem::take(&mut self.rendered_frame.touch_observers);
-        for observer in observers.iter_mut().flatten() {
-            let propagate = cx.propagate_event;
-            let prevented = self.default_prevented;
-            observer(event, self, cx);
-            cx.propagate_event = propagate;
-            self.default_prevented = prevented;
-        }
-        self.rendered_frame.touch_observers = observers;
         let mut event = event.clone();
         if !self.touch_prediction_enabled {
             event.predicted_position = None;

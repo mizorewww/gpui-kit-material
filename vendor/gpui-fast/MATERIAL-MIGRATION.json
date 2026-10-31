@@ -177,7 +177,7 @@
     "src/window.rs": "d3f00c28cc47446f6c73be67d00830446e0e3a9a7fadefdf54fff9e5ccadee0b"
   },
   "patch_base": "gpui-pre 0.3.10 published archive plus this workspace compatibility patches",
-  "patch_contract": "Preserve raw touch observers and extended hitboxes through Fast retained/scroll replay; preserve full CPU scopes and repeat playback. Runtime validation is required.",
+  "patch_contract": "Preserve full CPU scopes and repeat playback through Fast retained/scroll replay. Runtime validation is required.",
   "additional_test_fixtures": {
     "tests/fonts/README.md": {
       "sha256": "675824dd97a1d09a1a105d186a7b96a05016009d5d14621d6f5298612b3fbc6d",
@@ -248,48 +248,18 @@
       },
       "src/elements/div.rs": {
         "upstream_sha256": "fa6378a65d066a46670dea1b65d305c25e2e7f06c1ced9f7a4175e1adb1aa8dc",
-        "local_sha256": "d10032c2a9506c1217741368be365a3491f8728d3bd3bc4cf1f06d3355b6a13e",
-        "reason": "hitbox_extension builder and contains_pointer hit testing (vendor/gpui-pre/hitbox-extension-patch.md). Material performance patch: the scroll-wheel listener ignores a wheel that cannot move the offset (already at that end, incl. a vertical wheel mapped onto a horizontal-only box): no notify, retained-subtree invalidation or note_scrolled, which repainted the enclosing scroll layer on every wheel event. scroll_max factored out of clamp_scroll_position."
-      },
-      "src/fast/composition.rs": {
-        "upstream_sha256": "0d60427202a86fdfde3bc75ee90cae144d0822363deb4f7d879b4523c528a880",
-        "local_sha256": "9e486eaedcf5e0e629486051b05a687e317763f16f157600eb8052480f8ee515",
-        "reason": "Composition input regions clip the visual and extension rectangles independently and hit-test both (composition_hitbox_contains), so an extension-only target neither disappears nor fills the gap (hitbox extension)."
-      },
-      "src/fast/layers/input.rs": {
-        "upstream_sha256": "e54dce67c2eee996a785b181ea478330467780c3149c73647f23582b965ccb23",
-        "local_sha256": "85e39dacf74cda812467fa467822fe3675ee96b5b0f442c0acb5a447ff660c29",
-        "reason": "Scrolled layer replay translates Hitbox.additional_bounds with the visual bounds, keeping identity and viewport clip (hitbox extension)."
-      },
-      "src/fast/layers/lists.rs": {
-        "upstream_sha256": "d167ae8af3ae59a8c3eaa0ee20c8f933521200b6b882775f3e4120e9180a538f",
-        "local_sha256": "7f191273a738c0ec408e93f433322c2780f96788198939d2850cd5c561235fa8",
-        "reason": "List hit testing uses Hitbox::contains_pointer (hitbox extension)."
+        "local_sha256": "cb2ac094d9bd1c909124d646371a88415bfb9e2d308a1efd14165e57e0a9b5b2",
+        "reason": "Material performance patch: the scroll-wheel listener ignores a wheel that cannot move the offset (already at that end, incl. a vertical wheel mapped onto a horizontal-only box): no notify, retained-subtree invalidation or note_scrolled, which repainted the enclosing scroll layer on every wheel event. scroll_max factored out of clamp_scroll_position."
       },
       "src/fast/layers/reuse.rs": {
         "upstream_sha256": "8259c4c5b53a8d9818786dbdedc377b8da4a8b1c84baafa65dd89cfb562b3f3f",
-        "local_sha256": "3ea103c11235d4ed749428098f5e0f264b5dc979b306ea600d38a8592694fcb1",
-        "reason": "Carried paint records move touch observers and check their index range (touch observers through retained replay); debug-bounds borrows moved inside the test-support cfg to avoid unused-variable warnings (warning_patches)."
-      },
-      "src/fast/layout_key.rs": {
-        "upstream_sha256": "07732d58977e847f9200f3fbdd36efd26d660e8c929aa74ffed12d45b9802471",
-        "local_sha256": "8c6f9252b1bae7b88ee562855fbe8534998459805c3854f479ca243f5181f50a",
-        "reason": "Scene description includes additional_bounds so layout/oracle comparisons see extension changes (hitbox extension)."
-      },
-      "src/fast/retained.rs": {
-        "upstream_sha256": "e6885ba63fccd9375a0afc80b657463790cc9a39f639676997f8fa293b1beb6b",
-        "local_sha256": "d56f8384e268ea8c0af9e04eb769f655211328352aef11caf35062a613279005",
-        "reason": "PaintIndex gains touch_observers_index (equality and shifting); touch-replay tests."
+        "local_sha256": "48ecbaa35f3707ab9dee2e3d4fb6bd1cc372a26e86a9a6875b51f8c20975f735",
+        "reason": "Debug-bounds borrows moved inside the test-support cfg to avoid unused-variable warnings (warning_patches)."
       },
       "src/fast/splice.rs": {
         "upstream_sha256": "4436ab4f8934aec0e95e73edf69fb3ea36c1b01cb6fe494037cb9923ea221efd",
         "local_sha256": "e5a18513fa798ad23f0648a81e6544995112cd4a46e8f8346c265ae3c7fa6a0a",
         "reason": "A view rebuilt alone keeps its direction (vendor/gpui-pre/layout-direction-patch.md)."
-      },
-      "src/fast/tests/layers_oracle.rs": {
-        "upstream_sha256": "ff28ee326fccca43f6d3a04bf7f3d76693ee0d09e6096c3101fabdc1177f35e6",
-        "local_sha256": "33764049ae7efa57ecb1ce74af890eff91a4e0f3001555171e765035db21906f",
-        "reason": "Oracle hitbox description includes the clipped extension rectangle (hitbox extension, test only)."
       },
       "src/fast/text.rs": {
         "upstream_sha256": "e386a393269aee9189cb87c2a1f40f40fb4716b2cd98e6a394e052b318177814",
@@ -343,8 +313,13 @@
       },
       "src/window.rs": {
         "upstream_sha256": "d3f00c28cc47446f6c73be67d00830446e0e3a9a7fadefdf54fff9e5ccadee0b",
-        "local_sha256": "7b01f7c1388b83f3fb16ff90f25f63c05b6c0bdb076b15d7b48b504c584a81cb",
-        "reason": "Same GPUI window patches as vendor/gpui-pre (hitbox extension, touch observers, CPU frame scope, submission stats/vsync/throttle retry, present outcome); touch-observer storage and FrameDirtyAccumulator made pub(crate) for Fast layer reuse. Layout direction on the window, recorded per layout node (vendor/gpui-pre/layout-direction-patch.md)."
+        "local_sha256": "f5ca5a1c0bb9f76821053e6c25173acc91cc37e0a24005a3824772fcbbbd0380",
+        "reason": "Same GPUI window patches as vendor/gpui-pre (CPU frame scope, submission stats/vsync/throttle retry, present outcome); FrameDirtyAccumulator made pub(crate) for Fast layer reuse. Layout direction on the window, recorded per layout node (vendor/gpui-pre/layout-direction-patch.md)."
+      },
+      "src/tab_stop.rs": {
+        "upstream_sha256": "0c14aec0196ad632601015e166dfcd3df72228292646120bbc3857c3631cd680",
+        "local_sha256": "1675934f90bd8dec84cb920dec09587c3681a5bc843fb8a0bebd9e8203eda120",
+        "reason": "Material performance patch: TabStopMap records only its insertion history while painting and builds the tab order and focus lookup lazily on the first query (Tab navigation, a11y dump); query results unchanged. Replaying a reused view's or composited layer's tab stops no longer updates a SumTree per insertion."
       },
       "src/elements/text.rs": {
         "upstream_sha256": "8f2de269d51ad703618666283161c151191070d88e697afe9c73fd8aef6551ef",
@@ -385,6 +360,16 @@
         "upstream_sha256": "1f8d49e1f08e320cf393fcacb2ac402044ddb7aaf8dffc4572e31aa3d5a9e7ea",
         "local_sha256": "b01f32721377a3712286427ce84e1d2ea895c0c0e7d2a30b690017c29b75764c",
         "reason": "The dev-only frame-observation feature (vendor/gpui-pre/frame-submission-patch.md)."
+      },
+      "src/fast/dependencies.rs": {
+        "upstream_sha256": "8f230852f0585bec1f92608aec4fcc3d8fb3f00ad4736cba8a8d05f736e84cc5",
+        "local_sha256": "5529a863e4edfb2d3b164dbac494fedd5fb1fdbf1786d51e5312ba6baed3ed91",
+        "reason": "Entity::update_for_render, the public form of dependencies::query (vendor/gpui-pre/render-lease-patch.md)."
+      },
+      "src/fast/tests/dependencies.rs": {
+        "upstream_sha256": "131164fada000e865db0a14855e4eab5446f89b45e70a1904414408cd0cdb6b0",
+        "local_sha256": "9e69cccb259c6531194158b892e3641fef5f09e86dea403eb6c381d1795b737d",
+        "reason": "A render lease is not a change unless it notifies (vendor/gpui-pre/render-lease-patch.md)."
       }
     },
     "added": {
@@ -423,6 +408,6 @@
         "reason": "Package-level lockfile not retained; the workspace Cargo.lock owns resolution."
       }
     },
-    "unchanged_file_count": 139
+    "unchanged_file_count": 143
   }
 }

@@ -779,3 +779,34 @@ fn visible_target_updates_sync_cache_before_offscreen_reversal(cx: &mut TestAppC
         "offscreen retarget must retain Base reversal history"
     );
 }
+
+#[gpui::test]
+fn a_focused_toggle_that_becomes_disabled_keeps_focus(cx: &mut TestAppContext) {
+    cx.update(gpui_base::init);
+    let (view, cx) = cx.add_window_view(|_, _| ToggleHarness {
+        selected: false,
+        disabled: false,
+        toggle_on_click: true,
+        apply_change: true,
+        focusable: true,
+        requests: vec![],
+        clicks: 0,
+        radius: Rc::new(Cell::new(0.)),
+    });
+    draw(cx);
+    let point = cx.debug_bounds("toggle-test").unwrap().center();
+    cx.simulate_click(point, Modifiers::default());
+    draw(cx);
+    let focused = cx.update(|window, cx| window.focused(cx));
+    assert!(focused.is_some(), "a click focuses a focusable toggle");
+    view.update(cx, |view, cx| {
+        view.disabled = true;
+        cx.notify();
+    });
+    draw(cx);
+    assert_eq!(
+        cx.update(|window, cx| window.focused(cx)),
+        focused,
+        "disabling must not drop focus, so Tab can still leave"
+    );
+}

@@ -268,7 +268,7 @@ impl Interactivity {
             .push(Box::new(move |event, phase, hitbox, window, cx| {
                 if phase == DispatchPhase::Capture
                     && !window.has_active_prompt()
-                    && !hitbox.contains_pointer(&window.mouse_position())
+                    && !hitbox.contains(&window.mouse_position())
                 {
                     (listener)(event, window, cx)
                 }
@@ -792,17 +792,6 @@ impl Interactivity {
 pub trait InteractiveElement: Sized {
     /// Retrieve the interactivity state associated with this element
     fn interactivity(&mut self) -> &mut Interactivity;
-
-    /// Adds a pointer target to this element without changing its layout or visual bounds.
-    /// The callback runs during prepaint with the resolved style. The extra target
-    /// uses the element's existing event handlers, occlusion behavior, and overflow mask.
-    fn hitbox_extension(
-        mut self,
-        extension: impl Fn(Bounds<Pixels>, &Style, &Window) -> Option<Bounds<Pixels>> + 'static,
-    ) -> Self {
-        self.interactivity().hitbox_extension = Some(Box::new(extension));
-        self
-    }
 
     /// Assign this element to a group of elements that can be styled together
     fn group(mut self, group: impl Into<SharedString>) -> Self {
@@ -2188,8 +2177,6 @@ pub(crate) struct AriaProperties {
     pub(crate) column_count: Option<usize>,
 }
 
-type HitboxExtension = dyn Fn(Bounds<Pixels>, &Style, &Window) -> Option<Bounds<Pixels>>;
-
 /// The interactivity struct. Powers all of the general-purpose
 /// interactivity in the `Div` element.
 #[derive(Default)]
@@ -2250,7 +2237,6 @@ pub struct Interactivity {
     pub(crate) tooltip_show_delay: Option<Duration>,
     pub(crate) window_control: Option<WindowControlArea>,
     pub(crate) hitbox_behavior: HitboxBehavior,
-    pub(crate) hitbox_extension: Option<Box<HitboxExtension>>,
     pub(crate) tab_index: Option<isize>,
     pub(crate) tab_group: bool,
     pub(crate) tab_stop: bool,
@@ -2453,15 +2439,7 @@ impl Interactivity {
                         style.overflow_mask(bounds, window.rem_size()),
                         |window| {
                             let hitbox = if self.should_insert_hitbox(&style, window, cx) {
-                                let additional_bounds = self
-                                    .hitbox_extension
-                                    .as_ref()
-                                    .and_then(|extension| extension(bounds, &style, window));
-                                Some(window.insert_hitbox_with_extension(
-                                    bounds,
-                                    additional_bounds,
-                                    self.hitbox_behavior,
-                                ))
+                                Some(window.insert_hitbox(bounds, self.hitbox_behavior))
                             } else {
                                 None
                             };
@@ -3286,11 +3264,11 @@ impl Interactivity {
                 // Use bounds instead of testing hitbox since this is called during prepaint.
                 let check_is_hovered_during_prepaint = Rc::new({
                     let pending_mouse_down = pending_mouse_down.clone();
-                    let hitbox = hitbox.clone();
+                    let source_bounds = hitbox.bounds;
                     move |window: &Window| {
                         !window.last_input_was_keyboard()
                             && pending_mouse_down.borrow().is_none()
-                            && hitbox.contains_pointer(&window.mouse_position())
+                            && source_bounds.contains(&window.mouse_position())
                     }
                 });
                 let check_is_hovered = Rc::new({

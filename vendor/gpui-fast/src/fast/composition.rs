@@ -651,38 +651,16 @@ pub(crate) fn finish_input(window: &mut Window) {
         if surface != state.base_surface {
             input.owners.insert(hitbox.id, surface);
         }
-        // Clip each pointer rectangle independently: their union may have a
-        // gap, and an extension may remain visible when the visual box does not.
-        let bounds = input_bounds(
-            &state,
-            surface,
-            hitbox.bounds.intersect(&hitbox.content_mask.bounds),
-            scale,
-        );
-        let additional_bounds = hitbox.additional_bounds.and_then(|bounds| {
-            input_bounds(
-                &state,
-                surface,
-                bounds.intersect(&hitbox.content_mask.bounds),
-                scale,
-            )
-        });
-        if bounds.is_some() || additional_bounds.is_some() {
+        let bounds = hitbox.bounds.intersect(&hitbox.content_mask.bounds);
+        let Some(bounds) = input_bounds(&state, surface, bounds, scale) else {
+            continue;
+        };
+        if !bounds.is_empty() {
             let mut clipped = hitbox.clone();
-            clipped.bounds = bounds.unwrap_or_default();
-            clipped.additional_bounds = additional_bounds;
+            clipped.bounds = bounds;
             input.hitboxes.entry(surface).or_default().push(clipped);
         }
     }
-}
-
-// These rectangles have already been clipped to content and surface bounds.
-// A missing visual rectangle is represented by empty bounds, not a target at 0,0.
-fn composition_hitbox_contains(hitbox: &crate::Hitbox, point: &Point<Pixels>) -> bool {
-    (!hitbox.bounds.is_empty() && hitbox.bounds.contains(point))
-        || hitbox
-            .additional_bounds
-            .is_some_and(|bounds| !bounds.is_empty() && bounds.contains(point))
 }
 
 /// Native content blocks GPUI hover and click targets behind it, while keeping
@@ -708,7 +686,7 @@ pub(crate) fn hit_test(
             continue;
         };
         for hitbox in hitboxes.iter().rev() {
-            if composition_hitbox_contains(hitbox, &point) {
+            if hitbox.bounds.contains(&point) {
                 result.ids.push(hitbox.id);
                 if hover.is_none() && hitbox.behavior == HitboxBehavior::BlockMouseExceptScroll {
                     hover = Some(result.ids.len());
@@ -1470,7 +1448,7 @@ fn native_target(window: &Window, scroll: bool) -> Option<CompositionSurfaceId> 
             .get(&surface)
         {
             if regions.iter().rev().any(|hitbox| {
-                composition_hitbox_contains(hitbox, &point)
+                hitbox.bounds.contains(&point)
                     && (!scroll || hitbox.behavior == HitboxBehavior::BlockMouse)
             }) {
                 return None;
@@ -1644,38 +1622,6 @@ mod tests {
     };
     use anyhow::Result;
     use std::{any::Any, cell::Cell, rc::Rc};
-
-    #[cfg(feature = "test-support")]
-    #[test]
-    fn extension_only_composition_target_does_not_fill_visual_gap() {
-        let mut hitbox = crate::Hitbox {
-            id: crate::HitboxId::placeholder(),
-            bounds: Bounds::default(),
-            additional_bounds: Some(Bounds::new(
-                crate::point(px(20.), px(40.)),
-                size(px(10.), px(10.)),
-            )),
-            content_mask: ContentMask::default(),
-            behavior: crate::HitboxBehavior::Normal,
-        };
-        assert!(super::composition_hitbox_contains(
-            &hitbox,
-            &crate::point(px(25.), px(45.))
-        ));
-        assert!(!super::composition_hitbox_contains(
-            &hitbox,
-            &crate::point(px(0.), px(0.))
-        ));
-        hitbox.bounds = Bounds::new(crate::point(px(20.), px(20.)), size(px(10.), px(10.)));
-        assert!(!super::composition_hitbox_contains(
-            &hitbox,
-            &crate::point(px(25.), px(35.))
-        ));
-        assert!(super::composition_hitbox_contains(
-            &hitbox,
-            &crate::point(px(25.), px(25.))
-        ));
-    }
 
     #[test]
     fn composition_surfaces_have_stable_identity_and_explicit_order() -> Result<()> {

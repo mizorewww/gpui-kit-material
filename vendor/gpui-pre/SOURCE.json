@@ -177,7 +177,6 @@
     "src/app.rs",
     "src/app/bench_context.rs",
     "src/elements/animation.rs",
-    "src/elements/div.rs",
     "src/elements/text.rs",
     "src/geometry.rs",
     "src/platform.rs",
@@ -188,11 +187,13 @@
     "src/style.rs",
     "src/styled.rs",
     "src/svg_renderer.rs",
+    "src/tab_stop.rs",
     "src/taffy.rs",
     "src/text_system.rs",
     "src/text_system/line_layout.rs",
     "src/text_system/line_wrapper.rs",
-    "src/window.rs"
+    "src/window.rs",
+    "src/app/entity_map.rs"
   ],
   "modified_files": {
     "src/app.rs": {
@@ -209,11 +210,6 @@
       "upstream_sha256": "117a4b1a580382b21accce30308f0480853c1e9372220566748dcb5f74d5793e",
       "local_sha256": "da466d2d926998f334aac8b4871d807a4eda8b972f8df8c9ea05abc0fe382a2d",
       "reason": "Executor-clock sampling, repeat_when_visible and RepeatAnimationPlayback (animation-visibility-patch.md)."
-    },
-    "src/elements/div.rs": {
-      "upstream_sha256": "3e3fada72485b0dea4987feab7eab7827b476dd91ad83845f8b2aa92565fcd30",
-      "local_sha256": "3f004bd798b123d78bd7ef340df79b999e3a023dc9b024b7b752d1fa0ac3a2fb",
-      "reason": "hitbox_extension builder and contains_pointer hit testing (hitbox-extension-patch.md)."
     },
     "src/platform.rs": {
       "upstream_sha256": "d5a1f49466edafc882f2646c0d97b7febcec61aa2a3df43f08035a812c9be7b5",
@@ -262,8 +258,13 @@
     },
     "src/window.rs": {
       "upstream_sha256": "83bace5e5cf503b21c789c4ca7bc3b11965c2256cb5a2398f2b70e5baf7aa1bb",
-      "local_sha256": "5906af0c109b3d2fb6023df80bd1380137012f2c4f3a975130d4b7dbb1473e61",
-      "reason": "Hitbox.additional_bounds/contains_pointer/insert_hitbox_with_extension (hitbox-extension-patch.md); touch observers (touch-observer-patch.md); CPU frame scope (cpu-frame-scope-patch.md); WindowSubmissionStats, vsync, throttle retry (frame-submission-patch.md); present outcome (presentation-timing-patch.md). Layout direction on the window, recorded per layout node (layout-direction-patch.md)."
+      "local_sha256": "aefaed05b756eba58b93227cdc48d083c7f0da3e94ce07e4d8a798f543fd1406",
+      "reason": "CPU frame scope (cpu-frame-scope-patch.md); WindowSubmissionStats, vsync, throttle retry (frame-submission-patch.md); present outcome (presentation-timing-patch.md). Layout direction on the window, recorded per layout node (layout-direction-patch.md)."
+    },
+    "src/tab_stop.rs": {
+      "upstream_sha256": "0c14aec0196ad632601015e166dfcd3df72228292646120bbc3857c3631cd680",
+      "local_sha256": "1675934f90bd8dec84cb920dec09587c3681a5bc843fb8a0bebd9e8203eda120",
+      "reason": "Material performance patch: TabStopMap records only its insertion history while painting and builds the tab order and focus lookup lazily on the first query (Tab navigation, a11y dump); query results unchanged. Replaying a reused view's or composited layer's tab stops no longer updates a SumTree per insertion."
     },
     "src/elements/text.rs": {
       "upstream_sha256": "3ffcc422356924ae4d6eef864421f56588be65cd931c8fe35d7e5e6438c23346",
@@ -294,6 +295,11 @@
       "upstream_sha256": "17c581884c21901f604eec93d32171dd17518606ce726fd7e59f9a442abc07de",
       "local_sha256": "86a6f52566d0702799a2b77f50e5579c9c24eac24b891c830f8d2a5795f813a9",
       "reason": "The dev-only frame-observation feature, which gates frame statistics, vsync control, CPU scopes, presentation timing and GPU time (frame-submission-patch.md)."
+    },
+    "src/app/entity_map.rs": {
+      "upstream_sha256": "47e536ebd98ec97bc1193c176295b4b69dfb2a37c30cb8ab7879e32b1a4ea180",
+      "local_sha256": "08565386dee8a1660600a20f9aedb98a85d80ff68023f9135f4a4f51c43dac20",
+      "reason": "Entity::update_for_render (render-lease-patch.md)."
     }
   },
   "added_files": {
@@ -337,13 +343,13 @@
     "focused-input-bounds-patch.md",
     "frame-submission-patch.md",
     "hanging-space-patch.md",
-    "hitbox-extension-patch.md",
     "layout-direction-patch.md",
     "letter-spacing-patch.md",
     "presentation-timing-patch.md",
     "quiet-global-swap-patch.md",
-    "test-harness-patch.md",
-    "touch-observer-patch.md"
+    "render-lease-patch.md",
+    "tab-stop-index-patch.md",
+    "test-harness-patch.md"
   ],
   "verification": "Archive downloaded from archive_url; its SHA-256 equals the crates.io index cksum and ~/.cargo/registry/cache. upstream_files are hashes of the extracted archive (excluding Cargo's .cargo-ok marker). Recompute: extract the .crate and compare with sha256 of each vendor file.",
   "validation": "source identity and per-file hashes verified; runtime acceptance is tracked separately"

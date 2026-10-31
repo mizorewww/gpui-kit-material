@@ -8,37 +8,23 @@
   "development_examples_limit": "Upstream development examples are preserved, including references to sibling story-web font and repository example fixtures. Those external fixtures are not included in this Base-only vendor snapshot; standalone example execution is not asserted.",
   "license": "Apache-2.0",
   "local_patch_files": [
-    "src/a11y_disabled.rs",
-    "src/button.rs",
     "src/dialog.rs",
     "src/input/base/element.rs",
     "src/input/base/state.rs",
     "src/lib.rs",
     "src/motion.rs",
     "src/slider.rs",
-    "src/text_selection.rs",
-    "src/toggle.rs",
     "src/toolbar.rs"
   ],
   "local_patch_sha256": {
-    "src/a11y_disabled.rs": {
-      "local_sha256": "1568f7d301c66cd754ef37ea372edc474d0c760d20e159df56c1764155797a36",
-      "reason": "Transparent accessibility state for disabled and busy controls (motion-patch.md).",
-      "upstream_sha256": "979c0103db88f31fad9425ca6fc16351bdb07a5b5b0fe30a85d2aaec573bcceb"
-    },
-    "src/button.rs": {
-      "local_sha256": "c493baa980d6832c151cf439bb35023ba86dd7baf37aa5cb5ec03982e5449755",
-      "reason": "Caller-controlled busy(bool), independent of disabled (motion-patch.md).",
-      "upstream_sha256": "822d81a514355c92f41f4a13392f783b4307061ecc8be49a38f4bc1f41fdd55c"
-    },
     "src/dialog.rs": {
       "local_sha256": "950592bd13881d5540885528eb6aa197cf39adcb245109b102ba6abb683e30f1",
       "reason": "Dialog::accessibility_label names the Role::Dialog host for accessibility clients (motion-patch.md).",
       "upstream_sha256": "f56cc07dda43678903e2907b8c8c6028ae5fa80f0a637b8f065054a4c55b391d"
     },
     "src/input/base/state.rs": {
-      "local_sha256": "dcb51db7e117a6567fe28bc70ea9fdf613379b31f5a7bf1e90d34d8fc73bc6ad",
-      "reason": "Caller caret colour that wins over the projected editor style, set_caret_color (motion-patch.md); the IME anchor (ime-anchor-patch.md).",
+      "local_sha256": "9accae1333235bf245ba112ed3321004958eb7748155f552368cb21c545ff7fb",
+      "reason": "The IME anchor (ime-anchor-patch.md).",
       "upstream_sha256": "39296e195f6dabbb581b8f72ee06809b13fae3b328c4a71b48768dbff5c81c53"
     },
     "src/lib.rs": {
@@ -55,16 +41,6 @@
       "local_sha256": "732c3aff910fd205c6581112a4d798d6e2d3c4e8a78cda4fcd48579a2b44b9e8",
       "reason": "Step snapping counted from min, AT Increment/Decrement that move only a range's end, and Slider::track_focus for a focusable slider node (motion-patch.md). Right-to-left pointer math on a horizontal slider (motion-patch.md).",
       "upstream_sha256": "71b801a92588d12f7931a5a9e1745fb62f4283ae87d651d4004ae9b41ad72da3"
-    },
-    "src/text_selection.rs": {
-      "local_sha256": "be2bc711ab2f1b109c73b1c45411b5b58029c46d852ae6962164ec7bd9cd75f4",
-      "reason": "Hitbox literals set additional_bounds: None after the GPUI Hitbox field patch (vendor/gpui-pre/hitbox-extension-patch.md); no behavior change.",
-      "upstream_sha256": "4d45f303915294b0e1984bc6a83a00f8752751c96bf78d6f24dcd057b17b742c"
-    },
-    "src/toggle.rs": {
-      "local_sha256": "ba62b028b21e4210cfe780a5abb8825a468a379b37a73c9d106a5252c6934163",
-      "reason": "Busy state and nonfocusable activation/focus corrections (motion-patch.md).",
-      "upstream_sha256": "f534cdf953b1ed7d61e98f787e108d1698bfe482ad6ac28ebc314afea98ad802"
     },
     "src/toolbar.rs": {
       "local_sha256": "2eb0d4560dac01d2c278354bc3c2f6d745dcf8f2f09d3c9b948c4e90bcf17716",

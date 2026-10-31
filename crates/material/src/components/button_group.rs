@@ -815,7 +815,7 @@ impl RenderOnce for ConnectedButtonGroup {
                 let on_activate = self.on_activate.clone();
                 let option = if toggles {
                     item_style(
-                        gpui_base::Toggle::new(value.clone()),
+                        gpui_base::Button::new(value.clone()),
                         paint,
                         item_height,
                         fill,
@@ -824,7 +824,11 @@ impl RenderOnce for ConnectedButtonGroup {
                         metrics,
                     )
                     .when_some(self.label_text_size, |item, size| item.text_size(size))
-                    .pressed(checked)
+                    .aria_toggled(if checked {
+                        Toggled::True
+                    } else {
+                        Toggled::False
+                    })
                     .tab_stop(entry == Some(index))
                     .disabled(option_disabled)
                     .accessibility_label(label)
@@ -833,10 +837,10 @@ impl RenderOnce for ConnectedButtonGroup {
                     .when(cfg!(test), |item| {
                         item.debug_selector(move || format!("{debug_kind}-choice-option-{index}"))
                     })
-                    .on_change(move |pressed, _, window, cx| {
+                    .on_click(move |_, window, cx| {
                         click_focus.focus(window, cx);
                         if let Some(callback) = &on_toggle {
-                            callback(&value, pressed, window, cx);
+                            callback(&value, !checked, window, cx);
                         }
                     })
                     .into_any_element()

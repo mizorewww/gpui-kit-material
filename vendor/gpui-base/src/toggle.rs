@@ -24,13 +24,11 @@ pub struct Toggle {
     semantic_styles: ToggleStyles,
     pressed: bool,
     disabled: bool,
-    busy: bool,
     children: SmallVec<[AnyElement; 2]>,
     on_change: Option<ChangeHandler>,
     accessibility_label: Option<SharedString>,
     tab_index: isize,
     tab_stop: bool,
-    focusable: bool,
     tracked_focus: Option<FocusHandle>,
 }
 
@@ -65,13 +63,11 @@ impl Toggle {
             semantic_styles: ToggleStyles::default(),
             pressed: false,
             disabled: false,
-            busy: false,
             children: SmallVec::new(),
             on_change: None,
             accessibility_label: None,
             tab_index: 0,
             tab_stop: true,
-            focusable: true,
             tracked_focus: None,
         }
     }
@@ -83,13 +79,6 @@ impl Toggle {
 
     pub fn disabled(mut self, disabled: bool) -> Self {
         self.disabled = disabled;
-        self
-    }
-
-    /// Mark the control as busy for assistive technology. This does not disable
-    /// activation; applications independently choose the disabled state.
-    pub fn busy(mut self, busy: bool) -> Self {
-        self.busy = busy;
         self
     }
 
@@ -132,13 +121,6 @@ impl Toggle {
 
     pub fn tab_stop(mut self, tab_stop: bool) -> Self {
         self.tab_stop = tab_stop;
-        self
-    }
-
-    /// Whether activation moves focus here. A non-focusable toggle only
-    /// supports pointer activation, matching Button's composed-control policy.
-    pub fn focusable(mut self, focusable: bool) -> Self {
-        self.focusable = focusable;
         self
     }
 
@@ -204,16 +186,13 @@ impl RenderOnce for Toggle {
             .when_some(self.accessibility_label, |this, label| {
                 this.aria_label(label)
             })
-            .when(
-                self.focusable && (!disabled || focus_handle.is_focused(window)),
-                |this| {
-                    this.track_focus(
-                        &focus_handle
-                            .tab_index(self.tab_index)
-                            .tab_stop(self.tab_stop && !disabled),
-                    )
-                },
-            )
+            .when(!disabled, |this| {
+                this.track_focus(
+                    &focus_handle
+                        .tab_index(self.tab_index)
+                        .tab_stop(self.tab_stop),
+                )
+            })
             .when(disabled, |this| {
                 this.on_mouse_down(MouseButton::Left, |_, _, cx| {
                     cx.stop_propagation();
@@ -229,7 +208,7 @@ impl RenderOnce for Toggle {
             )
             .children(self.children)
             .refine_style(&style)
-            .a11y_control_state(disabled, self.busy)
+            .a11y_disabled(disabled)
     }
 }
 

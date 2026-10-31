@@ -530,9 +530,6 @@ pub struct InputBaseState<M: InputModeKind> {
     /// colours once and then never see them as unset again, which is the same
     /// freeze in a different place.
     projected_editor_style: InputEditorStyle,
-    /// A caret colour that wins over the projected one (local patch,
-    /// `motion-patch.md`).
-    caret_color: Option<gpui::Hsla>,
     accessibility: Option<InputAccessibility>,
     /// What paints in place of Base's editor scrollbar, when a consumer
     /// supplies its own.
@@ -1018,7 +1015,6 @@ impl<M: InputModeKind> InputBaseState<M> {
             mask_pattern_set: false,
             editor_style: InputEditorStyle::default(),
             projected_editor_style: InputEditorStyle::default(),
-            caret_color: None,
             accessibility: None,
             scrollbar_renderer: None,
             diagnostic_popover: None,
@@ -1114,21 +1110,6 @@ impl<M: InputModeKind> InputBaseState<M> {
     pub fn set_editor_style(&mut self, style: InputEditorStyle) {
         self.editor_style = style.clone();
         self.projected_editor_style = style;
-        if let Some(caret) = self.caret_color {
-            self.editor_style.caret = caret;
-        }
-    }
-
-    /// Paint the caret in `caret` whatever editor style a consumer projects,
-    /// or in the projected caret again with `None`: for a field whose caret
-    /// follows its own state, such as an error colour. Like
-    /// [`Self::set_editor_style`], this does not notify, so it can be called
-    /// while rendering.
-    pub fn set_caret_color(&mut self, caret: Option<gpui::Hsla>) {
-        self.caret_color = caret;
-        if let Some(caret) = caret {
-            self.editor_style.caret = caret;
-        }
     }
 
     /// Project semantics onto the editor, never onto a second focus owner.
@@ -5012,9 +4993,6 @@ impl<M: InputModeKind> Render for InputBaseState<M> {
         self.editor_style = self
             .projected_editor_style
             .resolved(&crate::Theme::global(cx).tokens);
-        if let Some(caret) = self.caret_color {
-            self.editor_style.caret = caret;
-        }
         let entity = cx.entity();
         if self._pending_update {
             self.mode.update_highlighter::<M>(
@@ -5216,37 +5194,6 @@ impl<M: InputModeKind> Render for InputBaseState<M> {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[gpui::test]
-    fn a_caller_caret_color_wins_over_the_projected_style(cx: &mut TestAppContext) {
-        cx.update(crate::init);
-        let (state, cx) =
-            cx.add_window_view(|window, cx| crate::input::InputState::new(window, cx));
-        let projected = gpui::hsla(0.6, 0.5, 0.5, 1.);
-        let error = gpui::hsla(0., 0.7, 0.45, 1.);
-        let caret = |cx: &mut gpui::VisualTestContext| {
-            cx.update(|window, cx| window.draw(cx).clear(cx));
-            state.read_with(cx, |state, _| state.editor_style.caret)
-        };
-        state.update(cx, |state, _| {
-            state.set_editor_style(InputEditorStyle {
-                caret: projected,
-                ..Default::default()
-            })
-        });
-        assert_eq!(caret(cx), projected);
-        state.update(cx, |state, _| {
-            state.set_caret_color(Some(error));
-            // A consumer projecting its style again keeps the caller's caret.
-            state.set_editor_style(InputEditorStyle {
-                caret: projected,
-                ..Default::default()
-            });
-        });
-        assert_eq!(caret(cx), error);
-        state.update(cx, |state, _| state.set_caret_color(None));
-        assert_eq!(caret(cx), projected);
-    }
 
     #[gpui::test]
     fn accessibility_actions_recheck_live_editability(cx: &mut TestAppContext) {
