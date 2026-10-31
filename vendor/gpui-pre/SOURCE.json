@@ -253,7 +253,7 @@
     },
     "src/text_system/line_layout.rs": {
       "upstream_sha256": "a78d230d050bbf17bd968612da1d84f4c8aaefc39f82100e11b2b3a6990d45e4",
-      "local_sha256": "a867b1604e157fd61bf7f02358acf4ca12eab29bacb8254d327d1fd97fa33bd8",
+      "local_sha256": "6cc3a546e3fe39d37d611e62e631190df1fff030708a8d173a3707fd9fb26dda",
       "reason": "Spaced line layouts in the cache key and apply_letter_spacing (letter-spacing-patch.md). Hanging overflow space in compute_wrap_boundaries (hanging-space-patch.md)."
     },
     "src/window.rs": {
@@ -298,7 +298,7 @@
     },
     "src/app/entity_map.rs": {
       "upstream_sha256": "47e536ebd98ec97bc1193c176295b4b69dfb2a37c30cb8ab7879e32b1a4ea180",
-      "local_sha256": "08565386dee8a1660600a20f9aedb98a85d80ff68023f9135f4a4f51c43dac20",
+      "local_sha256": "16c97f95e69ba27b24078a326dd1796fc7dd61162d058b8fc502354ea188bd94",
       "reason": "Entity::update_for_render (render-lease-patch.md)."
     }
   },
@@ -334,7 +334,7 @@
       "reason": "Not retained; Cargo.toml is the normalized manifest Cargo builds (test-harness-patch.md)."
     }
   },
-  "unchanged_file_count": 142,
+  "unchanged_file_count": 141,
   "provenance_files": [
     "SOURCE.json",
     "animation-visibility-patch.md",
