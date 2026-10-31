@@ -726,6 +726,8 @@ impl RenderOnce for MaterialCarousel {
             state.update(cx, |state, _| {
                 state.started = true;
                 state.scroll = start;
+                // Where it starts is no change to tell the caller about.
+                state.reported = Some(CarouselState::item_at(start, step));
             });
         }
         // Follow the caller's current item when it changes.
@@ -1710,5 +1712,38 @@ mod tests {
         cx.simulate_mouse_up(to, MouseButton::Left, Modifiers::none());
         redraw(cx);
         assert_eq!(clicks.get(), 1, "the swipe's release did not click");
+    }
+
+    struct Uncontrolled(std::rc::Rc<std::cell::Cell<usize>>);
+    impl gpui::Render for Uncontrolled {
+        fn render(&mut self, window: &mut Window, _: &mut gpui::Context<Self>) -> impl IntoElement {
+            window.set_rem_size(px(BASE_PX));
+            let reports = self.0.clone();
+            MaterialCarousel::new("carousel", "Photos")
+                .width(412.)
+                .on_change(move |_, _, _| reports.set(reports.get() + 1))
+                .items((0..6).map(|_| CarouselItem::new()))
+        }
+    }
+
+    #[gpui::test]
+    fn a_key_that_moves_nothing_reports_nothing(cx: &mut gpui::TestAppContext) {
+        cx.update(|cx| {
+            gpui_base::init(cx);
+            cx.set_reduce_motion(true);
+        });
+        let reports = std::rc::Rc::new(std::cell::Cell::new(0));
+        let (_, cx) = cx.add_window_view({
+            let reports = reports.clone();
+            move |_, _| Uncontrolled(reports)
+        });
+        redraw(cx);
+        cx.update(|window, cx| window.focus_next(cx));
+        cx.simulate_keystrokes("left");
+        redraw(cx);
+        assert_eq!(reports.get(), 0, "it was on its first item already");
+        cx.simulate_keystrokes("right");
+        redraw(cx);
+        assert_eq!(reports.get(), 1);
     }
 }
