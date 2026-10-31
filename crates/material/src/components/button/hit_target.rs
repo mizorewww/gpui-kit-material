@@ -2,7 +2,8 @@
 //! Base root is the target, its negative margins keep it out of layout, and what the
 //! button paints is a child. Hit testing, clipping and occlusion are then GPUI's own.
 use gpui::{
-    AbsoluteLength, DefiniteLength, Edges, Length, Overflow, Pixels, Rems, StyleRefinement,
+    AbsoluteLength, DefiniteLength, Edges, Length, Overflow, Pixels, Rems, SizeRefinement,
+    StyleRefinement,
 };
 
 use crate::tokens::typography::rem;
@@ -83,35 +84,44 @@ impl Target {
 /// Moves what places the button from its painted style to its root's. The height stays
 /// behind in the result for [`height_of`]; `Target` already accounts for it.
 pub(super) fn take_layout(style: &mut StyleRefinement) -> StyleRefinement {
-    let mut layout = StyleRefinement::default();
-    layout.display = style.display.take();
-    layout.visibility = style.visibility.take();
-    layout.position = style.position.take();
-    layout.inset = std::mem::take(&mut style.inset);
-    layout.margin = std::mem::take(&mut style.margin);
-    layout.margin.top = None;
-    layout.margin.bottom = None;
-    layout.flex_basis = style.flex_basis.take();
-    layout.flex_grow = style.flex_grow.take();
-    layout.flex_shrink = style.flex_shrink.take();
-    layout.align_self = style.align_self.take();
-    layout.size.width = style.size.width.take();
-    layout.min_size.width = style.min_size.width.take();
-    layout.max_size.width = style.max_size.width.take();
-    layout.size.height = style.size.height.take();
-    layout.min_size.height = style.min_size.height.take();
-    layout.max_size.height = style.max_size.height.take();
-    layout
+    let mut margin = std::mem::take(&mut style.margin);
+    margin.top = None;
+    margin.bottom = None;
+    StyleRefinement {
+        display: style.display.take(),
+        visibility: style.visibility.take(),
+        position: style.position.take(),
+        inset: std::mem::take(&mut style.inset),
+        margin,
+        flex_basis: style.flex_basis.take(),
+        flex_grow: style.flex_grow.take(),
+        flex_shrink: style.flex_shrink.take(),
+        align_self: style.align_self.take(),
+        size: std::mem::take(&mut style.size),
+        min_size: std::mem::take(&mut style.min_size),
+        max_size: std::mem::take(&mut style.max_size),
+        ..Default::default()
+    }
 }
 
 /// The heights [`take_layout`] moved, for the surface they size. The root keeps the
 /// target's own height, which callers of this set after refining with the layout.
 pub(super) fn height_of(layout: &StyleRefinement) -> StyleRefinement {
-    let mut heights = StyleRefinement::default();
-    heights.size.height = layout.size.height;
-    heights.min_size.height = layout.min_size.height;
-    heights.max_size.height = layout.max_size.height;
-    heights
+    StyleRefinement {
+        size: SizeRefinement {
+            height: layout.size.height,
+            width: None,
+        },
+        min_size: SizeRefinement {
+            height: layout.min_size.height,
+            width: None,
+        },
+        max_size: SizeRefinement {
+            height: layout.max_size.height,
+            width: None,
+        },
+        ..Default::default()
+    }
 }
 
 #[cfg(test)]
