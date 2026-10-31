@@ -236,6 +236,22 @@ mod tests {
     use crate::{FocusHandle, FocusId, FocusMap, TabStopMap};
     use std::sync::Arc;
 
+    /// Painting only records: what a frame replays must not build the index.
+    #[test]
+    fn inserting_builds_no_index_until_a_query() {
+        let focus_map = Arc::new(RwLock::new(FocusMap::default()));
+        let mut tab = TabStopMap::default();
+        let handle = FocusHandle::new(&focus_map).tab_stop(true);
+        tab.begin_group(0);
+        tab.insert(&handle);
+        tab.end_group();
+        assert!(tab.index.borrow().is_none());
+        assert_eq!(tab.tab_stop_count(), 1);
+        assert!(tab.index.borrow().is_some());
+        tab.insert(&handle);
+        assert!(tab.index.borrow().is_none(), "a change drops the index");
+    }
+
     #[test]
     fn test_tab_handles() {
         let focus_map = Arc::new(RwLock::new(FocusMap::default()));

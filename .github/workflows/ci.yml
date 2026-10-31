@@ -67,11 +67,13 @@ jobs:
           # Selecting a backend is what turns frame-observation on in the engine.
           cargo test --locked -p gpui-pre -p gpui-pre-macos --lib frame_submission
           cargo test --locked -p gpui-fast -p gpui-fast-macos --lib frame_submission
-      - name: Engine rules with frame observation off, as a consumer builds them
+      - name: Engine rules with frame observation off, as a consumer builds them, and the lazy tab-stop index
         working-directory: gpui-kit-material/crates/consumer-check
         run: |
           cargo test --locked -p consumer-check -p gpui-pre --lib profiler
           cargo test --locked -p consumer-check -p gpui-fast --features gpui-fast --lib profiler
+          cargo test --locked -p consumer-check -p gpui-pre --lib tab_stop
+          cargo test --locked -p consumer-check -p gpui-fast --features gpui-fast --lib tab_stop
       # Builds the library beside upstream's gpui-fps against only the patches a
       # consumer needs, so library code cannot start to depend on the dev overlay.
       - name: Consumer patch set

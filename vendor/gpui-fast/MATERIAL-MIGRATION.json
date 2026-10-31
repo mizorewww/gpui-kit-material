@@ -318,7 +318,7 @@
       },
       "src/tab_stop.rs": {
         "upstream_sha256": "0c14aec0196ad632601015e166dfcd3df72228292646120bbc3857c3631cd680",
-        "local_sha256": "62a51ab7de3043ee2f4ffe5f8d9eddf8019021a64c4d633b99bde3cf693f9a10",
+        "local_sha256": "1675934f90bd8dec84cb920dec09587c3681a5bc843fb8a0bebd9e8203eda120",
         "reason": "Material performance patch: TabStopMap records only its insertion history while painting and builds the tab order and focus lookup lazily on the first query (Tab navigation, a11y dump); query results unchanged. Replaying a reused view's or composited layer's tab stops no longer updates a SumTree per insertion."
       },
       "src/elements/text.rs": {
