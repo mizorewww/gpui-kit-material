@@ -308,7 +308,7 @@
       },
       "src/text_system/line_layout.rs": {
         "upstream_sha256": "757c2672c0831f9f848845c6ac74dece3c6e0401613b1e00325129cbf1548c08",
-        "local_sha256": "a67f2f34e3a0c44823bf246238ae03d41304c0f3c80fff36340e1aa50157ad51",
+        "local_sha256": "5677247e639d269d11f462a07efc0a13f19ca15ad4e8d63e424d389ef110d579",
         "reason": "Spaced line layouts in the cache key and apply_letter_spacing; layout_wrapped_line stays as the zero-spacing form (vendor/gpui-pre/letter-spacing-patch.md). Hanging overflow space in compute_wrap_boundaries (vendor/gpui-pre/hanging-space-patch.md)."
       },
       "src/window.rs": {

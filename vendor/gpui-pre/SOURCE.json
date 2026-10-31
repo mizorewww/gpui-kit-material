@@ -253,7 +253,7 @@
     },
     "src/text_system/line_layout.rs": {
       "upstream_sha256": "a78d230d050bbf17bd968612da1d84f4c8aaefc39f82100e11b2b3a6990d45e4",
-      "local_sha256": "6cc3a546e3fe39d37d611e62e631190df1fff030708a8d173a3707fd9fb26dda",
+      "local_sha256": "df73912030ee988ddcc762aa47869167f2121bbf033a63d11524f86eecd4781d",
       "reason": "Spaced line layouts in the cache key and apply_letter_spacing (letter-spacing-patch.md). Hanging overflow space in compute_wrap_boundaries (hanging-space-patch.md)."
     },
     "src/window.rs": {
