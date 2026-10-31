@@ -87,6 +87,11 @@
   virtualize long collections. Measure before introducing caches and identify
   each cache's invalidation owner. Do not simplify required animations to pass.
 - Use bounded captures and stop owned test processes when sampling completes.
+- Keep disk use bounded; Rust build output is the main risk. Check free space
+  before heavy builds and stop below 40 GB. Avoid scratch copies of the repo; delete
+  any you make, and every extra `target/`, as soon as you have the result. Remove
+  agent worktrees and their build output when their branch merges. Keep raw
+  evidence (JSON, images, logs), which is small.
 - Before merging: `cargo fmt --all --check`,
   `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace`,
   plus relevant WASM, profiler and compatibility checks for the change.
