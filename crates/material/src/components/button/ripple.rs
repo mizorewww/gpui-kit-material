@@ -34,6 +34,9 @@ struct RippleState {
     touch_generation: u64,
     /// Mirrors a held touch for press feedback beyond the wave.
     touch_pressed: Option<WeakEntity<bool>>,
+    /// While a press is held: the window losing activation ends it, because
+    /// its release may then go to another application and never arrive here.
+    activation: Option<Subscription>,
 }
 /// The expansion clock id of `key` for one expansion generation.
 fn expansion_key(key: &ElementId, generation: u64) -> ElementId {
@@ -47,7 +50,20 @@ fn expansion_key(key: &ElementId, generation: u64) -> ElementId {
     )
 }
 impl RippleState {
-    fn press(&mut self, bounds: Bounds<Pixels>, position: Point<Pixels>, cx: &mut Context<Self>) {
+    fn press(
+        &mut self,
+        bounds: Bounds<Pixels>,
+        position: Point<Pixels>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if self.activation.is_none() {
+            self.activation = Some(cx.observe_window_activation(window, |state, window, cx| {
+                if !window.is_window_active() {
+                    state.release(cx);
+                }
+            }));
+        }
         self.next += 1;
         let parent = self
             .parent
@@ -72,9 +88,10 @@ impl RippleState {
         &mut self,
         bounds: Bounds<Pixels>,
         position: Point<Pixels>,
+        window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        self.press(bounds, position, cx);
+        self.press(bounds, position, window, cx);
         self.touch_held = true;
         self.touch_generation += 1;
         let generation = self.touch_generation;
@@ -107,6 +124,7 @@ impl RippleState {
     fn release(&mut self, cx: &mut Context<Self>) {
         #[cfg(test)]
         RIPPLE_WRITES.with(|writes| writes.set(writes.get() + 1));
+        self.activation = None;
         if self.touch_held {
             self.touch_held = false;
             self.mirror_touch(false, cx);
@@ -426,8 +444,9 @@ impl Element for ButtonRipple {
                 TouchPhase::Started => {
                     if enabled && !window.default_prevented() && touch_hitbox.is_hovered(window) {
                         let position = wave_origin(bounds, event.start_position, centered);
-                        let _ = touch_state
-                            .update(cx, |state, cx| state.touch_press(bounds, position, cx));
+                        let _ = touch_state.update(cx, |state, cx| {
+                            state.touch_press(bounds, position, window, cx);
+                        });
                     }
                 }
                 TouchPhase::Ended | TouchPhase::Cancelled => release_held(&touch_state, cx),
@@ -474,7 +493,7 @@ impl Element for ButtonRipple {
                 && !window.last_input_was_touch()
             {
                 let position = wave_origin(bounds, event.position, centered);
-                let _ = state.update(cx, |state, cx| state.press(bounds, position, cx));
+                let _ = state.update(cx, |state, cx| state.press(bounds, position, window, cx));
             }
         });
         let state = self.state.downgrade();
