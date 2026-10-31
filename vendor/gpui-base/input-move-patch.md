@@ -12,9 +12,8 @@ holds itself for as long as the scroll lasts.
 
 The input now compares its size, its text's place inside its bounds and its caret's
 place inside its bounds. Its position alone still notifies while it is focused, since
-only a focused input has a caret for an open menu to read. The notification is not
-needed for anything else: `text_bounds` and `input_bounds` are read on demand, and
-Kit's readers do so while handling events.
+only a focused input has a caret for an open menu to read. Nothing else needs
+the notification: `text_bounds` and `input_bounds` are read on demand.
 
 `component_bench`, scroll, retired instructions per frame, median of 3 runs of 300:
 
