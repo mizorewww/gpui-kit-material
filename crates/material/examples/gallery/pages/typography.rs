@@ -2,6 +2,7 @@
 //! roles as live samples of editable text, in their regular and M3
 //! Expressive emphasized styles, with the text scale the whole Gallery
 //! follows.
+use super::super::shell;
 use super::prelude::*;
 use gpui_base::input::{InputEvent, InputState};
 use gpui_kit_material::tokens::typography::TypeScale;
@@ -12,6 +13,9 @@ const STYLES: [(&str, &str); 3] = [
     ("emphasized", "Emphasized"),
     ("both", "Both"),
 ];
+
+/// The sample field's width, where the card has room.
+const SAMPLE_WIDTH: f32 = 360.;
 
 pub struct Page {
     page: PageCx,
@@ -87,9 +91,17 @@ impl GalleryPage for Page {
         row == 0
     }
 
-    fn render_row(&mut self, row: usize, _: &mut Window, cx: &mut Context<Self>) -> AnyElement {
+    fn render_row(
+        &mut self,
+        row: usize,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> AnyElement {
         let list = self.page.rows.list().clone();
         if row == 0 {
+            // The field and the focus reveal around it have no width to fill,
+            // so its width is worked out rather than a percentage of nothing.
+            let sample_width = SAMPLE_WIDTH.min(shell::spec_content_width(window));
             let shared = self.page.shared.clone();
             return div()
                 .flex()
@@ -131,7 +143,7 @@ impl GalleryPage for Page {
                 .child(
                     div()
                         .debug_selector(|| "type-sample-input".into())
-                        .w(rem(360.))
+                        .w(rem(sample_width))
                         .child(
                             TextField::new("type-sample", &self.sample)
                                 .variant(TextFieldVariant::Outlined)

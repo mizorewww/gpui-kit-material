@@ -2,6 +2,8 @@
 //! on the real `PaneScaffold` and `FeedLayout`. Destinations navigate; the width
 //! slider stands in for a window larger than the preview, and also narrows the
 //! frame so the feed's columns follow it.
+use super::super::playground::PaneHint;
+use super::super::shell::{panes_stacked, preview_area};
 use super::prelude::*;
 
 const MAIL: [(&str, &str); 4] = [
@@ -19,6 +21,9 @@ const POSTS: [&str; 7] = [
     "Lakes",
     "Islands",
 ];
+
+/// The least room for two usable panes, in design px.
+const TWO_PANES: f32 = 480.;
 
 pub static PLAYGROUND: Playground = Playground {
     scenarios: &[
@@ -373,7 +378,16 @@ fn preview(
     window: &mut Window,
     cx: &mut Context<PlaygroundState>,
 ) -> AnyElement {
-    let size_class = WindowSizeClass::of(config.number("width"), config.number("height"));
+    // On a phone the frame can't hold two panes, whatever "Width" asks for: the
+    // layout takes its compact, single pane form. Elsewhere the frame shows what
+    // the chosen width lays out as.
+    let room = preview_area(window, panes_stacked(window, PaneHint::default())).0;
+    let width = if room < TWO_PANES {
+        room
+    } else {
+        config.number("width")
+    };
+    let size_class = WindowSizeClass::of(width, config.number("height"));
     let content = match config.option("layout") {
         "supporting pane" => supporting(config, size_class, preview, window, cx),
         "feed" => feed(),

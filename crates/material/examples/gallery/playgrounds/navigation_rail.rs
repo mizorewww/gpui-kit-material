@@ -4,6 +4,8 @@
 //! `NavigationRail` beside a content pane. The menu button expands and
 //! collapses the rail; a modal expanded rail floats over a scrim that,
 //! like Escape, collapses it.
+use super::super::playground::PaneHint;
+use super::super::shell::{panes_stacked, preview_area};
 use super::prelude::*;
 use gpui_kit_material::icons::Symbol;
 use std::sync::OnceLock;
@@ -21,6 +23,9 @@ const LABELS: &[&str] = &[
     "Timer",
     "Stopwatch",
 ];
+
+/// The least a standard rail leaves its content, in design px.
+const MIN_CONTENT: f32 = 200.;
 
 pub static PLAYGROUND: Playground = Playground {
     scenarios: &[
@@ -194,7 +199,7 @@ fn items(set: &'static [Destination], badges: bool) -> impl Iterator<Item = NavI
 fn preview(
     config: &Config,
     preview: &mut Preview,
-    _: &mut Window,
+    window: &mut Window,
     cx: &mut Context<PlaygroundState>,
 ) -> AnyElement {
     let set = match config.option("destinations") {
@@ -256,8 +261,12 @@ fn preview(
         }
         rail
     };
-    let in_flow = rail("playground-rail", expanded && !modal);
-    let overlay = (modal && expanded).then(|| {
+    // Where an expanded standard rail would leave its content no usable pane, it
+    // overlays the content instead, as a modal one does.
+    let room = preview_area(window, panes_stacked(window, PaneHint::default())).0;
+    let overlays = modal || room < width + MIN_CONTENT;
+    let in_flow = rail("playground-rail", expanded && !overlays);
+    let overlay = (overlays && expanded).then(|| {
         let collapse = toggle.clone();
         let dismiss = toggle.clone();
         div()
@@ -280,6 +289,7 @@ fn preview(
         .find(|destination| destination.label == selected)
         .map_or("", |destination| destination.label);
     let content = div()
+        .debug_selector(|| "playground-rail-content".into())
         .flex_1()
         .min_w_0()
         .h_full()

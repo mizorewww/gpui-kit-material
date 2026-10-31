@@ -4,6 +4,12 @@ use super::super::playground::PaneHint;
 use super::super::shell::{ShellLayout, flush_preview_area, preview_area, preview_card_height};
 use super::prelude::*;
 
+/// Below this scale a device's touch targets are too small to use, as a Tablet
+/// or Desktop is on a phone (Phone, the default device, fits one).
+const USABLE_SCALE: f32 = 0.6;
+/// The height of the line saying so, in design px.
+const SCALE_LABEL: f32 = 32.;
+
 pub static PLAYGROUND: Playground = Playground {
     scenarios: &[
         Scenario {
@@ -65,9 +71,14 @@ fn preview(
         preview_area
     };
     let fit = fit(outer, area(window, false), area(window, true));
+    // Too small to use by touch: it is a picture of that device, and says so.
+    let scaled = fit.scale < USABLE_SCALE;
     preview.pane_hint(PaneHint {
         stacked: fit.stacked,
-        height: Some(preview_card_height(outer.1 * fit.scale, window)),
+        height: Some(preview_card_height(
+            outer.1 * fit.scale + if scaled { SCALE_LABEL } else { 0. },
+            window,
+        )),
         flush,
     });
     let playground = cx.weak_entity();
@@ -96,13 +107,31 @@ fn preview(
     }
     // The device is its own view: scrolling and tapping inside it notify the
     // app, which only this view reads, so the Gallery around it is left alone.
-    let rem = window.rem_size() * fit.scale;
-    AnyView::from(view)
-        .cached(
-            StyleRefinement::default()
-                .w(rem * outer.0 / BASE_PX)
-                .h(rem * outer.1 / BASE_PX),
+    let scaled_rem = window.rem_size() * fit.scale;
+    let device = AnyView::from(view).cached(
+        StyleRefinement::default()
+            .w(scaled_rem * outer.0 / BASE_PX)
+            .h(scaled_rem * outer.1 / BASE_PX),
+    );
+    if !scaled {
+        return device.into_any_element();
+    }
+    gpui_base::v_flex()
+        .items_center()
+        .child(
+            div()
+                .debug_selector(|| "example-device-scale".into())
+                .h(rem(SCALE_LABEL))
+                .flex()
+                .items_center()
+                .map(|text| type_role(text, TypeRole::LabelMedium))
+                .text_color(color(ColorRole::ON_SURFACE_VARIANT))
+                .child(SharedString::from(format!(
+                    "Shown at {}%. Use a wider window to try it.",
+                    (fit.scale * 100.).round()
+                ))),
         )
+        .child(device)
         .into_any_element()
 }
 

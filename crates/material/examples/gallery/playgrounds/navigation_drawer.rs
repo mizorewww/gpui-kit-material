@@ -3,6 +3,8 @@
 //! selection, icons, badges, section labels, open, dismissible) on the
 //! real `NavigationDrawer` beside or over a content pane whose menu button
 //! opens and closes it.
+use super::super::playground::PaneHint;
+use super::super::shell::{panes_stacked, preview_area};
 use super::prelude::*;
 use gpui_kit_material::icons::Symbol;
 use std::sync::OnceLock;
@@ -27,6 +29,9 @@ const LABELS: &[&str] = &[
     "Offline",
     "Uploads",
 ];
+
+/// The least a standard drawer leaves its content, in design px.
+const MIN_CONTENT: f32 = 200.;
 
 pub static PLAYGROUND: Playground = Playground {
     scenarios: &[
@@ -232,13 +237,17 @@ fn icons(set: usize) -> &'static [NavIcon] {
 fn preview(
     config: &Config,
     preview: &mut Preview,
-    _: &mut Window,
+    window: &mut Window,
     cx: &mut Context<PlaygroundState>,
 ) -> AnyElement {
     let index = config.choice("destinations");
     let set = ALL[index];
     let badges = config.bool("badges");
-    let modal = config.option("variant") == "modal";
+    // Where a standard drawer would leave its content no usable pane, it overlays
+    // the content instead, as a modal one does, and a press beside it closes it.
+    let room = preview_area(window, panes_stacked(window, PaneHint::default())).0;
+    let overlays = room < config.number("width") + MIN_CONTENT;
+    let modal = overlays || config.option("variant") == "modal";
     let end = config.option("position") == "end";
     let open = config.bool("open");
     let selected = config.option("selected");
@@ -282,7 +291,7 @@ fn preview(
             drawer = drawer.section(*before, *label);
         }
     }
-    if config.bool("dismissible") {
+    if overlays || config.bool("dismissible") {
         let close = set_open.clone();
         drawer = drawer.on_dismiss(move |window, cx| close(Value::Bool(false), window, cx));
     }
