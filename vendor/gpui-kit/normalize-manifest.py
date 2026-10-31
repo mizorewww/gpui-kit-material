@@ -39,7 +39,7 @@ def dependency(name, local=None):
     result = dict(declared) if isinstance(declared, dict) else {'version': declared}
     if 'path' in result:
         del result['path']
-        result.update(git=REPOSITORY, branch='main')
+        result.update(git=REPOSITORY, rev=REVISION)
     local = dict(local or {})
     local.pop('workspace', None)
     if 'features' in local:
