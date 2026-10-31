@@ -12,7 +12,7 @@ repository = "https://github.com/mizorewww/gpui-kit-material"
 authors = ["mizorewww"]
 
 [workspace.dependencies]
-gpui-kit-material-color = { path = "crates/color", version = "0.1.0" }
+gpui-kit-material-color = { path = "crates/color", version = "0.1.0", default-features = false }
 
 # Kit owns application initialization and the Component layer, at the audited
 # revision of vendor/gpui-kit; GPUI and the patched Base must be shared.

@@ -15,6 +15,7 @@
 //! Keeping this crate free of GPUI lets the scheme rules be tested on their
 //! own.
 mod color;
+#[cfg(feature = "dynamic")]
 pub mod dynamic;
 pub mod palette;
 pub mod scheme;

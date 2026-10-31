@@ -16,8 +16,10 @@ categories = ["gui"]
 all-features = true
 
 [features]
-default = ["serde"]
+default = ["serde", "dynamic"]
 serde = ["dep:serde"]
+# `dynamic`: HCT, tonal palettes and seed schemes, ported from material-color-utilities.
+dynamic = []
 
 [dependencies]
 serde = { workspace = true, optional = true }
