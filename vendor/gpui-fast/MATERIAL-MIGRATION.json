@@ -177,7 +177,7 @@
     "src/window.rs": "d3f00c28cc47446f6c73be67d00830446e0e3a9a7fadefdf54fff9e5ccadee0b"
   },
   "patch_base": "gpui-pre 0.3.10 published archive plus this workspace compatibility patches",
-  "patch_contract": "Preserve raw touch observers and extended hitboxes through Fast retained/scroll replay; preserve full CPU scopes and repeat playback. Runtime validation is required.",
+  "patch_contract": "Preserve extended hitboxes through Fast retained/scroll replay; preserve full CPU scopes and repeat playback. Runtime validation is required.",
   "additional_test_fixtures": {
     "tests/fonts/README.md": {
       "sha256": "675824dd97a1d09a1a105d186a7b96a05016009d5d14621d6f5298612b3fbc6d",
@@ -268,18 +268,13 @@
       },
       "src/fast/layers/reuse.rs": {
         "upstream_sha256": "8259c4c5b53a8d9818786dbdedc377b8da4a8b1c84baafa65dd89cfb562b3f3f",
-        "local_sha256": "3ea103c11235d4ed749428098f5e0f264b5dc979b306ea600d38a8592694fcb1",
-        "reason": "Carried paint records move touch observers and check their index range (touch observers through retained replay); debug-bounds borrows moved inside the test-support cfg to avoid unused-variable warnings (warning_patches)."
+        "local_sha256": "48ecbaa35f3707ab9dee2e3d4fb6bd1cc372a26e86a9a6875b51f8c20975f735",
+        "reason": "Debug-bounds borrows moved inside the test-support cfg to avoid unused-variable warnings (warning_patches)."
       },
       "src/fast/layout_key.rs": {
         "upstream_sha256": "07732d58977e847f9200f3fbdd36efd26d660e8c929aa74ffed12d45b9802471",
         "local_sha256": "8c6f9252b1bae7b88ee562855fbe8534998459805c3854f479ca243f5181f50a",
         "reason": "Scene description includes additional_bounds so layout/oracle comparisons see extension changes (hitbox extension)."
-      },
-      "src/fast/retained.rs": {
-        "upstream_sha256": "e6885ba63fccd9375a0afc80b657463790cc9a39f639676997f8fa293b1beb6b",
-        "local_sha256": "d56f8384e268ea8c0af9e04eb769f655211328352aef11caf35062a613279005",
-        "reason": "PaintIndex gains touch_observers_index (equality and shifting); touch-replay tests."
       },
       "src/fast/splice.rs": {
         "upstream_sha256": "4436ab4f8934aec0e95e73edf69fb3ea36c1b01cb6fe494037cb9923ea221efd",
@@ -343,8 +338,8 @@
       },
       "src/window.rs": {
         "upstream_sha256": "d3f00c28cc47446f6c73be67d00830446e0e3a9a7fadefdf54fff9e5ccadee0b",
-        "local_sha256": "7b01f7c1388b83f3fb16ff90f25f63c05b6c0bdb076b15d7b48b504c584a81cb",
-        "reason": "Same GPUI window patches as vendor/gpui-pre (hitbox extension, touch observers, CPU frame scope, submission stats/vsync/throttle retry, present outcome); touch-observer storage and FrameDirtyAccumulator made pub(crate) for Fast layer reuse. Layout direction on the window, recorded per layout node (vendor/gpui-pre/layout-direction-patch.md)."
+        "local_sha256": "30e77a23e9d94fddf85d4dfc4c03a2e0422f4e3f1699ca301f3a545c84ff6873",
+        "reason": "Same GPUI window patches as vendor/gpui-pre (hitbox extension, CPU frame scope, submission stats/vsync/throttle retry, present outcome); FrameDirtyAccumulator made pub(crate) for Fast layer reuse. Layout direction on the window, recorded per layout node (vendor/gpui-pre/layout-direction-patch.md)."
       },
       "src/tab_stop.rs": {
         "upstream_sha256": "0c14aec0196ad632601015e166dfcd3df72228292646120bbc3857c3631cd680",
@@ -438,6 +433,6 @@
         "reason": "Package-level lockfile not retained; the workspace Cargo.lock owns resolution."
       }
     },
-    "unchanged_file_count": 137
+    "unchanged_file_count": 138
   }
 }

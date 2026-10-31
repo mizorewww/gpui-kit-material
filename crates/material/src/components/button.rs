@@ -372,6 +372,8 @@ struct PressState {
     native_hovered: bool,
     outside_window: bool,
     keyboard: bool,
+    /// Counts touches and mouse presses, so a touch's hold limit ends only that touch.
+    press_generation: u64,
     focus: FocusHandle,
     focus_out: Option<Subscription>,
     _activation: Subscription,
@@ -403,6 +405,7 @@ fn press_state(
             native_hovered: false,
             outside_window: false,
             keyboard: false,
+            press_generation: 0,
             focus: focus.clone(),
             focus_out: None,
             _activation: activation,
@@ -438,6 +441,7 @@ fn observe_press(
     base = base.on_mouse_down(MouseButton::Left, move |_, window, cx| {
         if !window.default_prevented() {
             down.update(cx, |state, cx| {
+                state.press_generation += 1;
                 state.outside_window = false;
                 state.pointer = true;
                 state.hovered = !window.last_input_was_touch();
@@ -1115,6 +1119,34 @@ impl MaterialButton {
     }
 }
 
+/// A touch came down on a button: press it at once, as a tap's own mouse-down comes
+/// only with the finger's lift, and bound how long it can hold. GPUI reports a tap's
+/// end and a pan's scroll publicly, but not a system cancel of a still finger.
+fn touch_press(state: &mut PressState, cx: &mut Context<PressState>) {
+    state.press_generation += 1;
+    state.pointer = true;
+    state.hovered = false;
+    state.outside_window = false;
+    cx.notify();
+    let generation = state.press_generation;
+    let timer = cx.background_executor().timer(ripple::TOUCH_HOLD_LIMIT);
+    cx.spawn(async move |this, cx| {
+        timer.await;
+        let _ = this.update(cx, |state, cx| {
+            if state.press_generation == generation && state.pointer {
+                touch_release(state, cx);
+            }
+        });
+    })
+    .detach();
+}
+
+fn touch_release(state: &mut PressState, cx: &mut Context<PressState>) {
+    state.pointer = false;
+    state.hovered = false;
+    cx.notify();
+}
+
 /// Passive pointer/touch observer. A window exit must clear a held press even
 /// after the pointer has left the button. Its non-occluding hitbox (the Base
 /// border box captured in prepaint) only locates passive touch presses.
@@ -1131,31 +1163,45 @@ fn pointer_observer(
                 .unwrap_or_else(|| hit_target::ResolvedTarget::new(bounds, None, window))
                 .insert(window)
         },
-        move |_, hitbox, window, _| {
+        move |_, hitbox, window, cx| {
             let moving_hitbox = hitbox.clone();
             let touch = weak.clone();
-            window.observe_touch_event(move |event, window, cx| match event.phase {
-                TouchPhase::Started
-                    if touch_enabled && hitbox.is_hovered_at(event.position, window) =>
-                {
-                    let _ = touch.update(cx, |state, cx| {
-                        state.pointer = true;
-                        state.hovered = false;
-                        state.outside_window = false;
-                        cx.notify();
-                    });
+            // GPUI offers each new touch as an unclaimed drag. Observing the offer
+            // without claiming it leaves tap and scroll recognition untouched. A tap
+            // ends in the mouse-up `observe_press` installs, a pan in the scroll below
+            // and a claimed drag here.
+            window.on_mouse_event(move |event: &TouchDragEvent, phase, window, cx| {
+                if phase != DispatchPhase::Bubble {
+                    return;
                 }
-                TouchPhase::Ended | TouchPhase::Cancelled
-                    if touch.upgrade().is_some_and(|state| state.read(cx).pointer) =>
-                {
-                    let _ = touch.update(cx, |state, cx| {
-                        state.pointer = false;
-                        state.hovered = false;
-                        cx.notify();
-                    });
+                match event.phase {
+                    TouchPhase::Started
+                        if touch_enabled
+                            && !window.default_prevented()
+                            && hitbox.is_hovered(window) =>
+                    {
+                        let _ = touch.update(cx, touch_press);
+                    }
+                    TouchPhase::Ended | TouchPhase::Cancelled
+                        if touch.upgrade().is_some_and(|state| state.read(cx).pointer) =>
+                    {
+                        let _ = touch.update(cx, touch_release);
+                    }
+                    _ => {}
                 }
-                _ => {}
             });
+            // Installed only while held: every wheel event calls every wheel listener.
+            if weak.upgrade().is_some_and(|state| state.read(cx).pointer) {
+                let scrolled = weak.clone();
+                window.on_mouse_event(move |_: &ScrollEvent, phase, window, cx| {
+                    if phase == DispatchPhase::Capture
+                        && window.last_input_was_touch()
+                        && scrolled.upgrade().is_some_and(|state| state.read(cx).pointer)
+                    {
+                        let _ = scrolled.update(cx, touch_release);
+                    }
+                });
+            }
             let moving = weak.clone();
             window.on_mouse_event(move |event: &MouseMoveEvent, phase, window, cx| {
                 // Every button hears every move: only a held or returning one writes.
@@ -2239,6 +2285,9 @@ mod tests {
             position: center,
             ..Default::default()
         });
+        // A system cancel of a still finger has no public signal: the hold limit ends it.
+        cx.executor().advance_clock(super::ripple::TOUCH_HOLD_LIMIT);
+        cx.run_until_parked();
         draw(cx);
         cx.executor().advance_clock(Duration::from_millis(500));
         draw(cx);

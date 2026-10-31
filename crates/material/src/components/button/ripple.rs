@@ -8,7 +8,7 @@ const LIFETIME: Duration = Duration::from_millis(450);
 /// How long a held touch can go without an end before its wave is released. GPUI
 /// reports a tap's end and a pan's scroll publicly, but not a system cancel of a
 /// still finger; this keeps that wave from staying on screen.
-const TOUCH_HOLD_LIMIT: Duration = Duration::from_secs(5);
+pub(super) const TOUCH_HOLD_LIMIT: Duration = Duration::from_secs(5);
 #[derive(Clone)]
 struct Wave {
     id: u64,

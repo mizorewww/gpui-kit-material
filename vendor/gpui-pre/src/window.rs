@@ -1059,7 +1059,6 @@ pub(crate) struct DeferredDraw {
     paint_range: Range<PaintIndex>,
 }
 
-type TouchObserver = Box<dyn FnMut(&TouchEvent, &mut Window, &mut App)>;
 
 pub(crate) struct Frame {
     pub(crate) focus: Option<FocusId>,
@@ -1067,7 +1066,6 @@ pub(crate) struct Frame {
     pub(crate) element_states: FxHashMap<(GlobalElementId, TypeId), ElementStateBox>,
     accessed_element_states: Vec<(GlobalElementId, TypeId)>,
     pub(crate) mouse_listeners: Vec<Option<AnyMouseListener>>,
-    touch_observers: Vec<Option<TouchObserver>>,
     pub(crate) dispatch_tree: DispatchTree,
     pub(crate) scene: Scene,
     pub(crate) hitboxes: Vec<Hitbox>,
@@ -1103,7 +1101,6 @@ pub(crate) struct PaintIndex {
     #[cfg(any(test, feature = "test-support"))]
     debug_bounds_index: usize,
     mouse_listeners_index: usize,
-    touch_observers_index: usize,
     input_handlers_index: usize,
     cursor_styles_index: usize,
     accessed_element_states_index: usize,
@@ -1125,7 +1122,6 @@ impl Frame {
             element_states: FxHashMap::default(),
             accessed_element_states: Vec::new(),
             mouse_listeners: Vec::new(),
-            touch_observers: Vec::new(),
             dispatch_tree,
             scene: Scene::default(),
             hitboxes: Vec::new(),
@@ -1153,7 +1149,6 @@ impl Frame {
         self.element_states.clear();
         self.accessed_element_states.clear();
         self.mouse_listeners.clear();
-        self.touch_observers.clear();
         self.dispatch_tree.clear();
         self.scene.clear();
         self.input_handlers.clear();
@@ -4259,7 +4254,6 @@ impl Window {
             #[cfg(any(test, feature = "test-support"))]
             debug_bounds_index: self.next_frame.debug_bounds_records.len(),
             mouse_listeners_index: self.next_frame.mouse_listeners.len(),
-            touch_observers_index: self.next_frame.touch_observers.len(),
             input_handlers_index: self.next_frame.input_handlers.len(),
             cursor_styles_index: self.next_frame.cursor_styles.len(),
             accessed_element_states_index: self.next_frame.accessed_element_states.len(),
@@ -4294,12 +4288,6 @@ impl Window {
                 [range.start.mouse_listeners_index..range.end.mouse_listeners_index]
                 .iter_mut()
                 .map(|listener| listener.take()),
-        );
-        self.next_frame.touch_observers.extend(
-            self.rendered_frame.touch_observers
-                [range.start.touch_observers_index..range.end.touch_observers_index]
-                .iter_mut()
-                .map(|observer| observer.take()),
         );
         self.next_frame.accessed_element_states.extend(
             self.rendered_frame.accessed_element_states[range.start.accessed_element_states_index
@@ -5695,23 +5683,6 @@ impl Window {
         )));
     }
 
-    /// Observe raw touch input without claiming a gesture or suppressing a tap.
-    ///
-    /// Register during paint, just like a mouse listener. Observers are retained
-    /// for cached paint and removed with their element. Every observer sees each
-    /// touch once, before gesture recognition. Propagation and default-prevention
-    /// changes made by an observer are discarded; use gesture handlers to consume
-    /// input. Hitbox::is_hovered_at can test the event position and occlusion.
-    pub fn observe_touch_event(
-        &mut self,
-        observer: impl FnMut(&TouchEvent, &mut Window, &mut App) + 'static,
-    ) {
-        self.invalidator.debug_assert_paint();
-        self.next_frame
-            .touch_observers
-            .push(Some(Box::new(observer)));
-    }
-
     /// Register a key event listener on this node for the next frame. The type of event
     /// is determined by the first parameter of the given listener. When the next frame is rendered
     /// the listener will be cleared.
@@ -6083,15 +6054,6 @@ impl Window {
         if self.invalidator.is_dirty() {
             self.draw(cx).clear(cx);
         }
-        let mut observers = std::mem::take(&mut self.rendered_frame.touch_observers);
-        for observer in observers.iter_mut().flatten() {
-            let propagate = cx.propagate_event;
-            let prevented = self.default_prevented;
-            observer(event, self, cx);
-            cx.propagate_event = propagate;
-            self.default_prevented = prevented;
-        }
-        self.rendered_frame.touch_observers = observers;
         let mut event = event.clone();
         if !self.touch_prediction_enabled {
             event.predicted_position = None;

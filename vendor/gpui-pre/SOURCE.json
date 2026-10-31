@@ -264,8 +264,8 @@
     },
     "src/window.rs": {
       "upstream_sha256": "83bace5e5cf503b21c789c4ca7bc3b11965c2256cb5a2398f2b70e5baf7aa1bb",
-      "local_sha256": "5906af0c109b3d2fb6023df80bd1380137012f2c4f3a975130d4b7dbb1473e61",
-      "reason": "Hitbox.additional_bounds/contains_pointer/insert_hitbox_with_extension (hitbox-extension-patch.md); touch observers (touch-observer-patch.md); CPU frame scope (cpu-frame-scope-patch.md); WindowSubmissionStats, vsync, throttle retry (frame-submission-patch.md); present outcome (presentation-timing-patch.md). Layout direction on the window, recorded per layout node (layout-direction-patch.md)."
+      "local_sha256": "12c7ac7161882031a3170e7d289fffdd776dd726488a20f3bd571ad6ce3c1679",
+      "reason": "Hitbox.additional_bounds/contains_pointer/insert_hitbox_with_extension (hitbox-extension-patch.md); CPU frame scope (cpu-frame-scope-patch.md); WindowSubmissionStats, vsync, throttle retry (frame-submission-patch.md); present outcome (presentation-timing-patch.md). Layout direction on the window, recorded per layout node (layout-direction-patch.md)."
     },
     "src/tab_stop.rs": {
       "upstream_sha256": "0c14aec0196ad632601015e166dfcd3df72228292646120bbc3857c3631cd680",
@@ -356,8 +356,7 @@
     "quiet-global-swap-patch.md",
     "render-lease-patch.md",
     "tab-stop-index-patch.md",
-    "test-harness-patch.md",
-    "touch-observer-patch.md"
+    "test-harness-patch.md"
   ],
   "verification": "Archive downloaded from archive_url; its SHA-256 equals the crates.io index cksum and ~/.cargo/registry/cache. upstream_files are hashes of the extracted archive (excluding Cargo's .cargo-ok marker). Recompute: extract the .crate and compare with sha256 of each vendor file.",
   "validation": "source identity and per-file hashes verified; runtime acceptance is tracked separately"

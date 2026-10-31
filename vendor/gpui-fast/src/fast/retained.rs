@@ -375,7 +375,6 @@ impl PartialEq for PaintIndex {
             debug_bounds_index,
             fast,
             mouse_listeners_index,
-            touch_observers_index,
             input_handlers_index,
             cursor_styles_index,
             accessed_element_states_index,
@@ -385,7 +384,6 @@ impl PartialEq for PaintIndex {
         *fast == other.fast
             && *scene_index == other.scene_index
             && *mouse_listeners_index == other.mouse_listeners_index
-            && *touch_observers_index == other.touch_observers_index
             && *input_handlers_index == other.input_handlers_index
             && *cursor_styles_index == other.cursor_styles_index
             && *accessed_element_states_index == other.accessed_element_states_index
@@ -418,8 +416,6 @@ impl PaintIndex {
             },
             mouse_listeners_index: self.mouse_listeners_index - from.mouse_listeners_index
                 + to.mouse_listeners_index,
-            touch_observers_index: self.touch_observers_index - from.touch_observers_index
-                + to.touch_observers_index,
             input_handlers_index: self.input_handlers_index - from.input_handlers_index
                 + to.input_handlers_index,
             cursor_styles_index: self.cursor_styles_index - from.cursor_styles_index
@@ -1974,209 +1970,5 @@ impl HitboxId {
             return false;
         }
         self.hit_test(window)
-    }
-}
-
-#[cfg(test)]
-mod touch_replay_tests {
-    use crate::window::PaintIndex;
-    use crate::{
-        AppContext as _, Context, Entity, InputEvent, IntoElement, ParentElement as _, Render,
-        StyleRefinement, Styled as _, TestAppContext, TouchEvent, TouchPhase, Window, canvas, div,
-        point, prelude::FluentBuilder as _, px,
-    };
-    use std::{
-        cell::{Cell, RefCell},
-        ops::Range,
-        rc::Rc,
-    };
-
-    #[derive(Clone, Default)]
-    struct Records {
-        calls: Rc<RefCell<Vec<u8>>>,
-        paints: Rc<Cell<usize>>,
-        range: Rc<RefCell<Option<Range<PaintIndex>>>>,
-    }
-    struct Observed {
-        records: Records,
-        carry: bool,
-    }
-    impl Render for Observed {
-        fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
-            let records = self.records.clone();
-            let carry = self.carry;
-            canvas(
-                |_, _, _| (),
-                move |bounds, _, window, _| {
-                    let start = window.paint_index();
-                    if carry {
-                        let range = records.range.borrow().as_ref().unwrap().clone();
-                        crate::fast::layers::reuse::carry_paint_records(
-                            window,
-                            &range,
-                            point(px(0.), px(0.)),
-                            point(px(0.), px(0.)),
-                            bounds,
-                            true,
-                        );
-                    } else {
-                        records.paints.set(records.paints.get() + 1);
-                        for id in [1, 2] {
-                            let calls = records.calls.clone();
-                            window.observe_touch_event(move |_, _, _| calls.borrow_mut().push(id));
-                        }
-                    }
-                    *records.range.borrow_mut() = Some(start..window.paint_index());
-                },
-            )
-            .size_full()
-        }
-    }
-    struct Parent {
-        child: Entity<Observed>,
-        prefix: bool,
-        visible: bool,
-        records: Records,
-    }
-    impl Render for Parent {
-        fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
-            let calls = self.records.calls.clone();
-            let prefix = self.prefix;
-            div()
-                .relative()
-                .size_full()
-                // Keep both layout and element ordering identical. Adding a
-                // normal-flow prefix would move the cached child and correctly
-                // require repaint, rather than testing observer-range rebasing.
-                .child(
-                    canvas(
-                        |_, _, _| (),
-                        move |_, _, window, _| {
-                            if prefix {
-                                window.observe_touch_event({
-                                    let calls = calls.clone();
-                                    move |_, _, _| calls.borrow_mut().push(0)
-                                });
-                            }
-                        },
-                    )
-                    .absolute()
-                    .top_0()
-                    .left_0()
-                    .size(px(1.)),
-                )
-                .when(self.visible, |root| {
-                    root.child(
-                        self.child
-                            .clone()
-                            .cached(StyleRefinement::default().size(px(80.))),
-                    )
-                })
-        }
-    }
-    fn touch(window: &mut Window, cx: &mut crate::App) {
-        window.dispatch_event(
-            TouchEvent {
-                phase: TouchPhase::Started,
-                position: point(px(10.), px(10.)),
-                ..Default::default()
-            }
-            .to_platform_input(),
-            cx,
-        );
-    }
-
-    #[test]
-    fn cached_touch_observers_survive_shifted_replays_and_disappear_on_unmount() {
-        let mut cx = TestAppContext::single();
-        let records = Records::default();
-        let window = cx.add_window({
-            let records = records.clone();
-            move |_, cx| Parent {
-                child: cx.new(|_| Observed {
-                    records: records.clone(),
-                    carry: false,
-                }),
-                prefix: false,
-                visible: true,
-                records,
-            }
-        });
-        cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear(cx))
-            .unwrap();
-        // Enter touch modality before measuring replay: the first real touch
-        // deliberately refreshes the window to update focus/hover styling.
-        cx.update_window(window.into(), |_, window, cx| touch(window, cx))
-            .unwrap();
-        records.calls.borrow_mut().clear();
-        let painted = records.paints.get();
-        assert!(painted > 0);
-        for _ in 0..3 {
-            window
-                .update(&mut cx, |parent, _, cx| {
-                    parent.prefix = true;
-                    cx.notify();
-                })
-                .unwrap();
-            cx.update_window(window.into(), |_, window, cx| {
-                window.draw(cx).clear(cx);
-                records.calls.borrow_mut().clear();
-                touch(window, cx);
-            })
-            .unwrap();
-            assert_eq!(
-                records.paints.get(),
-                painted,
-                "must exercise cached replay, not repaint"
-            );
-            assert_eq!(
-                *records.calls.borrow(),
-                vec![0, 1, 2],
-                "each observer runs exactly once"
-            );
-        }
-        window
-            .update(&mut cx, |parent, _, cx| {
-                parent.visible = false;
-                cx.notify();
-            })
-            .unwrap();
-        cx.update_window(window.into(), |_, window, cx| {
-            window.draw(cx).clear(cx);
-            records.calls.borrow_mut().clear();
-            touch(window, cx);
-        })
-        .unwrap();
-        assert_eq!(*records.calls.borrow(), vec![0]);
-    }
-
-    #[test]
-    fn layer_paint_record_carry_keeps_touch_observers_without_registering_again() {
-        let mut cx = TestAppContext::single();
-        let records = Records::default();
-        let window = cx.add_window({
-            let records = records.clone();
-            move |_, _| Observed {
-                records,
-                carry: false,
-            }
-        });
-        cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear(cx))
-            .unwrap();
-        let painted = records.paints.get();
-        window
-            .update(&mut cx, |view, _, cx| {
-                view.carry = true;
-                cx.notify();
-            })
-            .unwrap();
-        cx.update_window(window.into(), |_, window, cx| {
-            window.draw(cx).clear(cx);
-            records.calls.borrow_mut().clear();
-            touch(window, cx);
-        })
-        .unwrap();
-        assert_eq!(records.paints.get(), painted);
-        assert_eq!(*records.calls.borrow(), vec![1, 2]);
     }
 }
