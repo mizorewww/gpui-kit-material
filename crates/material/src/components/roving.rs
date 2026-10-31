@@ -318,6 +318,18 @@ pub(crate) fn index_handles(
     cx: &mut App,
 ) -> Rc<[FocusHandle]> {
     let handles = window.use_keyed_state(id, cx, |_, _| Vec::<FocusHandle>::new());
+    // Focus on an item that goes would fall out of the widget, and its arrow
+    // keys with it: it moves to the nearest item that stays.
+    let current = handles.read(cx);
+    if count > 0
+        && current.len() > count
+        && current[count..]
+            .iter()
+            .any(|handle| handle.is_focused(window))
+    {
+        let neighbor = current[count - 1].clone();
+        window.defer(cx, move |window, cx| neighbor.focus(window, cx));
+    }
     handles.update(cx, |handles, cx| {
         if handles.len() != count {
             handles.truncate(count);
@@ -591,5 +603,55 @@ mod tests {
             cx.update(|window, _| after.is_focused(window)),
             "Tab leaves the widget forward"
         );
+    }
+
+    struct Shrinking {
+        count: usize,
+        handles: Rc<RefCell<Rc<[FocusHandle]>>>,
+    }
+    impl gpui::Render for Shrinking {
+        fn render(
+            &mut self,
+            window: &mut Window,
+            cx: &mut gpui::Context<Self>,
+        ) -> impl IntoElement {
+            let handles = index_handles("items", self.count, window, cx);
+            *self.handles.borrow_mut() = handles.clone();
+            div().flex().flex_col().children(
+                handles
+                    .iter()
+                    .enumerate()
+                    .map(|(i, handle)| div().id(i).track_focus(handle).size(px(10.))),
+            )
+        }
+    }
+
+    #[gpui::test]
+    fn focus_moves_to_a_neighbor_when_its_item_goes(cx: &mut gpui::TestAppContext) {
+        let handles: Rc<RefCell<Rc<[FocusHandle]>>> = Rc::new(RefCell::new(Rc::from([])));
+        let (view, cx) = cx.add_window_view({
+            let handles = handles.clone();
+            move |_, _| Shrinking { count: 3, handles }
+        });
+        let draw = |cx: &mut gpui::VisualTestContext| {
+            cx.update(|window, cx| {
+                window.refresh();
+                window.draw(cx).clear(cx);
+            });
+            cx.run_until_parked();
+        };
+        draw(cx);
+        let last = handles.borrow()[2].clone();
+        cx.update(|window, cx| last.focus(window, cx));
+        draw(cx);
+        drop(last);
+        view.update(cx, |view, cx| {
+            view.count = 2;
+            cx.notify();
+        });
+        draw(cx);
+        draw(cx);
+        let kept = handles.borrow()[1].clone();
+        cx.update(|window, _| assert!(kept.is_focused(window), "focus stays in the widget"));
     }
 }
