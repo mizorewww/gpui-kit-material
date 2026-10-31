@@ -99,6 +99,9 @@ impl ButtonDensity {
 #[derive(Default)]
 struct GroupState {
     items: Vec<ItemState>,
+    /// Whether an equal group is sharing a parent too narrow for its widest
+    /// width, so its buttons are narrower than they measured.
+    shrunk: Rc<Cell<bool>>,
 }
 
 struct ItemState {
@@ -168,6 +171,7 @@ impl RenderOnce for ButtonGroup {
             GroupState::default()
         });
         let count = self.items.len();
+        let shrunk = state.read(cx).shrunk.clone();
         let (probes, naturals, ids) = state.update(cx, |state, _| {
             while state.items.len() < count {
                 let index = state.items.len();
@@ -196,13 +200,19 @@ impl RenderOnce for ButtonGroup {
         });
         let pressed = probes.iter().position(|probe| probe.get());
         let natural: Vec<f32> = naturals.iter().map(|extent| extent.get()).collect();
-        let targets = width_deltas(&natural, pressed);
         let vertical = self.vertical;
         let equal = self.equal_widths;
         // Horizontal equal widths share the widest measured width (which
-        // then holds while the group is equal); vertical ones stretch to
-        // the column.
+        // then holds while the group is equal), or take the same off it in a
+        // parent too narrow for that; vertical ones stretch to the column.
         let widest = natural.iter().copied().fold(0., f32::max);
+        let shares = equal && !vertical && widest > 0.;
+        let is_shrunk = shares && shrunk.get();
+        let targets = if is_shrunk {
+            width_deltas(&vec![widest; natural.len()], pressed)
+        } else {
+            width_deltas(&natural, pressed)
+        };
         let height = (self.size.height() + self.density.offset()).max(0.);
         let dense = self.density != ButtonDensity::Default;
         let mut row = div()
@@ -217,7 +227,20 @@ impl RenderOnce for ButtonGroup {
                     row.flex_row()
                 }
             })
-            .flex_shrink_0()
+            .map(|row| {
+                if is_shrunk {
+                    // Its buttons no longer tell how wide it would like to be.
+                    let gap = rem(standard_group_gap(self.size)).to_pixels(window.rem_size());
+                    let gaps = natural.len().saturating_sub(1) as f32;
+                    row.w_full()
+                        .min_w_0()
+                        .max_w(px(widest * natural.len() as f32 + f32::from(gap) * gaps))
+                } else if shares {
+                    row.min_w_0()
+                } else {
+                    row.flex_shrink_0()
+                }
+            })
             .map(|row| match (vertical, equal) {
                 (true, true) => row.items_stretch(),
                 _ => row.items_center(),
@@ -232,15 +255,14 @@ impl RenderOnce for ButtonGroup {
                 cx,
             );
             let moving = delta != 0.;
-            let extent = natural[index] + delta;
+            let extent = if is_shrunk { widest } else { natural[index] } + delta;
             let button = button
                 .press_probe(probes[index].clone())
                 .when(dense, |button| button.h(rem(height)))
-                .when(equal && !vertical && widest > 0., |button| {
-                    button.min_w(px(widest))
-                })
+                .when(shares && !is_shrunk, |button| button.min_w(px(widest)))
+                .when(is_shrunk, |button| button.w_full().min_w_0())
                 .when(equal && vertical, |button| button.w_full())
-                .when(moving && natural[index] > 0., |button| {
+                .when(moving && natural[index] > 0. && !is_shrunk, |button| {
                     if vertical {
                         button.h(px(extent.max(0.))).min_h(px(0.))
                     } else {
@@ -248,8 +270,20 @@ impl RenderOnce for ButtonGroup {
                     }
                 });
             let measured = naturals[index].clone();
+            let shrunk = shrunk.clone();
+            let slot = div().relative().flex().map(|slot| {
+                if is_shrunk {
+                    // Shrinking takes the same from equal bases.
+                    let basis = if moving { extent.max(0.) } else { widest };
+                    slot.flex_basis(px(basis)).min_w_0()
+                } else if shares {
+                    slot.min_w_0()
+                } else {
+                    slot.flex_shrink_0()
+                }
+            });
             row = row.child(
-                div().relative().flex().flex_shrink_0().child(button).child(
+                slot.child(button).child(
                     canvas(
                         move |bounds, window, _| {
                             // Only an item at rest shows its natural extent.
@@ -258,7 +292,12 @@ impl RenderOnce for ButtonGroup {
                             } else {
                                 bounds.size.width
                             });
-                            if !moving && (measured.get() - extent).abs() > 0.01 {
+                            let narrower = shares && extent + 0.01 < widest;
+                            if shares && !moving && shrunk.get() != narrower {
+                                shrunk.set(narrower);
+                                window.request_animation_frame();
+                            }
+                            if !moving && !narrower && (measured.get() - extent).abs() > 0.01 {
                                 measured.set(extent);
                                 if equal && !vertical {
                                     // The others take the new widest width next frame.
@@ -471,6 +510,51 @@ mod layout_tests {
         assert!(c.size.width > px(80.));
         assert_eq!(a.size.width, c.size.width);
         assert_eq!(b.size.width, c.size.width);
+    }
+
+    struct Narrow {
+        width: f32,
+    }
+    impl Render for Narrow {
+        fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+            window.set_rem_size(px(14.));
+            div().flex().w(px(self.width)).child(
+                ButtonGroup::new("group", "Sizes")
+                    .equal_widths(true)
+                    .items((0..3usize).map(|index| {
+                        MaterialButton::new(("item", index))
+                            .debug_selector(move || ITEMS[index].into())
+                            .child(LABELS[index])
+                    })),
+            )
+        }
+    }
+
+    /// Equal widths share a parent too narrow for the widest button three times,
+    /// and take the widest again when there is room.
+    #[gpui::test]
+    fn equal_widths_shrink_together_in_a_narrow_parent(cx: &mut TestAppContext) {
+        cx.update(|cx| {
+            gpui_base::init(cx);
+            cx.set_reduce_motion(true);
+        });
+        let (view, cx) = cx.add_window_view(|_, _| Narrow { width: 600. });
+        draw(cx);
+        let [_, _, wide] = ITEMS.map(|item| cx.debug_bounds(item).unwrap());
+        assert!(wide.size.width > px(80.));
+        let natural = wide.size.width;
+
+        cx.update(|_, cx| view.update(cx, |view, _| view.width = 180.));
+        draw(cx);
+        let [a, b, c] = ITEMS.map(|item| cx.debug_bounds(item).unwrap());
+        assert!(c.right() <= a.left() + px(180.), "inside: {a:?} .. {c:?}");
+        assert_eq!(a.size.width, c.size.width);
+        assert_eq!(b.size.width, c.size.width);
+        assert!(c.size.width < natural);
+
+        cx.update(|_, cx| view.update(cx, |view, _| view.width = 600.));
+        draw(cx);
+        assert_eq!(cx.debug_bounds(ITEMS[0]).unwrap().size.width, natural);
     }
 
     #[gpui::test]
