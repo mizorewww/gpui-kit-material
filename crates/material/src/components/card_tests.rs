@@ -304,3 +304,41 @@ fn a_material_card_clicks_drags_and_springs_home(cx: &mut TestAppContext) {
     cx.run_until_parked();
     assert_eq!(clicks.get(), 2);
 }
+
+struct RtlCard;
+impl Render for RtlCard {
+    fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        window.set_rem_size(px(14.));
+        crate::scope::Scope::new("rtl-card")
+            .direction(gpui::LayoutDirection::Rtl)
+            .child(
+                div().p(px(40.)).child(
+                    super::MaterialCard::new("action-card", CardVariant::Elevated)
+                        .draggable(true)
+                        .w(px(100.))
+                        .child(
+                            div()
+                                .h(px(60.))
+                                .debug_selector(|| "action-card-body".into()),
+                        ),
+                ),
+            )
+    }
+}
+
+#[gpui::test]
+fn a_dragged_card_stays_under_the_pointer_right_to_left(cx: &mut TestAppContext) {
+    use gpui::{Modifiers, MouseButton, point};
+    let (_, cx) = cx.add_window_view(|_, _| RtlCard);
+    cx.run_until_parked();
+    super::tests::redraw(cx);
+    let home = cx.debug_bounds("action-card-body").unwrap();
+    let start = home.center();
+    cx.simulate_mouse_down(start, MouseButton::Left, Modifiers::none());
+    super::tests::redraw(cx);
+    let to = start + point(px(30.), px(20.));
+    cx.simulate_mouse_move(to, Some(MouseButton::Left), Modifiers::none());
+    super::tests::redraw(cx);
+    let carried = cx.debug_bounds("action-card-body").unwrap();
+    assert_eq!(carried.origin - home.origin, point(px(30.), px(20.)));
+}
