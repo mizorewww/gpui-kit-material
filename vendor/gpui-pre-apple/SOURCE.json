@@ -56,7 +56,7 @@
   },
   "added_files": {
     "tests/font_fallback.rs": {
-      "sha256": "4ca77731fbd3a6e716a2c0eac5a59b2e60ad845c5d39fe5bbad96b4cc6c81eb2",
+      "sha256": "18c0585e87a0458666c4f8ca57a141b1d567800eedb8f5d3296156a3283c1111",
       "reason": "Added: tests of the kept font patches (VENDORED.md)."
     }
   },

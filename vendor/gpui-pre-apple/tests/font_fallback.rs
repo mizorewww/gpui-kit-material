@@ -9,13 +9,13 @@ fn registered_non_latin_font_is_used_in_explicit_fallback_cascade() {
     use std::{borrow::Cow, sync::Arc};
     let fonts = gpui_apple::AppleTextSystem::new();
     fonts.add_fonts(vec![
-        Cow::Borrowed(include_bytes!("../../../crates/material/examples/gallery/fonts/roboto/Roboto-Regular.ttf")),
-        Cow::Borrowed(include_bytes!("../../../crates/material/examples/gallery/fonts/conformance/notosanshebrew/NotoSansHebrew-Regular.ttf")),
+        Cow::Borrowed(include_bytes!("../../../crates/gallery/fonts/roboto/Roboto-Regular.ttf")),
+        Cow::Borrowed(include_bytes!("../../../crates/gallery/fonts/conformance/notosanshebrew/NotoSansHebrew-Regular.ttf")),
     ]).unwrap();
     let hebrew = fonts
         .font_id(&font("Noto Sans Hebrew"))
         .expect("a non-Latin font does not require m");
-    fonts.add_fonts(vec![Cow::Borrowed(include_bytes!("../../../crates/material/examples/gallery/fonts/conformance/notoemoji/NotoEmoji-Regular.ttf"))]).unwrap();
+    fonts.add_fonts(vec![Cow::Borrowed(include_bytes!("../../../crates/gallery/fonts/conformance/notoemoji/NotoEmoji-Regular.ttf"))]).unwrap();
     let emoji = fonts
         .font_id(&font("Noto Emoji"))
         .expect("a font does not require Latin m");
@@ -77,13 +77,13 @@ fn adding_a_registered_fallback_rebuilds_cached_cascades() {
     let fonts = gpui_apple::AppleTextSystem::new();
     fonts
         .add_fonts(vec![Cow::Borrowed(include_bytes!(
-            "../../../crates/material/examples/gallery/fonts/roboto/Roboto-Regular.ttf"
+            "../../../crates/gallery/fonts/roboto/Roboto-Regular.ttf"
         ))])
         .unwrap();
     let mut primary = font("Roboto");
     primary.fallbacks = Some(FontFallbacks::from_fonts(vec!["Noto Sans Hebrew".into()]));
     let before = fonts.font_id(&primary).unwrap();
-    fonts.add_fonts(vec![Cow::Borrowed(include_bytes!("../../../crates/material/examples/gallery/fonts/conformance/notosanshebrew/NotoSansHebrew-Regular.ttf"))]).unwrap();
+    fonts.add_fonts(vec![Cow::Borrowed(include_bytes!("../../../crates/gallery/fonts/conformance/notosanshebrew/NotoSansHebrew-Regular.ttf"))]).unwrap();
     let expected = fonts.font_id(&font("Noto Sans Hebrew")).unwrap();
     let after = fonts.font_id(&primary).unwrap();
     assert_ne!(before, after);
@@ -110,8 +110,8 @@ fn registered_sbix_color_font_retains_its_actual_glyphs() {
     use std::borrow::Cow;
     let fonts = gpui_apple::AppleTextSystem::new();
     fonts.add_fonts(vec![
-        Cow::Borrowed(include_bytes!("../../../crates/material/examples/gallery/fonts/roboto/Roboto-Regular.ttf")),
-        Cow::Borrowed(include_bytes!("../../../crates/material/examples/gallery/fonts/conformance/notocoloremoji/NotoColorEmoji-Probe-sbix.ttf")),
+        Cow::Borrowed(include_bytes!("../../../crates/gallery/fonts/roboto/Roboto-Regular.ttf")),
+        Cow::Borrowed(include_bytes!("../../../crates/gallery/fonts/conformance/notocoloremoji/NotoColorEmoji-Probe-sbix.ttf")),
     ]).unwrap();
     let emoji = fonts.font_id(&font("Noto Color Emoji")).unwrap();
     let mut primary = font("Roboto");
