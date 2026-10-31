@@ -2,6 +2,7 @@
 # like. It proves the library builds against the patches a consumer needs, including
 # the web backends' IME position and the lazy tab-stop index (tested by CI's engine rules
 # step), without the dev-only frame observation, and that Kit's FPS HUD builds beside it.
+# It reads them from this checkout; CI's git-consumer job builds the same set from Git.
 [package]
 name = "consumer-check"
 version = "0.0.0"

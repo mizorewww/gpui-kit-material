@@ -48,17 +48,32 @@ Icons come from
 
 ## Quick start
 
+The library is distributed by Git revision, and a downstream workspace needs the
+engine patches below until they land upstream. All of them must use one revision:
+
 ```toml
 [dependencies]
-gpui-kit = { git = "https://github.com/longbridge/gpui-kit", branch = "main" }
-gpui-kit-material = { git = "https://github.com/mizorewww/gpui-kit-material" }
+gpui-kit = { git = "https://github.com/longbridge/gpui-kit", rev = "bb85882e1faab845d9e7be33b69a152879a90f69" }
+gpui-kit-material = { git = "https://github.com/mizorewww/gpui-kit-material", rev = "0f56b40f05e09e95d3cdad19f6d8e8df3d4b09f7" }
+
+[patch.crates-io]
+gpui-base = { git = "https://github.com/mizorewww/gpui-kit-material", rev = "0f56b40f05e09e95d3cdad19f6d8e8df3d4b09f7" }
+gpui-pre = { git = "https://github.com/mizorewww/gpui-kit-material", rev = "0f56b40f05e09e95d3cdad19f6d8e8df3d4b09f7" }
+gpui-pre-apple = { git = "https://github.com/mizorewww/gpui-kit-material", rev = "0f56b40f05e09e95d3cdad19f6d8e8df3d4b09f7" }
+gpui-pre-web = { git = "https://github.com/mizorewww/gpui-kit-material", rev = "0f56b40f05e09e95d3cdad19f6d8e8df3d4b09f7" }
+gpui-fast = { git = "https://github.com/mizorewww/gpui-kit-material", rev = "0f56b40f05e09e95d3cdad19f6d8e8df3d4b09f7" }
+gpui-fast-apple = { git = "https://github.com/mizorewww/gpui-kit-material", rev = "0f56b40f05e09e95d3cdad19f6d8e8df3d4b09f7" }
+gpui-fast-web = { git = "https://github.com/mizorewww/gpui-kit-material", rev = "0f56b40f05e09e95d3cdad19f6d8e8df3d4b09f7" }
+
+[patch."https://github.com/longbridge/gpui-kit"]
+gpui-kit = { git = "https://github.com/mizorewww/gpui-kit-material", rev = "0f56b40f05e09e95d3cdad19f6d8e8df3d4b09f7" }
+gpui-base = { git = "https://github.com/mizorewww/gpui-kit-material", rev = "0f56b40f05e09e95d3cdad19f6d8e8df3d4b09f7" }
 ```
 
-> The workspace patches GPUI, GPUI Base and GPUI Fast (see `[patch]` in
-> [Cargo.toml](Cargo.toml) and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#engine-patches)).
-> Downstream workspaces need only the patches listed in
-> [crates/consumer-check/Cargo.toml](crates/consumer-check/Cargo.toml) until they
-> land upstream; the rest of `vendor/` is dev-only frame observation for the Gallery.
+> `[patch]` is read only from the top-level manifest, so it goes in your workspace root.
+> [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#consumer-patch-set) says why each patch
+> exists. The rest of `vendor/` is dev-only frame observation for the Gallery. CI builds
+> this manifest from Git at every pushed commit (`scripts/check-git-consumer.sh`).
 
 ```rust
 use gpui_kit_material::{color::themes::{Contrast, ThemeId, ThemeMode}, icons::Assets, theme};

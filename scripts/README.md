@@ -23,7 +23,9 @@ script's docstring (`--help`) and [docs/DEVELOPMENT.md](../docs/DEVELOPMENT.md).
 | `build-gallery-web.sh` | Builds the WASM gallery (`--fast`, `--upstream`, `--release`) into `crates/gallery-web/www/wasm` |
 | `build-site.sh`, `build-site.py` | Static site (docs, release gallery, API docs) into `target/site` |
 | `deploy-site.sh` | Publishes `target/site` to material.mizore.blog with the Cloudflare CLI |
-| `profile-gallery.py` | Builds and records a native Gallery CPU frame profile with provenance (frame-budget/FPS gates) |
+| `check-git-consumer.sh` | Builds the README's quick start in a directory outside the repository, from Git at a pushed commit (`git-consumer/`) |
+| `check-package.sh` | Checks that each package ships its license texts and notices, and not the Gallery's fonts |
+| `profile-gallery.py` | Builds and records a native Gallery CPU frame profile with provenance, and judges AGENTS.md's performance targets |
 | `figma/figma.py` | `figma-*.json` token fixtures and page specs from the Figma kit (below) |
 | `build-reference-fonts.py` | Gallery `fonts/roboto/Roboto-{Regular,Medium,SemiBold}.ttf` from the pinned md3.io WOFF2, hash-checked against `SOURCES.json` |
 | `freeze-conformance-fonts.py` | Static Noto Arabic/Hebrew/Emoji instances under `fonts/conformance/`, recorded in its `SOURCES.json` |
@@ -61,7 +63,8 @@ token is read only from the environment and is never stored.
 Reference priority is Figma M3 Design Kit > md3.io > m3e.kyralabs.dev per
 value; the Figma fixtures (`figma-*.json`) are extracted with the Figma Plugin
 API and record their node, style and variable ids. m3e values are used only
-where neither defines them (today: the Standard motion scheme).
+where neither defines them (today: the Standard motion scheme, the navigation suite's
+rules and the window size classes).
 
 m3e token values are read from source, not captured: `extract-m3e-tokens.py`
 parses the generated CSS custom properties that m3exp-web commits

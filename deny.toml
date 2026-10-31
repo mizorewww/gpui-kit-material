@@ -1,0 +1,48 @@
+# cargo deny --locked check
+# Every platform CI builds, so a dependency one of them alone pulls in is judged too.
+[graph]
+targets = [
+    "aarch64-apple-darwin",
+    "x86_64-unknown-linux-gnu",
+    "x86_64-pc-windows-msvc",
+    "wasm32-unknown-unknown",
+]
+
+[advisories]
+yanked = "deny"
+# Vulnerabilities always fail. "Unmaintained" fails only for this workspace's direct
+# dependencies: GPUI's tree holds several (paste, instant, rustybuzz, ttf-parser,
+# zvariant, zbus_names, rustls-pemfile) that only upstream can replace.
+unmaintained = "workspace"
+
+[licenses]
+confidence-threshold = 0.9
+# Permissive, plus MPL-2.0's file-level copyleft (dwrote, cbindgen, option-ext), and
+# OFL-1.1 for the fonts gpui-kit-material-gallery-web declares.
+allow = [
+    "0BSD",
+    "Apache-2.0",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "CC0-1.0",
+    "ISC",
+    "MIT",
+    "MPL-2.0",
+    "OFL-1.1",
+    "Unicode-3.0",
+    "Zlib",
+]
+
+[bans]
+# GPUI's own tree carries duplicate versions; the one identity that matters here,
+# a single GPUI and Base, is checked by scripts/check-git-consumer.sh.
+multiple-versions = "allow"
+wildcards = "allow"
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-git = [
+    "https://github.com/longbridge/gpui-kit",
+    "https://github.com/mizorewww/gpui-material-symbols",
+]
