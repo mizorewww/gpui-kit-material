@@ -1,6 +1,7 @@
 //! M3 menus: the baseline menu, the M3 Expressive vertical menu (standard and
-//! vibrant, with groups), a popup that opens a menu from a trigger, and the
-//! exposed dropdown menu built from a text field and a menu.
+//! vibrant, with groups), a popup that opens a menu from a trigger, a context
+//! menu that opens one at the pointer, and the exposed dropdown menu built from
+//! a text field and a menu.
 //!
 //! Reference: <https://m3.material.io/components/menus/specs> and the
 //! Material 3 Design Kit "Menu" page (inspected tokens: Expressive items are
@@ -130,6 +131,8 @@ type Handler = Rc<dyn Fn(&ClickEvent, &mut Window, &mut App)>;
 type Notify = Rc<dyn Fn(&mut Window, &mut App)>;
 type Select = Rc<dyn Fn(&usize, &mut Window, &mut App)>;
 type OpenChange = Rc<dyn Fn(&bool, &mut Window, &mut App)>;
+type OnClosed = Box<dyn FnOnce(&mut App)>;
+type MenuBuilder = Box<dyn Fn(&mut Window, &mut App) -> MaterialMenu>;
 
 /// One menu item.
 pub struct MaterialMenuItem {
@@ -1047,6 +1050,7 @@ pub struct MenuPopup {
     submenu: Option<(usize, MaterialMenu)>,
     submenu_open: bool,
     on_submenu_change: Option<OpenChange>,
+    on_closed: Option<OnClosed>,
 }
 
 impl MenuPopup {
@@ -1062,7 +1066,13 @@ impl MenuPopup {
             submenu: None,
             submenu_open: false,
             on_submenu_change: None,
+            on_closed: None,
         }
+    }
+    /// Runs on a frame that finds the menu closed and settled.
+    fn on_closed(mut self, handler: impl FnOnce(&mut App) + 'static) -> Self {
+        self.on_closed = Some(Box::new(handler));
+        self
     }
     /// Close the menu when an item (other than a sub-menu) is activated
     /// (default). Off, the menu stays open, e.g. to toggle several items.
@@ -1177,9 +1187,12 @@ fn reveal_surface(
 }
 
 impl RenderOnce for MenuPopup {
-    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
+    fn render(mut self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let (reveal, fade) = open_motion(&self.id, self.open, window, cx);
         let visible = popup_visible(self.open, reveal, fade);
+        if !visible && let Some(closed) = self.on_closed.take() {
+            closed(cx);
+        }
         let focus = window
             .use_keyed_state((self.id.clone(), "menu-popup-focus"), cx, |_, cx| {
                 cx.focus_handle()
@@ -1420,6 +1433,143 @@ impl RenderOnce for MenuPopup {
                     .take()
                     .unwrap_or_else(|| div().into_any_element())
             })
+    }
+}
+
+/// A menu that opens at the pointer on a right press inside its parent.
+///
+/// Add it as the first child of the element it serves, which must be
+/// `relative`: it takes no room, and it builds nothing until the press, so a
+/// long list pays only for a hitbox and a listener per row. The menu behaves as
+/// a [`MenuPopup`] does: it reveals on the same motion, keeps inside the window,
+/// takes focus and returns it, and closes on an activated item, Escape or a press
+/// outside. A right press elsewhere in the parent moves it there. Of nested
+/// context menus, the innermost under the pointer opens.
+///
+/// A control that blocks the mouse, such as a button in the row, keeps its own
+/// right press, as it does for Kit's `context_menu`. Give the same commands a
+/// way in from the keyboard, usually a [`MenuPopup`] behind a "more" button.
+///
+/// ```ignore
+/// div()
+///     .relative()
+///     .child(MaterialContextMenu::new("row-menu", |_, _| {
+///         MaterialMenu::new("row-menu-items").item(MaterialMenuItem::new("Rename"))
+///     }))
+///     .child(row_content)
+/// ```
+#[derive(gpui::IntoElement)]
+pub struct MaterialContextMenu {
+    id: ElementId,
+    menu: MenuBuilder,
+}
+
+impl MaterialContextMenu {
+    /// `menu` builds the menu on each frame it is shown, and no other.
+    pub fn new(
+        id: impl Into<ElementId>,
+        menu: impl Fn(&mut Window, &mut App) -> MaterialMenu + 'static,
+    ) -> Self {
+        Self {
+            id: id.into(),
+            menu: Box::new(menu),
+        }
+    }
+}
+
+#[derive(Default)]
+struct ContextMenuState {
+    /// Whether the popup is in the tree: from the press until it has closed.
+    mounted: bool,
+    /// The popup enters the tree closed for one frame, so that it has a closed
+    /// state to reveal from and a trigger position to open at.
+    entering: bool,
+    open: bool,
+    /// The pointer's offset from the parent's start edge.
+    position: Point<Pixels>,
+}
+
+impl RenderOnce for MaterialContextMenu {
+    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
+        let state = window.use_keyed_state((self.id.clone(), "context-menu"), cx, |_, _| {
+            ContextMenuState::default()
+        });
+        let rtl = crate::scope::is_rtl(window);
+        let press = canvas(
+            |bounds, window, _| (bounds, window.insert_hitbox(bounds, HitboxBehavior::Normal)),
+            {
+                let state = state.clone();
+                move |_, (bounds, hitbox): (Bounds<Pixels>, Hitbox), window, _| {
+                    window.on_mouse_event(move |event: &MouseDownEvent, phase, window, cx| {
+                        if phase.bubble()
+                            && event.button == MouseButton::Right
+                            && hitbox.is_hovered(window)
+                        {
+                            // Bubbling reaches the innermost context menu first.
+                            cx.stop_propagation();
+                            let from_left = event.position - bounds.origin;
+                            state.update(cx, |state, cx| {
+                                state.entering = !state.mounted;
+                                state.mounted = true;
+                                state.open = true;
+                                // Layout mirrors an absolute offset right to left.
+                                state.position = point(
+                                    if rtl {
+                                        bounds.size.width - from_left.x
+                                    } else {
+                                        from_left.x
+                                    },
+                                    from_left.y,
+                                );
+                                cx.notify();
+                            });
+                        }
+                    });
+                }
+            },
+        )
+        .absolute()
+        .top_0()
+        .left_0()
+        .size_full();
+        let mut popup = None;
+        if state.read(cx).mounted {
+            let entering = state.update(cx, |state, _| std::mem::take(&mut state.entering));
+            if entering {
+                window.request_animation_frame();
+            }
+            let open = state.read(cx).open && !entering;
+            let position = state.read(cx).position;
+            let close = state.clone();
+            let mut menu = MenuPopup::new((self.id, "popup"), div(), (self.menu)(window, cx))
+                .open(open)
+                .on_open_change(move |next, _, cx| {
+                    close.update(cx, |state, cx| {
+                        state.open = *next;
+                        cx.notify();
+                    })
+                });
+            // The frame that finds it closed still draws it, so its popover
+            // returns focus before it leaves the tree.
+            if !entering {
+                let leave = state.clone();
+                menu = menu.on_closed(move |cx| leave.update(cx, |state, _| state.mounted = false));
+            }
+            popup = Some(
+                div()
+                    .absolute()
+                    .left(position.x)
+                    .top(position.y)
+                    .child(menu),
+            );
+        }
+        div()
+            .absolute()
+            .top_0()
+            .left_0()
+            .size_full()
+            .child(press)
+            .children(popup)
     }
 }
 

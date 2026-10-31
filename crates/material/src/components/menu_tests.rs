@@ -89,6 +89,168 @@ fn keyboard_navigation_skips_disabled_items_and_wraps() {
     assert_eq!(target(&[true, true], None, Direction::Next), None);
 }
 
+struct ContextHarness {
+    picked: Rc<Cell<usize>>,
+    built: Rc<Cell<usize>>,
+    focus: FocusHandle,
+    rtl: bool,
+}
+
+impl Render for ContextHarness {
+    fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        window.set_rem_size(px(14.));
+        if self.rtl {
+            window.set_layout_direction(gpui::LayoutDirection::Rtl);
+        }
+        let (picked, built) = (self.picked.clone(), self.built.clone());
+        let region = move |id: &'static str, label: &'static str| {
+            let (picked, built) = (picked.clone(), built.clone());
+            MaterialContextMenu::new(id, move |_, _| {
+                built.set(built.get() + 1);
+                let picked = picked.clone();
+                MaterialMenu::new((id, 0usize)).item(
+                    MaterialMenuItem::new(label)
+                        .leading(div().debug_selector(move || label.into()).size_full())
+                        .on_click(move |_, _, _| picked.set(picked.get() + 1)),
+                )
+            })
+        };
+        div()
+            .size_full()
+            .track_focus(&self.focus)
+            .child(
+                div()
+                    .debug_selector(|| "row".into())
+                    .relative()
+                    .w(px(400.))
+                    .h(px(300.))
+                    .child(region("outer", "outer-item"))
+                    .child(
+                        div()
+                            .debug_selector(|| "inner".into())
+                            .relative()
+                            .size(px(100.))
+                            .child(region("inner", "inner-item")),
+                    ),
+            )
+            .child(div().debug_selector(|| "elsewhere".into()).size(px(40.)))
+    }
+}
+
+fn context_menu(
+    cx: &mut TestAppContext,
+    rtl: bool,
+) -> (Entity<ContextHarness>, &mut VisualTestContext) {
+    cx.update(|cx| {
+        gpui_kit::init(cx);
+        crate::init(cx);
+        cx.set_reduce_motion(true);
+    });
+    let (view, cx) = cx.add_window_view(move |_, cx| ContextHarness {
+        picked: Rc::default(),
+        built: Rc::default(),
+        focus: cx.focus_handle(),
+        rtl,
+    });
+    settle(cx);
+    (view, cx)
+}
+
+fn right_press(cx: &mut VisualTestContext, at: Point<Pixels>) {
+    cx.simulate_mouse_down(at, MouseButton::Right, Modifiers::default());
+    cx.simulate_mouse_up(at, MouseButton::Right, Modifiers::default());
+    settle(cx);
+}
+
+#[gpui::test]
+fn a_right_press_opens_the_menu_at_the_pointer(cx: &mut TestAppContext) {
+    let (view, cx) = context_menu(cx, false);
+    let built = view.update(cx, |v, _| v.built.clone());
+    assert_eq!(built.get(), 0, "nothing is built before the press");
+    let row = cx.debug_bounds("row").unwrap();
+    let at = row.origin + point(px(200.), px(150.));
+    cx.simulate_click(at, Modifiers::default());
+    settle(cx);
+    assert!(
+        cx.debug_bounds("material-menu").is_none(),
+        "a left press does not"
+    );
+
+    right_press(cx, at);
+    let menu = cx.debug_bounds("material-menu").expect("the menu opened");
+    assert_eq!(menu.origin.x, at.x, "its start is at the pointer");
+    assert!(menu.origin.y >= at.y && menu.origin.y - at.y <= px(4.));
+
+    let moved = row.origin + point(px(150.), px(280.));
+    right_press(cx, moved);
+    let menu = cx.debug_bounds("material-menu").expect("the menu stayed");
+    assert_eq!(menu.origin.x, moved.x, "a second press moves it");
+}
+
+#[gpui::test]
+fn a_right_press_opens_the_menu_at_the_pointer_right_to_left(cx: &mut TestAppContext) {
+    let (_, cx) = context_menu(cx, true);
+    let row = cx.debug_bounds("row").unwrap();
+    let at = row.origin + point(px(200.), px(150.));
+    right_press(cx, at);
+    let menu = cx.debug_bounds("material-menu").expect("the menu opened");
+    assert_eq!(menu.right(), at.x, "its start is at the pointer");
+}
+
+#[gpui::test]
+fn an_activated_context_item_runs_and_the_menu_leaves_the_tree(cx: &mut TestAppContext) {
+    let (view, cx) = context_menu(cx, false);
+    let (picked, built) = view.update(cx, |v, _| (v.picked.clone(), v.built.clone()));
+    let row = cx.debug_bounds("row").unwrap();
+    right_press(cx, row.origin + point(px(200.), px(150.)));
+    let item = cx.debug_bounds("outer-item").unwrap().center();
+    cx.simulate_click(item, Modifiers::default());
+    settle(cx);
+    assert_eq!(picked.get(), 1);
+    assert!(cx.debug_bounds("material-menu").is_none());
+    let settled = built.get();
+    draw(cx);
+    assert_eq!(built.get(), settled, "a closed menu builds nothing");
+}
+
+#[gpui::test]
+fn escape_closes_a_context_menu_and_returns_focus(cx: &mut TestAppContext) {
+    let (view, cx) = context_menu(cx, false);
+    let focus = view.update(cx, |v, _| v.focus.clone());
+    cx.update(|window, cx| focus.focus(window, cx));
+    settle(cx);
+    let row = cx.debug_bounds("row").unwrap();
+    right_press(cx, row.origin + point(px(200.), px(150.)));
+    cx.update(|window, _| assert!(!focus.is_focused(window), "the menu takes focus"));
+    cx.simulate_keystrokes("down");
+    settle(cx);
+    cx.simulate_keystrokes("escape");
+    settle(cx);
+    assert!(cx.debug_bounds("material-menu").is_none());
+    cx.update(|window, _| assert!(focus.is_focused(window), "focus comes back"));
+}
+
+#[gpui::test]
+fn a_press_outside_closes_a_context_menu(cx: &mut TestAppContext) {
+    let (_, cx) = context_menu(cx, false);
+    let row = cx.debug_bounds("row").unwrap();
+    right_press(cx, row.origin + point(px(200.), px(150.)));
+    assert!(cx.debug_bounds("material-menu").is_some());
+    let outside = cx.debug_bounds("elsewhere").unwrap().center();
+    cx.simulate_click(outside, Modifiers::default());
+    settle(cx);
+    assert!(cx.debug_bounds("material-menu").is_none());
+}
+
+#[gpui::test]
+fn the_innermost_context_menu_under_the_pointer_opens(cx: &mut TestAppContext) {
+    let (_, cx) = context_menu(cx, false);
+    let inner = cx.debug_bounds("inner").unwrap().center();
+    right_press(cx, inner);
+    assert!(cx.debug_bounds("inner-item").is_some());
+    assert!(cx.debug_bounds("outer-item").is_none());
+}
+
 #[test]
 fn a_closing_popup_paints_until_both_channels_settle() {
     assert!(popup_visible(true, 0., 0.));
