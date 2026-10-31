@@ -1457,7 +1457,8 @@ impl ExposedDropdown {
             required: false,
             leading: None,
             supporting: None,
-            style: MenuStyle::Standard,
+            // The kit's menus anchored to a text field are baseline menus.
+            style: MenuStyle::Baseline,
             width: 210.,
             on_open_change: None,
             on_select: None,

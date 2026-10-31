@@ -522,3 +522,13 @@ fn a_material_button_trigger_toggles_the_menu_by_pointer(cx: &mut TestAppContext
     settle(cx);
     cx.update(|_, cx| assert!(!view.read(cx).open, "a second press closes it"));
 }
+
+/// The kit draws menus anchored to a text field as baseline menus: the select's
+/// selected option is on the secondary container, not the expressive tertiary.
+#[test]
+fn an_exposed_dropdown_opens_a_baseline_menu() {
+    assert_eq!(
+        ExposedDropdown::new("select", "Fruit").style,
+        MenuStyle::Baseline
+    );
+}
