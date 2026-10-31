@@ -8,8 +8,6 @@
   "development_examples_limit": "Upstream development examples are preserved, including references to sibling story-web font and repository example fixtures. Those external fixtures are not included in this Base-only vendor snapshot; standalone example execution is not asserted.",
   "license": "Apache-2.0",
   "local_patch_files": [
-    "src/a11y_disabled.rs",
-    "src/button.rs",
     "src/dialog.rs",
     "src/input/base/element.rs",
     "src/input/base/state.rs",
@@ -20,16 +18,6 @@
     "src/toolbar.rs"
   ],
   "local_patch_sha256": {
-    "src/a11y_disabled.rs": {
-      "local_sha256": "369279b8e5a2bec83c572c44fb5b62aa477cff6c2aac3be2f9004255ad878f40",
-      "reason": "Transparent accessibility state for disabled and busy controls (motion-patch.md).",
-      "upstream_sha256": "979c0103db88f31fad9425ca6fc16351bdb07a5b5b0fe30a85d2aaec573bcceb"
-    },
-    "src/button.rs": {
-      "local_sha256": "c493baa980d6832c151cf439bb35023ba86dd7baf37aa5cb5ec03982e5449755",
-      "reason": "Caller-controlled busy(bool), independent of disabled (motion-patch.md).",
-      "upstream_sha256": "822d81a514355c92f41f4a13392f783b4307061ecc8be49a38f4bc1f41fdd55c"
-    },
     "src/dialog.rs": {
       "local_sha256": "950592bd13881d5540885528eb6aa197cf39adcb245109b102ba6abb683e30f1",
       "reason": "Dialog::accessibility_label names the Role::Dialog host for accessibility clients (motion-patch.md).",

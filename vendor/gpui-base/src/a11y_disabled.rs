@@ -1,28 +1,23 @@
-//! Disabled and busy semantics on a control's accessibility node.
+//! Disabled semantics on a control's accessibility node.
 //!
-//! GPUI has no `aria_disabled` or `aria_busy` setter, so a disabled control would reach
+//! GPUI has no `aria_disabled` setter, so a disabled control would reach
 //! assistive technology as one that accepts input. [`A11yDisabledExt`] wraps the
 //! control's root element without adding a layout node, a focus stop or an
-//! accessibility node, and marks the state on the node it writes.
+//! accessibility node, and only marks the node it writes disabled.
 use gpui::{
     App, Bounds, Element, ElementId, GlobalElementId, InspectorElementId, InteractiveElement,
     Interactivity, IntoElement, LayoutId, Pixels, Window, accesskit,
 };
 
-/// A control's root element whose accessibility node may be disabled or busy.
+/// A control's root element whose accessibility node may be marked disabled.
 pub(crate) struct A11yDisabled<E> {
     inner: E,
     disabled: bool,
-    busy: bool,
 }
 
 impl<E> A11yDisabled<E> {
-    pub(crate) fn new(inner: E, disabled: bool, busy: bool) -> Self {
-        Self {
-            inner,
-            disabled,
-            busy,
-        }
+    pub(crate) fn new(inner: E, disabled: bool) -> Self {
+        Self { inner, disabled }
     }
 }
 
@@ -33,20 +28,15 @@ impl<E> A11yDisabled<E> {
 pub(crate) trait A11yDisabledExt: Sized {
     type Output: IntoElement;
 
-    fn a11y_disabled(self, disabled: bool) -> Self::Output {
-        self.a11y_control_state(disabled, false)
-    }
-
-    /// Add semantic state without adding a layout or accessibility node.
-    fn a11y_control_state(self, disabled: bool, busy: bool) -> Self::Output;
+    fn a11y_disabled(self, disabled: bool) -> Self::Output;
 }
 
 #[cfg(not(feature = "test-support"))]
 impl<E: Element + InteractiveElement> A11yDisabledExt for E {
     type Output = A11yDisabled<E>;
 
-    fn a11y_control_state(self, disabled: bool, busy: bool) -> Self::Output {
-        A11yDisabled::new(self, disabled, busy)
+    fn a11y_disabled(self, disabled: bool) -> Self::Output {
+        A11yDisabled::new(self, disabled)
     }
 }
 
@@ -54,8 +44,8 @@ impl<E: Element + InteractiveElement> A11yDisabledExt for E {
 impl<E: Element + InteractiveElement> A11yDisabledExt for gpui::Stateful<E> {
     type Output = A11yDisabled<Self>;
 
-    fn a11y_control_state(self, disabled: bool, busy: bool) -> Self::Output {
-        A11yDisabled::new(self, disabled, busy)
+    fn a11y_disabled(self, disabled: bool) -> Self::Output {
+        A11yDisabled::new(self, disabled)
     }
 }
 
@@ -65,8 +55,8 @@ impl<E: Element<PrepaintState = Option<gpui::Hitbox>> + InteractiveElement> A11y
 {
     type Output = crate::test_support::Observed<A11yDisabled<E>>;
 
-    fn a11y_control_state(self, disabled: bool, busy: bool) -> Self::Output {
-        self.map_inner(|inner| A11yDisabled::new(inner, disabled, busy))
+    fn a11y_disabled(self, disabled: bool) -> Self::Output {
+        self.map_inner(|inner| A11yDisabled::new(inner, disabled))
     }
 }
 
@@ -142,9 +132,6 @@ impl<E: Element> Element for A11yDisabled<E> {
         if self.disabled {
             node.set_disabled();
         }
-        if self.busy {
-            node.set_busy();
-        }
     }
 
     fn a11y_synthetic_children(
@@ -174,53 +161,6 @@ mod tests {
         let mut node = accesskit::Node::new(element.a11y_role().unwrap_or(gpui::Role::Unknown));
         element.write_a11y_info(&mut node);
         node
-    }
-
-    #[gpui::test]
-    fn button_and_toggle_busy_is_independent_of_disabled(cx: &mut TestAppContext) {
-        type States = Arc<Mutex<Vec<(bool, bool, accesskit::Node)>>>;
-        struct BusyProbe(States);
-        impl Render for BusyProbe {
-            fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
-                let captured = self.0.clone();
-                canvas(
-                    move |_, window, cx| {
-                        let mut nodes = captured.lock().unwrap();
-                        nodes.clear();
-                        for busy in [false, true] {
-                            for disabled in [false, true] {
-                                nodes.push((
-                                    busy,
-                                    disabled,
-                                    node_of(
-                                        Button::new("busy-button")
-                                            .busy(busy)
-                                            .disabled(disabled)
-                                            .on_click(|_, _, _| {})
-                                            .render(window, cx),
-                                    ),
-                                ));
-                            }
-                        }
-                    },
-                    |_, _, _, _| {},
-                )
-            }
-        }
-        let captured = Arc::new(Mutex::new(Vec::new()));
-        let (_, cx) = cx.add_window_view({
-            let captured = captured.clone();
-            move |_, _| BusyProbe(captured)
-        });
-        cx.update(|window, cx| window.draw(cx).clear(cx));
-        let nodes = captured.lock().unwrap();
-        assert_eq!(nodes.len(), 4);
-        for (busy, disabled, node) in nodes.iter() {
-            assert_eq!(node.role(), gpui::Role::Button);
-            assert_eq!(node.is_busy(), *busy);
-            assert_eq!(node.is_disabled(), *disabled);
-            assert_eq!(node.supports_action(accesskit::Action::Click), !disabled);
-        }
     }
 
     type Captured = Arc<Mutex<Vec<(&'static str, bool, accesskit::Node)>>>;

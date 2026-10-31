@@ -27,7 +27,6 @@ pub struct Button {
     semantic_styles: ButtonStyles,
     selected: bool,
     disabled: bool,
-    busy: bool,
     children: SmallVec<[AnyElement; 2]>,
     on_click: Option<ClickHandler>,
     accessibility_label: Option<SharedString>,
@@ -48,7 +47,6 @@ impl Button {
             semantic_styles: ButtonStyles::default(),
             selected: false,
             disabled: false,
-            busy: false,
             children: SmallVec::new(),
             on_click: None,
             accessibility_label: None,
@@ -67,13 +65,6 @@ impl Button {
     /// focus moves away, so keyboard traversal can continue in either direction.
     pub fn disabled(mut self, disabled: bool) -> Self {
         self.disabled = disabled;
-        self
-    }
-
-    /// Mark the control as busy for assistive technology. This does not disable
-    /// activation; applications independently choose the disabled state.
-    pub fn busy(mut self, busy: bool) -> Self {
-        self.busy = busy;
         self
     }
 
@@ -275,7 +266,7 @@ impl RenderOnce for Button {
             )
             .children(self.children)
             .refine_style(&style)
-            .a11y_control_state(disabled, self.busy)
+            .a11y_disabled(disabled)
     }
 }
 
