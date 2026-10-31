@@ -1151,8 +1151,11 @@ impl Render for PreviewView {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let scope = self.shared.read(cx).preview_scope().resolve(window, cx);
         let state = self.state.clone();
+        // A lease: what the Gallery reads of the state does not change by building
+        // the preview, and through `update` every animation frame of a preview
+        // would rebuild the Gallery around it.
         let (preview, hint) = scope.build(window, cx, |window, cx| {
-            state.update(cx, |state, cx| {
+            state.update_for_render(cx, |state, cx| {
                 (state.render_preview(window, cx), state.pane_hint())
             })
         });
@@ -1199,7 +1202,7 @@ impl Render for PanelView {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let panel = self
             .state
-            .update(cx, |state, cx| state.render_panel(window, cx));
+            .update_for_render(cx, |state, cx| state.render_panel(window, cx));
         // Stacked, the card is as tall as its controls and the page scrolls.
         if panes_stacked(window, self.hint.get()) {
             return panel;

@@ -873,6 +873,7 @@ impl Window {
             .push(OpenPaint { nested: Vec::new() });
         let hovers_start = self.retained_state.hover_dependencies.len();
         let start = self.paint_index();
+        let writes_before = cx.entities.write_generation();
         let mut segments: Vec<(PaintIndex, PaintIndex)> = Vec::with_capacity(gaps.len() + 1);
         let mut cursor = paint_range.start.clone();
         for gap in gaps.iter_mut() {
@@ -928,10 +929,20 @@ impl Window {
         hovers.extend_from_slice(&own_hovers);
         hovers.extend_from_slice(&copied_hovers);
         hovers.extend_from_slice(gap_hovers);
+        // What the gaps wrote as they painted is part of drawing this view, as it
+        // is of a view painted whole. Taken for a change to what it read, a nested
+        // input storing its layout would build this view on every later frame.
+        let writes_after = cx.entities.write_generation();
         let record = &mut self.next_frame.retained.records[*index];
         record.paint_range = start..end;
         record.paint = PaintStatus::Painted { source: None };
         record.hover_dependencies = hovers.into();
+        record.dependencies = record
+            .dependencies
+            .with_own_writes(writes_before, writes_after);
+        record.own_dependencies = record
+            .own_dependencies
+            .with_own_writes(writes_before, writes_after);
         self.retained_state.open_paints.pop();
         self.retained_state.subtree_stack.pop();
 

@@ -1202,6 +1202,13 @@ mod window_tests {
                     ..Default::default()
                 });
                 visual.run_until_parked();
+                // The frame an animation ticks between two wheels: nothing is dirty
+                // for the Gallery, whatever the last draw painted.
+                visual.update(|window, cx| {
+                    window.simulate_next_frame(cx);
+                    window.draw(cx).clear(cx);
+                });
+                visual.run_until_parked();
             }
             assert_eq!(
                 cx.read(|cx| gallery.read(cx).renders.get()),

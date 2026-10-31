@@ -258,8 +258,8 @@
       },
       "src/fast/splice.rs": {
         "upstream_sha256": "4436ab4f8934aec0e95e73edf69fb3ea36c1b01cb6fe494037cb9923ea221efd",
-        "local_sha256": "e5a18513fa798ad23f0648a81e6544995112cd4a46e8f8346c265ae3c7fa6a0a",
-        "reason": "A view rebuilt alone keeps its direction (vendor/gpui-pre/layout-direction-patch.md)."
+        "local_sha256": "f6932404b16138329069649b83a3be9884ba338862c5aceedbca884919349dbd",
+        "reason": "A view rebuilt alone keeps its direction (vendor/gpui-pre/layout-direction-patch.md). What a gap writes as it paints is the spliced view's own."
       },
       "src/fast/text.rs": {
         "upstream_sha256": "e386a393269aee9189cb87c2a1f40f40fb4716b2cd98e6a394e052b318177814",
