@@ -13,6 +13,8 @@ Distribution is by Git revision for now; see the [quick start](README.md#quick-s
 - `rust-version` 1.99.1, the toolchain this workspace is verified with.
 - `[package.metadata.docs.rs]`, `deny.toml`, and CI checks of what each package ships.
 
+- `status_chip_outlined`: one of several facts in a row, filled only where it needs attention.
+
 ### Changed
 
 - Kit is pinned by revision (`bb85882`) instead of `branch = "main"`, so a consumer
