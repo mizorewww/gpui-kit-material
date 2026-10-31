@@ -1359,18 +1359,20 @@ impl RenderOnce for MenuPopup {
         let measure = trigger_height;
         // Material buttons block the mouse for the elements under them, so
         // Kit's popover never sees a press on such a trigger. A window
-        // listener over the trigger's bounds toggles the menu instead (a
-        // press while open closes it before the popover's outside-press
-        // dismissal, which then has nothing to do).
+        // listener toggles the menu instead (a press while open closes it
+        // before the popover's outside-press dismissal, which then has nothing
+        // to do). A passive hitbox over the trigger keeps what covers the
+        // trigger, such as a dialog or an app bar, in charge of its own press;
+        // it has to come after the trigger, which would otherwise occlude it.
         let toggle = self.on_open_change.clone();
         let press = canvas(
-            |_, _, _| {},
-            move |bounds, _, window, _| {
+            |bounds, window, _| window.insert_hitbox(bounds, HitboxBehavior::Normal),
+            move |_, hitbox, window, _| {
                 let toggle = toggle.clone();
                 window.on_mouse_event(move |event: &MouseDownEvent, phase, window, cx| {
                     if phase == DispatchPhase::Capture
                         && event.button == MouseButton::Left
-                        && bounds.contains(&event.position)
+                        && hitbox.is_hovered(window)
                         && let Some(toggle) = toggle.as_ref()
                     {
                         toggle(&!open, window, cx);
@@ -1379,16 +1381,18 @@ impl RenderOnce for MenuPopup {
             },
         )
         .absolute()
+        .top_0()
+        .left_0()
         .size_full();
         let trigger = div()
             .relative()
+            .child(self.trigger)
             .child(super::prepaint_bounds(press, move |bounds, window, _| {
                 measure.set(
                     f32::from(bounds.size.height) * crate::tokens::typography::BASE_PX
                         / f32::from(window.rem_size()),
                 );
-            }))
-            .child(self.trigger);
+            }));
         Popover::new(self.id.clone())
             .appearance(false)
             .anchor(if crate::scope::is_rtl(window) {

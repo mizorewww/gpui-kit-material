@@ -187,6 +187,76 @@ fn the_popup_opens_below_its_trigger_and_navigates_by_keyboard(cx: &mut TestAppC
     );
 }
 
+struct CoveredTrigger {
+    open: bool,
+    changes: Rc<Cell<usize>>,
+    covers: Rc<Cell<usize>>,
+}
+
+impl Render for CoveredTrigger {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        window.set_rem_size(px(14.));
+        let menu = MaterialMenu::new("menu").items([MaterialMenuItem::new("Item")]);
+        let changes = self.changes.clone();
+        let covers = self.covers.clone();
+        div()
+            .relative()
+            .size_full()
+            .child(
+                div().p(px(20.)).child(
+                    MenuPopup::new(
+                        "popup",
+                        crate::components::MaterialButton::new("menu-trigger")
+                            .debug_selector(|| "trigger".into())
+                            .child("Open"),
+                        menu,
+                    )
+                    .open(self.open)
+                    .on_open_change(cx.listener(
+                        move |this, open: &bool, _, cx| {
+                            this.open = *open;
+                            changes.set(changes.get() + 1);
+                            cx.notify();
+                        },
+                    )),
+                ),
+            )
+            .child(
+                // What an app bar or a dialog's scrim does to the trigger.
+                div()
+                    .id("cover")
+                    .absolute()
+                    .inset_0()
+                    .occlude()
+                    .on_click(move |_, _, _| covers.set(covers.get() + 1)),
+            )
+    }
+}
+
+#[gpui::test]
+fn a_press_on_what_covers_the_trigger_does_not_open_the_menu(cx: &mut TestAppContext) {
+    cx.update(|cx| {
+        gpui_kit::init(cx);
+        crate::init(cx);
+        cx.set_reduce_motion(true);
+    });
+    let (view, cx) = cx.add_window_view(|_, _| CoveredTrigger {
+        open: false,
+        changes: Rc::default(),
+        covers: Rc::default(),
+    });
+    draw(cx);
+    let trigger = cx.debug_bounds("trigger").unwrap();
+    cx.simulate_click(trigger.center(), Modifiers::default());
+    settle(cx);
+    cx.update(|_, cx| {
+        let view = view.read(cx);
+        assert_eq!(view.changes.get(), 0, "the covered trigger heard the press");
+        assert!(!view.open);
+        assert_eq!(view.covers.get(), 1, "the cover took it");
+    });
+}
+
 #[gpui::test]
 fn escape_closes_the_menu(cx: &mut TestAppContext) {
     let (view, cx) = setup(cx);
