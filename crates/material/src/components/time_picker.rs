@@ -1406,9 +1406,12 @@ impl RenderOnce for TimePicker {
                             let state = period_state.clone();
                             return segment
                                 .clear_children()
+                                .when(cfg!(test), |segment| {
+                                    segment.debug_selector(|| "time-period".into())
+                                })
                                 .ml(rem(12.))
-                                .child(
-                                    PeriodSelector::new(
+                                .child({
+                                    let period = PeriodSelector::new(
                                         "period",
                                         period_labels.am.clone(),
                                         period_labels.pm.clone(),
@@ -1419,8 +1422,13 @@ impl RenderOnce for TimePicker {
                                         move |pm, window, cx| {
                                             state.update(cx, |s, cx| s.set_pm(pm, window, cx))
                                         },
-                                    ),
-                                )
+                                    );
+                                    if specimen {
+                                        period.preview_state(pm, InteractionPreview::Enabled)
+                                    } else {
+                                        period
+                                    }
+                                })
                                 .into_any_element();
                         }
                         let selected = which == editing;
