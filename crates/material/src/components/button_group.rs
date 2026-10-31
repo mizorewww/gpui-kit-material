@@ -318,10 +318,13 @@ struct Metrics {
     inner: f32,
     /// Unselected outer ends: `None` is a full half-height round.
     outer: Option<f32>,
-    /// Horizontal padding of filling options, inside the 2px border;
-    /// content-sized options add the border back.
+    /// Horizontal padding of filling options, inside the 2px border.
     padding: f32,
+    /// The same of content-sized options.
+    content_padding: f32,
     icon: f32,
+    /// Between an option's icon and label.
+    icon_gap: f32,
     text: Option<TypeRole>,
     /// Options stack top to bottom.
     vertical: bool,
@@ -329,14 +332,16 @@ struct Metrics {
 
 impl Metrics {
     /// M3 Expressive connected group (Figma kit): each option is that
-    /// size's button; inner corners are XS 4, S 8, M 8, L 16, XL 20.
+    /// size's button, padding and icon gap included, so with the border an
+    /// option's content sits where the button's does; inner corners are
+    /// XS 4, S 8, M 8, L 16, XL 20.
     fn of(size: ButtonSize, shape: ButtonShape) -> Self {
-        let (height, inner, padding, icon, text) = match size {
-            ButtonSize::ExtraSmall => (32., 4., 12., 20., TypeRole::LabelLarge),
-            ButtonSize::Small => (40., 8., 16., 20., TypeRole::LabelLarge),
-            ButtonSize::Medium => (56., 8., 24., 24., TypeRole::TitleMedium),
-            ButtonSize::Large => (96., 16., 48., 32., TypeRole::HeadlineSmall),
-            ButtonSize::ExtraLarge => (136., 20., 64., 40., TypeRole::HeadlineLarge),
+        let (height, inner, padding, icon, icon_gap, text) = match size {
+            ButtonSize::ExtraSmall => (32., 4., 12., 20., 4., TypeRole::LabelLarge),
+            ButtonSize::Small => (40., 8., 16., 20., 8., TypeRole::LabelLarge),
+            ButtonSize::Medium => (56., 8., 24., 24., 8., TypeRole::TitleMedium),
+            ButtonSize::Large => (96., 16., 48., 32., 12., TypeRole::HeadlineSmall),
+            ButtonSize::ExtraLarge => (136., 20., 64., 40., 16., TypeRole::HeadlineLarge),
         };
         Self {
             height,
@@ -344,7 +349,9 @@ impl Metrics {
             // Square groups round their ends like their inner corners.
             outer: (shape == ButtonShape::Square).then_some(inner),
             padding: padding - 2.,
+            content_padding: padding - 2.,
             icon,
+            icon_gap,
             text: Some(text),
             vertical: false,
         }
@@ -355,7 +362,9 @@ impl Metrics {
             inner: INNER_RADIUS,
             outer: None,
             padding: 12.,
+            content_padding: 14.,
             icon: 18.,
+            icon_gap: 8.,
             text: None,
             vertical: false,
         }
@@ -464,7 +473,7 @@ fn item_style<T: Styled + StatefulInteractiveElement + gpui::prelude::FluentBuil
         .px(rem(if fill {
             metrics.padding
         } else {
-            metrics.padding + 2.
+            metrics.content_padding
         }))
         .py_0()
         .map(|item| {
@@ -775,7 +784,7 @@ impl RenderOnce for ConnectedButtonGroup {
             });
             let content = gpui_base::h_flex()
                 .when(!fill, |content| content.max_w_full().min_w_0())
-                .gap(rem(8.))
+                .gap(rem(metrics.icon_gap))
                 .items_center()
                 // Text-only options center their label; no empty icon slot.
                 .when_some(self.icons.get(&value).cloned(), |content, icon| {
@@ -801,9 +810,10 @@ impl RenderOnce for ConnectedButtonGroup {
                         GroupLabels::Never if has_icon => content,
                         GroupLabels::Selected if has_icon => {
                             let role = metrics.text.unwrap_or(TypeRole::LabelLarge);
-                            content.gap(rem(8. * selection.clamp(0., 1.))).children(
-                                super::fab::revealed_label(&label, role, selection, window),
-                            )
+                            let gap = metrics.icon_gap * selection.clamp(0., 1.);
+                            content.gap(rem(gap)).children(super::fab::revealed_label(
+                                &label, role, selection, window,
+                            ))
                         }
                         _ => content.child(
                             div()
@@ -1429,6 +1439,43 @@ mod tests {
         };
         assert_eq!(paint.left_radius, left, "{name}");
         assert_eq!(paint.right_radius, right, "{name}");
+    }
+
+    struct SizedHarness(crate::components::ButtonSize);
+    impl Render for SizedHarness {
+        fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+            window.set_rem_size(px(crate::tokens::typography::BASE_PX));
+            div().flex().items_start().child(
+                ConnectedButtonGroup::new("connected-sized", "Sized")
+                    .options([("0", "One"), ("1", "Two")])
+                    .icon("0", IconName::Check)
+                    .button_size(self.0)
+                    .selected("1"),
+            )
+        }
+    }
+
+    /// An option of a sized group is that size's button: the kit's padding and
+    /// icon-label gap (`tests/fixtures/figma-button.json`).
+    #[gpui::test]
+    fn a_sized_option_has_its_buttons_padding_and_gap(cx: &mut TestAppContext) {
+        cx.update(|cx| cx.set_reduce_motion(true));
+        use crate::components::ButtonSize as Size;
+        for (size, padding, gap) in [
+            (Size::ExtraSmall, 12., 4.),
+            (Size::Small, 16., 8.),
+            (Size::Medium, 24., 8.),
+            (Size::Large, 48., 12.),
+            (Size::ExtraLarge, 64., 16.),
+        ] {
+            let (_, cx) = cx.add_window_view(move |_, _| SizedHarness(size));
+            draw_choice(cx);
+            let option = choice_bounds(cx, "content-choice-option-0");
+            let icon = choice_bounds(cx, "content-choice-icon-0");
+            let label = choice_bounds(cx, "content-choice-label-0");
+            assert_eq!(icon.left() - option.left(), px(padding), "{size:?} padding");
+            assert_eq!(label.left() - icon.right(), px(gap), "{size:?} gap");
+        }
     }
 
     #[gpui::test]
@@ -2152,8 +2199,8 @@ mod mode_tests {
             },
         );
         let (bare, labelled) = (option(cx, 0), option(cx, 2));
-        // An unselected icon option is the icon, its padding and border.
-        assert_eq!(bare.size.width, px(20. + (16. + 2.) * 2.));
+        // An unselected icon option is the icon and its padding, the border within.
+        assert_eq!(bare.size.width, px(20. + 16. * 2.));
         assert!(labelled.size.width > bare.size.width + px(40.));
         let at = bare.center();
         cx.simulate_click(at, Modifiers::none());
