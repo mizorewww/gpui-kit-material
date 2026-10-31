@@ -293,3 +293,153 @@ fn dates_format_and_parse_in_every_format() {
     assert_eq!(DateFormat::YearMonthDay.parse("2025/08/17"), None);
     assert_eq!(DateFormat::DayMonthYear.parse("not a date"), None);
 }
+
+#[test]
+fn a_year_is_written_in_full() {
+    let format = DateFormat::MonthDayYear;
+    assert_eq!(format.parse("08/17/2"), None, "still typing");
+    assert_eq!(format.parse("08/17/25"), None, "not the year 25");
+    assert_eq!(format.parse("08/17/202"), None);
+    assert_eq!(format.parse("08/17/2025"), Some(d(2025, 8, 17)));
+    assert_eq!(DateFormat::YearMonthDay.parse("202 08 17"), None);
+}
+
+fn init_picker(cx: &mut TestAppContext) {
+    cx.update(|cx| {
+        gpui_kit::init(cx);
+        crate::init(cx);
+        cx.set_reduce_motion(true);
+    });
+}
+
+#[gpui::test]
+fn typing_a_complete_date_does_not_close_the_picker(cx: &mut TestAppContext) {
+    init_picker(cx);
+    let (view, cx) = cx.add_window_view(|window, cx| {
+        let input = cx.new(|cx| InputState::new(window, cx));
+        Harness(cx.new(|cx| {
+            DatePickerState::new(labels(), d(2025, 8, 5), cx)
+                .input_mode()
+                .close_on_selection(true)
+                .with_inputs(input, None, cx)
+        }))
+    });
+    let state = view.read_with(cx, |h, _| h.0.clone());
+    let input = state.read_with(cx, |s, _| s.inputs.clone().unwrap().0);
+    let (changes, dismissals) = (
+        Rc::new(std::cell::Cell::new(0)),
+        Rc::new(std::cell::Cell::new(0)),
+    );
+    cx.update(|_, cx| {
+        let (changes, dismissals) = (changes.clone(), dismissals.clone());
+        cx.subscribe(&state, move |_, event: &DatePickerEvent, _| match event {
+            DatePickerEvent::Change(_) => changes.set(changes.get() + 1),
+            DatePickerEvent::Dismiss(_) => dismissals.set(dismissals.get() + 1),
+            #[allow(unreachable_patterns)]
+            _ => {}
+        })
+        .detach();
+    });
+    cx.update(|window, cx| {
+        input.update(cx, |i, cx| i.set_value("08/17/2025", window, cx));
+        state.update(cx, |s, cx| s.parse_inputs(cx));
+    });
+    cx.run_until_parked();
+    assert!(changes.get() > 0, "the picker followed the text");
+    assert_eq!(dismissals.get(), 0, "typing leaves it open");
+    // A pick on the calendar still closes it.
+    state.update(cx, |s, cx| {
+        s.select(d(2025, 8, 18), cx);
+    });
+    cx.run_until_parked();
+    assert_eq!(dismissals.get(), 1);
+}
+
+#[gpui::test]
+fn empty_inputs_take_the_selection_rather_than_clear_it(cx: &mut TestAppContext) {
+    init_picker(cx);
+    let (view, cx) = cx.add_window_view(|window, cx| {
+        let input = cx.new(|cx| InputState::new(window, cx));
+        Harness(cx.new(|cx| {
+            DatePickerState::new(labels(), d(2025, 8, 5), cx)
+                .selection(DateSelection::Single(Some(d(2025, 8, 17))))
+                .input_mode()
+                .with_inputs(input, None, cx)
+        }))
+    });
+    let state = view.read_with(cx, |h, _| h.0.clone());
+    let input = state.read_with(cx, |s, _| s.inputs.clone().unwrap().0);
+    draw(cx);
+    cx.run_until_parked();
+    assert_eq!(input.read_with(cx, |i, _| i.value()).as_ref(), "08/17/2025");
+    state.update(cx, |s, cx| s.parse_inputs(cx));
+    let aug17 = DateSelection::Single(Some(d(2025, 8, 17)));
+    assert_eq!(state.read_with(cx, |s, _| s.value()), aug17);
+    // A value set from outside reaches the text too.
+    state.update(cx, |s, cx| {
+        s.set_value(DateSelection::Single(Some(d(2025, 9, 1))), cx)
+    });
+    draw(cx);
+    cx.run_until_parked();
+    state.update(cx, |s, cx| s.parse_inputs(cx));
+    assert_eq!(
+        state.read_with(cx, |s, _| s.value()),
+        DateSelection::Single(Some(d(2025, 9, 1)))
+    );
+}
+
+struct FullScreen(Entity<DatePickerState>);
+impl Render for FullScreen {
+    fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        window.set_rem_size(px(14.));
+        div()
+            .size_full()
+            .child(DatePicker::new("picker", &self.0).variant(DatePickerVariant::FullScreen))
+    }
+}
+
+#[gpui::test]
+fn the_full_screen_edit_button_shows_the_inputs(cx: &mut TestAppContext) {
+    init_picker(cx);
+    let (view, cx) = cx.add_window_view(|window, cx| {
+        let input = cx.new(|cx| InputState::new(window, cx));
+        FullScreen(cx.new(|cx| {
+            DatePickerState::new(labels(), d(2025, 8, 5), cx).with_inputs(input, None, cx)
+        }))
+    });
+    draw(cx);
+    assert!(cx.debug_bounds("date-picker-input").is_none());
+    let state = view.read_with(cx, |h, _| h.0.clone());
+    cx.update(|window, cx| state.update(cx, |s, cx| s.toggle_mode(window, cx)));
+    draw(cx);
+    assert!(cx.debug_bounds("date-picker-input").is_some());
+}
+
+#[gpui::test]
+fn the_cursor_comes_back_with_the_shown_month(cx: &mut TestAppContext) {
+    init_picker(cx);
+    let (view, cx) = cx.add_window_view(|_, cx| {
+        Harness(cx.new(|cx| DatePickerState::new(labels(), d(2026, 8, 5), cx)))
+    });
+    let state = view.read_with(cx, |h, _| h.0.clone());
+    draw(cx);
+    state.update(cx, |s, cx| {
+        s.cursor = d(2027, 8, 5);
+        s.choose_year(2026, cx);
+    });
+    assert_eq!(state.read_with(cx, |s, _| s.cursor), d(2026, 8, 5));
+}
+
+#[gpui::test]
+fn a_date_outside_the_offered_years_cannot_be_selected(cx: &mut TestAppContext) {
+    init_picker(cx);
+    let (view, cx) = cx.add_window_view(|_, cx| {
+        Harness(cx.new(|cx| DatePickerState::new(labels(), d(2030, 12, 5), cx).years(2000..=2030)))
+    });
+    let state = view.read_with(cx, |h, _| h.0.clone());
+    draw(cx);
+    let before = state.read_with(cx, |s, _| s.value());
+    let selected = state.update(cx, |s, cx| s.select(d(2031, 1, 2), cx));
+    assert!(!selected);
+    assert_eq!(state.read_with(cx, |s, _| s.value()), before);
+}

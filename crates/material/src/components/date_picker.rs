@@ -122,11 +122,7 @@ impl DateFormat {
     /// The date `text` writes in this format, if it names a real one.
     pub fn parse(self, text: &str) -> Option<NaiveDate> {
         let separator = if self == Self::YearMonthDay { ' ' } else { '/' };
-        let parts = text
-            .trim()
-            .split(separator)
-            .map(|part| part.trim().parse::<u32>().ok())
-            .collect::<Option<Vec<_>>>()?;
+        let parts: Vec<&str> = text.trim().split(separator).map(str::trim).collect();
         let [a, b, c] = parts[..] else {
             return None;
         };
@@ -135,7 +131,11 @@ impl DateFormat {
             Self::DayMonthYear => (c, b, a),
             Self::YearMonthDay => (a, b, c),
         };
-        NaiveDate::from_ymd_opt(i32::try_from(y).ok()?, m, d)
+        // Fewer digits are a year still being typed, not the year 2 or 25.
+        if y.len() < 4 {
+            return None;
+        }
+        NaiveDate::from_ymd_opt(y.parse().ok()?, m.parse().ok()?, d.parse().ok()?)
     }
 }
 
@@ -267,6 +267,8 @@ pub struct DatePickerState {
     month_scroll: UniformListScrollHandle,
     inputs: Option<(Entity<InputState>, Option<Entity<InputState>>)>,
     invalid: (bool, bool),
+    /// The inputs have yet to show the selection; a draw has the window to.
+    inputs_stale: bool,
     close_on_selection: bool,
     _subscriptions: Vec<Subscription>,
 }
@@ -306,6 +308,7 @@ impl DatePickerState {
             month_scroll: UniformListScrollHandle::new(),
             inputs: None,
             invalid: (false, false),
+            inputs_stale: false,
             close_on_selection: false,
             _subscriptions: Vec::new(),
         };
@@ -378,6 +381,7 @@ impl DatePickerState {
                 }));
         }
         self.inputs = Some((start, end));
+        self.inputs_stale = true;
         self
     }
 
@@ -440,6 +444,7 @@ impl DatePickerState {
     /// Replace the selection without emitting.
     pub fn set_value(&mut self, selection: DateSelection, cx: &mut Context<Self>) {
         self.apply(selection);
+        self.inputs_stale = self.inputs.is_some();
         cx.notify();
     }
 
@@ -448,7 +453,9 @@ impl DatePickerState {
     /// restarts, as in `gpui_base::CalendarState::select_date`. Disabled
     /// dates are ignored. Returns whether the selection changed.
     pub fn select(&mut self, date: NaiveDate, cx: &mut Context<Self>) -> bool {
-        if self.is_disabled(date) {
+        // An adjacent month's day can lie past the offered years, where the
+        // grid cannot show it.
+        if self.is_disabled(date) || !self.years.contains(&date.year()) {
             return false;
         }
         self.selection = next_selection(self.selection, date);
@@ -482,6 +489,10 @@ impl DatePickerState {
         let target = first_of_month(year, month);
         let current = (self.year, self.month);
         let to = (target.year(), target.month());
+        if (self.cursor.year(), self.cursor.month()) != to {
+            let day = self.cursor.day().min(days_in_month(to.0, to.1));
+            self.cursor = NaiveDate::from_ymd_opt(to.0, to.1, day).unwrap_or(target);
+        }
         if to == current {
             return;
         }
@@ -493,10 +504,6 @@ impl DatePickerState {
             generation: self.generation,
         });
         (self.year, self.month) = to;
-        if (self.cursor.year(), self.cursor.month()) != to {
-            let day = self.cursor.day().min(days_in_month(to.0, to.1));
-            self.cursor = NaiveDate::from_ymd_opt(to.0, to.1, day).unwrap_or(target);
-        }
         // Drop the outgoing grid once its slide has finished.
         let generation = self.generation;
         let settle = motion::curve(MotionToken::DefaultSpatial).duration();
@@ -576,6 +583,7 @@ impl DatePickerState {
         match self.mode {
             DateInputMode::Calendar => {
                 self.mode = DateInputMode::Input;
+                self.inputs_stale = false;
                 self.write_inputs(window, cx);
             }
             DateInputMode::Input => {
@@ -642,7 +650,9 @@ impl DatePickerState {
         };
         if next != self.selection {
             self.apply(next);
-            self.report_change(cx);
+            // Text that parses is not a choice made: only a pick closes the
+            // picker, or a date would close it under the person still typing.
+            cx.emit(DatePickerEvent::Change(self.selection));
         }
         cx.notify();
     }
@@ -987,6 +997,14 @@ fn icon(name: &str) -> Icon {
 
 impl RenderOnce for DatePicker {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
+        // OK reads the inputs, so they have to say what the picker holds.
+        let state = self.state.read(cx);
+        if state.inputs_stale && state.mode == DateInputMode::Input {
+            self.state.update(cx, |state, cx| {
+                state.inputs_stale = false;
+                state.write_inputs(window, cx);
+            });
+        }
         let s = self.state.read(cx);
         let snap = Rc::new(Snapshot {
             rtl: crate::scope::is_rtl(window),
@@ -1026,12 +1044,15 @@ impl RenderOnce for DatePicker {
             (DatePickerVariant::Docked, _) => ctx
                 .docked(self.show_actions.then_some(actions))
                 .into_any_element(),
-            (DatePickerVariant::FullScreen, _) => ctx
+            (DatePickerVariant::FullScreen, DateInputMode::Calendar) => ctx
                 .full_screen(actions, self.height.unwrap_or(696.))
                 .into_any_element(),
-            (DatePickerVariant::Modal, DateInputMode::Input) => {
-                ctx.modal_input(actions).into_any_element()
-            }
+            (DatePickerVariant::Modal | DatePickerVariant::FullScreen, DateInputMode::Input) => ctx
+                .modal_input(actions)
+                .when(cfg!(test), |input| {
+                    input.debug_selector(|| "date-picker-input".into())
+                })
+                .into_any_element(),
             (DatePickerVariant::Modal, DateInputMode::Calendar) => {
                 ctx.modal(actions).into_any_element()
             }
@@ -1369,7 +1390,7 @@ impl PickerCx {
             .today(date == snap.today && !outside)
             .adjacent(outside)
             .range(range)
-            .disabled(snap.is_disabled(date));
+            .disabled(snap.is_disabled(date) || !snap.years.contains(&date.year()));
         if self.specimen || !live {
             day = day.preview_state(InteractionPreview::Enabled);
         } else {
