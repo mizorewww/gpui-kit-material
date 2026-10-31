@@ -292,7 +292,8 @@ impl ChipBase {
             };
             icon.size(icon_size).color(paint.leading)
         });
-        let check_slot = slide.then(|| {
+        // Nothing to lay out or paint until the check starts to arrive.
+        let check_slot = (slide && check > 0.).then(|| {
             div()
                 .flex_shrink_0()
                 .overflow_hidden()
@@ -728,7 +729,7 @@ mod tests {
         });
         draw(cx);
         let rest = cx.debug_bounds("filter-chip").unwrap();
-        assert_eq!(cx.debug_bounds("chip-check").unwrap().size.width, px(0.));
+        assert!(cx.debug_bounds("chip-check").is_none(), "no check to show");
         cx.simulate_click(rest.center(), Modifiers::default());
         draw(cx);
         view.read_with(cx, |h, _| assert!(h.selected));
