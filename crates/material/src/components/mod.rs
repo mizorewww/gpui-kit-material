@@ -192,7 +192,7 @@ pub use tile::{
     TileGroup, TileScale, disclosure_chevron, list_tile, tile, tile_chevron, tile_info,
 };
 pub use title_bar::{
-    TitleBar, title_bar_leading, title_bar_window_options, traffic_light_position,
+    TitleBar, title_bar_leading, title_bar_room, title_bar_window_options, traffic_light_position,
 };
 pub use toolbar::{
     TOOLBAR_FAB_GAP, TOOLBAR_MARGIN, TOOLBAR_SIZE, Toolbar, ToolbarButton, ToolbarColor,

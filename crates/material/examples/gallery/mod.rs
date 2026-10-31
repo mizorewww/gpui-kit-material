@@ -767,10 +767,11 @@ struct GalleryWindow {
 }
 
 impl Render for GalleryWindow {
-    fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         // The compact bar has no room for a counter, and labels its settings
         // with an icon only.
         let compact = shell::ShellLayout::of(window) == shell::ShellLayout::Compact;
+        let shared = self.gallery.read(cx).shared.clone();
         // A phone's cutouts and home indicator: the content stays clear of them
         // and the bar's color reaches the window's edges.
         let insets = window.insets().effective();
@@ -781,7 +782,7 @@ impl Render for GalleryWindow {
                     playground::symbol("settings", 24.),
                     "Settings",
                 )
-                .on_click(|_, window, cx| settings::open(window, cx))
+                .on_click(move |_, window, cx| settings::open(shared.clone(), window, cx))
                 .into_any_element()
             } else {
                 MaterialButton::new("gallery-settings-open")
@@ -789,9 +790,14 @@ impl Render for GalleryWindow {
                     .button_size(ButtonSize::ExtraSmall)
                     .accessibility_label("Settings")
                     .child("Settings")
-                    .on_click(|_, window, cx| settings::open(window, cx))
+                    .on_click(move |_, window, cx| settings::open(shared.clone(), window, cx))
                     .into_any_element()
             });
+        let settings = if compact {
+            top_bar::compact_control(settings, window)
+        } else {
+            settings.into_any_element()
+        };
         let mut bar = TitleBar::new("title-bar", title_bar_height(window), caption_labels());
         if let Some(caption) = self.caption {
             bar = bar.caption(caption);
@@ -811,7 +817,8 @@ impl Render for GalleryWindow {
                     .pr(insets.right)
                     .bg(color(ColorRole::SURFACE_CONTAINER_LOW))
                     .child(
-                        bar.gap(rem(if compact { 4. } else { 12. }))
+                        bar.when(compact, |bar| bar.gap(px(4.)))
+                            .when(!compact, |bar| bar.gap(rem(12.)))
                             .bg(color(ColorRole::SURFACE_CONTAINER_LOW))
                             .border_b_1()
                             .border_color(color(ColorRole::OUTLINE_VARIANT))
@@ -889,13 +896,14 @@ pub fn run(application: gpui::Application, initialize: impl FnOnce(&mut App) + '
             #[cfg(target_family = "wasm")]
             let show_fps = true;
             let fps = show_fps.then(|| cx.new(|cx| fps::FpsDisplay::new(window, cx)));
-            let top_bar = cx.new(|cx| top_bar::TopBar::new(gallery.clone(), window, cx));
             #[cfg(not(target_family = "wasm"))]
             capture::install(&gallery, window, cx);
             #[cfg(not(target_family = "wasm"))]
             let caption = capture::caption(cx);
             #[cfg(target_family = "wasm")]
             let caption = None;
+            let top_bar =
+                cx.new(|cx| top_bar::TopBar::new(gallery.clone(), window, cx).caption(caption));
             #[cfg(target_family = "wasm")]
             web_route::install(&gallery, cx);
             let shared = gallery.read(cx).shared.read(cx);
@@ -958,70 +966,122 @@ mod window_tests {
         cx.run_until_parked();
     }
 
-    /// The bar's content ends before the caption buttons at every width, and
-    /// trades its sections and field for the drawer's button when compact.
+    /// Every control of the top bar is inside the bar's room and clear of the
+    /// others, at every width, text scale and caption style, with the drawer
+    /// and the compact search open too; and the bar trades its sections and
+    /// field for the drawer's button when compact.
     #[gpui::test]
-    fn the_top_bar_fits_every_width_beside_the_caption_buttons(cx: &mut TestAppContext) {
+    fn the_top_bar_fits_every_width_text_scale_and_caption(cx: &mut TestAppContext) {
+        use gpui_kit_material::components::{Caption, title_bar_leading, title_bar_room};
+        const CONTROLS: [&str; 7] = [
+            "top-menu",
+            "top-brand",
+            "sections",
+            "top-search",
+            "top-search-toggle",
+            "mode-toggle",
+            "gallery-settings-open",
+        ];
         cx.update(|cx| {
             gpui_kit::init(cx);
             gpui_kit_material::init(cx);
-        });
-        let window = cx.open_window(size(px(1600.), px(800.)), |window, cx| {
-            let gallery = cx.new(|cx| Gallery::new(window, cx));
-            let fps = cx.new(|cx| fps::FpsDisplay::new(window, cx));
-            let top_bar = cx.new(|cx| top_bar::TopBar::new(gallery.clone(), window, cx));
-            GalleryWindow {
-                gallery,
-                top_bar,
-                fps: Some(fps),
-                caption: Some(gpui_kit_material::components::Caption::Windows),
-            }
-        });
-        let mut cx = gpui::VisualTestContext::from_window(window.into(), cx);
-        cx.update(|window, _| {
-            window.set_rem_size(px(gpui_kit_material::tokens::typography::BASE_PX))
+            cx.set_reduce_motion(true);
         });
         let base = gpui_kit_material::tokens::typography::BASE_PX;
-        for (width, text_scale) in [
-            (1600., 1.),
-            (1280., 1.),
-            (1000., 1.),
-            (900., 1.),
-            (760., 1.),
-            (480., 1.),
-            // 200% text: 1280px is a compact 640 design px.
-            (1280., 2.),
-            (1920., 2.),
-            (1280., 1.5),
-            (800., 2.),
-        ] {
-            cx.update(|window, _| window.set_rem_size(px(base * text_scale)));
-            cx.simulate_resize(size(px(width), px(800.)));
-            draw(window.into(), &mut cx);
-            draw(window.into(), &mut cx);
-            let compact = width / text_scale < 900.;
-            assert_eq!(cx.debug_bounds("top-menu").is_some(), compact, "{width}");
-            assert_eq!(
-                cx.debug_bounds("top-section-components").is_none(),
-                compact,
-                "{width}"
-            );
-            // Three 46px Windows buttons and 8px of open space.
-            let end = px(width - 3. * 46. - 8.);
-            let settings = cx.debug_bounds("gallery-settings-open").unwrap();
-            assert!(settings.right() <= end, "{width}: {settings:?}");
-            let mode = cx.debug_bounds("mode-toggle").unwrap();
-            assert!(
-                mode.right() <= settings.left(),
-                "{width} at {text_scale}: {mode:?} collides with {settings:?}"
-            );
-            // The bar grows, so the controls fit it at any text scale.
-            let bar = super::TITLE_BAR * text_scale;
-            for control in [mode, settings] {
-                assert!(
-                    control.top() >= px(0.) && control.bottom() <= bar,
-                    "{width} at {text_scale}: {control:?}"
-                );
+        for caption in [Caption::System, Caption::Windows, Caption::Linux] {
+            let mut parts = None;
+            let window = cx.open_window(size(px(1600.), px(800.)), |window, cx| {
+                let gallery = cx.new(|cx| Gallery::new(window, cx));
+                let fps = cx.new(|cx| fps::FpsDisplay::new(window, cx));
+                let top_bar = cx.new(|cx| {
+                    top_bar::TopBar::new(gallery.clone(), window, cx).caption(Some(caption))
+                });
+                parts = Some(gallery.clone());
+                GalleryWindow {
+                    gallery,
+                    top_bar,
+                    fps: Some(fps),
+                    caption: Some(caption),
+                }
+            });
+            let gallery = parts.unwrap();
+            let mut cx = gpui::VisualTestContext::from_window(window.into(), cx);
+            for text_scale in [1., 2.] {
+                for width in [
+                    320., 360., 390., 480., 760., 899., 900., 1040., 1280., 1920.,
+                ] {
+                    cx.update(|window, _| window.set_rem_size(px(base * text_scale)));
+                    cx.simulate_resize(size(px(width), px(800.)));
+                    for _ in 0..2 {
+                        draw(window.into(), &mut cx);
+                    }
+                    let design = width * base / (base * text_scale);
+                    let compact = design < 900.;
+                    let context = format!("{caption:?} at {width} and {text_scale}x");
+                    assert_eq!(cx.debug_bounds("top-menu").is_some(), compact, "{context}");
+                    assert_eq!(
+                        cx.debug_bounds("top-section-components").is_none(),
+                        compact,
+                        "{context}"
+                    );
+                    // The bar's room: from its leading inset, which only the
+                    // system caption's traffic lights widen, to the caption.
+                    let (start, room) = cx.update(|window, _| {
+                        let height = super::title_bar_height(window);
+                        let start = match caption {
+                            Caption::System => title_bar_leading(height, window),
+                            _ => 16.,
+                        };
+                        (
+                            px(start),
+                            title_bar_room(px(width), height, Some(caption), window),
+                        )
+                    });
+                    let end = start + room;
+                    let check = |cx: &mut gpui::VisualTestContext, state: &str| {
+                        let shown: Vec<_> = CONTROLS
+                            .into_iter()
+                            .filter_map(|name| Some((name, cx.debug_bounds(name)?)))
+                            .collect();
+                        assert!(shown.len() >= 2, "{context} {state}: {shown:?}");
+                        for (at, (name, control)) in shown.iter().enumerate() {
+                            assert!(
+                                control.left() >= start - px(0.5)
+                                    && control.right() <= end + px(0.5),
+                                "{context} {state}: {name} {control:?} leaves {start:?}..{end:?}"
+                            );
+                            assert!(
+                                control.top() >= px(0.)
+                                    && control.bottom() <= super::TITLE_BAR * text_scale,
+                                "{context} {state}: {name} {control:?} leaves the bar"
+                            );
+                            if let Some((next, after)) = shown.get(at + 1) {
+                                assert!(
+                                    control.right() <= after.left() + px(0.5),
+                                    "{context} {state}: {name} {control:?} overlaps {next} {after:?}"
+                                );
+                            }
+                        }
+                    };
+                    check(&mut cx, "closed");
+                    if compact {
+                        cx.update(|_, cx| {
+                            gallery.update(cx, |gallery, cx| gallery.set_drawer_open(true, cx))
+                        });
+                        draw(window.into(), &mut cx);
+                        check(&mut cx, "with the drawer");
+                        cx.update(|_, cx| {
+                            gallery.update(cx, |gallery, cx| gallery.set_drawer_open(false, cx))
+                        });
+                        let toggle = cx.debug_bounds("top-search-toggle").unwrap();
+                        cx.simulate_click(toggle.center(), gpui::Modifiers::none());
+                        draw(window.into(), &mut cx);
+                        check(&mut cx, "searching");
+                        let toggle = cx.debug_bounds("top-search-toggle").unwrap();
+                        cx.simulate_click(toggle.center(), gpui::Modifiers::none());
+                        draw(window.into(), &mut cx);
+                    }
+                }
             }
         }
     }

@@ -160,6 +160,18 @@ const ROWS: [Row; 5] = [
     Row::Window,
 ];
 
+fn rows_where(keep: fn(Row) -> bool) -> Vec<usize> {
+    (0..ROWS.len()).filter(|row| keep(ROWS[*row])).collect()
+}
+/// The top app bar's rows on its Specs tab.
+pub fn top_bar_rows() -> Vec<usize> {
+    rows_where(|row| !matches!(row, Row::Bottom))
+}
+/// The bottom app bar's rows on its Specs tab.
+pub fn bottom_bar_rows() -> Vec<usize> {
+    rows_where(|row| matches!(row, Row::Bottom | Row::Demo))
+}
+
 const BOTTOM_ICONS: [(&str, &str); 4] = [
     ("search", "Search"),
     ("delete", "Delete"),
@@ -283,6 +295,7 @@ impl Page {
     /// The Gallery's own window title bar and caption buttons, the
     /// app-drawn bar of its window.
     fn window_bar(&self, window: &mut Window) -> AnyElement {
+        let shared = self.page.shared.clone();
         let caption = match Caption::detect(window) {
             Caption::System => "Caption buttons: drawn by the system",
             Caption::Windows => "Caption buttons: Windows style, drawn by the app",
@@ -348,8 +361,8 @@ impl Page {
                                 material_button("sample-bar-settings", ButtonVariant::Text)
                                     .button_size(ButtonSize::ExtraSmall)
                                     .child("Settings")
-                                    .on_click(|_, window, cx| {
-                                        super::super::settings::open(window, cx)
+                                    .on_click(move |_, window, cx| {
+                                        super::super::settings::open(shared.clone(), window, cx)
                                     }),
                             )
                             .reveal("reveal-sample-bar-settings", self.page.rows.list()),

@@ -66,6 +66,39 @@ pub fn title_bar_leading(height: Pixels, window: &Window) -> f32 {
     leading_for(cfg!(target_os = "macos") && !window.is_fullscreen(), height)
 }
 
+/// The insets a bar leaves for the platform's buttons, leading and trailing,
+/// with its caption style forced or detected. A forced Windows or Linux style
+/// has its buttons at the trailing edge, so it leaves no room for traffic
+/// lights, which real Windows and Linux windows never have.
+fn insets(height: Pixels, caption: Option<Caption>, window: &Window) -> (f32, f32) {
+    match caption {
+        Some(style @ (Caption::Windows | Caption::Linux)) => (
+            leading_for(false, height),
+            CaptionButtons::trailing_for_style(style, window),
+        ),
+        Some(style) => (
+            title_bar_leading(height, window),
+            CaptionButtons::trailing_for_style(style, window),
+        ),
+        None => (
+            title_bar_leading(height, window),
+            CaptionButtons::trailing(window),
+        ),
+    }
+}
+
+/// The width a bar `height` tall leaves for its children in `width`, with its
+/// caption style forced or detected, so a crowded bar can decide what to show.
+pub fn title_bar_room(
+    width: Pixels,
+    height: Pixels,
+    caption: Option<Caption>,
+    window: &Window,
+) -> Pixels {
+    let (leading, trailing) = insets(height, caption, window);
+    width - px(leading + trailing)
+}
+
 fn leading_for(traffic_lights: bool, height: Pixels) -> f32 {
     if traffic_lights {
         f32::from(traffic_light_position(height).x)
@@ -168,14 +201,11 @@ impl RenderOnce for TitleBar {
         );
         let press = intent.clone();
         let release = intent.clone();
+        let (leading, trailing) = insets(self.height, self.caption, window);
         let mut caption = CaptionButtons::new(self.height, self.labels);
-        let trailing = match self.caption {
-            Some(style) => {
-                caption = caption.caption(style);
-                CaptionButtons::trailing_for_style(style, window)
-            }
-            None => CaptionButtons::trailing(window),
-        };
+        if let Some(style) = self.caption {
+            caption = caption.caption(style);
+        }
         if let Some(request) = self.on_close {
             caption = caption.on_close(move |window, cx| request(window, cx));
         }
@@ -184,7 +214,7 @@ impl RenderOnce for TitleBar {
             .flex_shrink_0()
             .items_center()
             .h(self.height)
-            .pl(px(title_bar_leading(self.height, window)))
+            .pl(px(leading))
             .pr(px(trailing))
             // Windows hit-tests this as the caption: the system moves the
             // window and zooms on a double click.
@@ -241,6 +271,26 @@ mod tests {
         assert_eq!(traffic_light_position(px(32.)), point(px(9.), px(9.)));
         // Taller bars keep the lights near the corner, as macOS places them.
         assert_eq!(traffic_light_position(px(64.)), point(px(20.), px(25.)));
+    }
+
+    /// A Windows or Linux caption forced on another platform, as captures do,
+    /// starts where those platforms do: there are no traffic lights to clear.
+    #[gpui::test]
+    fn a_forced_trailing_caption_has_no_traffic_light_inset(cx: &mut TestAppContext) {
+        let window = cx.add_empty_window();
+        window.update(|window, _| {
+            let height = px(56.);
+            let width = px(390.);
+            assert_eq!(
+                title_bar_room(width, height, Some(Caption::Windows), window),
+                // 16px inset, three 46px buttons and 8px of open space.
+                px(390. - 16. - 3. * 46. - 8.)
+            );
+            assert_eq!(
+                title_bar_room(width, height, Some(Caption::System), window),
+                width - px(title_bar_leading(height, window) + 16.)
+            );
+        });
     }
 
     #[test]
