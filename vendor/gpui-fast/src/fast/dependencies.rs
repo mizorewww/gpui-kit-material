@@ -674,11 +674,6 @@ impl EntityMap {
         log.boundary.set(log.access_log.borrow().len());
     }
 
-    /// How many changes were stamped so far: see [`EntityAccessLog::changed_since`].
-    pub(crate) fn update_generation(&self) -> u64 {
-        self.access_log.update_generation
-    }
-
     /// How many writes were made while the window drew so far.
     pub(crate) fn write_generation(&self) -> u64 {
         self.access_log.write_generation.get()
@@ -1301,12 +1296,6 @@ impl RenderDependencies {
                 .filter(|entity| cx.entities.is_alive(*entity))
                 .collect();
         }
-        self
-    }
-
-    /// The same dependencies, known to be up to date with every change up to `updates`.
-    pub(crate) fn updated_up_to(mut self, updates: u64) -> Self {
-        self.updates = updates;
         self
     }
 

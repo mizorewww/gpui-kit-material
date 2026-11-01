@@ -232,8 +232,6 @@ pub(crate) struct RetainedState {
     /// interaction inside one, a hover or a scroll, marks all of them to be
     /// built again.
     pub(crate) subtree_stack: Vec<GlobalElementId>,
-    /// Where the update generation stood as this frame began, when what views read was checked.
-    pub(crate) updates_at_frame_start: u64,
     /// Reusable subtrees that an interaction inside them changed since they
     /// were drawn.
     pub(crate) dirty_subtrees: FxHashSet<GlobalElementId>,
@@ -285,7 +283,6 @@ impl RetainedState {
         RetainedState {
             ambient_reads: cx.ambient_reads(),
             subtree_stack: Vec::new(),
-            updates_at_frame_start: 0,
             dirty_subtrees: FxHashSet::default(),
             subtrees_dirty_next_frame: FxHashSet::default(),
             hover_dependencies: Vec::new(),
@@ -1115,7 +1112,6 @@ impl Window {
     /// [`crate::fast::splice`]) instead of being built again because
     /// something nested in them changed.
     pub(crate) fn mark_changed_retained_views_dirty(&mut self, cx: &App) {
-        self.retained_state.updates_at_frame_start = cx.entities.update_generation();
         if !self.retained_state.view_retention || self.refreshing {
             return;
         }
