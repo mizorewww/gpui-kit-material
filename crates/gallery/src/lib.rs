@@ -914,6 +914,14 @@ pub fn run(application: gpui::Application, initialize: impl FnOnce(&mut App) + '
             window_options.inactive_frame_interval = None;
         }
         startup_mark("window_options");
+        // A sampler can only attach once dyld has finished: time to do so before the window.
+        #[cfg(all(not(target_family = "wasm"), feature = "instruction-bench"))]
+        if let Some(delay) = std::env::var("MATERIAL_INSTR_OPEN_DELAY_MS")
+            .ok()
+            .and_then(|delay| delay.parse().ok())
+        {
+            std::thread::sleep(std::time::Duration::from_millis(delay));
+        }
         let (_window, _content) = gpui_kit::open_window(window_options, cx, move |window, cx| {
             startup_mark("platform_window");
             let gallery = cx.new(|cx| Gallery::new(window, cx));
