@@ -82,7 +82,9 @@ impl TileScale {
         }
     }
 
-    /// A tile's main label, medium weight.
+    /// A tile's main label: the M3 list item headline's weight (body large, regular).
+    /// The hierarchy comes from the supporting text's size and color, so a list of
+    /// tiles does not read as a list of headings.
     pub fn label(
         self,
         id: impl Into<gpui::ElementId>,
@@ -92,7 +94,9 @@ impl TileScale {
         accessible_text(id, value)
             .text_size(self.label_size())
             .line_height(self.label_line_height())
-            .font_weight(gpui::FontWeight::MEDIUM)
+            .font_weight(gpui::FontWeight(
+                TypeRole::BodyLarge.scale().font_weight as f32,
+            ))
             .text_color(color(ColorRole::ON_SURFACE))
     }
 
