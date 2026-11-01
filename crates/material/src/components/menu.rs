@@ -813,8 +813,10 @@ impl RenderOnce for MaterialMenu {
         for (group_ix, group) in self.groups.into_iter().enumerate() {
             let mut items = Vec::with_capacity(group.items.len());
             for item in group.items {
-                let keyboard_focus = window.last_input_was_keyboard()
-                    && handles.get(index).is_some_and(|h| h.is_focused(window));
+                let focus = handles.get(index).map(|handle| {
+                    let keyboard = window.last_input_was_keyboard() && handle.is_focused(window);
+                    (handle.clone(), keyboard)
+                });
                 items.push(render_item(
                     // Scoped by the menu container's own id below, so a
                     // static name is unique without formatting per frame.
@@ -822,8 +824,7 @@ impl RenderOnce for MaterialMenu {
                     item,
                     style,
                     density,
-                    handles.get(index).cloned(),
-                    keyboard_focus,
+                    focus,
                     on_activate.clone(),
                     window.rem_size(),
                 ));
@@ -996,8 +997,8 @@ fn render_item(
     item: MaterialMenuItem,
     style: MenuStyle,
     density: MenuDensity,
-    focus: Option<FocusHandle>,
-    keyboard_focus: bool,
+    // And whether it has focus by keyboard.
+    focus: Option<(FocusHandle, bool)>,
     on_activate: Option<Notify>,
     rem_size: Pixels,
 ) -> AnyElement {
@@ -1102,9 +1103,9 @@ fn render_item(
             // The kit paints the focus layer as well as the ring.
             button = button.map(|b| b.bg(state::layer(under, layer, state::FOCUS)));
         }
-    } else if let Some(focus) = focus {
+    } else if let Some((focus, keyboard)) = focus {
         button = button.track_focus(&focus);
-        if keyboard_focus {
+        if keyboard {
             button = button.map(|b| b.bg(state::layer(under, layer, state::FOCUS)));
         }
     }

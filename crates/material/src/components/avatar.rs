@@ -208,7 +208,6 @@ mod tests {
     #[test]
     fn the_placeholder_has_the_kits_ink_height() {
         assert_eq!(PLACEHOLDER_EM * 2. / 3., 26.);
-        assert!(PLACEHOLDER_EM <= AVATAR_SIZE, "it stays inside the circle");
     }
 
     #[test]

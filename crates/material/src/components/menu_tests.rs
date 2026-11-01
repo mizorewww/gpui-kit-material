@@ -1277,8 +1277,7 @@ fn pick_after(keys: &str, cx: &mut TestAppContext) -> Vec<usize> {
     settle(cx);
     cx.simulate_keystrokes(keys);
     settle(cx);
-    let picked = picked.borrow().clone();
-    picked
+    picked.borrow().clone()
 }
 
 #[gpui::test]
