@@ -25,6 +25,37 @@ use gpui_base::input::InputState;
 use gpui_kit::component::{Sizable as _, Size, input::Input};
 use std::rc::Rc;
 
+/// How a search bar sits on the screen. The M3 bar suits a page on the plain surface; on a
+/// page ground, a field among tiles reads better as one of them or as a quiet well.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+pub enum SearchFieldStyle {
+    /// The M3 search bar: surface-container-high, no edge.
+    #[default]
+    Standard,
+    /// Surface with a 1dp outline-variant edge: one more tile on the page ground.
+    Surface,
+    /// Surface-container-highest, no edge: a well, among filled controls.
+    Tonal,
+}
+
+impl SearchFieldStyle {
+    pub const ALL: [Self; 3] = [Self::Standard, Self::Surface, Self::Tonal];
+    pub const fn name(self) -> &'static str {
+        match self {
+            Self::Standard => "Standard",
+            Self::Surface => "Surface",
+            Self::Tonal => "Tonal",
+        }
+    }
+    const fn container(self) -> ColorRole {
+        match self {
+            Self::Standard => SEARCH_CONTAINER,
+            Self::Surface => ColorRole::SURFACE,
+            Self::Tonal => ColorRole::SURFACE_CONTAINER_HIGHEST,
+        }
+    }
+}
+
 /// The search bar container: surface-container-high (not the highest).
 pub(crate) const SEARCH_CONTAINER: ColorRole = ColorRole::SURFACE_CONTAINER_HIGH;
 /// Search bar height.
@@ -53,6 +84,7 @@ pub struct SearchField {
     leading: Option<AnyElement>,
     trailing: Vec<AnyElement>,
     disabled: bool,
+    field_style: SearchFieldStyle,
     preview: Option<InteractionPreview>,
     style: StyleRefinement,
 }
@@ -83,9 +115,16 @@ impl SearchField {
             leading: None,
             trailing: Vec::new(),
             disabled: false,
+            field_style: SearchFieldStyle::Standard,
             preview: None,
             style: StyleRefinement::default(),
         }
+    }
+
+    /// How the bar sits on the screen. See [`SearchFieldStyle`].
+    pub fn field_style(mut self, style: SearchFieldStyle) -> Self {
+        self.field_style = style;
+        self
     }
 
     /// A disabled bar takes no focus, input or hover, and fades its content
@@ -143,7 +182,8 @@ fn target(child: AnyElement, ink: Rgba) -> Div {
 impl RenderOnce for SearchField {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let on_surface = color(ColorRole::ON_SURFACE);
-        let container = color(SEARCH_CONTAINER);
+        let container = color(self.field_style.container());
+        let edged = self.field_style == SearchFieldStyle::Surface;
         let disabled = self.disabled || self.preview.is_some_and(InteractionPreview::is_disabled);
         let preview = self.preview.filter(|_| !disabled);
         let live = preview.is_none() && !disabled;
@@ -196,6 +236,10 @@ impl RenderOnce for SearchField {
             .gap(rem(4.))
             .rounded_full()
             .bg(container)
+            .when(edged, |this| {
+                this.border(px(1.))
+                    .border_color(color(ColorRole::OUTLINE_VARIANT))
+            })
             .text_color(on_surface)
             .map(|this| type_style(this, TypeRole::BodyLarge))
             .when(live, |this| this.cursor_text())

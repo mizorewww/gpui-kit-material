@@ -5,10 +5,11 @@
 //! a draggable card follows the pointer and springs home on release.
 use super::prelude::*;
 
-const VARIANTS: [CardVariant; 3] = [
+const VARIANTS: [CardVariant; 4] = [
     CardVariant::Elevated,
     CardVariant::Filled,
     CardVariant::Outlined,
+    CardVariant::Surface,
 ];
 /// The card's width in design px, as md3.io's preview.
 const WIDTH: f32 = 340.;
@@ -61,10 +62,11 @@ pub static PLAYGROUND: Playground = Playground {
         Section {
             title: "Appearance",
             controls: &[
-                Control::Segmented {
+                // Four options are too wide for the configuration card's row.
+                Control::Select {
                     id: "variant",
                     label: "Variant",
-                    options: &["elevated", "filled", "outlined"],
+                    options: &["elevated", "filled", "outlined", "surface"],
                     default: 0,
                 },
                 Control::Switch {

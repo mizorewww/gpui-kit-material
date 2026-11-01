@@ -64,8 +64,8 @@ pub use divider::{
 };
 #[cfg(feature = "inputs")]
 pub use search::{
-    SEARCH_BAR_HEIGHT, SEARCH_SUGGESTION_HEIGHT, SearchField, SearchSuggestion, SearchView,
-    SearchViewLayout, SearchViewStyle,
+    SEARCH_BAR_HEIGHT, SEARCH_SUGGESTION_HEIGHT, SearchField, SearchFieldStyle, SearchSuggestion,
+    SearchView, SearchViewLayout, SearchViewStyle,
 };
 #[cfg(feature = "selection")]
 pub use slider::{MaterialSlider, SliderAppearance, SliderColor, SliderSize};

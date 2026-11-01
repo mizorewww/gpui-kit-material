@@ -45,6 +45,12 @@ pub static PLAYGROUND: Playground = Playground {
                     default: 0,
                 },
                 Control::Segmented {
+                    id: "field",
+                    label: "Field",
+                    options: &["standard", "surface", "tonal"],
+                    default: 0,
+                },
+                Control::Segmented {
                     id: "state",
                     label: "State",
                     options: &["bar", "view"],
@@ -162,6 +168,7 @@ fn preview(
     };
     let mut bar = SearchField::new(&input)
         .id("playground-search-bar")
+        .field_style(SearchFieldStyle::ALL[config.choice("field")])
         .leading(leading)
         .disabled(disabled);
     if config.bool("clear") && !query.is_empty() {

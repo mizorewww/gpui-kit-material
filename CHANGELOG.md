@@ -34,6 +34,9 @@ Distribution is by Git revision for now; see the [quick start](README.md#quick-s
 - `ButtonTone`, on `MaterialButton`, `IconButton` and `ConnectedButtonGroup`: neutral and
   accent roles for a variant, for screens that need more than one level of action.
 
+- `SearchFieldStyle`, `CardVariant::Surface` and `MaterialDialog::container`: a search bar,
+  card and dialog that sit on the surface, for a page whose ground is a step below it.
+
 ### Changed
 
 - **Breaking:** with `default-features = false`, `gpui-kit-material` now has no
