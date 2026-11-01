@@ -42,7 +42,7 @@ full = [
 ]
 # MaterialButton, IconButton, ButtonGroup, ConnectedButtonGroup, SplitButton, Fab, FabMenu.
 buttons = ["menus", "progress"]
-# LinearProgress, CircularProgress.
+# LinearProgress, CircularProgress, Stepper.
 progress = []
 # LoadingIndicator, PullToRefresh.
 loading = ["progress", "shapes"]

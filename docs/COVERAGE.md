@@ -103,6 +103,7 @@ Limits of this audit:
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | Badge | Y | Y | Y | `Badge` | Yes | 5 + 2 | code | inherit | none | none found |
 | Avatar | Y | - | - | `Avatar` | Yes | 3 + 0 | code | inherit | none | none found |
+| Stepper | - | - | - | `Stepper` | Specs | 1 + 0 | code | inherit | none | M3 specifies no stepper; added for flows walked through once |
 | Linear and circular progress | Y | Y | Y | `LinearProgress`, `CircularProgress` | Yes | 16 + 2 | tree, RM | inherit | none | Wave height and percentage label are not options. No reference defines a contained form |
 | Loading indicator | Y | Y | Y | `LoadingIndicator` | Yes | 8 + 1 | attr | inherit | none | `.playback` still needs the vendored repeat patch; determinate turns opposite to Compose |
 | Snackbar | Y | Y | Y | `Snackbar` | Yes | 7 + 3 | code | inherit | none | none found |

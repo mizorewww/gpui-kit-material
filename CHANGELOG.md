@@ -39,6 +39,8 @@ Distribution is by Git revision for now; see the [quick start](README.md#quick-s
 
 - `ListItem::switch_icons`: the handle icons of a list item's switch.
 
+- `Stepper`: numbered steps joined by hairlines, for a flow a person walks through once.
+
 ### Changed
 
 - **Breaking:** with `default-features = false`, `gpui-kit-material` now has no

@@ -141,6 +141,8 @@ mod roving;
 mod search;
 #[cfg(feature = "dialogs")]
 mod sheets;
+#[cfg(feature = "progress")]
+mod stepper;
 #[cfg(feature = "navigation")]
 mod tabs;
 mod text;
@@ -272,6 +274,8 @@ pub use radio::{MaterialRadio, MaterialRadioGroup};
 pub use ripple::Ripple;
 #[cfg(feature = "dialogs")]
 pub use sheets::{BottomSheetDetent, MaterialBottomSheet, MaterialSideSheet, SideSheetEdge};
+#[cfg(feature = "progress")]
+pub use stepper::{STEPPER_DOT_SIZE, Stepper};
 #[cfg(feature = "navigation")]
 pub use tabs::{MaterialTabs, TabItem, TabsVariant};
 pub use text::{

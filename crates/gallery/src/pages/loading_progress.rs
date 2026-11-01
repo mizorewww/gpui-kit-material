@@ -5,10 +5,11 @@ use super::prelude::*;
 
 const LOADING_INDICATOR: usize = 4;
 const PULL_TO_REFRESH: usize = 5;
+const STEPPER: usize = 6;
 
 /// The progress indicators' rows on the Progress page's Specs tab.
 pub fn progress_rows() -> Vec<usize> {
-    (0..LOADING_INDICATOR).collect()
+    (0..LOADING_INDICATOR).chain([STEPPER]).collect()
 }
 /// The loading indicator's rows on its Specs tab.
 pub fn loading_indicator_rows() -> Vec<usize> {
@@ -120,7 +121,7 @@ impl GalleryPage for Page {
     }
 
     fn row_count(&self, _: &Window) -> usize {
-        PULL_TO_REFRESH + 1
+        STEPPER + 1
     }
 
     const PREPARES: bool = true;
@@ -237,6 +238,19 @@ impl GalleryPage for Page {
                 ))
                 .into_any_element(),
             PULL_TO_REFRESH => pull_to_refresh_board(),
+            STEPPER => spec::demo(
+                "stepper",
+                "Stepper",
+                gpui_base::v_flex()
+                    .w_full()
+                    .gap(rem(24.))
+                    .children((0..3).map(|current| {
+                        Stepper::new(("stepper", current), "Setup progress")
+                            .steps(["Source", "Service", "Account"])
+                            .current(current)
+                    })),
+            )
+            .into_any_element(),
             _ => board("loading-indicator")
                 .caption("Loading indicator · Indeterminate")
                 .columns(2)
