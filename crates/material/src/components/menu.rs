@@ -1680,7 +1680,7 @@ impl RenderOnce for MenuPopup {
 /// way in from the keyboard, usually a [`MenuPopup`] behind a "more" button.
 ///
 /// ```
-/// use gpui::{div, prelude::*};
+/// use gpui_kit::{div, prelude::*};
 /// use gpui_kit_material::prelude::*;
 ///
 /// # let row_content = div();
