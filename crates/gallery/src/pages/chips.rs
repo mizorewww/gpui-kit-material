@@ -142,7 +142,23 @@ impl Page {
                 .child(group_line(
                     "input-group-label",
                     "Input chips",
-                    spec::demo_row().gap(rem(8.)).children(inputs),
+                    spec::demo_row()
+                        .gap(rem(8.))
+                        .children(inputs)
+                        // Removed, the chips would stay gone for the rest of the session.
+                        .when(self.inputs.is_empty(), |row| {
+                            let view = cx.entity();
+                            row.child(
+                                AssistChip::new("live-input-restore", "Restore chips")
+                                    .icon(spec::star_icon())
+                                    .on_click(move |_, _, cx| {
+                                        view.update(cx, |this, cx| {
+                                            this.inputs = (0..INPUTS.len()).collect();
+                                            cx.notify();
+                                        })
+                                    }),
+                            )
+                        }),
                 ))
                 .child(group_line(
                     "assist-group-label",
