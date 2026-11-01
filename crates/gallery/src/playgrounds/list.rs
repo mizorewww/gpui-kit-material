@@ -6,6 +6,8 @@
 //! "… selected" switches.
 use super::prelude::*;
 
+const SWITCH_ICONS: [SwitchIcons; 3] =
+    [SwitchIcons::None, SwitchIcons::Selected, SwitchIcons::Both];
 const ITEM_SETS: &[&str] = &[
     "Default",
     "Inbox threads",
@@ -207,6 +209,12 @@ pub static PLAYGROUND: Playground = Playground {
             title: "Content",
             controls: &[
                 Control::Select {
+                    id: "switch_icons",
+                    label: "Switch icons",
+                    options: &["none", "selected", "both"],
+                    default: 0,
+                },
+                Control::Select {
                     id: "items",
                     label: "Items",
                     options: ITEM_SETS,
@@ -312,6 +320,7 @@ fn preview(
             // against the surface.
             let mut item =
                 ListItem::new(SharedString::from(format!("list-item-{index}")), *headline)
+                    .switch_icons(SWITCH_ICONS[config.choice("switch_icons")])
                     .selected(on && selection != "none")
                     .expressive(config.bool("expressive"))
                     .disabled(config.bool("disable_last") && index + 1 == count)
