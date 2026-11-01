@@ -284,14 +284,7 @@ impl Gallery {
 
     /// Entries whose title contains the search query, in catalog order.
     pub(crate) fn matches(&self) -> impl Iterator<Item = usize> + '_ {
-        let query = self.query.trim().to_lowercase();
-        CATALOG
-            .iter()
-            .enumerate()
-            .filter(move |(_, entry)| {
-                query.is_empty() || entry.title.to_lowercase().contains(&query)
-            })
-            .map(|(index, _)| index)
+        matching_entries(&self.query)
     }
 
     /// What forwards controlled changes to playbacks of unmounted rows, for a
@@ -430,119 +423,6 @@ impl Gallery {
             drawer = drawer.headline("No matching pages");
         }
         drawer.items(shown)
-    }
-
-    pub(super) fn render_navigation(&self, cx: &mut Context<Self>) -> Stateful<Div> {
-        #[cfg(all(not(target_family = "wasm"), feature = "instruction-bench"))]
-        super::instr_bench::note(super::instr_bench::Count::Navigation);
-        let searching = !self.query.trim().is_empty();
-        let section = CATALOG[self.current].group.section();
-        let mut groups: Vec<AnyElement> = Vec::new();
-        let mut items: Vec<AnyElement> = Vec::new();
-        let mut group = None;
-        let flush =
-            |group: Option<Group>, items: &mut Vec<AnyElement>, groups: &mut Vec<AnyElement>| {
-                if let Some(group) = group
-                    && !items.is_empty()
-                {
-                    groups.push(
-                        gpui_base::v_flex()
-                            .gap(rem(2.))
-                            .child(
-                                div().px(rem(16.)).pt(rem(12.)).pb(rem(6.)).child(
-                                    accessible_text(("nav-group", group as usize), group.title())
-                                        .role(Role::Heading)
-                                        .map(|text| type_role(text, TypeRole::TitleSmall))
-                                        .text_color(color(ColorRole::ON_SURFACE_VARIANT)),
-                                ),
-                            )
-                            .children(items.drain(..))
-                            .into_any_element(),
-                    );
-                }
-            };
-        for index in self.matches() {
-            let entry = &CATALOG[index];
-            if !searching && entry.group.section() != section {
-                continue;
-            }
-            if group != Some(entry.group) {
-                flush(group, &mut items, &mut groups);
-                group = Some(entry.group);
-            }
-            items.push(self.nav_item(index, cx).into_any_element());
-        }
-        flush(group, &mut items, &mut groups);
-        if groups.is_empty() {
-            groups.push(
-                div()
-                    .px(rem(16.))
-                    .pt(rem(16.))
-                    .child(
-                        accessible_text("nav-empty", "No matching pages")
-                            .map(|text| type_role(text, TypeRole::BodyMedium))
-                            .text_color(color(ColorRole::ON_SURFACE_VARIANT)),
-                    )
-                    .into_any_element(),
-            );
-        }
-        div()
-            .id("gallery-navigation")
-            .role(Role::Navigation)
-            .aria_label("Gallery pages")
-            .track_focus(&self.navigation_focus)
-            .tab_stop(false)
-            .flex_shrink_0()
-            .min_h_0()
-            .overflow_y_scroll()
-            .track_scroll(&self.navigation_scroll)
-            .bg(spec::page_background())
-            .w(rem(NAV_WIDTH))
-            .h_full()
-            .border_r_1()
-            .border_color(outline())
-            .child(
-                gpui_base::v_flex()
-                    .px(rem(12.))
-                    .py(rem(12.))
-                    .gap(rem(4.))
-                    .children(groups),
-            )
-    }
-
-    fn nav_item(&self, index: usize, cx: &mut Context<Self>) -> impl IntoElement {
-        let entry = &CATALOG[index];
-        let selected = index == self.current;
-        let on_surface = color(ColorRole::ON_SURFACE);
-        FocusRing::new(
-            ("nav-ring", index),
-            gpui_base::Button::new(("navigate", index))
-                .role(Role::Link)
-                .accessibility_label(entry.title)
-                .selected(selected)
-                .debug_selector(move || format!("nav-{}", entry.id))
-                .flex()
-                .items_center()
-                .justify_start()
-                .h(rem(36.))
-                .px(rem(16.))
-                .rounded_full()
-                .cursor_pointer()
-                .w_full()
-                .map(|item| type_role(item, TypeRole::LabelLarge))
-                .when(selected, |item| {
-                    item.bg(color(ColorRole::SECONDARY_CONTAINER))
-                        .text_color(color(ColorRole::ON_SECONDARY_CONTAINER))
-                })
-                .when(!selected, |item| {
-                    item.font_weight(FontWeight::NORMAL)
-                        .text_color(color(ColorRole::ON_SURFACE_VARIANT))
-                        .hover(move |style| style.bg(on_surface.opacity(0.08)))
-                })
-                .child(entry.title)
-                .on_click(cx.listener(move |this, _, _, cx| this.navigate(index, cx)))
-                .reveal_handle(("reveal-navigation", index), &self.navigation_scroll),
-        )
     }
 
     /// What list row `index` shows, copied out so that building it only reads
@@ -1202,6 +1082,205 @@ impl LayoutObserver {
             })
         };
         self.page.after_layout(&visible, cx);
+    }
+}
+
+/// Entries whose title contains `query`, in catalog order.
+fn matching_entries(query: &str) -> impl Iterator<Item = usize> + use<> {
+    let query = query.trim().to_lowercase();
+    CATALOG
+        .iter()
+        .enumerate()
+        .filter(move |(_, entry)| query.is_empty() || entry.title.to_lowercase().contains(&query))
+        .map(|(index, _)| index)
+}
+
+/// The navigation column as a view, holding one view per entry. Moving to another page
+/// changes two entries, so only they build again, and only a change of section or search
+/// builds this one; it reads no state of the Gallery, which pushes what it shows here.
+pub(crate) struct NavigationView {
+    section: TopSection,
+    query: SharedString,
+    items: Vec<Entity<NavigationItem>>,
+    focus: FocusHandle,
+    scroll: ScrollHandle,
+}
+
+impl NavigationView {
+    pub(super) fn new(
+        gallery: WeakEntity<Gallery>,
+        current: usize,
+        focus: FocusHandle,
+        scroll: ScrollHandle,
+        cx: &mut Context<Self>,
+    ) -> Self {
+        let items = (0..CATALOG.len())
+            .map(|index| {
+                cx.new(|_| NavigationItem {
+                    index,
+                    selected: index == current,
+                    gallery: gallery.clone(),
+                    scroll: scroll.clone(),
+                })
+            })
+            .collect();
+        Self {
+            section: CATALOG[current].group.section(),
+            query: SharedString::default(),
+            items,
+            focus,
+            scroll,
+        }
+    }
+
+    /// The page went from `previous` to `current`.
+    pub(super) fn select(&mut self, previous: usize, current: usize, cx: &mut Context<Self>) {
+        for (index, selected) in [(previous, false), (current, true)] {
+            self.items[index].update(cx, |item, cx| {
+                if item.selected != selected {
+                    item.selected = selected;
+                    cx.notify();
+                }
+            });
+        }
+        let section = CATALOG[current].group.section();
+        if self.section != section {
+            self.section = section;
+            cx.notify();
+        }
+    }
+
+    pub(super) fn set_query(&mut self, query: SharedString, cx: &mut Context<Self>) {
+        self.query = query;
+        cx.notify();
+    }
+}
+
+impl Render for NavigationView {
+    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        #[cfg(all(not(target_family = "wasm"), feature = "instruction-bench"))]
+        super::instr_bench::note(super::instr_bench::Count::Navigation);
+        let searching = !self.query.trim().is_empty();
+        let section = self.section;
+        let mut groups: Vec<AnyElement> = Vec::new();
+        let mut items: Vec<AnyElement> = Vec::new();
+        let mut group = None;
+        let flush =
+            |group: Option<Group>, items: &mut Vec<AnyElement>, groups: &mut Vec<AnyElement>| {
+                if let Some(group) = group
+                    && !items.is_empty()
+                {
+                    groups.push(
+                        gpui_base::v_flex()
+                            .gap(rem(2.))
+                            .child(
+                                div().px(rem(16.)).pt(rem(12.)).pb(rem(6.)).child(
+                                    accessible_text(("nav-group", group as usize), group.title())
+                                        .role(Role::Heading)
+                                        .map(|text| type_role(text, TypeRole::TitleSmall))
+                                        .text_color(color(ColorRole::ON_SURFACE_VARIANT)),
+                                ),
+                            )
+                            .children(items.drain(..))
+                            .into_any_element(),
+                    );
+                }
+            };
+        for index in matching_entries(&self.query) {
+            let entry = &CATALOG[index];
+            if !searching && entry.group.section() != section {
+                continue;
+            }
+            if group != Some(entry.group) {
+                flush(group, &mut items, &mut groups);
+                group = Some(entry.group);
+            }
+            items.push(self.items[index].clone().into_any_element());
+        }
+        flush(group, &mut items, &mut groups);
+        if groups.is_empty() {
+            groups.push(
+                div()
+                    .px(rem(16.))
+                    .pt(rem(16.))
+                    .child(
+                        accessible_text("nav-empty", "No matching pages")
+                            .map(|text| type_role(text, TypeRole::BodyMedium))
+                            .text_color(color(ColorRole::ON_SURFACE_VARIANT)),
+                    )
+                    .into_any_element(),
+            );
+        }
+        div()
+            .id("gallery-navigation")
+            .role(Role::Navigation)
+            .aria_label("Gallery pages")
+            .track_focus(&self.focus)
+            .tab_stop(false)
+            .flex_shrink_0()
+            .min_h_0()
+            .overflow_y_scroll()
+            .track_scroll(&self.scroll)
+            .bg(spec::page_background())
+            .w(rem(NAV_WIDTH))
+            .h_full()
+            .border_r_1()
+            .border_color(outline())
+            .child(
+                gpui_base::v_flex()
+                    .px(rem(12.))
+                    .py(rem(12.))
+                    .gap(rem(4.))
+                    .children(groups),
+            )
+    }
+}
+
+/// One entry of [`NavigationView`].
+pub(crate) struct NavigationItem {
+    index: usize,
+    selected: bool,
+    gallery: WeakEntity<Gallery>,
+    scroll: ScrollHandle,
+}
+
+impl Render for NavigationItem {
+    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        let (index, selected) = (self.index, self.selected);
+        let entry = &CATALOG[index];
+        let on_surface = color(ColorRole::ON_SURFACE);
+        let gallery = self.gallery.clone();
+        FocusRing::new(
+            ("nav-ring", index),
+            gpui_base::Button::new(("navigate", index))
+                .role(Role::Link)
+                .accessibility_label(entry.title)
+                .selected(selected)
+                .debug_selector(move || format!("nav-{}", entry.id))
+                .flex()
+                .items_center()
+                .justify_start()
+                .h(rem(36.))
+                .px(rem(16.))
+                .rounded_full()
+                .cursor_pointer()
+                .w_full()
+                .map(|item| type_role(item, TypeRole::LabelLarge))
+                .when(selected, |item| {
+                    item.bg(color(ColorRole::SECONDARY_CONTAINER))
+                        .text_color(color(ColorRole::ON_SECONDARY_CONTAINER))
+                })
+                .when(!selected, |item| {
+                    item.font_weight(FontWeight::NORMAL)
+                        .text_color(color(ColorRole::ON_SURFACE_VARIANT))
+                        .hover(move |style| style.bg(on_surface.opacity(0.08)))
+                })
+                .child(entry.title)
+                .on_click(move |_, _, cx| {
+                    let _ = gallery.update(cx, |gallery, cx| gallery.navigate(index, cx));
+                })
+                .reveal_handle(("reveal-navigation", index), &self.scroll),
+        )
     }
 }
 

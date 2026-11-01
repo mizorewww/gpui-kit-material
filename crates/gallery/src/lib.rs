@@ -205,7 +205,8 @@ pub(crate) struct Gallery {
     counted: Cell<Option<Counted>>,
     row_focus: Vec<FocusHandle>,
     navigation_focus: FocusHandle,
-    navigation_scroll: ScrollHandle,
+    /// The column of pages: see [`shell::NavigationView`].
+    navigation: Entity<shell::NavigationView>,
     pending_focus: Option<(usize, bool)>,
     last_rem: Pixels,
     last_height: Pixels,
@@ -252,6 +253,11 @@ impl Gallery {
         bind_focus_keys(cx);
         let gallery = cx.entity();
         let content = cx.new(|cx| shell::ContentView::new(gallery.clone(), cx));
+        let navigation_focus = cx.focus_handle();
+        let navigation = {
+            let (gallery, focus) = (gallery.downgrade(), navigation_focus.clone());
+            cx.new(|cx| shell::NavigationView::new(gallery, 0, focus, ScrollHandle::new(), cx))
+        };
         let lead = cx.new(|cx| shell::LeadView::new(gallery, cx));
         Gallery {
             lead,
@@ -270,8 +276,8 @@ impl Gallery {
             layout: None,
             counted: Cell::new(None),
             row_focus: Vec::new(),
-            navigation_focus: cx.focus_handle(),
-            navigation_scroll: ScrollHandle::new(),
+            navigation_focus,
+            navigation,
             pending_focus: None,
             last_rem: window.rem_size(),
             last_height: window.viewport_size().height,
@@ -407,7 +413,9 @@ impl Gallery {
         }
         self.entries[self.current].scroll = Some(self.list.logical_scroll_top());
         self.entries[self.current].lead_offset = self.lead_scroll.offset();
-        self.current = entry;
+        let previous = std::mem::replace(&mut self.current, entry);
+        self.navigation
+            .update(cx, |navigation, cx| navigation.select(previous, entry, cx));
         self.lead_scroll.set_offset(self.entries[entry].lead_offset);
         self.theme_menu_open = false;
         self.drawer_open = false;
@@ -444,7 +452,9 @@ impl Gallery {
 
     pub(crate) fn set_query(&mut self, query: SharedString, cx: &mut Context<Self>) {
         if self.query != query {
-            self.query = query;
+            self.query = query.clone();
+            self.navigation
+                .update(cx, |navigation, cx| navigation.set_query(query, cx));
             // The compact layout's results are in its drawer.
             if self.shell_layout == shell::ShellLayout::Compact && !self.query.trim().is_empty() {
                 self.drawer_open = true;
@@ -642,7 +652,9 @@ impl Gallery {
         // Capture applies the theme before the first frame (see `run`).
         self.applied_theme = theme_key(self.shared.read(cx));
         self.capture = state;
-        self.current = entry;
+        let previous = std::mem::replace(&mut self.current, entry);
+        self.navigation
+            .update(cx, |navigation, cx| navigation.select(previous, entry, cx));
         self.entries[entry].tab = tab;
         for built in self.pages.iter().flatten() {
             built.page.apply_capture(state, cx);
@@ -707,7 +719,7 @@ impl Render for Gallery {
         let compact = layout == shell::ShellLayout::Compact;
         // A window widened past the drawer leaves nothing to reopen.
         self.drawer_open &= compact;
-        let navigation = (!compact).then(|| self.render_navigation(cx));
+        let navigation = (!compact).then(|| self.navigation.clone());
         let drawer = compact.then(|| self.render_drawer(window, cx));
         gpui_base::v_flex()
             .id("gallery")
