@@ -12,35 +12,28 @@ Distribution is by Git revision for now; see the [quick start](README.md#quick-s
 - Cargo feature groups on `gpui-kit-material`, with `full` naming every group; see the
   [README](README.md#crates). `default` still enables everything.
 - A `dynamic` feature on `gpui-kit-material-color`, on by default.
+- A published `[patch]` block for downstream workspaces, built from Git by CI.
+- `rust-version` 1.99.1, the toolchain this workspace is verified with.
+- `[package.metadata.docs.rs]`, `deny.toml`, and CI checks of what each package ships.
 - `MaterialMenu::max_height` and `ExposedDropdown::menu_max_height`: past it a menu
   scrolls, with the keyboard's item kept in view and the selected item shown on open.
   A `MenuPopup` also scrolls rather than outgrow its window.
-- `MaterialContextMenu`: a Material menu that opens at the pointer on a right press.
-- A published `[patch]` block for downstream workspaces, built from Git by CI.
-- `NoticeKind::Warning`, for a notice that needs attention when nothing has failed.
-- `rust-version` 1.99.1, the toolchain this workspace is verified with.
-- `[package.metadata.docs.rs]`, `deny.toml`, and CI checks of what each package ships.
 - `ExposedDropdown::full_width`: the field fills its parent and the menu matches it.
-
+- `NoticeKind::Warning`, for a notice that needs attention when nothing has failed.
+- `MaterialContextMenu`: a Material menu that opens at the pointer on a right press.
 - `TintFamily`, and `ColorRole`s for its seven container and content pairs: hue families
   harmonized toward each scheme's primary, as Material's custom colors are.
 - `ListLeading::Tinted`: a `tinted_icon` as a list item's leading element.
-
 - `TextFieldVariant::Hero`: a page's one main input, a 72dp pill with a ring while focused
   or populated, whose trailing slot takes a labeled button.
 - `TextFieldShape`, on `TextField` and `ExposedDropdown`: medium corners for a form that
   rounds its fields with its surfaces.
-
 - `ButtonTone`, on `MaterialButton`, `IconButton` and `ConnectedButtonGroup`: neutral and
   accent roles for a variant, for screens that need more than one level of action.
-
 - `SearchFieldStyle`, `CardVariant::Surface` and `MaterialDialog::container`: a search bar,
   card and dialog that sit on the surface, for a page whose ground is a step below it.
-
 - `ListItem::switch_icons`: the handle icons of a list item's switch.
-
 - `Stepper`: numbered steps joined by hairlines, for a flow a person walks through once.
-
 - `status_chip_outlined`: one of several facts in a row, filled only where it needs attention.
 
 ### Changed

@@ -68,12 +68,12 @@ gpui-kit-material = { git = "...", rev = "...", default-features = false, featur
 | Feature | Components | Needs |
 | --- | --- | --- |
 | `buttons` | `MaterialButton`, `IconButton`, `ButtonGroup`, `ConnectedButtonGroup`, `SplitButton`, `Fab`, `ExtendedFab`, `FabMenu` | `menus`, `progress` |
-| `progress` | `LinearProgress`, `CircularProgress` | |
+| `progress` | `LinearProgress`, `CircularProgress`, `Stepper` | |
 | `loading` | `LoadingIndicator`, `PullToRefresh` | `progress`, `shapes` |
 | `feedback` | `Badge`, `Snackbar`, `MaterialTooltip`, `MaterialCard`, status chips, notices | |
 | `selection` | `MaterialCheckbox`, `MaterialRadio`, `MaterialSwitch`, chips, `ChipSet`, `MaterialSlider`, tiles, choice tiles | |
 | `inputs` | `TextField`, `SearchField`, `SearchView` | |
-| `menus` | `MaterialMenu`, and `ExposedDropdown` when `inputs` is on too | |
+| `menus` | `MaterialMenu`, `MenuPopup`, `MaterialContextMenu`, and `ExposedDropdown` when `inputs` is on too | |
 | `pickers` | `DatePicker`, `TimePicker` | `buttons`, `inputs`, `chrono` |
 | `dialogs` | `MaterialDialog`, `MaterialBottomSheet`, `MaterialSideSheet` | |
 | `containment` | `Avatar`, `MaterialCarousel`, `MaterialDivider`, `ListItem` | `selection` |

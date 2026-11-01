@@ -8,7 +8,7 @@ by reading the source, playgrounds and tests of every row again: the Tests, A11y
 Playground and Rust columns and the gaps checkable in code are current to it. The F, M
 and E columns and gaps against the references keep the `45de656` audit.
 
-**Result: 0 components are production-ready.** Of the 46 rows below, 44 are
+**Result: 0 components are production-ready.** Of the 47 rows below, 45 are
 implemented, 43 with a playground, all with tests. None has independent approval, committed
 captures against the kit, or per-component performance results. RTL is inherited by
 every component with tests for the direction-sensitive ones, but has no committed
@@ -30,6 +30,25 @@ Limits of this audit:
   Drawer, Tabs, Top and Bottom app bar, Docked and Floating toolbar.
 - Some rows marked `inherit` read the direction without an RTL test: Radio, Carousel,
   Menu, Rail, Bar, Date picker, Text field and Button group.
+
+## Outside the references
+
+These public options are not in the Figma kit, md3.io or m3e. An application asked for
+them, so they are kept and marked here rather than held to a reference, and they keep to
+M3 roles and type. Each is opt-in: the M3 defaults do not change.
+
+| Addition | What it adds |
+| --- | --- |
+| `Stepper` | Numbered steps joined by hairlines, in the form of Material 2's horizontal stepper |
+| `TextFieldVariant::Hero` | A 72dp pill with a 2dp ring. No floating label; the label is only the accessible name |
+| `TextFieldShape::Rounded` | Medium corners on a filled or outlined field |
+| `ButtonTone::Neutral`, `Accent` | Other roles for a button's enabled, unselected colors. Disabled and selected keep M3's |
+| `SearchFieldStyle::Surface`, `Tonal` | A search bar on the surface with an edge, or on surface-container-highest |
+| `CardVariant::Surface` | A flat card on the surface with no edge |
+| `MaterialDialog::container` | Another role for a dialog's container |
+| `NoticeKind::Warning`, `status_chip_outlined` | Status surfaces on the kit's own warning and success roles |
+| `TintFamily`, `ListLeading::Tinted` | Seven harmonized hue families in 14 `ColorRole`s. M3's custom colors are the model; the design colors are the kit's |
+| `MaterialContextMenu` | A menu opened at the pointer. The menu is M3's; the right press is not in a reference |
 
 ## Legend
 
@@ -103,7 +122,7 @@ Limits of this audit:
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | Badge | Y | Y | Y | `Badge` | Yes | 5 + 2 | code | inherit | none | none found |
 | Avatar | Y | - | - | `Avatar` | Yes | 3 + 0 | code | inherit | none | none found |
-| Stepper | - | - | - | `Stepper` | Specs | 1 + 0 | code | inherit | none | M3 specifies no stepper; added for flows walked through once |
+| Stepper | - | - | - | `Stepper` | Specs | 1 + 0 | code | inherit | none | **Non-M3**: no reference specifies a stepper; added for flows walked through once. No playground |
 | Linear and circular progress | Y | Y | Y | `LinearProgress`, `CircularProgress` | Yes | 16 + 2 | tree, RM | inherit | none | Wave height and percentage label are not options. No reference defines a contained form |
 | Loading indicator | Y | Y | Y | `LoadingIndicator` | Yes | 8 + 1 | attr | inherit | none | `.playback` still needs the vendored repeat patch; determinate turns opposite to Compose |
 | Snackbar | Y | Y | Y | `Snackbar` | Yes | 7 + 3 | code | inherit | none | none found |
