@@ -1290,3 +1290,40 @@ fn the_first_arrow_key_moves_from_the_selected_item(cx: &mut TestAppContext) {
 fn the_first_arrow_key_up_moves_from_the_selected_item(cx: &mut TestAppContext) {
     assert_eq!(pick_after("up enter", cx), vec![49]);
 }
+
+#[gpui::test]
+fn a_keyboard_focused_item_paints_the_focus_layer(cx: &mut TestAppContext) {
+    let (_, cx) = cascade(cx, Anchor::TopLeft);
+    settle(cx);
+    let paint = item_paint(MenuStyle::Standard, false);
+    let focused = gpui::Background::from(state::layer(
+        alpha(paint.layer, 0.),
+        paint.layer,
+        state::FOCUS,
+    ));
+    let painted = |cx: &mut VisualTestContext| {
+        cx.update(|window, _| {
+            // A popup's rounded clip keeps its quads in a layer of their own under Fast.
+            #[cfg(feature = "gpui-fast")]
+            let in_layers = window
+                .painted_scene()
+                .layers
+                .frames
+                .iter()
+                .filter_map(|frame| frame.content.scene())
+                .flat_map(|scene| scene.quads.iter())
+                .any(|quad| quad.background == focused);
+            #[cfg(not(feature = "gpui-fast"))]
+            let in_layers = false;
+            in_layers
+                || window
+                    .painted_quads()
+                    .iter()
+                    .any(|quad| quad.background == focused)
+        })
+    };
+    assert!(!painted(cx), "no item has focus yet");
+    cx.simulate_keystrokes("down");
+    settle(cx);
+    assert!(painted(cx), "as a focused specimen paints it");
+}
