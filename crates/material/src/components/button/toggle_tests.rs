@@ -810,3 +810,62 @@ fn a_focused_toggle_that_becomes_disabled_keeps_focus(cx: &mut TestAppContext) {
         "disabling must not drop focus, so Tab can still leave"
     );
 }
+
+/// Accent is the standard look of a filled button, whose unselected toggle is not the
+/// selected one's primary: the two states must stay apart in every composite.
+#[test]
+fn an_accent_filled_toggle_shows_whether_it_is_selected() {
+    use super::ButtonTone;
+    use crate::components::{IconButton, IconButtonVariant};
+    let resolved = |(bg, fg, border): (super::CssColor, super::CssColor, super::CssColor)| {
+        (bg.resolve(), fg.resolve(), border.resolve())
+    };
+    let unselected = resolved(toggle_color_targets(
+        ButtonVariant::Filled,
+        false,
+        true,
+        false,
+    ));
+    let selected = resolved(toggle_color_targets(
+        ButtonVariant::Filled,
+        false,
+        true,
+        true,
+    ));
+
+    let button = |on| {
+        resolved(
+            MaterialButton::new("toggle")
+                .variant(ButtonVariant::Filled)
+                .tone(ButtonTone::Accent)
+                .toggle(true)
+                .selected(on)
+                .color_targets(),
+        )
+    };
+    assert_eq!(button(false), unselected, "button, unselected");
+    assert_eq!(button(true), selected, "button, selected");
+
+    let icon_button = |on| {
+        resolved(
+            IconButton::new("toggle", crate::icons::IconName::Check.icon(), "Check")
+                .variant(IconButtonVariant::Filled)
+                .tone(ButtonTone::Accent)
+                .toggle(true)
+                .selected(on)
+                .into_button()
+                .color_targets(),
+        )
+    };
+    assert_eq!(icon_button(false), unselected, "icon button, unselected");
+    assert_eq!(icon_button(true), selected, "icon button, selected");
+
+    // Not a toggle, accent stays the filled button's primary.
+    let plain = resolved(
+        MaterialButton::new("plain")
+            .variant(ButtonVariant::Filled)
+            .tone(ButtonTone::Accent)
+            .color_targets(),
+    );
+    assert_eq!(plain, colors(ButtonVariant::Filled, false));
+}
