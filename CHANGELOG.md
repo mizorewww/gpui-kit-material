@@ -41,6 +41,8 @@ Distribution is by Git revision for now; see the [quick start](README.md#quick-s
 
 - `Stepper`: numbered steps joined by hairlines, for a flow a person walks through once.
 
+- `status_chip_outlined`: one of several facts in a row, filled only where it needs attention.
+
 ### Changed
 
 - **Breaking:** with `default-features = false`, `gpui-kit-material` now has no
