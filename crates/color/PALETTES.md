@@ -60,7 +60,7 @@ Copyright Google LLC, licensed under Apache-2.0: the license is at
 copyright notice and states that it was modified. The rest of this crate is MIT,
 so the crate's license is `MIT AND Apache-2.0`.
 
-`tests/fixtures/mcu-schemes.json` holds every role of 416 schemes (four seeds,
+`tests/fixtures/mcu-schemes.json` holds every role of 520 schemes (five seeds, one in `Hct::is_cyan`'s range,
 all variants, both specs, both modes, contrast -1, 0, 0.5 and 1), produced by
 running that pinned TypeScript under bun. It is what holds the 2025 spec to
 upstream, for which upstream publishes no vectors of its own.
