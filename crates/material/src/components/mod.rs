@@ -280,8 +280,8 @@ pub use text::{
 };
 #[cfg(feature = "inputs")]
 pub use text_field::{
-    TEXT_FIELD_HEIGHT, TEXT_FIELD_WIDTH, TextField, TextFieldDensity, TextFieldInputType,
-    TextFieldVariant,
+    HERO_FIELD_HEIGHT, TEXT_FIELD_HEIGHT, TEXT_FIELD_WIDTH, TextField, TextFieldDensity,
+    TextFieldInputType, TextFieldShape, TextFieldVariant,
 };
 #[cfg(feature = "selection")]
 pub use tile::{

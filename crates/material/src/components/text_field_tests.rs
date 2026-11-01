@@ -355,3 +355,47 @@ fn a_field_without_a_type_leaves_its_callers_mask_alone(cx: &mut TestAppContext)
     let state = view.read_with(cx, |view, _| view.state.clone());
     assert!(is_masked(&state, cx));
 }
+
+#[test]
+fn a_hero_field_is_a_surface_pill_with_a_ring_that_never_changes_its_width() {
+    use ColorRole as C;
+    let rest = FieldState::default();
+    let paint = field_paint(TextFieldVariant::Hero, rest);
+    assert_eq!(paint.container, color(C::SURFACE));
+    assert_eq!(paint.indicator, color(C::SURFACE), "no ring at rest");
+    assert_eq!(paint.indicator_width, HERO_RING);
+    for (state, ring) in [
+        (
+            FieldState {
+                focused: true,
+                ..rest
+            },
+            color(C::PRIMARY),
+        ),
+        (
+            FieldState {
+                error: true,
+                ..rest
+            },
+            color(C::ERROR),
+        ),
+    ] {
+        let paint = field_paint(TextFieldVariant::Hero, state);
+        assert_eq!(paint.indicator, ring);
+        assert_eq!(paint.indicator_width, HERO_RING);
+    }
+    assert_eq!(
+        hero_ring(false, true, false),
+        color(C::PRIMARY),
+        "populated"
+    );
+}
+
+#[test]
+fn shapes_keep_the_standard_corners_unless_asked() {
+    assert_eq!(
+        TextFieldShape::default().radius(),
+        RADIUS_EXTRA_SMALL.as_f32()
+    );
+    assert_eq!(TextFieldShape::Rounded.radius(), 12.);
+}
