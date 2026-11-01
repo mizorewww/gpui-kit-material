@@ -184,34 +184,23 @@ fn schedule<T>(sample: gpui_base::MotionValue<T>, window: &mut Window) -> T {
     sample.value
 }
 pub(super) fn token_sample<T: gpui_base::Interpolate + PartialEq + 'static>(
-    playback: Option<&motion::TokenTransitionPlayback<T>>,
-    id: impl Into<ElementId>,
+    playback: &motion::TokenTransitionPlayback<T>,
     target: T,
     token: MotionToken,
     window: &mut Window,
     cx: &mut App,
 ) -> T {
-    match playback {
-        Some(playback) => schedule(playback.sample(target, token, cx), window),
-        None => motion::token_transition(id, target, token, window, cx),
-    }
+    schedule(playback.sample(target, token, cx), window)
 }
 pub(super) fn opacity_sample(
-    playback: Option<&ButtonTransitionPlayback>,
-    id: impl Into<ElementId>,
+    playback: &ButtonTransitionPlayback,
     target: f32,
     policy: gpui_base::Transition,
     window: &mut Window,
     cx: &mut App,
 ) -> f32 {
-    let id: ElementId = id.into();
-    match playback {
-        Some(playback) => {
-            playback.opacity_target.set(target);
-            schedule(playback.opacity.sample(target, policy, cx), window)
-        }
-        None => gpui_base::transition(id, target, policy, window, cx),
-    }
+    playback.opacity_target.set(target);
+    schedule(playback.opacity.sample(target, policy, cx), window)
 }
 
 #[cfg(test)]
