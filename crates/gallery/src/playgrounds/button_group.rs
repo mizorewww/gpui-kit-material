@@ -78,6 +78,12 @@ pub static PLAYGROUND: Playground = Playground {
         Section {
             title: "Appearance",
             controls: &[
+                Control::Select {
+                    id: "tone",
+                    label: "Tone",
+                    options: &["standard", "neutral", "accent"],
+                    default: 0,
+                },
                 Control::Segmented {
                     id: "kind",
                     label: "Kind",
@@ -305,6 +311,7 @@ fn preview(
     } else {
         let mut group = ConnectedButtonGroup::new(id, "Options")
             .variant(variant)
+            .tone(ButtonTone::ALL[config.choice("tone")])
             .button_size(size)
             .shape(shape)
             .vertical(vertical)
