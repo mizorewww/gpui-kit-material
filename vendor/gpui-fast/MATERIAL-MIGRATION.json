@@ -258,8 +258,8 @@
       },
       "src/fast/splice.rs": {
         "upstream_sha256": "4436ab4f8934aec0e95e73edf69fb3ea36c1b01cb6fe494037cb9923ea221efd",
-        "local_sha256": "f6932404b16138329069649b83a3be9884ba338862c5aceedbca884919349dbd",
-        "reason": "A view rebuilt alone keeps its direction (vendor/gpui-pre/layout-direction-patch.md). What a gap writes as it paints is the spliced view's own."
+        "local_sha256": "48e6944a9c38654fdad7c836ae811fae4ec844bd8267b1313b1e56a28aba6dc2",
+        "reason": "A view rebuilt alone keeps its direction (vendor/gpui-pre/layout-direction-patch.md). What a gap writes as it paints is the spliced view's own. Its own dependencies restart from the check each frame it is spliced, so those writes do not pile up. Limit: an entity keeps only its last write's stamp, so a write the view should see is hidden if a gap writes the same entity later in the frame; stamping each write would mean keeping every entity's history since the oldest live record, which an idle second window can hold back without bound (fast::tests::retained::a_later_paint_write_hides_an_earlier_write_of_the_same_entity)."
       },
       "src/fast/text.rs": {
         "upstream_sha256": "e386a393269aee9189cb87c2a1f40f40fb4716b2cd98e6a394e052b318177814",
@@ -363,8 +363,8 @@
       },
       "src/fast/dependencies.rs": {
         "upstream_sha256": "8f230852f0585bec1f92608aec4fcc3d8fb3f00ad4736cba8a8d05f736e84cc5",
-        "local_sha256": "31dae8069a989ee77ec61753c22bba96f6af0ea291511291723bf1fa5e4cf1e4",
-        "reason": "Entity::update_for_render, the public form of dependencies::query, behind frame-observation (vendor/gpui-pre/render-lease-patch.md)."
+        "local_sha256": "12a381a1186b2f4e01e116eacc7cf31d2d6ed0294ebd64b78ad7569f7d4a8a16",
+        "reason": "Entity::update_for_render, the public form of dependencies::query, behind frame-observation (vendor/gpui-pre/render-lease-patch.md). A test's count of a record's stretches of own writes."
       },
       "src/fast/tests/dependencies.rs": {
         "upstream_sha256": "131164fada000e865db0a14855e4eab5446f89b45e70a1904414408cd0cdb6b0",
@@ -385,6 +385,11 @@
         "upstream_sha256": "09da7204a25f0ad3276a5fcf82ebb48f35de4170e613f90411e272ee02debc7c",
         "local_sha256": "f6e763a49b2f87c049182fbb9e54e315a7b1fec9f61ae3f859e650da5db432ca",
         "reason": "Comment: a break before / is what lets a URL wrap, not one before ? (vendor/gpui-pre/line-start-marks-patch.md)."
+      },
+      "src/fast/tests/retained.rs": {
+        "upstream_sha256": "95fbb8389daf15e227312b07d2794ba109406071a780d3f4d9224e61f722173b",
+        "local_sha256": "ca7c667c562c4eeeb551710994b2c9d612e968ea237b3867d1f8c90b568efaec",
+        "reason": "Tests of what a gap writes around a spliced view, and of the limit in src/fast/splice.rs."
       }
     },
     "added": {

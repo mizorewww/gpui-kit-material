@@ -2677,3 +2677,201 @@ fn an_element_no_longer_drawn_leaves_the_debug_bounds_of_a_retained_frame() {
     );
     assert_eq!(bounds(&mut cx, "kept"), Some(kept));
 }
+
+/// What a [`GapPainter`] writes as it paints.
+struct Stored(usize);
+
+/// A nested view of a fixed size that stores something as it paints, as an input stores its
+/// layout, and, if asked, as it is built.
+struct GapPainter {
+    stored: Entity<Stored>,
+    written_as_built: bool,
+    written_as_painted: bool,
+}
+
+impl Render for GapPainter {
+    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        if self.written_as_built {
+            self.stored.update(cx, |stored, _| stored.0 += 1);
+        }
+        div().w(px(100.)).h(px(40.)).child(StoresAsItPaints(
+            self.written_as_painted.then(|| self.stored.clone()),
+        ))
+    }
+}
+
+/// An element with an id, so its node is kept from frame to frame, that writes as it paints.
+struct StoresAsItPaints(Option<Entity<Stored>>);
+
+impl IntoElement for StoresAsItPaints {
+    type Element = Self;
+
+    fn into_element(self) -> Self {
+        self
+    }
+}
+
+impl crate::Element for StoresAsItPaints {
+    type RequestLayoutState = ();
+    type PrepaintState = ();
+
+    fn id(&self) -> Option<crate::ElementId> {
+        Some("stores-as-it-paints".into())
+    }
+
+    fn source_location(&self) -> Option<&'static std::panic::Location<'static>> {
+        None
+    }
+
+    fn request_layout(
+        &mut self,
+        _: Option<&crate::GlobalElementId>,
+        _: Option<&crate::InspectorElementId>,
+        window: &mut Window,
+        cx: &mut crate::App,
+    ) -> (crate::LayoutId, ()) {
+        (window.request_layout(crate::Style::default(), [], cx), ())
+    }
+
+    fn prepaint(
+        &mut self,
+        _: Option<&crate::GlobalElementId>,
+        _: Option<&crate::InspectorElementId>,
+        _: crate::Bounds<crate::Pixels>,
+        _: &mut (),
+        _: &mut Window,
+        _: &mut crate::App,
+    ) {
+    }
+
+    fn paint(
+        &mut self,
+        _: Option<&crate::GlobalElementId>,
+        _: Option<&crate::InspectorElementId>,
+        _: crate::Bounds<crate::Pixels>,
+        _: &mut (),
+        _: &mut (),
+        _: &mut Window,
+        cx: &mut crate::App,
+    ) {
+        if let Some(stored) = &self.0 {
+            stored.update(cx, |stored, _| stored.0 += 1);
+        }
+    }
+}
+
+/// A shell around a [`GapPainter`], and the painter, drawn once.
+fn shell_around_painter(
+    cx: &mut TestAppContext,
+) -> (WindowHandle<Shell>, Rc<Cell<usize>>, Entity<GapPainter>) {
+    let stored = cx.new(|_| Stored(0));
+    let gap = cx.new(|_| GapPainter {
+        stored,
+        written_as_built: false,
+        written_as_painted: true,
+    });
+    let (window, builds) = shell(cx, {
+        let gap = gap.clone();
+        move |_| gap.into()
+    });
+    draw_shell(cx, window);
+    (window, builds, gap)
+}
+
+/// A view drawn again around a gap that writes as it paints took the writes for its own on
+/// every frame, and kept every earlier frame's: its record grew by a stretch a frame, cloned
+/// with each copy and scanned for each write it had read.
+#[test]
+fn a_spliced_view_does_not_collect_a_stretch_of_writes_per_frame() {
+    let mut cx = TestAppContext::single();
+    let (window, builds, gap) = shell_around_painter(&mut cx);
+    // Notifying draws the window as the update finishes.
+    for _ in 0..200 {
+        gap.update(&mut cx, |_, cx| cx.notify());
+    }
+    assert_eq!(builds.get(), 1, "the shell was spliced around the painter");
+    let stretches = cx
+        .update_window(window.into(), |_, window, _| {
+            window
+                .rendered_frame
+                .retained
+                .records
+                .iter()
+                .map(|record| {
+                    record
+                        .own_dependencies
+                        .own_write_stretches()
+                        .max(record.dependencies.own_write_stretches())
+                })
+                .max()
+        })
+        .unwrap()
+        .unwrap();
+    assert!(
+        stretches <= 2,
+        "a record kept {stretches} stretches of writes after 200 frames"
+    );
+}
+
+/// A view around a gap, and the entity it reads, which the gap writes.
+struct GapReader {
+    gap: Entity<GapPainter>,
+    stored: Entity<Stored>,
+    builds: Rc<Cell<usize>>,
+}
+
+impl Render for GapReader {
+    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        self.builds.set(self.builds.get() + 1);
+        self.stored.read(cx);
+        div().child(self.gap.clone())
+    }
+}
+
+/// How many times a [`GapReader`] is built, past its first, as a gap writing as asked is
+/// notified twice: the frame the gap writes and the one that can find it.
+fn reader_builds(written_as_built: bool, written_as_painted: bool) -> usize {
+    let mut cx = TestAppContext::single();
+    let builds = Rc::new(Cell::new(0));
+    let stored = cx.new(|_| Stored(0));
+    let gap = cx.new(|_| GapPainter {
+        stored: stored.clone(),
+        written_as_built,
+        written_as_painted,
+    });
+    let window = cx.add_window({
+        let (gap, stored, builds) = (gap.clone(), stored, builds.clone());
+        move |_, _| GapReader {
+            gap,
+            stored,
+            builds,
+        }
+    });
+    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear(cx))
+        .unwrap();
+    let before = builds.get();
+    gap.update(&mut cx, |_, cx| cx.notify());
+    gap.update(&mut cx, |_, cx| cx.notify());
+    builds.get() - before
+}
+
+/// What a gap writes while it is built comes after the view around it was checked and is not
+/// part of drawing that view: a view that read it is built with what was written.
+#[test]
+fn a_gaps_write_while_built_reaches_the_view_around_it() {
+    assert!(reader_builds(true, false) > 0);
+}
+
+/// What a gap writes as it paints is taken for part of drawing the view around it.
+#[test]
+fn a_gaps_write_as_it_paints_does_not_build_the_view_around_it() {
+    assert_eq!(reader_builds(false, true), 0);
+}
+
+/// The limit of telling those apart (`MATERIAL-MIGRATION.json`): an entity keeps only its last
+/// write's stamp, so a write the view around a gap should see is hidden when the gap writes
+/// the same entity later in the frame. Pinned here so that a change to it is noticed.
+#[test]
+fn a_later_paint_write_hides_an_earlier_write_of_the_same_entity() {
+    assert_eq!(reader_builds(true, true), 0);
+}
