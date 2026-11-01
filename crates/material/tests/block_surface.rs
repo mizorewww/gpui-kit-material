@@ -128,8 +128,7 @@ impl Doc<'_> {
 
     /// What the app's copy reads, without writing to the clipboard.
     fn copied(&mut self) -> String {
-        self.cx
-            .update(|window, cx| TextSelection::selected_text(window, cx))
+        self.cx.update(TextSelection::selected_text)
     }
 
     fn select_all_plain_lines(&mut self) -> Vec<String> {
@@ -185,11 +184,11 @@ fn copies(format: SelectionFormat, scrollable: bool, cx: &mut TestAppContext) ->
     let mut copy = |from, to| {
         doc.drag(from, to);
         let forward = doc.copied();
-        doc.cx.update(|window, cx| TextSelection::clear(window, cx));
+        doc.cx.update(TextSelection::clear);
         settle(doc.cx);
         doc.drag(to, from);
         assert_eq!(forward, doc.copied(), "a drag copies the same both ways");
-        doc.cx.update(|window, cx| TextSelection::clear(window, cx));
+        doc.cx.update(TextSelection::clear);
         settle(doc.cx);
         forward.trim_end().to_string()
     };
@@ -259,7 +258,7 @@ fn the_title_is_not_selectable_text(cx: &mut TestAppContext) {
 
 #[gpui::test]
 fn the_rendered_text_and_a_find_ignore_the_surface(cx: &mut TestAppContext) {
-    let mut doc = open(DOCUMENT, (600., true, SelectionFormat::Plain, true), cx);
+    let doc = open(DOCUMENT, (600., true, SelectionFormat::Plain, true), cx);
     let rendered = doc
         .view
         .read_with(doc.cx, |view, _| view.rendered_text().as_str().to_string());
