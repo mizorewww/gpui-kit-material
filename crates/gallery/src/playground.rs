@@ -1123,6 +1123,8 @@ pub struct PreviewView {
     hint: Rc<Cell<PaneHint>>,
     dependents: (WeakEntity<LeadView>, WeakEntity<PanelView>),
     _observe: [Subscription; 2],
+    #[cfg(test)]
+    pub(crate) renders: Cell<usize>,
 }
 
 impl PreviewView {
@@ -1143,12 +1145,16 @@ impl PreviewView {
             hint,
             dependents,
             _observe: observe,
+            #[cfg(test)]
+            renders: Cell::default(),
         }
     }
 }
 
 impl Render for PreviewView {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        #[cfg(test)]
+        self.renders.set(self.renders.get() + 1);
         let scope = self.shared.read(cx).preview_scope().resolve(window, cx);
         let state = self.state.clone();
         // A lease: what the Gallery reads of the state does not change by building

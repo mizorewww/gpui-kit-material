@@ -1175,18 +1175,23 @@ mod window_tests {
             cx.read(|cx| gallery.read(cx).shell_layout),
             super::shell::ShellLayout::at(width)
         );
-        // The preview's first frame after the page was built can lay the row out afresh, so
-        // the views around it build once more (`splice_layout_holds`). That once is what a
-        // page used to pay on its second frame, for its tabs' first measure.
-        cx.update(|cx| cx.notify(preview.entity_id()));
-        draw(window.into(), cx);
         let settled = counts(cx);
+        let frames = cx.read(|cx| preview.read(cx).renders.get());
         // What every animation frame of a component in the preview does:
-        // `Window::request_animation_frame` notifies the view, without updating it.
+        // `Window::request_animation_frame` notifies the view, without updating it. The
+        // flush draws the dirty window here, and nothing else may: a running window draws
+        // only when something is dirty, which makes its root dirty and splices it. A draw
+        // with nothing dirty would build what surrounds a page's input once, for the
+        // notification of the input's first paint, as
+        // `the_first_idle_draw_after_a_splice_builds_the_view_around_the_gap_once` pins.
         for _ in 0..3 {
             cx.update(|cx| cx.notify(preview.entity_id()));
-            draw(window.into(), cx);
         }
+        assert_eq!(
+            cx.read(|cx| preview.read(cx).renders.get()),
+            frames + 3,
+            "the preview's frames were drawn at {width}"
+        );
         assert_eq!(
             counts(cx),
             settled,
