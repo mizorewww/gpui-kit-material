@@ -1,0 +1,55 @@
+{
+  "source": "native Gallery frames.json",
+  "metrics": {
+    "steady_cpu_excluding_drawable_wait": {
+      "count": 4,
+      "p50_ns": 3662875,
+      "p95_ns": 6221250,
+      "p99_ns": 6221250,
+      "max_ns": 6221250
+    },
+    "drawable_wait": {
+      "count": 4,
+      "p50_ns": 144958,
+      "p95_ns": 1412750,
+      "p99_ns": 1412750,
+      "max_ns": 1412750
+    },
+    "gpu": {
+      "count": 3,
+      "p50_ns": 4118708,
+      "p95_ns": 5805417,
+      "p99_ns": 5805417,
+      "max_ns": 5805417
+    },
+    "first_frame_cpu_ns": 33577875
+  },
+  "targets": {
+    "steady_cpu_p95": {
+      "target": "steady-state main-thread CPU p95 (excluding drawable wait)",
+      "limit": 1000000,
+      "measured": 6221250,
+      "verdict": "FAIL"
+    },
+    "steady_cpu_max": {
+      "target": "steady-state main-thread CPU max (excluding drawable wait)",
+      "limit": 2000000,
+      "measured": 6221250,
+      "verdict": "FAIL"
+    },
+    "first_frame_vs_kit": {
+      "target": "first frame main-thread CPU / Kit's stories baseline on this machine",
+      "limit": 1.2,
+      "measured": null,
+      "verdict": "UNVERIFIED",
+      "note": "InitialDraw scope plus the first presenting frame's scope; window creation CPU is not included in Gallery evidence; pass --kit-first-frame-ms, measured on this machine"
+    },
+    "page_switch": {
+      "target": "switching Gallery pages",
+      "limit": 8000000,
+      "measured": null,
+      "verdict": "UNVERIFIED",
+      "note": "hook: the Gallery shell must report page_switch_ns (one CPU duration per switch)"
+    }
+  }
+}

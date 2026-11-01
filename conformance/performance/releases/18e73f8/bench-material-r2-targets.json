@@ -1,0 +1,190 @@
+{
+  "source": "crates/bench/src/bin/engine_bench.rs (standalone, not the Gallery)",
+  "metrics": {
+    "scroll_vsync_off": {
+      "steady_frames": 258,
+      "cpu_excluding_drawable_wait": {
+        "count": 258,
+        "p50_ns": 3155291,
+        "p95_ns": 5160500,
+        "p99_ns": 6664708,
+        "max_ns": 11596042
+      },
+      "drawable_wait": {
+        "count": 258,
+        "p50_ns": 13372500,
+        "p95_ns": 15403875,
+        "p99_ns": 17304084,
+        "max_ns": 19236292
+      },
+      "frames_with_drawable_wait_over_0_1ms": 257,
+      "layout": {
+        "count": 258,
+        "p50_ns": 102292,
+        "p95_ns": 142166,
+        "p99_ns": 192750,
+        "max_ns": 813833
+      },
+      "prepaint": {
+        "count": 258,
+        "p50_ns": 884958,
+        "p95_ns": 1804667,
+        "p99_ns": 2167750,
+        "max_ns": 5667834
+      },
+      "paint": {
+        "count": 258,
+        "p50_ns": 725250,
+        "p95_ns": 1253625,
+        "p99_ns": 2958625,
+        "max_ns": 5278000
+      },
+      "present": {
+        "count": 258,
+        "p50_ns": 13686916,
+        "p95_ns": 15489750,
+        "p99_ns": 17741042,
+        "max_ns": 19798500
+      },
+      "gpu": {
+        "count": 258,
+        "p50_ns": 16274416,
+        "p95_ns": 17228625,
+        "p99_ns": 17372499,
+        "max_ns": 17454375
+      },
+      "new_frames_per_s": 60.705882352941174,
+      "min_100ms_window_new_frames_per_s": 60.0,
+      "engine_counters": {
+        "at_settle": {
+          "frames": 5,
+          "views_built": 23,
+          "views_reused": 2,
+          "nodes_created": 859,
+          "nodes_reused": 1274,
+          "lines_shaped": 40,
+          "layer_frames_composited": 1,
+          "layer_frames_repainted": 1,
+          "tiles_dirtied": 0,
+          "layer_rebuilds_for_input": 0,
+          "layers_demoted": 0
+        },
+        "final": {
+          "frames": 265,
+          "views_built": 301,
+          "views_reused": 259,
+          "nodes_created": 1611,
+          "nodes_reused": 6352,
+          "lines_shaped": 72,
+          "layer_frames_composited": 258,
+          "layer_frames_repainted": 1,
+          "tiles_dirtied": 0,
+          "layer_rebuilds_for_input": 0,
+          "layers_demoted": 0
+        }
+      }
+    },
+    "scroll_vsync_on": {
+      "display_refresh_hz": 60.0,
+      "missed_refreshes": 1,
+      "new_frames_per_s": 60.0,
+      "cpu_excluding_drawable_wait": {
+        "count": 255,
+        "p50_ns": 4665543,
+        "p95_ns": 7435541,
+        "p99_ns": 8514083,
+        "max_ns": 27919042
+      }
+    },
+    "idle": {
+      "frames_drawn": 0,
+      "frames_presented": 0,
+      "seconds": 4.25
+    },
+    "forced_redraw": {
+      "cpu_excluding_drawable_wait": {
+        "count": 257,
+        "p50_ns": 5008667,
+        "p95_ns": 6111958,
+        "p99_ns": 7052125,
+        "max_ns": 7709709
+      }
+    },
+    "first_frame": {
+      "runs": 3,
+      "main_thread_cpu_ns": [
+        114861083,
+        106169208,
+        119378958
+      ],
+      "initial_draw_ns": [
+        13202500,
+        9758834,
+        9984208
+      ],
+      "open_window_cpu_ns": [
+        72430625,
+        67726875,
+        76962833
+      ],
+      "wall_to_first_frame_ns": [
+        193245125,
+        149984416,
+        185294458
+      ]
+    }
+  },
+  "targets": {
+    "steady_cpu_p95": {
+      "target": "steady-state main-thread CPU p95 (excluding drawable wait)",
+      "limit": 1000000,
+      "measured": 5160500,
+      "verdict": "FAIL"
+    },
+    "steady_cpu_max": {
+      "target": "steady-state main-thread CPU max (excluding drawable wait)",
+      "limit": 2000000,
+      "measured": 11596042,
+      "verdict": "FAIL"
+    },
+    "missed_refreshes_vsync_on": {
+      "target": "missed refreshes with vsync on at 120 Hz",
+      "limit": 0,
+      "measured": null,
+      "verdict": "UNVERIFIED",
+      "note": "measured on a 60.0 Hz display; 120 Hz unverified on this display (1 missed at 60.0 Hz)"
+    },
+    "idle_frames": {
+      "target": "idle window draws and presents nothing",
+      "limit": 0,
+      "measured": 0,
+      "verdict": "PASS"
+    },
+    "first_frame_vs_kit": {
+      "target": "first frame main-thread CPU / Kit's stories baseline on this machine",
+      "limit": 1.2,
+      "measured": null,
+      "verdict": "UNVERIFIED",
+      "note": "worst of the runs; pass --kit-first-frame-ms, measured on this machine"
+    },
+    "page_switch": {
+      "target": "switching Gallery pages",
+      "limit": 8000000,
+      "measured": null,
+      "verdict": "UNVERIFIED",
+      "note": "the standalone benchmark has no pages; measured from the Gallery shell"
+    }
+  },
+  "load_average": [
+    [
+      1.74951171875,
+      2.03173828125,
+      4.03173828125
+    ],
+    [
+      1.93017578125,
+      2.056640625,
+      3.970703125
+    ]
+  ]
+}

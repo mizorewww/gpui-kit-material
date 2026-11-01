@@ -1,0 +1,3 @@
+Per-run data: summary.json. Evidence = 1-minute load <= 2 at run start. Not reviewed; not a release claim.
+Binaries built at 18e73f8 (differs from ff0b2f2 only in tests); HEAD moved to 6f2e747 (README) mid-run. Predates PRs #2-#15.
+Low Power Mode was on. Frame dumps: ~/Developer/.figma-shots/work/quiet-run/runs/ (runs-loaded*: replaced loaded attempts).

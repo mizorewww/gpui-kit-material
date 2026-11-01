@@ -1,0 +1,2257 @@
+{
+ "commit_binaries": "18e73f8",
+ "head_during": "18e73f8 then 6f2e747 (README only); both differ from ff0b2f2 only in tests/README",
+ "machine": "Apple M2, built-in 2560x1600, 60 Hz, AC, thermal nominal, Low Power Mode ON (pmset lowpowermode 1 on AC)",
+ "notes": [
+  "engine_bench and component_bench do not compile with shipped features; built with --features gpui-kit/test-support from the command line",
+  "www/profile.js throws ReferenceError in finish(); WASM runs served a scratch copy with one line moved (web_nobuild.py)",
+  "WASM runs skipped the rebuild step immediately before each run; modules prebuilt at 18e73f8",
+  "evidence=true means 1-min load <=2 at run start; load_peak can include the run itself"
+ ],
+ "gallery_scroll": [
+  {
+   "rep": 1,
+   "steady_ms": {
+    "p50_ns": 2.068,
+    "p95_ns": 2.856,
+    "p99_ns": 7.813,
+    "max_ns": 13.446
+   },
+   "frames": 601,
+   "drawable_wait_ms": 14.329,
+   "gpu_ms": {
+    "p50_ns": 4.543,
+    "p95_ns": 19.525,
+    "p99_ns": 20.163,
+    "max_ns": 21.082
+   },
+   "first_frame_ms": 34.066,
+   "capture_s": 10.03,
+   "fps_min_median": [
+    57.3,
+    60.0
+   ],
+   "vsync": "disabled",
+   "refresh_ns": 16666667,
+   "errors": [
+    "did not complete a full top-to-bottom-to-top Gallery traversal"
+   ],
+   "load_start": 1.88,
+   "load_peak": 2.14,
+   "gate_met": true,
+   "waited_s": 0,
+   "head": "18e73f8",
+   "dirty": false,
+   "uptime_before": "06:02:19 up 14 days 8:22,  3 users,  load average: 1.88, 2.67, 6.20",
+   "uptime_after": "06:02:35 up 14 days 8:23,  3 users,  load average: 2.14, 2.69, 6.15",
+   "top_before": [
+    "  4.8 49822 /Applications/Google Chrome.app/Contents/Frameworks/Google Chrome Framework.fr",
+    "  4.2   612 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+    "  3.5  3268 /Applications/Stats.app/Contents/MacOS/Stats",
+    "  3.3 21797 /System/Library/CoreServices/System Events.app/Contents/MacOS/System Events"
+   ],
+   "top_mid": [
+    " 47.5   612 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+    " 20.4 21855 /Users/aac6fef/Developer/gpui-kit-material/target/release/gallery",
+    "  7.2 49822 /Applications/Google Chrome.app/Contents/Frameworks/Google Chrome Framework.fr",
+    "  3.2 40448 /usr/libexec/duetexpertd"
+   ],
+   "evidence": true
+  },
+  {
+   "rep": 2,
+   "steady_ms": {
+    "p50_ns": 2.05,
+    "p95_ns": 3.2,
+    "p99_ns": 9.638,
+    "max_ns": 14.219
+   },
+   "frames": 378,
+   "drawable_wait_ms": 14.356,
+   "gpu_ms": {
+    "p50_ns": 4.619,
+    "p95_ns": 19.154,
+    "p99_ns": 20.079,
+    "max_ns": 20.53
+   },
+   "first_frame_ms": 32.244,
+   "capture_s": 6.4,
+   "fps_min_median": [
+    53.4,
+    60.0
+   ],
+   "vsync": "disabled",
+   "refresh_ns": 16666667,
+   "errors": [
+    "content offset jumped -12.0px between observations (limit 8.5px); measurement cannot prove continuous movement"
+   ],
+   "load_start": 1.71,
+   "load_peak": 1.73,
+   "gate_met": true,
+   "waited_s": 0,
+   "head": "18e73f8",
+   "dirty": false,
+   "uptime_before": "06:05:04 up 14 days 8:25,  3 users,  load average: 1.71, 2.31, 5.45",
+   "uptime_after": "06:05:15 up 14 days 8:25,  3 users,  load average: 1.62, 2.26, 5.37",
+   "top_before": [
+    " 40.4   612 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+    " 10.6 49822 /Applications/Google Chrome.app/Contents/Frameworks/Google Chrome Framework.fr",
+    " 10.2  1065 /System/Library/CoreServices/MenuBarAgent.app/Contents/MacOS/MenuBarAgent",
+    "  6.8 23671 /Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+   ],
+   "top_mid": [
+    " 47.9   612 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+    " 31.0 23835 /usr/bin/top",
+    " 22.0 98090 claude bg-spare",
+    " 17.6 23681 /Users/aac6fef/Developer/gpui-kit-material/target/release/gallery"
+   ],
+   "evidence": true
+  },
+  {
+   "rep": 3,
+   "steady_ms": {
+    "p50_ns": 2.089,
+    "p95_ns": 2.967,
+    "p99_ns": 8.16,
+    "max_ns": 12.999
+   },
+   "frames": 596,
+   "drawable_wait_ms": 14.304,
+   "gpu_ms": {
+    "p50_ns": 4.601,
+    "p95_ns": 19.064,
+    "p99_ns": 20.474,
+    "max_ns": 20.73
+   },
+   "first_frame_ms": 33.784,
+   "capture_s": 10.11,
+   "fps_min_median": [
+    39.9,
+    60.0
+   ],
+   "vsync": "disabled",
+   "refresh_ns": 16666667,
+   "errors": [
+    "did not complete a full top-to-bottom-to-top Gallery traversal"
+   ],
+   "load_start": 1.8,
+   "load_peak": 1.91,
+   "gate_met": true,
+   "waited_s": 0,
+   "head": "18e73f8",
+   "dirty": false,
+   "uptime_before": "06:05:44 up 14 days 8:26,  3 users,  load average: 1.80, 2.25, 5.28",
+   "uptime_after": "06:05:59 up 14 days 8:26,  3 users,  load average: 1.75, 2.22, 5.22",
+   "top_before": [
+    " 42.2   612 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+    " 18.3   729 /System/Library/PrivateFrameworks/BackgroundTaskManagement.framework/Resources",
+    " 14.5  1065 /System/Library/CoreServices/MenuBarAgent.app/Contents/MacOS/MenuBarAgent",
+    " 11.2   592 /usr/libexec/dasd"
+   ],
+   "top_mid": [
+    " 48.4   612 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+    " 29.2 98090 claude bg-spare",
+    " 18.3 24396 /Users/aac6fef/Developer/gpui-kit-material/target/release/gallery",
+    " 17.5  3268 /Applications/Stats.app/Contents/MacOS/Stats"
+   ],
+   "evidence": true
+  }
+ ],
+ "gallery_startup": [
+  {
+   "rep": 1,
+   "first_frame_ms": 33.578,
+   "second_frame_ms": 6.221,
+   "window": {
+    "id": "WindowId(1v1)",
+    "viewport_logical_px": [
+     1280.0,
+     780.0
+    ],
+    "dpr": 2.0,
+    "rem_size_px": 14.0,
+    "snapshot": "initial window; viewport changes are not tracked"
+   },
+   "load_start": 1.73,
+   "load_peak": 1.73,
+   "gate_met": true,
+   "waited_s": 120,
+   "head": "18e73f8",
+   "dirty": false,
+   "uptime_before": "06:04:35 up 14 days 8:25,  3 users,  load average: 1.73, 2.37, 5.56",
+   "uptime_after": "06:04:45 up 14 days 8:25,  3 users,  load average: 1.61, 2.32, 5.51",
+   "top_before": [
+    " 14.9 51821 claude",
+    "  6.7   612 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+    "  6.7  3268 /Applications/Stats.app/Contents/MacOS/Stats",
+    "  2.1 12948 /Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versi"
+   ],
+   "top_mid": [
+    " 10.7   612 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+    "  4.4 49822 /Applications/Google Chrome.app/Contents/Frameworks/Google Chrome Framework.fr",
+    "  3.7 23215 /Users/aac6fef/Developer/gpui-kit-material/target/release/gallery",
+    "  2.4  3268 /Applications/Stats.app/Contents/MacOS/Stats"
+   ],
+   "evidence": true
+  },
+  {
+   "rep": 2,
+   "first_frame_ms": 32.621,
+   "second_frame_ms": 5.478,
+   "window": {
+    "id": "WindowId(1v1)",
+    "viewport_logical_px": [
+     1280.0,
+     780.0
+    ],
+    "dpr": 2.0,
+    "rem_size_px": 14.0,
+    "snapshot": "initial window; viewport changes are not tracked"
+   },
+   "load_start": 1.62,
+   "load_peak": 1.75,
+   "gate_met": true,
+   "waited_s": 0,
+   "head": "18e73f8",
+   "dirty": false,
+   "uptime_before": "06:05:15 up 14 days 8:25,  3 users,  load average: 1.62, 2.26, 5.37",
+   "uptime_after": "06:05:25 up 14 days 8:25,  3 users,  load average: 1.75, 2.27, 5.34",
+   "top_before": [
+    "  6.2   612 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+    "  4.3 49822 /Applications/Google Chrome.app/Contents/Frameworks/Google Chrome Framework.fr",
+    "  3.4  3268 /Applications/Stats.app/Contents/MacOS/Stats",
+    "  2.2 51334 /Applications/sing-box.app/Contents/PlugIns/Extension.appex/Contents/MacOS/Ext"
+   ],
+   "top_mid": [
+    " 19.5 51821 claude",
+    "  5.5   612 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+    "  5.5 98090 claude bg-spare",
+    "  4.5 49822 /Applications/Google Chrome.app/Contents/Frameworks/Google Chrome Framework.fr"
+   ],
+   "evidence": true
+  },
+  {
+   "rep": 3,
+   "first_frame_ms": 33.815,
+   "second_frame_ms": 6.203,
+   "window": {
+    "id": "WindowId(1v1)",
+    "viewport_logical_px": [
+     1280.0,
+     780.0
+    ],
+    "dpr": 2.0,
+    "rem_size_px": 14.0,
+    "snapshot": "initial window; viewport changes are not tracked"
+   },
+   "load_start": 1.75,
+   "load_peak": 1.77,
+   "gate_met": true,
+   "waited_s": 0,
+   "head": "18e73f8",
+   "dirty": false,
+   "uptime_before": "06:05:59 up 14 days 8:26,  3 users,  load average: 1.75, 2.22, 5.22",
+   "uptime_after": "06:06:09 up 14 days 8:26,  3 users,  load average: 1.71, 2.20, 5.17",
+   "top_before": [
+    "  6.9   612 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+    "  4.3 49822 /Applications/Google Chrome.app/Contents/Frameworks/Google Chrome Framework.fr",
+    "  3.5  3268 /Applications/Stats.app/Contents/MacOS/Stats",
+    "  1.9  1194 /System/Library/CoreServices/Dock.app/Contents/MacOS/Dock"
+   ],
+   "top_mid": [
+    "  5.9   612 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+    "  3.9 49822 /Applications/Google Chrome.app/Contents/Frameworks/Google Chrome Framework.fr",
+    "  2.2 24666 /Users/aac6fef/Developer/gpui-kit-material/target/release/gallery",
+    "  2.2 24795 sleep"
+   ],
+   "evidence": true
+  }
+ ],
+ "gallery_interactions": [
+  {
+   "rep": 1,
+   "page_switches_ms": {
+    "switch:button": 29.615,
+    "switch:text-field": 27.382,
+    "switch:date-picker": 25.602,
+    "switch:examples": 32.774,
+    "switch:button-again": 19.417,
+    "switch:overview": 6.337,
+    "switch:button-specs": 15.136,
+    "switch:tab-specs": 25.875
+   },
+   "verdicts": [
+    "FAIL       steady_cpu_p95                     4.636 ms  stea",
+    "FAIL       steady_cpu_max                    24.245 ms  stea",
+    "PASS       first_frame_vs_kit                    1.17x  firs",
+    "FAIL       page_switch                       32.774 ms  swit"
+   ],
+   "window": null,
+   "load_start": 1.61,
+   "load_peak": 1.71,
+   "gate_met": true,
+   "waited_s": 0,
+   "head": "18e73f8",
+   "dirty": false,
+   "uptime_before": "06:04:45 up 14 days 8:25,  3 users,  load average: 1.61, 2.32, 5.51",
+   "uptime_after": "06:05:03 up 14 days 8:25,  3 users,  load average: 1.71, 2.31, 5.45",
+   "top_before": [
+    "  5.8   612 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+    "  4.1 49822 /Applications/Google Chrome.app/Contents/Frameworks/Google Chrome Framework.fr",
+    "  3.5  3268 /Applications/Stats.app/Contents/MacOS/Stats",
+    "  2.1 12948 /Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versi"
+   ],
+   "top_mid": [
+    " 42.5   612 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+    " 23.7 23415 /Users/aac6fef/Developer/gpui-kit-material/target/release/gallery",
+    "  8.1 49822 /Applications/Google Chrome.app/Contents/Frameworks/Google Chrome Framework.fr",
+    "  2.2 23677 /Applications/Google Chrome.app/Contents/Frameworks/Google Chrome Framework.fr"
+   ],
+   "evidence": true
+  },
+  {
+   "rep": 2,
+   "page_switches_ms": {
+    "switch:button": 29.374,
+    "switch:text-field": 21.403,
+    "switch:date-picker": 14.791,
+    "switch:examples": 34.742,
+    "switch:button-again": 16.044,
+    "switch:overview": 13.66,
+    "switch:button-specs": 9.003,
+    "switch:tab-specs": 19.767
+   },
+   "verdicts": [
+    "FAIL       steady_cpu_p95                     5.034 ms  stea",
+    "FAIL       steady_cpu_max                    24.521 ms  stea",
+    "FAIL       first_frame_vs_kit                    1.21x  firs",
+    "FAIL       page_switch                       34.742 ms  swit"
+   ],
+   "window": null,
+   "load_start": 1.75,
+   "load_peak": 1.87,
+   "gate_met": true,
+   "waited_s": 0,
+   "head": "18e73f8",
+   "dirty": false,
+   "uptime_before": "06:05:25 up 14 days 8:25,  3 users,  load average: 1.75, 2.27, 5.34",
+   "uptime_after": "06:05:44 up 14 days 8:26,  3 users,  load average: 1.80, 2.25, 5.28",
+   "top_before": [
+    "  5.3   612 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+    "  4.8 49822 /Applications/Google Chrome.app/Contents/Frameworks/Google Chrome Framework.fr",
+    "  4.2  3268 /Applications/Stats.app/Contents/MacOS/Stats",
+    "  3.1 51334 /Applications/sing-box.app/Contents/PlugIns/Extension.appex/Contents/MacOS/Ext"
+   ],
+   "top_mid": [
+    " 38.3   612 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+    " 22.0 24129 /Users/aac6fef/Developer/gpui-kit-material/target/release/gallery",
+    "  7.3 49822 /Applications/Google Chrome.app/Contents/Frameworks/Google Chrome Framework.fr",
+    "  7.3 98090 claude bg-spare"
+   ],
+   "evidence": true
+  },
+  {
+   "rep": 3,
+   "page_switches_ms": {
+    "switch:button": 23.968,
+    "switch:text-field": 20.139,
+    "switch:date-picker": 23.013,
+    "switch:examples": 36.063,
+    "switch:button-again": 19.088,
+    "switch:overview": 12.959,
+    "switch:button-specs": 17.545,
+    "switch:tab-specs": 27.64
+   },
+   "verdicts": [
+    "FAIL       steady_cpu_p95                     5.025 ms  stea",
+    "FAIL       steady_cpu_max                    27.121 ms  stea",
+    "PASS       first_frame_vs_kit                    1.19x  firs",
+    "FAIL       page_switch                       36.063 ms  swit"
+   ],
+   "window": null,
+   "load_start": 1.71,
+   "load_peak": 1.74,
+   "gate_met": true,
+   "waited_s": 0,
+   "head": "18e73f8",
+   "dirty": false,
+   "uptime_before": "06:06:09 up 14 days 8:26,  3 users,  load average: 1.71, 2.20, 5.17",
+   "uptime_after": "06:06:28 up 14 days 8:27,  3 users,  load average: 1.74, 2.17, 5.09",
+   "top_before": [
+    "  5.5   612 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+    "  4.4 49822 /Applications/Google Chrome.app/Contents/Frameworks/Google Chrome Framework.fr",
+    "  2.3 51821 claude",
+    "  2.3  3268 /Applications/Stats.app/Contents/MacOS/Stats"
+   ],
+   "top_mid": [
+    " 38.9   612 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+    " 22.0 24851 /Users/aac6fef/Developer/gpui-kit-material/target/release/gallery",
+    "  7.3 49822 /Applications/Google Chrome.app/Contents/Frameworks/Google Chrome Framework.fr",
+    "  2.7   739 /System/Library/DriverExtensions/com.apple.DriverKit-AppleBCMWLAN.dext/com.app"
+   ],
+   "evidence": true
+  }
+ ],
+ "bench-material": [
+  {
+   "rep": 1,
+   "scroll_off": {
+    "p50_ns": 3.051,
+    "p95_ns": 5.016,
+    "p99_ns": 7.228,
+    "max_ns": 11.375
+   },
+   "gpu": {
+    "p50_ns": 16.298,
+    "p95_ns": 17.205,
+    "p99_ns": 17.308,
+    "max_ns": 17.329
+   },
+   "scroll_on": {
+    "p50_ns": 4.532,
+    "p95_ns": 6.879,
+    "p99_ns": 10.556,
+    "max_ns": 27.697
+   },
+   "missed_at_60hz": 1,
+   "redraw": {
+    "p50_ns": 5.04,
+    "p95_ns": 6.232,
+    "p99_ns": 7.173,
+    "max_ns": 12.717
+   },
+   "idle": {
+    "frames_drawn": 0,
+    "frames_presented": 0,
+    "seconds": 4.25
+   },
+   "first_frame": {
+    "runs": 3,
+    "main_thread_cpu_ns": [
+     116275542,
+     106598083,
+     105528000
+    ],
+    "initial_draw_ns": [
+     13813625,
+     9680625,
+     9713292
+    ],
+    "open_window_cpu_ns": [
+     76805000,
+     67624875,
+     69163208
+    ],
+    "wall_to_first_frame_ns": [
+     182135667,
+     157911083,
+     146106167
+    ]
+   },
+   "load_start": 1.74,
+   "load_peak": 2.16,
+   "gate_met": true,
+   "waited_s": 0,
+   "head": "18e73f8",
+   "dirty": false,
+   "uptime_before": "06:06:28 up 14 days 8:27,  3 users,  load average: 1.74, 2.17, 5.09",
+   "uptime_after": "06:06:57 up 14 days 8:27,  3 users,  load average: 2.13, 2.22, 5.01",
+   "top_before": [
+    " 49.8     1 /sbin/launchd",
+    " 36.8   612 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+    " 30.0   729 /System/Library/PrivateFrameworks/BackgroundTaskManagement.framework/Resources",
+    " 26.7 11098 /System/Library/PrivateFrameworks/BiomeStreams.framework/Support/BiomeAgent"
+   ],
+   "top_mid": [
+    " 47.5   612 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+    " 35.6 25578 /Users/aac6fef/Developer/gpui-kit-material/target/release/engine_bench",
+    "  8.3 49822 /Applications/Google Chrome.app/Contents/Frameworks/Google Chrome Framework.fr",
+    "  3.8 98090 claude bg-spare"
+   ],
+   "evidence": true
+  },
+  {
+   "rep": 2,
+   "scroll_off": {
+    "p50_ns": 3.155,
+    "p95_ns": 5.16,
+    "p99_ns": 6.665,
+    "max_ns": 11.596
+   },
+   "gpu": {
+    "p50_ns": 16.274,
+    "p95_ns": 17.229,
+    "p99_ns": 17.372,
+    "max_ns": 17.454
+   },
+   "scroll_on": {
+    "p50_ns": 4.666,
+    "p95_ns": 7.436,
+    "p99_ns": 8.514,
+    "max_ns": 27.919
+   },
+   "missed_at_60hz": 1,
+   "redraw": {
+    "p50_ns": 5.009,
+    "p95_ns": 6.112,
+    "p99_ns": 7.052,
+    "max_ns": 7.71
+   },
+   "idle": {
+    "frames_drawn": 0,
+    "frames_presented": 0,
+    "seconds": 4.25
+   },
+   "first_frame": {
+    "runs": 3,
+    "main_thread_cpu_ns": [
+     114861083,
+     106169208,
+     119378958
+    ],
+    "initial_draw_ns": [
+     13202500,
+     9758834,
+     9984208
+    ],
+    "open_window_cpu_ns": [
+     72430625,
+     67726875,
+     76962833
+    ],
+    "wall_to_first_frame_ns": [
+     193245125,
+     149984416,
+     185294458
+    ]
+   },
+   "load_start": 1.75,
+   "load_peak": 2.01,
+   "gate_met": true,
+   "waited_s": 60,
+   "head": "6f2e747",
+   "dirty": false,
+   "uptime_before": "06:12:27 up 14 days 8:33,  3 users,  load average: 1.75, 2.03, 4.03",
+   "uptime_after": "06:12:56 up 14 days 8:33,  3 users,  load average: 1.93, 2.06, 3.97",
+   "top_before": [
+    " 16.8  3268 /Applications/Stats.app/Contents/MacOS/Stats",
+    " 13.7   612 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+    "  7.0  3291 claude",
+    "  4.9   552 /usr/libexec/configd"
+   ],
+   "top_mid": [
+    " 78.9 30445 /usr/bin/top",
+    " 40.8   612 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+    " 34.2 30327 /Users/aac6fef/Developer/gpui-kit-material/target/release/engine_bench",
+    "  6.2 49822 /Applications/Google Chrome.app/Contents/Frameworks/Google Chrome Framework.fr"
+   ],
+   "evidence": true
+  },
+  {
+   "rep": 3,
+   "scroll_off": {
+    "p50_ns": 3.145,
+    "p95_ns": 5.129,
+    "p99_ns": 6.472,
+    "max_ns": 10.993
+   },
+   "gpu": {
+    "p50_ns": 16.276,
+    "p95_ns": 17.202,
+    "p99_ns": 17.325,
+    "max_ns": 17.376
+   },
+   "scroll_on": {
+    "p50_ns": 4.566,
+    "p95_ns": 7.038,
+    "p99_ns": 8.136,
+    "max_ns": 11.035
+   },
+   "missed_at_60hz": 1,
+   "redraw": {
+    "p50_ns": 5.302,
+    "p95_ns": 6.992,
+    "p99_ns": 12.255,
+    "max_ns": 13.979
+   },
+   "idle": {
+    "frames_drawn": 0,
+    "frames_presented": 0,
+    "seconds": 4.25
+   },
+   "first_frame": {
+    "runs": 3,
+    "main_thread_cpu_ns": [
+     112579375,
+     105587084,
+     107106750
+    ],
+    "initial_draw_ns": [
+     12732292,
+     9660750,
+     9651917
+    ],
+    "open_window_cpu_ns": [
+     72534625,
+     68983667,
+     68016084
+    ],
+    "wall_to_first_frame_ns": [
+     171101625,
+     148054917,
+     149028416
+    ]
+   },
+   "load_start": 1.82,
+   "load_peak": 2.3,
+   "gate_met": true,
+   "waited_s": 0,
+   "head": "6f2e747",
+   "dirty": false,
+   "uptime_before": "06:13:25 up 14 days 8:33,  3 users,  load average: 1.82, 2.02, 3.89",
+   "uptime_after": "06:13:55 up 14 days 8:34,  3 users,  load average: 2.16, 2.09, 3.85",
+   "top_before": [
+    " 20.8   612 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+    "  8.7 49822 /Applications/Google Chrome.app/Contents/Frameworks/Google Chrome Framework.fr",
+    "  8.4  1194 /System/Library/CoreServices/Dock.app/Contents/MacOS/Dock",
+    "  4.3 11098 /System/Library/PrivateFrameworks/BiomeStreams.framework/Support/BiomeAgent"
+   ],
+   "top_mid": [
+    " 45.6   612 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+    " 41.6 32285 /Users/aac6fef/Developer/gpui-kit-material/target/release/engine_bench",
+    "  8.2 49822 /Applications/Google Chrome.app/Contents/Frameworks/Google Chrome Framework.fr",
+    "  5.5  3268 /Applications/Stats.app/Contents/MacOS/Stats"
+   ],
+   "evidence": true
+  }
+ ],
+ "bench-simple": [
+  {
+   "rep": 1,
+   "scroll_off": {
+    "p50_ns": 0.946,
+    "p95_ns": 1.431,
+    "p99_ns": 2.057,
+    "max_ns": 3.865
+   },
+   "gpu": {
+    "p50_ns": 1.525,
+    "p95_ns": 1.538,
+    "p99_ns": 1.544,
+    "max_ns": 3.17
+   },
+   "scroll_on": {
+    "p50_ns": 1.15,
+    "p95_ns": 2.25,
+    "p99_ns": 2.589,
+    "max_ns": 8.157
+   },
+   "missed_at_60hz": 0,
+   "redraw": {
+    "p50_ns": 1.003,
+    "p95_ns": 1.326,
+    "p99_ns": 1.671,
+    "max_ns": 3.568
+   },
+   "idle": {
+    "frames_drawn": 0,
+    "frames_presented": 0,
+    "seconds": 4.25
+   },
+   "first_frame": {
+    "runs": 3,
+    "main_thread_cpu_ns": [
+     107087959,
+     99125375,
+     99818042
+    ],
+    "initial_draw_ns": [
+     7504000,
+     5810625,
+     6017042
+    ],
+    "open_window_cpu_ns": [
+     65446542,
+     63692625,
+     64252209
+    ],
+    "wall_to_first_frame_ns": [
+     161075083,
+     148416667,
+     149706208
+    ]
+   },
+   "load_start": 1.98,
+   "load_peak": 2.37,
+   "gate_met": true,
+   "waited_s": 240,
+   "head": "18e73f8",
+   "dirty": false,
+   "uptime_before": "06:10:57 up 14 days 8:31,  3 users,  load average: 1.98, 2.10, 4.28",
+   "uptime_after": "06:11:27 up 14 days 8:32,  3 users,  load average: 2.21, 2.15, 4.22",
+   "top_before": [
+    " 70.9 28213 /usr/bin/top",
+    "  5.6 98090 claude bg-spare",
+    "  4.9 55112 /usr/libexec/trustd",
+    "  4.3   729 /System/Library/PrivateFrameworks/BackgroundTaskManagement.framework/Resources"
+   ],
+   "top_mid": [
+    " 46.2   612 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+    " 41.5 28861 /usr/bin/top",
+    " 17.3 28725 /Users/aac6fef/Developer/gpui-kit-material/target/release/engine_bench",
+    "  7.9 49822 /Applications/Google Chrome.app/Contents/Frameworks/Google Chrome Framework.fr"
+   ],
+   "evidence": true
+  },
+  {
+   "rep": 2,
+   "scroll_off": {
+    "p50_ns": 1.016,
+    "p95_ns": 1.527,
+    "p99_ns": 2.355,
+    "max_ns": 3.285
+   },
+   "gpu": {
+    "p50_ns": 1.525,
+    "p95_ns": 1.536,
+    "p99_ns": 1.54,
+    "max_ns": 1.543
+   },
+   "scroll_on": {
+    "p50_ns": 1.329,
+    "p95_ns": 2.29,
+    "p99_ns": 2.785,
+    "max_ns": 10.598
+   },
+   "missed_at_60hz": 0,
+   "redraw": {
+    "p50_ns": 1.018,
+    "p95_ns": 1.322,
+    "p99_ns": 2.797,
+    "max_ns": 6.849
+   },
+   "idle": {
+    "frames_drawn": 0,
+    "frames_presented": 0,
+    "seconds": 4.25
+   },
+   "first_frame": {
+    "runs": 3,
+    "main_thread_cpu_ns": [
+     107309667,
+     103386125,
+     101198875
+    ],
+    "initial_draw_ns": [
+     7656375,
+     6090250,
+     5904167
+    ],
+    "open_window_cpu_ns": [
+     66430875,
+     64312875,
+     64030292
+    ],
+    "wall_to_first_frame_ns": [
+     155277333,
+     166909292,
+     152830458
+    ]
+   },
+   "load_start": 1.93,
+   "load_peak": 2.02,
+   "gate_met": true,
+   "waited_s": 0,
+   "head": "6f2e747",
+   "dirty": false,
+   "uptime_before": "06:12:56 up 14 days 8:33,  3 users,  load average: 1.93, 2.06, 3.97",
+   "uptime_after": "06:13:25 up 14 days 8:33,  3 users,  load average: 1.82, 2.02, 3.89",
+   "top_before": [
+    " 64.9   900 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metada",
+    " 25.8   612 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+    " 10.3  1194 /System/Library/CoreServices/Dock.app/Contents/MacOS/Dock",
+    "  8.6 49822 /Applications/Google Chrome.app/Contents/Frameworks/Google Chrome Framework.fr"
+   ],
+   "top_mid": [
+    " 46.7   612 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+    " 15.9 31308 /Users/aac6fef/Developer/gpui-kit-material/target/release/engine_bench",
+    " 10.7  3268 /Applications/Stats.app/Contents/MacOS/Stats",
+    "  6.6 49822 /Applications/Google Chrome.app/Contents/Frameworks/Google Chrome Framework.fr"
+   ],
+   "evidence": true
+  },
+  {
+   "rep": 3,
+   "scroll_off": {
+    "p50_ns": 0.984,
+    "p95_ns": 1.545,
+    "p99_ns": 1.819,
+    "max_ns": 3.478
+   },
+   "gpu": {
+    "p50_ns": 1.522,
+    "p95_ns": 1.536,
+    "p99_ns": 1.546,
+    "max_ns": 3.287
+   },
+   "scroll_on": {
+    "p50_ns": 1.27,
+    "p95_ns": 2.379,
+    "p99_ns": 2.86,
+    "max_ns": 10.495
+   },
+   "missed_at_60hz": 2,
+   "redraw": {
+    "p50_ns": 1.007,
+    "p95_ns": 1.254,
+    "p99_ns": 1.527,
+    "max_ns": 1.647
+   },
+   "idle": {
+    "frames_drawn": 0,
+    "frames_presented": 0,
+    "seconds": 4.25
+   },
+   "first_frame": {
+    "runs": 3,
+    "main_thread_cpu_ns": [
+     108871791,
+     126139000,
+     118484375
+    ],
+    "initial_draw_ns": [
+     7675459,
+     10390000,
+     6796417
+    ],
+    "open_window_cpu_ns": [
+     65883125,
+     77352792,
+     79001958
+    ],
+    "wall_to_first_frame_ns": [
+     155966917,
+     283398417,
+     180376709
+    ]
+   },
+   "load_start": 1.99,
+   "load_peak": 2.2,
+   "gate_met": true,
+   "waited_s": 60,
+   "head": "6f2e747",
+   "dirty": false,
+   "uptime_before": "06:14:55 up 14 days 8:35,  3 users,  load average: 1.99, 2.03, 3.71",
+   "uptime_after": "06:15:24 up 14 days 8:35,  3 users,  load average: 2.20, 2.08, 3.67",
+   "top_before": [
+    "  6.4  3268 /Applications/Stats.app/Contents/MacOS/Stats",
+    "  4.8 85732 claude",
+    "  4.8   612 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+    "  4.2 98090 claude bg-spare"
+   ],
+   "top_mid": [
+    " 45.5   612 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+    " 15.5 33799 /Users/aac6fef/Developer/gpui-kit-material/target/release/engine_bench",
+    "  8.4 49822 /Applications/Google Chrome.app/Contents/Frameworks/Google Chrome Framework.fr",
+    "  8.1  3268 /Applications/Stats.app/Contents/MacOS/Stats"
+   ],
+   "evidence": true
+  }
+ ],
+ "kit_stories": [
+  {
+   "rep": 1,
+   "tool_evidence": true,
+   "first_frame_ms": 22.232,
+   "main_thread_ms": 150.923,
+   "viewport": [
+    1224.0,
+    766.0
+   ],
+   "load_start": 1.96,
+   "load_peak": 1.96,
+   "gate_met": true,
+   "waited_s": 420,
+   "head": "18e73f8",
+   "dirty": false,
+   "uptime_before": "05:53:08 up 14 days 8:13,  3 users,  load average: 1.96, 3.17, 9.44",
+   "uptime_after": "05:53:11 up 14 days 8:13,  3 users,  load average: 1.96, 3.17, 9.44",
+   "top_before": [
+    " 17.2  3268 /Applications/Stats.app/Contents/MacOS/Stats",
+    " 11.9   612 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+    "  5.1   552 /usr/libexec/configd",
+    "  3.9   616 /usr/sbin/cfprefsd"
+   ],
+   "top_mid": [
+    "  9.6   612 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+    "  8.7 49822 /Applications/Google Chrome.app/Contents/Frameworks/Google Chrome Framework.fr",
+    "  4.9 16778 /usr/bin/top",
+    "  3.0  1194 /System/Library/CoreServices/Dock.app/Contents/MacOS/Dock"
+   ],
+   "evidence": true
+  },
+  {
+   "rep": 2,
+   "tool_evidence": false,
+   "first_frame_ms": 21.457,
+   "main_thread_ms": 138.927,
+   "viewport": [
+    1224.0,
+    766.0
+   ],
+   "load_start": 1.96,
+   "load_peak": 2.05,
+   "gate_met": true,
+   "waited_s": 0,
+   "head": "18e73f8",
+   "dirty": false,
+   "uptime_before": "05:53:11 up 14 days 8:13,  3 users,  load average: 2.05, 3.16, 9.40",
+   "uptime_after": "05:53:15 up 14 days 8:13,  3 users,  load average: 2.05, 3.16, 9.40",
+   "top_before": [
+    "  6.7 49822 /Applications/Google Chrome.app/Contents/Frameworks/Google Chrome Framework.fr",
+    "  6.4 98090 claude bg-spare",
+    "  2.5 16792 /System/Library/CoreServices/System Events.app/Contents/MacOS/System Events",
+    "  2.4   616 /usr/sbin/cfprefsd"
+   ],
+   "top_mid": [
+    "128.8 49822 /Applications/Google Chrome.app/Contents/Frameworks/Google Chrome Framework.fr",
+    " 48.4 16841 /usr/bin/top",
+    " 46.3 40448 /usr/libexec/duetexpertd",
+    " 16.6   592 /usr/libexec/dasd"
+   ],
+   "evidence": true
+  },
+  {
+   "rep": 3,
+   "tool_evidence": true,
+   "first_frame_ms": 22.567,
+   "main_thread_ms": 148.955,
+   "viewport": [
+    1224.0,
+    766.0
+   ],
+   "load_start": 1.86,
+   "load_peak": 1.88,
+   "gate_met": true,
+   "waited_s": 540,
+   "head": "18e73f8",
+   "dirty": false,
+   "uptime_before": "06:02:15 up 14 days 8:22,  3 users,  load average: 1.86, 2.69, 6.23",
+   "uptime_after": "06:02:19 up 14 days 8:22,  3 users,  load average: 1.88, 2.67, 6.20",
+   "top_before": [
+    " 15.3 21740 /usr/bin/top",
+    " 13.6 51821 claude",
+    "  2.7  3268 /Applications/Stats.app/Contents/MacOS/Stats",
+    "  2.5 21735 zsh"
+   ],
+   "top_mid": [
+    " 20.1   612 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+    " 11.9  3268 /Applications/Stats.app/Contents/MacOS/Stats",
+    "  7.2 49822 /Applications/Google Chrome.app/Contents/Frameworks/Google Chrome Framework.fr",
+    "  3.5   588 /usr/libexec/locationd"
+   ],
+   "evidence": true
+  }
+ ],
+ "kit_stories_3run_loaded_not_evidence": {
+  "first_frame_ms": [
+   44.358,
+   91.037,
+   90.798
+  ],
+  "main_thread_ms": [
+   207.911,
+   211.546,
+   213.481
+  ],
+  "load_start": 1.87,
+  "load_peak": 3.48,
+  "gate_met": true,
+  "waited_s": 360,
+  "head": "18e73f8",
+  "dirty": false,
+  "uptime_before": "05:45:12 up 14 days 8:05,  3 users,  load average: 1.87, 6.29, 14.50",
+  "uptime_after": "05:45:25 up 14 days 8:05,  3 users,  load average: 3.36, 6.47, 14.47",
+  "top_before": [
+   "  5.3 98090 claude bg-spare",
+   "  2.5 49822 /Applications/Google Chrome.app/Contents/Frameworks/Google Chrome Framework.fr",
+   "  2.3   612 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+   "  1.8  2499 /Applications/Caffeine.app/Contents/MacOS/Caffeine"
+  ],
+  "top_mid": [
+   " 47.6 40448 /usr/libexec/duetexpertd",
+   "  8.0   592 /usr/libexec/dasd",
+   "  6.5 49822 /Applications/Google Chrome.app/Contents/Frameworks/Google Chrome Framework.fr",
+   "  5.2   612 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer"
+  ],
+  "evidence": true
+ },
+ "web": [
+  {
+   "variant": "o3",
+   "mode": "scroll",
+   "rep": 1,
+   "attempt": "current",
+   "p50": 2.6549999713897705,
+   "p95": 5.025000095367432,
+   "p99": 7.120000123977661,
+   "max": 16.664999961853027,
+   "frames": 3919,
+   "over_budget": 591,
+   "first_frame_ms": 13.28499984741211,
+   "min_fps": 110.47108023272257,
+   "dpr": 1,
+   "errors": [],
+   "load_start": 1.86,
+   "load_peak": 3.26,
+   "gate_met": true,
+   "waited_s": 420,
+   "head": "6f2e747",
+   "dirty": false,
+   "uptime_before": "07:44:43 up 14 days 10:05,  3 users,  load average: 1.86, 2.16, 2.21",
+   "uptime_after": "07:45:02 up 14 days 10:05,  3 users,  load average: 3.08, 2.44, 2.31",
+   "top_before": [
+    "  2.3   588 /usr/libexec/locationd",
+    "  2.2 98090 claude bg-spare",
+    "  1.5 49822 /Applications/Google Chrome.app/Contents/Frameworks/Google Chrome Framework.fr",
+    "  1.5   739 /System/Library/DriverExtensions/com.apple.DriverKit-AppleBCMWLAN.dext/com.app"
+   ],
+   "top_mid": [
+    "113.5 90062 /Users/aac6fef/.agent-browser/browsers/chrome-155.0.8059.84/Google Chrome for ",
+    " 98.0 90046 /Users/aac6fef/.agent-browser/browsers/chrome-155.0.8059.84/Google Chrome for ",
+    " 66.2 90159 /usr/bin/top",
+    " 21.8   612 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer"
+   ],
+   "evidence": true
+  },
+  {
+   "variant": "o3",
+   "mode": "scroll",
+   "rep": 2,
+   "attempt": "current",
+   "p50": 3.444999933242798,
+   "p95": 5.059999942779541,
+   "p99": 7.450000047683716,
+   "max": 15.399999856948853,
+   "frames": 3436,
+   "over_budget": 664,
+   "first_frame_ms": 16.625,
+   "min_fps": 118.46937565746703,
+   "dpr": 1,
+   "errors": [],
+   "load_start": 1.91,
+   "load_peak": 5.15,
+   "gate_met": true,
+   "waited_s": 540,
+   "head": "6f2e747",
+   "dirty": false,
+   "uptime_before": "09:10:04 up 14 days 11:30,  3 users,  load average: 1.91, 3.46, 10.00",
+   "uptime_after": "09:10:25 up 14 days 11:30,  3 users,  load average: 5.14, 4.15, 10.10",
+   "top_before": [
+    " 19.4 51821 claude",
+    "  5.8 98090 claude bg-spare",
+    "  3.4   612 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+    "  2.8 51334 /Applications/sing-box.app/Contents/PlugIns/Extension.appex/Contents/MacOS/Ext"
+   ],
+   "top_mid": [
+    "114.8 73093 /Users/aac6fef/.agent-browser/browsers/chrome-155.0.8059.84/Google Chrome for ",
+    " 71.9 73075 /Users/aac6fef/.agent-browser/browsers/chrome-155.0.8059.84/Google Chrome for ",
+    " 46.3 73158 /Users/aac6fef/.rustup/toolchains/1.99.1-aarch64-apple-darwin/bin/cargo",
+    " 41.9 73162 (node)"
+   ],
+   "evidence": true
+  },
+  {
+   "variant": "o3",
+   "mode": "scroll",
+   "rep": 2,
+   "attempt": "earlier-loaded",
+   "p50": 3.6499998569488525,
+   "p95": 6.295000076293945,
+   "p99": 10.384999990463257,
+   "max": 22.014999866485596,
+   "frames": 2860,
+   "over_budget": 706,
+   "first_frame_ms": 25.575000047683716,
+   "min_fps": 90.83369533799996,
+   "dpr": 1,
+   "errors": [],
+   "load_start": 1.96,
+   "load_peak": 8.52,
+   "gate_met": true,
+   "waited_s": 360,
+   "head": "6f2e747",
+   "dirty": false,
+   "uptime_before": "07:56:11 up 14 days 10:16,  3 users,  load average: 1.96, 2.19, 2.22",
+   "uptime_after": "07:56:32 up 14 days 10:17,  3 users,  load average: 8.52, 3.69, 2.76",
+   "top_before": [
+    " 65.1 96438 /Users/aac6fef/.rustup/toolchains/1.99.1-aarch64-apple-darwin/bin/cargo",
+    "  4.9  3268 /Applications/Stats.app/Contents/MacOS/Stats",
+    "  3.7   612 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+    "  3.6   689 /usr/libexec/airportd"
+   ],
+   "top_mid": [
+    "104.3 96599 /Users/aac6fef/.agent-browser/browsers/chrome-155.0.8059.84/Google Chrome for ",
+    " 58.2 96570 /Users/aac6fef/.agent-browser/browsers/chrome-155.0.8059.84/Google Chrome for ",
+    " 24.5 96674 /Users/aac6fef/.rustup/toolchains/1.99.1-aarch64-apple-darwin/bin/rustc",
+    " 23.2   612 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer"
+   ],
+   "evidence": true
+  },
+  {
+   "variant": "o3",
+   "mode": "scroll",
+   "rep": 3,
+   "attempt": "current",
+   "p50": 3.5,
+   "p95": 5.075000047683716,
+   "p99": 7.450000047683716,
+   "max": 13.860000133514404,
+   "frames": 3288,
+   "over_budget": 723,
+   "first_frame_ms": 14.684999704360962,
+   "min_fps": 85.08334302386173,
+   "dpr": 1,
+   "errors": [],
+   "load_start": 1.68,
+   "load_peak": 3.0,
+   "gate_met": true,
+   "waited_s": 120,
+   "head": "6f2e747",
+   "dirty": false,
+   "uptime_before": "09:32:46 up 14 days 11:53,  3 users,  load average: 1.68, 2.48, 4.27",
+   "uptime_after": "09:33:05 up 14 days 11:53,  3 users,  load average: 3.00, 2.72, 4.32",
+   "top_before": [
+    " 28.9   612 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+    " 20.1  3268 /Applications/Stats.app/Contents/MacOS/Stats",
+    "  6.0 49822 /Applications/Google Chrome.app/Contents/Frameworks/Google Chrome Framework.fr",
+    "  5.3   552 /usr/libexec/configd"
+   ],
+   "top_mid": [
+    "113.6 85857 /Users/aac6fef/.agent-browser/browsers/chrome-155.0.8059.84/Google Chrome for ",
+    " 65.1 85841 /Users/aac6fef/.agent-browser/browsers/chrome-155.0.8059.84/Google Chrome for ",
+    " 50.3 85904 /opt/homebrew/Cellar/python@3.13/3.13.16/Frameworks/Python.framework/Versions/",
+    " 43.0 85937 (node)"
+   ],
+   "evidence": true
+  },
+  {
+   "variant": "o3",
+   "mode": "scroll",
+   "rep": 3,
+   "attempt": "earlier-loaded",
+   "p50": 3.6599998474121094,
+   "p95": 6.984999895095825,
+   "p99": 10.25,
+   "max": 33.10000014305115,
+   "frames": 2825,
+   "over_budget": 693,
+   "first_frame_ms": 19.83999991416931,
+   "min_fps": 80.17256191264059,
+   "dpr": 1,
+   "errors": [],
+   "load_start": 6.98,
+   "load_peak": 15.15,
+   "gate_met": false,
+   "waited_s": 300,
+   "head": "6f2e747",
+   "dirty": false,
+   "uptime_before": "08:22:06 up 14 days 10:42,  3 users,  load average: 6.98, 40.51, 39.56",
+   "uptime_after": "08:22:28 up 14 days 10:43,  3 users,  load average: 14.50, 39.58, 39.25",
+   "top_before": [
+    "100.0 30640 /Users/aac6fef/.rustup/toolchains/1.99.1-aarch64-apple-darwin/bin/rustc",
+    " 97.5   900 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metada",
+    " 91.6 30868 /Users/aac6fef/Downloads/Xcode-beta.app/Contents/Developer/usr/bin/git",
+    " 66.5   543 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/FSEven"
+   ],
+   "top_mid": [
+    "109.4 30984 /Users/aac6fef/.agent-browser/browsers/chrome-155.0.8059.84/Google Chrome for ",
+    " 68.6 30925 /Users/aac6fef/.agent-browser/browsers/chrome-155.0.8059.84/Google Chrome for ",
+    " 51.8 30640 /Users/aac6fef/.rustup/toolchains/1.99.1-aarch64-apple-darwin/bin/rustc",
+    " 26.8 31146 /opt/homebrew/opt/node/bin/node"
+   ],
+   "evidence": false
+  },
+  {
+   "variant": "o3",
+   "mode": "startup",
+   "rep": 1,
+   "attempt": "current",
+   "p50": 5.0849997997283936,
+   "p95": 5.0849997997283936,
+   "p99": 5.0849997997283936,
+   "max": 5.0849997997283936,
+   "frames": 1,
+   "over_budget": 1,
+   "first_frame_ms": 13.740000009536743,
+   "min_fps": 1.9863142947742072,
+   "dpr": 1,
+   "errors": [],
+   "load_start": 1.97,
+   "load_peak": 2.93,
+   "gate_met": true,
+   "waited_s": 300,
+   "head": "6f2e747",
+   "dirty": false,
+   "uptime_before": "07:50:02 up 14 days 10:10,  3 users,  load average: 1.97, 2.17, 2.21",
+   "uptime_after": "07:50:11 up 14 days 10:10,  3 users,  load average: 2.86, 2.36, 2.28",
+   "top_before": [
+    " 11.8  3268 /Applications/Stats.app/Contents/MacOS/Stats",
+    " 10.1   612 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+    "  8.2 85732 claude",
+    "  4.1 92935 /usr/bin/top"
+   ],
+   "top_mid": [
+    " 26.2 92972 /Users/aac6fef/.agent-browser/browsers/chrome-155.0.8059.84/Google Chrome for ",
+    " 12.7 93036 /Users/aac6fef/.agent-browser/browsers/chrome-155.0.8059.84/Google Chrome for ",
+    " 11.8 47380 /usr/libexec/searchpartyuseragent",
+    "  8.5   970 /System/Library/PrivateFrameworks/TCC.framework/Support/tccd"
+   ],
+   "evidence": true
+  },
+  {
+   "variant": "o3",
+   "mode": "startup",
+   "rep": 2,
+   "attempt": "current",
+   "p50": 3.489999771118164,
+   "p95": 3.489999771118164,
+   "p99": 3.489999771118164,
+   "max": 3.489999771118164,
+   "frames": 1,
+   "over_budget": 0,
+   "first_frame_ms": 21.424999952316284,
+   "min_fps": 1.9955300132271119,
+   "dpr": 1,
+   "errors": [],
+   "load_start": 43.91,
+   "load_peak": 42.24,
+   "gate_met": false,
+   "waited_s": 300,
+   "head": "6f2e747",
+   "dirty": false,
+   "uptime_before": "09:49:22 up 14 days 12:09,  3 users,  load average: 43.91, 35.85, 24.56",
+   "uptime_after": "09:49:39 up 14 days 12:10,  3 users,  load average: 39.89, 35.36, 24.58",
+   "top_before": [
+    " 71.4 13376 /Users/aac6fef/Downloads/Xcode-beta.app/Contents/Developer/Toolchains/XcodeDef",
+    " 68.1 13381 /Users/aac6fef/Downloads/Xcode-beta.app/Contents/Developer/Toolchains/XcodeDef",
+    " 64.9 13377 /Users/aac6fef/Downloads/Xcode-beta.app/Contents/Developer/Toolchains/XcodeDef",
+    " 50.3 10644 /Users/aac6fef/Downloads/Xcode-beta.app/Contents/Developer/Toolchains/XcodeDef"
+   ],
+   "top_mid": [
+    " 83.1 13557 /Users/aac6fef/.rustup/toolchains/1.99.1-aarch64-apple-darwin/bin/clippy-drive",
+    " 77.8 13598 /Users/aac6fef/Downloads/Xcode-beta.app/Contents/Developer/Toolchains/XcodeDef",
+    " 77.2 13388 /Users/aac6fef/Downloads/Xcode-beta.app/Contents/Developer/Toolchains/XcodeDef",
+    " 74.8 13596 /Users/aac6fef/Downloads/Xcode-beta.app/Contents/Developer/Toolchains/XcodeDef"
+   ],
+   "evidence": false
+  },
+  {
+   "variant": "o3",
+   "mode": "startup",
+   "rep": 2,
+   "attempt": "earlier-loaded",
+   "p50": 3.955000162124634,
+   "p95": 3.955000162124634,
+   "p99": 3.955000162124634,
+   "max": 3.955000162124634,
+   "frames": 1,
+   "over_budget": 0,
+   "first_frame_ms": 22.139999866485596,
+   "min_fps": 1.9976826874348284,
+   "dpr": 1,
+   "errors": [],
+   "load_start": 71.43,
+   "load_peak": 82.53,
+   "gate_met": false,
+   "waited_s": 1200,
+   "head": "6f2e747",
+   "dirty": false,
+   "uptime_before": "08:16:34 up 14 days 10:37,  3 users,  load average: 71.43, 68.55, 42.76",
+   "uptime_after": "08:17:06 up 14 days 10:37,  3 users,  load average: 82.53, 71.46, 44.70",
+   "top_before": [
+    " 66.6 23763 /Users/aac6fef/.rustup/toolchains/1.99.1-aarch64-apple-darwin/bin/rustc",
+    " 61.9 26284 /Users/aac6fef/.rustup/toolchains/1.99.1-aarch64-apple-darwin/bin/rustc",
+    " 61.8 26176 /Users/aac6fef/.rustup/toolchains/1.99.1-aarch64-apple-darwin/bin/rustc",
+    " 56.1 23646 /Users/aac6fef/.rustup/toolchains/1.99.1-aarch64-apple-darwin/bin/rustc"
+   ],
+   "top_mid": [
+    " 61.4 25690 /Users/aac6fef/.rustup/toolchains/1.99.1-aarch64-apple-darwin/bin/rustc",
+    " 58.0 26176 /Users/aac6fef/.rustup/toolchains/1.99.1-aarch64-apple-darwin/bin/rustc",
+    " 54.6 23646 /Users/aac6fef/.rustup/toolchains/1.99.1-aarch64-apple-darwin/bin/rustc",
+    " 52.8 23763 /Users/aac6fef/.rustup/toolchains/1.99.1-aarch64-apple-darwin/bin/rustc"
+   ],
+   "evidence": false
+  },
+  {
+   "variant": "o3",
+   "mode": "startup",
+   "rep": 3,
+   "attempt": "current",
+   "p50": 4.224999904632568,
+   "p95": 4.224999904632568,
+   "p99": 4.224999904632568,
+   "max": 4.224999904632568,
+   "frames": 1,
+   "over_budget": 1,
+   "first_frame_ms": 26.81499981880188,
+   "min_fps": 1.9896142142192135,
+   "dpr": 1,
+   "errors": [],
+   "load_start": 25.85,
+   "load_peak": 29.7,
+   "gate_met": false,
+   "waited_s": 300,
+   "head": "6f2e747",
+   "dirty": false,
+   "uptime_before": "09:59:58 up 14 days 12:20,  2 users,  load average: 25.85, 37.65, 31.95",
+   "uptime_after": "10:00:21 up 14 days 12:20,  2 users,  load average: 28.93, 37.43, 32.04",
+   "top_before": [
+    " 74.3 24644 /Users/aac6fef/Downloads/Xcode-beta.app/Contents/Developer/Toolchains/XcodeDef",
+    " 68.8 24819 /Users/aac6fef/Downloads/Xcode-beta.app/Contents/Developer/Toolchains/XcodeDef",
+    " 65.2 24715 /Users/aac6fef/Downloads/Xcode-beta.app/Contents/Developer/Toolchains/XcodeDef",
+    " 62.8 24777 /Users/aac6fef/Downloads/Xcode-beta.app/Contents/Developer/Toolchains/XcodeDef"
+   ],
+   "top_mid": [
+    " 61.4 24902 /Users/aac6fef/Downloads/Xcode-beta.app/Contents/Developer/Toolchains/XcodeDef",
+    " 60.6 24904 /Users/aac6fef/Downloads/Xcode-beta.app/Contents/Developer/Toolchains/XcodeDef",
+    " 60.0 25020 /Users/aac6fef/Downloads/Xcode-beta.app/Contents/Developer/Toolchains/XcodeDef",
+    " 59.6 24736 /Users/aac6fef/Downloads/Xcode-beta.app/Contents/Developer/Toolchains/XcodeDef"
+   ],
+   "evidence": false
+  },
+  {
+   "variant": "o3",
+   "mode": "startup",
+   "rep": 3,
+   "attempt": "earlier-loaded",
+   "p50": 3.130000114440918,
+   "p95": 3.130000114440918,
+   "p99": 3.130000114440918,
+   "max": 3.130000114440918,
+   "frames": 1,
+   "over_budget": 0,
+   "first_frame_ms": 28.27999997138977,
+   "min_fps": 1.9891392993496713,
+   "dpr": 1,
+   "errors": [],
+   "load_start": 35.31,
+   "load_peak": 35.31,
+   "gate_met": false,
+   "waited_s": 300,
+   "head": "6f2e747",
+   "dirty": false,
+   "uptime_before": "08:27:29 up 14 days 10:48,  3 users,  load average: 35.31, 42.11, 41.06",
+   "uptime_after": "08:27:54 up 14 days 10:48,  3 users,  load average: 35.00, 41.48, 40.86",
+   "top_before": [
+    " 77.9 38215 /private/tmp/claude-501/-Users-aac6fef-Developer-course2md/efbdb7fd-15b6-4010-",
+    " 44.6 38561 node",
+    " 41.8 38556 /Users/aac6fef/.rustup/toolchains/1.99.1-aarch64-apple-darwin/bin/rustc",
+    " 41.5 38509 /Users/aac6fef/Downloads/Xcode-beta.app/Contents/Developer/Toolchains/XcodeDef"
+   ],
+   "top_mid": [
+    " 77.0 38215 /private/tmp/claude-501/-Users-aac6fef-Developer-course2md/efbdb7fd-15b6-4010-",
+    " 48.3 38838 /Users/aac6fef/Downloads/Xcode-beta.app/Contents/Developer/Toolchains/XcodeDef",
+    " 45.9 38867 /Users/aac6fef/Downloads/Xcode-beta.app/Contents/Developer/Toolchains/XcodeDef",
+    " 43.9 37872 /Users/aac6fef/Downloads/Xcode-beta.app/Contents/Developer/Toolchains/XcodeDef"
+   ],
+   "evidence": false
+  },
+  {
+   "variant": "s",
+   "mode": "scroll",
+   "rep": 1,
+   "attempt": "current",
+   "p50": 3.5249998569488525,
+   "p95": 5.539999961853027,
+   "p99": 7.799999952316284,
+   "max": 18.12999987602234,
+   "frames": 3361,
+   "over_budget": 1006,
+   "first_frame_ms": 17.695000171661377,
+   "min_fps": 114.36233134103261,
+   "dpr": 1,
+   "errors": [],
+   "load_start": 2.45,
+   "load_peak": 2.98,
+   "gate_met": false,
+   "waited_s": 1200,
+   "head": "6f2e747",
+   "dirty": false,
+   "uptime_before": "09:30:25 up 14 days 11:50,  3 users,  load average: 2.45, 2.76, 4.67",
+   "uptime_after": "09:30:46 up 14 days 11:51,  3 users,  load average: 2.98, 2.85, 4.66",
+   "top_before": [
+    " 95.7 83398 /private/tmp/claude-501/-Users-aac6fef-Developer-course2md/efbdb7fd-15b6-4010-",
+    " 20.8  3268 /Applications/Stats.app/Contents/MacOS/Stats",
+    " 11.7 98090 claude bg-spare",
+    "  9.6   612 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer"
+   ],
+   "top_mid": [
+    "119.3 83819 /Users/aac6fef/.agent-browser/browsers/chrome-155.0.8059.84/Google Chrome for ",
+    " 77.9 83802 /Users/aac6fef/.agent-browser/browsers/chrome-155.0.8059.84/Google Chrome for ",
+    " 47.1 83398 /private/tmp/claude-501/-Users-aac6fef-Developer-course2md/efbdb7fd-15b6-4010-",
+    " 38.6   612 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer"
+   ],
+   "evidence": false
+  },
+  {
+   "variant": "s",
+   "mode": "scroll",
+   "rep": 1,
+   "attempt": "earlier-loaded",
+   "p50": 4,
+   "p95": 7.125,
+   "p99": 11.684999942779541,
+   "max": 28.794999837875366,
+   "frames": 2645,
+   "over_budget": 1319,
+   "first_frame_ms": 22.859999895095825,
+   "min_fps": 104.27528673015438,
+   "dpr": 1,
+   "errors": [],
+   "load_start": 45.62,
+   "load_peak": 65.28,
+   "gate_met": false,
+   "waited_s": 300,
+   "head": "6f2e747",
+   "dirty": false,
+   "uptime_before": "08:32:55 up 14 days 10:53,  3 users,  load average: 45.62, 36.08, 37.97",
+   "uptime_after": "08:33:28 up 14 days 10:54,  3 users,  load average: 65.28, 41.77, 39.96",
+   "top_before": [
+    " 78.5 41890 /private/tmp/claude-501/-Users-aac6fef-Developer-course2md/efbdb7fd-15b6-4010-",
+    " 75.8 43934 /Users/aac6fef/.rustup/toolchains/1.99.1-aarch64-apple-darwin/bin/rustc",
+    " 52.6 44042 /Users/aac6fef/.rustup/toolchains/1.99.1-aarch64-apple-darwin/bin/rustc",
+    " 48.6 44069 /Users/aac6fef/.rustup/toolchains/1.99.1-aarch64-apple-darwin/bin/rustc"
+   ],
+   "top_mid": [
+    "107.8 44471 /Users/aac6fef/.agent-browser/browsers/chrome-155.0.8059.84/Google Chrome for ",
+    " 59.0 44453 /Users/aac6fef/.agent-browser/browsers/chrome-155.0.8059.84/Google Chrome for ",
+    " 34.1 44511 /Users/aac6fef/.rustup/toolchains/1.99.1-aarch64-apple-darwin/bin/clippy-drive",
+    " 30.5 44527 /private/tmp/claude-501/-Users-aac6fef-Developer-course2md/efbdb7fd-15b6-4010-"
+   ],
+   "evidence": false
+  },
+  {
+   "variant": "s",
+   "mode": "scroll",
+   "rep": 2,
+   "attempt": "current",
+   "p50": 3.9600000381469727,
+   "p95": 8.02999997138977,
+   "p99": 13.899999856948853,
+   "max": 33.3199999332428,
+   "frames": 2601,
+   "over_budget": 1193,
+   "first_frame_ms": 23.41000008583069,
+   "min_fps": 78.75411000377414,
+   "dpr": 1,
+   "errors": [],
+   "load_start": 34.84,
+   "load_peak": 45.1,
+   "gate_met": false,
+   "waited_s": 300,
+   "head": "6f2e747",
+   "dirty": false,
+   "uptime_before": "09:38:05 up 14 days 11:58,  3 users,  load average: 34.84, 23.10, 13.16",
+   "uptime_after": "09:39:01 up 14 days 11:59,  3 users,  load average: 45.01, 27.81, 15.53",
+   "top_before": [
+    " 48.2 98633 /Users/aac6fef/Downloads/Xcode-beta.app/Contents/Developer/Toolchains/XcodeDef",
+    " 41.3 98608 /Users/aac6fef/Downloads/Xcode-beta.app/Contents/Developer/Toolchains/XcodeDef",
+    " 40.4 98453 /Users/aac6fef/Downloads/Xcode-beta.app/Contents/Developer/Toolchains/XcodeDef",
+    " 38.7 98390 /Users/aac6fef/Downloads/Xcode-beta.app/Contents/Developer/Toolchains/XcodeDef"
+   ],
+   "top_mid": [
+    "107.1 98847 /Users/aac6fef/.agent-browser/browsers/chrome-155.0.8059.84/Google Chrome for ",
+    " 67.1 98819 /Users/aac6fef/.agent-browser/browsers/chrome-155.0.8059.84/Google Chrome for ",
+    " 40.8 46826 /System/Library/PrivateFrameworks/ScreenTimeSettingsFoundation.framework/Versi",
+    " 21.1   612 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer"
+   ],
+   "evidence": false
+  },
+  {
+   "variant": "s",
+   "mode": "scroll",
+   "rep": 2,
+   "attempt": "earlier-loaded",
+   "p50": 3.984999895095825,
+   "p95": 6.989999771118164,
+   "p99": 10.65499997138977,
+   "max": 19.75,
+   "frames": 2744,
+   "over_budget": 1314,
+   "first_frame_ms": 25.679999828338623,
+   "min_fps": 111.75637118329426,
+   "dpr": 1,
+   "errors": [],
+   "load_start": 38.06,
+   "load_peak": 38.06,
+   "gate_met": false,
+   "waited_s": 300,
+   "head": "6f2e747",
+   "dirty": false,
+   "uptime_before": "08:43:56 up 14 days 11:04,  3 users,  load average: 38.06, 41.55, 42.87",
+   "uptime_after": "08:44:17 up 14 days 11:04,  3 users,  load average: 30.12, 39.52, 42.11",
+   "top_before": [
+    " 91.5 55326 /Users/aac6fef/.rustup/toolchains/1.99.1-aarch64-apple-darwin/bin/rustc",
+    " 90.7 55329 /Users/aac6fef/.rustup/toolchains/1.99.1-aarch64-apple-darwin/bin/rustc",
+    " 66.6 53255 /System/Library/PrivateFrameworks/WorkflowKit.framework/XPCServices/Background",
+    " 48.2  1120 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metada"
+   ],
+   "top_mid": [
+    "112.2 55399 /Users/aac6fef/.agent-browser/browsers/chrome-155.0.8059.84/Google Chrome for ",
+    " 61.9 55376 /Users/aac6fef/.agent-browser/browsers/chrome-155.0.8059.84/Google Chrome for ",
+    " 60.6 55505 ditto",
+    " 25.8 55509 /Users/aac6fef/.rustup/toolchains/1.99.1-aarch64-apple-darwin/bin/rustc"
+   ],
+   "evidence": false
+  },
+  {
+   "variant": "s",
+   "mode": "scroll",
+   "rep": 3,
+   "attempt": "current",
+   "p50": 3.9749999046325684,
+   "p95": 6.4700000286102295,
+   "p99": 9.710000038146973,
+   "max": 32.58500003814697,
+   "frames": 2776,
+   "over_budget": 1335,
+   "first_frame_ms": 21.574999809265137,
+   "min_fps": 102.41663876085038,
+   "dpr": 1,
+   "errors": [],
+   "load_start": 21.84,
+   "load_peak": 21.84,
+   "gate_met": false,
+   "waited_s": 300,
+   "head": "6f2e747",
+   "dirty": false,
+   "uptime_before": "09:44:01 up 14 days 12:04,  3 users,  load average: 21.84, 26.38, 18.64",
+   "uptime_after": "09:44:22 up 14 days 12:04,  3 users,  load average: 20.37, 25.76, 18.60",
+   "top_before": [
+    "185.1  3358 ffmpeg",
+    " 99.9  3357 ffmpeg",
+    " 68.5   705 /usr/libexec/syspolicyd",
+    " 15.5 62998 /System/Library/PrivateFrameworks/XprotectFramework.framework/Versions/A/XPCSe"
+   ],
+   "top_mid": [
+    "107.6  3427 /Users/aac6fef/.agent-browser/browsers/chrome-155.0.8059.84/Google Chrome for ",
+    " 60.6  3408 /Users/aac6fef/.agent-browser/browsers/chrome-155.0.8059.84/Google Chrome for ",
+    " 53.2  1477 /private/tmp/claude-501/-Users-aac6fef-Developer-course2md/efbdb7fd-15b6-4010-",
+    " 48.4  3462 /Users/aac6fef/.rustup/toolchains/1.99.1-aarch64-apple-darwin/bin/cargo"
+   ],
+   "evidence": false
+  },
+  {
+   "variant": "s",
+   "mode": "scroll",
+   "rep": 3,
+   "attempt": "earlier-loaded",
+   "p50": 3.765000104904175,
+   "p95": 6.0350000858306885,
+   "p99": 10.514999866485596,
+   "max": 20.234999895095825,
+   "frames": 3075,
+   "over_budget": 984,
+   "first_frame_ms": 22.805000066757202,
+   "min_fps": 93.81779799711394,
+   "dpr": 1,
+   "errors": [],
+   "load_start": 2.88,
+   "load_peak": 8.59,
+   "gate_met": false,
+   "waited_s": 300,
+   "head": "6f2e747",
+   "dirty": false,
+   "uptime_before": "08:54:27 up 14 days 11:15,  3 users,  load average: 2.88, 8.82, 23.16",
+   "uptime_after": "08:54:47 up 14 days 11:15,  3 users,  load average: 8.59, 9.70, 23.14",
+   "top_before": [
+    " 29.0 55028 /usr/libexec/biomesyncd",
+    "  9.6  3268 /Applications/Stats.app/Contents/MacOS/Stats",
+    "  8.7   612 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+    "  7.5 11098 /System/Library/PrivateFrameworks/BiomeStreams.framework/Support/BiomeAgent"
+   ],
+   "top_mid": [
+    "113.9 63598 /Users/aac6fef/.agent-browser/browsers/chrome-155.0.8059.84/Google Chrome for ",
+    " 67.3 63582 /Users/aac6fef/.agent-browser/browsers/chrome-155.0.8059.84/Google Chrome for ",
+    " 53.8 55028 /usr/libexec/biomesyncd",
+    " 48.4 63431 (app-p1)"
+   ],
+   "evidence": false
+  },
+  {
+   "variant": "s",
+   "mode": "startup",
+   "rep": 1,
+   "attempt": "current",
+   "p50": 4.579999923706055,
+   "p95": 4.579999923706055,
+   "p99": 4.579999923706055,
+   "max": 4.579999923706055,
+   "frames": 1,
+   "over_budget": 1,
+   "first_frame_ms": 23.365000009536743,
+   "min_fps": 1.9788852937645551,
+   "dpr": 1,
+   "errors": [],
+   "load_start": 16.93,
+   "load_peak": 26.18,
+   "gate_met": false,
+   "waited_s": 300,
+   "head": "6f2e747",
+   "dirty": false,
+   "uptime_before": "09:54:39 up 14 days 12:15,  3 users,  load average: 16.93, 31.54, 26.50",
+   "uptime_after": "09:54:57 up 14 days 12:15,  3 users,  load average: 26.18, 32.54, 26.97",
+   "top_before": [
+    " 78.7 17777 /Users/aac6fef/.rustup/toolchains/1.99.1-aarch64-apple-darwin/bin/rustfmt",
+    " 63.9 17780 /Users/aac6fef/.rustup/toolchains/1.99.1-aarch64-apple-darwin/bin/rustc",
+    " 62.2 17778 /Users/aac6fef/.rustup/toolchains/1.99.1-aarch64-apple-darwin/bin/rustc",
+    " 59.9 17779 /Users/aac6fef/.rustup/toolchains/1.99.1-aarch64-apple-darwin/bin/rustc"
+   ],
+   "top_mid": [
+    " 83.5 17780 /Users/aac6fef/.rustup/toolchains/1.99.1-aarch64-apple-darwin/bin/rustc",
+    " 61.0 18093 /Users/aac6fef/.rustup/toolchains/1.99.1-aarch64-apple-darwin/bin/rustc",
+    " 57.3 17983 /Users/aac6fef/.rustup/toolchains/1.99.1-aarch64-apple-darwin/bin/rustc",
+    " 56.1 18066 /Users/aac6fef/.rustup/toolchains/1.99.1-aarch64-apple-darwin/bin/rustc"
+   ],
+   "evidence": false
+  },
+  {
+   "variant": "s",
+   "mode": "startup",
+   "rep": 1,
+   "attempt": "earlier-loaded",
+   "p50": 4.90500020980835,
+   "p95": 4.90500020980835,
+   "p99": 4.90500020980835,
+   "max": 4.90500020980835,
+   "frames": 1,
+   "over_budget": 1,
+   "first_frame_ms": 40.80000019073486,
+   "min_fps": 1.9971241411225071,
+   "dpr": 1,
+   "errors": [],
+   "load_start": 45.05,
+   "load_peak": 54.03,
+   "gate_met": false,
+   "waited_s": 300,
+   "head": "6f2e747",
+   "dirty": false,
+   "uptime_before": "08:38:29 up 14 days 10:59,  3 users,  load average: 45.05, 52.32, 46.07",
+   "uptime_after": "08:38:55 up 14 days 10:59,  3 users,  load average: 54.03, 53.59, 46.73",
+   "top_before": [
+    " 82.6 49786 /Users/aac6fef/.rustup/toolchains/1.99.1-aarch64-apple-darwin/bin/rustc",
+    " 72.9 23919 /usr/libexec/biomesyncd",
+    " 45.0 49813 /Users/aac6fef/.rustup/toolchains/1.99.1-aarch64-apple-darwin/bin/rustc",
+    " 43.1 49849 /Users/aac6fef/.rustup/toolchains/1.99.1-aarch64-apple-darwin/bin/rustc"
+   ],
+   "top_mid": [
+    " 63.9 50323 /private/tmp/claude-501/-Users-aac6fef-Developer-course2md/efbdb7fd-15b6-4010-",
+    " 59.0 49920 /Users/aac6fef/.rustup/toolchains/1.99.1-aarch64-apple-darwin/bin/rustc",
+    " 58.0 23919 /usr/libexec/biomesyncd",
+    " 54.0 49786 /Users/aac6fef/.rustup/toolchains/1.99.1-aarch64-apple-darwin/bin/rustc"
+   ],
+   "evidence": false
+  },
+  {
+   "variant": "s",
+   "mode": "startup",
+   "rep": 2,
+   "attempt": "current",
+   "p50": 3.5,
+   "p95": 3.5,
+   "p99": 3.5,
+   "max": 3.5,
+   "frames": 1,
+   "over_budget": 0,
+   "first_frame_ms": 23.115000009536743,
+   "min_fps": 1.9849540484640822,
+   "dpr": 1,
+   "errors": [],
+   "load_start": 94.6,
+   "load_peak": 109.64,
+   "gate_met": false,
+   "waited_s": 300,
+   "head": "6f2e747",
+   "dirty": false,
+   "uptime_before": "10:05:22 up 14 days 12:25,  2 users,  load average: 98.88, 55.04, 39.81",
+   "uptime_after": "10:05:46 up 14 days 12:26,  2 users,  load average: 109.64, 60.25, 42.03",
+   "top_before": [
+    "100.5 28409 /Users/aac6fef/.rustup/toolchains/1.99.1-aarch64-apple-darwin/bin/rustc",
+    " 98.8 28396 /Users/aac6fef/.rustup/toolchains/1.99.1-aarch64-apple-darwin/bin/rustc",
+    " 64.1 28987 /Users/aac6fef/Downloads/Xcode-beta.app/Contents/Developer/Toolchains/XcodeDef",
+    " 52.3 28389 /Users/aac6fef/.rustup/toolchains/1.99.1-aarch64-apple-darwin/bin/rustc"
+   ],
+   "top_mid": [
+    "265.7 28396 /Users/aac6fef/.rustup/toolchains/1.99.1-aarch64-apple-darwin/bin/rustc",
+    " 58.1 30717 /Users/aac6fef/.rustup/toolchains/1.99.1-aarch64-apple-darwin/bin/rustc",
+    " 51.4 28409 /Users/aac6fef/.rustup/toolchains/1.99.1-aarch64-apple-darwin/bin/rustc",
+    " 42.3 30639 /private/tmp/claude-501/-Users-aac6fef-Developer-course2md/efbdb7fd-15b6-4010-"
+   ],
+   "evidence": false
+  },
+  {
+   "variant": "s",
+   "mode": "startup",
+   "rep": 2,
+   "attempt": "earlier-loaded",
+   "p50": 6.630000114440918,
+   "p95": 6.630000114440918,
+   "p99": 6.630000114440918,
+   "max": 6.630000114440918,
+   "frames": 1,
+   "over_budget": 1,
+   "first_frame_ms": 16.365000009536743,
+   "min_fps": 1.962188625229258,
+   "dpr": 1,
+   "errors": [],
+   "load_start": 5.07,
+   "load_peak": 5.07,
+   "gate_met": false,
+   "waited_s": 300,
+   "head": "6f2e747",
+   "dirty": false,
+   "uptime_before": "08:49:17 up 14 days 11:09,  3 users,  load average: 5.07, 18.70, 31.67",
+   "uptime_after": "08:49:27 up 14 days 11:10,  3 users,  load average: 4.60, 18.15, 31.33",
+   "top_before": [
+    " 18.1  3268 /Applications/Stats.app/Contents/MacOS/Stats",
+    " 10.1   612 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+    " 10.1 51821 claude",
+    "  5.4   552 /usr/libexec/configd"
+   ],
+   "top_mid": [
+    "  9.5  3268 /Applications/Stats.app/Contents/MacOS/Stats",
+    "  8.3 51821 claude",
+    "  6.4   612 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+    "  4.2 60695 /bin/sh"
+   ],
+   "evidence": false
+  },
+  {
+   "variant": "s",
+   "mode": "startup",
+   "rep": 3,
+   "attempt": "current",
+   "p50": 5,
+   "p95": 5,
+   "p99": 5,
+   "max": 5,
+   "frames": 1,
+   "over_budget": 1,
+   "first_frame_ms": 30.43499994277954,
+   "min_fps": 1.975855050752198,
+   "dpr": 1,
+   "errors": [],
+   "load_start": 23.97,
+   "load_peak": 25.26,
+   "gate_met": false,
+   "waited_s": 300,
+   "head": "6f2e747",
+   "dirty": false,
+   "uptime_before": "10:10:46 up 14 days 12:31,  1 user,  load average: 23.97, 39.78, 38.76",
+   "uptime_after": "10:11:07 up 14 days 12:31,  1 user,  load average: 25.26, 39.01, 38.50",
+   "top_before": [
+    " 59.5 35277 /private/tmp/claude-501/-Users-aac6fef-Developer-course2md/efbdb7fd-15b6-4010-",
+    " 52.1 36200 /Users/aac6fef/Downloads/Xcode-beta.app/Contents/Developer/Toolchains/XcodeDef",
+    " 51.5 36166 /Users/aac6fef/Downloads/Xcode-beta.app/Contents/Developer/Toolchains/XcodeDef",
+    " 51.0 36064 /Users/aac6fef/Downloads/Xcode-beta.app/Contents/Developer/Toolchains/XcodeDef"
+   ],
+   "top_mid": [
+    " 84.5 35277 /private/tmp/claude-501/-Users-aac6fef-Developer-course2md/efbdb7fd-15b6-4010-",
+    " 60.6 36373 /Users/aac6fef/Downloads/Xcode-beta.app/Contents/Developer/Toolchains/XcodeDef",
+    " 57.4 36314 /Users/aac6fef/Downloads/Xcode-beta.app/Contents/Developer/Toolchains/XcodeDef",
+    " 55.8 36367 /Users/aac6fef/Downloads/Xcode-beta.app/Contents/Developer/Toolchains/XcodeDef"
+   ],
+   "evidence": false
+  },
+  {
+   "variant": "s",
+   "mode": "startup",
+   "rep": 3,
+   "attempt": "earlier-loaded",
+   "p50": 2.2900002002716064,
+   "p95": 2.2900002002716064,
+   "p99": 2.2900002002716064,
+   "max": 2.2900002002716064,
+   "frames": 1,
+   "over_budget": 0,
+   "first_frame_ms": 24.5,
+   "min_fps": 1.9748600317580525,
+   "dpr": 1,
+   "errors": [],
+   "load_start": 2.03,
+   "load_peak": 3.96,
+   "gate_met": false,
+   "waited_s": 300,
+   "head": "6f2e747",
+   "dirty": false,
+   "uptime_before": "08:59:47 up 14 days 11:20,  3 users,  load average: 2.03, 4.95, 16.91",
+   "uptime_after": "08:59:57 up 14 days 11:20,  3 users,  load average: 3.96, 5.27, 16.89",
+   "top_before": [
+    " 60.7 12728 /usr/libexec/mobileassetd",
+    " 46.3 66709 /private/tmp/claude-501/-Users-aac6fef-Developer-course2md/efbdb7fd-15b6-4010-",
+    " 45.1   946 /usr/libexec/secd",
+    " 43.4   612 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer"
+   ],
+   "top_mid": [
+    " 63.6 67184 /private/tmp/claude-501/-Users-aac6fef-Developer-course2md/efbdb7fd-15b6-4010-",
+    " 43.1   612 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+    " 12.9   613 /System/Library/PrivateFrameworks/TCC.framework/Support/tccd",
+    " 12.8 67193 /System/Library/PrivateFrameworks/SafariPlatformSupport.framework/Versions/A/X"
+   ],
+   "evidence": false
+  }
+ ],
+ "component": {
+  "median_of": 3,
+  "mode": "scroll",
+  "frames": 300,
+  "empty_row_baseline": {
+   "p50": 1012941,
+   "p95": 1330475
+  },
+  "pairs": [
+   {
+    "name": "list row",
+    "material": "material-list",
+    "kit": "kit-list",
+    "m_p50": 8098467,
+    "m_p95": 9705543,
+    "k_p50": 3908105,
+    "k_p95": 5242339,
+    "ratio_p50": 2.0722234945069284,
+    "ratio_p95": 1.8513764561963657,
+    "net_ratio_p50": 2.447366021406732,
+    "runs_m": [
+     [
+      8099522,
+      9738358
+     ],
+     [
+      8072875,
+      9670105
+     ],
+     [
+      8098467,
+      9705543
+     ]
+    ],
+    "runs_k": [
+     [
+      3907131,
+      5252291
+     ],
+     [
+      3908105,
+      5233973
+     ],
+     [
+      3920255,
+      5242339
+     ]
+    ],
+    "moved": [
+     389,
+     389,
+     389,
+     389,
+     389,
+     389
+    ]
+   },
+   {
+    "name": "list item x6",
+    "material": "list-item-m",
+    "kit": "list-item-k",
+    "m_p50": 2259725,
+    "m_p95": 3781439,
+    "k_p50": 2152978,
+    "k_p95": 3171512,
+    "ratio_p50": 1.049581091864385,
+    "ratio_p95": 1.1923142652463556,
+    "net_ratio_p50": 1.0936346802779209,
+    "runs_m": [
+     [
+      2253212,
+      3777184
+     ],
+     [
+      2259725,
+      3781439
+     ],
+     [
+      2270306,
+      3795733
+     ]
+    ],
+    "runs_k": [
+     [
+      2152978,
+      3178246
+     ],
+     [
+      2152512,
+      3167419
+     ],
+     [
+      2153535,
+      3171512
+     ]
+    ],
+    "moved": [
+     389,
+     389,
+     389,
+     389,
+     389,
+     389
+    ]
+   },
+   {
+    "name": "button x6",
+    "material": "button-m",
+    "kit": "button-k",
+    "m_p50": 7749907,
+    "m_p95": 9540104,
+    "k_p50": 3097644,
+    "k_p95": 4501025,
+    "ratio_p50": 2.5018714222809333,
+    "ratio_p95": 2.1195403269255335,
+    "net_ratio_p50": 3.2316190843491857,
+    "runs_m": [
+     [
+      7751088,
+      9594395
+     ],
+     [
+      7749907,
+      9470618
+     ],
+     [
+      7734373,
+      9540104
+     ]
+    ],
+    "runs_k": [
+     [
+      3099065,
+      4501025
+     ],
+     [
+      3096501,
+      4471706
+     ],
+     [
+      3097644,
+      4521875
+     ]
+    ],
+    "moved": [
+     389,
+     389,
+     389,
+     389,
+     389,
+     389
+    ]
+   },
+   {
+    "name": "switch x6",
+    "material": "switch-m",
+    "kit": "switch-k",
+    "m_p50": 6440878,
+    "m_p95": 7768737,
+    "k_p50": 3306034,
+    "k_p95": 4582895,
+    "ratio_p50": 1.9482189233383564,
+    "ratio_p95": 1.695159282505927,
+    "net_ratio_p50": 2.367081056023458,
+    "runs_m": [
+     [
+      6440878,
+      7764322
+     ],
+     [
+      6452135,
+      7804634
+     ],
+     [
+      6438147,
+      7768737
+     ]
+    ],
+    "runs_k": [
+     [
+      3307080,
+      4582895
+     ],
+     [
+      3306034,
+      4591332
+     ],
+     [
+      3300285,
+      4551100
+     ]
+    ],
+    "moved": [
+     389,
+     389,
+     389,
+     389,
+     389,
+     389
+    ]
+   },
+   {
+    "name": "checkbox x6",
+    "material": "checkbox-m",
+    "kit": "checkbox-k",
+    "m_p50": 6896308,
+    "m_p95": 8430237,
+    "k_p50": 3771437,
+    "k_p95": 4985811,
+    "ratio_p50": 1.828562428591542,
+    "ratio_p95": 1.6908456818760278,
+    "net_ratio_p50": 2.1328169408257254,
+    "runs_m": [
+     [
+      6896308,
+      8467478
+     ],
+     [
+      6902447,
+      8430237
+     ],
+     [
+      6885560,
+      8420156
+     ]
+    ],
+    "runs_k": [
+     [
+      3771437,
+      4943763
+     ],
+     [
+      3746892,
+      4991091
+     ],
+     [
+      3778148,
+      4985811
+     ]
+    ],
+    "moved": [
+     389,
+     389,
+     389,
+     389,
+     389,
+     389
+    ]
+   },
+   {
+    "name": "chip/tag x6",
+    "material": "chip-m",
+    "kit": "tag-k",
+    "m_p50": 4934639,
+    "m_p95": 6454477,
+    "k_p50": 2602044,
+    "k_p95": 3402933,
+    "ratio_p50": 1.896447177680316,
+    "ratio_p95": 1.896739371595033,
+    "net_ratio_p50": 2.4678689801730913,
+    "runs_m": [
+     [
+      4934639,
+      6466702
+     ],
+     [
+      4938692,
+      6450721
+     ],
+     [
+      4928629,
+      6454477
+     ]
+    ],
+    "runs_k": [
+     [
+      2602044,
+      3404201
+     ],
+     [
+      2596742,
+      3402933
+     ],
+     [
+      2607001,
+      3391672
+     ]
+    ],
+    "moved": [
+     389,
+     389,
+     389,
+     389,
+     389,
+     389
+    ]
+   },
+   {
+    "name": "tabs x6",
+    "material": "tabs-m",
+    "kit": "tabs-k",
+    "m_p50": 14146378,
+    "m_p95": 54762726,
+    "k_p50": 10424447,
+    "k_p95": 15221582,
+    "ratio_p50": 1.357038699510871,
+    "ratio_p95": 3.5977026566620998,
+    "net_ratio_p50": 1.3954660391227505,
+    "runs_m": [
+     [
+      14070456,
+      54762726
+     ],
+     [
+      14162841,
+      54741811
+     ],
+     [
+      14146378,
+      54784131
+     ]
+    ],
+    "runs_k": [
+     [
+      10409714,
+      15221582
+     ],
+     [
+      10429289,
+      15296554
+     ],
+     [
+      10424447,
+      15079870
+     ]
+    ],
+    "moved": [
+     389,
+     389,
+     389,
+     389,
+     389,
+     389
+    ]
+   },
+   {
+    "name": "text field x6",
+    "material": "text-field-m",
+    "kit": "input-k",
+    "m_p50": 11457777,
+    "m_p95": 16181879,
+    "k_p50": 7975049,
+    "k_p95": 11805479,
+    "ratio_p50": 1.4367030221381711,
+    "ratio_p95": 1.3707092274697197,
+    "net_ratio_p50": 1.500240444417122,
+    "runs_m": [
+     [
+      11457777,
+      16169508
+     ],
+     [
+      11501005,
+      16181879
+     ],
+     [
+      11423711,
+      16258507
+     ]
+    ],
+    "runs_k": [
+     [
+      7979100,
+      11830462
+     ],
+     [
+      7959857,
+      11751296
+     ],
+     [
+      7975049,
+      11805479
+     ]
+    ],
+    "moved": [
+     389,
+     389,
+     389,
+     389,
+     389,
+     389
+    ]
+   }
+  ]
+ },
+ "component_loads": [
+  1.85,
+  1.7,
+  1.85,
+  1.79,
+  1.84,
+  1.8,
+  1.92,
+  1.87,
+  1.96,
+  1.91,
+  1.93,
+  1.81,
+  1.83,
+  1.92,
+  1.92,
+  1.74,
+  1.78,
+  1.85,
+  1.69,
+  1.83,
+  1.92,
+  1.92,
+  1.85,
+  1.82,
+  1.61,
+  1.83,
+  1.86,
+  1.91,
+  1.83,
+  1.8,
+  1.76,
+  1.7,
+  1.86,
+  1.91,
+  1.89,
+  1.9,
+  1.7,
+  1.81,
+  1.69,
+  1.88,
+  1.65,
+  1.74,
+  1.84,
+  1.79,
+  1.7,
+  1.99,
+  1.98,
+  1.75,
+  1.8,
+  1.76,
+  1.7
+ ],
+ "wasm_sizes_mib": {
+  "o3": 23.14,
+  "s": 19.21
+ }
+}
