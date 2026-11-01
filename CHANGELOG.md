@@ -28,6 +28,9 @@ Distribution is by Git revision for now; see the [quick start](README.md#quick-s
   or populated, whose trailing slot takes a labeled button.
 - `TextFieldShape`, on `TextField` and `ExposedDropdown`: medium corners for a form that
   rounds its fields with its surfaces.
+- `MarkdownExtensions::block_surface`, in `gpui_kit::base::text`: the top-level blocks between
+  `<!-- surface:name -->` and `<!-- /surface -->` draw inside a container the caller builds
+  from theme roles. They stay the document's for selection, find, reveal and copy.
 - `ButtonTone`, on `MaterialButton`, `IconButton` and `ConnectedButtonGroup`: neutral and
   accent roles for a variant, for screens that need more than one level of action.
 - `SearchFieldStyle`, `CardVariant::Surface` and `MaterialDialog::container`: a search bar,

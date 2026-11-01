@@ -414,7 +414,9 @@ impl IndexBuilder {
                     self.push_block(child);
                 }
             }
-            BlockNode::List { children, .. } | BlockNode::ListItem { children, .. } => {
+            BlockNode::Surface { children, .. }
+            | BlockNode::List { children, .. }
+            | BlockNode::ListItem { children, .. } => {
                 for child in children {
                     self.push_block(child);
                 }
@@ -565,6 +567,7 @@ fn table_row_source_ends(blocks: &[BlockNode], rows: &mut Vec<(TextLeafKey, Opti
             }
             BlockNode::Root { children, .. }
             | BlockNode::Blockquote { children, .. }
+            | BlockNode::Surface { children, .. }
             | BlockNode::List { children, .. }
             | BlockNode::ListItem { children, .. } => table_row_source_ends(children, rows),
             _ => {}
@@ -1332,6 +1335,7 @@ mod tests {
             match block {
                 BlockNode::Root { children, .. }
                 | BlockNode::Blockquote { children, .. }
+                | BlockNode::Surface { children, .. }
                 | BlockNode::List { children, .. }
                 | BlockNode::ListItem { children, .. } => leaf_nodes(children, leaves),
                 BlockNode::Paragraph(paragraph) => leaves.push(LeafNode::Paragraph(paragraph)),

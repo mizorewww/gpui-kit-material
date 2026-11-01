@@ -66,6 +66,19 @@ pub enum BlockNode {
         children: Vec<BlockNode>,
         span: Option<Span>,
     },
+    /// Blocks drawn inside a container named by a
+    /// [block surface](super::MarkdownExtensions::block_surface).
+    ///
+    /// Presentation only: its text, selection, highlights and reveals are its
+    /// children's, as if the fences around them were not there.
+    Surface {
+        name: SharedString,
+        children: Vec<BlockNode>,
+        /// The source from the opening fence through the closing one.
+        span: Option<Span>,
+        /// The source between the fences, which is what a copy takes.
+        content: Option<Span>,
+    },
     List {
         /// Only contains ListItem, others will be ignored
         children: Vec<BlockNode>,
@@ -436,6 +449,7 @@ impl BlockNode {
             BlockNode::Paragraph(paragraph) => paragraph.span,
             BlockNode::Heading { span, .. } => *span,
             BlockNode::Blockquote { span, .. } => *span,
+            BlockNode::Surface { span, .. } => *span,
             BlockNode::List { span, .. } => *span,
             BlockNode::ListItem { span, .. } => *span,
             BlockNode::CodeBlock(code_block) => code_block.span,
@@ -471,6 +485,7 @@ impl BlockNode {
         match self {
             BlockNode::Root { children, .. }
             | BlockNode::Blockquote { children, .. }
+            | BlockNode::Surface { children, .. }
             | BlockNode::List { children, .. }
             | BlockNode::ListItem { children, .. } => {
                 for child in children {
@@ -510,6 +525,7 @@ impl BlockNode {
         match self {
             BlockNode::Root { children, .. }
             | BlockNode::Blockquote { children, .. }
+            | BlockNode::Surface { children, .. }
             | BlockNode::List { children, .. }
             | BlockNode::ListItem { children, .. } => {
                 for child in children {
@@ -624,6 +640,23 @@ impl BlockNode {
                     text.push('\n');
                 }
             }
+            BlockNode::Surface { children, .. } => {
+                if matches!(kind, BlockTextKind::SelectedSource) {
+                    // The children stay separate blocks when pasted back.
+                    let sources = children
+                        .iter()
+                        .map(|child| child.text_by_kind(kind))
+                        .filter(|source| !source.is_empty())
+                        .map(|source| source.trim_end_matches('\n').to_string())
+                        .collect::<Vec<_>>();
+                    if !sources.is_empty() {
+                        text.push_str(&sources.join("\n\n"));
+                        text.push('\n');
+                    }
+                } else {
+                    text.push_str(&Self::children_text(children, kind));
+                }
+            }
             BlockNode::Table(table) => {
                 if matches!(kind, BlockTextKind::SelectedSource) {
                     let block_text = table_selected_source(table);
@@ -716,6 +749,7 @@ impl BlockNode {
         match self {
             BlockNode::Root { children, .. }
             | BlockNode::Blockquote { children, .. }
+            | BlockNode::Surface { children, .. }
             | BlockNode::List { children, .. }
             | BlockNode::ListItem { children, .. } => {
                 children.iter().any(|child| child.has_selection())
@@ -743,6 +777,7 @@ impl BlockNode {
         match self {
             BlockNode::Root { children, .. }
             | BlockNode::Blockquote { children, .. }
+            | BlockNode::Surface { children, .. }
             | BlockNode::List { children, .. }
             | BlockNode::ListItem { children, .. } => {
                 for child in children.iter() {
@@ -3572,6 +3607,12 @@ impl BlockNode {
                     .collect::<Vec<_>>()
                     .join("\n")
             }
+            BlockNode::Surface { name, children, .. } => {
+                let mut parts = vec![format!("<!-- surface:{name} -->")];
+                parts.extend(children.iter().map(|child| child.to_markdown()));
+                parts.push("<!-- /surface -->".to_string());
+                parts.join("\n\n")
+            }
             BlockNode::List {
                 children,
                 ordered,
@@ -3830,6 +3871,7 @@ impl BlockNode {
                                 BlockNode::Root { .. }
                                 | BlockNode::Heading { .. }
                                 | BlockNode::Blockquote { .. }
+                                | BlockNode::Surface { .. }
                                 | BlockNode::CodeBlock(_)
                                 | BlockNode::Custom { .. }
                                 | BlockNode::Table(_)
@@ -4325,6 +4367,39 @@ impl BlockNode {
                     .into_any_element(),
                 mb,
             ),
+            BlockNode::Surface { name, children, .. } => {
+                if children.is_empty() {
+                    // Fences with nothing yet between them, as a stream opens one.
+                    return div().into_any_element();
+                }
+                let mut container = node_cx
+                    .markdown_extensions
+                    .render_block_surface(name, window, cx)
+                    .unwrap_or_else(div);
+                // Nested tables measure while rendering, before the container
+                // applies its text style.
+                let text_style = container.style().text.clone();
+                let blocks = window.with_text_style(Some(text_style), |window| {
+                    children
+                        .iter()
+                        .enumerate()
+                        .map(|(ix, child)| {
+                            let (is_first, prev) = flow_position(children, ix);
+                            child.render_block(
+                                NodeRenderOptions {
+                                    is_first,
+                                    prev,
+                                    ..options.is_last(ix + 1 == children.len())
+                                },
+                                node_cx,
+                                window,
+                                cx,
+                            )
+                        })
+                        .collect::<Vec<_>>()
+                });
+                gapped(container.children(blocks).into_any_element(), mb)
+            }
             BlockNode::List {
                 children,
                 ordered,
@@ -4772,6 +4847,59 @@ mod tests {
                         // Ten glyphs at the table's 14px size, plus 24px cell padding.
                         assert_eq!(cached_column_widths(table).widths, vec![expected_width]);
                     }
+                },
+            );
+        });
+    }
+
+    #[test]
+    fn block_surface_typography_reaches_nested_table_measurement() {
+        use crate::text::MarkdownExtensions;
+        use crate::text::inline::test_draw::in_prepaint;
+        use crate::text::inline::test_fonts::{BODY, MONO, WideMonoTextSystem};
+        use gpui::TestApp;
+
+        let surface = BlockNode::Surface {
+            name: "large".into(),
+            children: vec![BlockNode::Table(table_of(
+                vec![vec![plain_cell("0123456789")]],
+                vec![],
+            ))],
+            span: None,
+            content: None,
+        };
+        let mut app = TestApp::with_text_system(Arc::new(WideMonoTextSystem));
+        in_prepaint(&mut app, move |window, cx| {
+            cx.set_global(crate::Theme::default());
+            window.with_text_style(
+                Some(
+                    StyleRefinement::default()
+                        .font_family(BODY)
+                        .text_size(px(15.))
+                        .text,
+                ),
+                |window| {
+                    let node_cx = NodeContext {
+                        body_font_size: px(15.),
+                        markdown_extensions: Arc::new(
+                            MarkdownExtensions::default().block_surface("large", |_, _| {
+                                div()
+                                    .font_family(MONO)
+                                    .text_size(px(30.))
+                                    .font_weight(FontWeight::BOLD)
+                            }),
+                        ),
+                        ..Default::default()
+                    };
+                    surface.render_block(NodeRenderOptions::default(), &node_cx, window, cx);
+                    let BlockNode::Surface { children, .. } = &surface else {
+                        unreachable!()
+                    };
+                    let BlockNode::Table(table) = &children[0] else {
+                        unreachable!()
+                    };
+                    // The same as a blockquote with this text style.
+                    assert_eq!(cached_column_widths(table).widths, vec![199.]);
                 },
             );
         });

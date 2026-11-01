@@ -195,7 +195,17 @@ impl ParsedDocument {
     /// stays `_italic_`, a reference link keeps its `[ref]` form, a table keeps
     /// its column padding — and it needs no rule of its own per block type.
     /// Blocks the parser could not locate fall back to reconstruction.
+    ///
+    /// A block surface's fences are presentation, and are left out.
     fn whole_source(&self, block: &BlockNode) -> String {
+        if let BlockNode::Surface {
+            content: Some(content),
+            ..
+        } = block
+            && let Some(source) = self.source.get(content.start..content.end)
+        {
+            return source.trim_start_matches(['\r', '\n']).to_string();
+        }
         if let Some(span) = block.span()
             && let Some(source) = self.source.get(span.start..span.end)
         {
@@ -203,6 +213,27 @@ impl ParsedDocument {
         }
 
         block.selected_text(SelectionFormat::Source)
+    }
+
+    /// The source a select-all copies: all of it, as written, except the
+    /// fences of block surfaces.
+    pub(super) fn copied_source(&self) -> String {
+        let mut copied = String::new();
+        let mut end = 0;
+        for block in self.blocks.iter() {
+            if let BlockNode::Surface {
+                span: Some(span),
+                content: Some(content),
+                ..
+            } = block
+            {
+                copied.push_str(&self.source[end..span.start]);
+                copied.push_str(&self.source[content.start..content.end]);
+                end = span.end;
+            }
+        }
+        copied.push_str(&self.source[end..]);
+        copied
     }
 
     pub(super) fn selected_source_range(&self) -> Option<Range<usize>> {
