@@ -190,6 +190,20 @@ impl<T> Default for TokenTransitionPlayback<T> {
     }
 }
 impl<T: gpui_base::Interpolate + PartialEq + 'static> TokenTransitionPlayback<T> {
+    /// Follow `target` while drawing, as [`token_transition`] does, for a control that
+    /// keeps its channels together in one entity rather than one each: what a view records
+    /// and replays each frame grows with the entities read while it draws.
+    pub fn follow(&self, target: T, token: MotionToken, window: &mut Window, cx: &App) -> T {
+        let sample = self.sample(target, token, cx);
+        if matches!(
+            sample.status,
+            gpui_base::MotionStatus::Running | gpui_base::MotionStatus::Delayed
+        ) {
+            window.request_animation_frame();
+        }
+        sample.value
+    }
+
     /// Resample an initialized channel's current visual target, preserving
     /// transient presentation while applying a motion preference change.
     pub fn resample(&self, token: MotionToken, cx: &App) -> Option<gpui_base::MotionValue<T>> {

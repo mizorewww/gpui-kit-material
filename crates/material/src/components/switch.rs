@@ -266,12 +266,34 @@ fn switch_paint(checked: bool, disabled: bool, error: bool) -> SwitchPaint {
 /// Hover styles resolve against this group.
 const SWITCH_GROUP: &str = "material-switch";
 
+/// What a switch keeps between frames, in one entity; each channel keeps its own clock.
+struct SwitchState {
+    focus: FocusHandle,
+    thumb: motion::TokenTransitionPlayback<f32>,
+    /// Not followed by a static specimen, which leaves it to start over.
+    size: std::cell::RefCell<Option<motion::TokenTransitionPlayback<f32>>>,
+}
+
 impl RenderOnce for MaterialSwitch {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
-        let focus = window
-            .use_keyed_state((self.id.clone(), "focus"), cx, |_, cx| cx.focus_handle())
-            .read(cx)
-            .clone();
+        let state = window.use_keyed_state((self.id.clone(), "state"), cx, |_, cx| SwitchState {
+            focus: cx.focus_handle(),
+            thumb: Default::default(),
+            size: Default::default(),
+        });
+        let state = state.read(cx);
+        let focus = state.focus.clone();
+        let thumb = state.thumb.clone();
+        let size_channel = (self.preview.is_none()).then(|| {
+            state
+                .size
+                .borrow_mut()
+                .get_or_insert_with(Default::default)
+                .clone()
+        });
+        if self.preview.is_some() {
+            state.size.borrow_mut().take();
+        }
         // A press is a press, by mouse or touch; a held row carries every keyed state on
         // every frame of a scroll.
         let press_state = window.use_keyed_state((self.id.clone(), "pressed"), cx, |_, _| false);
@@ -292,23 +314,16 @@ impl RenderOnce for MaterialSwitch {
         let icon = self.icons.shows(self.checked);
         // Position and size follow separate fast spatial springs, so a press
         // during a toggle retargets only the size, from where it is.
-        let t = motion::selection_value(
-            (self.id.clone(), "thumb"),
+        let t = thumb.follow(
             if self.checked { 1. } else { 0. },
+            MotionToken::FastSpatial,
             window,
             cx,
         );
         let target = handle_size(self.checked, icon, pressed);
-        let size = if preview.is_some() {
-            target
-        } else {
-            motion::token_value(
-                (self.id.clone(), "handle-size"),
-                target,
-                MotionToken::FastSpatial,
-                window,
-                cx,
-            )
+        let size = match size_channel {
+            Some(channel) => channel.follow(target, MotionToken::FastSpatial, window, cx),
+            None => target,
         }
         .clamp(0., HANDLE_PRESSED);
         let left = handle_left(t, size);
