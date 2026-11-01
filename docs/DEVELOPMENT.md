@@ -183,6 +183,11 @@ load and Low Power Mode leave alone (`src/instr_bench.rs`). `MATERIAL_INSTR_MODE
 visits, with phase times and lines shaped. Every report also has `startup`, the
 instructions at each step from `main` to the first presented frame.
 
+A window that something covers gets no frames from macOS, and a benchmark then waits for
+ever. A remote desktop's overlay covers every window: set `GPUI_IGNORE_OCCLUSION=1` to draw
+regardless (dev backend only). Counts stay comparable; a stalled main thread can still add
+frames, as a wheel's hover freeze expiring refreshes the window, so compare the frames' `row_builds` too.
+
 Re-judge saved evidence without running anything:
 
 ```sh
