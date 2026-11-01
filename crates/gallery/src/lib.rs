@@ -205,7 +205,8 @@ pub(crate) struct Gallery {
     counted: Cell<Option<Counted>>,
     row_focus: Vec<FocusHandle>,
     navigation_focus: FocusHandle,
-    navigation_scroll: ScrollHandle,
+    /// The column of pages: see [`shell::NavigationView`].
+    navigation: Entity<shell::NavigationView>,
     pending_focus: Option<(usize, bool)>,
     last_rem: Pixels,
     last_height: Pixels,
@@ -252,6 +253,11 @@ impl Gallery {
         bind_focus_keys(cx);
         let gallery = cx.entity();
         let content = cx.new(|cx| shell::ContentView::new(gallery.clone(), cx));
+        let navigation_focus = cx.focus_handle();
+        let navigation = {
+            let (gallery, focus) = (gallery.downgrade(), navigation_focus.clone());
+            cx.new(|cx| shell::NavigationView::new(gallery, 0, focus, ScrollHandle::new(), cx))
+        };
         let lead = cx.new(|cx| shell::LeadView::new(gallery, cx));
         Gallery {
             lead,
@@ -270,8 +276,8 @@ impl Gallery {
             layout: None,
             counted: Cell::new(None),
             row_focus: Vec::new(),
-            navigation_focus: cx.focus_handle(),
-            navigation_scroll: ScrollHandle::new(),
+            navigation_focus,
+            navigation,
             pending_focus: None,
             last_rem: window.rem_size(),
             last_height: window.viewport_size().height,
@@ -407,7 +413,9 @@ impl Gallery {
         }
         self.entries[self.current].scroll = Some(self.list.logical_scroll_top());
         self.entries[self.current].lead_offset = self.lead_scroll.offset();
-        self.current = entry;
+        let previous = std::mem::replace(&mut self.current, entry);
+        self.navigation
+            .update(cx, |navigation, cx| navigation.select(previous, entry, cx));
         self.lead_scroll.set_offset(self.entries[entry].lead_offset);
         self.theme_menu_open = false;
         self.drawer_open = false;
@@ -444,7 +452,9 @@ impl Gallery {
 
     pub(crate) fn set_query(&mut self, query: SharedString, cx: &mut Context<Self>) {
         if self.query != query {
-            self.query = query;
+            self.query = query.clone();
+            self.navigation
+                .update(cx, |navigation, cx| navigation.set_query(query, cx));
             // The compact layout's results are in its drawer.
             if self.shell_layout == shell::ShellLayout::Compact && !self.query.trim().is_empty() {
                 self.drawer_open = true;
@@ -642,7 +652,9 @@ impl Gallery {
         // Capture applies the theme before the first frame (see `run`).
         self.applied_theme = theme_key(self.shared.read(cx));
         self.capture = state;
-        self.current = entry;
+        let previous = std::mem::replace(&mut self.current, entry);
+        self.navigation
+            .update(cx, |navigation, cx| navigation.select(previous, entry, cx));
         self.entries[entry].tab = tab;
         for built in self.pages.iter().flatten() {
             built.page.apply_capture(state, cx);
@@ -707,7 +719,7 @@ impl Render for Gallery {
         let compact = layout == shell::ShellLayout::Compact;
         // A window widened past the drawer leaves nothing to reopen.
         self.drawer_open &= compact;
-        let navigation = (!compact).then(|| self.render_navigation(cx));
+        let navigation = (!compact).then(|| self.navigation.clone());
         let drawer = compact.then(|| self.render_drawer(window, cx));
         gpui_base::v_flex()
             .id("gallery")
@@ -849,7 +861,15 @@ impl Render for GalleryWindow {
     }
 }
 
+/// Ends a step of startup, for the instruction counters' report.
+#[inline]
+fn startup_mark(_step: &'static str) {
+    #[cfg(all(not(target_family = "wasm"), feature = "instruction-bench"))]
+    instr_bench::mark(_step);
+}
+
 pub fn run(application: gpui::Application, initialize: impl FnOnce(&mut App) + 'static) {
+    startup_mark("process_to_run");
     #[cfg(all(not(target_family = "wasm"), feature = "frame-profiler"))]
     let interactions = interactions::prepare();
     #[cfg(all(not(target_family = "wasm"), feature = "frame-profiler"))]
@@ -860,6 +880,7 @@ pub fn run(application: gpui::Application, initialize: impl FnOnce(&mut App) + '
     };
     let application = application.with_assets(Assets::new());
     application.run(move |cx: &mut App| {
+        startup_mark("application_started");
         #[cfg(target_family = "wasm")]
         cx.text_system()
             .add_fonts(vec![std::borrow::Cow::Borrowed(include_bytes!(
@@ -873,8 +894,11 @@ pub fn run(application: gpui::Application, initialize: impl FnOnce(&mut App) + '
                 std::borrow::Cow::Borrowed(include_bytes!("../fonts/roboto/Roboto-SemiBold.ttf")),
             ])
             .expect("Failed to load the reference Roboto fonts");
+        startup_mark("fonts");
         gpui_kit::init(cx);
+        startup_mark("kit_init");
         gpui_kit_material::init(cx);
+        startup_mark("material_init");
         initialize(cx);
         let viewport = size(px(1280.), px(900.));
         #[cfg(not(target_family = "wasm"))]
@@ -889,8 +913,19 @@ pub fn run(application: gpui::Application, initialize: impl FnOnce(&mut App) + '
         if instruction_bench.is_some() {
             window_options.inactive_frame_interval = None;
         }
+        startup_mark("window_options");
+        // A sampler can only attach once dyld has finished: time to do so before the window.
+        #[cfg(all(not(target_family = "wasm"), feature = "instruction-bench"))]
+        if let Some(delay) = std::env::var("MATERIAL_INSTR_OPEN_DELAY_MS")
+            .ok()
+            .and_then(|delay| delay.parse().ok())
+        {
+            std::thread::sleep(std::time::Duration::from_millis(delay));
+        }
         let (_window, _content) = gpui_kit::open_window(window_options, cx, move |window, cx| {
+            startup_mark("platform_window");
             let gallery = cx.new(|cx| Gallery::new(window, cx));
+            startup_mark("gallery_new");
             // FPS is part of ordinary UI and profiler runs. Only deterministic
             // screenshot captures omit the changing counter and its timer.
             #[cfg(not(target_family = "wasm"))]
@@ -910,7 +945,9 @@ pub fn run(application: gpui::Application, initialize: impl FnOnce(&mut App) + '
             web_route::install(&gallery, cx);
             let shared = gallery.read(cx).shared.read(cx);
             let (initial_scheme, initial_scale) = (shared.target_scheme(), shared.text_scale());
+            startup_mark("top_bar_and_fps");
             theme::init_component_theme(initial_scheme, initial_scale, cx);
+            startup_mark("theme");
             cx.new(|_| GalleryWindow {
                 gallery,
                 top_bar,
@@ -919,6 +956,7 @@ pub fn run(application: gpui::Application, initialize: impl FnOnce(&mut App) + '
             })
         })
         .unwrap();
+        startup_mark("open_window_returned");
         #[cfg(all(not(target_family = "wasm"), feature = "instruction-bench"))]
         if let Some(options) = instruction_bench {
             _window
@@ -1137,6 +1175,11 @@ mod window_tests {
             cx.read(|cx| gallery.read(cx).shell_layout),
             super::shell::ShellLayout::at(width)
         );
+        // The preview's first frame after the page was built can lay the row out afresh, so
+        // the views around it build once more (`splice_layout_holds`). That once is what a
+        // page used to pay on its second frame, for its tabs' first measure.
+        cx.update(|cx| cx.notify(preview.entity_id()));
+        draw(window.into(), cx);
         let settled = counts(cx);
         // What every animation frame of a component in the preview does:
         // `Window::request_animation_frame` notifies the view, without updating it.

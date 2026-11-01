@@ -27,6 +27,7 @@ script's docstring (`--help`) and [docs/DEVELOPMENT.md](../docs/DEVELOPMENT.md).
 | `check-features.sh` | `cargo check` of the library's default, empty, `full` and single-group feature selections, and the color crate's |
 | `check-git-consumer.sh` | Builds the README's quick start in a directory outside the repository, from Git at a pushed commit (`git-consumer/`) |
 | `check-package.sh` | Checks that each package ships its license texts and notices, and not the Gallery's fonts |
+| `check-web-profile.mjs` | Runs `www/profile.js` under Node as far as its report, which CI has no browser to reach |
 | `profile-gallery.py` | Builds and records a native Gallery CPU frame profile with provenance, and judges AGENTS.md's performance targets |
 | `figma/figma.py` | `figma-*.json` token fixtures and page specs from the Figma kit (below) |
 | `build-reference-fonts.py` | Gallery `fonts/roboto/Roboto-{Regular,Medium,SemiBold}.ttf` from the pinned md3.io WOFF2, hash-checked against `SOURCES.json` |

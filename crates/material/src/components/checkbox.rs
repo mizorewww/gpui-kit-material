@@ -255,14 +255,37 @@ thread_local! {
     static MARK: std::cell::Cell<(f32, f32)> = const { std::cell::Cell::new((0., 0.)) };
 }
 
+/// The channels of a live checkbox, each on its own clock. A static specimen follows none,
+/// and a checkbox that leaves one starts them over at their targets.
+#[derive(Clone, Default)]
+struct MarkChannels {
+    draw: motion::TokenTransitionPlayback<f32>,
+    fill: motion::TokenTransitionPlayback<f32>,
+    /// The shape morphs on two channels: see `MarkShape::channel`.
+    morph: [motion::TokenTransitionPlayback<f32>; 2],
+}
+
+/// What a checkbox keeps between frames, in one entity.
+struct CheckboxKeyed {
+    focus: FocusHandle,
+    shape: MarkShape,
+    channels: std::cell::RefCell<Option<MarkChannels>>,
+}
+
 impl RenderOnce for MaterialCheckbox {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
-        let focus = self.focus.clone().unwrap_or_else(|| {
-            window
-                .use_keyed_state((self.id.clone(), "focus"), cx, |_, cx| cx.focus_handle())
-                .read(cx)
-                .clone()
+        let keyed = window.use_keyed_state((self.id.clone(), "state"), cx, |_, cx| CheckboxKeyed {
+            focus: cx.focus_handle(),
+            shape: MarkShape {
+                shape: 0.,
+                channel: false,
+            },
+            channels: Default::default(),
         });
+        let focus = self
+            .focus
+            .clone()
+            .unwrap_or_else(|| keyed.read(cx).focus.clone());
         let preview = self.preview;
         let disabled = self.disabled || preview.is_some_and(|p| p.is_disabled());
         let enabled = !disabled;
@@ -273,11 +296,7 @@ impl RenderOnce for MaterialCheckbox {
         let selected = self.state != CheckboxState::Unchecked;
         // An unchecking mark keeps the shape it had, so it retracts rather
         // than morphing on its way out.
-        let shape = window.use_keyed_state((self.id.clone(), "shape"), cx, |_, _| MarkShape {
-            shape: 0.,
-            channel: false,
-        });
-        let previous = *shape.read(cx);
+        let previous = keyed.read(cx).shape;
         let shape_target = match self.state {
             CheckboxState::Checked => 0.,
             CheckboxState::Indeterminate => 1.,
@@ -285,9 +304,18 @@ impl RenderOnce for MaterialCheckbox {
         };
         let target = if selected { 1. } else { 0. };
         let (fill, draw, morph) = if preview.is_some() {
+            keyed.read(cx).channels.borrow_mut().take();
             (target, target, shape_target)
         } else {
-            let draw = motion::selection_value((self.id.clone(), "mark"), target, window, cx);
+            let channels = keyed
+                .read(cx)
+                .channels
+                .borrow_mut()
+                .get_or_insert_with(Default::default)
+                .clone();
+            let draw = channels
+                .draw
+                .follow(target, MotionToken::FastSpatial, window, cx);
             // A mark drawing in from nothing takes its new shape at once:
             // only a visible mark morphs between the check and the dash.
             // Switching to the other morph channel starts it at its target.
@@ -300,20 +328,29 @@ impl RenderOnce for MaterialCheckbox {
                 shape: shape_target,
                 channel,
             };
+            // The channel it switches to starts anew, at its target.
+            let channels = if channel != previous.channel {
+                let mut fresh = channels;
+                fresh.morph[usize::from(channel)] = Default::default();
+                *keyed.read(cx).channels.borrow_mut() = Some(fresh.clone());
+                fresh
+            } else {
+                channels
+            };
             if next != previous {
-                shape.update(cx, |shape, _| *shape = next);
+                keyed.update(cx, |keyed, _| keyed.shape = next);
             }
-            let morph_key = if channel { "morph-b" } else { "morph-a" };
             (
-                motion::token_value(
-                    (self.id.clone(), "fill"),
-                    target,
-                    MotionToken::FastEffects,
+                channels
+                    .fill
+                    .follow(target, MotionToken::FastEffects, window, cx),
+                draw,
+                channels.morph[usize::from(channel)].follow(
+                    shape_target,
+                    MotionToken::FastSpatial,
                     window,
                     cx,
                 ),
-                draw,
-                motion::selection_value((self.id.clone(), morph_key), shape_target, window, cx),
             )
         };
         #[cfg(test)]

@@ -19,6 +19,11 @@ frame-profiler = ["gpui-kit/profiler"]
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
 anyhow.workspace = true
 gpui-base.workspace = true
-gpui-kit.workspace = true
+# The benches read `Window::layout_stats`, which is behind test-support. Selecting it here
+# rather than relying on the Gallery's selection unifying with it is what lets
+# `cargo build -p gpui-kit-material-bench` compile alone. It costs no per-frame work in a
+# release build: selectors stay off without debug assertions, and the extra timers are off
+# until `Window::reset_layout_stats`.
+gpui-kit = { workspace = true, features = ["test-support"] }
 gpui-kit-material = { path = "../material", default-features = false, features = ["full", "serde"] }
 serde_json.workspace = true

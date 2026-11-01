@@ -1162,6 +1162,18 @@ fn open_motion(id: &ElementId, open: bool, window: &mut Window, cx: &mut App) ->
     (reveal, fade)
 }
 
+/// What a menu popup keeps between frames, in one entity, as a page holds many closed ones
+/// and a frame records each read. The channels keep their own clocks.
+struct PopupState {
+    focus: FocusHandle,
+    /// The trigger's size in design px, measured as it prepaints.
+    trigger_size: Rc<std::cell::Cell<(f32, f32)>>,
+    /// Closing the sub-menu by keyboard returns focus to its owner item.
+    restore: Rc<std::cell::Cell<bool>>,
+    reveal: motion::TokenTransitionPlayback<f32>,
+    fade: motion::TokenTransitionPlayback<f32>,
+}
+
 /// Whether a popup still paints its surface: open, or closing until both
 /// channels settle.
 pub(crate) fn popup_visible(open: bool, reveal: f32, fade: f32) -> bool {
@@ -1366,7 +1378,26 @@ impl RenderOnce for MenuPopup {
         // would still lose its end there, so it scrolls instead.
         let room = window_room(window);
         self.menu = self.menu.fit(room);
-        let (reveal, fade) = open_motion(&self.id, self.open, window, cx);
+        let state =
+            window.use_keyed_state((self.id.clone(), "menu-popup"), cx, |_, cx| PopupState {
+                focus: cx.focus_handle(),
+                trigger_size: Default::default(),
+                restore: Default::default(),
+                reveal: Default::default(),
+                fade: Default::default(),
+            });
+        let state = state.read(cx);
+        let (focus, trigger_size, restore) = (
+            state.focus.clone(),
+            state.trigger_size.clone(),
+            state.restore.clone(),
+        );
+        let (reveal_channel, fade_channel) = (state.reveal.clone(), state.fade.clone());
+        let target = if self.open { 1. } else { 0. };
+        let reveal = reveal_channel.follow(target, MotionToken::DefaultSpatial, window, cx);
+        let fade = fade_channel
+            .follow(target, MotionToken::FastEffects, window, cx)
+            .clamp(0., 1.);
         let visible = popup_visible(self.open, reveal, fade);
         // A menu on its way out shows its items, and activates none of them.
         if !self.open {
@@ -1384,21 +1415,8 @@ impl RenderOnce for MenuPopup {
         if !visible && let Some(closed) = self.on_closed.take() {
             closed(cx);
         }
-        let focus = window
-            .use_keyed_state((self.id.clone(), "menu-popup-focus"), cx, |_, cx| {
-                cx.focus_handle()
-            })
-            .read(cx)
-            .clone();
-        // The trigger's size in design px, measured as it prepaints: its height
-        // places a side popup's top at the trigger's top, and its width is a
-        // full-width menu's.
-        let trigger_size = window
-            .use_keyed_state((self.id.clone(), "menu-popup-trigger"), cx, |_, _| {
-                Rc::new(std::cell::Cell::new((0f32, 0f32)))
-            })
-            .read(cx)
-            .clone();
+        // The trigger's height places a side popup's top at the trigger's top, and its
+        // width is a full-width menu's.
         let full_width = self.full_width;
         if full_width {
             self.menu = self.menu.width(trigger_size.get().0);
@@ -1464,13 +1482,6 @@ impl RenderOnce for MenuPopup {
         let cascade_height = self.submenu.as_ref().map_or(0., |(_, submenu)| {
             column_inset(submenu.style) + submenu.visible_height()
         });
-        // Closing the sub-menu by keyboard returns focus to its owner item.
-        let restore = window
-            .use_keyed_state((self.id.clone(), "menu-submenu-restore"), cx, |_, _| {
-                Rc::new(std::cell::Cell::new(false))
-            })
-            .read(cx)
-            .clone();
         let mut menu = self.menu;
         if let Some(index) = submenu_index
             && restore.replace(false)
