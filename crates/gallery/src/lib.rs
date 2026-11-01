@@ -1175,6 +1175,11 @@ mod window_tests {
             cx.read(|cx| gallery.read(cx).shell_layout),
             super::shell::ShellLayout::at(width)
         );
+        // The preview's first frame after the page was built can lay the row out afresh, so
+        // the views around it build once more (`splice_layout_holds`). That once is what a
+        // page used to pay on its second frame, for its tabs' first measure.
+        cx.update(|cx| cx.notify(preview.entity_id()));
+        draw(window.into(), cx);
         let settled = counts(cx);
         // What every animation frame of a component in the preview does:
         // `Window::request_animation_frame` notifies the view, without updating it.
