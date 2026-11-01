@@ -61,7 +61,8 @@ Distribution is by Git revision for now; see the [quick start](README.md#quick-s
   without this workspace's lockfile gets Component at the same revision as Base.
 - `Entity::update_for_render` is dev-only, behind `frame-observation`; a consumer's
   engine keeps upstream's API here.
-- `LineLayoutCache::layout_wrapped_line` is back, as upstream's zero-spacing form.
+- `LineLayoutCache::layout_wrapped_line` is gone from both engines: `layout_wrapped_line_spaced`
+  replaces it, and nothing outside the crate could reach it.
 - Performance tooling judges the targets in `AGENTS.md`: the 500 FPS, 0.3 ms redraw and
   16 ms first-frame limits are gone, and the first frame and Material list are judged
   against Kit.

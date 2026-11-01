@@ -133,8 +133,9 @@ equivalent; six approximate translations await visual review. Raw SVG/data
 icons bypass the resolver. Cold-load and new-size/DPR raster costs must be
 measured before adding a cache beyond GPUI's.
 
-The gallery embeds Symbols on both targets (no HTTP fallback). Consumers that
-serve Symbols at runtime can disable the `embedded-symbols` default feature. An
+The desktop Gallery embeds Symbols. The browser Gallery downloads the two styles it
+draws (`www/main.js`) and hands them over with `provide_symbol_asset`, drawing a placeholder
+for each icon until its font arrives or fails. Consumers that serve Symbols at runtime can disable the `embedded-symbols` default feature. An
 adjacent `../gpui-material-symbols` checkout is never substituted implicitly.
 
 ## Engine patches

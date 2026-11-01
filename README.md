@@ -41,9 +41,9 @@ Icons come from
 | Actions | `MaterialButton` (5 variants, 5 sizes, round/square, toggle, loading), `IconButton`, `ButtonGroup`, `ConnectedButtonGroup`, `SplitButton`, `Fab`, `ExtendedFab`, `FabMenu` |
 | Selection | `MaterialCheckbox`, `MaterialSwitch`, `MaterialRadio`/`MaterialRadioGroup`, `AssistChip`/`FilterChip`/`InputChip`/`SuggestionChip`, `ChipSet`, `MaterialSlider` |
 | Text input | `TextField`, `ExposedDropdown` (select), `SearchField`/`SearchView`, `DatePicker`, `TimePicker` |
-| Navigation | `NavigationRail`, `NavigationBar`, `NavigationDrawer`, `NavigationSuite`, `MaterialTabs`, `MaterialMenu`, `TopAppBar`, `BottomAppBar`, `Toolbar` (docked and floating) |
+| Navigation | `NavigationRail`, `NavigationBar`, `NavigationDrawer`, `NavigationSuite`, `MaterialTabs`, `MaterialMenu`, `MaterialContextMenu`, `TopAppBar`, `BottomAppBar`, `Toolbar` (docked and floating) |
 | Containment | `MaterialCard`, `ListItem`, `MaterialCarousel`, `MaterialDivider`, `MaterialDialog`, `MaterialBottomSheet`, `MaterialSideSheet` |
-| Communication | `Badge`, `Avatar`, `LinearProgress`/`CircularProgress`, `LoadingIndicator`, `Snackbar`, `MaterialTooltip`, `PullToRefresh` |
+| Communication | `Badge`, `Avatar`, `LinearProgress`/`CircularProgress`, `Stepper`, `LoadingIndicator`, `Snackbar`, `MaterialTooltip`, `PullToRefresh` |
 | Layout | `PaneScaffold`, `FeedLayout` |
 | Application | `TitleBar`, `CaptionButtons`, tiles, choice tiles, status chips and notices (from course2md, not M3 components) |
 
@@ -112,8 +112,11 @@ gpui-base = { git = "https://github.com/mizorewww/gpui-kit-material", rev = "3df
 
 > `[patch]` is read only from the top-level manifest, so it goes in your workspace root.
 > [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#consumer-patch-set) says why each patch
-> exists. The rest of `vendor/` is dev-only frame observation for the Gallery. CI builds
-> this manifest from Git at every pushed commit (`scripts/check-git-consumer.sh`).
+> exists. The rest of `vendor/` is dev-only frame observation for the Gallery. At every pushed
+> commit, CI builds this block's template from Git at that commit
+> (`scripts/git-consumer/Cargo.toml.in`, `scripts/check-git-consumer.sh`), and checks that this
+> block differs from the template only in its revision (`scripts/check-package.sh`). The revision
+> shown here is the last release's: CI does not build that revision again.
 
 ```rust
 use gpui_kit_material::{color::themes::{Contrast, ThemeId, ThemeMode}, icons::Assets, theme};
@@ -218,8 +221,9 @@ cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace
 ```
 
-CI runs these on macOS, Linux and Windows, plus both GPUI backends, every feature
-combination (`scripts/check-features.sh`) and the WASM gallery build. Project rules for contributors and agents are in
+CI runs these on macOS, Linux and Windows, plus both GPUI backends, the WASM gallery build, and
+`cargo check` of the defaults, no features, `full` with and without Fast, and each feature group
+alone (`scripts/check-features.sh`). Project rules for contributors and agents are in
 [AGENTS.md](AGENTS.md).
 
 | Document | Contents |
