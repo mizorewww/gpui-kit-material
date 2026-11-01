@@ -1235,3 +1235,58 @@ fn a_tall_submenu_below_its_trigger_stays_in_the_window(cx: &mut TestAppContext)
 fn a_tall_submenu_above_its_trigger_stays_in_the_window(cx: &mut TestAppContext) {
     tall_cascade_stays_in_the_window(Anchor::BottomLeft, cx);
 }
+
+/// A menu centered on its selected item, as a dropdown opens.
+struct SelectedMenu {
+    picked: Rc<RefCell<Vec<usize>>>,
+}
+
+impl Render for SelectedMenu {
+    fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        window.set_rem_size(px(14.));
+        let menu = MaterialMenu::new("menu")
+            .max_height(240.)
+            .items((0..100).map(|ix| {
+                let picked = self.picked.clone();
+                MaterialMenuItem::new("Option")
+                    .selected(ix == 50)
+                    .on_click(move |_, _, _| picked.borrow_mut().push(ix))
+            }));
+        div().child(
+            MenuPopup::new(
+                "popup",
+                div().debug_selector(|| "trigger".into()).size(px(40.)),
+                menu,
+            )
+            .open(true),
+        )
+    }
+}
+
+fn pick_after(keys: &str, cx: &mut TestAppContext) -> Vec<usize> {
+    cx.update(|cx| {
+        gpui_kit::init(cx);
+        crate::init(cx);
+        cx.set_reduce_motion(true);
+    });
+    let picked: Rc<RefCell<Vec<usize>>> = Rc::default();
+    let (_, cx) = cx.add_window_view({
+        let picked = picked.clone();
+        move |_, _| SelectedMenu { picked }
+    });
+    settle(cx);
+    cx.simulate_keystrokes(keys);
+    settle(cx);
+    let picked = picked.borrow().clone();
+    picked
+}
+
+#[gpui::test]
+fn the_first_arrow_key_moves_from_the_selected_item(cx: &mut TestAppContext) {
+    assert_eq!(pick_after("down enter", cx), vec![51]);
+}
+
+#[gpui::test]
+fn the_first_arrow_key_up_moves_from_the_selected_item(cx: &mut TestAppContext) {
+    assert_eq!(pick_after("up enter", cx), vec![49]);
+}

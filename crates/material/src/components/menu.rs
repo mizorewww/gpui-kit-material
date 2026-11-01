@@ -776,7 +776,12 @@ impl RenderOnce for MaterialMenu {
             let scrolling = scrolling.clone();
             let scroll = scroll.clone();
             move |direction: Direction, window: &mut Window, cx: &mut App| {
-                let current = handles.iter().position(|h| h.is_focused(window));
+                // Until an item has focus, the keyboard starts where the menu shows it is: a
+                // dropdown opens centered on its selected option.
+                let current = handles
+                    .iter()
+                    .position(|h| h.is_focused(window))
+                    .or(selected);
                 if let Some(ix) = target(&skip, current, direction) {
                     handles[ix].focus(window, cx);
                     if let Some((viewport, rows)) = &scrolling {
