@@ -44,6 +44,7 @@ const COUNTS: usize = 6;
 thread_local! {
     static TALLY: Cell<[u64; COUNTS]> = const { Cell::new([0; COUNTS]) };
     static STARTUP: RefCell<Vec<(&'static str, Counters)>> = const { RefCell::new(Vec::new()) };
+    static STARTUP_FRAMES: RefCell<Vec<Value>> = const { RefCell::new(Vec::new()) };
 }
 
 /// Records the main thread's counters as a step of startup ends.
@@ -52,12 +53,30 @@ pub(super) fn mark(step: &'static str) {
 }
 
 /// The frames after the window opened that startup's report ends with.
-fn note_startup_frame(seen: usize) {
-    match seen {
-        0 => mark("frame_1"),
-        1 => mark("frame_2"),
-        _ => {}
-    }
+fn note_startup_frame(seen: usize, window: &Window) {
+    let step = match seen {
+        0 => "frame_1",
+        1 => "frame_2",
+        2 => "frame_3",
+        3 => "frame_4",
+        _ => return,
+    };
+    mark(step);
+    let stats = phase_stats(window);
+    let tally = TALLY.with(Cell::get);
+    STARTUP_FRAMES.with(|frames| {
+        frames.borrow_mut().push(json!({
+            "step": step,
+            "views_built": stats.views_built,
+            "views_reused": stats.views_reused,
+            "nodes_created": stats.nodes_created,
+            "lines_shaped": stats.lines_shaped,
+            "frames_drawn": window.layout_stats().frames,
+            "gallery_renders": tally[Count::Gallery as usize],
+            "lead_renders": tally[Count::Lead as usize],
+            "row_builds": tally[Count::Row as usize],
+        }))
+    });
 }
 
 /// Each step's own counters: instructions, cycles, CPU ns, allocations, bytes.
@@ -70,7 +89,11 @@ fn startup_report() -> Value {
             steps.push(json!({"step": step, "counters": counters.since(last).row()}));
             last = *counters;
         }
-        json!({"columns":["instructions","cycles","cpu_ns","allocations","allocated_bytes"],"steps":steps})
+        json!({
+            "columns":["instructions","cycles","cpu_ns","allocations","allocated_bytes"],
+            "steps":steps,
+            "frames":STARTUP_FRAMES.with(|frames| frames.borrow().clone()),
+        })
     })
 }
 
@@ -280,7 +303,7 @@ fn offset(gallery: &Gallery) -> f32 {
 /// One frame of a tour: closes the current stop when due, and starts the next.
 fn tour_step(mut run: Run, window: &mut Window, cx: &mut App) {
     let now = Counters::now();
-    note_startup_frame(run.seen);
+    note_startup_frame(run.seen, window);
     if run.seen == 0 {
         window.reset_layout_stats();
     }
@@ -330,7 +353,7 @@ fn tour_step(mut run: Run, window: &mut Window, cx: &mut App) {
 
 fn step(mut run: Run, window: &mut Window, cx: &mut App) {
     let now = Counters::now();
-    note_startup_frame(run.seen);
+    note_startup_frame(run.seen, window);
     let tally = TALLY.with(Cell::get);
     let frame_stats = stats(window);
     let warm = run.options.quiet + run.options.settle;
