@@ -321,12 +321,21 @@ impl Element for CustomBlockElement {
     ) {
         self.content.prepaint(window, cx);
         if let Some(reveal) = &self.reveal {
-            window.request_autoscroll(bounds);
-            let visible = window.content_mask().bounds.dilate(px(0.5));
-            reveal.report(
-                bounds,
-                bounds.top() >= visible.top() && bounds.bottom() <= visible.bottom(),
-            );
+            // A list scrolls to its edge, which layout may miss by a fraction of
+            // a pixel.
+            let slack = px(0.5);
+            let view = window.content_mask().bounds;
+            let inside =
+                bounds.top() >= view.top() - slack && bounds.bottom() <= view.bottom() + slack;
+            // A block taller than the view has no place to scroll to where it
+            // fits, and asking from each edge in turn would never settle.
+            let fills =
+                bounds.top() <= view.top() + slack && bounds.bottom() >= view.bottom() - slack;
+            let visible = inside || fills;
+            if !visible {
+                window.request_autoscroll(bounds);
+            }
+            reveal.report(bounds, visible);
         }
     }
 
@@ -445,19 +454,16 @@ impl BlockNode {
         matches!(self, Self::ListItem { .. })
     }
 
-    /// `Some(ordered)` for a list.
-    pub(super) fn list_kind(&self) -> Option<bool> {
-        match self {
-            Self::List { ordered, .. } => Some(*ordered),
-            _ => None,
-        }
-    }
-
-    /// Whether this block shows nothing: a link definition, a comment.
+    /// Whether this block shows nothing: a link definition, a comment, a `<br>`.
     fn draws_nothing(&self) -> bool {
         match self {
             Self::Definition { .. } | Self::Break { .. } | Self::Unknown => true,
             Self::Root { children, .. } => children.iter().all(Self::draws_nothing),
+            Self::Paragraph(paragraph) => paragraph.children().iter().all(|inline| {
+                inline.as_image().is_none()
+                    && inline.as_custom().is_none()
+                    && inline.text().trim().is_empty()
+            }),
             _ => false,
         }
     }

@@ -280,6 +280,31 @@ impl Doc<'_> {
     }
 }
 
+/// A source, what to drag from and to, and what that copies.
+const AS_EVER: &[(&str, &str, &str, &str)] = &[
+    ("- a1\n\n* b1", "a1", "b1", "- a1\n\n- b1"),
+    ("1. a1\n\n1) b1", "a1", "b1", "1. a1\n\n1. b1"),
+    ("- a1\n- a2\n\n* b1", "a1", "b1", "- a1\n- a2\n\n- b1"),
+    (
+        "- a1\n\n<!-- c -->\n\n- b1",
+        "a1",
+        "b1",
+        "- a1\n\n<!-- c -->\n\n- b1",
+    ),
+    (
+        "one _em_\n\n---\n\n![](a.png)\n\n| a   | b |\n|-----|---|\n| 1   | 2 |\n\n[r]: http://x\n\ntwo",
+        "one",
+        "two",
+        "one *em*\n\n---\n\n![](a.png)\n\n| a   | b |\n|-----|---|\n| 1   | 2 |\n\n[r]: http://x\n\ntwo",
+    ),
+    (
+        "> quote\n\n```\ncode\n```\n\nlast",
+        "quote",
+        "last",
+        "> quote\n\n```\ncode\n```\n\nlast",
+    ),
+];
+
 const DOCUMENT: &str = "before text\n\n<!-- surface:summary -->\n\ninside one\n\ninside two\n\n<!-- /surface -->\n\nafter text";
 
 // What gathers, and what does not.
@@ -390,6 +415,7 @@ fn a_surface_with_nothing_to_show_draws_nothing(cx: &mut TestAppContext) {
         "<!-- a comment -->",
         "[r]: http://x",
         "<!-- a comment -->\n\n[r]: http://x",
+        "<br>",
     ] {
         let source = format!("{}\n\nafter", fenced(body));
         let mut doc = open(
@@ -532,30 +558,21 @@ fn a_partial_source_copy_takes_only_what_is_selected(cx: &mut TestAppContext) {
     assert_eq!(doc.drag_copy("before", "one"), "before\n\nskipped\n\none");
 }
 
+/// These strings are what `origin/main`'s `text/`, without the surface patch, copied.
 #[gpui::test]
-fn lists_kept_apart_by_a_fence_stay_apart_when_copied(cx: &mut TestAppContext) {
-    let source = "<!-- surface:summary -->\n- a\n<!-- /surface -->\n- b";
-    let mut doc = open(
-        source,
-        tall(true, SelectionFormat::Source),
-        extensions(),
-        cx,
-    );
-    assert_eq!(doc.rows(), 2);
-    assert_eq!(doc.select_all(), "- a\n\n<!-- -->\n\n- b");
-    doc.view.update(doc.cx, |view, cx| view.clear_selection(cx));
-    settle(doc.cx);
-    assert_eq!(doc.drag_copy("a", "b"), "- a\n\n<!-- -->\n\n- b");
-    drop(doc);
-
-    // Lists of two kinds, and a list beside a paragraph, are apart already.
-    let mut doc = open(
-        "<!-- surface:summary -->\n- a\n<!-- /surface -->\n1. b\n\n<!-- surface:summary -->\nc\n<!-- /surface -->\n- d",
-        tall(true, SelectionFormat::Source),
-        extensions(),
-        cx,
-    );
-    assert_eq!(doc.select_all(), "- a\n\n1. b\n\nc\n\n- d");
+fn a_document_without_a_surface_copies_as_ever(cx: &mut TestAppContext) {
+    for (source, from, to, copied) in AS_EVER {
+        for scrollable in [false, true] {
+            let mut doc = open(
+                source,
+                tall(scrollable, SelectionFormat::Source),
+                MarkdownExtensions::default(),
+                cx,
+            );
+            assert_eq!(doc.drag_copy(from, to), *copied, "{source}");
+            drop(doc);
+        }
+    }
 }
 
 #[gpui::test]
@@ -777,6 +794,37 @@ fn a_reveal_shows_all_of_a_custom_block_inside_a_surface(cx: &mut TestAppContext
     assert!(
         card.top() >= viewport.top() - px(0.5) && card.bottom() <= viewport.bottom() + px(0.5),
         "{card:?} in {viewport:?}"
+    );
+}
+
+#[gpui::test]
+fn a_reveal_of_a_custom_block_taller_than_the_view_settles(cx: &mut TestAppContext) {
+    let body = format!("{}\n\n[card](target)\n\n{}", paragraphs(20), paragraphs(20));
+    let source = format!("{}\n\nafter", fenced(&body));
+    let mut doc = open(
+        &source,
+        (50., true, SelectionFormat::Plain),
+        with_cards(extensions()),
+        cx,
+    );
+    let range = doc.range_of("target");
+    doc.view
+        .update(doc.cx, |view, cx| view.reveal_range(range, cx).unwrap());
+    let mut tops = Vec::new();
+    for _ in 0..16 {
+        doc.cx.update(|window, cx| window.draw(cx).clear(cx));
+        let top = doc.scroll_top();
+        tops.push(top.offset_in_item);
+    }
+    assert!(
+        tops[1..].iter().all(|top| *top == tops[1]),
+        "it moved after the first frames: {tops:?}"
+    );
+    let viewport = doc.viewport();
+    let card = doc.cx.debug_bounds("target-card").unwrap();
+    assert!(
+        card.top() <= viewport.top() + px(0.5) && card.bottom() >= viewport.bottom() - px(0.5),
+        "{card:?} fills {viewport:?}"
     );
 }
 

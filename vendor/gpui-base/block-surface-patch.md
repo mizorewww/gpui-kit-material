@@ -20,9 +20,8 @@ appended to that `Div`.
 A surface is presentation. Every walker passes through it as through a list, so
 `rendered_text` is the same as without the fences and no range moves. A source copy
 takes its children as blocks of the document, so what it covers keeps its source as
-written. Its fences are not copied, in any format; two lists of one kind that only a
-fence kept apart copy with `<!-- -->` between them. Its `span` starts at the opening
-fence, so the stream parser, which parses the last block again, sees the fence again.
+written. Its fences are not copied, in any format, so two lists of one kind that only
+a fence kept apart copy as one. Its `span` starts at the opening fence, so the stream parser, which parses the last block again, sees the fence again.
 
 A custom block has its own row, which a reveal scrolls to. Inside a surface it has
 none, so it reports its bounds and asks to be scrolled to, as a line of text does.

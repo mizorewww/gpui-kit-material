@@ -61,7 +61,7 @@
       "upstream_sha256": "71b801a92588d12f7931a5a9e1745fb62f4283ae87d651d4004ae9b41ad72da3"
     },
     "src/text/document.rs": {
-      "local_sha256": "e726d8c943e0b7ad1dd637df1e45257a122aa6d437114bfc5c7b252f2dc0e3a6",
+      "local_sha256": "9a6bb5145daa9db2764b843b1d120c077bad3441ede58f45626a80dd93d36eec",
       "reason": "BlockNode::Surface and MarkdownExtensions::block_surface: a run of top-level blocks drawn in a consumer's container (block-surface-patch.md).",
       "upstream_sha256": "fbac8a9bfcfbc884eadafa4e1a6c4b897593e0c48917179267d6deed9e1b81fb"
     },
@@ -71,7 +71,7 @@
       "upstream_sha256": "08be31515e0b041fd39e10007c883105015fa498d23e3bb7023b561e84eddf7e"
     },
     "src/text/markdown_ext.rs": {
-      "local_sha256": "8e9ec05d81c622b661ef515ba24f79c71bbd0cf7fde30e55543922372ed54dff",
+      "local_sha256": "eb95c08802bebe05c0e6773f41eff5996d9cf710316e36d5627f9e4ac14b5ef8",
       "reason": "BlockNode::Surface and MarkdownExtensions::block_surface: a run of top-level blocks drawn in a consumer's container (block-surface-patch.md).",
       "upstream_sha256": "44fa63ece976a0474f402a2a65d7d1f382f143c1a482dbb392b8f39f85e397b3"
     },
@@ -81,7 +81,7 @@
       "upstream_sha256": "c88ba532a1d529ad16e89788685c7752cd701771d08699d0395a8ab196ff2be6"
     },
     "src/text/node.rs": {
-      "local_sha256": "eaaa401795c7762c2da69e6325a99e6eeb2d52ec478e4b95f1ab6e7ebdc15ed0",
+      "local_sha256": "a3f48081c35659ee79f3fc7b77022373da8947a3efd32c41773d3ce59a40c0c1",
       "reason": "BlockNode::Surface and MarkdownExtensions::block_surface: a run of top-level blocks drawn in a consumer's container (block-surface-patch.md).",
       "upstream_sha256": "9c98338199b5269791f0aefcb24038f4f59c681adc1ca5e6a6dcd676057ba219"
     },

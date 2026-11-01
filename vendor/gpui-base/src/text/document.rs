@@ -70,15 +70,6 @@ pub(crate) fn flow_position<B: std::borrow::Borrow<BlockNode>>(
     }
 }
 
-/// Keeps two lists apart in copied source. Only a fence can stand between two
-/// lists of one kind, and without it Markdown reads them as one, blank line or
-/// not. CommonMark's own way to end a list is a comment.
-const LIST_SEPARATOR: &str = "<!-- -->";
-
-fn lists_would_merge(previous: Option<Option<bool>>, next: Option<Option<bool>>) -> bool {
-    matches!((previous, next), (Some(Some(a)), Some(Some(b))) if a == b)
-}
-
 impl NodeRenderOptions {
     pub(crate) fn is_last(mut self, is_last: bool) -> Self {
         self.is_last = is_last;
@@ -178,7 +169,6 @@ impl ParsedDocument {
         let covered = self.covered_blocks(first, last, &painted);
         let last_covered = covered.len().saturating_sub(1);
         let mut out: Vec<String> = Vec::new();
-        let mut previous = None;
         for (ix, block) in covered.iter().copied().enumerate() {
             // The selection is one continuous range, so only the block it
             // starts in and the block it ends in can be partly selected.
@@ -194,11 +184,7 @@ impl ParsedDocument {
 
             let trimmed = source.trim_end_matches('\n');
             if !trimmed.is_empty() {
-                if lists_would_merge(previous, Some(block.list_kind())) {
-                    out.push(LIST_SEPARATOR.to_string());
-                }
                 out.push(trimmed.to_string());
-                previous = Some(block.list_kind());
             }
         }
         out.join("\n\n")
@@ -209,7 +195,7 @@ impl ParsedDocument {
     /// its source has them as such. A surface the selection ends in takes only
     /// the children from or up to the end it painted.
     fn covered_blocks(&self, first: usize, last: usize, painted: &[bool]) -> Vec<&BlockNode> {
-        let mut covered = Vec::with_capacity(last + 1 - first);
+        let mut covered = Vec::with_capacity((last + 1).saturating_sub(first));
         for (ix, block) in self.blocks.iter().enumerate().take(last + 1).skip(first) {
             let BlockNode::Surface { children, .. } = block else {
                 covered.push(block);
@@ -246,7 +232,8 @@ impl ParsedDocument {
     }
 
     /// The source a select-all copies: all of it, as written, except the
-    /// fences of block surfaces. What they stood between stays separate blocks.
+    /// fences of block surfaces. What they stood between stays separate blocks,
+    /// except that two lists of one kind read as one list without a fence.
     pub(super) fn copied_source(&self) -> String {
         if !self
             .blocks
@@ -256,37 +243,30 @@ impl ParsedDocument {
             return self.source.to_string();
         }
         let mut copied = String::new();
-        let mut previous = None;
-        let mut push = |source: &str, blocks: &'_ [BlockNode]| {
+        let mut push = |source: &str| {
             let source = source.trim_matches(['\r', '\n']);
             if source.is_empty() {
                 return;
             }
             if !copied.is_empty() {
                 copied.push_str("\n\n");
-                if lists_would_merge(previous, blocks.first().map(BlockNode::list_kind)) {
-                    copied.push_str(LIST_SEPARATOR);
-                    copied.push_str("\n\n");
-                }
             }
             copied.push_str(source);
-            previous = blocks.last().map(BlockNode::list_kind);
         };
-        let (mut end, mut outside) = (0, 0);
-        for (ix, block) in self.blocks.iter().enumerate() {
+        let mut end = 0;
+        for block in self.blocks.iter() {
             if let BlockNode::Surface {
-                children,
                 span: Some(span),
                 content: Some(content),
                 ..
             } = block
             {
-                push(&self.source[end..span.start], &self.blocks[outside..ix]);
-                push(&self.source[content.start..content.end], children);
-                (end, outside) = (span.end, ix + 1);
+                push(&self.source[end..span.start]);
+                push(&self.source[content.start..content.end]);
+                end = span.end;
             }
         }
-        push(&self.source[end..], &self.blocks[outside..]);
+        push(&self.source[end..]);
         copied
     }
 
