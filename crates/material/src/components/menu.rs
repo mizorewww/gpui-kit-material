@@ -1378,13 +1378,14 @@ impl RenderOnce for MenuPopup {
         // would still lose its end there, so it scrolls instead.
         let room = window_room(window);
         self.menu = self.menu.fit(room);
-        let state = window.use_keyed_state((self.id.clone(), "menu-popup"), cx, |_, cx| PopupState {
-            focus: cx.focus_handle(),
-            trigger_size: Default::default(),
-            restore: Default::default(),
-            reveal: Default::default(),
-            fade: Default::default(),
-        });
+        let state =
+            window.use_keyed_state((self.id.clone(), "menu-popup"), cx, |_, cx| PopupState {
+                focus: cx.focus_handle(),
+                trigger_size: Default::default(),
+                restore: Default::default(),
+                reveal: Default::default(),
+                fade: Default::default(),
+            });
         let state = state.read(cx);
         let (focus, trigger_size, restore) = (
             state.focus.clone(),

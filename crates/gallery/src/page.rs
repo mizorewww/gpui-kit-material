@@ -370,7 +370,11 @@ mod scheme_tests {
         for _ in 0..2 {
             assert_eq!(
                 shared.preview_scheme(),
-                Some(expect(ThemeId::Baseline, ThemeMode::Dark, Contrast::Standard))
+                Some(expect(
+                    ThemeId::Baseline,
+                    ThemeMode::Dark,
+                    Contrast::Standard
+                ))
             );
         }
         shared.preview_theme = Some(ThemeId::Ocean);
