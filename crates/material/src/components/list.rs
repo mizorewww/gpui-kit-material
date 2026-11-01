@@ -1006,6 +1006,113 @@ mod tests {
         }
     }
 
+    /// A view of one item, sized by the caller's rem.
+    struct One(fn() -> ListItem);
+
+    impl Render for One {
+        fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+            window.set_rem_size(px(crate::tokens::typography::BASE_PX));
+            div()
+                .w(px(360.))
+                .child(div().debug_selector(|| "one-item".into()).child((self.0)()))
+        }
+    }
+
+    fn one(
+        cx: &mut TestAppContext,
+        item: fn() -> ListItem,
+    ) -> (Entity<One>, &mut VisualTestContext) {
+        cx.update(|cx| {
+            gpui_base::init(cx);
+            cx.set_reduce_motion(true);
+        });
+        let (view, cx) = cx.add_window_view(move |_, _| One(item));
+        cx.update(|window, cx| {
+            window.refresh();
+            window.draw(cx).clear(cx);
+        });
+        (view, cx)
+    }
+
+    #[gpui::test]
+    fn a_tinted_leading_icon_paints_its_family(cx: &mut TestAppContext) {
+        let (_, cx) = one(cx, || {
+            ListItem::new("item", "Item").leading(ListLeading::Tinted(
+                crate::icons::IconName::Check.icon(),
+                Tint::Teal,
+                40.,
+            ))
+        });
+        let tile = gpui::Background::from(crate::theme::color(Tint::Teal.roles().0));
+        cx.update(|window, _| {
+            let scale = window.scale_factor();
+            let quad = window
+                .painted_quads()
+                .into_iter()
+                .find(|quad| quad.background == tile)
+                .expect("the tint's container is painted");
+            assert_eq!(quad.bounds.size.width.0, 40. * scale);
+            assert_eq!(quad.bounds.size.height.0, 40. * scale);
+        });
+    }
+
+    #[gpui::test]
+    fn switch_icons_reach_the_items_switch(cx: &mut TestAppContext) {
+        // A switch's icons are what sets `Both` apart at rest: the unselected handle grows to
+        // make room for its icon.
+        let (view, cx) = one(cx, || {
+            ListItem::new("item", "Item").trailing(ListTrailing::Switch(false))
+        });
+        let plain = cx.debug_bounds("switch-handle").unwrap().size;
+        view.update(cx, |view, cx| {
+            view.0 = || {
+                ListItem::new("item", "Item")
+                    .trailing(ListTrailing::Switch(false))
+                    .switch_icons(SwitchIcons::Both)
+            };
+            cx.notify();
+        });
+        cx.update(|window, cx| {
+            window.refresh();
+            window.draw(cx).clear(cx);
+        });
+        let with_icons = cx.debug_bounds("switch-handle").unwrap().size;
+        assert!(with_icons.width > plain.width, "{with_icons:?} {plain:?}");
+    }
+
+    #[gpui::test]
+    fn an_expressive_row_rounds_as_it_is_pressed(cx: &mut TestAppContext) {
+        let (_, cx) = one(cx, || {
+            ListItem::new("item", "Item")
+                .expressive(true)
+                .on_click(|_, _, _| {})
+        });
+        let radius = |cx: &mut VisualTestContext, dp: f32| {
+            cx.update(|window, _| {
+                let corner = dp * window.scale_factor();
+                window
+                    .painted_quads()
+                    .iter()
+                    .any(|quad| quad.corner_radii.top_left.0 == corner)
+            })
+        };
+        assert!(radius(cx, 4.), "4dp at rest");
+        assert!(!radius(cx, 16.));
+        let center = cx.debug_bounds("one-item").unwrap().center();
+        cx.simulate_mouse_down(center, gpui::MouseButton::Left, gpui::Modifiers::default());
+        cx.update(|window, cx| {
+            window.refresh();
+            window.draw(cx).clear(cx);
+        });
+        cx.executor()
+            .advance_clock(std::time::Duration::from_millis(600));
+        cx.update(|window, cx| {
+            window.refresh();
+            window.draw(cx).clear(cx);
+        });
+        assert!(radius(cx, 16.), "16dp pressed");
+    }
+
     #[gpui::test]
     fn inset_dividers_start_16dp_in_under_a_48dp_subheader(cx: &mut TestAppContext) {
         let (_, cx) = cx.add_window_view(|_, _| Dividers);

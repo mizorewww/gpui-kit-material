@@ -220,6 +220,8 @@ pub(crate) struct Splice {
     /// layout the same for it to be drawn around the gap. See
     /// [`Window::splice_layout_holds`].
     held: Vec<(LayoutId, taffy::Layout)>,
+    /// Where the write generation stood when what the view read itself was checked.
+    checked_at: u64,
 }
 
 impl Splice {
@@ -304,6 +306,8 @@ impl Window {
     /// nodes, if it can be: nothing it read itself changed, it is hovered as
     /// it was, and the nested views ask for the layout they had.
     pub(crate) fn splice_layout(&mut self, id: &GlobalElementId, cx: &mut App) -> Option<Splice> {
+        // What the view read itself is checked just below, as of now.
+        let checked_at = cx.entities.write_generation();
         if self.refreshing
             || cx.has_active_drag()
             || crate::fast::a11y::stale(&self.a11y)
@@ -472,6 +476,7 @@ impl Window {
             gaps: built,
             layout,
             held,
+            checked_at,
         })
     }
 
@@ -620,6 +625,7 @@ impl Window {
             previous,
             mut gaps,
             layout,
+            checked_at,
             ..
         } = splice;
         let writes_now = cx.entities.write_generation();
@@ -754,6 +760,10 @@ impl Window {
         record.nested = nested;
         record.layout_keys = layout_keys.into();
         record.dependencies = dependencies;
+        // Each frame it is spliced is checked in turn, so only writes since this one matter,
+        // and the stretches `splice_paint` adds do not pile up. From the check, not from now:
+        // what a gap wrote while it was built, the view has not seen.
+        record.own_dependencies = record.own_dependencies.written_up_to(checked_at);
 
         ViewPrepaint::Spliced(SplicedPrepaint {
             previous,

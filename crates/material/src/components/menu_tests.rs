@@ -1162,3 +1162,190 @@ fn an_exposed_dropdown_limits_its_menu(cx: &mut TestAppContext) {
     let surface = cx.debug_bounds("menu-popup-surface").unwrap();
     assert_eq!(surface.size.height, px(240.));
 }
+
+/// A tall sub-menu owned by an item well down its menu, near whichever window edge it opens to.
+struct TallCascade {
+    anchor: Anchor,
+}
+
+impl Render for TallCascade {
+    fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        window.set_rem_size(px(14.));
+        let menu = MaterialMenu::new("menu")
+            .items((0..6).map(|_| MaterialMenuItem::new("Item").submenu(true)));
+        let submenu =
+            MaterialMenu::new("submenu").items((0..60).map(|_| MaterialMenuItem::new("Sub")));
+        let upward = opens_upward(self.anchor);
+        div()
+            .size_full()
+            .flex()
+            .flex_col()
+            .when(upward, |root| root.justify_end())
+            .p(px(20.))
+            .child(
+                MenuPopup::new(
+                    "popup",
+                    div()
+                        .debug_selector(|| "trigger".into())
+                        .w(px(100.))
+                        .h(px(40.)),
+                    menu,
+                )
+                .open(true)
+                .anchor(self.anchor)
+                // Below the trigger the last item leaves the least room under it, above the
+                // trigger the first item leaves the least room over it.
+                .submenu(if upward { 0 } else { 5 }, submenu, true),
+            )
+    }
+}
+
+fn tall_cascade_stays_in_the_window(anchor: Anchor, cx: &mut TestAppContext) {
+    cx.update(|cx| {
+        gpui_kit::init(cx);
+        crate::init(cx);
+        cx.set_reduce_motion(true);
+    });
+    let (_, cx) = cx.add_window_view(move |_, _| TallCascade { anchor });
+    settle(cx);
+    let window = cx.update(|window, _| window.viewport_size());
+    let submenu = cx.debug_bounds("menu-popup-submenu").unwrap();
+    assert!(
+        submenu.top() >= px(0.) && submenu.bottom() <= window.height,
+        "{anchor:?}: sub-menu at {:?}..{:?} in a window {:?} tall",
+        submenu.top(),
+        submenu.bottom(),
+        window.height
+    );
+    let surface = cx.debug_bounds("menu-popup-surface").unwrap();
+    assert!(
+        surface.top() >= px(0.) && surface.bottom() <= window.height,
+        "{anchor:?}: menu at {:?}..{:?}",
+        surface.top(),
+        surface.bottom()
+    );
+}
+
+#[gpui::test]
+fn a_tall_submenu_below_its_trigger_stays_in_the_window(cx: &mut TestAppContext) {
+    tall_cascade_stays_in_the_window(Anchor::TopLeft, cx);
+}
+
+#[gpui::test]
+fn a_tall_submenu_above_its_trigger_stays_in_the_window(cx: &mut TestAppContext) {
+    tall_cascade_stays_in_the_window(Anchor::BottomLeft, cx);
+}
+
+/// A menu centered on its selected item, as a dropdown opens.
+struct SelectedMenu {
+    picked: Rc<RefCell<Vec<usize>>>,
+}
+
+impl Render for SelectedMenu {
+    fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        window.set_rem_size(px(14.));
+        let menu = MaterialMenu::new("menu")
+            .max_height(240.)
+            .items((0..100).map(|ix| {
+                let picked = self.picked.clone();
+                MaterialMenuItem::new("Option")
+                    .selected(ix == 50)
+                    .on_click(move |_, _, _| picked.borrow_mut().push(ix))
+            }));
+        div().child(
+            MenuPopup::new(
+                "popup",
+                div().debug_selector(|| "trigger".into()).size(px(40.)),
+                menu,
+            )
+            .open(true),
+        )
+    }
+}
+
+fn pick_after(keys: &str, cx: &mut TestAppContext) -> Vec<usize> {
+    cx.update(|cx| {
+        gpui_kit::init(cx);
+        crate::init(cx);
+        cx.set_reduce_motion(true);
+    });
+    let picked: Rc<RefCell<Vec<usize>>> = Rc::default();
+    let (_, cx) = cx.add_window_view({
+        let picked = picked.clone();
+        move |_, _| SelectedMenu { picked }
+    });
+    settle(cx);
+    cx.simulate_keystrokes(keys);
+    settle(cx);
+    picked.borrow().clone()
+}
+
+#[gpui::test]
+fn the_first_arrow_key_moves_from_the_selected_item(cx: &mut TestAppContext) {
+    assert_eq!(pick_after("down enter", cx), vec![51]);
+}
+
+#[gpui::test]
+fn the_first_arrow_key_up_moves_from_the_selected_item(cx: &mut TestAppContext) {
+    assert_eq!(pick_after("up enter", cx), vec![49]);
+}
+
+struct HeroDropdown;
+
+impl Render for HeroDropdown {
+    fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        window.set_rem_size(px(14.));
+        ExposedDropdown::new("dropdown", "Language")
+            .variant(TextFieldVariant::Hero)
+            .options(["English", "Chinese"])
+    }
+}
+
+#[gpui::test]
+fn a_hero_dropdown_shows_its_label_where_a_field_puts_its_placeholder(cx: &mut TestAppContext) {
+    cx.update(|cx| {
+        gpui_kit::init(cx);
+        crate::init(cx);
+        cx.set_reduce_motion(true);
+    });
+    let (_, cx) = cx.add_window_view(|_, _| HeroDropdown);
+    draw(cx);
+    assert!(cx.debug_bounds("text-field-placeholder").is_some());
+}
+
+#[gpui::test]
+fn a_keyboard_focused_item_paints_the_focus_layer(cx: &mut TestAppContext) {
+    let (_, cx) = cascade(cx, Anchor::TopLeft);
+    settle(cx);
+    let paint = item_paint(MenuStyle::Standard, false);
+    let focused = gpui::Background::from(state::layer(
+        alpha(paint.layer, 0.),
+        paint.layer,
+        state::FOCUS,
+    ));
+    let painted = |cx: &mut VisualTestContext| {
+        cx.update(|window, _| {
+            // A popup's rounded clip keeps its quads in a layer of their own under Fast.
+            #[cfg(feature = "gpui-fast")]
+            let in_layers = window
+                .painted_scene()
+                .layers
+                .frames
+                .iter()
+                .filter_map(|frame| frame.content.scene())
+                .flat_map(|scene| scene.quads.iter())
+                .any(|quad| quad.background == focused);
+            #[cfg(not(feature = "gpui-fast"))]
+            let in_layers = false;
+            in_layers
+                || window
+                    .painted_quads()
+                    .iter()
+                    .any(|quad| quad.background == focused)
+        })
+    };
+    assert!(!painted(cx), "no item has focus yet");
+    cx.simulate_keystrokes("down");
+    settle(cx);
+    assert!(painted(cx), "as a focused specimen paints it");
+}

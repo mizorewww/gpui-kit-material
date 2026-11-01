@@ -27,6 +27,15 @@ impl Render for Screen {
                     .width(412.)
                     .items([CarouselItem::new().label("Beach").supporting("Summer")]),
             )
+            .child(
+                status_fact_chip("fact", "Checked: passed", StatusKind::Success).child("Checked"),
+            )
+            .child(
+                Stepper::new("stepper", "Setup progress")
+                    .steps(["Source", "Service", "Account"])
+                    .current(1)
+                    .state_labels("Finished", "Current", "Upcoming"),
+            )
             .child(MaterialTooltip::plain("tip", "Save a copy").trigger(div().size(px(20.))))
             .child(progress_with_label("copy", "Copy", 0.25, window, cx))
             .child(indeterminate_progress_with_label("index", "Index", cx))
@@ -170,6 +179,23 @@ fn overlays_rows_and_items_announce_names_and_states(cx: &mut TestAppContext) {
     labelled(&all, "dialog", "Filters", &tree);
     // A time picker is named for the mode it is in, here the input.
     labelled(&all, "dialog", "Enter time", &tree);
+
+    // A status fact says in words what its color says.
+    labelled(&all, "label", "Checked: passed", &tree);
+
+    // A stepper is a list of its steps, each with its name, state and place in the flow.
+    labelled(&all, "list", "Setup progress", &tree);
+    for (position, step, state, current) in [
+        (1, "Source", "Finished", false),
+        (2, "Service", "Current", true),
+        (3, "Account", "Upcoming", false),
+    ] {
+        let node = labelled(&all, "listItem", step, &tree);
+        assert_eq!(node["position_in_set"], position, "{node}");
+        assert_eq!(node["size_of_set"], 3, "{node}");
+        assert_eq!(node["description"], state, "{node}");
+        assert_eq!(node["selected"], current, "{node}");
+    }
 
     // Carousel items are list items named by their label.
     let item = labelled(&all, "listItem", "Beach", &tree);

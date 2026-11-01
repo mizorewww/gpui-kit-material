@@ -496,6 +496,58 @@ mod tests {
         });
     }
 
+    /// The shadows painted, in the frame last drawn.
+    #[cfg(feature = "gpui-fast")]
+    fn shadows(cx: &mut VisualTestContext) -> Vec<String> {
+        cx.update(|window, _| {
+            window
+                .painted_scene()
+                .shadows
+                .iter()
+                .map(|shadow| format!("{:?} {:?}", shadow.bounds, shadow.blur_radius))
+                .collect()
+        })
+    }
+
+    #[cfg(feature = "gpui-fast")]
+    #[gpui::test]
+    fn a_fab_rises_under_the_pointer(cx: &mut TestAppContext) {
+        struct One;
+        impl gpui::Render for One {
+            fn render(
+                &mut self,
+                _: &mut gpui::Window,
+                _: &mut gpui::Context<Self>,
+            ) -> impl IntoElement {
+                div()
+                    .p(px(40.))
+                    .child(div().debug_selector(|| "fab".into()).child(Fab::new(
+                        "fab",
+                        IconName::Check,
+                        "Compose",
+                    )))
+            }
+        }
+        cx.update(|cx| {
+            gpui_kit::init(cx);
+            cx.set_reduce_motion(true);
+        });
+        let (_, cx) = cx.add_window_view(|_, _| One);
+        draw(cx);
+        let rest = shadows(cx);
+        assert!(!rest.is_empty(), "level 3 at rest");
+        let fab = cx.debug_bounds("fab").unwrap();
+        let over = fab.origin + gpui::point(px(28.), px(28.));
+        cx.simulate_mouse_move(over, None, gpui::Modifiers::default());
+        draw(cx);
+        cx.run_until_parked();
+        draw(cx);
+        cx.executor()
+            .advance_clock(std::time::Duration::from_millis(400));
+        draw(cx);
+        assert_ne!(shadows(cx), rest, "level 4 under the pointer");
+    }
+
     #[gpui::test]
     fn extended_fab_collapses_to_a_square_through_intermediate_widths(cx: &mut TestAppContext) {
         cx.update(|cx| {

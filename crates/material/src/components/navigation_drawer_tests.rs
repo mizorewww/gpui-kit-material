@@ -416,3 +416,26 @@ fn items_follow_the_kits_nav_item() {
     let rest = drawer_paint(false, 0., false);
     assert_eq!(rest.focus, color(ColorRole::ON_SURFACE).opacity(0.10));
 }
+
+#[gpui::test]
+fn keyboard_focus_paints_a_rows_focus_layer_and_a_pointer_does_not(cx: &mut TestAppContext) {
+    let (_, cx) = harness(cx, false);
+    settle(cx);
+    let focus = gpui::Background::from(drawer_paint(false, 0., false).focus);
+    let painted = |cx: &mut VisualTestContext| {
+        cx.update(|window, _| {
+            window
+                .painted_quads()
+                .iter()
+                .any(|quad| quad.background == focus)
+        })
+    };
+    assert!(!painted(cx), "no row has focus");
+    let second = row(cx, "d1").unwrap();
+    cx.simulate_click(second.center(), Modifiers::none());
+    settle(cx);
+    assert!(!painted(cx), "a press focuses the row but shows no focus");
+    cx.simulate_keystrokes("down");
+    settle(cx);
+    assert!(painted(cx), "the keyboard does");
+}

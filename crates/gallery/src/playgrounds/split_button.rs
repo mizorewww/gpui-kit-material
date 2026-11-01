@@ -265,8 +265,9 @@ mod tests {
             h.cx.debug_bounds("material-menu").is_some(),
             "the menu opens"
         );
-        // Down focuses "0.5×"; Enter chooses it and closes the menu.
-        h.cx.simulate_keystrokes("down enter");
+        // The keyboard starts from the selected "1×": Up reaches "0.5×"; Enter chooses it and
+        // closes the menu.
+        h.cx.simulate_keystrokes("up enter");
         h.settle();
         assert_eq!(h.config().text("text"), "0.5×");
         assert!(h.cx.debug_bounds("material-menu").is_none(), "and closes");

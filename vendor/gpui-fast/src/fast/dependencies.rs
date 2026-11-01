@@ -1259,6 +1259,12 @@ impl RenderDependencies {
         }
     }
 
+    /// How many stretches of writes are taken for the subtree's own.
+    #[cfg(test)]
+    pub(crate) fn own_write_stretches(&self) -> usize {
+        self.writes.own.len()
+    }
+
     /// The same dependencies, known to be up to date with every write up to
     /// `writes`: a reused subtree's, checked when it was reused.
     pub(crate) fn written_up_to(&self, writes: u64) -> Self {

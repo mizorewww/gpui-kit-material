@@ -61,6 +61,12 @@ pub static PLAYGROUND: Playground = Playground {
             title: "Appearance",
             controls: &[
                 Control::Select {
+                    id: "container",
+                    label: "Container",
+                    options: &["default", "surface container", "surface container low"],
+                    default: 0,
+                },
+                Control::Select {
                     id: "size",
                     label: "Size",
                     options: &["small", "medium", "large", "fullwidth", "fullscreen"],
@@ -198,6 +204,14 @@ fn preview(
     let title = config.text("title");
     let (dismiss_label, confirm_label) = action_labels(&title);
     let mut dialog = MaterialDialog::new("playground-dialog")
+        .when_some(
+            match config.option("container") {
+                "surface container" => Some(ColorRole::SURFACE_CONTAINER),
+                "surface container low" => Some(ColorRole::SURFACE_CONTAINER_LOW),
+                _ => None,
+            },
+            |dialog, role| dialog.container(role),
+        )
         .size(DialogSize::ALL[config.choice("size")])
         .animation(DialogAnimation::ALL[config.choice("animation")])
         .dividers(config.bool("dividers"))

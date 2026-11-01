@@ -23,6 +23,10 @@ use gpui::{prelude::*, *};
 
 /// The kit's avatar diameter in design px.
 pub const AVATAR_SIZE: f32 = 40.;
+/// The placeholder's Material Symbol size, in the 40dp frame. The kit's own glyph has 28x26dp
+/// of ink (Avatars, `Avatar Placeholder`); `person` fills two thirds of its square, so this
+/// gives it the kit's height, and 26dp rather than 28dp of width.
+const PLACEHOLDER_EM: f32 = 39.;
 
 /// What an avatar shows.
 // A short-lived builder value consumed by one render, like `ListLeading`;
@@ -142,7 +146,9 @@ impl RenderOnce for Avatar {
             glyph(symbol("check"), 24.).into_any_element()
         } else {
             match self.content {
-                AvatarContent::Placeholder => glyph(symbol("person"), 28.).into_any_element(),
+                AvatarContent::Placeholder => {
+                    glyph(symbol("person"), PLACEHOLDER_EM).into_any_element()
+                }
                 AvatarContent::Icon(icon) => glyph(icon, 24.).into_any_element(),
                 AvatarContent::Monogram(text) => {
                     let type_scale = TypeRole::TitleMedium.scale();
@@ -197,6 +203,11 @@ mod tests {
         assert_eq!(monogram_initials("j d x"), "JD");
         assert_eq!(monogram_initials("ßa"), "SSA");
         assert_eq!(monogram_initials(""), "");
+    }
+
+    #[test]
+    fn the_placeholder_has_the_kits_ink_height() {
+        assert_eq!(PLACEHOLDER_EM * 2. / 3., 26.);
     }
 
     #[test]

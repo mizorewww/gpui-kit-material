@@ -463,3 +463,32 @@ fn dial_numbers_hover_in_the_kits_roles() {
     let selected = color(ColorRole::ON_PRIMARY_CONTAINER);
     assert_eq!(dial_number_hover(true), selected.opacity(0.08));
 }
+
+#[gpui::test]
+fn a_dial_number_hovers_under_the_pointer(cx: &mut TestAppContext) {
+    cx.update(|cx| {
+        gpui_kit::init(cx);
+        crate::init(cx);
+        cx.set_reduce_motion(true);
+    });
+    let (_, cx) = cx.add_window_view(|window, cx| {
+        Harness(cx.new(|cx| TimePickerState::new(labels(), t(7, 0), window, cx)))
+    });
+    draw(cx);
+    let hover = gpui::Background::from(dial_number_hover(false));
+    let painted = |cx: &mut VisualTestContext| {
+        cx.update(|window, _| {
+            window
+                .painted_quads()
+                .iter()
+                .any(|quad| quad.background == hover)
+        })
+    };
+    assert!(!painted(cx), "not until the pointer is over a number");
+    // 12 is at the top of the dial; 7 is selected.
+    let dial = cx.debug_bounds("clock-dial").unwrap();
+    let over_twelve = gpui::point(dial.center().x, dial.top() + px(26.));
+    cx.simulate_mouse_move(over_twelve, None, Modifiers::default());
+    draw(cx);
+    assert!(painted(cx));
+}

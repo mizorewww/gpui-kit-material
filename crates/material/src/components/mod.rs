@@ -188,11 +188,11 @@ pub use feedback::{
     BADGE_CONTAINER, BADGE_LABEL, CARD_PADDING, CardState, CardSurface, CardVariant,
     LARGE_BADGE_PADDING, LARGE_BADGE_SIZE, MaterialCard, NoticeKind, SMALL_BADGE_SIZE, StatusKind,
     card, card_surface, large_badge, notice_banner, outlined_status_chip, small_badge, status_chip,
-    status_chip_outlined,
+    status_fact_chip,
 };
 #[cfg(feature = "feedback")]
 #[allow(deprecated)]
-pub use feedback::{BadgeKind, badge, outlined_badge};
+pub use feedback::{BadgeKind, badge, outlined_badge, status_chip_outlined};
 pub use focus::{FocusRing, RevealFocus, RingedButton, contain_scroll};
 pub use labeled::{LabelPosition, required_label};
 #[cfg(feature = "containment")]
