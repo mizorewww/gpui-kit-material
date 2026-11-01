@@ -337,7 +337,15 @@ impl MarkdownExtensions {
     /// Fences work only at the top level of a Markdown view and only for a
     /// registered `name`. Any other comment stays a comment. Surfaces do not nest:
     /// an opening fence ends the surface before it, and so does the end of the
-    /// text. [`Self::mdx`] turns HTML comments off, and with them the fences.
+    /// text. Two lists of one kind that only a fence kept apart copy with an empty
+    /// comment between them, or Markdown would read them as one.
+    ///
+    /// Fences are markup, so a registered fence in text you don't control takes
+    /// effect: escape that text, as with any other Markdown. One unclosed fence
+    /// gathers the rest of the document into one row, which is no longer
+    /// virtualized. [`Self::mdx`] is not for these documents: MDX has no HTML
+    /// comments, so a fence fails the parse of the whole document, as any comment
+    /// does there.
     pub fn block_surface<F>(mut self, name: impl Into<SharedString>, render: F) -> Self
     where
         F: Fn(&mut Window, &mut App) -> Div + Send + Sync + 'static,
@@ -467,7 +475,9 @@ impl MarkdownExtensions {
         window: &mut Window,
         cx: &mut App,
     ) -> Option<Div> {
-        self.block_surfaces.get(name).map(|render| render(window, cx))
+        self.block_surfaces
+            .get(name)
+            .map(|render| render(window, cx))
     }
 
     pub(crate) fn parse_block(

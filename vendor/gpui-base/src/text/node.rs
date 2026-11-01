@@ -275,6 +275,9 @@ impl Element for TableCellElement {
 struct CustomBlockElement {
     content: AnyElement,
     state: BlockState,
+    /// A pending reveal of this block, when it is inside a block surface and
+    /// so has no row of its own to scroll to.
+    reveal: Option<RevealAt>,
 }
 
 impl IntoElement for CustomBlockElement {
@@ -311,12 +314,20 @@ impl Element for CustomBlockElement {
         &mut self,
         _: Option<&GlobalElementId>,
         _: Option<&InspectorElementId>,
-        _: Bounds<Pixels>,
+        bounds: Bounds<Pixels>,
         _: &mut (),
         window: &mut Window,
         cx: &mut App,
     ) {
         self.content.prepaint(window, cx);
+        if let Some(reveal) = &self.reveal {
+            window.request_autoscroll(bounds);
+            let visible = window.content_mask().bounds.dilate(px(0.5));
+            reveal.report(
+                bounds,
+                bounds.top() >= visible.top() && bounds.bottom() <= visible.bottom(),
+            );
+        }
     }
 
     fn paint(
@@ -432,6 +443,23 @@ enum BlockTextKind {
 impl BlockNode {
     pub(super) fn is_list_item(&self) -> bool {
         matches!(self, Self::ListItem { .. })
+    }
+
+    /// `Some(ordered)` for a list.
+    pub(super) fn list_kind(&self) -> Option<bool> {
+        match self {
+            Self::List { ordered, .. } => Some(*ordered),
+            _ => None,
+        }
+    }
+
+    /// Whether this block shows nothing: a link definition, a comment.
+    fn draws_nothing(&self) -> bool {
+        match self {
+            Self::Definition { .. } | Self::Break { .. } | Self::Unknown => true,
+            Self::Root { children, .. } => children.iter().all(Self::draws_nothing),
+            _ => false,
+        }
     }
 
     /// Combine all children, omitting the empt parent nodes.
@@ -641,21 +669,7 @@ impl BlockNode {
                 }
             }
             BlockNode::Surface { children, .. } => {
-                if matches!(kind, BlockTextKind::SelectedSource) {
-                    // The children stay separate blocks when pasted back.
-                    let sources = children
-                        .iter()
-                        .map(|child| child.text_by_kind(kind))
-                        .filter(|source| !source.is_empty())
-                        .map(|source| source.trim_end_matches('\n').to_string())
-                        .collect::<Vec<_>>();
-                    if !sources.is_empty() {
-                        text.push_str(&sources.join("\n\n"));
-                        text.push('\n');
-                    }
-                } else {
-                    text.push_str(&Self::children_text(children, kind));
-                }
+                text.push_str(&Self::children_text(children, kind));
             }
             BlockNode::Table(table) => {
                 if matches!(kind, BlockTextKind::SelectedSource) {
@@ -4368,8 +4382,8 @@ impl BlockNode {
                 mb,
             ),
             BlockNode::Surface { name, children, .. } => {
-                if children.is_empty() {
-                    // Fences with nothing yet between them, as a stream opens one.
+                if children.iter().all(Self::draws_nothing) {
+                    // Nothing to hold, as when a stream has just opened the fence.
                     return div().into_any_element();
                 }
                 let mut container = node_cx
@@ -4389,7 +4403,8 @@ impl BlockNode {
                                 NodeRenderOptions {
                                     is_first,
                                     prev,
-                                    ..options.is_last(ix + 1 == children.len())
+                                    ..options
+                                        .is_last(children[ix + 1..].iter().all(Self::draws_nothing))
                                 },
                                 node_cx,
                                 window,
@@ -4448,6 +4463,11 @@ impl BlockNode {
                     .child(CustomBlockElement {
                         content: inner,
                         state: state.clone(),
+                        reveal: node_cx.reveal_at(
+                            node.span.map(|span| TextLeafKey::block(span.start)),
+                            0,
+                            1,
+                        ),
                     })
                     .into_any_element()
             }
@@ -4881,14 +4901,15 @@ mod tests {
                 |window| {
                     let node_cx = NodeContext {
                         body_font_size: px(15.),
-                        markdown_extensions: Arc::new(
-                            MarkdownExtensions::default().block_surface("large", |_, _| {
+                        markdown_extensions: Arc::new(MarkdownExtensions::default().block_surface(
+                            "large",
+                            |_, _| {
                                 div()
                                     .font_family(MONO)
                                     .text_size(px(30.))
                                     .font_weight(FontWeight::BOLD)
-                            }),
-                        ),
+                            },
+                        )),
                         ..Default::default()
                     };
                     surface.render_block(NodeRenderOptions::default(), &node_cx, window, cx);

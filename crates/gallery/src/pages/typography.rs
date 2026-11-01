@@ -24,41 +24,39 @@ const RICH_TEXT: &str = "A reading view is one document, so a selection and a fi
 
 /// The summary surface of `RICH_TEXT`, in the current theme's roles.
 fn rich_text_extensions() -> MarkdownExtensions {
-    MarkdownExtensions::default()
-        .parser_revision(1)
-        .block_surface("summary", |_, _| {
-            gpui_base::v_flex()
-                .w_full()
-                .min_w_0()
-                .px(rem(24.))
-                .py(rem(20.))
-                .rounded(rem(20.))
-                .bg(color(ColorRole::SECONDARY_CONTAINER))
-                .text_color(color(ColorRole::ON_SECONDARY_CONTAINER))
-                .child(
-                    gpui_base::h_flex()
-                        .gap(rem(8.))
-                        .pb(rem(12.))
-                        .items_center()
-                        .child(
-                            Icon::new(SharedString::from(
-                                Symbol::named("auto_awesome")
-                                    .expect("a Material Symbol")
-                                    .icon()
-                                    .style(Style::Rounded)
-                                    .asset_path(),
-                            ))
-                            .size(rem(18.))
-                            .color(color(ColorRole::ON_SECONDARY_CONTAINER)),
-                        )
-                        .child(
-                            div()
-                                .text_size(rem(14.))
-                                .font_weight(FontWeight::SEMIBOLD)
-                                .child("Summary"),
-                        ),
-                )
-        })
+    MarkdownExtensions::default().block_surface("summary", |_, _| {
+        gpui_base::v_flex()
+            .w_full()
+            .min_w_0()
+            .px(rem(24.))
+            .py(rem(20.))
+            .rounded(rem(20.))
+            .bg(color(ColorRole::SECONDARY_CONTAINER))
+            .text_color(color(ColorRole::ON_SECONDARY_CONTAINER))
+            .child(
+                gpui_base::h_flex()
+                    .gap(rem(8.))
+                    .pb(rem(12.))
+                    .items_center()
+                    .child(
+                        Icon::new(SharedString::from(
+                            Symbol::named("auto_awesome")
+                                .expect("a Material Symbol")
+                                .icon()
+                                .style(Style::Rounded)
+                                .asset_path(),
+                        ))
+                        .size(rem(18.))
+                        .color(color(ColorRole::ON_SECONDARY_CONTAINER)),
+                    )
+                    .child(
+                        div()
+                            .text_size(rem(14.))
+                            .font_weight(FontWeight::SEMIBOLD)
+                            .child("Summary"),
+                    ),
+            )
+    })
 }
 
 pub struct Page {

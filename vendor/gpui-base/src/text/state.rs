@@ -2534,35 +2534,6 @@ mod tests {
         }
 
         #[gpui::test]
-        fn a_match_paints_in_the_leaves_inside_and_across_a_block_surface(cx: &mut TestAppContext) {
-            let source = "before\n\n<!-- surface:summary -->\n\n# inside one\n\ninside **two**\n\n- three\n\n<!-- /surface -->\n\nafter";
-            let state = state(source, cx);
-            state.update(cx, |state, cx| {
-                state.set_markdown_extensions(
-                    Arc::new(
-                        MarkdownExtensions::default().block_surface("summary", |_, _| gpui::div()),
-                    ),
-                    cx,
-                );
-            });
-            cx.run_until_parked();
-            let (start, end) = state.read_with(cx, |state, _| {
-                let text = state.rendered_text();
-                (
-                    text.as_str().find("fore").unwrap(),
-                    text.as_str().find("aft").unwrap() + 3,
-                )
-            });
-            set(&state, [start..end], cx).unwrap();
-            let key = |needle| TextLeafKey::block(source.find(needle).unwrap());
-            assert_eq!(painted(&state, key("before"), cx), [2..6]);
-            assert_eq!(painted(&state, key("# inside one"), cx), [0..10]);
-            assert_eq!(painted(&state, key("inside **two**"), cx), [0..10]);
-            assert_eq!(painted(&state, key("three"), cx), [0..5]);
-            assert_eq!(painted(&state, key("after"), cx), [0..3]);
-        }
-
-        #[gpui::test]
         fn a_match_across_marks_paints_in_its_paragraph(cx: &mut TestAppContext) {
             let state = state("hello **world**", cx);
             set(&state, [0.."hello world".len()], cx).unwrap();

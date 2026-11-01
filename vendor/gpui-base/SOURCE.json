@@ -6,7 +6,7 @@
     },
     "src/text/block_surface_tests.rs": {
       "reason": "Tests of the block surface patch (block-surface-patch.md); not an upstream file.",
-      "sha256": "fb06cc61ca94486e7673445d3f65657c0f83d5b65fc9825f02307f8a19e5f26b"
+      "sha256": "d561f99df7801112ef3bfb4f5a3233580e71524cb489ec1719f94d2b4ebe271c"
     }
   },
   "development_examples_limit": "Upstream development examples are preserved, including references to sibling story-web font and repository example fixtures. Those external fixtures are not included in this Base-only vendor snapshot; standalone example execution is not asserted.",
@@ -61,7 +61,7 @@
       "upstream_sha256": "71b801a92588d12f7931a5a9e1745fb62f4283ae87d651d4004ae9b41ad72da3"
     },
     "src/text/document.rs": {
-      "local_sha256": "ed260c5664e1a425fdb19fd8279495debd942a534bf3cd783f117030e6baa868",
+      "local_sha256": "e726d8c943e0b7ad1dd637df1e45257a122aa6d437114bfc5c7b252f2dc0e3a6",
       "reason": "BlockNode::Surface and MarkdownExtensions::block_surface: a run of top-level blocks drawn in a consumer's container (block-surface-patch.md).",
       "upstream_sha256": "fbac8a9bfcfbc884eadafa4e1a6c4b897593e0c48917179267d6deed9e1b81fb"
     },
@@ -71,7 +71,7 @@
       "upstream_sha256": "08be31515e0b041fd39e10007c883105015fa498d23e3bb7023b561e84eddf7e"
     },
     "src/text/markdown_ext.rs": {
-      "local_sha256": "c3ea5314646db94c839394c51a1d3b7bfe8daf412b45b575b3aeaa9c028a0a39",
+      "local_sha256": "8e9ec05d81c622b661ef515ba24f79c71bbd0cf7fde30e55543922372ed54dff",
       "reason": "BlockNode::Surface and MarkdownExtensions::block_surface: a run of top-level blocks drawn in a consumer's container (block-surface-patch.md).",
       "upstream_sha256": "44fa63ece976a0474f402a2a65d7d1f382f143c1a482dbb392b8f39f85e397b3"
     },
@@ -81,17 +81,17 @@
       "upstream_sha256": "c88ba532a1d529ad16e89788685c7752cd701771d08699d0395a8ab196ff2be6"
     },
     "src/text/node.rs": {
-      "local_sha256": "44f00d982e28435b97ec6fb64c3505652c4328fdf233138316a3d137695f744c",
+      "local_sha256": "eaaa401795c7762c2da69e6325a99e6eeb2d52ec478e4b95f1ab6e7ebdc15ed0",
       "reason": "BlockNode::Surface and MarkdownExtensions::block_surface: a run of top-level blocks drawn in a consumer's container (block-surface-patch.md).",
       "upstream_sha256": "9c98338199b5269791f0aefcb24038f4f59c681adc1ca5e6a6dcd676057ba219"
     },
     "src/text/range_highlight.rs": {
-      "local_sha256": "1094c6687cd978df0dfbde1c4b2fe836a84cd8eb9b4f9110d9027d953a33305e",
+      "local_sha256": "8cc268301204cd388a797c9662531fcbcf7795de85e3131fd6ea9b603e855161",
       "reason": "BlockNode::Surface and MarkdownExtensions::block_surface: a run of top-level blocks drawn in a consumer's container (block-surface-patch.md).",
       "upstream_sha256": "99ed9b73bcd26b30bda29135c2a2c0a2963aac82eff9ab720eb12563575078c0"
     },
     "src/text/state.rs": {
-      "local_sha256": "053d7a1276608a7efe86134a99f579086eb8d070b2ef0836161ebb65866aa2d2",
+      "local_sha256": "97fc34fc4df41deddb0740904defa2a296bb1df7207029cf5f0b5558b54daf87",
       "reason": "BlockNode::Surface and MarkdownExtensions::block_surface: a run of top-level blocks drawn in a consumer's container (block-surface-patch.md).",
       "upstream_sha256": "b22bf74f36e5fc0adcbb1200b4db64356272965e5fdecfdcd2b62d700de38bec"
     },
