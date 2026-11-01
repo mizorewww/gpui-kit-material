@@ -12,6 +12,7 @@ use std::rc::Rc;
 use super::text::accessible_text;
 
 /// The tone of a [`notice_banner`].
+#[non_exhaustive]
 pub enum NoticeKind {
     Info,
     /// Something needs attention, but nothing has failed.
@@ -296,6 +297,7 @@ pub fn large_badge(id: impl Into<ElementId>, label: impl Into<SharedString>) -> 
 
 /// The three M3 card variants.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum CardVariant {
     /// Surface-container-low with level-1 elevation and no outline.
     Elevated,

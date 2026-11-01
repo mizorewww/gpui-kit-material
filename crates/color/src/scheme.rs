@@ -121,12 +121,19 @@ roles!(
 /// them from one accent, so they would all be one color.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum TintFamily {
+    /// Designed as `#d9692b`, before harmonizing.
     Orange,
+    /// Designed as `#2f6fe0`, before harmonizing.
     Blue,
+    /// Designed as `#1b8ea6`, before harmonizing.
     Teal,
+    /// Designed as `#c79a12`, before harmonizing.
     Amber,
+    /// Designed as `#2f9a52`, before harmonizing.
     Green,
+    /// Designed as `#c7428a`, before harmonizing.
     Pink,
+    /// Designed as `#7a5cc7`, before harmonizing.
     Purple,
 }
 

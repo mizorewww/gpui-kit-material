@@ -82,6 +82,7 @@ impl TextFieldDensity {
 
 /// The two M3 text field styles, and a hero field for a page's one main input.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+#[non_exhaustive]
 pub enum TextFieldVariant {
     #[default]
     Filled,
