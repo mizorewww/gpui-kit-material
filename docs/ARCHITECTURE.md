@@ -84,10 +84,11 @@ Galleries use `gpui_kit::application`, `init` and `open_window`; Kit owns the
 single Root and Component window extensions. Capture settings apply before the
 initial theme projection and Root creation.
 
-`theme::init_component_theme` projects 19 generic Material roles (including the
-caret and text selection colors of Kit's inputs), the body font
-and text scale into Component colors/tokens (and its Base projection) before
-Root's first render. Palette and scale events call
+`theme::init_component_theme` projects 25 generic Material roles (including the
+caret and text selection colors of Kit's inputs, Base's scrollbars, and `TextView`'s
+links and table heads), the body font and text scale into Component colors/tokens
+(and its Base projection) before Root's first render. A scope's projection writes the
+same list. Palette and scale events call
 `theme::advance_component_theme` before drawing; one pending callback continues
 an active animation. **Render never updates Component Theme.** Full M3 roles,
 reference blending, motion, spacing and elevation remain Material-owned; unmanaged

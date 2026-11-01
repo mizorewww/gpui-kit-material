@@ -31,6 +31,8 @@ Distribution is by Git revision for now; see the [quick start](README.md#quick-s
 - **Breaking:** the Gallery and benches moved out of `gpui-kit-material`'s examples:
   `cargo run -p gpui-kit-material-gallery`, and `-p gpui-kit-material-bench --bin engine_bench`.
 - `gpui-kit-material`'s `serde` feature now controls the color crate's, which was always on.
+- `advance_component_theme` also projects Base's scrollbar colors and `TextView`'s
+  link and table-head colors, so they follow the palette instead of Kit's default theme.
 - Kit is pinned by revision (`bb85882`) instead of `branch = "main"`, so a consumer
   without this workspace's lockfile gets Component at the same revision as Base.
 - `Entity::update_for_render` is dev-only, behind `frame-observation`; a consumer's
