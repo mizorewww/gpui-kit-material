@@ -52,7 +52,7 @@ feedback = []
 selection = []
 # TextField, SearchField, SearchView.
 inputs = []
-# MaterialMenu, and ExposedDropdown when `inputs` is on too.
+# MaterialMenu, MenuPopup, MaterialContextMenu, and ExposedDropdown when `inputs` is on too.
 menus = []
 # DatePicker, TimePicker.
 pickers = ["buttons", "dep:chrono", "inputs"]

@@ -204,7 +204,10 @@ pub use loading_indicator::{
 #[cfg(all(feature = "menus", feature = "inputs"))]
 pub use menu::ExposedDropdown;
 #[cfg(feature = "menus")]
-pub use menu::{MaterialMenu, MaterialMenuItem, MenuDensity, MenuGroup, MenuPopup, MenuStyle};
+pub use menu::{
+    MaterialContextMenu, MaterialMenu, MaterialMenuItem, MenuDensity, MenuGroup, MenuPopup,
+    MenuStyle,
+};
 #[cfg(feature = "navigation")]
 pub use navigation::{
     MEDIUM_WIDTH, NavBadge, NavIcon, NavItem, NavItemLayout, NavigationBar, NavigationItem,
