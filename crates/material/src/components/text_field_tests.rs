@@ -399,3 +399,164 @@ fn shapes_keep_the_standard_corners_unless_asked() {
     );
     assert_eq!(TextFieldShape::Rounded.radius(), 12.);
 }
+
+/// A hero field, configured by the test, on the theme it paints with.
+struct HeroHarness {
+    input: Entity<InputState>,
+    area: Entity<TextareaState>,
+    multi: bool,
+    required: bool,
+    placeholder: Option<&'static str>,
+}
+
+impl Render for HeroHarness {
+    fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        window.set_rem_size(px(14.));
+        let field = if self.multi {
+            TextField::multi_line("hero", &self.area)
+        } else {
+            TextField::new("hero", &self.input)
+        };
+        div().p(px(20.)).child(
+            div().debug_selector(|| "field".into()).w(px(300.)).child(
+                field
+                    .variant(TextFieldVariant::Hero)
+                    .label("Video link")
+                    .required(self.required)
+                    .when_some(self.placeholder, |field, placeholder| {
+                        field.placeholder(placeholder)
+                    }),
+            ),
+        )
+    }
+}
+
+fn hero_harness(
+    cx: &mut TestAppContext,
+    reduced: bool,
+    configure: impl FnOnce(&mut HeroHarness),
+) -> (Entity<HeroHarness>, &mut VisualTestContext) {
+    cx.update(|cx| {
+        gpui_kit::init(cx);
+        cx.set_reduce_motion(reduced);
+    });
+    cx.add_window_view(|window, cx| {
+        let mut harness = HeroHarness {
+            input: cx.new(|cx| InputState::new(window, cx)),
+            area: cx.new(|cx| TextareaState::new(window, cx)),
+            multi: false,
+            required: false,
+            placeholder: None,
+        };
+        configure(&mut harness);
+        harness
+    })
+}
+
+#[gpui::test]
+fn a_multi_line_hero_field_keeps_its_text_off_the_ring(cx: &mut TestAppContext) {
+    let (_, cx) = hero_harness(cx, true, |hero| hero.multi = true);
+    draw(cx);
+    let field = cx.debug_bounds("field").unwrap();
+    let input = cx.debug_bounds("text-field-input").unwrap();
+    assert_eq!(
+        input.top() - field.top(),
+        px((HERO_FIELD_HEIGHT - 24.) / 2.),
+        "centered on the first line, as a single-line hero field's text is"
+    );
+}
+
+#[gpui::test]
+fn a_required_hero_field_shows_its_mark(cx: &mut TestAppContext) {
+    let (view, cx) = hero_harness(cx, true, |hero| hero.required = true);
+    draw(cx);
+    assert!(
+        cx.debug_bounds("text-field-placeholder").is_some(),
+        "a hero field draws no label, so the mark needs the placeholder's place"
+    );
+    view.update(cx, |hero, cx| {
+        hero.required = false;
+        cx.notify();
+    });
+    draw(cx);
+    assert!(
+        cx.debug_bounds("text-field-placeholder").is_none(),
+        "with nothing to show, none is drawn"
+    );
+}
+
+/// The hero field's ring, in the frame last painted.
+fn hero_ring_painted(cx: &mut VisualTestContext) -> Hsla {
+    cx.update(|window, _| {
+        let width = HERO_RING * window.scale_factor();
+        window
+            .painted_quads()
+            .into_iter()
+            .find(|quad| quad.border_widths.top.0 == width)
+            .expect("the ring paints as the container's border")
+            .border_color
+    })
+}
+
+#[gpui::test]
+fn a_hero_fields_ring_fades_in_as_it_takes_focus(cx: &mut TestAppContext) {
+    let (_, cx) = hero_harness(cx, false, |_| {});
+    draw(cx);
+    let rest = hero_ring_painted(cx);
+    let field = cx.debug_bounds("field").unwrap();
+    cx.simulate_click(field.center(), Modifiers::default());
+    draw(cx);
+    cx.executor()
+        .advance_clock(std::time::Duration::from_millis(30));
+    draw(cx);
+    let during = hero_ring_painted(cx);
+    let primary = Hsla::from(color(ColorRole::PRIMARY));
+    assert_ne!(during, rest, "under way");
+    assert_ne!(during, primary, "not yet there");
+    cx.executor()
+        .advance_clock(std::time::Duration::from_millis(600));
+    draw(cx);
+    assert_eq!(hero_ring_painted(cx), primary);
+}
+
+#[test]
+fn a_hovered_hero_field_paints_the_on_surface_state_layer() {
+    let hovered = FieldState {
+        hovered: true,
+        ..FieldState::default()
+    };
+    let paint = field_paint(TextFieldVariant::Hero, hovered);
+    assert_eq!(
+        paint.state_layer,
+        alpha(color(ColorRole::ON_SURFACE), state::HOVER)
+    );
+    let rest = field_paint(TextFieldVariant::Hero, FieldState::default());
+    assert_eq!(rest.state_layer.a, 0.);
+}
+
+#[gpui::test]
+fn a_hero_field_hovers_under_the_pointer(cx: &mut TestAppContext) {
+    let (_, cx) = hero_harness(cx, true, |_| {});
+    draw(cx);
+    let layer = cx
+        .debug_bounds("text-field-hero-layer")
+        .expect("the hover layer fills the pill");
+    assert_eq!(
+        layer.size.height,
+        cx.debug_bounds("field").unwrap().size.height - px(2. * HERO_RING),
+        "inside the ring"
+    );
+    let hover = Background::from(alpha(color(ColorRole::ON_SURFACE), state::HOVER));
+    let painted = |cx: &mut VisualTestContext| {
+        cx.update(|window, _| {
+            window
+                .painted_quads()
+                .iter()
+                .any(|quad| quad.background == hover)
+        })
+    };
+    assert!(!painted(cx), "not until the pointer is over it");
+    cx.simulate_mouse_move(layer.center(), None, Modifiers::default());
+    draw(cx);
+    assert!(painted(cx));
+}

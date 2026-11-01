@@ -882,6 +882,8 @@ pub struct DatePicker {
 
 /// Widths of the presentations, in dp.
 pub const DATE_PICKER_WIDTH: f32 = 360.;
+/// Between the header's supporting text and its headline: the kit's `Label and Date`.
+pub(crate) const HEADER_GAP: f32 = 36.;
 pub const DATE_INPUT_PICKER_WIDTH: f32 = 328.;
 const GRID_PADDING: f32 = 12.;
 const SLIDE_DISTANCE: f32 = DAY_CELL * 7.;
@@ -1246,7 +1248,9 @@ impl PickerCx {
                     .min_w_0()
                     .flex()
                     .flex_col()
-                    .gap(rem(36.))
+                    // The kit's `Label and Date` frame (Modal date picker): 36dp, and the kit
+                    // comes first (PRODUCTION.md).
+                    .gap(rem(HEADER_GAP))
                     .child(label_text(
                         "title",
                         l.title.clone(),
@@ -1615,7 +1619,7 @@ impl PickerCx {
             .h(rem(128.))
             .flex()
             .flex_col()
-            .gap(rem(36.))
+            .gap(rem(HEADER_GAP))
             .pt(rem(16.))
             .pr(rem(12.))
             .pb(rem(8.))

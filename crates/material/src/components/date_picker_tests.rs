@@ -555,3 +555,10 @@ fn the_selection_row_is_padded_as_the_kit_has_it() {
     assert_eq!(selection_row_padding(DatePickerView::Year), (48., 48.));
     assert_eq!(selection_row_padding(DatePickerView::Month), (48., 54.));
 }
+
+#[test]
+fn the_header_keeps_the_kits_gap() {
+    // The kit's Modal date picker has 36dp in `Label and Date`, not the 32dp a review asked about.
+    // The kit comes first (docs/PRODUCTION.md); this holds the choice until it changes.
+    assert_eq!(HEADER_GAP, 36.);
+}

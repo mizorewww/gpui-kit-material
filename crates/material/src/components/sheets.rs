@@ -26,7 +26,7 @@
 //! accessibility nodes off screen.
 use super::dialog::{
     OverlayFrame, container_state, header_icon_button, modal_focus, overlay_area, overlay_frame,
-    place_host, scrim, with_container_probe,
+    place_host, scrim, sized_header_icon_button, with_container_probe,
 };
 use crate::{
     color::ColorRole,
@@ -244,8 +244,11 @@ impl MaterialSideSheet {
                 .pb(rem(16.))
                 .pl(rem(if back.is_some() { 4. } else { 24. }))
                 .when_some(back, |header, (label, on_back)| {
-                    header.child(header_icon_button(
+                    // The kit's back affordance is its narrow standard icon button: a 32x40
+                    // state layer in the 48dp target (Sheets, `Back affordance`).
+                    header.child(sized_header_icon_button(
                         "sheet-back",
+                        32.,
                         arrow_back(),
                         label,
                         move |_, window, cx| on_back(window, cx),
@@ -1234,6 +1237,45 @@ mod tests {
             window.draw(cx).clear(cx);
         });
         cx.run_until_parked();
+    }
+
+    #[gpui::test]
+    fn the_back_affordance_is_the_kits_narrow_icon_button(cx: &mut TestAppContext) {
+        struct Back;
+        impl Render for Back {
+            fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+                window.set_rem_size(px(crate::tokens::typography::BASE_PX));
+                div().size(px(600.)).child(
+                    MaterialSideSheet::new("side")
+                        .open(true)
+                        .headline("Details")
+                        .back("Back", |_, _| {}),
+                )
+            }
+        }
+        cx.update(|cx| {
+            gpui_base::init(cx);
+            cx.set_reduce_motion(true);
+        });
+        let (_, cx) = cx.add_window_view(|_, _| Back);
+        draw(cx);
+        let target = cx.debug_bounds("sheet-back").expect("the back button");
+        assert_eq!(target.size, gpui::size(px(48.), px(48.)));
+        cx.simulate_mouse_move(target.center(), None, gpui::Modifiers::default());
+        draw(cx);
+        let ink = color(ColorRole::ON_SURFACE_VARIANT);
+        let hover =
+            gpui::Background::from(crate::tokens::state::hovered(Rgba { a: 0., ..ink }, ink));
+        cx.update(|window, _| {
+            let layer = window
+                .painted_quads()
+                .into_iter()
+                .find(|quad| quad.background == hover)
+                .expect("the state layer under the pointer");
+            let scale = window.scale_factor();
+            assert_eq!(layer.bounds.size.width.0, 32. * scale);
+            assert_eq!(layer.bounds.size.height.0, 40. * scale);
+        });
     }
 
     struct SheetHarness(bool);

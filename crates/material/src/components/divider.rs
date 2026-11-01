@@ -1,5 +1,9 @@
 //! Noninteractive separators from the pinned md3.io divider factory.
-use crate::{color::ColorRole, theme::color};
+use crate::{
+    color::ColorRole,
+    theme::color,
+    tokens::typography::{TypeRole, rem},
+};
 use gpui::{prelude::*, *};
 use gpui_base::StyledExt;
 
@@ -33,6 +37,11 @@ pub enum DividerContext {
 
 /// A separator without focus, activation, or intrinsic animation.
 ///
+/// The side margin and the gap above the text of a divider with a subhead (the kit's
+/// `Horizontal/Divider with subhead`).
+const SUBHEAD_MARGIN: f32 = 16.;
+const SUBHEAD_GAP: f32 = 4.;
+
 /// Insets use logical start/end. Inset variants leave their main size automatic:
 /// a vertical divider needs a stretching row or an explicit height from its
 /// caller. Insets are retained when switching back from `FullWidth`.
@@ -51,6 +60,7 @@ pub struct MaterialDivider {
     inset_start: Option<Length>,
     inset_end: Option<Length>,
     color_role: ColorRole,
+    subhead: Option<SharedString>,
     style: StyleRefinement,
 }
 impl MaterialDivider {
@@ -65,6 +75,7 @@ impl MaterialDivider {
             inset_start: None,
             inset_end: None,
             color_role: ColorRole::OUTLINE_VARIANT,
+            subhead: None,
             style: StyleRefinement::default(),
         }
     }
@@ -100,6 +111,13 @@ impl MaterialDivider {
     }
     pub fn inset_end(mut self, inset: impl Into<Length>) -> Self {
         self.inset_end = Some(inset.into());
+        self
+    }
+    /// The kit's `Divider with subhead`: a horizontal line 16dp in from each side, and under
+    /// it this title-small text, which heads what follows. The line's own variant and insets
+    /// give way to that margin, and a vertical divider has none.
+    pub fn subhead(mut self, subhead: impl Into<SharedString>) -> Self {
+        self.subhead = Some(subhead.into());
         self
     }
     pub fn color_role(mut self, role: ColorRole) -> Self {
@@ -168,7 +186,36 @@ impl RenderOnce for MaterialDivider {
         if crate::scope::is_rtl(window) {
             self.direction = DividerDirection::Ltr;
         }
-        self.into_line()
+        let subhead = self
+            .subhead
+            .take()
+            .filter(|_| self.orientation == DividerOrientation::Horizontal);
+        let Some(subhead) = subhead else {
+            return self.into_line().into_any_element();
+        };
+        self.variant = DividerVariant::FullWidth;
+        self.inset_start = None;
+        self.inset_end = None;
+        let scale = TypeRole::TitleSmall.scale();
+        let text_id = ElementId::NamedChild(std::sync::Arc::new(self.id.clone()), "subhead".into());
+        div()
+            .debug_selector(|| "divider-with-subhead".into())
+            .flex()
+            .flex_col()
+            .w_full()
+            .px(rem(SUBHEAD_MARGIN))
+            .gap(rem(SUBHEAD_GAP))
+            .child(self.into_line())
+            .child(
+                super::text::accessible_text(text_id, subhead)
+                    .font_family(scale.font_family)
+                    .text_size(scale.font_size)
+                    .line_height(scale.line_height)
+                    .font_weight(FontWeight(scale.font_weight as f32))
+                    .letter_spacing(scale.letter_spacing)
+                    .text_color(color(ColorRole::ON_SURFACE_VARIANT)),
+            )
+            .into_any_element()
     }
 }
 

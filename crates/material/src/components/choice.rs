@@ -347,6 +347,7 @@ mod choice_tile {
 /// families stay apart in every palette, reference theme and seed scheme, while the
 /// exact colors follow that scheme's primary, surface and text.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Tint {
     Orange,
     Blue,

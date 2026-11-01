@@ -36,6 +36,7 @@ pub mod side_sheet;
 pub mod slider;
 pub mod snackbar;
 pub mod split_button;
+pub mod stepper;
 pub mod switch;
 pub mod tabs;
 pub mod text_field;

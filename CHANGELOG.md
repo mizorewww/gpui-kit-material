@@ -33,8 +33,16 @@ Distribution is by Git revision for now; see the [quick start](README.md#quick-s
 - `SearchFieldStyle`, `CardVariant::Surface` and `MaterialDialog::container`: a search bar,
   card and dialog that sit on the surface, for a page whose ground is a step below it.
 - `ListItem::switch_icons`: the handle icons of a list item's switch.
-- `Stepper`: numbered steps joined by hairlines, for a flow a person walks through once.
-- `status_chip_outlined`: one of several facts in a row, filled only where it needs attention.
+- `Stepper`: numbered steps joined by hairlines, for a flow a person walks through once. It
+  is a list to assistive technology, with `state_labels` for what each step's state is called.
+- `status_fact_chip`: one of several facts in a row, with an id and accessible name. Facts
+  that need attention and work under way are filled. `status_chip_outlined`, its earlier
+  name without them, stays as a deprecated alias.
+- `Tint::Danger`, so `Tint::ALL` has eight entries. Code sizing an array by it needs the new length.
+- `PullToRefresh::nested_scroll`: a scroller inside the refreshing area takes the wheel first.
+- `ListItem::expressive`: the kit's expressive row, tighter, whose corners round from 4dp to
+  16dp when it is selected, pressed or focused.
+- `MaterialDivider::subhead`: the kit's divider with subhead.
 
 ### Changed
 
@@ -58,6 +66,16 @@ Distribution is by Git revision for now; see the [quick start](README.md#quick-s
   16 ms first-frame limits are gone, and the first frame and Material list are judged
   against Kit.
 
+- **Breaking:** `TextField::hero` takes the label, which is the field's only accessible name.
+- **Breaking:** the enums that gained a variant here (`Tint`, `NoticeKind`, `TextFieldVariant`,
+  `CardVariant`) are now `#[non_exhaustive]`: a `match` on one outside this crate needs a `_`
+  arm, and adding to them later is no longer breaking. Before this, the added variants
+  themselves broke any exhaustive match.
+- A tile's label has the list headline's weight.
+- A `TextField::hero` that is `required` shows its mark on the placeholder, or on the label
+  in its place, and an `ExposedDropdown` in the hero variant shows its label as a placeholder.
+- `IconButton::tone` sets a standard button's icon color at rest, where it did nothing.
+
 - Breaking: `ChipSetItem::new` takes a key first. It stays with the chip as the set is
   reordered, and the chip's focus is kept under it.
 - Breaking: `TimePickerLabels` has a required `separator` field, for what stands between
@@ -66,6 +84,20 @@ Distribution is by Git revision for now; see the [quick start](README.md#quick-s
   long URL no longer wraps before `?`; it still wraps at `/` and `&`.
 
 ### Fixed
+
+- A sub-menu fits the room past its owner item, so a tall one no longer leaves the window.
+- The first arrow key in a menu moves from its selected item, not from the top or the end.
+- A keyboard-focused menu item paints the focus layer as well as the ring.
+- An accent, filled toggle shows whether it is selected, on `MaterialButton`, `IconButton`
+  and `ConnectedButtonGroup`.
+- A `Stepper`'s labels wrap at narrow widths instead of overlapping.
+- A multi-line hero field keeps its text off the ring; its ring fades as focus changes, and
+  it has a hover layer.
+- `MaterialDialog::container` applies to a full-screen dialog.
+- A side sheet's back button is the kit's narrow icon button, and an `Avatar`'s placeholder
+  glyph has the kit's ink height.
+- Engine: a view drawn around a nested view that writes as it paints no longer grows with
+  every frame.
 
 - A menu item's label or supporting text too long for the menu ends in an ellipsis
   instead of stopping mid-letter.

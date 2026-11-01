@@ -351,6 +351,21 @@ fn toned_color_targets(variant: ButtonVariant, tone: ButtonTone) -> (CssColor, C
     }
 }
 
+/// An unselected toggle's enabled colors in `tone`. Accent is the filled button's own look,
+/// which for a toggle is its selected state, so an unselected one keeps the toggle's colors
+/// rather than read as selected.
+fn toned_toggle_targets(
+    variant: ButtonVariant,
+    tone: ButtonTone,
+) -> (CssColor, CssColor, CssColor) {
+    match (tone, variant) {
+        (ButtonTone::Accent, ButtonVariant::Filled) => {
+            toggle_color_targets(variant, false, true, false)
+        }
+        _ => toned_color_targets(variant, tone),
+    }
+}
+
 fn resting_radius(size: ButtonSize, shape: ButtonShape, selected: bool) -> f32 {
     let g = size.geometry();
     if (shape == ButtonShape::Round) != selected {
@@ -405,7 +420,7 @@ pub(crate) fn toggle_colors(variant: ButtonVariant, selected: bool) -> (Rgba, Rg
 
 /// The tonal content and container colors of an unselected toned group option.
 pub(crate) fn toned_colors(variant: ButtonVariant, tone: ButtonTone) -> (Rgba, Rgba) {
-    let (bg, fg, _) = toned_color_targets(variant, tone);
+    let (bg, fg, _) = toned_toggle_targets(variant, tone);
     (bg.resolve(), fg.resolve())
 }
 
@@ -679,7 +694,11 @@ impl MaterialButton {
                 && !self.disabled
                 && !(self.base.toggle && self.base.selected) =>
             {
-                toned_color_targets(self.variant, self.tone)
+                if self.base.toggle {
+                    toned_toggle_targets(self.variant, self.tone)
+                } else {
+                    toned_color_targets(self.variant, self.tone)
+                }
             }
             None => toggle_color_targets(
                 self.variant,

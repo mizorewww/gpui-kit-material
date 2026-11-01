@@ -54,26 +54,10 @@ impl GalleryPage for Page {
                             )
                             .into_any_element()
                     })
-                    // The kit's divider with subhead: a middle-inset divider
-                    // over a title-small subheader, 4dp apart.
                     .chain([div()
                         .w(rem(320.))
-                        .flex()
-                        .flex_col()
-                        .gap(rem(4.))
                         .bg(color(ColorRole::SURFACE_CONTAINER_HIGH))
-                        .child(
-                            MaterialDivider::new("subhead-divider")
-                                .variant(DividerVariant::MiddleInset),
-                        )
-                        .child(
-                            spec::type_role(
-                                accessible_text("subheader", "Subheader"),
-                                TypeRole::TitleSmall,
-                            )
-                            .px(rem(16.))
-                            .text_color(color(ColorRole::ON_SURFACE_VARIANT)),
-                        )
+                        .child(MaterialDivider::new("subhead-divider").subhead("Subheader"))
                         .into_any_element()]),
                 )
                 .into_any_element(),
