@@ -149,7 +149,8 @@ pub struct MaterialDialog {
     dismiss_on_scrim: bool,
     dismiss_on_escape: bool,
     on_dismiss: Option<Dismiss>,
-    container: ColorRole,
+    /// Set by the caller; each form has its own default.
+    container: Option<ColorRole>,
 }
 
 /// The full-screen dialog's header: its close button's accessible name and
@@ -183,7 +184,7 @@ impl MaterialDialog {
             dismiss_on_scrim: true,
             dismiss_on_escape: true,
             on_dismiss: None,
-            container: ColorRole::SURFACE_CONTAINER_HIGH,
+            container: None,
         }
     }
     /// The hero icon above the headline; the headline then centers.
@@ -231,10 +232,10 @@ impl MaterialDialog {
         self.dividers = dividers;
         self
     }
-    /// Paint the dialog in `role` instead of M3's surface-container-high, for an app whose
-    /// surfaces are one layer above its ground.
+    /// Paint the dialog in `role` instead of M3's surface-container-high (surface when it is
+    /// full-screen), for an app whose surfaces are one layer above its ground.
     pub fn container(mut self, role: ColorRole) -> Self {
-        self.container = role;
+        self.container = Some(role);
         self
     }
     /// The basic dialog's width in dp, clamped to M3's 280–560dp.
@@ -453,6 +454,18 @@ pub(crate) fn header_icon_button(
     label: SharedString,
     on_click: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
 ) -> impl IntoElement {
+    sized_header_icon_button(id, 40., icon, label, on_click)
+}
+
+/// [`header_icon_button`] whose state layer is `width` dp wide and 40dp tall, in its 48dp
+/// target.
+pub(crate) fn sized_header_icon_button(
+    id: impl Into<ElementId>,
+    width: f32,
+    icon: Icon,
+    label: SharedString,
+    on_click: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
+) -> impl IntoElement {
     let ink = color(ColorRole::ON_SURFACE_VARIANT);
     let clear = Rgba { a: 0., ..ink };
     let id = id.into();
@@ -472,7 +485,8 @@ pub(crate) fn header_icon_button(
                 ElementId::NamedChild(std::sync::Arc::new(id.clone()), "ripple".into()),
                 gpui_base::Button::new(id)
                     .accessibility_label(label)
-                    .size(rem(40.))
+                    .w(rem(width))
+                    .h(rem(40.))
                     .rounded_full()
                     .flex()
                     .items_center()
@@ -684,7 +698,9 @@ impl MaterialDialog {
             .w(rem(width))
             .overflow_hidden()
             .rounded(DIALOG_RADIUS)
-            .bg(color(self.container))
+            .bg(color(
+                self.container.unwrap_or(ColorRole::SURFACE_CONTAINER_HIGH),
+            ))
             .shadow(elevation::level3())
             .child(text);
         match middle {
@@ -736,7 +752,7 @@ impl MaterialDialog {
             .flex()
             .flex_col()
             .size_full()
-            .bg(color(ColorRole::SURFACE))
+            .bg(color(self.container.unwrap_or(ColorRole::SURFACE)))
             .child(
                 div()
                     .flex()
@@ -1166,6 +1182,80 @@ mod tests {
                     ),
             )
         }
+    }
+
+    struct FullScreenDialog {
+        container: Option<ColorRole>,
+    }
+
+    impl Render for FullScreenDialog {
+        fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+            div().size(px(400.)).child(
+                MaterialDialog::new("full")
+                    .headline("Title")
+                    .size(DialogSize::FullScreen)
+                    .when_some(self.container, |dialog, role| dialog.container(role)),
+            )
+        }
+    }
+
+    fn paints_background(cx: &mut VisualTestContext, role: ColorRole) -> bool {
+        let background = gpui::Background::from(color(role));
+        cx.update(|window, _| {
+            window
+                .painted_quads()
+                .iter()
+                .any(|quad| quad.background == background)
+        })
+    }
+
+    #[gpui::test]
+    fn a_basic_dialog_paints_the_container_it_is_given(cx: &mut TestAppContext) {
+        struct Basic(Option<ColorRole>);
+        impl Render for Basic {
+            fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+                div().size(px(600.)).child(
+                    MaterialDialog::new("basic")
+                        .headline("Title")
+                        .when_some(self.0, |dialog, role| dialog.container(role)),
+                )
+            }
+        }
+        cx.update(|cx| {
+            gpui_base::init(cx);
+            cx.set_reduce_motion(true);
+        });
+        let (view, cx) = cx.add_window_view(|_, _| Basic(None));
+        draw(cx);
+        assert!(
+            paints_background(cx, ColorRole::SURFACE_CONTAINER_HIGH),
+            "M3's by default"
+        );
+        view.update(cx, |view, cx| {
+            view.0 = Some(ColorRole::SURFACE_CONTAINER_LOW);
+            cx.notify();
+        });
+        draw(cx);
+        assert!(paints_background(cx, ColorRole::SURFACE_CONTAINER_LOW));
+        assert!(!paints_background(cx, ColorRole::SURFACE_CONTAINER_HIGH));
+    }
+
+    #[gpui::test]
+    fn a_full_screen_dialog_paints_the_container_it_is_given(cx: &mut TestAppContext) {
+        cx.update(|cx| {
+            gpui_base::init(cx);
+            cx.set_reduce_motion(true);
+        });
+        let (view, cx) = cx.add_window_view(|_, _| FullScreenDialog { container: None });
+        draw(cx);
+        assert!(paints_background(cx, ColorRole::SURFACE), "M3's by default");
+        view.update(cx, |view, cx| {
+            view.container = Some(ColorRole::SURFACE_CONTAINER_LOW);
+            cx.notify();
+        });
+        draw(cx);
+        assert!(paints_background(cx, ColorRole::SURFACE_CONTAINER_LOW));
+        assert!(!paints_background(cx, ColorRole::SURFACE));
     }
 
     #[gpui::test]

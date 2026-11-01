@@ -114,7 +114,9 @@ impl IconButton {
             style: StyleRefinement::default(),
         }
     }
-    /// Which roles a filled, tonal or outlined container and its icon paint with.
+    /// Which roles the button paints with: a filled, tonal or outlined container and its
+    /// icon, or a standard button's icon alone. Selected and disabled standard buttons keep
+    /// their colors, which say that state.
     pub fn tone(mut self, tone: ButtonTone) -> Self {
         self.tone = tone;
         self
@@ -199,7 +201,10 @@ impl IconButton {
             .toggle(self.toggle)
             .selected(self.selected)
             .disabled(self.disabled);
-        if self.variant == IconButtonVariant::Standard {
+        // Its own palette, but for the icon's ink at rest, which `tone` sets.
+        if self.variant == IconButtonVariant::Standard
+            && (self.tone == ButtonTone::Standard || selected || self.disabled)
+        {
             button = button.palette(STANDARD);
         }
         if let Some(preview) = self.preview {

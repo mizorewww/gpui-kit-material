@@ -481,8 +481,9 @@ mod tests {
         harness.set("submenu", Value::Bool(true));
         harness.click("menu-trigger");
         harness.advance(1000);
-        // Italic toggles on and the menu stays open (Close on selection off).
-        harness.keys("down down enter");
+        // The keyboard starts from Bold, which is selected: Italic toggles on and the menu
+        // stays open (Close on selection off).
+        harness.keys("down enter");
         assert_eq!(drawn().2, 0b011);
         assert!(drawn().0);
         // Past Underline and Align left, Align center selects the second

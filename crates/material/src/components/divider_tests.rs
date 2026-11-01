@@ -215,3 +215,37 @@ fn separator_node_exposes_orientation_without_activation_actions() {
         assert_eq!(node.label(), None);
     }
 }
+
+struct WithSubhead;
+
+impl Render for WithSubhead {
+    fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        window.set_rem_size(px(crate::tokens::typography::BASE_PX));
+        div()
+            .w(px(320.))
+            .child(MaterialDivider::new("divider").subhead("Subheader"))
+    }
+}
+
+/// The kit's `Horizontal/Divider with subhead`: 320x25, 16dp side padding, a 288dp line, 4dp gap.
+#[gpui::test]
+fn a_divider_with_subhead_follows_the_kit(cx: &mut TestAppContext) {
+    let (_, cx) = cx.add_window_view(|_, _| WithSubhead);
+    cx.update(|window, cx| {
+        window.refresh();
+        window.draw(cx).clear(cx);
+    });
+    let frame = cx.debug_bounds("divider-with-subhead").unwrap();
+    assert_eq!(frame.size.width, px(320.));
+    assert_eq!(frame.size.height, px(25.));
+    cx.update(|window, _| {
+        let scale = window.scale_factor();
+        let line = window
+            .painted_quads()
+            .into_iter()
+            .find(|quad| quad.bounds.size.height.0 == scale)
+            .expect("the 1dp line");
+        assert_eq!(line.bounds.origin.x.0, 16. * scale);
+        assert_eq!(line.bounds.size.width.0, 288. * scale);
+    });
+}

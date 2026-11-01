@@ -776,7 +776,12 @@ impl RenderOnce for MaterialMenu {
             let scrolling = scrolling.clone();
             let scroll = scroll.clone();
             move |direction: Direction, window: &mut Window, cx: &mut App| {
-                let current = handles.iter().position(|h| h.is_focused(window));
+                // Until an item has focus, the keyboard starts where the menu shows it is: a
+                // dropdown opens centered on its selected option.
+                let current = handles
+                    .iter()
+                    .position(|h| h.is_focused(window))
+                    .or(selected);
                 if let Some(ix) = target(&skip, current, direction) {
                     handles[ix].focus(window, cx);
                     if let Some((viewport, rows)) = &scrolling {
@@ -808,6 +813,10 @@ impl RenderOnce for MaterialMenu {
         for (group_ix, group) in self.groups.into_iter().enumerate() {
             let mut items = Vec::with_capacity(group.items.len());
             for item in group.items {
+                let focus = handles.get(index).map(|handle| {
+                    let keyboard = window.last_input_was_keyboard() && handle.is_focused(window);
+                    (handle.clone(), keyboard)
+                });
                 items.push(render_item(
                     // Scoped by the menu container's own id below, so a
                     // static name is unique without formatting per frame.
@@ -815,7 +824,7 @@ impl RenderOnce for MaterialMenu {
                     item,
                     style,
                     density,
-                    handles.get(index).cloned(),
+                    focus,
                     on_activate.clone(),
                     window.rem_size(),
                 ));
@@ -988,7 +997,8 @@ fn render_item(
     item: MaterialMenuItem,
     style: MenuStyle,
     density: MenuDensity,
-    focus: Option<FocusHandle>,
+    // And whether it has focus by keyboard.
+    focus: Option<(FocusHandle, bool)>,
     on_activate: Option<Notify>,
     rem_size: Pixels,
 ) -> AnyElement {
@@ -1093,8 +1103,11 @@ fn render_item(
             // The kit paints the focus layer as well as the ring.
             button = button.map(|b| b.bg(state::layer(under, layer, state::FOCUS)));
         }
-    } else if let Some(focus) = focus {
+    } else if let Some((focus, keyboard)) = focus {
         button = button.track_focus(&focus);
+        if keyboard {
+            button = button.map(|b| b.bg(state::layer(under, layer, state::FOCUS)));
+        }
     }
     if let Some(handler) = item
         .on_click
@@ -1353,7 +1366,6 @@ impl RenderOnce for MenuPopup {
         // would still lose its end there, so it scrolls instead.
         let room = window_room(window);
         self.menu = self.menu.fit(room);
-        self.submenu = self.submenu.map(|(index, menu)| (index, menu.fit(room)));
         let (reveal, fade) = open_motion(&self.id, self.open, window, cx);
         let visible = popup_visible(self.open, reveal, fade);
         // A menu on its way out shows its items, and activates none of them.
@@ -1429,14 +1441,28 @@ impl RenderOnce for MenuPopup {
         let submenu_bottom = submenu_index
             .and_then(|index| self.menu.item_bottom(index))
             .map(|bottom| bottom - scrolled_by);
-        // The reserved cascade column's height below the trigger.
-        let cascade_height = self.submenu.as_ref().map_or(0., |(_, submenu)| {
-            let first_row = if submenu.style.expressive() {
+        // A sub-menu's column starts from its owner, so it has what is left of the room past
+        // that: told the whole room, the column outgrows the window and Base's clamp, which
+        // can only pin an oversized box, leaves its end outside.
+        let column_inset = |style: MenuStyle| {
+            let first_row = if style.expressive() {
                 EXPRESSIVE_INSET_Y
             } else {
                 BASELINE_PADDING
             };
-            (submenu_top.unwrap_or(0.) - first_row).max(0.) + submenu.visible_height()
+            if upward {
+                (height - submenu_bottom.unwrap_or(height) - first_row).max(0.)
+            } else {
+                (submenu_top.unwrap_or(0.) - first_row).max(0.)
+            }
+        };
+        self.submenu = self.submenu.map(|(index, menu)| {
+            let room = (room - column_inset(menu.style)).max(0.);
+            (index, menu.fit(room))
+        });
+        // The reserved cascade column's height below the trigger.
+        let cascade_height = self.submenu.as_ref().map_or(0., |(_, submenu)| {
+            column_inset(submenu.style) + submenu.visible_height()
         });
         // Closing the sub-menu by keyboard returns focus to its owner item.
         let restore = window
@@ -1522,11 +1548,7 @@ impl RenderOnce for MenuPopup {
                         }
                     }
                 });
-            let first_row = if sub_style.expressive() {
-                EXPRESSIVE_INSET_Y
-            } else {
-                BASELINE_PADDING
-            };
+            let inset = column_inset(sub_style);
             let visible = popup_visible(open, sub_reveal, sub_fade);
             // The column is reserved while closed, so opening the sub-menu
             // never moves the menu Kit anchored. Below the trigger the
@@ -1535,11 +1557,9 @@ impl RenderOnce for MenuPopup {
             // owner's bottom and it extends up, within the popup's box.
             let column = div().flex_shrink_0().flex().flex_col();
             let column = if upward {
-                let under = (height - submenu_bottom.unwrap_or(height) - first_row).max(0.);
-                column.h(rem(sub_height + under)).pb(rem(under))
+                column.h(rem(sub_height + inset)).pb(rem(inset))
             } else {
-                let top = (submenu_top.unwrap_or(0.) - first_row).max(0.);
-                column.h(rem(top + sub_height)).pt(rem(top))
+                column.h(rem(inset + sub_height)).pt(rem(inset))
             };
             column.when(!visible, |cascade| cascade.invisible()).child(
                 reveal_surface(
@@ -1659,13 +1679,18 @@ impl RenderOnce for MenuPopup {
 /// right press, as it does for Kit's `context_menu`. Give the same commands a
 /// way in from the keyboard, usually a [`MenuPopup`] behind a "more" button.
 ///
-/// ```ignore
-/// div()
+/// ```
+/// use gpui_kit::{div, prelude::*};
+/// use gpui_kit_material::prelude::*;
+///
+/// # let row_content = div();
+/// let row = div()
 ///     .relative()
 ///     .child(MaterialContextMenu::new("row-menu", |_, _| {
 ///         MaterialMenu::new("row-menu-items").item(MaterialMenuItem::new("Rename"))
 ///     }))
-///     .child(row_content)
+///     .child(row_content);
+/// # let _ = row;
 /// ```
 #[derive(gpui::IntoElement)]
 pub struct MaterialContextMenu {
@@ -1957,6 +1982,10 @@ impl RenderOnce for ExposedDropdown {
             .shape(self.shape)
             .density(self.density)
             .label(self.label.clone())
+            // A hero field draws no label, and a dropdown has no placeholder of its own.
+            .when(self.variant == TextFieldVariant::Hero, |field| {
+                field.placeholder(self.label.clone())
+            })
             .required(self.required)
             .trailing_icon(arrow)
             .error(self.error)

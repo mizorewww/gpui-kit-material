@@ -142,7 +142,23 @@ impl Page {
                 .child(group_line(
                     "input-group-label",
                     "Input chips",
-                    spec::demo_row().gap(rem(8.)).children(inputs),
+                    spec::demo_row()
+                        .gap(rem(8.))
+                        .children(inputs)
+                        // Removed, the chips would stay gone for the rest of the session.
+                        .when(self.inputs.is_empty(), |row| {
+                            let view = cx.entity();
+                            row.child(
+                                AssistChip::new("live-input-restore", "Restore chips")
+                                    .icon(spec::star_icon())
+                                    .on_click(move |_, _, cx| {
+                                        view.update(cx, |this, cx| {
+                                            this.inputs = (0..INPUTS.len()).collect();
+                                            cx.notify();
+                                        })
+                                    }),
+                            )
+                        }),
                 ))
                 .child(group_line(
                     "assist-group-label",
@@ -341,8 +357,18 @@ impl GalleryPage for Page {
                     .child(status_chip(StatusKind::Progress).child("Working"))
                     .child(status_chip(StatusKind::Neutral).child("Queued"))
                     .child(status_chip(StatusKind::Tonal).child("Default"))
-                    .child(status_chip_outlined(StatusKind::Success).child("Checked"))
-                    .child(status_chip_outlined(StatusKind::Warning).child("To repair"))
+                    .child(
+                        status_fact_chip("fact-checked", "Checked: passed", StatusKind::Success)
+                            .child("Checked"),
+                    )
+                    .child(
+                        status_fact_chip(
+                            "fact-repair",
+                            "To repair: needs attention",
+                            StatusKind::Warning,
+                        )
+                        .child("To repair"),
+                    )
                     .child(outlined_status_chip("outlined", "Outlined")),
             )
             .into_any_element(),

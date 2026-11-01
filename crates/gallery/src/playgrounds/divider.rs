@@ -50,6 +50,14 @@ pub static PLAYGROUND: Playground = Playground {
             ],
         },
         Section {
+            title: "Content",
+            controls: &[Control::Text {
+                id: "subhead",
+                label: "Subhead",
+                default: "",
+            }],
+        },
+        Section {
             title: "Layout",
             controls: &[
                 Control::Slider {
@@ -92,6 +100,12 @@ fn preview(
         .color_role(COLORS[config.choice("color")])
         .inset_start(rem(config.number("start")))
         .inset_end(rem(config.number("end")));
+    let subhead = config.text("subhead");
+    let divider = if subhead.is_empty() {
+        divider
+    } else {
+        divider.subhead(subhead)
+    };
     // The line's box stretches along the frame's main axis and is as thick
     // as the line across it.
     let line = div()

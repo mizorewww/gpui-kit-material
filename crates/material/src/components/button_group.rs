@@ -1468,6 +1468,27 @@ mod tests {
         assert!(same(selected.background, standard.background));
     }
 
+    #[test]
+    fn an_accent_filled_group_shows_which_option_is_selected() {
+        use super::{ButtonTone, ButtonVariant, Metrics, option_paint_with};
+        let paint = |selection| {
+            option_paint_with(
+                selection,
+                1,
+                3,
+                px(40.),
+                false,
+                (ButtonVariant::Filled, ButtonTone::Accent),
+                Metrics::compact(40.),
+            )
+        };
+        let (rest, on) = (paint(0.), paint(1.));
+        assert!(same(rest.background, token(ColorRole::SURFACE_CONTAINER)));
+        assert!(same(rest.foreground, token(ColorRole::ON_SURFACE_VARIANT)));
+        assert!(same(on.background, token(ColorRole::PRIMARY)));
+        assert!(same(on.foreground, token(ColorRole::ON_PRIMARY)));
+    }
+
     fn assert_unselected(name: &str, index: usize, count: usize, height: Pixels) {
         let paint = painted(name);
         assert_eq!(

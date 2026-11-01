@@ -68,6 +68,11 @@ pub static PLAYGROUND: Playground = Playground {
         Section {
             title: "Content",
             controls: &[
+                Control::Switch {
+                    id: "limit_height",
+                    label: "Limit menu height",
+                    default: false,
+                },
                 Control::Select {
                     id: "set",
                     label: "Select",
@@ -157,6 +162,9 @@ fn preview(
         .required(config.bool("required"))
         .disabled(config.bool("disabled"))
         .width(280.)
+        .when(config.bool("limit_height"), |dropdown| {
+            dropdown.menu_max_height(120.)
+        })
         .on_open_change({
             let open = open.clone();
             move |next: &bool, _, cx| {

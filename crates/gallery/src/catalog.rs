@@ -489,6 +489,14 @@ pub static CATALOG: &[Entry] = &[
         Some(&playgrounds::loading_indicator::PLAYGROUND),
     ),
     component(
+        "stepper",
+        "Stepper",
+        Communication,
+        "Numbered steps of a flow a person walks through once.",
+        slice("loading-progress", pages::loading_progress::stepper_rows),
+        Some(&playgrounds::stepper::PLAYGROUND),
+    ),
+    component(
         "pull-to-refresh",
         "Pull to refresh",
         Communication,

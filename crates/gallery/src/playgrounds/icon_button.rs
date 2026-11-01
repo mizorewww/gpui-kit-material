@@ -66,6 +66,12 @@ pub static PLAYGROUND: Playground = Playground {
             title: "Appearance",
             controls: &[
                 Control::Select {
+                    id: "tone",
+                    label: "Tone",
+                    options: &["standard", "neutral", "accent"],
+                    default: 0,
+                },
+                Control::Select {
                     id: "variant",
                     label: "Variant",
                     options: &["standard", "filled", "tonal", "outlined"],
@@ -166,6 +172,7 @@ fn preview(
     };
     let mut button = IconButton::new("playground-icon-button", symbol(icon, 24.), label)
         .variant(IconButtonVariant::ALL[config.choice("variant")])
+        .tone(ButtonTone::ALL[config.choice("tone")])
         .button_size(ButtonSize::ALL[config.choice("size")])
         .width(WIDTHS[config.choice("width")])
         .shape(if config.bool("square") {

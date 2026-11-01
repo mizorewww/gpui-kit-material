@@ -40,13 +40,13 @@ M3 roles and type. Each is opt-in: the M3 defaults do not change.
 | Addition | What it adds |
 | --- | --- |
 | `Stepper` | Numbered steps joined by hairlines, in the form of Material 2's horizontal stepper |
-| `TextFieldVariant::Hero` | A 72dp pill with a 2dp ring. No floating label; the label is only the accessible name |
+| `TextFieldVariant::Hero` | A 72dp pill with a 2dp ring. No floating label; the label is the accessible name, required by `.hero()` |
 | `TextFieldShape::Rounded` | Medium corners on a filled or outlined field |
 | `ButtonTone::Neutral`, `Accent` | Other roles for a button's enabled, unselected colors. Disabled and selected keep M3's |
 | `SearchFieldStyle::Surface`, `Tonal` | A search bar on the surface with an edge, or on surface-container-highest |
 | `CardVariant::Surface` | A flat card on the surface with no edge |
 | `MaterialDialog::container` | Another role for a dialog's container |
-| `NoticeKind::Warning`, `status_chip_outlined` | Status surfaces on the kit's own warning and success roles |
+| `NoticeKind::Warning`, `status_fact_chip` | Status surfaces on the kit's own warning and success roles |
 | `TintFamily`, `ListLeading::Tinted` | Seven harmonized hue families in 14 `ColorRole`s. M3's custom colors are the model; the design colors are the kit's |
 | `MaterialContextMenu` | A menu opened at the pointer. The menu is M3's; the right press is not in a reference |
 
@@ -122,7 +122,7 @@ M3 roles and type. Each is opt-in: the M3 defaults do not change.
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | Badge | Y | Y | Y | `Badge` | Yes | 5 + 2 | code | inherit | none | none found |
 | Avatar | Y | - | - | `Avatar` | Yes | 3 + 0 | code | inherit | none | none found |
-| Stepper | - | - | - | `Stepper` | Specs | 1 + 0 | code | inherit | none | **Non-M3**: no reference specifies a stepper; added for flows walked through once. No playground |
+| Stepper | - | - | - | `Stepper` | Yes | 7 + 2 | tree | tested | none | **Non-M3**: no reference specifies a stepper; added for flows walked through once |
 | Linear and circular progress | Y | Y | Y | `LinearProgress`, `CircularProgress` | Yes | 16 + 2 | tree, RM | inherit | none | Wave height and percentage label are not options. No reference defines a contained form |
 | Loading indicator | Y | Y | Y | `LoadingIndicator` | Yes | 8 + 1 | attr | inherit | none | `.playback` still needs the vendored repeat patch; determinate turns opposite to Compose |
 | Snackbar | Y | Y | Y | `Snackbar` | Yes | 7 + 3 | code | inherit | none | none found |
