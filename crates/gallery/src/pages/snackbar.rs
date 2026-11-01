@@ -140,6 +140,11 @@ impl GalleryPage for Page {
                         "An informational notice wraps its text when narrow.",
                     ))
                     .child(notice_banner(
+                        "notice-warning",
+                        NoticeKind::Warning,
+                        "Some files could not be checked yet.",
+                    ))
+                    .child(notice_banner(
                         "notice-danger",
                         NoticeKind::Danger,
                         "A failure stays visible with its recovery action.",

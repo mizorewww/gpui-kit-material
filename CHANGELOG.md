@@ -16,6 +16,7 @@ Distribution is by Git revision for now; see the [quick start](README.md#quick-s
   scrolls, with the keyboard's item kept in view and the selected item shown on open.
   A `MenuPopup` also scrolls rather than outgrow its window.
 - A published `[patch]` block for downstream workspaces, built from Git by CI.
+- `NoticeKind::Warning`, for a notice that needs attention when nothing has failed.
 - `rust-version` 1.99.1, the toolchain this workspace is verified with.
 - `[package.metadata.docs.rs]`, `deny.toml`, and CI checks of what each package ships.
 - `ExposedDropdown::full_width`: the field fills its parent and the menu matches it.
