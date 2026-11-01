@@ -8,8 +8,8 @@ mod button;
 #[cfg(feature = "buttons")]
 pub use button::{
     ButtonDirection, ButtonIconPosition, ButtonProgressPlayback, ButtonShape, ButtonSize,
-    ButtonTransitionInputs, ButtonTransitionPlayback, ButtonVariant, FabSize, IconButtonWidth,
-    MaterialButton, material_button,
+    ButtonTone, ButtonTransitionInputs, ButtonTransitionPlayback, ButtonVariant, FabSize,
+    IconButtonWidth, MaterialButton, material_button,
 };
 #[cfg(feature = "buttons")]
 mod fab;

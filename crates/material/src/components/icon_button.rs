@@ -8,7 +8,8 @@
 //! the button variants' toggle colors; the standard icon button has no
 //! container and turns primary when selected.
 use super::{
-    ButtonShape, ButtonSize, ButtonVariant, IconButtonWidth, InteractionPreview, MaterialButton,
+    ButtonShape, ButtonSize, ButtonTone, ButtonVariant, IconButtonWidth, InteractionPreview,
+    MaterialButton,
     button::{Form, Palette, Roles},
 };
 use crate::{color::ColorRole, icons::Icon};
@@ -71,6 +72,7 @@ pub struct IconButton {
     selected_icon: Option<Icon>,
     label: SharedString,
     variant: IconButtonVariant,
+    tone: ButtonTone,
     size: ButtonSize,
     width: IconButtonWidth,
     shape: ButtonShape,
@@ -97,6 +99,7 @@ impl IconButton {
             selected_icon: None,
             label: label.into(),
             variant: IconButtonVariant::Standard,
+            tone: ButtonTone::Standard,
             size: ButtonSize::Small,
             width: IconButtonWidth::Default,
             shape: ButtonShape::Round,
@@ -110,6 +113,11 @@ impl IconButton {
             on_change: None,
             style: StyleRefinement::default(),
         }
+    }
+    /// Which roles a filled, tonal or outlined container and its icon paint with.
+    pub fn tone(mut self, tone: ButtonTone) -> Self {
+        self.tone = tone;
+        self
     }
     pub fn variant(mut self, variant: IconButtonVariant) -> Self {
         self.variant = variant;
@@ -183,6 +191,7 @@ impl IconButton {
         let mut button = MaterialButton::new(self.id)
             .variant(self.variant.button_variant())
             .form(Form::Icon(self.width))
+            .tone(self.tone)
             .button_size(self.size)
             .shape(self.shape)
             .icon(icon)

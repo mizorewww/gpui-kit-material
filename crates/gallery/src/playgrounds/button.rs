@@ -67,6 +67,12 @@ pub static PLAYGROUND: Playground = Playground {
                     options: &["filled", "tonal", "outlined", "elevated", "text"],
                     default: 0,
                 },
+                Control::Select {
+                    id: "tone",
+                    label: "Tone",
+                    options: &["standard", "neutral", "accent"],
+                    default: 0,
+                },
                 Control::Segmented {
                     id: "size",
                     label: "Size",
@@ -131,6 +137,7 @@ fn preview(
     let mut button = MaterialButton::new("playground-button")
         .debug_selector(|| "playground-button".into())
         .variant(VARIANTS[config.choice("variant")])
+        .tone(ButtonTone::ALL[config.choice("tone")])
         .button_size(ButtonSize::ALL[config.choice("size")])
         .shape(if config.bool("square") {
             ButtonShape::Square
