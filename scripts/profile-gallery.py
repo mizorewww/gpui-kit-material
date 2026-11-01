@@ -9,6 +9,7 @@ import hashlib
 import json
 import math
 import os
+import re
 from pathlib import Path
 import subprocess
 import sys
@@ -19,6 +20,58 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def output(*args):
     return subprocess.check_output(args, cwd=ROOT)
+
+
+# A scroll run ends at --seconds only once it has finished a whole lap, and always by this,
+# scroll_performance.rs's MAX_RUN.
+SCROLL_RUN_LIMIT_S = 120
+
+
+def machine_environment():
+    """What a timing depends on besides the code, so a report can say what it was taken
+    under. macOS only; anything unread stays null rather than being guessed."""
+    def read(*command):
+        try:
+            return subprocess.run(command, capture_output=True, text=True, timeout=15).stdout
+        except (OSError, subprocess.SubprocessError):
+            return ""
+
+    environment = {"load_average": list(os.getloadavg()), "low_power_mode": None,
+                   "power_source": None, "display_refresh_hz": None, "display": None}
+    match = re.search(r"^\s*(?:lowpowermode|powermode)\s+(\d)", read("pmset", "-g"), re.M)
+    if match:
+        environment["low_power_mode"] = match.group(1) != "0"
+    match = re.search(r"drawing from '([^']+)'", read("pmset", "-g", "ps"))
+    if match:
+        environment["power_source"] = match.group(1)
+    try:
+        displays = json.loads(read("system_profiler", "SPDisplaysDataType", "-json"))
+        gpus = displays["SPDisplaysDataType"]
+        screens = [screen for gpu in gpus for screen in gpu.get("spdisplays_ndrvs", [])]
+        main = next((s for s in screens if s.get("spdisplays_main") == "spdisplays_yes"), screens[0])
+        environment["display"] = main.get("_spdisplays_resolution")
+        match = re.search(r"@\s*([\d.]+)\s*Hz", environment["display"] or "")
+        if match:
+            environment["display_refresh_hz"] = float(match.group(1))
+    except (ValueError, KeyError, IndexError):
+        pass
+    return environment
+
+
+def environment_label(environment):
+    """One line for a report, leading with what most changes the numbers."""
+    power = {True: "LOW POWER MODE", False: "normal power", None: "power mode unknown"}
+    refresh = environment["display_refresh_hz"]
+    load = environment["load_average"][0]
+    return (f"{power[environment['low_power_mode']]}, load {load:.2f}, "
+            f"display {f'{refresh:g} Hz' if refresh else 'refresh unknown'}")
+
+
+def warn_about_environment(environment):
+    if environment["low_power_mode"]:
+        print("WARNING: Low Power Mode is on (pmset -g lowpowermode): the CPU is capped, and its "
+              "timings do not compare with a run without it. Instruction counts still do.",
+              file=sys.stderr)
 
 
 def repository_identity(root):
@@ -186,7 +239,10 @@ def web_profile(args, destination):
         query += f"&hz={args.input_hz}"
     url = f"http://127.0.0.1:{server.server_address[1]}/?{query}"
     browser_args = "--disable-gpu-vsync,--disable-frame-rate-limit,--enable-unsafe-webgpu"
-    provenance.update(url=url, browser_args=browser_args, viewport=[1280, 800])
+    provenance.update(url=url, browser_args=browser_args, viewport=[1280, 800],
+                      environment=machine_environment())
+    save()
+    print(f"Conditions: {environment_label(provenance['environment'])}")
 
     def browser(*command, timeout=60):
         return subprocess.run(["agent-browser", "--session", session, "--args", browser_args,
@@ -214,6 +270,7 @@ def web_profile(args, destination):
         if report is None:
             provenance["capture_error"] = "browser profile did not finish before the deadline"
         else:
+            report["environment"] = provenance["environment"]
             (destination / "frames.json").write_text(json.dumps(report, indent=2) + "\n")
             code = report.get("exit_code", 2)
         console = browser("console")
@@ -488,6 +545,7 @@ def bench_profile(args, destination):
             binary = Path(event["executable"])
     provenance["binary"] = str(binary)
     provenance["binary_sha256"] = hashlib.sha256(binary.read_bytes()).hexdigest()
+    provenance["environment"] = machine_environment()
     reports = {}
     seconds = max(2.0, min(args.seconds, 30.0))
     for name in BENCH_SCENARIOS:
@@ -510,8 +568,9 @@ def bench_profile(args, destination):
     (destination / "build.json").write_text(json.dumps(provenance, indent=2) + "\n")
     table = bench_targets(reports, kit_first_frame_ns=kit_first_frame_ns(args))
     table["load_average"] = [provenance["load_average_before"], provenance["load_average_after"]]
+    table["environment"] = provenance["environment"]
     (destination / "targets.json").write_text(json.dumps(table, indent=2) + "\n")
-    print(f"Engine benchmark targets ({args.bench_content} rows, load {provenance['load_average_before']}):")
+    print(f"Engine benchmark targets ({args.bench_content} rows, {environment_label(table['environment'])}):")
     print_targets(table)
     failed = any(t["verdict"] == "FAIL" for t in table["targets"].values())
     return 1 if failed else 2
@@ -674,6 +733,7 @@ def main():
     if destination == ROOT or ROOT in destination.parents:
         parser.error("use an output directory outside the repository to keep source fingerprints stable")
     destination.mkdir(parents=True, exist_ok=False)
+    warn_about_environment(machine_environment())
     if args.md3io:
         result = md3io_probe(args, destination)
         print(f"Evidence: {destination}; runner exit {result}.")
@@ -747,6 +807,8 @@ def main():
     provenance["binary"] = str(binary)
     provenance["binary_sha256"] = hashlib.sha256(binary.read_bytes()).hexdigest()
     save()
+    provenance["environment"] = machine_environment()
+    save()
     env = os.environ.copy()
     env.pop("MATERIAL_SCROLL_PROFILE", None)
     env.pop("MATERIAL_SCROLL_INPUT", None)
@@ -762,7 +824,7 @@ def main():
         try:
             result = subprocess.run([str(binary)], cwd=ROOT, env=env,
                                     stdout=log, stderr=subprocess.STDOUT,
-                                    timeout=args.seconds + 60)
+                                    timeout=(SCROLL_RUN_LIMIT_S if args.scroll else args.seconds) + 60)
             code = result.returncode
         except subprocess.TimeoutExpired:
             code = 2
@@ -781,7 +843,9 @@ def main():
     try:
         table = gallery_targets(json.loads((destination / "frames.json").read_text()),
                                 kit_first_frame_ns=kit_first_frame_ns(args))
+        table["environment"] = provenance["environment"]
         (destination / "targets.json").write_text(json.dumps(table, indent=2) + "\n")
+        print(f"Conditions: {environment_label(table['environment'])}")
         print_targets(table)
     except (OSError, ValueError, KeyError, TypeError) as error:
         print(f"Could not judge targets: {error}", file=sys.stderr)
