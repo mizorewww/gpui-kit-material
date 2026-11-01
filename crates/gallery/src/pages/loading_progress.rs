@@ -9,7 +9,11 @@ const STEPPER: usize = 6;
 
 /// The progress indicators' rows on the Progress page's Specs tab.
 pub fn progress_rows() -> Vec<usize> {
-    (0..LOADING_INDICATOR).chain([STEPPER]).collect()
+    (0..LOADING_INDICATOR).collect()
+}
+/// The stepper's rows on its Specs tab.
+pub fn stepper_rows() -> Vec<usize> {
+    vec![STEPPER]
 }
 /// The loading indicator's rows on its Specs tab.
 pub fn loading_indicator_rows() -> Vec<usize> {
@@ -244,10 +248,11 @@ impl GalleryPage for Page {
                 gpui_base::v_flex()
                     .w_full()
                     .gap(rem(24.))
-                    .children((0..3).map(|current| {
+                    .children((0..4).map(|current| {
                         Stepper::new(("stepper", current), "Setup progress")
                             .steps(["Source", "Service", "Account"])
                             .current(current)
+                            .state_labels("Finished", "Current", "Upcoming")
                     })),
             )
             .into_any_element(),
