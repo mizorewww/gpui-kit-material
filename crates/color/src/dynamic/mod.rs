@@ -10,24 +10,45 @@
 //! and `Scheme` classes, and multiple source colors.
 //!
 //! [material-color-utilities]: https://github.com/material-foundation/material-color-utilities
+//!
+//! Without the `dynamic` feature only `blend` and what it needs compile, privately, for
+//! [`crate::scheme::TintFamily`]'s harmonized hues.
+#![cfg_attr(not(feature = "dynamic"), allow(dead_code))]
+
 pub mod blend;
+#[cfg(feature = "dynamic")]
 mod color;
+#[cfg(feature = "dynamic")]
 pub mod contrast;
+#[cfg(feature = "dynamic")]
 mod dislike;
 mod hct;
+#[cfg(feature = "dynamic")]
 mod palette;
+#[cfg(feature = "dynamic")]
 mod scheme;
+#[cfg(feature = "dynamic")]
 mod seed;
 mod solver;
+#[cfg(feature = "dynamic")]
 mod spec_2021;
+#[cfg(feature = "dynamic")]
 mod spec_2025;
+#[cfg(feature = "dynamic")]
 mod temperature;
 pub mod utils;
 
+#[cfg(feature = "dynamic")]
 pub use color::{ContrastCurve, DynamicRole};
+#[cfg(feature = "dynamic")]
 pub use dislike::{fix_if_disliked, is_disliked};
+#[cfg(feature = "dynamic")]
 pub use hct::{Cam16, Hct, ViewingConditions};
+#[cfg(feature = "dynamic")]
 pub use palette::TonalPalette;
+#[cfg(feature = "dynamic")]
 pub use scheme::{DynamicScheme, SpecVersion, Variant};
+#[cfg(feature = "dynamic")]
 pub use seed::SeedScheme;
+#[cfg(feature = "dynamic")]
 pub use temperature::{TemperatureCache, raw_temperature};

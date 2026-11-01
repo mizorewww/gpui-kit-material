@@ -19,6 +19,7 @@ all-features = true
 default = ["serde", "dynamic"]
 serde = ["dep:serde"]
 # `dynamic`: HCT, tonal palettes and seed schemes, ported from material-color-utilities.
+# Without it the HCT core still compiles, privately, for the tint families' harmonized hues.
 dynamic = []
 
 [dependencies]

@@ -17,10 +17,14 @@
 mod color;
 #[cfg(feature = "dynamic")]
 pub mod dynamic;
+// Without the feature, only what `scheme` needs to harmonize its tint families, and
+// nothing public: a scheme's colors do not depend on the feature selection.
+#[cfg(not(feature = "dynamic"))]
+mod dynamic;
 pub mod palette;
 pub mod scheme;
 pub mod themes;
 
 pub use color::Color;
 pub use palette::{Appearance, Palette, PaletteId, ThemePreferences};
-pub use scheme::{ColorRole, Scheme};
+pub use scheme::{ColorRole, Scheme, TintFamily};

@@ -25,7 +25,8 @@ Icons come from
 ## What's included
 
 - **Color and theme**: semantic `ColorRole`s, all 20 md3.io reference themes
-  (light/dark × standard/medium/high contrast, 52 roles each), 10 legacy
+  (light/dark × standard/medium/high contrast, 52 reference roles each, with the kit's
+  10 application roles and 14 tint-family roles: 76 in all), 10 legacy
   palettes, animated theme transitions and a 100–200% text scale. Dynamic
   seed/HCT schemes are ported from material-color-utilities; image-derived seeds
   are not supported.

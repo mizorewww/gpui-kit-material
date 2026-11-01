@@ -25,6 +25,11 @@ Dark palettes also paint their surfaces with 4.5% of their text color, as
 Material 3 lifts dark surface containers. The stored colors above are
 unchanged.
 
+Tint families (`TintFamily`) are the kit's own design colors for telling categories
+apart. Each is harmonized toward the scheme's primary, then mixed into its surface for the
+container and with its text for the content, so a family keeps its hue in every palette,
+reference theme and seed scheme.
+
 Original licenses are in `licenses/`. They cover the palette source material;
 upstream projects do not endorse this kit or course2md.
 

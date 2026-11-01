@@ -23,6 +23,17 @@ impl Color {
         }
     }
 
+    /// An opaque color from `0xAARRGGBB`, dropping the alpha.
+    pub const fn argb(argb: u32) -> Self {
+        Self::hex(argb & 0x00ff_ffff)
+    }
+
+    /// The color as opaque `0xAARRGGBB`, the form the dynamic color utilities take.
+    pub fn to_argb(self) -> u32 {
+        let channel = |value: f32| (value.clamp(0., 1.) * 255.).round() as u32;
+        0xff00_0000 | channel(self.r) << 16 | channel(self.g) << 8 | channel(self.b)
+    }
+
     /// The same color at `alpha` opacity.
     pub const fn alpha(self, alpha: f32) -> Self {
         Self { a: alpha, ..self }

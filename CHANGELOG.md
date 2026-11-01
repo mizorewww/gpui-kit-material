@@ -22,6 +22,10 @@ Distribution is by Git revision for now; see the [quick start](README.md#quick-s
 - `[package.metadata.docs.rs]`, `deny.toml`, and CI checks of what each package ships.
 - `ExposedDropdown::full_width`: the field fills its parent and the menu matches it.
 
+- `TintFamily`, and `ColorRole`s for its seven container and content pairs: hue families
+  harmonized toward each scheme's primary, as Material's custom colors are.
+- `ListLeading::Tinted`: a `tinted_icon` as a list item's leading element.
+
 ### Changed
 
 - **Breaking:** with `default-features = false`, `gpui-kit-material` now has no
@@ -33,6 +37,8 @@ Distribution is by Git revision for now; see the [quick start](README.md#quick-s
 - `gpui-kit-material`'s `serde` feature now controls the color crate's, which was always on.
 - `advance_component_theme` also projects Base's scrollbar colors and `TextView`'s
   link and table-head colors, so they follow the palette instead of Kit's default theme.
+- `Tint` paints its own `TintFamily`. Its old mapping onto the container roles gave one
+  color for blue, teal, pink and purple in every source palette.
 - Kit is pinned by revision (`bb85882`) instead of `branch = "main"`, so a consumer
   without this workspace's lockfile gets Component at the same revision as Base.
 - `Entity::update_for_render` is dev-only, behind `frame-observation`; a consumer's
