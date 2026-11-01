@@ -1678,13 +1678,18 @@ impl RenderOnce for MenuPopup {
 /// right press, as it does for Kit's `context_menu`. Give the same commands a
 /// way in from the keyboard, usually a [`MenuPopup`] behind a "more" button.
 ///
-/// ```ignore
-/// div()
+/// ```
+/// use gpui::{div, prelude::*};
+/// use gpui_kit_material::prelude::*;
+///
+/// # let row_content = div();
+/// let row = div()
 ///     .relative()
 ///     .child(MaterialContextMenu::new("row-menu", |_, _| {
 ///         MaterialMenu::new("row-menu-items").item(MaterialMenuItem::new("Rename"))
 ///     }))
-///     .child(row_content)
+///     .child(row_content);
+/// # let _ = row;
 /// ```
 #[derive(gpui::IntoElement)]
 pub struct MaterialContextMenu {
