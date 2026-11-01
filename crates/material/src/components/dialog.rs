@@ -454,6 +454,18 @@ pub(crate) fn header_icon_button(
     label: SharedString,
     on_click: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
 ) -> impl IntoElement {
+    sized_header_icon_button(id, 40., icon, label, on_click)
+}
+
+/// [`header_icon_button`] whose state layer is `width` dp wide and 40dp tall, in its 48dp
+/// target.
+pub(crate) fn sized_header_icon_button(
+    id: impl Into<ElementId>,
+    width: f32,
+    icon: Icon,
+    label: SharedString,
+    on_click: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
+) -> impl IntoElement {
     let ink = color(ColorRole::ON_SURFACE_VARIANT);
     let clear = Rgba { a: 0., ..ink };
     let id = id.into();
@@ -473,7 +485,8 @@ pub(crate) fn header_icon_button(
                 ElementId::NamedChild(std::sync::Arc::new(id.clone()), "ripple".into()),
                 gpui_base::Button::new(id)
                     .accessibility_label(label)
-                    .size(rem(40.))
+                    .w(rem(width))
+                    .h(rem(40.))
                     .rounded_full()
                     .flex()
                     .items_center()
