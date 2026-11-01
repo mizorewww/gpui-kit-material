@@ -1162,3 +1162,76 @@ fn an_exposed_dropdown_limits_its_menu(cx: &mut TestAppContext) {
     let surface = cx.debug_bounds("menu-popup-surface").unwrap();
     assert_eq!(surface.size.height, px(240.));
 }
+
+/// A tall sub-menu owned by an item well down its menu, near whichever window edge it opens to.
+struct TallCascade {
+    anchor: Anchor,
+}
+
+impl Render for TallCascade {
+    fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        window.set_rem_size(px(14.));
+        let menu = MaterialMenu::new("menu")
+            .items((0..6).map(|_| MaterialMenuItem::new("Item").submenu(true)));
+        let submenu =
+            MaterialMenu::new("submenu").items((0..60).map(|_| MaterialMenuItem::new("Sub")));
+        let upward = opens_upward(self.anchor);
+        div()
+            .size_full()
+            .flex()
+            .flex_col()
+            .when(upward, |root| root.justify_end())
+            .p(px(20.))
+            .child(
+                MenuPopup::new(
+                    "popup",
+                    div()
+                        .debug_selector(|| "trigger".into())
+                        .w(px(100.))
+                        .h(px(40.)),
+                    menu,
+                )
+                .open(true)
+                .anchor(self.anchor)
+                // Below the trigger the last item leaves the least room under it, above the
+                // trigger the first item leaves the least room over it.
+                .submenu(if upward { 0 } else { 5 }, submenu, true),
+            )
+    }
+}
+
+fn tall_cascade_stays_in_the_window(anchor: Anchor, cx: &mut TestAppContext) {
+    cx.update(|cx| {
+        gpui_kit::init(cx);
+        crate::init(cx);
+        cx.set_reduce_motion(true);
+    });
+    let (_, cx) = cx.add_window_view(move |_, _| TallCascade { anchor });
+    settle(cx);
+    let window = cx.update(|window, _| window.viewport_size());
+    let submenu = cx.debug_bounds("menu-popup-submenu").unwrap();
+    assert!(
+        submenu.top() >= px(0.) && submenu.bottom() <= window.height,
+        "{anchor:?}: sub-menu at {:?}..{:?} in a window {:?} tall",
+        submenu.top(),
+        submenu.bottom(),
+        window.height
+    );
+    let surface = cx.debug_bounds("menu-popup-surface").unwrap();
+    assert!(
+        surface.top() >= px(0.) && surface.bottom() <= window.height,
+        "{anchor:?}: menu at {:?}..{:?}",
+        surface.top(),
+        surface.bottom()
+    );
+}
+
+#[gpui::test]
+fn a_tall_submenu_below_its_trigger_stays_in_the_window(cx: &mut TestAppContext) {
+    tall_cascade_stays_in_the_window(Anchor::TopLeft, cx);
+}
+
+#[gpui::test]
+fn a_tall_submenu_above_its_trigger_stays_in_the_window(cx: &mut TestAppContext) {
+    tall_cascade_stays_in_the_window(Anchor::BottomLeft, cx);
+}

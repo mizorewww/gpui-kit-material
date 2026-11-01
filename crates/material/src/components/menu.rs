@@ -1353,7 +1353,6 @@ impl RenderOnce for MenuPopup {
         // would still lose its end there, so it scrolls instead.
         let room = window_room(window);
         self.menu = self.menu.fit(room);
-        self.submenu = self.submenu.map(|(index, menu)| (index, menu.fit(room)));
         let (reveal, fade) = open_motion(&self.id, self.open, window, cx);
         let visible = popup_visible(self.open, reveal, fade);
         // A menu on its way out shows its items, and activates none of them.
@@ -1429,14 +1428,28 @@ impl RenderOnce for MenuPopup {
         let submenu_bottom = submenu_index
             .and_then(|index| self.menu.item_bottom(index))
             .map(|bottom| bottom - scrolled_by);
-        // The reserved cascade column's height below the trigger.
-        let cascade_height = self.submenu.as_ref().map_or(0., |(_, submenu)| {
-            let first_row = if submenu.style.expressive() {
+        // A sub-menu's column starts from its owner, so it has what is left of the room past
+        // that: told the whole room, the column outgrows the window and Base's clamp, which
+        // can only pin an oversized box, leaves its end outside.
+        let column_inset = |style: MenuStyle| {
+            let first_row = if style.expressive() {
                 EXPRESSIVE_INSET_Y
             } else {
                 BASELINE_PADDING
             };
-            (submenu_top.unwrap_or(0.) - first_row).max(0.) + submenu.visible_height()
+            if upward {
+                (height - submenu_bottom.unwrap_or(height) - first_row).max(0.)
+            } else {
+                (submenu_top.unwrap_or(0.) - first_row).max(0.)
+            }
+        };
+        self.submenu = self.submenu.map(|(index, menu)| {
+            let room = (room - column_inset(menu.style)).max(0.);
+            (index, menu.fit(room))
+        });
+        // The reserved cascade column's height below the trigger.
+        let cascade_height = self.submenu.as_ref().map_or(0., |(_, submenu)| {
+            column_inset(submenu.style) + submenu.visible_height()
         });
         // Closing the sub-menu by keyboard returns focus to its owner item.
         let restore = window
@@ -1522,11 +1535,7 @@ impl RenderOnce for MenuPopup {
                         }
                     }
                 });
-            let first_row = if sub_style.expressive() {
-                EXPRESSIVE_INSET_Y
-            } else {
-                BASELINE_PADDING
-            };
+            let inset = column_inset(sub_style);
             let visible = popup_visible(open, sub_reveal, sub_fade);
             // The column is reserved while closed, so opening the sub-menu
             // never moves the menu Kit anchored. Below the trigger the
@@ -1535,11 +1544,9 @@ impl RenderOnce for MenuPopup {
             // owner's bottom and it extends up, within the popup's box.
             let column = div().flex_shrink_0().flex().flex_col();
             let column = if upward {
-                let under = (height - submenu_bottom.unwrap_or(height) - first_row).max(0.);
-                column.h(rem(sub_height + under)).pb(rem(under))
+                column.h(rem(sub_height + inset)).pb(rem(inset))
             } else {
-                let top = (submenu_top.unwrap_or(0.) - first_row).max(0.);
-                column.h(rem(top + sub_height)).pt(rem(top))
+                column.h(rem(inset + sub_height)).pt(rem(inset))
             };
             column.when(!visible, |cascade| cascade.invisible()).child(
                 reveal_surface(
