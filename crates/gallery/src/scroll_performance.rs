@@ -343,14 +343,16 @@ impl Session {
             engine_initial: engine_snapshot(window),
             engine_final: Value::Null,
             engine_environment: engine_environment(),
-            inputs: Vec::with_capacity(sample_capacity(self.duration)),
-            raw: Vec::with_capacity(sample_capacity(self.duration)),
+            inputs: Vec::with_capacity(sample_capacity(MAX_RUN)),
+            raw: Vec::with_capacity(sample_capacity(MAX_RUN)),
             errors: Vec::new(),
             previous: None,
             down: true,
             input_interval: self.input_interval,
             refresh_interval: window.refresh_interval(cx),
             traversal: Traversal::default(),
+            last_turn: None,
+            turn_corrections: Vec::new(),
             new_draw_presents_ns: Vec::new(),
             successful_submission_diagnostic: Value::Null,
             moved_up: false,
@@ -416,7 +418,7 @@ impl Session {
                     cpu_errors.push("profiler ring full; event loss cannot be excluded".into());
                 }
                 events.extend(batch);
-                if started.elapsed() >= self.duration || state.borrow().stopped {
+                if state.borrow().finished() || state.borrow().stopped {
                     break;
                 }
             }
@@ -497,6 +499,10 @@ struct Drive {
     input_interval: Duration,
     refresh_interval: Option<Duration>,
     traversal: Traversal,
+    /// The index in `raw` of the observation at the last turn.
+    last_turn: Option<usize>,
+    /// What the list moved beyond an input just after turning, as `[ns, px]`.
+    turn_corrections: Vec<[f64; 2]>,
     /// First Present-attempt end after Draw, ns since driver start. These
     /// profiler events do not establish backend success or retry identity.
     new_draw_presents_ns: Vec<i128>,
@@ -510,14 +516,21 @@ impl Drive {
         let position = self.target.position();
         // Continuity in content pixels: one 8px input separates observations.
         // Row indices may legitimately jump across rows shorter than a step.
-        if let Some(previous) = self.previous
-            && (position.px - previous.px).abs() > CONTINUITY_PX
-        {
-            self.errors.push(format!(
-                "content offset jumped {:.1}px between observations (limit {CONTINUITY_PX}px); measurement cannot prove continuous movement",
-                position.px - previous.px
-            ));
-            self.stopped = true;
+        if let Some(previous) = self.previous {
+            let moved = (position.px - previous.px).abs();
+            let limit = continuity_limit(self.raw.len(), self.last_turn);
+            if moved > limit {
+                self.errors.push(format!(
+                    "content offset jumped {:.1}px between observations (limit {limit}px); measurement cannot prove continuous movement",
+                    position.px - previous.px
+                ));
+                self.stopped = true;
+            } else if moved > CONTINUITY_PX {
+                self.turn_corrections.push([
+                    self.started.elapsed().as_nanos() as f64,
+                    f64::from(moved - STEP_PX),
+                ]);
+            }
         }
         let moved = self.previous.is_some_and(|previous| previous != position);
         if moved {
@@ -558,6 +571,12 @@ impl Drive {
         });
         self.previous = Some(position);
         moved
+    }
+    /// Whether the run is long enough: `duration`, and at least one whole lap, which is
+    /// what the report's coverage needs, however long `duration` was asked to be.
+    fn finished(&self) -> bool {
+        let elapsed = self.started.elapsed();
+        elapsed >= MAX_RUN || (elapsed >= self.duration && self.traversal.laps >= 1)
     }
     fn report(&self, cpu: Value) -> Value {
         let mut windows = Vec::new();
@@ -674,6 +693,8 @@ impl Drive {
             "timing_domains":"CPU collector includes synchronous InitialDraw before open returns; FPS observations start when driver installs after open, not at CPU startup",
             "coverage":{"visited_logical_items":visited_items,"item_count":self.target.item_count(),
                 "contiguous_top_rows_from_zero":contiguous_top_rows,"laps":self.traversal.laps,
+                "requested_seconds":self.duration.as_secs_f64(),
+                "turn_corrections":self.turn_corrections,
                 "observed_offset_min":offset_min,"observed_offset_max":offset_max,
                 "total_scrollable_pixels":total_scrollable_pixels,"visited_sections":null,
                 "visited_sections_reason":"section identity is not exposed to the driver; row coverage is recorded instead",
@@ -744,8 +765,23 @@ fn new_draw_presents(events: &[FrameEvent], window: WindowId, origin: Instant) -
     presents
 }
 
-/// One 8px input plus half a pixel of rounding between observations.
-const CONTINUITY_PX: f32 = 8.5;
+/// The distance of one input.
+const STEP_PX: f32 = 8.;
+/// One input plus half a pixel of rounding between observations.
+const CONTINUITY_PX: f32 = STEP_PX + 0.5;
+/// A run stops here even without a whole lap, so it stays bounded.
+const MAX_RUN: Duration = Duration::from_secs(120);
+
+/// How far the content may move at observation `index`. The list clamps at its end and
+/// can settle a few pixels further once it lays out the frame after a turn, which is the
+/// run turning at the real end, not a teleport, so those observations may move one more step.
+fn continuity_limit(index: usize, last_turn: Option<usize>) -> f32 {
+    if last_turn.is_some_and(|turn| index.saturating_sub(turn) <= 2) {
+        CONTINUITY_PX + STEP_PX
+    } else {
+        CONTINUITY_PX
+    }
+}
 
 /// Full-Gallery traversal state: top -> bottom -> top is one lap.
 #[derive(Default, Clone, Copy)]
@@ -759,7 +795,7 @@ struct Traversal {
 const STALL_NS: u128 = 1_000_000_000;
 
 fn tick(drive: &mut Drive, window: &mut Window, cx: &mut App) {
-    if drive.stopped || drive.started.elapsed() >= drive.duration {
+    if drive.stopped || drive.finished() {
         drive.stopped = true;
         return;
     }
@@ -780,6 +816,7 @@ fn tick(drive: &mut Drive, window: &mut Window, cx: &mut App) {
     if drive.down && drive.target.at_end() {
         drive.traversal.reached_end = true;
         drive.down = false;
+        drive.last_turn = drive.raw.len().checked_sub(1);
         drive.traversal.last_progress_ns = now;
     } else if !drive.down && drive.target.at_top() {
         if drive.traversal.reached_end {
@@ -787,6 +824,7 @@ fn tick(drive: &mut Drive, window: &mut Window, cx: &mut App) {
             drive.traversal.reached_end = false;
         }
         drive.down = true;
+        drive.last_turn = drive.raw.len().checked_sub(1);
         drive.traversal.last_progress_ns = now;
     } else if now.saturating_sub(drive.traversal.last_progress_ns) > STALL_NS {
         drive.errors.push(
@@ -828,6 +866,27 @@ fn tick(drive: &mut Drive, window: &mut Window, cx: &mut App) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn a_turn_may_settle_but_a_jump_elsewhere_stops_the_run() {
+        assert_eq!(continuity_limit(100, None), CONTINUITY_PX);
+        assert_eq!(continuity_limit(100, Some(10)), CONTINUITY_PX);
+        // The overshoot at the bottom seen in the first load-gated run: -12 px.
+        assert!(continuity_limit(11, Some(10)) >= 12.);
+        assert!(continuity_limit(12, Some(10)) >= 12.);
+        assert_eq!(continuity_limit(13, Some(10)), CONTINUITY_PX);
+    }
+    #[test]
+    fn a_run_outlasts_its_duration_only_to_finish_a_lap() {
+        let mut run = drive(0);
+        run.duration = Duration::ZERO;
+        run.traversal.laps = 0;
+        assert!(!run.finished());
+        run.traversal.laps = 1;
+        assert!(run.finished());
+        run.traversal.laps = 0;
+        run.started = Instant::now() - MAX_RUN;
+        assert!(run.finished());
+    }
     #[gpui::test]
     fn short_rows_skip_indices_but_stay_pixel_continuous(cx: &mut gpui::TestAppContext) {
         use gpui::{Context, IntoElement, ListAlignment, ParentElement, Render, Styled, div, list};
@@ -978,6 +1037,8 @@ mod tests {
                 laps: 1,
                 last_progress_ns: 0,
             },
+            last_turn: None,
+            turn_corrections: Vec::new(),
             new_draw_presents_ns: Vec::new(),
             successful_submission_diagnostic: Value::Null,
             moved_up: true,

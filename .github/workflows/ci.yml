@@ -61,6 +61,16 @@ jobs:
         run: |
           cargo clippy --locked -p gpui-kit-material-gallery -p gpui-kit-material-bench --all-targets --features gpui-kit-material-gallery/frame-profiler,gpui-kit-material-gallery/instruction-bench,gpui-kit-material-bench/frame-profiler -- -D warnings
           cargo test --locked -p gpui-kit-material-gallery --lib --features frame-profiler -- performance:: scroll_performance:: interactions::
+      # Each alone: in a command naming several packages, features unify across them, which
+      # is how a bench that needed the Gallery's test-support kept passing the steps above.
+      - name: Build each benchmark as its documentation does
+        run: |
+          cargo check --locked --release -p gpui-kit-material-bench --bin engine_bench --no-default-features --features embedded-symbols,frame-profiler,gpui-fast
+          cargo check --locked --release -p gpui-kit-material-bench --bin engine_bench --features frame-profiler
+          cargo check --locked --release -p gpui-kit-material-bench --bin component_bench
+          cargo check --locked --release -p gpui-kit-material-gallery --bin gallery --features instruction-bench
+      - name: The browser profiler's report
+        run: node scripts/check-web-profile.mjs
       - name: Linux present mode rules
         if: runner.os == 'Linux'
         run: |

@@ -131,7 +131,9 @@ python3 scripts/profile-gallery.py /tmp/material-scroll --backend fast --seconds
 ```
 
 `--scroll` (2–120 s) disables vertical sync and scrolls the whole Gallery
-top → bottom → top repeatedly, turning only at the real ends. Input comes from
+top → bottom → top repeatedly, turning only at the real ends. A run lasts `--seconds`
+but continues until it has finished one lap, up to 120 s: Overview alone is 6 000 px,
+which takes 13 s where a display of 60 Hz paces input to two steps a frame. Input comes from
 a foreground timer (`--input-hz`, default 1000), never from frame callbacks,
 so the driver cannot pace frames. `--scroll-input wheel` sends 8 px wheel
 events through the normal input path; `programmatic` mutates the offset
@@ -166,6 +168,25 @@ per-frame data with nearest-rank quantiles; an average never decides one:
 
 GPU time (Metal timestamps), drawable wait, new frames per second and the forced
 redraw are reported under `metrics`, without a verdict.
+
+Each report's `environment` records Low Power Mode, power source, display refresh and
+load, and the runner warns on stderr when Low Power Mode is on. Timings across different
+conditions do not compare; use instruction counts (below) to compare changes.
+
+### Instruction counts
+
+`--features instruction-bench` counts retired instructions per main-thread frame, which
+load and Low Power Mode leave alone (`src/instr_bench.rs`). `MATERIAL_INSTR_MODE` is
+`scroll`, `redraw`, `idle`, `switch` or `tour`; `tour` visits each entry of
+`MATERIAL_INSTR_TOUR` in turn (`button,text-field,button:specs`) for
+`MATERIAL_INSTR_TOUR_ROUNDS`, recording what each switch cost on its first and later
+visits, with phase times and lines shaped. Every report also has `startup`, the
+instructions at each step from `main` to the first presented frame.
+
+A window that something covers gets no frames from macOS, and a benchmark then waits for
+ever. A remote desktop's overlay covers every window: set `GPUI_IGNORE_OCCLUSION=1` to draw
+regardless (dev backend only). Counts stay comparable; a stalled main thread can still add
+frames, as a wheel's hover freeze expiring refreshes the window, so compare the frames' `row_builds` too.
 
 Re-judge saved evidence without running anything:
 

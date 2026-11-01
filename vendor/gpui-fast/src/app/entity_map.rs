@@ -182,6 +182,11 @@ impl EntityMap {
         );
     }
 
+    /// Whether `entity_id` still exists: it may be leased, so its slot may be empty.
+    pub(crate) fn is_alive(&self, entity_id: EntityId) -> bool {
+        self.ref_counts.read().counts.contains_key(entity_id)
+    }
+
     pub fn clear_accessed(&mut self) {
         self.accessed_entities.get_mut().clear();
     }

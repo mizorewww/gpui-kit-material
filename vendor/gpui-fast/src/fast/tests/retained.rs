@@ -2355,6 +2355,61 @@ fn new_layout_nodes_in_a_spliced_gap_survive_idle_frames() {
     assert_eq!(builds.get(), 3);
 }
 
+/// A page of a fixed size whose state is replaced as a page's keyed state is when it is
+/// left and shown again.
+struct ReplacedState {
+    state: Rc<std::cell::RefCell<Entity<Model>>>,
+    builds: Rc<Cell<usize>>,
+}
+
+impl Render for ReplacedState {
+    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        self.builds.set(self.builds.get() + 1);
+        let _ = self.state.borrow().read(cx);
+        div().relative().w(px(100.)).h(px(40.))
+    }
+}
+
+/// A view that is never built itself, as a window's root is not while only a page inside it
+/// changes, keeps only what still exists of what the views in it read: otherwise each frame
+/// replays every entity they ever read.
+#[test]
+fn a_spliced_view_forgets_the_entities_views_in_it_dropped() {
+    let mut cx = TestAppContext::single();
+    let builds = Rc::new(Cell::new(0));
+    let state = Rc::new(std::cell::RefCell::new(cx.new(|_| Model(0))));
+    let page = cx.new({
+        let (state, builds) = (state.clone(), builds.clone());
+        move |_| ReplacedState { state, builds }
+    });
+    let (window, outer_builds) = shell(&mut cx, {
+        let page = page.clone();
+        move |_| page.into()
+    });
+    draw_shell(&mut cx, window);
+    let tracked = cx
+        .update_window(window.into(), |_, _, cx| {
+            cx.entities.accessed_entities.borrow().len()
+        })
+        .unwrap();
+    for frame in 0..20 {
+        *state.borrow_mut() = cx.new(|_| Model(frame));
+        cx.update(|cx| cx.notify(page.entity_id()));
+        draw_shell(&mut cx, window);
+        let shown = cx
+            .update_window(window.into(), |_, _, cx| {
+                cx.entities.accessed_entities.borrow().len()
+            })
+            .unwrap();
+        assert!(
+            shown <= tracked + 1,
+            "frame {frame}: {shown} entities replayed, from {tracked}"
+        );
+    }
+    assert_eq!(outer_builds.get(), 1, "the parent was spliced throughout");
+    assert_eq!(builds.get(), 21);
+}
+
 /// What a [`HandingHost`] hands the view [`Handed`] draws in it.
 struct Shown(bool);
 
@@ -2811,6 +2866,24 @@ fn a_spliced_view_does_not_collect_a_stretch_of_writes_per_frame() {
         stretches <= 2,
         "a record kept {stretches} stretches of writes after 200 frames"
     );
+}
+
+/// The first idle draw after a splice builds the view around the gap, once. Its `updates`
+/// stay as they were, so the gap's change reads as its own. It looks wasteful, and a window
+/// only draws when something is dirty, but `randomized_element_tree_matches_full_render` relies
+/// on it: a tree that shares what it shows outside its entities has its stale views
+/// replaced by this build. Advancing the generation when spliced fails that test.
+#[test]
+fn the_first_idle_draw_after_a_splice_builds_the_view_around_the_gap_once() {
+    let mut cx = TestAppContext::single();
+    let (window, builds, gap) = shell_around_painter(&mut cx);
+    gap.update(&mut cx, |_, cx| cx.notify());
+    assert_eq!(builds.get(), 1, "the shell was spliced around the painter");
+    draw_shell(&mut cx, window);
+    assert_eq!(builds.get(), 2, "the first idle draw builds it");
+    draw_shell(&mut cx, window);
+    draw_shell(&mut cx, window);
+    assert_eq!(builds.get(), 2, "later ones do not");
 }
 
 /// A view around a gap, and the entity it reads, which the gap writes.

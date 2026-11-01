@@ -258,8 +258,8 @@
       },
       "src/fast/splice.rs": {
         "upstream_sha256": "4436ab4f8934aec0e95e73edf69fb3ea36c1b01cb6fe494037cb9923ea221efd",
-        "local_sha256": "48e6944a9c38654fdad7c836ae811fae4ec844bd8267b1313b1e56a28aba6dc2",
-        "reason": "A view rebuilt alone keeps its direction (vendor/gpui-pre/layout-direction-patch.md). What a gap writes as it paints is the spliced view's own. Its own dependencies restart from the check each frame it is spliced, so those writes do not pile up. Limit: an entity keeps only its last write's stamp, so a write the view should see is hidden if a gap writes the same entity later in the frame; stamping each write would mean keeping every entity's history since the oldest live record, which an idle second window can hold back without bound (fast::tests::retained::a_later_paint_write_hides_an_earlier_write_of_the_same_entity)."
+        "local_sha256": "acace50f03f453c29c4b2fd30961882fbfd5308a434735f0a9d37a201236b294",
+        "reason": "A view rebuilt alone keeps its direction (vendor/gpui-pre/layout-direction-patch.md). What a gap writes as it paints is the spliced view's own. Its own dependencies restart from the check each frame it is spliced, so those writes do not pile up. Limit: an entity keeps only its last write's stamp, so a write the view should see is hidden if a gap writes the same entity later in the frame; stamping each write would mean keeping every entity's history since the oldest live record, which an idle second window can hold back without bound (fast::tests::retained::a_later_paint_write_hides_an_earlier_write_of_the_same_entity). A spliced view forgets entities that no longer exist when its dependency list grew; without it a window's root keeps every entity a page ever read and replays them each frame (Material performance patch)."
       },
       "src/fast/text.rs": {
         "upstream_sha256": "e386a393269aee9189cb87c2a1f40f40fb4716b2cd98e6a394e052b318177814",
@@ -363,8 +363,8 @@
       },
       "src/fast/dependencies.rs": {
         "upstream_sha256": "8f230852f0585bec1f92608aec4fcc3d8fb3f00ad4736cba8a8d05f736e84cc5",
-        "local_sha256": "12a381a1186b2f4e01e116eacc7cf31d2d6ed0294ebd64b78ad7569f7d4a8a16",
-        "reason": "Entity::update_for_render, the public form of dependencies::query, behind frame-observation (vendor/gpui-pre/render-lease-patch.md). A test's count of a record's stretches of own writes."
+        "local_sha256": "bc7563df2239bfa6cd5e5400348506afe10260a4df878c78075dbfd8d1d148c2",
+        "reason": "Entity::update_for_render, the public form of dependencies::query, behind frame-observation (vendor/gpui-pre/render-lease-patch.md). A test's count of a record's stretches of own writes. RenderDependencies::without_dropped_entities for the same."
       },
       "src/fast/tests/dependencies.rs": {
         "upstream_sha256": "131164fada000e865db0a14855e4eab5446f89b45e70a1904414408cd0cdb6b0",
@@ -388,8 +388,18 @@
       },
       "src/fast/tests/retained.rs": {
         "upstream_sha256": "95fbb8389daf15e227312b07d2794ba109406071a780d3f4d9224e61f722173b",
-        "local_sha256": "ca7c667c562c4eeeb551710994b2c9d612e968ea237b3867d1f8c90b568efaec",
-        "reason": "Tests of what a gap writes around a spliced view, and of the limit in src/fast/splice.rs."
+        "local_sha256": "1d90e6c32b9ddc1443f7631681e47e2034b6d8bfdb888ca3496350d752961581",
+        "reason": "Tests of what a gap writes around a spliced view, and of the limit in src/fast/splice.rs. Test of the spliced view forgetting dropped entities."
+      },
+      "src/app/entity_map.rs": {
+        "upstream_sha256": "c15e4ae3de7b646f8061dcbec965c5f6f669cc00b08c570f7af4c4e40df6393b",
+        "local_sha256": "8e60ef743f704271a53f8876e3c251f53ff26cf9d570aaca8bb1625c6f562b2d",
+        "reason": "EntityMap::is_alive for the same."
+      },
+      "src/fast/retained.rs": {
+        "upstream_sha256": "e6885ba63fccd9375a0afc80b657463790cc9a39f639676997f8fa293b1beb6b",
+        "local_sha256": "e6885ba63fccd9375a0afc80b657463790cc9a39f639676997f8fa293b1beb6b",
+        "reason": ""
       }
     },
     "added": {

@@ -27,7 +27,11 @@ use gpui::{prelude::*, *};
 use gpui_kit_material::color::themes::{Contrast, ThemeId, ThemeMode};
 use gpui_kit_material::motion;
 use gpui_kit_material::prelude::PaletteId;
-use std::{cell::RefCell, ops::RangeInclusive, rc::Rc};
+use std::{
+    cell::{Cell, RefCell},
+    ops::RangeInclusive,
+    rc::Rc,
+};
 
 pub use super::spec::PageInfo;
 
@@ -54,6 +58,7 @@ pub struct GalleryShared {
     pub motion_scheme: motion::MotionScheme,
     /// Shows the Gallery's sample snackbar.
     pub snackbar: bool,
+    scheme_memo: Cell<SchemeMemo>,
 }
 
 impl Default for GalleryShared {
@@ -70,19 +75,59 @@ impl Default for GalleryShared {
             scale: "1".into(),
             motion_scheme: motion::MotionScheme::Expressive,
             snackbar: false,
+            scheme_memo: Default::default(),
         }
     }
 }
 
+/// What a scheme is built from: the palette and theme, seed, mode and contrast.
+type SchemeSource = (
+    PaletteId,
+    Option<ThemeId>,
+    Option<gpui_kit_material::color::dynamic::SeedScheme>,
+    ThemeMode,
+    Contrast,
+);
+/// The application's and the preview's last schemes. Harmonizing a scheme's tints costs
+/// about 85k instructions, and a preview with its own mode asks twice per frame it draws, so
+/// each is kept until what it was built from changes, which the key says.
+type SchemeMemo = [Option<(SchemeSource, gpui_kit_material::color::Scheme)>; 2];
+
 impl GalleryShared {
-    pub fn target_scheme(&self) -> gpui_kit_material::color::Scheme {
-        if let Some(seed) = self.seed_scheme(self.reference_mode) {
-            return seed;
+    fn memoized_scheme(
+        &self,
+        slot: usize,
+        source: SchemeSource,
+        build: impl FnOnce() -> gpui_kit_material::color::Scheme,
+    ) -> gpui_kit_material::color::Scheme {
+        let mut memo = self.scheme_memo.get();
+        if let Some((held, scheme)) = memo[slot]
+            && held == source
+        {
+            return scheme;
         }
-        self.reference_theme.map_or_else(
-            || gpui_kit_material::color::Scheme::from_palette(self.palette),
-            |id| id.scheme(self.reference_mode, self.contrast),
-        )
+        let scheme = build();
+        memo[slot] = Some((source, scheme));
+        self.scheme_memo.set(memo);
+        scheme
+    }
+    pub fn target_scheme(&self) -> gpui_kit_material::color::Scheme {
+        let source = (
+            self.palette,
+            self.reference_theme,
+            self.seed,
+            self.reference_mode,
+            self.contrast,
+        );
+        self.memoized_scheme(0, source, || {
+            if let Some(seed) = self.seed_scheme(self.reference_mode) {
+                return seed;
+            }
+            self.reference_theme.map_or_else(
+                || gpui_kit_material::color::Scheme::from_palette(self.palette),
+                |id| id.scheme(self.reference_mode, self.contrast),
+            )
+        })
     }
     fn seed_scheme(&self, mode: ThemeMode) -> Option<gpui_kit_material::color::Scheme> {
         let seed = self.seed?;
@@ -99,16 +144,19 @@ impl GalleryShared {
             return None;
         }
         let mode = self.preview_mode.unwrap_or(self.reference_mode);
-        if self.preview_theme.is_none()
-            && let Some(seed) = self.seed_scheme(mode)
-        {
-            return Some(seed);
-        }
-        let theme = self
-            .preview_theme
-            .or(self.reference_theme)
-            .unwrap_or(ThemeId::Baseline);
-        Some(theme.scheme(mode, self.contrast))
+        let theme = self.preview_theme.or(self.reference_theme);
+        let seed = self.seed.filter(|_| self.preview_theme.is_none());
+        let source = (self.palette, theme, seed, mode, self.contrast);
+        Some(self.memoized_scheme(1, source, || {
+            if seed.is_some()
+                && let Some(seed) = self.seed_scheme(mode)
+            {
+                return seed;
+            }
+            theme
+                .unwrap_or(ThemeId::Baseline)
+                .scheme(mode, self.contrast)
+        }))
     }
     /// The live preview's overrides, as a [`Scope`]. With none set it changes nothing.
     pub fn preview_scope(&self) -> gpui_kit_material::scope::Scope {
@@ -301,5 +349,53 @@ pub const fn entry<P: GalleryPage>() -> PageEntry {
     PageEntry {
         info: &P::INFO,
         build: build::<P>,
+    }
+}
+
+#[cfg(test)]
+mod scheme_tests {
+    use super::*;
+    use core::prelude::v1::test;
+
+    #[test]
+    fn a_kept_scheme_follows_what_it_was_built_from() {
+        let mut shared = GalleryShared::default();
+        assert_eq!(shared.preview_scheme(), None);
+        let expect = |theme: ThemeId, mode, contrast| theme.scheme(mode, contrast);
+        assert_eq!(
+            shared.target_scheme(),
+            expect(ThemeId::Baseline, ThemeMode::Light, Contrast::Standard)
+        );
+        shared.preview_mode = Some(ThemeMode::Dark);
+        for _ in 0..2 {
+            assert_eq!(
+                shared.preview_scheme(),
+                Some(expect(
+                    ThemeId::Baseline,
+                    ThemeMode::Dark,
+                    Contrast::Standard
+                ))
+            );
+        }
+        shared.preview_theme = Some(ThemeId::Ocean);
+        assert_eq!(
+            shared.preview_scheme(),
+            Some(expect(ThemeId::Ocean, ThemeMode::Dark, Contrast::Standard))
+        );
+        shared.contrast = Contrast::High;
+        assert_eq!(
+            shared.preview_scheme(),
+            Some(expect(ThemeId::Ocean, ThemeMode::Dark, Contrast::High))
+        );
+        shared.reference_mode = ThemeMode::Dark;
+        assert_eq!(
+            shared.target_scheme(),
+            expect(ThemeId::Baseline, ThemeMode::Dark, Contrast::High)
+        );
+        shared.reference_theme = None;
+        assert_eq!(
+            shared.target_scheme(),
+            gpui_kit_material::color::Scheme::from_palette(shared.palette)
+        );
     }
 }

@@ -18,6 +18,8 @@ Fast composition surfaces:
   frame only when synchronization is `Disabled`, the window is visible and the
   display link is running, without forcing render/present or re-arming; and
   the unconditional `anyhow::Result` import needed by `set_vsync`.
+- `src/window.rs`: `GPUI_IGNORE_OCCLUSION` draws a covered window as a visible one, for
+  instruction benchmarks behind a remote desktop's overlay, which covers every window.
 - `src/display_link.rs`: `is_running` and `wake` (one coalesced demand request
   on the existing main-thread source).
 - `src/fast/composition.rs`: `vsync_status` reads every composed Metal layer

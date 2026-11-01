@@ -442,6 +442,12 @@ pub(crate) struct PressState {
     press_generation: u64,
     focus: FocusHandle,
     focus_out: Option<Subscription>,
+    /// The focus handle of a button whose caller gave it none.
+    own_focus: FocusHandle,
+    /// The visual channels of a button whose caller holds none. Each runs on its own
+    /// clock; keeping them here costs a button one entity, rather than one per channel,
+    /// on every read of its frame, in what every view around it records and replays.
+    own_transitions: ButtonTransitionPlayback,
     _activation: Subscription,
 }
 fn clear_press(state: &mut PressState) {
@@ -452,11 +458,12 @@ fn clear_press(state: &mut PressState) {
 }
 fn press_state(
     id: ElementId,
-    focus: &FocusHandle,
+    focus: Option<&FocusHandle>,
     window: &mut Window,
     cx: &mut App,
 ) -> Entity<PressState> {
     let state = window.use_keyed_state((id, "material-press"), cx, |window, cx| {
+        let own_focus = cx.focus_handle();
         let activation =
             cx.observe_window_activation(window, |state: &mut PressState, window, cx| {
                 if !window.is_window_active() {
@@ -472,14 +479,20 @@ fn press_state(
             outside_window: false,
             keyboard: false,
             press_generation: 0,
-            focus: focus.clone(),
+            focus: focus.unwrap_or(&own_focus).clone(),
             focus_out: None,
+            own_focus,
+            own_transitions: ButtonTransitionPlayback::default(),
             _activation: activation,
         }
     });
-    if state.read(cx).focus_out.is_none() || state.read(cx).focus != *focus {
+    let focus = {
+        let state = state.read(cx);
+        focus.unwrap_or(&state.own_focus).clone()
+    };
+    if state.read(cx).focus_out.is_none() || state.read(cx).focus != focus {
         let weak = state.downgrade();
-        let subscription = window.on_focus_out(focus, cx, move |_, _, cx| {
+        let subscription = window.on_focus_out(&focus, cx, move |_, _, cx| {
             let _ = weak.update(cx, |state, cx| {
                 state.keyboard = false;
                 cx.notify();
@@ -487,7 +500,7 @@ fn press_state(
         });
         state.update(cx, |state, _| {
             state.keyboard = false;
-            state.focus = focus.clone();
+            state.focus = focus;
             state.focus_out = Some(subscription);
         });
     }
@@ -969,10 +982,12 @@ impl MaterialButton {
     fn sample_colors(&self, window: &mut Window, cx: &mut App) -> SampledColors {
         let (bg_target, fg_target, border_target) = self.color_targets();
         let disabled_icon = fg_target.resolve();
-        let transitions = self.transition_playback.as_ref();
+        let transitions = self
+            .transition_playback
+            .as_ref()
+            .expect("set when the button renders");
         let bg = playback::token_sample(
-            transitions.map(|p| &p.background),
-            (self.id.clone(), "background-color"),
+            &transitions.background,
             bg_target,
             MotionToken::DefaultEffects,
             window,
@@ -980,8 +995,7 @@ impl MaterialButton {
         )
         .resolve();
         let fg = playback::token_sample(
-            transitions.map(|p| &p.foreground),
-            (self.id.clone(), "foreground-color"),
+            &transitions.foreground,
             fg_target,
             MotionToken::DefaultEffects,
             window,
@@ -989,8 +1003,7 @@ impl MaterialButton {
         )
         .resolve();
         let border = playback::token_sample(
-            transitions.map(|p| &p.border),
-            (self.id.clone(), "border-color"),
+            &transitions.border,
             border_target,
             MotionToken::DefaultEffects,
             window,
@@ -1009,16 +1022,13 @@ impl MaterialButton {
         }
     }
 
-    fn resolve_interaction(&self, window: &mut Window, cx: &mut App) -> Interaction {
-        let focus = self.focus_handle.clone().unwrap_or_else(|| {
-            window
-                .use_keyed_state((self.id.clone(), "material-focus"), cx, |_, cx| {
-                    cx.focus_handle()
-                })
-                .read(cx)
-                .clone()
-        });
-        let pressed = press_state(self.id.clone(), &focus, window, cx);
+    fn resolve_interaction(
+        &self,
+        pressed: Entity<PressState>,
+        window: &mut Window,
+        cx: &mut App,
+    ) -> Interaction {
+        let focus = pressed.read(cx).focus.clone();
         if self.disabled || !self.focusable || !focus.is_focused(window) {
             // Nothing to clear on almost every render: only read, as a write
             // would mark what read this state as changed.
@@ -1070,10 +1080,12 @@ impl MaterialButton {
             focused,
             ..
         } = *interaction;
-        let transitions = self.transition_playback.as_ref();
+        let transitions = self
+            .transition_playback
+            .as_ref()
+            .expect("set when the button renders");
         let opacity = playback::opacity_sample(
             transitions,
-            (self.id.clone(), "state-opacity"),
             playback::state_opacity(
                 self.active_state,
                 self.disabled,
@@ -1101,8 +1113,7 @@ impl MaterialButton {
             ),
         };
         let shadows = playback::token_sample(
-            transitions.map(|p| &p.shadow),
-            (self.id.clone(), "box-shadow"),
+            &transitions.shadow,
             shadow::ShadowPair::level(level),
             MotionToken::DefaultEffects,
             window,
@@ -1133,8 +1144,7 @@ impl MaterialButton {
             ),
         };
         let radius = playback::token_sample(
-            transitions.map(|p| &p.radius),
-            (self.id.clone(), "pressed-radius"),
+            &transitions.radius,
             target,
             MotionToken::FastSpatial,
             window,
@@ -1418,6 +1428,10 @@ impl RenderOnce for MaterialButton {
         self.record_transition_inputs(cx);
         // `disabled()` already set Base; loading additionally disables it.
         self.base = self.base.disabled(self.disabled).busy(loading);
+        let pressed = press_state(self.id.clone(), self.focus_handle.as_ref(), window, cx);
+        if self.transition_playback.is_none() {
+            self.transition_playback = Some(pressed.read(cx).own_transitions.clone());
+        }
         let (progress_playback, progress_opacity) = self.sample_progress(loading, window, cx);
         #[cfg(test)]
         if let Some(observer) = &self.progress_opacity_observer {
@@ -1426,7 +1440,7 @@ impl RenderOnce for MaterialButton {
         let g = self.form_geometry();
         let ty = g.typography.scale();
         let colors = self.sample_colors(window, cx);
-        let interaction = self.resolve_interaction(window, cx);
+        let interaction = self.resolve_interaction(pressed, window, cx);
         if let Some(probe) = &self.press_probe
             && probe.get() != interaction.active
         {
