@@ -28,6 +28,9 @@ impl Render for Screen {
                     .items([CarouselItem::new().label("Beach").supporting("Summer")]),
             )
             .child(
+                status_fact_chip("fact", "Checked: passed", StatusKind::Success).child("Checked"),
+            )
+            .child(
                 Stepper::new("stepper", "Setup progress")
                     .steps(["Source", "Service", "Account"])
                     .current(1)
@@ -176,6 +179,9 @@ fn overlays_rows_and_items_announce_names_and_states(cx: &mut TestAppContext) {
     labelled(&all, "dialog", "Filters", &tree);
     // A time picker is named for the mode it is in, here the input.
     labelled(&all, "dialog", "Enter time", &tree);
+
+    // A status fact says in words what its color says.
+    labelled(&all, "label", "Checked: passed", &tree);
 
     // A stepper is a list of its steps, each with its name, state and place in the flow.
     labelled(&all, "list", "Setup progress", &tree);
