@@ -167,11 +167,27 @@ fn outlined_chip_paint(
 }
 
 /// One of several facts in a row, such as the checks of a diagnosis or the steps of a task.
-/// A row of [`status_chip`]s reads as many results; here the row stays quiet, with a
-/// colored icon where a fact is fine, and only the fact that needs attention is filled.
-/// Callers append the label, and a progress spinner where one applies. For a plain fact
-/// with no status and an accessible name of its own, see [`outlined_status_chip`].
+/// A row of [`status_chip`]s reads as many results; here the row stays quiet: a fine or
+/// neutral fact is outlined, with a colored icon where it is fine. Facts that need attention
+/// (warning, danger) and work under way (progress, tonal) are filled. `name` is its
+/// accessible name, usually the label with what the color says, as a color alone does not
+/// reach assistive technology. Callers append the label, and a progress spinner where one
+/// applies. For a plain fact with no status, see [`outlined_status_chip`].
+pub fn status_fact_chip(
+    id: impl Into<ElementId>,
+    name: impl Into<SharedString>,
+    kind: StatusKind,
+) -> Stateful<Div> {
+    fact_chip(kind).id(id).role(Role::Label).aria_label(name)
+}
+
+/// The chip of [`status_fact_chip`], without its id or accessible name.
+#[deprecated(note = "use `status_fact_chip`, which takes the id and accessible name")]
 pub fn status_chip_outlined(kind: StatusKind) -> Div {
+    fact_chip(kind)
+}
+
+fn fact_chip(kind: StatusKind) -> Div {
     let (text, container, edge, icon) = outlined_chip_paint(kind);
     let mut view = div()
         .flex()
@@ -207,7 +223,7 @@ pub fn badge(kind: StatusKind) -> Div {
 
 /// A fact beside a label in the status chip's size, outlined rather than
 /// filled: e.g. the engine a tile uses. It has no status of its own; for facts that
-/// do, see [`status_chip_outlined`].
+/// do, see [`status_fact_chip`].
 pub fn outlined_status_chip(
     id: impl Into<ElementId>,
     label: impl Into<SharedString>,
