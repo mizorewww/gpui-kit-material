@@ -145,7 +145,6 @@ export function installProfiler(params) {
       errors.push("no wheel input was dispatched");
     }
     const vsyncFinal = counters?.gallery_vsync_status() ?? null;
-    const targetFailure = Object.values(targets).some((t) => t.verdict === "FAIL");
     const settled = rows.filter((r) => startedAt !== null && r.start_ms >= startedAt + SETTLE_MS);
     const steady = settled.map((r) => r.cpu_ms);
     const steadySummary = summarize(steady);
@@ -179,6 +178,7 @@ export function installProfiler(params) {
       md3io_comparison: judge("main-thread frame time at least 5x below md3.io (ratio)", 5, null, ">=",
         "needs the DevTools comparison in docs/DEVELOPMENT.md, on interactions with real main-thread work"),
     };
+    const targetFailure = Object.values(targets).some((t) => t.verdict === "FAIL");
     const report = {
       schema: "gallery-web-frames-v2",
       mode,
