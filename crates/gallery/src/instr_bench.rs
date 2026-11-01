@@ -9,12 +9,18 @@
 //! ```
 //!
 //! Modes: `scroll` (one 8 px wheel per frame, reversing every 60 frames), `redraw`
-//! (notifies the Gallery each frame), `idle` (nothing), and `switch` (navigates
-//! between `MATERIAL_INSTR_ENTRY` and `MATERIAL_INSTR_ENTRY2` every 12 frames).
+//! (notifies the Gallery each frame), `idle` (nothing), `switch` (navigates
+//! between `MATERIAL_INSTR_ENTRY` and `MATERIAL_INSTR_ENTRY2` every 12 frames), and
+//! `tour` (see [`Tour`]). Every report has `startup`: the counters at each step from
+//! `main` to the first presented frame, see [`mark`].
 use super::{Gallery, Tab, catalog};
 use gpui::*;
 use serde_json::{Value, json};
-use std::{cell::Cell, path::PathBuf, time::Duration};
+use std::{
+    cell::{Cell, RefCell},
+    path::PathBuf,
+    time::Duration,
+};
 
 #[path = "../../bench/src/perf_counters.rs"]
 mod perf_counters;
@@ -37,6 +43,35 @@ const COUNTS: usize = 6;
 
 thread_local! {
     static TALLY: Cell<[u64; COUNTS]> = const { Cell::new([0; COUNTS]) };
+    static STARTUP: RefCell<Vec<(&'static str, Counters)>> = const { RefCell::new(Vec::new()) };
+}
+
+/// Records the main thread's counters as a step of startup ends.
+pub(super) fn mark(step: &'static str) {
+    STARTUP.with(|marks| marks.borrow_mut().push((step, Counters::now())));
+}
+
+/// The frames after the window opened that startup's report ends with.
+fn note_startup_frame(seen: usize) {
+    match seen {
+        0 => mark("frame_1"),
+        1 => mark("frame_2"),
+        _ => {}
+    }
+}
+
+/// Each step's own counters: instructions, cycles, CPU ns, allocations, bytes.
+fn startup_report() -> Value {
+    STARTUP.with(|marks| {
+        let marks = marks.borrow();
+        let mut last = Counters::default();
+        let mut steps = Vec::new();
+        for (step, counters) in marks.iter() {
+            steps.push(json!({"step": step, "counters": counters.since(last).row()}));
+            last = *counters;
+        }
+        json!({"columns":["instructions","cycles","cpu_ns","allocations","allocated_bytes"],"steps":steps})
+    })
 }
 
 /// Counts one rebuild. Costs a few instructions, in this feature's builds only.
@@ -54,6 +89,72 @@ enum Mode {
     Redraw,
     Idle,
     Switch,
+    Tour,
+}
+
+/// What `tour` mode does: visit each stop of `MATERIAL_INSTR_TOUR`, `<entry>` or
+/// `<entry>:specs`, for `MATERIAL_INSTR_TOUR_ROUNDS` rounds, one every
+/// `MATERIAL_INSTR_TOUR_GAP` frames (more than a switch's own frames take to settle).
+/// The stop's cost is the frames from its navigation until the next stop.
+struct Tour {
+    stops: Vec<(String, usize, bool)>,
+    rounds: usize,
+    gap: usize,
+    /// The next stop, counted across rounds.
+    next: usize,
+    /// When the frame after the last navigation is due.
+    since: usize,
+    visits: Vec<Value>,
+    frames: Vec<Value>,
+    before: Option<PhaseStats>,
+}
+
+/// The engine's cumulative counters, as far as a stop reports them.
+#[derive(Clone, Copy, Default)]
+struct PhaseStats {
+    build_ns: u128,
+    prepaint_ns: u128,
+    paint_ns: u128,
+    compute_layout_ns: u128,
+    shape_ns: u128,
+    lines_shaped: u64,
+    views_built: u64,
+    views_reused: u64,
+    nodes_created: u64,
+    measure_calls: u64,
+}
+
+fn phase_stats(window: &Window) -> PhaseStats {
+    let stats = window.layout_stats();
+    PhaseStats {
+        build_ns: stats.build_time.as_nanos(),
+        prepaint_ns: stats.prepaint_time.as_nanos(),
+        paint_ns: stats.paint_time.as_nanos(),
+        compute_layout_ns: stats.compute_layout_time.as_nanos(),
+        shape_ns: stats.shape_time.as_nanos(),
+        lines_shaped: stats.lines_shaped,
+        views_built: stats.views_built,
+        views_reused: stats.views_reused,
+        nodes_created: stats.nodes_created,
+        measure_calls: stats.measure_calls,
+    }
+}
+
+impl PhaseStats {
+    fn since(&self, earlier: &Self) -> Value {
+        json!({
+            "build_ns": self.build_ns - earlier.build_ns,
+            "prepaint_ns": self.prepaint_ns - earlier.prepaint_ns,
+            "paint_ns": self.paint_ns - earlier.paint_ns,
+            "compute_layout_ns": self.compute_layout_ns - earlier.compute_layout_ns,
+            "shape_ns": self.shape_ns - earlier.shape_ns,
+            "lines_shaped": self.lines_shaped - earlier.lines_shaped,
+            "views_built": self.views_built - earlier.views_built,
+            "views_reused": self.views_reused - earlier.views_reused,
+            "nodes_created": self.nodes_created - earlier.nodes_created,
+            "measure_calls": self.measure_calls - earlier.measure_calls,
+        })
+    }
 }
 
 pub(super) struct Options {
@@ -67,6 +168,7 @@ pub(super) struct Options {
     settle: usize,
     frames: usize,
     at: Point<Pixels>,
+    tour: Option<Tour>,
 }
 
 /// The run the environment asks for, if any.
@@ -79,6 +181,7 @@ pub(super) fn options() -> Option<Options> {
         "redraw" => Mode::Redraw,
         "idle" => Mode::Idle,
         "switch" => Mode::Switch,
+        "tour" => Mode::Tour,
         other => panic!("unknown MATERIAL_INSTR_MODE {other}"),
     };
     let number = |name: &str, default: f32| {
@@ -86,8 +189,34 @@ pub(super) fn options() -> Option<Options> {
             value.parse().unwrap_or_else(|_| panic!("{name}: {value}"))
         })
     };
+    let tour = (mode == Mode::Tour).then(|| {
+        let stops = var("MATERIAL_INSTR_TOUR")
+            .expect("MATERIAL_INSTR_TOUR")
+            .split(',')
+            .map(|stop| {
+                let (id, specs) = match stop.split_once(':') {
+                    Some((id, "specs")) => (id, true),
+                    _ => (stop, false),
+                };
+                let entry =
+                    catalog::position(id).unwrap_or_else(|| panic!("no catalog entry {id}"));
+                (stop.to_string(), entry, specs)
+            })
+            .collect();
+        Tour {
+            stops,
+            rounds: number("MATERIAL_INSTR_TOUR_ROUNDS", 3.) as usize,
+            gap: number("MATERIAL_INSTR_TOUR_GAP", 20.) as usize,
+            next: 0,
+            since: 0,
+            visits: Vec::new(),
+            frames: Vec::new(),
+            before: None,
+        }
+    });
     Some(Options {
         out: out.into(),
+        tour,
         mode,
         mode_name,
         entry: var("MATERIAL_INSTR_ENTRY").unwrap_or_else(|| "button".into()),
@@ -148,8 +277,60 @@ fn offset(gallery: &Gallery) -> f32 {
     }
 }
 
+/// One frame of a tour: closes the current stop when due, and starts the next.
+fn tour_step(mut run: Run, window: &mut Window, cx: &mut App) {
+    let now = Counters::now();
+    note_startup_frame(run.seen);
+    if run.seen == 0 {
+        window.reset_layout_stats();
+    }
+    run.seen += 1;
+    let mut tour = run.options.tour.take().expect("tour mode");
+    let spent = now.since(run.last);
+    let stats = phase_stats(window);
+    if run.seen > run.options.quiet {
+        if tour.before.is_some() {
+            tour.frames.push(json!(spent.row()));
+        }
+        let due = run.seen >= tour.since;
+        if due {
+            if let Some(before) = tour.before.take() {
+                let at = tour.next - 1;
+                let (stop, ..) = &tour.stops[at % tour.stops.len()];
+                tour.visits.push(json!({
+                    "stop": stop,
+                    "visit": at / tour.stops.len(),
+                    "frames": std::mem::take(&mut tour.frames),
+                    "engine": stats.since(&before),
+                    "scroll_top": offset(run.gallery.read(cx)),
+                }));
+            }
+            if tour.next == tour.stops.len() * tour.rounds {
+                run.options.tour = Some(tour);
+                finish(run, window, cx);
+                return;
+            }
+            let (_, entry, specs) = tour.stops[tour.next % tour.stops.len()];
+            tour.next += 1;
+            tour.since = run.seen + tour.gap;
+            tour.before = Some(stats);
+            run.gallery.update(cx, |gallery, cx| {
+                gallery.navigate(entry, cx);
+                if specs {
+                    gallery.set_tab(Tab::Specs, cx);
+                }
+            });
+        }
+    }
+    run.options.tour = Some(tour);
+    // From before the navigation, so that a stop's first frame has it in.
+    run.last = now;
+    window.on_next_frame(move |window, cx| tour_step(run, window, cx));
+}
+
 fn step(mut run: Run, window: &mut Window, cx: &mut App) {
     let now = Counters::now();
+    note_startup_frame(run.seen);
     let tally = TALLY.with(Cell::get);
     let frame_stats = stats(window);
     let warm = run.options.quiet + run.options.settle;
@@ -205,7 +386,7 @@ fn step(mut run: Run, window: &mut Window, cx: &mut App) {
                         .update(cx, |gallery, cx| gallery.navigate(entry, cx));
                 }
             }
-            Mode::Switch | Mode::Idle => {}
+            Mode::Switch | Mode::Idle | Mode::Tour => {}
         }
     }
     run.last = now;
@@ -233,6 +414,8 @@ fn finish(run: Run, window: &mut Window, cx: &mut App) {
             "engine_at_start":run.engine_at_start,
             "engine_at_end":engine_counters(window),
             "tally_final":TALLY.with(Cell::get),
+            "startup":startup_report(),
+            "tour":run.options.tour.as_ref().map(|tour| &tour.visits),
             "columns":["instructions","cycles","cpu_ns","allocations","allocated_bytes","gallery_renders","row_builds","frames_drawn","views_built","lead_renders","navigation_builds"],
             "frames":run.frames,
         }),
@@ -307,5 +490,9 @@ pub(super) fn install(
         last_offset: 0.,
         engine_at_start: Value::Null,
     };
-    window.on_next_frame(move |window, cx| step(run, window, cx));
+    if run.options.tour.is_some() {
+        window.on_next_frame(move |window, cx| tour_step(run, window, cx));
+    } else {
+        window.on_next_frame(move |window, cx| step(run, window, cx));
+    }
 }

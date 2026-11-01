@@ -849,7 +849,15 @@ impl Render for GalleryWindow {
     }
 }
 
+/// Ends a step of startup, for the instruction counters' report.
+#[inline]
+fn startup_mark(_step: &'static str) {
+    #[cfg(all(not(target_family = "wasm"), feature = "instruction-bench"))]
+    instr_bench::mark(_step);
+}
+
 pub fn run(application: gpui::Application, initialize: impl FnOnce(&mut App) + 'static) {
+    startup_mark("process_to_run");
     #[cfg(all(not(target_family = "wasm"), feature = "frame-profiler"))]
     let interactions = interactions::prepare();
     #[cfg(all(not(target_family = "wasm"), feature = "frame-profiler"))]
@@ -860,6 +868,7 @@ pub fn run(application: gpui::Application, initialize: impl FnOnce(&mut App) + '
     };
     let application = application.with_assets(Assets::new());
     application.run(move |cx: &mut App| {
+        startup_mark("application_started");
         #[cfg(target_family = "wasm")]
         cx.text_system()
             .add_fonts(vec![std::borrow::Cow::Borrowed(include_bytes!(
@@ -873,8 +882,11 @@ pub fn run(application: gpui::Application, initialize: impl FnOnce(&mut App) + '
                 std::borrow::Cow::Borrowed(include_bytes!("../fonts/roboto/Roboto-SemiBold.ttf")),
             ])
             .expect("Failed to load the reference Roboto fonts");
+        startup_mark("fonts");
         gpui_kit::init(cx);
+        startup_mark("kit_init");
         gpui_kit_material::init(cx);
+        startup_mark("material_init");
         initialize(cx);
         let viewport = size(px(1280.), px(900.));
         #[cfg(not(target_family = "wasm"))]
@@ -889,8 +901,11 @@ pub fn run(application: gpui::Application, initialize: impl FnOnce(&mut App) + '
         if instruction_bench.is_some() {
             window_options.inactive_frame_interval = None;
         }
+        startup_mark("window_options");
         let (_window, _content) = gpui_kit::open_window(window_options, cx, move |window, cx| {
+            startup_mark("platform_window");
             let gallery = cx.new(|cx| Gallery::new(window, cx));
+            startup_mark("gallery_new");
             // FPS is part of ordinary UI and profiler runs. Only deterministic
             // screenshot captures omit the changing counter and its timer.
             #[cfg(not(target_family = "wasm"))]
@@ -910,7 +925,9 @@ pub fn run(application: gpui::Application, initialize: impl FnOnce(&mut App) + '
             web_route::install(&gallery, cx);
             let shared = gallery.read(cx).shared.read(cx);
             let (initial_scheme, initial_scale) = (shared.target_scheme(), shared.text_scale());
+            startup_mark("top_bar_and_fps");
             theme::init_component_theme(initial_scheme, initial_scale, cx);
+            startup_mark("theme");
             cx.new(|_| GalleryWindow {
                 gallery,
                 top_bar,
@@ -919,6 +936,7 @@ pub fn run(application: gpui::Application, initialize: impl FnOnce(&mut App) + '
             })
         })
         .unwrap();
+        startup_mark("open_window_returned");
         #[cfg(all(not(target_family = "wasm"), feature = "instruction-bench"))]
         if let Some(options) = instruction_bench {
             _window
