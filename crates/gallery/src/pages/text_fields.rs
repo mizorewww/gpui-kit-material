@@ -130,8 +130,7 @@ impl GalleryPage for Page {
                     .items_start()
                     .child(
                         TextField::new("hero", &self.hero)
-                            .hero()
-                            .label("Video link")
+                            .hero("Video link")
                             .placeholder("Paste a link")
                             .leading_icon(symbol("link", false))
                             .trailing_icon(

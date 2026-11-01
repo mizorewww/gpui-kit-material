@@ -1976,6 +1976,10 @@ impl RenderOnce for ExposedDropdown {
             .shape(self.shape)
             .density(self.density)
             .label(self.label.clone())
+            // A hero field draws no label, and a dropdown has no placeholder of its own.
+            .when(self.variant == TextFieldVariant::Hero, |field| {
+                field.placeholder(self.label.clone())
+            })
             .required(self.required)
             .trailing_icon(arrow)
             .error(self.error)

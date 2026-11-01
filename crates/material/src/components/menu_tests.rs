@@ -1291,6 +1291,29 @@ fn the_first_arrow_key_up_moves_from_the_selected_item(cx: &mut TestAppContext) 
     assert_eq!(pick_after("up enter", cx), vec![49]);
 }
 
+struct HeroDropdown;
+
+impl Render for HeroDropdown {
+    fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        window.set_rem_size(px(14.));
+        ExposedDropdown::new("dropdown", "Language")
+            .variant(TextFieldVariant::Hero)
+            .options(["English", "Chinese"])
+    }
+}
+
+#[gpui::test]
+fn a_hero_dropdown_shows_its_label_where_a_field_puts_its_placeholder(cx: &mut TestAppContext) {
+    cx.update(|cx| {
+        gpui_kit::init(cx);
+        crate::init(cx);
+        cx.set_reduce_motion(true);
+    });
+    let (_, cx) = cx.add_window_view(|_, _| HeroDropdown);
+    draw(cx);
+    assert!(cx.debug_bounds("text-field-placeholder").is_some());
+}
+
 #[gpui::test]
 fn a_keyboard_focused_item_paints_the_focus_layer(cx: &mut TestAppContext) {
     let (_, cx) = cascade(cx, Anchor::TopLeft);

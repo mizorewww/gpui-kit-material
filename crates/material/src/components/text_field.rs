@@ -284,9 +284,10 @@ impl TextField {
     pub fn outlined(self) -> Self {
         self.variant(TextFieldVariant::Outlined)
     }
-    /// The page's one main input: see [`TextFieldVariant::Hero`].
-    pub fn hero(self) -> Self {
-        self.variant(TextFieldVariant::Hero)
+    /// The page's one main input: see [`TextFieldVariant::Hero`]. It draws no floating label
+    /// to name it, so `label` is required: it is the field's accessible name.
+    pub fn hero(self, label: impl Into<SharedString>) -> Self {
+        self.variant(TextFieldVariant::Hero).label(label)
     }
     /// The corners of a filled or outlined field.
     pub fn shape(mut self, shape: TextFieldShape) -> Self {
@@ -456,7 +457,7 @@ pub(crate) fn field_paint(variant: TextFieldVariant, s: FieldState) -> FieldPain
             } else {
                 variant_ink
             },
-            state_layer: alpha(on_surface, 0.),
+            state_layer: alpha(on_surface, if s.hovered { state::HOVER } else { 0. }),
             caret: if s.error {
                 color(C::ERROR)
             } else {
@@ -744,6 +745,15 @@ impl RenderOnce for TextField {
         let id = self.id.clone();
         if self.required {
             self.label = self.label.map(|label| required_label(&label, true));
+            // A hero field draws no label, so its required mark shows at rest where the
+            // label would: on its placeholder, or the label itself standing in for one.
+            if self.variant == TextFieldVariant::Hero {
+                self.placeholder = self
+                    .placeholder
+                    .take()
+                    .map(|placeholder| required_label(&placeholder, true))
+                    .or_else(|| self.label.clone());
+            }
         }
         if let FieldInput::Single(state) = &self.input {
             apply_input_type(&id, state, self.input_type, window, cx);
@@ -808,6 +818,19 @@ impl RenderOnce for TextField {
                 ..base
             },
         );
+        // A hero field's ring fades in with its focus, and stays while it is populated.
+        let hero_emphasis = if hero {
+            motion::token_value(
+                (id.clone(), "hero-ring"),
+                if focused || populated { 1. } else { 0. },
+                MotionToken::FastEffects,
+                window,
+                cx,
+            )
+            .clamp(0., 1.)
+        } else {
+            0.
+        };
         let mix = |a: Rgba, b: Rgba| blend(a, b, focus_t);
         let indicator = mix(rest.indicator, active.indicator);
         // The outline's weight steps with focus; its color crossfades.
@@ -847,7 +870,11 @@ impl RenderOnce for TextField {
                     .rounded_full()
                     .bg(rest.container)
                     .border(px(HERO_RING))
-                    .border_color(hero_ring(self.error, focused || populated, disabled)),
+                    .border_color(blend(
+                        hero_ring(self.error, false, disabled),
+                        hero_ring(self.error, true, disabled),
+                        hero_emphasis,
+                    )),
             })
             .when(!disabled, |this| this.cursor_text());
         if let Some(focus) = focus.clone().filter(|_| !disabled && preview.is_none()) {
@@ -858,7 +885,19 @@ impl RenderOnce for TextField {
 
         // The filled hover state layer.
         if hero {
-            // The ring is the container's border.
+            // The ring is the container's border; the state layer fills the pill inside it.
+            container = container.child(
+                div()
+                    .debug_selector(|| "text-field-hero-layer".into())
+                    .absolute()
+                    .inset_0()
+                    .rounded_full()
+                    .bg(rest.state_layer)
+                    .when(live_hover, |this| {
+                        let layer = hover_paint.state_layer;
+                        this.group_hover(group.clone(), move |s| s.bg(layer))
+                    }),
+            );
         } else if filled {
             container = container.child(
                 div()
@@ -936,14 +975,24 @@ impl RenderOnce for TextField {
         } else {
             PADDING
         };
-        let input_top = if hero {
+        // A single-line hero field centers its text in the pill; lines of text start where
+        // that one line would, off the ring.
+        let input_top = if hero && !multi_line {
             0.
+        } else if hero {
+            (height - 24.) / 2. - HERO_RING
         } else if filled && has_label {
             FILLED_INPUT_TOP - density.lift()
         } else {
             (height - 24.) / 2.
         };
-        let input_bottom = if hero { 0. } else { height - 24. - input_top };
+        let input_bottom = if hero && !multi_line {
+            0.
+        } else if hero {
+            input_top
+        } else {
+            height - 24. - input_top
+        };
         let show_content = floating || !has_label;
         let show_placeholder = !populated && show_content;
 
@@ -954,7 +1003,10 @@ impl RenderOnce for TextField {
                 .items_center()
                 .justify_center()
                 .size(rem(ICON_SIZE))
-                .when(multi_line, |this| this.mt(rem((height - 24.) / 2.)))
+                .when(multi_line, |this| {
+                    let ring = if hero { HERO_RING } else { 0. };
+                    this.mt(rem((height - 24.) / 2. - ring))
+                })
                 .text_color(ink)
                 .child(icon)
         };
@@ -1008,6 +1060,7 @@ impl RenderOnce for TextField {
         let editor = CaretColor::around(editor, Hsla::from(active.caret), cx);
         let placeholder = self.placeholder.clone().filter(|_| show_placeholder);
         let input_row = div()
+            .debug_selector(|| "text-field-input".into())
             .relative()
             .flex()
             .flex_1()
@@ -1036,6 +1089,7 @@ impl RenderOnce for TextField {
                     .when_some(placeholder, |this, placeholder| {
                         this.child(
                             div()
+                                .debug_selector(|| "text-field-placeholder".into())
                                 .absolute()
                                 .top_0()
                                 .left_0()
