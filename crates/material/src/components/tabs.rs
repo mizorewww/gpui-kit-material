@@ -275,6 +275,13 @@ struct TabGeometry {
     probed: Vec<(f32, f32)>,
     /// Each tab's bounds, written by this frame's probes.
     slots: Vec<Bounds<Pixels>>,
+    /// Where the sliding indicator is.
+    indicator: motion::TokenTransitionPlayback<Bounds<Pixels>>,
+}
+
+/// The indicator's target for a tab's span along the row.
+fn indicator_target((left, width): (f32, f32), inset: Pixels) -> Bounds<Pixels> {
+    Bounds::new(point(inset + px(left), px(0.)), size(px(width), px(0.)))
 }
 
 #[cfg(test)]
@@ -296,16 +303,31 @@ impl RenderOnce for MaterialTabs {
             BTreeMap::<SharedString, FocusHandle>::new()
         });
         roving::keep_focus_in_handles(&handles_state, &self.items, |item| &item.value, window, cx);
-        let handles: Rc<[FocusHandle]> = handles_state
-            .update(cx, |handles, cx| {
-                roving::sync_handles(
-                    handles,
-                    &self.items,
-                    |item| &item.value,
-                    || cx.focus_handle(),
-                )
-            })
-            .into();
+        // Only read while the tabs stay the same: a write as the row is built marks what
+        // read this state as changed.
+        let known = {
+            let handles = handles_state.read(cx);
+            (handles.len() == count)
+                .then(|| {
+                    self.items
+                        .iter()
+                        .map(|item| handles.get(&item.value).cloned())
+                        .collect::<Option<Rc<[FocusHandle]>>>()
+                })
+                .flatten()
+        };
+        let handles: Rc<[FocusHandle]> = known.unwrap_or_else(|| {
+            handles_state
+                .update(cx, |handles, cx| {
+                    roving::sync_handles(
+                        handles,
+                        &self.items,
+                        |item| &item.value,
+                        || cx.focus_handle(),
+                    )
+                })
+                .into()
+        });
         let scroll = window
             .use_keyed_state((self.id.clone(), "tab-scroll"), cx, |_, _| {
                 ScrollHandle::new()
@@ -389,10 +411,8 @@ impl RenderOnce for MaterialTabs {
                 .when(primary, |bar| bar.rounded_t(thickness))
         };
         let sliding = measured.map(|(left, width)| {
-            let target = Bounds::new(point(inset + px(left), px(0.)), size(px(width), px(0.)));
-            let at = motion::token_transition(
-                (self.id.clone(), "tab-indicator"),
-                target,
+            let at = geometry.read(cx).indicator.clone().follow(
+                indicator_target((left, width), inset),
                 MotionToken::DefaultSpatial,
                 window,
                 cx,
@@ -585,7 +605,12 @@ impl RenderOnce for MaterialTabs {
                     })
                     .child(ring),
                 move |bounds, _, cx| {
-                    if slot_geometry.read(cx).slots.get(index) != Some(&bounds) {
+                    // Along the row only: a list scrolling the row moves it down the
+                    // window, which changes nothing here, and a write would build it again.
+                    let moved = slot_geometry.read(cx).slots.get(index).is_some_and(|slot| {
+                        slot.left() != bounds.left() || slot.size.width != bounds.size.width
+                    });
+                    if moved {
                         slot_geometry.update(cx, |geometry, _| {
                             if let Some(slot) = geometry.slots.get_mut(index) {
                                 *slot = bounds;
@@ -632,8 +657,28 @@ impl RenderOnce for MaterialTabs {
                     .map(|(left, width)| (along(*left, *width), *width))
                     .collect();
                 let current = geometry.read(cx);
-                let moved =
-                    spans_moved(&current.tabs, &tabs) || spans_moved(&current.contents, &contents);
+                let first = current.tabs.is_empty();
+                let moved = !first
+                    && (spans_moved(&current.tabs, &tabs)
+                        || spans_moved(&current.contents, &contents));
+                // The first measure changes nothing on screen: the row drew its indicator
+                // under the selected tab. So the indicator only starts from there, and the
+                // view holding the row, a list of many, is not built again for it.
+                if first && let Some(index) = selected {
+                    let span = if primary {
+                        contents.get(index)
+                    } else {
+                        tabs.get(index)
+                    };
+                    if let Some(span) = span {
+                        current.indicator.sample(
+                            indicator_target(*span, inset),
+                            MotionToken::DefaultSpatial,
+                            cx,
+                        );
+                    }
+                }
+                let current = geometry.read(cx);
                 if current.tabs != tabs || current.contents != contents {
                     geometry.update(cx, |geometry, _| {
                         geometry.tabs = tabs;
