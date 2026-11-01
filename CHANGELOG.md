@@ -37,6 +37,8 @@ Distribution is by Git revision for now; see the [quick start](README.md#quick-s
 - `SearchFieldStyle`, `CardVariant::Surface` and `MaterialDialog::container`: a search bar,
   card and dialog that sit on the surface, for a page whose ground is a step below it.
 
+- `ListItem::switch_icons`: the handle icons of a list item's switch.
+
 ### Changed
 
 - **Breaking:** with `default-features = false`, `gpui-kit-material` now has no
