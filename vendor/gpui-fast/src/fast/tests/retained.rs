@@ -2819,11 +2819,19 @@ impl crate::Element for StoresAsItPaints {
 fn shell_around_painter(
     cx: &mut TestAppContext,
 ) -> (WindowHandle<Shell>, Rc<Cell<usize>>, Entity<GapPainter>) {
+    shell_around_gap(cx, true)
+}
+
+/// A shell around a [`GapPainter`] that writes as it paints or does not, drawn once.
+fn shell_around_gap(
+    cx: &mut TestAppContext,
+    written_as_painted: bool,
+) -> (WindowHandle<Shell>, Rc<Cell<usize>>, Entity<GapPainter>) {
     let stored = cx.new(|_| Stored(0));
     let gap = cx.new(|_| GapPainter {
         stored,
         written_as_built: false,
-        written_as_painted: true,
+        written_as_painted,
     });
     let (window, builds) = shell(cx, {
         let gap = gap.clone();
@@ -2866,6 +2874,24 @@ fn a_spliced_view_does_not_collect_a_stretch_of_writes_per_frame() {
         stretches <= 2,
         "a record kept {stretches} stretches of writes after 200 frames"
     );
+}
+
+/// A view spliced around a gap has seen what changed the gap: an idle draw after the splice
+/// reuses it rather than building it, whether or not the gap writes as it paints.
+#[test]
+fn an_idle_draw_after_a_splice_does_not_build_the_view_around_a_gap() {
+    for written_as_painted in [true, false] {
+        let mut cx = TestAppContext::single();
+        let (window, builds, gap) = shell_around_gap(&mut cx, written_as_painted);
+        for _ in 0..3 {
+            gap.update(&mut cx, |_, cx| cx.notify());
+            assert_eq!(builds.get(), 1, "the shell was spliced around the gap");
+            draw_shell(&mut cx, window);
+            assert_eq!(builds.get(), 1, "an idle draw built the shell");
+            draw_shell(&mut cx, window);
+            assert_eq!(builds.get(), 1, "a second idle draw built the shell");
+        }
+    }
 }
 
 /// A view around a gap, and the entity it reads, which the gap writes.

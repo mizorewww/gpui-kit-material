@@ -258,8 +258,8 @@
       },
       "src/fast/splice.rs": {
         "upstream_sha256": "4436ab4f8934aec0e95e73edf69fb3ea36c1b01cb6fe494037cb9923ea221efd",
-        "local_sha256": "acace50f03f453c29c4b2fd30961882fbfd5308a434735f0a9d37a201236b294",
-        "reason": "A view rebuilt alone keeps its direction (vendor/gpui-pre/layout-direction-patch.md). What a gap writes as it paints is the spliced view's own. Its own dependencies restart from the check each frame it is spliced, so those writes do not pile up. Limit: an entity keeps only its last write's stamp, so a write the view should see is hidden if a gap writes the same entity later in the frame; stamping each write would mean keeping every entity's history since the oldest live record, which an idle second window can hold back without bound (fast::tests::retained::a_later_paint_write_hides_an_earlier_write_of_the_same_entity). A spliced view forgets entities that no longer exist when its dependency list grew; without it a window's root keeps every entity a page ever read and replays them each frame (Material performance patch)."
+        "local_sha256": "ac37ac45a7b665a473d8cb01ae1cec01d812be04f9d55c74c69912597ec3a4f7",
+        "reason": "A view rebuilt alone keeps its direction (vendor/gpui-pre/layout-direction-patch.md). What a gap writes as it paints is the spliced view's own. Its own dependencies restart from the check each frame it is spliced, so those writes do not pile up. Limit: an entity keeps only its last write's stamp, so a write the view should see is hidden if a gap writes the same entity later in the frame; stamping each write would mean keeping every entity's history since the oldest live record, which an idle second window can hold back without bound (fast::tests::retained::a_later_paint_write_hides_an_earlier_write_of_the_same_entity). A spliced view forgets entities that no longer exist when its dependency list grew; without it a window's root keeps every entity a page ever read and replays them each frame (Material performance patch). A spliced view counts what it read as checked up to the frame's start, so a change to a gap it drew does not leave it changed for an idle draw."
       },
       "src/fast/text.rs": {
         "upstream_sha256": "e386a393269aee9189cb87c2a1f40f40fb4716b2cd98e6a394e052b318177814",
@@ -363,7 +363,7 @@
       },
       "src/fast/dependencies.rs": {
         "upstream_sha256": "8f230852f0585bec1f92608aec4fcc3d8fb3f00ad4736cba8a8d05f736e84cc5",
-        "local_sha256": "bc7563df2239bfa6cd5e5400348506afe10260a4df878c78075dbfd8d1d148c2",
+        "local_sha256": "c9babe4b85313d50b22b9873cdcbeff40f23afa89fffcbe68fde9f4a36232089",
         "reason": "Entity::update_for_render, the public form of dependencies::query, behind frame-observation (vendor/gpui-pre/render-lease-patch.md). A test's count of a record's stretches of own writes. RenderDependencies::without_dropped_entities for the same."
       },
       "src/fast/tests/dependencies.rs": {
@@ -388,13 +388,18 @@
       },
       "src/fast/tests/retained.rs": {
         "upstream_sha256": "95fbb8389daf15e227312b07d2794ba109406071a780d3f4d9224e61f722173b",
-        "local_sha256": "263f518dcb029d20f6ee753bd5706fb5c3acad1da33553f177287f4290a84085",
+        "local_sha256": "88c293b5564a5c2e4cadfcf49a6a3b9e83b3a3306fb7ef7a48b6a3be9b37bec2",
         "reason": "Tests of what a gap writes around a spliced view, and of the limit in src/fast/splice.rs. Test of the spliced view forgetting dropped entities."
       },
       "src/app/entity_map.rs": {
         "upstream_sha256": "c15e4ae3de7b646f8061dcbec965c5f6f669cc00b08c570f7af4c4e40df6393b",
         "local_sha256": "8e60ef743f704271a53f8876e3c251f53ff26cf9d570aaca8bb1625c6f562b2d",
         "reason": "EntityMap::is_alive for the same."
+      },
+      "src/fast/retained.rs": {
+        "upstream_sha256": "e6885ba63fccd9375a0afc80b657463790cc9a39f639676997f8fa293b1beb6b",
+        "local_sha256": "a195bfd0e79d2a2ff32dcbd55466f701a1a9a505b59d7f28144a91b9bad69d8b",
+        "reason": "Where the update generation stood as the frame began."
       }
     },
     "added": {

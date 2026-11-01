@@ -743,7 +743,12 @@ impl Window {
         // What the view read itself was checked before it was spliced, so it
         // is up to date with every write so far.
         let previous_dependencies = &self.rendered_frame.retained.records[previous].dependencies;
-        let mut dependencies = previous_dependencies.written_up_to(writes_now);
+        // And what the views nested in it read was checked as the frame began, each marked
+        // dirty if it changed: those that were are the gaps. Without this it would stay
+        // "changed" for as long as it is not built, for a change to a gap it has drawn.
+        let mut dependencies = previous_dependencies
+            .written_up_to(writes_now)
+            .updated_up_to(self.retained_state.updates_at_frame_start);
         for gap in &gaps {
             let gap_id = &self.rendered_frame.retained.records[gap.record].id;
             if let Some(&gap_index) = target.by_id.get(gap_id) {
