@@ -823,10 +823,7 @@ impl MacWindowState {
 
     fn start_display_link(&mut self) {
         self.stop_display_link();
-        if !self
-            .native_window()
-            .occlusionState()
-            .contains(NSWindowOcclusionState::Visible)
+        if !visible_for_frames(self.native_window())
         {
             return;
         }
@@ -2043,10 +2040,7 @@ impl PlatformWindow for MacWindow {
             // Native display callbacks remain the synchronized/hidden path.
             // Demand adds requests only when presentation sync is disabled.
             if crate::fast::composition::vsync_status(&state) != gpui::VsyncStatus::Disabled
-                || !state
-                    .native_window()
-                    .occlusionState()
-                    .contains(NSWindowOcclusionState::Visible)
+                || !visible_for_frames(state.native_window())
             {
                 return;
             }
@@ -3053,11 +3047,19 @@ pub(crate) extern "C" fn handle_view_event(this: &AnyObject, _: Sel, native_even
     }
 }
 
-fn visibility(state: &MacWindowState) -> WindowVisibility {
-    let is_visible = state
-        .native_window()
+/// Whether the window should draw as a visible one. A remote desktop's overlay covers every
+/// window for as long as it is connected, so `GPUI_IGNORE_OCCLUSION` lets an instruction
+/// benchmark, which needs frames and not their pixels, run behind one.
+fn visible_for_frames(window: &NSWindow) -> bool {
+    static IGNORE: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    window
         .occlusionState()
-        .contains(NSWindowOcclusionState::Visible);
+        .contains(NSWindowOcclusionState::Visible)
+        || *IGNORE.get_or_init(|| std::env::var_os("GPUI_IGNORE_OCCLUSION").is_some())
+}
+
+fn visibility(state: &MacWindowState) -> WindowVisibility {
+    let is_visible = visible_for_frames(state.native_window());
     if is_visible {
         WindowVisibility::Visible
     } else {
@@ -3100,10 +3102,7 @@ fn report_visibility(window_state: &Arc<Mutex<MacWindowState>>) {
 extern "C" fn window_did_change_occlusion_state(this: &AnyObject, _: Sel, _: *mut AnyObject) {
     let window_state = unsafe { get_window_state(this) };
     let mut lock = window_state.lock();
-    if lock
-        .native_window()
-        .occlusionState()
-        .contains(NSWindowOcclusionState::Visible)
+    if visible_for_frames(lock.native_window())
     {
         lock.move_traffic_light();
         lock.start_display_link();

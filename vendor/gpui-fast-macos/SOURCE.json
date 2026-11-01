@@ -43,7 +43,7 @@
     },
     "src/window.rs": {
       "upstream_sha256": "d559ef3d21486e7e20fade38d917105ff4924d883143f5ef3aaca48faab5d1d8",
-      "local_sha256": "7cade7717a737b3ca1aa3721191e318499dbae4b17b05c36da2299951c962bca",
+      "local_sha256": "d20f7bcbe9d72993fcea498819a0169c0033c21156947d48d589ea5e5b8f1a08",
       "reason": "vsync_status/set_vsync, successful_frame_submissions via draw_with_status, has_periodic_frame_source, weak-owner demand frame_waker, unconditional anyhow::Result import (MATERIAL-PATCHES.md)."
     },
     "Cargo.toml": {
