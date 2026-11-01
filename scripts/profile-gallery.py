@@ -678,6 +678,9 @@ def md3io_probe(args, destination):
                 (destination / "probe.json").write_text(json.dumps(value, indent=2) + "\n")
                 print(f"{args.md3io}: {value['frames']} frames, p50 {value['p50_ms']} ms, "
                       f"p95 {value['p95_ms']} ms, max {value['max_ms']} ms")
+                if not value["moved"]:
+                    print(f"{args.md3io}: the wheel moved nothing, so this measured an idle page",
+                          file=sys.stderr)
                 code = 0
                 break
         else:

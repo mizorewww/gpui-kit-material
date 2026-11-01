@@ -28,9 +28,11 @@ export function installProfiler(params) {
     // The same probe `--md3io` injects into md3.io, for a like-for-like
     // comparison; it waits for the Gallery to load before measuring.
     const seconds = Number(params.get("seconds") ?? "10");
-    runFrameProbe({ seconds, hz: Number(params.get("hz") ?? "1000"), settleMs: 3000 }).then(
-      (report) => (window.__galleryProfile = { done: true, report }),
-    );
+    runFrameProbe({
+      seconds,
+      hz: Number(params.get("hz") ?? "1000"),
+      settleMs: Number(params.get("settle") ?? "3000"),
+    }).then((report) => (window.__galleryProfile = { done: true, report }));
     return null;
   }
   if (mode !== "startup" && mode !== "scroll" && mode !== "idle") return null;
@@ -339,7 +341,9 @@ function summarize(values) {
 // rendering. Input handlers that run before rAF and compositor-thread
 // scrolling are not included: compare with a DevTools trace (see
 // docs/DEVELOPMENT.md). Wheel input: fixed 8 px steps at `hz` over the element
-// under the viewport centre, reversing every `legPx`.
+// under the viewport centre once the page has settled, reversing every `legPx`.
+// `moved` says whether they moved anything: the scroller's position on a DOM page, the
+// new frames of a canvas (`window.__galleryNewFrames`, as an idle window draws nothing).
 function runFrameProbe({ seconds = 10, hz = 1000, legPx = 4000, settleMs = 750 } = {}) {
   return new Promise((resolve) => {
     const starts = [];
@@ -361,7 +365,12 @@ function runFrameProbe({ seconds = 10, hz = 1000, legPx = 4000, settleMs = 750 }
       requestAnimationFrame(frame);
     };
     requestAnimationFrame(frame);
-    const target = document.elementFromPoint(innerWidth / 2, innerHeight / 2) ?? document.body;
+    // Not before it settles: a loading page's splash would take the wheel events.
+    const pickTarget = () => document.elementFromPoint(innerWidth / 2, innerHeight / 2) ?? document.body;
+    let target = null;
+    const newFrames = () => window.__galleryNewFrames?.() ?? null;
+    let framesBefore = null;
+    let scrolledPx = 0;
     const input = new MessageChannel();
     const begun = performance.now();
     let next = begun + settleMs;
@@ -372,6 +381,10 @@ function runFrameProbe({ seconds = 10, hz = 1000, legPx = 4000, settleMs = 750 }
       if (!running) return;
       const now = performance.now();
       if (now >= next) {
+        if (!target || target.closest?.("#splash")) {
+          target = pickTarget();
+          framesBefore = newFrames();
+        }
         target.dispatchEvent(new WheelEvent("wheel", {
           deltaY: down ? 8 : -8, deltaMode: 0, clientX: innerWidth / 2, clientY: innerHeight / 2,
           bubbles: true, cancelable: true,
@@ -383,7 +396,10 @@ function runFrameProbe({ seconds = 10, hz = 1000, legPx = 4000, settleMs = 750 }
                  /(auto|scroll)/.test(getComputedStyle(scroller).overflowY))) {
           scroller = scroller.parentElement;
         }
-        (scroller ?? document.scrollingElement).scrollBy(0, down ? 8 : -8);
+        scroller ??= document.scrollingElement;
+        const top = scroller.scrollTop;
+        scroller.scrollBy(0, down ? 8 : -8);
+        scrolledPx += Math.abs(scroller.scrollTop - top);
         dispatched += 1;
         leg += 8;
         if (leg >= legPx) { leg = 0; down = !down; }
@@ -402,8 +418,10 @@ function runFrameProbe({ seconds = 10, hz = 1000, legPx = 4000, settleMs = 750 }
       const sorted = [...settled].sort((a, b) => a - b);
       const rank = (q) => (sorted.length ? sorted[Math.max(0, Math.ceil(q * sorted.length) - 1)] : null);
       const span = (performance.now() - begun - settleMs) / 1000;
+      const framesAfter = newFrames();
+      const drawn = framesBefore === null || framesAfter === null ? null : framesAfter - framesBefore;
       resolve({
-        schema: "frame-probe-v1",
+        schema: "frame-probe-v2",
         url: location.href,
         user_agent: navigator.userAgent,
         device_pixel_ratio: devicePixelRatio,
@@ -415,6 +433,11 @@ function runFrameProbe({ seconds = 10, hz = 1000, legPx = 4000, settleMs = 750 }
         p95_ms: rank(0.95),
         max_ms: sorted.length ? sorted[sorted.length - 1] : null,
         wheel_inputs: dispatched,
+        wheel_target: target?.tagName ?? null,
+        scrolled_px: scrolledPx,
+        new_frames: drawn,
+        // Unknown on a canvas whose backend counts no frames.
+        moved: scrolledPx > 0 || drawn > 0 || (drawn === null && target?.tagName === "CANVAS" ? null : false),
         raw_ms: settled,
       });
     }, settleMs + seconds * 1000);

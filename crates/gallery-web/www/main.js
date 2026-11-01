@@ -224,6 +224,8 @@ try {
     showIndeterminate("Starting…");
     watchContextLoss();
     module.run();
+    // What `?profile=probe` tells a moved canvas by.
+    window.__galleryNewFrames = () => module.gallery_successful_new_frames();
     removeSplashAfterFirstFrame(module);
     loadSymbolsInBackground(module);
   }
