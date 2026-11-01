@@ -7,8 +7,8 @@ use std::sync::{
 };
 
 use gpui::{
-    AppContext as _, Context, Entity, IntoElement, ParentElement as _, Pixels, Render,
-    SharedString, Styled as _, TestAppContext, VisualTestContext, Window, div, hsla, px,
+    AppContext as _, Context, Entity, IntoElement, ParentElement as _, Pixels, Render, Styled as _,
+    TestAppContext, VisualTestContext, Window, div, hsla, px,
 };
 
 use super::{
@@ -36,13 +36,6 @@ fn parsed(source: &str, extensions: MarkdownExtensions) -> Vec<BlockNode> {
     };
     let document = markdown::parse(source, &mut cx).unwrap();
     document.blocks.as_ref().clone()
-}
-
-fn surface(block: &BlockNode) -> (&SharedString, &[BlockNode]) {
-    match block {
-        BlockNode::Surface { name, children, .. } => (name, children),
-        block => panic!("not a surface: {block:?}"),
-    }
 }
 
 const DOCUMENT: &str = "before\n\n<!-- surface:summary -->\n\n# inside one\n\ninside **two**\n\n- three\n\n<!-- /surface -->\n\nafter";

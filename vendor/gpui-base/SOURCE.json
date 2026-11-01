@@ -6,7 +6,7 @@
     },
     "src/text/block_surface_tests.rs": {
       "reason": "Tests of the block surface patch (block-surface-patch.md); not an upstream file.",
-      "sha256": "d561f99df7801112ef3bfb4f5a3233580e71524cb489ec1719f94d2b4ebe271c"
+      "sha256": "f324704f404cc4f0b263796d309e2f2ff37e22b57e7d0fd28f7f61b7465ae25b"
     }
   },
   "development_examples_limit": "Upstream development examples are preserved, including references to sibling story-web font and repository example fixtures. Those external fixtures are not included in this Base-only vendor snapshot; standalone example execution is not asserted.",
