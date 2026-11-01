@@ -463,6 +463,14 @@ pub(super) fn install(
             gallery.set_tab(Tab::Specs, cx);
         }
     });
+    // A preview in a mode of its own builds its scheme as it renders.
+    if std::env::var_os("MATERIAL_INSTR_PREVIEW_DARK").is_some() {
+        let shared = gallery.read(cx).shared.clone();
+        shared.update(cx, |shared, cx| {
+            shared.preview_mode = Some(gpui_kit_material::color::themes::ThemeMode::Dark);
+            cx.notify();
+        });
+    }
     if options.mode == Mode::Idle {
         let out = options.out.clone();
         let (entry, seconds) = (options.entry.clone(), 3.);
