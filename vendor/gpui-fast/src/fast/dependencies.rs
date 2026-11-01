@@ -1272,6 +1272,32 @@ impl RenderDependencies {
         }
     }
 
+    /// These dependencies, without the entities that no longer exist, which
+    /// cannot change. A view spliced around nested views builds on what it read last
+    /// frame, so without this it keeps every entity they ever read, and replays
+    /// them on every frame it draws. Only worth calling when the list grew.
+    pub(crate) fn without_dropped_entities(mut self, cx: &App) -> Self {
+        let live = self
+            .entities
+            .iter()
+            .filter(|entity| cx.entities.is_alive(**entity))
+            .count();
+        if live != self.entities.len() {
+            self.entities = self
+                .entities
+                .iter()
+                .copied()
+                .filter(|entity| cx.entities.is_alive(*entity))
+                .collect();
+        }
+        self
+    }
+
+    /// Whether this holds the same list of entities as `other`, not an equal one.
+    pub(crate) fn shares_entities_with(&self, other: &Self) -> bool {
+        Rc::ptr_eq(&self.entities, &other.entities)
+    }
+
     /// Both sets of dependencies at once, as of the earlier generation, so
     /// that a change either would have seen is still seen.
     pub(crate) fn union(&self, other: &Self) -> Self {

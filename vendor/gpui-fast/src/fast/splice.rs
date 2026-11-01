@@ -736,9 +736,8 @@ impl Window {
         let mut layout_keys = kept_layout_keys;
         // What the view read itself was checked before it was spliced, so it
         // is up to date with every write so far.
-        let mut dependencies = self.rendered_frame.retained.records[previous]
-            .dependencies
-            .written_up_to(writes_now);
+        let previous_dependencies = &self.rendered_frame.retained.records[previous].dependencies;
+        let mut dependencies = previous_dependencies.written_up_to(writes_now);
         for gap in &gaps {
             let gap_id = &self.rendered_frame.retained.records[gap.record].id;
             if let Some(&gap_index) = target.by_id.get(gap_id) {
@@ -746,6 +745,9 @@ impl Window {
                 layout_keys.extend(gap_record.layout_keys.iter().copied());
                 dependencies = dependencies.union(&gap_record.dependencies);
             }
+        }
+        if !dependencies.shares_entities_with(previous_dependencies) {
+            dependencies = dependencies.without_dropped_entities(cx);
         }
         let record = &mut target.records[index];
         record.prepaint_range = start..end;
