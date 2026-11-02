@@ -8,6 +8,7 @@ struct BarHarness {
     layout: SearchViewLayout,
     style: SearchViewStyle,
     disabled: bool,
+    rows: usize,
     picked: Rc<Cell<Option<usize>>>,
 }
 
@@ -25,7 +26,7 @@ impl Render for BarHarness {
             .layout(self.layout)
             .view_style(self.style)
             .expanded(self.expanded)
-            .suggestions((0..3).map(|ix| {
+            .suggestions((0..self.rows).map(|ix| {
                 let picked = picked.clone();
                 SearchSuggestion::new("Label")
                     .supporting_text("Supporting")
@@ -56,6 +57,7 @@ fn setup(
         layout,
         style: SearchViewStyle::Contained,
         disabled: false,
+        rows: 3,
         picked: Rc::default(),
     })
 }
@@ -169,6 +171,49 @@ fn the_full_screen_view_fills_its_area(cx: &mut TestAppContext) {
     assert_eq!(bar.size.width, px(400. - 24.), "the bar insets 12dp");
     assert_eq!(results.top(), bar.bottom());
     assert_eq!(results.bottom(), px(410.));
+}
+
+/// Scroll the results down, then press 32px under their top: the row there
+/// is the first only if the list did not scroll.
+fn scroll_and_pick(cx: &mut VisualTestContext, view: &Entity<BarHarness>) -> Option<usize> {
+    let results = cx.debug_bounds("search-results").unwrap();
+    cx.simulate_event(ScrollEvent {
+        position: results.center(),
+        delta: ScrollDelta::Pixels(point(px(0.), px(-200.))),
+        ..Default::default()
+    });
+    draw(cx);
+    cx.simulate_click(
+        point(results.center().x, results.top() + px(32.)),
+        Modifiers::default(),
+    );
+    cx.update(|_, cx| view.read(cx).picked.get())
+}
+
+#[gpui::test]
+fn docked_results_longer_than_their_cap_scroll(cx: &mut TestAppContext) {
+    let (view, cx) = setup(cx, SearchViewLayout::Docked);
+    view.update(cx, |v, cx| {
+        v.rows = 20;
+        v.expanded = true;
+        cx.notify();
+    });
+    draw(cx);
+    let picked = scroll_and_pick(cx, &view);
+    assert!(picked.is_some_and(|row| row > 0), "scrolled: {picked:?}");
+}
+
+#[gpui::test]
+fn full_screen_results_longer_than_their_area_scroll(cx: &mut TestAppContext) {
+    let (view, cx) = setup(cx, SearchViewLayout::FullScreen);
+    view.update(cx, |v, cx| {
+        v.rows = 20;
+        v.expanded = true;
+        cx.notify();
+    });
+    draw(cx);
+    let picked = scroll_and_pick(cx, &view);
+    assert!(picked.is_some_and(|row| row > 0), "scrolled: {picked:?}");
 }
 
 #[test]
