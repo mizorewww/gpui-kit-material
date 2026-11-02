@@ -43,6 +43,7 @@ Distribution is by Git revision for now; see the [quick start](README.md#quick-s
 - `ListItem::expressive`: the kit's expressive row, tighter, whose corners round from 4dp to
   16dp when it is selected, pressed or focused.
 - `MaterialDivider::subhead`: the kit's divider with subhead.
+- `media_label`: a short fact over a picture, such as a duration on a cover.
 
 ### Changed
 
