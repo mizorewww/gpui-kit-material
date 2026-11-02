@@ -261,6 +261,9 @@ pub(crate) struct Gallery {
     navigation_focus: FocusHandle,
     /// Holds the compact drawer, to tell focus it took from focus elsewhere.
     pub(crate) drawer_focus: FocusHandle,
+    /// The top bar's search field, which Up from the drawer's first result
+    /// goes back to.
+    pub(crate) search_focus: Option<FocusHandle>,
     /// The column of pages: see [`shell::NavigationView`].
     navigation: Entity<shell::NavigationView>,
     pending_focus: Option<(usize, bool)>,
@@ -334,6 +337,7 @@ impl Gallery {
             row_focus: Vec::new(),
             navigation_focus,
             drawer_focus: cx.focus_handle(),
+            search_focus: None,
             navigation,
             pending_focus: None,
             last_rem: window.rem_size(),
@@ -1403,6 +1407,51 @@ mod window_tests {
         assert!(cx.read(|cx| gallery.read(cx).drawer_open));
         assert!(field_focused(&top_bar, &mut cx));
         assert_eq!(blurs.get(), 0, "the field kept focus throughout");
+    }
+
+    /// Down in the field goes to the first result, Up from it comes back, and
+    /// Escape there closes the results and gives the field focus without
+    /// opening them again.
+    #[gpui::test]
+    fn the_keyboard_reaches_the_compact_results(cx: &mut TestAppContext) {
+        let (gallery, top_bar, mut cx) = open_window(480., cx);
+        let toggle = cx.debug_bounds("top-search-toggle").unwrap();
+        cx.simulate_click(toggle.center(), gpui::Modifiers::none());
+        settle(&mut cx);
+        cx.simulate_input("s");
+        settle(&mut cx);
+        let in_drawer = |cx: &mut gpui::VisualTestContext| {
+            cx.update(|window, cx| gallery.read(cx).drawer_focus.contains_focused(window, cx))
+        };
+        cx.simulate_keystrokes("down");
+        settle(&mut cx);
+        assert!(in_drawer(&mut cx), "Down goes to the results");
+        assert!(!field_focused(&top_bar, &mut cx));
+        cx.simulate_keystrokes("up");
+        settle(&mut cx);
+        assert!(
+            field_focused(&top_bar, &mut cx),
+            "Up from the first comes back"
+        );
+        assert!(cx.read(|cx| gallery.read(cx).drawer_open));
+        cx.simulate_keystrokes("down");
+        settle(&mut cx);
+        assert!(in_drawer(&mut cx));
+        cx.simulate_keystrokes("escape");
+        settle(&mut cx);
+        assert!(
+            field_focused(&top_bar, &mut cx),
+            "Escape gives the field focus"
+        );
+        assert!(
+            !cx.read(|cx| gallery.read(cx).drawer_open),
+            "the dismissed results stay closed"
+        );
+        assert!(cx.read(|cx| top_bar.read(cx).search_open));
+        // Down shows them again.
+        cx.simulate_keystrokes("down");
+        settle(&mut cx);
+        assert!(cx.read(|cx| gallery.read(cx).drawer_open));
     }
 
     /// Enter with no query opens nothing; a dismissed results drawer comes back

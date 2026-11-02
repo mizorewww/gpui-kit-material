@@ -18,7 +18,7 @@ use super::{
     shell::{ShellLayout, shell_width},
 };
 use gpui::{prelude::*, *};
-use gpui_base::input::{InputEvent, InputState};
+use gpui_base::input::{InputEvent, InputState, MoveDown};
 use gpui_kit_material::prelude::*;
 
 /// Below these window widths (in design px) the brand's wordmark gives way:
@@ -143,6 +143,8 @@ impl TopBar {
     ) -> Self {
         let search = cx.new(|cx| InputState::new(window, cx).placeholder("Search"));
         let shared = gallery.read(cx).shared.clone();
+        let search_focus = search.read(cx).focus_handle(cx);
+        gallery.update(cx, |gallery, _| gallery.search_focus = Some(search_focus));
         let subscriptions = vec![
             cx.subscribe_in(&search, window, |this: &mut Self, search, event, _, cx| {
                 match event {
@@ -245,6 +247,24 @@ impl TopBar {
         cx.notify();
     }
 
+    /// Down in the compact search: to the first result, showing the
+    /// results first if they were dismissed.
+    fn down_to_results(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if !self.search_open || ShellLayout::of(window) != ShellLayout::Compact {
+            return;
+        }
+        let gallery = self.gallery.read(cx);
+        if gallery.drawer_open {
+            let container = gallery.drawer_focus.clone();
+            cx.stop_propagation();
+            NavigationDrawer::focus_first(&container, window, cx);
+        } else if self.has_query(cx) {
+            cx.stop_propagation();
+            self.gallery
+                .update(cx, |gallery, cx| gallery.show_results(cx));
+        }
+    }
+
     fn clear_query(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.search
             .update(cx, |search, cx| search.set_value("", window, cx));
@@ -282,6 +302,11 @@ impl Render for TopBar {
             div()
                 .id("top-search")
                 .debug_selector(|| "top-search".into())
+                // Down goes to the compact search's results, before the
+                // single-line field takes it.
+                .capture_action(
+                    cx.listener(|this, _: &MoveDown, window, cx| this.down_to_results(window, cx)),
+                )
                 // Escape closes the compact search, or clears the query.
                 .on_key_down(cx.listener(|this, event: &KeyDownEvent, window, cx| {
                     if event.keystroke.key != "escape" {
