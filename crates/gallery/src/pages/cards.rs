@@ -1,15 +1,20 @@
 //! Cards: the outlined, elevated and filled cards composed like the kit's
 //! specimens (header, media, text and actions), their horizontal form, and
 //! the kit's card states (hover, focus, press, drag), selectable cards
-//! (toggles) and a card group (one choice, a radio group).
+//! (toggles), a card group (one choice, a radio group), and a drop target:
+//! at rest, dragged over, and a live one that takes files dragged from the
+//! desktop or chosen with its button.
 use super::prelude::*;
-use gpui_kit_material::icons::Symbol;
+use gpui_kit_material::icons::{Icon, Symbol};
 
 pub struct Page {
     /// Which of the selectable cards are selected.
     selected: [bool; 3],
     /// The card group's choice.
     choice: usize,
+    /// The names of the files last dropped on or chosen for the live drop
+    /// target.
+    dropped: Option<SharedString>,
 }
 
 /// The kit's column order.
@@ -138,6 +143,55 @@ fn vertical(index: usize, variant: CardVariant) -> impl IntoElement {
         )
 }
 
+/// A drop target's content as an application composes it: an upload icon,
+/// a label and a button to choose a file instead.
+/// The icon turns primary with the target, by the drag itself or forced.
+fn drop_target_specimen(
+    id: &'static str,
+    active: bool,
+    label: SharedString,
+    choose: MaterialButton,
+) -> Stateful<Div> {
+    let upload: Icon = Symbol::named("upload")
+        .expect("upload is a Material Symbol")
+        .into();
+    let primary = color(ColorRole::PRIMARY);
+    drop_target(id, "Upload files", active)
+        .w(rem(CARD_WIDTH))
+        .h(rem(176.))
+        .p(rem(16.))
+        .gap(rem(12.))
+        .child(
+            div()
+                .text_color(color(if active {
+                    ColorRole::PRIMARY
+                } else {
+                    ColorRole::ON_SURFACE_VARIANT
+                }))
+                .group_drag_over::<ExternalPaths>(DROP_TARGET_GROUP, move |style| {
+                    style.text_color(primary)
+                })
+                .child(upload.size(rem(32.))),
+        )
+        .child(
+            spec::type_role(accessible_text((id, 0usize), label), TypeRole::BodyMedium)
+                .text_color(color(ColorRole::ON_SURFACE_VARIANT)),
+        )
+        .child(choose.child("Choose file"))
+}
+
+/// The names of `paths`, joined for the live target's label.
+#[cfg(not(target_arch = "wasm32"))]
+fn file_names(paths: &[std::path::PathBuf]) -> SharedString {
+    paths
+        .iter()
+        .filter_map(|path| path.file_name())
+        .map(|name| name.to_string_lossy().into_owned())
+        .collect::<Vec<_>>()
+        .join(", ")
+        .into()
+}
+
 fn horizontal(index: usize, variant: CardVariant) -> impl IntoElement {
     CardSurface::new(variant)
         .w(rem(CARD_WIDTH))
@@ -158,11 +212,12 @@ impl GalleryPage for Page {
         Page {
             selected: [true, false, false],
             choice: 0,
+            dropped: None,
         }
     }
 
     fn row_count(&self, _: &Window) -> usize {
-        5
+        6
     }
 
     fn render_row(&mut self, row: usize, _: &mut Window, cx: &mut Context<Self>) -> AnyElement {
@@ -226,6 +281,88 @@ impl GalleryPage for Page {
                 )
                 .into_any_element();
         }
+        if row == 5 {
+            let live = self
+                .dropped
+                .clone()
+                .unwrap_or_else(|| "Drop a file here".into());
+            let specimen = |id: &'static str| {
+                material_button((id, 1usize), ButtonVariant::Outlined)
+                    .preview_state(InteractionPreview::Enabled)
+            };
+            // The pointer-free way in: the button opens the file picker.
+            #[cfg(not(target_arch = "wasm32"))]
+            {
+                let choose = material_button(("drop-live", 1usize), ButtonVariant::Outlined)
+                    .on_click(cx.listener(|_, _, _, cx| {
+                        let picked = cx.prompt_for_paths(PathPromptOptions {
+                            files: true,
+                            directories: false,
+                            multiple: true,
+                            prompt: None,
+                        });
+                        cx.spawn(async move |page, cx| {
+                            if let Ok(Ok(Some(paths))) = picked.await {
+                                let _ = page.update(cx, |page, cx| {
+                                    page.dropped = Some(file_names(&paths));
+                                    cx.notify();
+                                });
+                            }
+                        })
+                        .detach();
+                    }));
+                return board("drop-target")
+                    .caption("Drop target")
+                    .columns(3)
+                    .column_labels(["At rest", "Dragged over", "Live"])
+                    .cells([
+                        drop_target_specimen(
+                            "drop-rest",
+                            false,
+                            "Drop a file here".into(),
+                            specimen("drop-rest"),
+                        ),
+                        drop_target_specimen(
+                            "drop-over",
+                            true,
+                            "Drop a file here".into(),
+                            specimen("drop-over"),
+                        ),
+                        drop_target_specimen("drop-live", false, live, choose).on_drop(
+                            cx.listener(|page, paths: &ExternalPaths, _, cx| {
+                                page.dropped = Some(file_names(paths.paths()));
+                                cx.notify();
+                            }),
+                        ),
+                    ])
+                    .into_any_element();
+            }
+            // A browser hands the page neither dropped files nor a file
+            // picker's paths, so the web gallery shows the specimens only.
+            #[cfg(target_arch = "wasm32")]
+            {
+                let _ = (live, cx);
+                return board("drop-target")
+                    .caption("Drop target (the live target is in the desktop gallery)")
+                    .columns(2)
+                    .column_labels(["At rest", "Dragged over"])
+                    .cells([
+                        drop_target_specimen(
+                            "drop-rest",
+                            false,
+                            "Drop a file here".into(),
+                            specimen("drop-rest"),
+                        ),
+                        drop_target_specimen(
+                            "drop-over",
+                            true,
+                            "Drop a file here".into(),
+                            specimen("drop-over"),
+                        ),
+                    ])
+                    .into_any_element();
+            }
+        }
         if row == 2 {
             return board("card-states")
                 .caption("Building blocks: card states")
@@ -261,5 +398,16 @@ impl GalleryPage for Page {
             )
         }
         .into_any_element()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use core::prelude::v1::test;
+
+    #[test]
+    fn the_drop_target_icon_is_a_material_symbol() {
+        assert!(Symbol::named("upload").is_some());
     }
 }

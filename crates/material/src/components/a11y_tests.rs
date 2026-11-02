@@ -68,6 +68,7 @@ impl Render for Screen {
                             .accessibility_label("Second choice"),
                     ),
             )
+            .child(drop_target("drop", "Upload files", false).size(px(40.)))
             .child(MaterialTooltip::plain("tip", "Save a copy").trigger(div().size(px(20.))))
             .child(progress_with_label("copy", "Copy", 0.25, window, cx))
             .child(indeterminate_progress_with_label("index", "Index", cx))
@@ -223,6 +224,9 @@ fn overlays_rows_and_items_announce_names_and_states(cx: &mut TestAppContext) {
         assert_eq!(node["position_in_set"], position, "{node}");
         assert_eq!(node["size_of_set"], 2, "{node}");
     }
+
+    // A drop target is a group named by its caller.
+    labelled(&all, "group", "Upload files", &tree);
 
     // Overlays are named by the caller's headline or label.
     labelled(&all, "dialog", "Discard draft?", &tree);

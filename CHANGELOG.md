@@ -63,6 +63,9 @@ Distribution is by Git revision for now; see the [quick start](README.md#quick-s
 - `MaterialDialog::max_width`: caps the basic dialog (no lower than 280dp), so a `FullWidth`
   dialog can be wider than `Large` on a large window and still narrow with it. Like the other
   dialog widths it is in dp and grows with the text scale; full-screen dialogs ignore it.
+- `drop_target`: a named region that takes dropped files, with a dashed outline that turns
+  primary under a state layer while files are dragged over it (GPUI's own drag state, which
+  clears itself), or while the caller forces it. `DROP_TARGET_GROUP` lets its content follow.
 
 ### Changed
 

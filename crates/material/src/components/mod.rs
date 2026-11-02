@@ -112,6 +112,10 @@ mod choice;
 #[cfg(feature = "dialogs")]
 mod dialog;
 #[cfg(feature = "feedback")]
+mod drop_target;
+#[cfg(feature = "feedback")]
+pub use drop_target::{DROP_TARGET_GROUP, DROP_TARGET_STROKE, drop_target};
+#[cfg(feature = "feedback")]
 mod feedback;
 mod focus;
 mod interaction;

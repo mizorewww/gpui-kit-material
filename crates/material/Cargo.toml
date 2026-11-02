@@ -46,7 +46,7 @@ buttons = ["menus", "progress"]
 progress = []
 # LoadingIndicator, PullToRefresh.
 loading = ["progress", "shapes"]
-# Badge, Snackbar, MaterialTooltip, MaterialCard, status chips and notices.
+# Badge, Snackbar, MaterialTooltip, MaterialCard, drop targets, status chips and notices.
 feedback = []
 # Checkbox, radio, switch, chips, slider, tiles and choice tiles.
 selection = []
