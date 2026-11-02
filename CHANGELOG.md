@@ -9,6 +9,7 @@ Distribution is by Git revision for now; see the [quick start](README.md#quick-s
 
 ### Added
 
+- `Color::contrast`, the WCAG 2.x contrast ratio of two colors.
 - Cargo feature groups on `gpui-kit-material`, with `full` naming every group; see the
   [README](README.md#crates). `default` still enables everything.
 - A `dynamic` feature on `gpui-kit-material-color`, on by default.
@@ -50,6 +51,11 @@ Distribution is by Git revision for now; see the [quick start](README.md#quick-s
 
 ### Changed
 
+- Every built-in palette's `ERROR` and `ON_ERROR_CONTAINER` change: the palette's
+  danger color is moved in tone, keeping its hue, until it reads at least 4.5:1 on
+  every surface role and on `ERROR_CONTAINER`, as Material's standard contrast
+  requires. Nord's moves most, `#bf616a` to `#ffd2d4`; the others move a few tone
+  steps. [PALETTES.md](crates/color/PALETTES.md) lists every value.
 - **Breaking:** with `default-features = false`, `gpui-kit-material` now has no
   components until a group or `full` is enabled.
 - **Breaking:** the `frame-profiler` and `instruction-bench` features moved to
