@@ -997,7 +997,9 @@ impl RenderOnce for MaterialDialog {
                     }
                 }),
             )
-            .popup(surface);
+            // The host draws deferred, after any enclosing scope has left the
+            // stack; the surface re-enters it to keep the scope's scheme.
+            .popup(crate::scope::current_scope(surface));
         let host = if container.is_some() {
             place_host(host, area)
         } else {
@@ -1497,6 +1499,66 @@ mod tests {
         assert!(
             close.top() >= px(56.),
             "below the traffic lights: {close:?}"
+        );
+    }
+
+    /// Reads the scheme while painting, in a dialog's deferred host: the host
+    /// paints after the enclosing scope has left the stack.
+    #[derive(gpui::IntoElement)]
+    struct SchemeProbe(Rc<Cell<Option<Rgba>>>);
+    impl RenderOnce for SchemeProbe {
+        fn render(self, _: &mut Window, _: &mut App) -> impl IntoElement {
+            let seen = self.0;
+            canvas(
+                |_, _, _| {},
+                move |_, _, _, _| seen.set(Some(color(ColorRole::SURFACE))),
+            )
+            .size(px(4.))
+        }
+    }
+
+    struct Scoped(Rc<Cell<Option<Rgba>>>);
+    impl Render for Scoped {
+        fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+            let seen = self.0.clone();
+            crate::scope::Scope::new("scoped")
+                .scheme(crate::color::Scheme::from_palette(
+                    crate::color::PaletteId::Ink,
+                ))
+                .child_with(move |_, _| {
+                    div()
+                        .size_full()
+                        .child(
+                            MaterialDialog::new("scoped-dialog")
+                                .headline("Title")
+                                .content(SchemeProbe(seen))
+                                .modal(true),
+                        )
+                        .into_any_element()
+                })
+        }
+    }
+
+    #[gpui::test]
+    fn a_dialog_in_a_scope_draws_in_its_scheme(cx: &mut TestAppContext) {
+        use crate::color::{PaletteId, Scheme};
+        cx.update(|cx| {
+            gpui_kit::init(cx);
+            crate::theme::init_component_theme(Scheme::from_palette(PaletteId::Paper), 1., cx);
+            cx.set_reduce_motion(true);
+        });
+        let seen = Rc::new(Cell::new(None));
+        let (_, cx) = cx.add_window_view({
+            let seen = seen.clone();
+            move |_, _| Scoped(seen)
+        });
+        draw(cx);
+        draw(cx);
+        let ink = crate::theme::rgba(Scheme::from_palette(PaletteId::Ink).get(ColorRole::SURFACE));
+        assert_eq!(
+            seen.get(),
+            Some(ink),
+            "the deferred surface keeps the scope"
         );
     }
 }
