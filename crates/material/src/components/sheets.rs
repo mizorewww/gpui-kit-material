@@ -57,6 +57,9 @@ const BOTTOM_SHEET_MAX_WIDTH: f32 = 640.;
 /// The room an expanded bottom sheet leaves above it, so its handle and the
 /// scrim stay in view however tall its content (M3 bottom sheet spec, 72dp).
 const BOTTOM_SHEET_TOP_MARGIN: f32 = 72.;
+/// The scrim a modal side sheet always leaves beside it, in window px: like
+/// the modal navigation drawer, at most the area's width less 56dp.
+const SIDE_SHEET_SCRIM_MARGIN: f32 = 56.;
 /// Pointer travel before a press on a bottom sheet becomes a drag.
 const DRAG_SLOP: f32 = 4.;
 
@@ -315,9 +318,9 @@ impl MaterialSideSheet {
             })
     }
 
-    /// The modal container: surface-container-low with 16dp corners.
-    fn modal_surface(self, corners: Corners<Pixels>) -> Div {
-        let width = self.width;
+    /// The modal container, `width` wide: surface-container-low with 16dp
+    /// corners.
+    fn modal_surface(self, width: Pixels, corners: Corners<Pixels>) -> Div {
         div()
             .w(width)
             .h_full()
@@ -359,7 +362,10 @@ impl RenderOnce for MaterialSideSheet {
                 div()
                     .id(id)
                     .h_full()
-                    .child(self.modal_surface(Corners::all(SIDE_SHEET_RADIUS)))
+                    .child(self.modal_surface(
+                        width.to_pixels(window.rem_size()),
+                        Corners::all(SIDE_SHEET_RADIUS),
+                    ))
                     .into_any_element()
             } else {
                 div()
@@ -383,7 +389,7 @@ impl RenderOnce for MaterialSideSheet {
             let Some(area) = overlay_area(container.as_ref(), window, cx) else {
                 return with_container_probe(container, div().into_any_element());
             };
-            let width = self.width.to_pixels(window.rem_size());
+            let width = modal_side_width(self.width.to_pixels(window.rem_size()), area.size.width);
             let dismiss = self.on_dismiss.clone().filter(|_| open);
             let dismissals = Dismissals {
                 escape: dismiss.clone().filter(|_| self.dismiss_on_escape),
@@ -420,7 +426,7 @@ impl RenderOnce for MaterialSideSheet {
                 })
                 .opacity(frame.opacity())
                 .occlude()
-                .child(self.modal_surface(corners));
+                .child(self.modal_surface(width, corners));
             let area = container.is_some().then_some(area);
             return with_container_probe(
                 container,
@@ -460,6 +466,14 @@ impl RenderOnce for MaterialSideSheet {
             })
             .into_any_element()
     }
+}
+
+/// A modal side sheet's width: the caller's, narrowed to leave the scrim
+/// margin in an `available`-wide area.
+fn modal_side_width(width: Pixels, available: Pixels) -> Pixels {
+    width
+        .min(available - px(SIDE_SHEET_SCRIM_MARGIN))
+        .max(px(0.))
 }
 
 /// What dismisses a modal sheet: Escape and the scrim, each optional.
@@ -2077,6 +2091,55 @@ mod tests {
         // The scrim above the sheet is still there to dismiss it.
         cx.simulate_click(point(px(200.), px(20.)), Modifiers::default());
         assert_eq!(dismissals.get(), 1);
+    }
+
+    #[test]
+    fn a_modal_side_sheet_leaves_its_scrim_margin() {
+        assert_eq!(modal_side_width(px(320.), px(1000.)), px(320.));
+        assert_eq!(modal_side_width(px(320.), px(320.)), px(264.));
+        assert_eq!(modal_side_width(px(320.), px(40.)), px(0.));
+    }
+
+    /// A modal side sheet at 200% text in a phone-width window.
+    struct NarrowSide(Rc<Cell<usize>>);
+    impl Render for NarrowSide {
+        fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+            window.set_rem_size(px(2. * crate::tokens::typography::BASE_PX));
+            let dismissals = self.0.clone();
+            div().size_full().child(
+                MaterialSideSheet::new("narrow-side")
+                    .modal(true)
+                    .open(true)
+                    .on_dismiss(move |_, _| dismissals.set(dismissals.get() + 1))
+                    .child(
+                        div()
+                            .debug_selector(|| "narrow-side-body".into())
+                            .size_full(),
+                    ),
+            )
+        }
+    }
+
+    #[gpui::test]
+    fn a_scaled_modal_side_sheet_fits_beside_its_scrim(cx: &mut TestAppContext) {
+        cx.update(|cx| {
+            gpui_base::init(cx);
+            cx.set_reduce_motion(true);
+        });
+        let dismissals = Rc::new(Cell::new(0));
+        let (_, cx) = cx.add_window_view({
+            let dismissals = dismissals.clone();
+            move |_, _| NarrowSide(dismissals)
+        });
+        cx.simulate_resize(size(px(320.), px(600.)));
+        for _ in 0..3 {
+            draw(cx);
+        }
+        let body = cx.debug_bounds("narrow-side-body").unwrap();
+        assert_eq!(body.right(), px(320.), "docked to the end edge");
+        assert_eq!(body.left(), px(SIDE_SHEET_SCRIM_MARGIN), "{body:?}");
+        cx.simulate_click(point(px(20.), px(300.)), Modifiers::default());
+        assert_eq!(dismissals.get(), 1, "the scrim beside it dismisses");
     }
 
     /// The kit's `Bottom sheet`, `Modal=False`.
