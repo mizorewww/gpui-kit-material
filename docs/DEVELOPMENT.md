@@ -163,7 +163,7 @@ per-frame data with nearest-rank quantiles; an average never decides one:
 | idle window | 0 frames drawn or presented | `--bench` idle scenario, `?profile=idle` |
 | missed refreshes, vsync on | 0 at 120 Hz | intervals > 1.5 refreshes; UNVERIFIED on other displays |
 | first frame | ≤ 1.2 × Kit's stories baseline on this machine | thread CPU clock from `open_window` to after the first submission, against `--kit-first-frame-ms`; UNVERIFIED without that baseline |
-| page switch | 8 ms | hook: the Gallery shell reports `page_switch_ns` (native) or calls `window.__galleryPageSwitch(ms)` (web) |
+| page switch | 8 ms | native: the Gallery reports `page_switch_ns`. Web: not measured, so UNVERIFIED: `profile.js` offers the hook `window.__galleryPageSwitch(ms)`, and nothing calls it |
 | WASM against md3.io | main-thread frame time ≥ 5× lower | stays UNVERIFIED in the tool; [the comparison below](#chrome-comparison-with-md3io) is by hand |
 
 GPU time (Metal timestamps), drawable wait, new frames per second and the forced
@@ -185,7 +185,7 @@ instructions at each step from `main` to the first presented frame.
 
 A window that something covers gets no frames from macOS, and a benchmark then waits for
 ever. A remote desktop's overlay covers every window: set `GPUI_IGNORE_OCCLUSION=1` to draw
-regardless (dev backend only). Counts stay comparable; a stalled main thread can still add
+regardless (Fast on macOS only, where any value turns it on, `0` and an empty one too). Counts stay comparable; a stalled main thread can still add
 frames, as a wheel's hover freeze expiring refreshes the window, so compare the frames' `row_builds` too.
 
 Re-judge saved evidence without running anything:
@@ -237,7 +237,10 @@ machine otherwise idle.
    self-contained function that times each animation frame from its
    `requestAnimationFrame` callback to a `MessageChannel` task posted there,
    which runs after that frame's style, layout, paint and commit, while it
-   sends 8 px wheel steps (and scrolls the nearest scroller) at 1000 Hz:
+   sends 8 px wheel steps (and scrolls the nearest scroller) at 1000 Hz to what is under the
+   viewport's centre once the page has settled. The report's `moved` says whether they moved
+   anything, from `scrolled_px` on a DOM page and `new_frames` on the Gallery's canvas; a
+   report with `moved` false measured an idle page:
 
    ```sh
    python3 scripts/profile-gallery.py /tmp/md3io --md3io https://md3.io/components/buttons --seconds 10

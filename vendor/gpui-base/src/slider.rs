@@ -343,12 +343,14 @@ impl SliderState {
     fn update_thumb_pos(&mut self) {
         match self.value {
             SliderValue::Single(value) => {
-                let percentage = self.value_to_percentage(value.clamp(self.min, self.max));
+                let percentage = self.value_to_percentage(value.min(self.max).max(self.min));
                 self.percentage = 0.0..percentage;
             }
             SliderValue::Range(start, end) => {
-                let clamped_start = start.clamp(self.min, self.max);
-                let clamped_end = end.clamp(self.min, self.max);
+                // Not `clamp`: while a builder is between its `min` and `max`, `min`
+                // can stand above `max`.
+                let clamped_start = start.min(self.max).max(self.min);
+                let clamped_end = end.min(self.max).max(self.min);
                 self.percentage =
                     self.value_to_percentage(clamped_start)..self.value_to_percentage(clamped_end);
             }
@@ -391,14 +393,32 @@ impl SliderState {
         let value = snap_to_step(value, self.min, self.max, step);
 
         if is_start {
-            self.percentage.start = percentage;
             self.value.set_start(value);
         } else {
-            self.percentage.end = percentage;
             self.value.set_end(value);
         }
+        // The handle stands at the value, on its step, not at the pointer.
+        self.update_thumb_pos();
         cx.emit(SliderEvent::Change(self.value));
         cx.notify();
+    }
+
+    /// Moves the end thumb or, with `start`, a range's start thumb by `delta`, as an
+    /// assistive technology's Increment and Decrement do, and reports the change if it
+    /// moved. A thumb stops at the other one and at the slider's ends.
+    #[doc(hidden)]
+    pub fn step_thumb(
+        &mut self,
+        start: bool,
+        delta: f32,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let value = step_thumb(self.value, start, delta, self.min, self.max);
+        if value != self.value {
+            self.set_value(value, window, cx);
+            cx.emit(SliderEvent::Change(value));
+        }
     }
 
     /// Whether `position` is closer to the range start thumb than to the end thumb.
@@ -437,12 +457,15 @@ fn snap_to_step(value: f32, min: f32, max: f32, step: f32) -> f32 {
         .max(min)
 }
 
-/// `value` with its end moved by `delta` inside `min..=max`. A range keeps
-/// its start: assistive-technology increments move only the end thumb.
-fn step_end(value: SliderValue, delta: f32, min: f32, max: f32) -> SliderValue {
+/// `value` with its end, or with `start` a range's start, moved by `delta` inside
+/// `min..=max`, without passing the other thumb.
+fn step_thumb(value: SliderValue, start: bool, delta: f32, min: f32, max: f32) -> SliderValue {
     let mut value = value;
-    let end = (value.end() + delta).min(max).max(min);
-    value.set_end(end);
+    if start && value.is_range() {
+        value.set_start((value.start() + delta).min(max).max(min));
+    } else {
+        value.set_end((value.end() + delta).min(max).max(min));
+    }
     value
 }
 
@@ -572,13 +595,7 @@ impl RenderOnce for Slider {
                     let state = slider_state.clone();
                     move |_, window, cx| {
                         state.update(cx, |state, cx| {
-                            let value = step_end(
-                                state.value(),
-                                state.step_value(),
-                                state.min_value(),
-                                state.max_value(),
-                            );
-                            state.set_value(value, window, cx);
+                            state.step_thumb(false, state.step_value(), window, cx);
                         });
                     }
                 })
@@ -586,13 +603,7 @@ impl RenderOnce for Slider {
                     let state = slider_state.clone();
                     move |_, window, cx| {
                         state.update(cx, |state, cx| {
-                            let value = step_end(
-                                state.value(),
-                                -state.step_value(),
-                                state.min_value(),
-                                state.max_value(),
-                            );
-                            state.set_value(value, window, cx);
+                            state.step_thumb(false, -state.step_value(), window, cx);
                         });
                     }
                 })
@@ -937,6 +948,8 @@ impl RenderOnce for SliderThumb {
                         },
                     ))
             })
+            // A caller can make a thumb a focusable slider of its own, as for a range.
+            .a11y_disabled(self.disabled)
     }
 }
 
@@ -1006,20 +1019,36 @@ mod tests {
     }
 
     #[test]
-    fn accessibility_steps_move_only_a_ranges_end() {
+    fn accessibility_steps_move_only_the_stepped_thumb() {
         assert_eq!(
-            step_end(SliderValue::Range(20., 60.), 1., 0., 100.),
+            step_thumb(SliderValue::Range(20., 60.), false, 1., 0., 100.),
             SliderValue::Range(20., 61.)
         );
         assert_eq!(
-            step_end(SliderValue::Range(20., 20.), -1., 0., 100.),
+            step_thumb(SliderValue::Range(20., 20.), false, -1., 0., 100.),
             SliderValue::Range(20., 20.),
             "the end never passes the start"
         );
         assert_eq!(
-            step_end(SliderValue::Single(99.5), 1., 0., 100.),
+            step_thumb(SliderValue::Single(99.5), false, 1., 0., 100.),
             SliderValue::Single(100.)
         );
+        assert_eq!(
+            step_thumb(SliderValue::Range(20., 60.), true, -1., 0., 100.),
+            SliderValue::Range(19., 60.)
+        );
+        assert_eq!(
+            step_thumb(SliderValue::Range(60., 60.), true, 1., 0., 100.),
+            SliderValue::Range(60., 60.),
+            "the start never passes the end"
+        );
+    }
+
+    #[test]
+    fn min_can_be_set_above_the_default_max_before_max() {
+        let state = SliderState::new().min(150.).max(200.).default_value(175.);
+        assert_eq!(state.value(), SliderValue::Single(175.));
+        assert_eq!(state.percentage(), 0.0..0.5);
     }
 
     #[test]

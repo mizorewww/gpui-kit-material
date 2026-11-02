@@ -291,7 +291,7 @@ pub static PLAYGROUND: Playground = Playground {
 fn preview(
     config: &Config,
     preview: &mut Preview,
-    _: &mut Window,
+    window: &mut Window,
     cx: &mut Context<PlaygroundState>,
 ) -> AnyElement {
     let set = &SETS[config.choice("items")];
@@ -302,7 +302,24 @@ fn preview(
     let selection = config.option("selection");
     let trailing = config.option("trailing");
     let segmented = config.option("variant") == "segmented";
-    let selected: Vec<bool> = SELECTED.iter().map(|id| config.bool(id)).collect();
+    let mut selected: Vec<bool> = SELECTED.iter().map(|id| config.bool(id)).collect();
+    // One choice: only the first of those a multiple selection left stays. It goes
+    // from the controls too, after this frame, which shows it already.
+    if selection == "single"
+        && let Some(first) = selected.iter().position(|selected| *selected)
+    {
+        let extra: Vec<&'static str> = (first + 1..SELECTED.len())
+            .filter(|&index| std::mem::take(&mut selected[index]))
+            .map(|index| SELECTED[index])
+            .collect();
+        if !extra.is_empty() {
+            cx.defer_in(window, move |state, window, cx| {
+                for id in extra {
+                    state.set_value(id, Value::Bool(false), window, cx);
+                }
+            });
+        }
+    }
     // Rows act when they select or toggle their trailing control.
     let interactive = selection != "none" || trailing == "control";
     let mut setters = Vec::with_capacity(SELECTED.len());
@@ -457,6 +474,13 @@ mod tests {
             config.bool("selected_2"),
             "multi selection keeps the others"
         );
+
+        // Back to one choice, one stays selected.
+        harness.set("selection", Value::Choice(1));
+        let config = harness.config();
+        assert!(config.bool("selected_0"));
+        assert!(!config.bool("selected_2"), "single selection keeps one");
+        harness.set("selection", Value::Choice(2));
 
         // More items and a subheader grow the list.
         harness.set("count", Value::Choice(1));

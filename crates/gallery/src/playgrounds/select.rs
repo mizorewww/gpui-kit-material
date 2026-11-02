@@ -102,7 +102,7 @@ pub static PLAYGROUND: Playground = Playground {
             controls: &[
                 Control::Switch {
                     id: "disable_second",
-                    label: "Disable banana",
+                    label: "Disable the second option",
                     default: false,
                 },
                 Control::Switch {

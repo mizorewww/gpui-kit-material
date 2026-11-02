@@ -9,7 +9,8 @@ Playground and Rust columns and the gaps checkable in code are current to it. Th
 and E columns and gaps against the references keep the `45de656` audit.
 
 **Result: 0 components are production-ready.** Of the 47 rows below, 45 are
-implemented, 43 with a playground, all with tests. None has independent approval, committed
+implemented, 44 with a playground (42 pages in `catalog.rs`: Toggle button shares Button's, and
+the two toolbars share one), all with tests. None has independent approval, committed
 captures against the kit, or per-component performance results. RTL is inherited by
 every component with tests for the direction-sensitive ones, but has no committed
 captures or review with a real RTL locale.

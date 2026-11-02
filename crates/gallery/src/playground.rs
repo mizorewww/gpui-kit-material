@@ -345,7 +345,8 @@ pub fn symbol(name: &str, size: f32) -> Icon {
 pub struct PreviewStore {
     inputs: HashMap<&'static str, Entity<InputState>>,
     textareas: HashMap<&'static str, Entity<TextareaState>>,
-    locals: HashMap<&'static str, Box<dyn Any>>,
+    /// With the observation that re-renders the playground for it.
+    locals: HashMap<&'static str, (Box<dyn Any>, Subscription)>,
     memos: HashMap<&'static str, u64>,
     hint: PaneHint,
     subscriptions: Vec<Subscription>,
@@ -484,15 +485,15 @@ impl Preview<'_> {
             .store
             .locals
             .get(key)
-            .and_then(|local| local.downcast_ref::<Entity<T>>())
+            .and_then(|(local, _)| local.downcast_ref::<Entity<T>>())
         {
             return entity.clone();
         }
         let entity = cx.new(|cx| init(window, cx));
+        let observation = cx.observe(&entity, |_, _, cx| cx.notify());
         self.store
-            .subscriptions
-            .push(cx.observe(&entity, |_, _, cx| cx.notify()));
-        self.store.locals.insert(key, Box::new(entity.clone()));
+            .locals
+            .insert(key, (Box::new(entity.clone()), observation));
         entity
     }
 }
@@ -612,8 +613,11 @@ impl PlaygroundState {
         }
     }
 
-    /// Restore the defaults (md3.io's Reset).
+    /// Restore the defaults (md3.io's Reset), and what the preview holds beyond its
+    /// controls, such as removed chips, which it builds again as it renders.
     pub fn reset(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.store.locals.clear();
+        self.store.memos.clear();
         self.select_scenario(0, window, cx);
     }
 
@@ -699,7 +703,7 @@ impl PlaygroundState {
         self.store
             .locals
             .get(key)
-            .and_then(|local| local.downcast_ref::<Entity<T>>())
+            .and_then(|(local, _)| local.downcast_ref::<Entity<T>>())
             .cloned()
     }
 
@@ -1123,6 +1127,8 @@ pub struct PreviewView {
     hint: Rc<Cell<PaneHint>>,
     dependents: (WeakEntity<LeadView>, WeakEntity<PanelView>),
     _observe: [Subscription; 2],
+    #[cfg(test)]
+    pub(crate) renders: Cell<usize>,
 }
 
 impl PreviewView {
@@ -1143,12 +1149,16 @@ impl PreviewView {
             hint,
             dependents,
             _observe: observe,
+            #[cfg(test)]
+            renders: Cell::default(),
         }
     }
 }
 
 impl Render for PreviewView {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        #[cfg(test)]
+        self.renders.set(self.renders.get() + 1);
         let scope = self.shared.read(cx).preview_scope().resolve(window, cx);
         let state = self.state.clone();
         // A lease: what the Gallery reads of the state does not change by building

@@ -12,6 +12,10 @@ use wasm_bindgen::prelude::*;
 use crate::ime_mirror::ImeMirror;
 use crate::window::WebWindowInner;
 
+#[path = "ime_edit.rs"]
+mod ime_edit;
+use ime_edit::{edit_prefix_and_suffix, key_belongs_to_ime};
+
 pub struct WebEventListeners {
     _handles: Vec<EventListenerHandle>,
 }
@@ -738,6 +742,18 @@ impl WebWindowInner {
                 return;
             }
 
+            // A key the IME owns, such as the Enter that commits a candidate,
+            // never reaches the app: a field would act on it mid-composition.
+            let composing = this.is_composing.get() || event.is_composing();
+            if key_belongs_to_ime(composing, event.key_code()) {
+                if composing {
+                    event.prevent_default();
+                } else {
+                    this.schedule_ime_mirror_sync();
+                }
+                return;
+            }
+
             let keystroke = Keystroke {
                 modifiers,
                 key,
@@ -756,11 +772,6 @@ impl WebWindowInner {
                     this.schedule_ime_mirror_sync();
                     return;
                 }
-            }
-
-            if this.is_composing.get() || event.is_composing() {
-                event.prevent_default();
-                return;
             }
 
             if keystroke_inserts_text(&modifiers, this.is_mac)
@@ -857,40 +868,12 @@ impl WebWindowInner {
             let old_units: Vec<u16> = old_value.encode_utf16().collect();
             let new_units: Vec<u16> = new_value.encode_utf16().collect();
 
-            // A prefix/suffix diff is ambiguous when the inserted text
-            // shares characters with what follows it (inserting "pactor "
-            // before "pact" also reads as inserting "or pact" four units
-            // later). The edit's true position is not ambiguous: the browser
-            // leaves the caret at the end of an IME edit, so the suffix is
-            // anchored as "everything after the post-edit caret", and the
-            // prefix is capped to fit. Greedy matching is only a fallback
-            // for edits where the anchored suffix doesn't verify.
             let post_edit_caret = this
                 .ime_mirror
                 .selection_start()
                 .map(|caret| caret as usize);
-            let anchored_suffix_length = post_edit_caret
-                .map(|caret| new_units.len().saturating_sub(caret))
-                .filter(|&suffix_length| {
-                    suffix_length <= old_units.len()
-                        && old_units[old_units.len() - suffix_length..]
-                            == new_units[new_units.len() - suffix_length..]
-                });
-            let suffix_length = anchored_suffix_length.unwrap_or_else(|| {
-                old_units
-                    .iter()
-                    .rev()
-                    .zip(new_units.iter().rev())
-                    .take_while(|(old_unit, new_unit)| old_unit == new_unit)
-                    .count()
-            });
-            let prefix_length = old_units
-                .iter()
-                .zip(&new_units)
-                .take_while(|(old_unit, new_unit)| old_unit == new_unit)
-                .count()
-                .min(old_units.len() - suffix_length)
-                .min(new_units.len() - suffix_length);
+            let (prefix_length, suffix_length) =
+                edit_prefix_and_suffix(&old_units, &new_units, post_edit_caret);
 
             let inserted_text = String::from_utf16_lossy(
                 &new_units[prefix_length..new_units.len() - suffix_length],

@@ -406,6 +406,7 @@ struct HeroHarness {
     area: Entity<TextareaState>,
     multi: bool,
     required: bool,
+    label: Option<&'static str>,
     placeholder: Option<&'static str>,
 }
 
@@ -421,7 +422,7 @@ impl Render for HeroHarness {
             div().debug_selector(|| "field".into()).w(px(300.)).child(
                 field
                     .variant(TextFieldVariant::Hero)
-                    .label("Video link")
+                    .when_some(self.label, |field, label| field.label(label))
                     .required(self.required)
                     .when_some(self.placeholder, |field, placeholder| {
                         field.placeholder(placeholder)
@@ -446,6 +447,7 @@ fn hero_harness(
             area: cx.new(|cx| TextareaState::new(window, cx)),
             multi: false,
             required: false,
+            label: Some("Video link"),
             placeholder: None,
         };
         configure(&mut harness);
@@ -464,6 +466,29 @@ fn a_multi_line_hero_field_keeps_its_text_off_the_ring(cx: &mut TestAppContext) 
         px((HERO_FIELD_HEIGHT - 24.) / 2.),
         "centered on the first line, as a single-line hero field's text is"
     );
+}
+
+#[gpui::test]
+fn a_hero_field_without_a_label_is_named_by_its_placeholder(cx: &mut TestAppContext) {
+    let (_, cx) = hero_harness(cx, true, |hero| {
+        hero.label = None;
+        hero.placeholder = Some("Paste a link");
+    });
+    draw(cx);
+    let input = cx.update(|window, _| {
+        gpui_base::test_support::snapshots(window)
+            .into_iter()
+            .find(|s| s.role() == Some(Role::TextInput))
+            .unwrap()
+    });
+    assert_eq!(input.label(), Some("Paste a link"));
+}
+
+#[gpui::test]
+fn a_hero_field_with_no_name_at_all_still_draws(cx: &mut TestAppContext) {
+    let (_, cx) = hero_harness(cx, true, |hero| hero.label = None);
+    draw(cx);
+    assert!(cx.debug_bounds("text-field-input").is_some());
 }
 
 #[gpui::test]

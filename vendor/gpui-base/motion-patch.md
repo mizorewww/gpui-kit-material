@@ -49,7 +49,18 @@ The local compatibility surface is restricted to:
   itself focusable (observed by `test_support`), so keyboard focus and
   assistive technology land on the slider instead of an unnamed wrapper.
   Tests: `dragging_snaps_from_min`,
-  `accessibility_steps_move_only_a_ranges_end`.
+  `accessibility_steps_move_only_the_stepped_thumb`.
+- `src/slider.rs`, four more. A drag kept the pointer's percentage, so a step-25 slider
+  dropped at 30% had value 25 with its handle at 30%; the handle now stands at the value.
+  Increment and Decrement went through `set_value`, which emits nothing, so a value owned by
+  events missed a screen reader's edit; `SliderState::step_thumb` now emits `Change` when the
+  thumb moved, and steps either thumb of a range for a caller whose thumbs are nodes of their
+  own. `SliderState::new().min(150.).max(200.)` panicked in `min`, whose `clamp` saw the
+  default max of 100; it no longer clamps by a pair that can be inverted. `SliderThumb`
+  reports its `disabled` flag on its accessibility node. Tests, in `crates/material/tests/slider_state.rs`
+  since this crate's own do not run in the workspace:
+  `a_dropped_handle_stands_at_its_value`, `an_accessibility_step_reports_a_change`,
+  `each_range_thumb_steps_by_itself`, `min_can_be_set_above_the_default_max_before_max`.
 
 - `src/dialog.rs`: `Dialog::accessibility_label`. The dialog host is the
   `Role::Dialog` node but upstream gives it no name and no way to set one,

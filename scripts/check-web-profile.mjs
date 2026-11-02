@@ -31,4 +31,50 @@ for (const mode of ["scroll", "startup", "idle"]) {
     assert.ok(["PASS", "FAIL", "UNVERIFIED"].includes(target.verdict), `${mode}: ${name}`);
   }
 }
+
+// The probe takes its wheel target once the page has settled, past a splash, and says
+// whether the wheel moved anything.
+const canvas = { tagName: "CANVAS", wheels: 0, dispatchEvent() { this.wheels += 1; }, closest: () => null, parentElement: null };
+const splash = { tagName: "DIV", wheels: 0, dispatchEvent() { this.wheels += 1; }, closest: () => splash, parentElement: null };
+const scrollingElement = { scrollTop: 0, scrollBy() {} };
+let settled = false;
+let frames = 5;
+Object.assign(globalThis, {
+  document: {
+    querySelector: () => null,
+    elementFromPoint: () => (settled ? canvas : splash),
+    scrollingElement,
+    documentElement: scrollingElement,
+    body: canvas,
+  },
+  requestAnimationFrame: (callback) => setTimeout(callback, 4),
+  location: { href: "http://localhost/?profile=probe" },
+  WheelEvent: class {},
+  getComputedStyle: () => ({ overflowY: "visible" }),
+});
+Object.assign(window, {
+  __galleryNewFrames: () => frames,
+});
+async function probe() {
+  delete window.__galleryProfile;
+  installProfiler(new URLSearchParams("profile=probe&seconds=0.2&settle=20&hz=500"));
+  while (!window.__galleryProfile?.done) await new Promise((resolve) => setTimeout(resolve, 10));
+  return window.__galleryProfile.report;
+}
+const timer = setInterval(() => { settled = true; frames += 1; }, 50);
+let report = await probe();
+clearInterval(timer);
+assert.ok(canvas.wheels > 0, "the probe's wheel reaches the canvas once the page settles");
+assert.equal(report.wheel_target, "CANVAS");
+assert.equal(report.wheel_inputs, splash.wheels + canvas.wheels);
+assert.ok(report.new_frames > 0 && report.moved, "a canvas that drew has moved");
+
+// A wheel that draws nothing and scrolls nothing is reported, not counted as a scroll.
+report = await probe();
+assert.equal(report.new_frames, 0);
+assert.equal(report.scrolled_px, 0);
+assert.equal(report.moved, false, "an idle page is not a scroll");
+
 console.log("www/profile.js reports");
+// The probe's frame channel stays open for the page's life.
+process.exit(0);
