@@ -303,13 +303,26 @@ fn preview(
     let trailing = config.option("trailing");
     let segmented = config.option("variant") == "segmented";
     let mut selected: Vec<bool> = SELECTED.iter().map(|id| config.bool(id)).collect();
-    // One choice: only the first of those a multiple selection left stays. It goes
-    // from the controls too, after this frame, which shows it already.
-    if selection == "single"
-        && let Some(first) = selected.iter().position(|selected| *selected)
-    {
-        let extra: Vec<&'static str> = (first + 1..SELECTED.len())
-            .filter(|&index| std::mem::take(&mut selected[index]))
+    // The selection the last frame showed, to tell which row was just turned on.
+    let shown = preview.local("shown-selection", window, cx, |_, _| {
+        vec![false; SELECTED.len()]
+    });
+    // One choice: the row just turned on stays, or with none (a multiple selection
+    // left by the selection mode) the first. The others go from the controls too,
+    // after this frame, which shows it already.
+    let keep = (selection == "single")
+        .then(|| {
+            let previous = shown.read(cx);
+            selected
+                .iter()
+                .zip(previous)
+                .position(|(now, before)| *now && !*before)
+                .or_else(|| selected.iter().position(|selected| *selected))
+        })
+        .flatten();
+    if let Some(keep) = keep {
+        let extra: Vec<&'static str> = (0..SELECTED.len())
+            .filter(|&index| index != keep && std::mem::take(&mut selected[index]))
             .map(|index| SELECTED[index])
             .collect();
         if !extra.is_empty() {
@@ -319,6 +332,10 @@ fn preview(
                 }
             });
         }
+    }
+    // Recorded without a notification: it only answers the next frame's question.
+    if *shown.read(cx) != selected {
+        shown.update(cx, |shown, _| shown.clone_from(&selected));
     }
     // Rows act when they select or toggle their trailing control.
     let interactive = selection != "none" || trailing == "control";
@@ -482,9 +499,34 @@ mod tests {
         assert!(!config.bool("selected_2"), "single selection keeps one");
         harness.set("selection", Value::Choice(2));
 
+        // Back to one choice from a multiple selection: the first stays.
+        harness.set("selection", Value::Choice(2));
+        harness.set("selected_2", Value::Bool(true));
+        harness.set("selection", Value::Choice(1));
+        let config = harness.config();
+        assert!(config.bool("selected_0") && !config.bool("selected_2"));
+        harness.set("selection", Value::Choice(2));
+
         // More items and a subheader grow the list.
         harness.set("count", Value::Choice(1));
         harness.set("subheader", Value::Bool(true));
         assert!(harness.expect("playground-list").size.height > list.size.height);
+    }
+
+    #[gpui::test]
+    fn a_later_rows_switch_takes_the_single_selection(cx: &mut TestAppContext) {
+        let mut harness = Harness::open(cx, &PLAYGROUND);
+        harness.expect("playground-list");
+        // Single selection with the first row selected: turning on the third
+        // row's switch selects it, rather than being reverted.
+        harness.set("selected_2", Value::Bool(true));
+        let config = harness.config();
+        assert!(config.bool("selected_2"), "the row just turned on stays");
+        assert!(!config.bool("selected_0"), "the other goes");
+        // And an earlier row's switch takes it back.
+        harness.set("selected_0", Value::Bool(true));
+        let config = harness.config();
+        assert!(config.bool("selected_0"));
+        assert!(!config.bool("selected_2"));
     }
 }
