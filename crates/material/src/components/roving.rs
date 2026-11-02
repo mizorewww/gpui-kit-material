@@ -330,12 +330,15 @@ pub(crate) fn index_handles(
         let neighbor = current[count - 1].clone();
         window.defer(cx, move |window, cx| neighbor.focus(window, cx));
     }
+    // Read first: a write on every render would read as a change to the view holding them.
+    let current = handles.read(cx);
+    if current.len() == count {
+        return current.as_slice().into();
+    }
     handles.update(cx, |handles, cx| {
-        if handles.len() != count {
-            handles.truncate(count);
-            while handles.len() < count {
-                handles.push(cx.focus_handle());
-            }
+        handles.truncate(count);
+        while handles.len() < count {
+            handles.push(cx.focus_handle());
         }
         handles.as_slice().into()
     })
@@ -352,16 +355,16 @@ pub(crate) fn keep_focus_in_handles<T>(
     cx: &mut App,
 ) {
     let current = handles.read(cx);
-    if current.len() <= items.len() {
-        return;
-    }
+    // Not by the counts: a tab can go as another comes.
     let leaving = current.iter().any(|(value, handle)| {
         handle.is_focused(window) && !items.iter().any(|item| key(item) == value)
     });
     if !leaving {
         return;
     }
-    if let Some(neighbor) = items.last().and_then(|item| current.get(key(item))) {
+    // Of those with a handle: an item that came this render has none yet.
+    let staying = items.iter().rev().find_map(|item| current.get(key(item)));
+    if let Some(neighbor) = staying {
         let neighbor = neighbor.clone();
         window.defer(cx, move |window, cx| neighbor.focus(window, cx));
     }
@@ -397,6 +400,102 @@ mod tests {
     use super::*;
     use core::prelude::v1::test;
     use std::cell::RefCell;
+
+    struct Blank;
+
+    impl Render for Blank {
+        fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+            div()
+        }
+    }
+
+    #[gpui::test]
+    fn focus_leaves_an_item_another_replaces(cx: &mut TestAppContext) {
+        let (_, cx) = cx.add_window_view(|_, _| Blank);
+        let kept = cx.update(|window, cx| {
+            let kept = cx.focus_handle();
+            let leaving = cx.focus_handle();
+            let handles = cx.new(|_| {
+                BTreeMap::from([
+                    (SharedString::from("a"), kept.clone()),
+                    (SharedString::from("b"), leaving.clone()),
+                ])
+            });
+            leaving.focus(window, cx);
+            let items = [SharedString::from("a"), SharedString::from("c")];
+            keep_focus_in_handles(&handles, &items, |item| item, window, cx);
+            kept
+        });
+        cx.run_until_parked();
+        assert!(cx.update(|window, _| kept.is_focused(window)));
+    }
+
+    /// `index_handles` under a view that renders, and a view beside it that reads them.
+    #[cfg(feature = "gpui-fast")]
+    mod retained {
+        use super::*;
+        use std::cell::Cell;
+
+        type Slot = Rc<RefCell<Option<Entity<Vec<FocusHandle>>>>>;
+
+        struct Roving(Slot);
+
+        impl Render for Roving {
+            fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+                index_handles("handles", 2, window, cx);
+                let handles = window.use_keyed_state("handles", cx, |_, _| Vec::new());
+                *self.0.borrow_mut() = Some(handles);
+                div()
+            }
+        }
+
+        struct Reader(Slot, Rc<Cell<usize>>);
+
+        impl Render for Reader {
+            fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+                self.1.set(self.1.get() + 1);
+                let slot = self.0.borrow();
+                div().children(
+                    slot.as_ref()
+                        .map(|handles| handles.read(cx).len().to_string()),
+                )
+            }
+        }
+
+        struct Pair(Entity<Roving>, Entity<Reader>);
+
+        impl Render for Pair {
+            fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+                div().child(self.0.clone()).child(self.1.clone())
+            }
+        }
+
+        /// A write on every render would read as a change to whoever read them.
+        #[gpui::test]
+        fn rendering_leaves_the_handles_unwritten(cx: &mut TestAppContext) {
+            let renders = Rc::new(Cell::new(0));
+            let (view, cx) = cx.add_window_view({
+                let renders = renders.clone();
+                move |_, cx| {
+                    let slot = Slot::default();
+                    Pair(
+                        cx.new(|_| Roving(slot.clone())),
+                        cx.new(|_| Reader(slot, renders)),
+                    )
+                }
+            });
+            // The first render finds no handles to read, and the next one does.
+            view.update(cx, |pair, cx| pair.1.update(cx, |_, cx| cx.notify()));
+            cx.update(|window, cx| window.draw(cx).clear(cx));
+            cx.update(|window, cx| window.draw(cx).clear(cx));
+            let rendered = renders.get();
+            for _ in 0..3 {
+                view.update(cx, |pair, cx| pair.0.update(cx, |_, cx| cx.notify()));
+                cx.update(|window, cx| window.draw(cx).clear(cx));
+            }
+            assert_eq!(renders.get(), rendered, "the reader was built again");
+        }
+    }
 
     #[test]
     fn arrows_wrap_and_start_when_the_current_item_is_unknown() {

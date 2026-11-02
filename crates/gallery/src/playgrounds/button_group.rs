@@ -248,6 +248,7 @@ fn preview(
     let equal = config.bool("equal");
     let disabled = config.bool("disabled");
     let variant = VARIANTS[config.choice("variant")];
+    let tone = ButtonTone::ALL[config.choice("tone")];
     let id = ElementId::from(("playground-button-group", items_index));
     let report = {
         let demo = demo.clone();
@@ -285,6 +286,7 @@ fn preview(
                         let show_text = text && (!labels_selected || on);
                         let mut button = MaterialButton::new(("playground-group-item", index))
                             .variant(variant)
+                            .tone(tone)
                             .button_size(size)
                             .shape(shape)
                             .disabled(disabled)
@@ -311,7 +313,7 @@ fn preview(
     } else {
         let mut group = ConnectedButtonGroup::new(id, "Options")
             .variant(variant)
-            .tone(ButtonTone::ALL[config.choice("tone")])
+            .tone(tone)
             .button_size(size)
             .shape(shape)
             .vertical(vertical)

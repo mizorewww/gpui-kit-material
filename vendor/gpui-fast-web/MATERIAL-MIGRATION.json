@@ -52,22 +52,32 @@
       },
       "src/ime_mirror.rs": {
         "upstream_sha256": "4061ebd319b5928c2a25f659c4f1db9adb193d5873bbbfeba36468ca2706895d",
-        "local_sha256": "092f950bc0c7020ff699a92943bbd4ea39941222f948fb7c647fe9cc1f16e099",
-        "reason": "Moves the hidden input to the caret for update_ime_position, so a browser IME panel opens there. A consumer needs it (identical in both web crates)."
+        "local_sha256": "f571bc8dcc711bb863077fb01c5e8bd3d89a519658ed61ae5cfb2d6333b3934d",
+        "reason": "Moves the hidden input to the caret for update_ime_position, so a browser IME panel opens there, without its taking clicks there or insetting its text. A consumer needs it (identical in both web crates)."
       },
       "Cargo.toml": {
         "upstream_sha256": "6f317d525676d116acce313da939b2bd2c877c174476d04625c6ec65f92332b3",
         "local_sha256": "ef4e34b5cb657db7d4e1fddb0f26d2297e9137624f2e7b5b8ba1912b1ea634e2",
         "reason": "A frame-observation feature, off by default, forwarding to the engine's; only the Gallery turns it on (vendor/gpui-pre-web/MATERIAL-PATCHES.md)."
+      },
+      "src/events.rs": {
+        "upstream_sha256": "250ba40e44975b282cd74797e76c96de6ef5bdcc537a8009f7e876c8a47ff239",
+        "local_sha256": "5f2ed4dcf49569f795f1982fa4dbc1ac8c33f750acfd7a1fb47d71391bda65ad",
+        "reason": "The IME owns a key while composing or reported as keyCode 229, before GPUI sees it, so the Enter committing a candidate is no PressEnter. An IME edit's prefix and suffix do not split a surrogate pair. A consumer needs both (identical in both web crates)."
       }
     },
-    "added": {},
+    "added": {
+      "src/ime_edit.rs": {
+        "local_sha256": "365e77d541e4f1603c1ff075eee3b3efc3195f6c5d46b3d492c4c58fe7d65170",
+        "reason": "The IME's key and edit rules as plain functions for events.rs, which crates/material/tests/ime_edit.rs runs natively (identical in both web crates)."
+      }
+    },
     "removed": {
       "Cargo.lock": {
         "upstream_sha256": "304fa06120cd487a62a22e76edffff0a74ac974a1b8ed26bfc43b33323b290ba",
         "reason": "Package-level lockfile not retained; the workspace Cargo.lock owns resolution."
       }
     },
-    "unchanged_file_count": 18
+    "unchanged_file_count": 17
   }
 }

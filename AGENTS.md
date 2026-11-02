@@ -87,6 +87,11 @@
   virtualize long collections. Measure before introducing caches and identify
   each cache's invalidation owner. Do not simplify required animations to pass.
 - Use bounded captures and stop owned test processes when sampling completes.
+  Stop processes only by the PIDs you started (`kill $pid`). Never use
+  `pkill`, `killall` or `pkill -f` with a pattern: on macOS `pkill -f cat -x`
+  treats `-x` as a second pattern and kills every process whose command line
+  contains "cat" (Application, Notification...), which took down the user's
+  desktop session. Never change power settings (`pmset`) or system services.
 - Keep disk use bounded; Rust build output is the main risk. Check free space
   before heavy builds and stop below 40 GB. Avoid scratch copies of the repo; delete
   any you make, and every extra `target/`, as soon as you have the result. Remove

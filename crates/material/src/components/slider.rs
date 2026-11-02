@@ -735,8 +735,31 @@ impl RenderOnce for MaterialSlider {
                             .aria_numeric_value(v as f64)
                             .aria_min_numeric_value(min as f64)
                             .aria_max_numeric_value(max as f64)
+                            .aria_numeric_value_step(step as f64)
                             .aria_orientation(orientation)
-                            .when(live, |thumb| thumb.track_focus(handle).tab_stop(true))
+                            .when(live, |thumb| {
+                                let increment = self.state.clone();
+                                let decrement = self.state.clone();
+                                thumb
+                                    .track_focus(handle)
+                                    .tab_stop(true)
+                                    .on_a11y_action(
+                                        AccessibleAction::Increment,
+                                        move |_, window, cx| {
+                                            increment.update(cx, |state, cx| {
+                                                state.step_thumb(start, step, window, cx);
+                                            });
+                                        },
+                                    )
+                                    .on_a11y_action(
+                                        AccessibleAction::Decrement,
+                                        move |_, window, cx| {
+                                            decrement.update(cx, |state, cx| {
+                                                state.step_thumb(start, -step, window, cx);
+                                            });
+                                        },
+                                    )
+                            })
                     });
                 if classic {
                     let size = handle;
@@ -993,6 +1016,12 @@ impl RenderOnce for MaterialSlider {
                     window.refresh();
                 })
                 .on_key_down(move |event, window, cx| {
+                    // Cmd+Left and the like are the application's or the system's. Shift
+                    // steps as usual: a slider has no larger step on it to offer.
+                    let modifiers = event.keystroke.modifiers;
+                    if modifiers.platform || modifiers.control || modifiers.alt {
+                        return;
+                    }
                     let key = match event.keystroke.key.as_str() {
                         "left" if mirrored_keys => "right",
                         "right" if mirrored_keys => "left",
@@ -1427,6 +1456,35 @@ mod tests {
         cx.update(|window, cx| window.focus_next(cx));
         cx.simulate_keystrokes("left left");
         assert_eq!(state.read_with(cx, |s, _| s.value()), (21., 58.).into());
+    }
+
+    #[gpui::test]
+    fn range_thumbs_report_their_step_and_a_disabled_slider(cx: &mut TestAppContext) {
+        let (_, cx) = configured(
+            cx,
+            SliderState::new().max(100.).default_value((20., 60.)),
+            |s| s.disabled(true),
+        );
+        draw(cx);
+        let disabled = cx.update(|window, _| {
+            gpui_base::test_support::snapshots(window)
+                .into_iter()
+                .filter(|s| s.role() == Some(Role::Slider))
+                .map(|s| s.disabled())
+                .collect::<Vec<_>>()
+        });
+        // The slider's own node and each thumb's.
+        assert_eq!(disabled, vec![Some(true); 3]);
+    }
+
+    #[gpui::test]
+    fn a_modified_arrow_is_not_the_sliders(cx: &mut TestAppContext) {
+        let (state, cx) = configured(cx, SliderState::new().max(100.).default_value(30.), |s| s);
+        cx.update(|window, cx| window.focus_next(cx));
+        cx.simulate_keystrokes("cmd-left ctrl-right alt-left cmd-home");
+        assert_eq!(state.read_with(cx, |s, _| s.value().end()), 30.);
+        cx.simulate_keystrokes("shift-right");
+        assert_eq!(state.read_with(cx, |s, _| s.value().end()), 31.);
     }
 
     #[gpui::test]

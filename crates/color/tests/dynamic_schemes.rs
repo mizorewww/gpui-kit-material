@@ -2,7 +2,7 @@
 //! (dynamic_color_test.ts, fixed_dynamic_color_test.ts),
 //! typescript/scheme/dynamic_scheme_test.ts, dart/test (scheme_monochrome_test,
 //! scheme_correctness_test), plus `tests/fixtures/mcu-schemes.json`: every role
-//! of 416 schemes produced by running the pinned upstream TypeScript.
+//! of 520 schemes produced by running the pinned upstream TypeScript.
 use gpui_kit_material_color::dynamic::DynamicRole::{self, *};
 use gpui_kit_material_color::dynamic::contrast::ratio_of_tones;
 use gpui_kit_material_color::dynamic::utils::lstar_from_argb;
@@ -42,7 +42,12 @@ fn every_role_of_every_fixture_scheme_matches_upstream() {
     let base = names("roles");
     let extra = names("roles_2025_extra");
     let rows = fixture["rows"].as_array().unwrap();
-    assert_eq!(rows.len(), 416);
+    assert_eq!(rows.len(), 520);
+    // The 2025 spec's cyan rules need a seed in `Hct::is_cyan`'s range.
+    assert!(rows.iter().any(|row| {
+        let seed = u32::from_str_radix(row["seed"].as_str().unwrap(), 16).unwrap();
+        row["spec"] == "2025" && Hct::is_cyan(Hct::from_argb(0xff00_0000 | seed).hue())
+    }));
     let mut mismatches = Vec::new();
     let mut compared = 0;
     for row in rows {

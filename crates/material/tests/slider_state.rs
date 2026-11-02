@@ -1,0 +1,115 @@
+//! `vendor/gpui-base/src/slider.rs`, whose crate is outside this workspace, so that its own
+//! tests do not run here. What `MaterialSlider` relies on from its state.
+extern crate gpui_kit as gpui;
+
+use core::prelude::v1::test;
+use gpui::{prelude::*, *};
+use gpui_base::slider::{SliderEvent, SliderState, SliderValue};
+use std::{cell::Cell, rc::Rc};
+
+struct Holder(Entity<SliderState>);
+
+impl Render for Holder {
+    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        div()
+    }
+}
+
+/// A slider of `state`, 100 px wide, in a window.
+fn sized(
+    state: SliderState,
+    cx: &mut TestAppContext,
+) -> (Entity<SliderState>, &mut VisualTestContext) {
+    let (holder, cx) = cx.add_window_view(|_, cx| Holder(cx.new(|_| state)));
+    let state = holder.read_with(cx, |holder, _| holder.0.clone());
+    state.update(cx, |state, _| {
+        state.set_bounds(Bounds::new(point(px(0.), px(0.)), size(px(100.), px(10.))));
+    });
+    (state, cx)
+}
+
+#[test]
+fn min_can_be_set_above_the_default_max_before_max() {
+    let state = SliderState::new().min(150.).max(200.).default_value(175.);
+    assert_eq!(state.value(), SliderValue::Single(175.));
+    assert_eq!(state.percentage(), 0.0..0.5);
+}
+
+#[gpui::test]
+fn a_dropped_handle_stands_at_its_value(cx: &mut TestAppContext) {
+    let (state, cx) = sized(SliderState::new().step(25.), cx);
+    let drag = |x: f32, start: bool, cx: &mut VisualTestContext| {
+        state.update_in(cx, |state, window, cx| {
+            let position = point(px(x), px(0.));
+            state.update_value_by_position(Axis::Horizontal, position, start, window, cx);
+        })
+    };
+    drag(30., false, cx);
+    state.read_with(cx, |state, _| {
+        assert_eq!(state.value(), SliderValue::Single(25.));
+        assert_eq!(state.percentage(), 0.0..0.25);
+    });
+
+    state.update_in(cx, |state, window, cx| {
+        state.set_value((25., 75.), window, cx);
+    });
+    drag(40., true, cx);
+    drag(60., false, cx);
+    state.read_with(cx, |state, _| {
+        assert_eq!(state.value(), SliderValue::Range(50., 50.));
+        assert_eq!(state.percentage(), 0.5..0.5);
+    });
+}
+
+#[gpui::test]
+fn an_accessibility_step_reports_a_change(cx: &mut TestAppContext) {
+    let (state, cx) = sized(SliderState::new().default_value(99.), cx);
+    let changes = Rc::new(Cell::new(0));
+    cx.update(|_, cx| {
+        let changes = changes.clone();
+        cx.subscribe(&state, move |_, event: &SliderEvent, _| {
+            assert!(matches!(event, SliderEvent::Change(_)));
+            changes.set(changes.get() + 1);
+        })
+        .detach();
+    });
+    let step = |delta: f32, cx: &mut VisualTestContext| {
+        state.update_in(cx, |state, window, cx| {
+            state.step_thumb(false, delta, window, cx)
+        })
+    };
+    step(1., cx);
+    assert_eq!(changes.get(), 1);
+    assert_eq!(state.read_with(cx, |state, _| state.value().end()), 100.);
+    // At its end the action changes nothing and reports nothing.
+    step(1., cx);
+    assert_eq!(changes.get(), 1);
+    step(-1., cx);
+    assert_eq!(changes.get(), 2);
+}
+
+#[gpui::test]
+fn each_range_thumb_steps_by_itself(cx: &mut TestAppContext) {
+    let (state, cx) = sized(SliderState::new().default_value((20., 60.)), cx);
+    let step = |start: bool, delta: f32, cx: &mut VisualTestContext| {
+        state.update_in(cx, |state, window, cx| {
+            state.step_thumb(start, delta, window, cx)
+        })
+    };
+    step(true, 5., cx);
+    assert_eq!(
+        state.read_with(cx, |state, _| state.value()),
+        SliderValue::Range(25., 60.)
+    );
+    step(false, -5., cx);
+    assert_eq!(
+        state.read_with(cx, |state, _| state.value()),
+        SliderValue::Range(25., 55.)
+    );
+    step(true, 100., cx);
+    assert_eq!(
+        state.read_with(cx, |state, _| state.value()),
+        SliderValue::Range(55., 55.),
+        "a thumb stops at the other"
+    );
+}

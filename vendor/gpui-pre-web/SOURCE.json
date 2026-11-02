@@ -29,6 +29,8 @@
   },
   "local_patches": [
     "Cargo.toml",
+    "src/events.rs",
+    "src/ime_edit.rs",
     "src/ime_mirror.rs",
     "src/window.rs"
   ],
@@ -40,16 +42,26 @@
     },
     "src/ime_mirror.rs": {
       "upstream_sha256": "4061ebd319b5928c2a25f659c4f1db9adb193d5873bbbfeba36468ca2706895d",
-      "local_sha256": "092f950bc0c7020ff699a92943bbd4ea39941222f948fb7c647fe9cc1f16e099",
-      "reason": "Moves the hidden input to the caret for update_ime_position, so a browser IME panel opens there. A consumer needs it (identical in both web crates)."
+      "local_sha256": "f571bc8dcc711bb863077fb01c5e8bd3d89a519658ed61ae5cfb2d6333b3934d",
+      "reason": "Moves the hidden input to the caret for update_ime_position, so a browser IME panel opens there, without its taking clicks there or insetting its text. A consumer needs it (identical in both web crates)."
     },
     "Cargo.toml": {
       "upstream_sha256": "da6d7e9f6bc0a2de9020cb81aeebea4b6e7d989dccade83f0c22440ed68164ce",
       "local_sha256": "7a7633b850bcfeaeac1007c48d422629a83f578ac0db89e9190ff2d8a14dc11b",
       "reason": "A frame-observation feature, off by default, forwarding to the engine's; only the Gallery turns it on (MATERIAL-PATCHES.md)."
+    },
+    "src/events.rs": {
+      "upstream_sha256": "250ba40e44975b282cd74797e76c96de6ef5bdcc537a8009f7e876c8a47ff239",
+      "local_sha256": "5f2ed4dcf49569f795f1982fa4dbc1ac8c33f750acfd7a1fb47d71391bda65ad",
+      "reason": "The IME owns a key while composing or reported as keyCode 229, before GPUI sees it, so the Enter committing a candidate is no PressEnter. An IME edit's prefix and suffix do not split a surrogate pair. A consumer needs both (identical in both web crates)."
     }
   },
-  "added_files": {},
+  "added_files": {
+    "src/ime_edit.rs": {
+      "local_sha256": "365e77d541e4f1603c1ff075eee3b3efc3195f6c5d46b3d492c4c58fe7d65170",
+      "reason": "The IME's key and edit rules as plain functions for events.rs, which crates/material/tests/ime_edit.rs runs natively (identical in both web crates)."
+    }
+  },
   "removed_files": {
     "Cargo.lock": {
       "upstream_sha256": "792e390642e5b0454af698408f60902a7ec856eaf73649f3d2006acf7380e2bb",

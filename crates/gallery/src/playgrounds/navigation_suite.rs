@@ -253,7 +253,10 @@ fn preview(
         .id("playground-navigation-suite-frame")
         .debug_selector(|| "playground-navigation-suite".into())
         .w_full()
-        .max_w(rem(config.number("width")))
+        // Following the window, the suite fills what there is.
+        .when(!config.bool("follow"), |frame| {
+            frame.max_w(rem(config.number("width")))
+        })
         .h(rem(480.))
         .rounded(rem(16.))
         .overflow_hidden()
@@ -275,6 +278,20 @@ mod tests {
         render_every_scenario(&state, &mut cx);
         render_every_option(&state, &mut cx, &["type", "expanded", "expanded_from"]);
         assert!(cx.debug_bounds("playground-navigation-suite").is_some());
+    }
+
+    #[gpui::test]
+    fn following_the_window_lifts_the_width_cap(cx: &mut gpui::TestAppContext) {
+        let (state, mut cx) = open(&PLAYGROUND, cx);
+        set(&state, &mut cx, "width", Value::Number(360.));
+        settle_motion(&mut cx);
+        let frame = |cx: &mut gpui::VisualTestContext| {
+            element_bounds(cx, "playground-navigation-suite").size.width
+        };
+        let capped = frame(&mut cx);
+        set(&state, &mut cx, "follow", Value::Bool(true));
+        settle_motion(&mut cx);
+        assert!(frame(&mut cx) > capped, "it fills what the window has");
     }
 
     #[gpui::test]

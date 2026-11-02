@@ -2480,6 +2480,7 @@ dependencies = [
  "gpui-kit",
  "gpui-kit-material-color",
  "gpui-material-symbols",
+ "log",
  "serde_json",
  "web-time",
 ]
