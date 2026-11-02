@@ -52,3 +52,11 @@ pub use scheme::{DynamicScheme, SpecVersion, Variant};
 pub use seed::SeedScheme;
 #[cfg(feature = "dynamic")]
 pub use temperature::{TemperatureCache, raw_temperature};
+
+/// `argb`'s hue and chroma at `tone` (L*), with chroma reduced where that
+/// tone cannot hold it. Not part of the upstream port: the scheme uses it to
+/// move a palette color to a readable tone without changing its hue.
+pub(crate) fn at_tone(argb: u32, tone: f64) -> u32 {
+    let hct = hct::Hct::from_argb(argb);
+    hct::Hct::from_hct(hct.hue(), hct.chroma(), tone).argb()
+}

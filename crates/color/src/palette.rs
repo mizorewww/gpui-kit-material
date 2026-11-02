@@ -90,8 +90,10 @@ impl ThemePreferences {
 }
 
 /// A source palette as `0xRRGGBB` values. [`crate::Scheme::from_palette`]
-/// derives the semantic roles from it; the stored colors are never painted
-/// with an adjustment silently applied.
+/// derives the semantic roles from it. The stored colors are never painted
+/// with an adjustment silently applied; the one documented adjustment is
+/// `danger`, which moves in tone (keeping its hue) where it would not reach
+/// Material 3's text contrast on the derived surfaces.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Palette {
     pub canvas: u32,

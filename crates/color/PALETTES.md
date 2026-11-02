@@ -25,6 +25,34 @@ Dark palettes also paint their surfaces with 4.5% of their text color, as
 Material 3 lifts dark surface containers. The stored colors above are
 unchanged.
 
+The error roles keep each palette's danger hue but are painted at a tone that
+meets Material 3's standard contrast. material-color-utilities' standard
+curves hold error at least 4.5:1 on the highest surface and on-error-container
+4.5:1 on error-container; this kit holds error and on-error-container (the
+same color) at least 4.5:1 on every derived surface (surface dim through
+surface bright, the containers and inset) and on the error container. A
+danger color that already reads would be painted as stored, but none of the
+built-in ones does: every palette's error and on-error-container moves in HCT
+tone, darker in light palettes and lighter in dark ones.
+
+| Palette | Stored danger | Painted error |
+| --- | --- | --- |
+| Paper | `#c2394c` | `#ba3346` |
+| Nord Snow | `#a94452` | `#a4404f` |
+| Tokyo Day | `#c62454` | `#b31047` |
+| Catppuccin Latte | `#d20f39` | `#c90034` |
+| Ink | `#ee9aa8` | `#f39eac` |
+| Nord | `#bf616a` | `#ffd2d4` |
+| Tokyo Night | `#f7768e` | `#ff96a7` |
+| Catppuccin Frappé | `#e78284` | `#ffafaf` |
+| Catppuccin Macchiato | `#ed8796` | `#ff97a6` |
+| Catppuccin Mocha | `#f38ba8` | `#f58ca9` |
+
+On-error departs from the reference: its standard curve asks 7:1 on error,
+but the kit holds it to the 4.5:1 text minimum. Light palettes' white on-error
+reaches 5.75 to 6.81:1 and could only reach 7:1 by darkening error further;
+dark palettes already exceed 7:1.
+
 Tint families (`TintFamily`) are the kit's own design colors for telling categories
 apart. Each is harmonized toward the scheme's primary, then mixed into its surface for the
 container and with its text for the content, so a family keeps its hue in every palette,
