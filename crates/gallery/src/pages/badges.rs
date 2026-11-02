@@ -1,4 +1,5 @@
-//! Badges: the kit's large and small badges, and both placed on an icon.
+//! Badges: the kit's large and small badges, both placed on an icon, and a media label
+//! on a picture.
 use super::prelude::*;
 
 pub struct Page;
@@ -20,6 +21,18 @@ fn badged(id: &'static str, badge: AnyElement) -> impl IntoElement {
         .child(badge)
 }
 
+/// A 16:9 stand-in for a picture, with a media label in a corner.
+fn on_picture(id: &'static str, fill: ColorRole, label: Stateful<Div>) -> impl IntoElement {
+    div()
+        .id(id)
+        .relative()
+        .w(rem(176.))
+        .aspect_ratio(16. / 9.)
+        .rounded(RADIUS_MEDIUM)
+        .bg(color(fill))
+        .child(label)
+}
+
 impl GalleryPage for Page {
     const INFO: PageInfo = PageInfo {
         id: "badges",
@@ -33,7 +46,7 @@ impl GalleryPage for Page {
     }
 
     fn row_count(&self, _: &Window) -> usize {
-        2
+        3
     }
 
     fn render_row(&mut self, row: usize, _: &mut Window, _: &mut Context<Self>) -> AnyElement {
@@ -44,6 +57,30 @@ impl GalleryPage for Page {
                 .column_labels(["Large", "Small"])
                 .cell(large_badge("large-badge-kit", "3"))
                 .cell(small_badge())
+                .into_any_element();
+        }
+        if row == 2 {
+            return board("media-labels")
+                .caption("Media label")
+                .columns(2)
+                .column_width(200.)
+                .column_labels(["On a cover", "On a screenshot"])
+                .cell(on_picture(
+                    "media-label-cover",
+                    ColorRole::TERTIARY_CONTAINER,
+                    media_label("media-label-duration", "1:02:14")
+                        .absolute()
+                        .right(rem(8.))
+                        .bottom(rem(8.)),
+                ))
+                .cell(on_picture(
+                    "media-label-screenshot",
+                    ColorRole::SURFACE_CONTAINER_HIGHEST,
+                    media_label("media-label-time", "04:37")
+                        .absolute()
+                        .left(rem(8.))
+                        .bottom(rem(8.)),
+                ))
                 .into_any_element();
         }
         board("badges-on-icons")

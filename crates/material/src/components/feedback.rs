@@ -295,6 +295,32 @@ pub fn large_badge(id: impl Into<ElementId>, label: impl Into<SharedString>) -> 
         .whitespace_nowrap()
 }
 
+/// The container and label roles of a [`media_label`]: the inverse surface, as a plain
+/// tooltip and a slider's value label use, reads over any picture in every scheme.
+pub const MEDIA_LABEL_CONTAINER: ColorRole = INVERSE_SURFACE;
+pub const MEDIA_LABEL_TEXT: ColorRole = INVERSE_ON_SURFACE;
+
+/// A short fact laid over a picture, such as a video's duration on its cover or a
+/// frame's time on a screenshot: label-medium on the inverse surface, small corners,
+/// one line. The caller positions it, usually 8dp in from a bottom corner.
+pub fn media_label(id: impl Into<ElementId>, label: impl Into<SharedString>) -> Stateful<Div> {
+    let scale = TypeRole::LabelMedium.scale();
+    accessible_text(id, label)
+        .flex()
+        .flex_shrink_0()
+        .items_center()
+        .px(rem(8.))
+        .py(rem(2.))
+        .rounded(RADIUS_SMALL)
+        .bg(color(MEDIA_LABEL_CONTAINER))
+        .text_color(color(MEDIA_LABEL_TEXT))
+        .text_size(scale.font_size)
+        .letter_spacing(scale.letter_spacing)
+        .line_height(scale.line_height)
+        .font_weight(FontWeight(scale.font_weight as f32))
+        .whitespace_nowrap()
+}
+
 /// The three M3 card variants.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[non_exhaustive]
@@ -918,6 +944,20 @@ mod tests {
     // `#[gpui::test]` expands to.
     use core::prelude::v1::test;
     use gpui::{Context, TestAppContext};
+
+    #[test]
+    fn a_media_label_reads_in_every_palette() {
+        use crate::color::{Scheme, palette};
+        let contrast = |a: f32, b: f32| (a.max(b) + 0.05) / (a.min(b) + 0.05);
+        for id in palette::ALL {
+            let scheme = Scheme::from_palette(id);
+            let ratio = contrast(
+                scheme.get(MEDIA_LABEL_CONTAINER).luminance(),
+                scheme.get(MEDIA_LABEL_TEXT).luminance(),
+            );
+            assert!(ratio >= 4.5, "{}: {ratio}", id.name());
+        }
+    }
 
     #[test]
     fn a_warning_notice_uses_the_warning_roles_and_does_not_alert() {
