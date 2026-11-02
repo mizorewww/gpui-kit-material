@@ -137,16 +137,25 @@ pub fn info_callout(id: impl Into<ElementId>, text: impl Into<SharedString>) -> 
 
 /// A page title: text alone in the regular-weight headline role. A title
 /// longer than its column wraps rather than running past the edge.
+///
+/// The type style is on the returned `Div`, which the text inherits, so a
+/// caller's `text_size` and `line_height` reach the text: a page that needs
+/// a larger headline role (M3 type scale, Headline medium 28/36) sets it on
+/// the heading.
 pub fn page_heading(id: impl Into<ElementId>, title: impl Into<SharedString>) -> Div {
-    div().flex().items_center().min_w_0().child(
-        accessible_text(id, title)
-            .min_w_0()
-            .whitespace_normal()
-            .role(Role::Heading)
-            .text_size(TEXT_HEADLINE)
-            .line_height(HEADLINE_LINE_HEIGHT)
-            .font_weight(FontWeight::NORMAL),
-    )
+    div()
+        .flex()
+        .items_center()
+        .min_w_0()
+        .text_size(TEXT_HEADLINE)
+        .line_height(HEADLINE_LINE_HEIGHT)
+        .font_weight(FontWeight::NORMAL)
+        .child(
+            accessible_text(id, title)
+                .min_w_0()
+                .whitespace_normal()
+                .role(Role::Heading),
+        )
 }
 
 /// An M3 list section title: a quiet medium-weight label above the group
@@ -231,6 +240,58 @@ mod tracking_tests {
         assert!(
             (tracked - plain - 10.).abs() <= 1.,
             "five characters at 2px: {plain} and {tracked}"
+        );
+    }
+}
+
+#[cfg(test)]
+mod heading_tests {
+    use super::*;
+    use crate::tokens::typography::BASE_PX;
+    use core::prelude::v1::test;
+    use gpui::{Context, Render, TestAppContext, VisualTestContext, Window};
+
+    struct Headings;
+    impl Render for Headings {
+        fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+            window.set_rem_size(px(BASE_PX));
+            let heading = |name: &'static str, heading: Div| {
+                div()
+                    .flex()
+                    .debug_selector(move || name.into())
+                    .child(heading)
+            };
+            let medium = TypeRole::HeadlineMedium.scale();
+            // Each heading as wide as its text.
+            div()
+                .flex()
+                .flex_col()
+                .items_start()
+                .child(heading("default", page_heading("default", "Library")))
+                .child(heading(
+                    "headline-medium",
+                    page_heading("headline-medium", "Library")
+                        .text_size(medium.font_size)
+                        .line_height(medium.line_height),
+                ))
+        }
+    }
+
+    #[gpui::test]
+    fn a_callers_type_size_reaches_the_heading_text(cx: &mut TestAppContext) {
+        let (_, cx) = cx.add_window_view(|_, _| Headings);
+        cx.update(|window, cx| {
+            window.refresh();
+            window.draw(cx).clear(cx);
+        });
+        let bounds = |cx: &mut VisualTestContext, name| cx.debug_bounds(name).unwrap().size;
+        let (default, medium) = (bounds(cx, "default"), bounds(cx, "headline-medium"));
+        // Headline small is 24/32, headline medium 28/36.
+        assert_eq!(default.height, px(32.));
+        assert_eq!(medium.height, px(36.));
+        assert!(
+            medium.width > default.width,
+            "28px text is wider than 24px: {default:?} and {medium:?}"
         );
     }
 }
