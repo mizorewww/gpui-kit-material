@@ -428,10 +428,13 @@ pub(crate) struct ModalFocus {
 }
 
 /// The focus handle of the modal surface keyed by `id`, after applying the
-/// open/close focus moves for this frame.
+/// open/close focus moves for this frame. With `take_focus` off, opening
+/// leaves focus where it is (a surface that opens in response to typing
+/// elsewhere); closing still gives focus back to what had it on opening.
 pub(crate) fn modal_focus(
     id: &ElementId,
     open: bool,
+    take_focus: bool,
     window: &mut Window,
     cx: &mut App,
 ) -> FocusHandle {
@@ -447,9 +450,11 @@ pub(crate) fn modal_focus(
             state.shown = true;
             state.previous = previous;
         });
-        let target = state.read(cx).focus.clone();
-        // The host's focus handle is attached during this frame's paint.
-        window.defer(cx, move |window, cx| target.focus(window, cx));
+        if take_focus {
+            let target = state.read(cx).focus.clone();
+            // The host's focus handle is attached during this frame's paint.
+            window.defer(cx, move |window, cx| target.focus(window, cx));
+        }
     } else if !open && shown {
         let previous = state.update(cx, |state, _| {
             state.shown = false;
@@ -892,7 +897,7 @@ impl RenderOnce for MaterialDialog {
         let id = self.id.clone();
         let container = self.contained.then(|| container_state(&id, window, cx));
         let frame = overlay_frame(&id, open, window, cx);
-        let focus = modal_focus(&id, open, window, cx);
+        let focus = modal_focus(&id, open, true, window, cx);
         if frame.settled_closed(open) {
             return with_container_probe(container, div().into_any_element());
         }

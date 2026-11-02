@@ -269,7 +269,8 @@ impl NavigationDrawer {
     }
     /// Whether opening a modal drawer moves focus to its selected destination
     /// (on by default). Turn it off when the drawer opens in response to
-    /// typing elsewhere, such as a search field filtering its destinations.
+    /// typing elsewhere, such as a search field filtering its destinations:
+    /// focus then stays where it is, and closing gives it back there.
     pub fn focus_on_open(mut self, focus: bool) -> Self {
         self.focus_on_open = focus;
         self
@@ -544,7 +545,9 @@ impl RenderOnce for NavigationDrawer {
         let end = self.position == DrawerPosition::End;
         // Remembers what had focus when it opens and gives it back when it
         // closes, so this runs whether or not there is anything to draw.
-        let trap = modal.then(|| super::dialog::modal_focus(&self.id, open, window, cx));
+        // Opening takes focus only when it asks to.
+        let trap = modal
+            .then(|| super::dialog::modal_focus(&self.id, open, self.focus_on_open, window, cx));
         // Fully closed: nothing to draw, focus or block the content with.
         if !open && visible < 0.001 {
             return div()

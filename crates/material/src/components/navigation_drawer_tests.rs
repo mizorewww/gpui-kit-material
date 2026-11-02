@@ -235,6 +235,7 @@ struct Trapped {
     open: bool,
     dismissed: usize,
     trigger: FocusHandle,
+    focus_on_open: bool,
 }
 
 impl Render for Trapped {
@@ -258,6 +259,7 @@ impl Render for Trapped {
                     .selected("d0")
                     .open(self.open)
                     .modal(true)
+                    .focus_on_open(self.focus_on_open)
                     .on_dismiss(move |_, cx| {
                         let _ = dismiss.update(cx, |this, cx| {
                             this.open = false;
@@ -279,6 +281,7 @@ fn trapped(cx: &mut TestAppContext, reduced: bool) -> (Entity<Trapped>, &mut Vis
         open: false,
         dismissed: 0,
         trigger: cx.focus_handle().tab_stop(true),
+        focus_on_open: true,
     })
 }
 
@@ -318,6 +321,35 @@ fn a_modal_drawer_traps_focus_and_returns_it_to_its_opener(cx: &mut TestAppConte
             "focus went back to what opened the drawer"
         );
     });
+}
+
+/// A drawer that opens without taking focus (a search field's results)
+/// leaves it where it was: neither the drawer nor its focus trap takes it.
+#[gpui::test]
+fn a_drawer_that_does_not_focus_on_open_leaves_focus_alone(cx: &mut TestAppContext) {
+    let (view, cx) = trapped(cx, true);
+    view.update(cx, |view, _| view.focus_on_open = false);
+    settle_open(cx);
+    cx.update(|window, cx| view.read(cx).trigger.clone().focus(window, cx));
+    settle_open(cx);
+    view.update(cx, |view, cx| {
+        view.open = true;
+        cx.notify();
+    });
+    settle_open(cx);
+    cx.update(|window, cx| {
+        assert!(
+            view.read(cx).trigger.is_focused(window),
+            "focus stayed where it was"
+        );
+        assert!(gpui_base::active_focus_trap(window, cx).is_none());
+    });
+    view.update(cx, |view, cx| {
+        view.open = false;
+        cx.notify();
+    });
+    settle_open(cx);
+    cx.update(|window, cx| assert!(view.read(cx).trigger.is_focused(window)));
 }
 
 #[gpui::test]
