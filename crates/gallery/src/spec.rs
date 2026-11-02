@@ -488,6 +488,7 @@ pub(crate) fn min_fit_scale(rem: Pixels) -> f32 {
 /// The scale that fits `needed` px into `available` px: 1 when it fits,
 /// else a little under the ratio (borders do not scale), never below
 /// [`MIN_FIT_SCALE`].
+#[cfg(test)]
 pub fn fit_scale(needed: f32, available: f32) -> f32 {
     fit_scale_down_to(needed, available, MIN_FIT_SCALE)
 }
