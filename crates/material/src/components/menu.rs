@@ -21,8 +21,9 @@
 //!
 //! A menu taller than [`MaterialMenu::max_height`] scrolls, and a popup never
 //! outgrows its window. A popup with no room on its side of the trigger opens
-//! on the other side, or scrolls on the side with more room; it never covers
-//! its trigger. The keyboard's item stays in view and an open menu starts at
+//! on the other side, or scrolls on the side with more room, rather than
+//! cover its trigger; only a trigger that leaves less than a row on both sides
+//! is covered. The keyboard's item stays in view and an open menu starts at
 //! its selected item.
 use super::InteractionPreview;
 use super::focus::{RingPlacement, RingedButton};
@@ -449,7 +450,9 @@ pub(crate) fn centered_offset((top, bottom): (f32, f32), viewport: f32, natural:
 }
 
 /// The space Base keeps between a popup and each edge of the content: its 8px
-/// margin and the window's frame.
+/// margin and the window's frame. Compose Material 3 keeps a menu 48dp from
+/// the window's edges (`MenuVerticalMargin`); this kit keeps Base's margin, so
+/// a menu in a short desktop window has more room.
 fn popup_edge(window: &Window) -> Pixels {
     const POPUP_MARGIN: Pixels = px(8.);
     POPUP_MARGIN + window.client_inset().unwrap_or(px(0.))
@@ -461,7 +464,9 @@ fn window_room(window: &Window) -> f32 {
     design_px(room, window.rem_size()).max(0.)
 }
 
-/// The gap between a popup and its trigger, in design px.
+/// The gap between a popup and its trigger, in design px. A kit choice: Compose
+/// Material 3 opens a dropdown menu flush with its anchor, and the references
+/// give no gap.
 const POPUP_GAP: f32 = 4.;
 
 /// The room a popup has `(above, below)` a `trigger`, in design px.
@@ -1351,23 +1356,41 @@ pub(crate) fn opens_upward(anchor: Anchor) -> bool {
     )
 }
 
-/// Whether a menu `height` tall opens above its trigger, given whether it
-/// asks to and the room `(above, below)` the trigger, all in design px.
+/// The side of its trigger a popup opens on: `Some(true)` above, `Some(false)`
+/// below, or `None` when the trigger leaves no usable room on either side.
 ///
-/// A menu opens on its side of the trigger, on the other side when it fits
+/// `need` is how tall the popup is `(above, below)` the trigger (a sub-menu's
+/// column can make the two differ), `room` the space there, and `least` the
+/// height under which a popup is no use (about one row), all in design px.
+///
+/// A popup opens on its side of the trigger, on the other side when it fits
 /// only there, and otherwise on whichever side has more room, where it
-/// scrolls: Jetpack Compose Material 3's dropdown menus place themselves so,
-/// and Base's side positioner follows the same rule. Kit's popover places a
-/// menu by its corner and only clamps it into the window, which slides a menu
-/// too tall for its side back over its own trigger.
-pub(crate) fn opens_above(asks_above: bool, height: f32, (above, below): (f32, f32)) -> bool {
-    let (asked, other) = if asks_above {
-        (above, below)
+/// scrolls. Compose Material 3's `DropdownMenuPositionProvider` tries below,
+/// then above; its `ExposedDropdownMenu` caps the menu at the larger of the
+/// heights above and below the anchor, and at the whole window when the anchor
+/// is off it (`calculateMaxHeight`). Base's side positioner follows the same
+/// order. Kit's popover places a popup by its corner and only clamps it into
+/// the window, which slides one too tall for its side back over its trigger;
+/// with `None` the caller keeps that clamping, as Compose falls back to the
+/// window.
+pub(crate) fn popup_side(
+    asks_above: bool,
+    (need_above, need_below): (f32, f32),
+    (above, below): (f32, f32),
+    least: f32,
+) -> Option<bool> {
+    let ((asked, asked_need), (other, other_need)) = if asks_above {
+        ((above, need_above), (below, need_below))
     } else {
-        (below, above)
+        ((below, need_below), (above, need_above))
     };
-    let flip = height > asked && (height <= other || other > asked);
-    asks_above != flip
+    let flip = asked_need > asked && (other_need <= other || other > asked);
+    let (room, need) = if flip {
+        (other, other_need)
+    } else {
+        (asked, asked_need)
+    };
+    (room >= need || room >= least).then_some(asks_above != flip)
 }
 
 /// The anchor on the other side of the trigger, at the same corner of it.
@@ -1484,17 +1507,44 @@ impl RenderOnce for MenuPopup {
         let style = self.menu.style;
         let mut anchor = self.anchor;
         let side = matches!(anchor, Anchor::LeftCenter | Anchor::RightCenter);
+        // A sub-menu's column counts: below the trigger it reaches from its owner's
+        // top down, above it from its owner's bottom up.
+        let submenu_need = |menu: &MaterialMenu, above: bool| {
+            self.submenu.as_ref().map_or(0., |(index, submenu)| {
+                let first_row = if submenu.style.expressive() {
+                    EXPRESSIVE_INSET_Y
+                } else {
+                    BASELINE_PADDING
+                };
+                let height = menu.visible_height();
+                let inset = if above {
+                    height - menu.item_bottom(*index).unwrap_or(height)
+                } else {
+                    menu.item_top(*index).unwrap_or(0.)
+                };
+                (inset - first_row).max(0.) + submenu.visible_height()
+            })
+        };
+        // The room left for the sub-menu's column past its owner: the window's,
+        // or the chosen side's.
+        let mut side_room = room;
         // A menu too tall for its side of the trigger opens on the other side if it
         // fits there, and otherwise scrolls on the side with more room. Base would
         // only slide it back into the window, over its own trigger.
+        // A trigger that leaves less than a row on both sides keeps that clamping.
         if !side && let Some(bounds) = trigger_bounds.get() {
-            let room = room_beside(bounds, window);
+            let beside = room_beside(bounds, window);
             let asks_above = opens_upward(anchor);
-            let above = opens_above(asks_above, self.menu.visible_height(), room);
-            if above != asks_above {
-                anchor = vertically_flipped(anchor);
+            let height = self.menu.visible_height();
+            let need = |above: bool| height.max(submenu_need(&self.menu, above));
+            let least = self.menu.item_bottom(0).unwrap_or(height).min(height);
+            if let Some(above) = popup_side(asks_above, (need(true), need(false)), beside, least) {
+                if above != asks_above {
+                    anchor = vertically_flipped(anchor);
+                }
+                side_room = if above { beside.0 } else { beside.1 };
+                self.menu = self.menu.fit(side_room);
             }
-            self.menu = self.menu.fit(if above { room.0 } else { room.1 });
         }
         let height = self.menu.visible_height();
         let upward = opens_upward(anchor);
@@ -1547,7 +1597,7 @@ impl RenderOnce for MenuPopup {
             }
         };
         self.submenu = self.submenu.map(|(index, menu)| {
-            let room = (room - column_inset(menu.style)).max(0.);
+            let room = (side_room - column_inset(menu.style)).max(0.);
             (index, menu.fit(room))
         });
         // The reserved cascade column's height below the trigger.
@@ -1680,6 +1730,7 @@ impl RenderOnce for MenuPopup {
         let open = self.open;
         let measure = trigger_size;
         let measure_bounds = trigger_bounds;
+        let placed = visible;
         // Material buttons block the mouse for the elements under them, so
         // Kit's popover never sees a press on such a trigger. A window
         // listener toggles the menu instead (a press while open closes it
@@ -1717,7 +1768,11 @@ impl RenderOnce for MenuPopup {
                         / f32::from(window.rem_size())
                 };
                 measure.set((design(bounds.size.width), design(bounds.size.height)));
-                measure_bounds.set(Some(bounds));
+                // The side was chosen from the bounds the last frame measured: a
+                // trigger that has moved since asks for a frame that chooses again.
+                if measure_bounds.replace(Some(bounds)) != Some(bounds) && placed {
+                    window.request_animation_frame();
+                }
             }));
         Popover::new(self.id.clone())
             .when(full_width, |popover| popover.w_full())
