@@ -154,3 +154,54 @@ fn a_continuous_slider_steps_by_a_hundredth_of_its_range() {
     }
     assert_eq!(SliderState::new().step(5.).accessibility_step(), 5.);
 }
+
+#[gpui::test]
+fn stepping_leaves_an_invalid_value_or_range_alone(cx: &mut TestAppContext) {
+    let cases = [
+        SliderState::new().default_value(f32::NAN),
+        SliderState::new().min(100.).max(0.).default_value(50.),
+        SliderState::new().default_value((60., 20.)),
+    ];
+    for state in cases {
+        let (state, cx) = sized(state, cx);
+        let before = state.read_with(cx, |state, _| state.value());
+        let changes = Rc::new(Cell::new(0));
+        cx.update(|_, cx| {
+            let changes = changes.clone();
+            cx.subscribe(&state, move |_, _: &SliderEvent, _| {
+                changes.set(changes.get() + 1)
+            })
+            .detach();
+        });
+        for start in [false, true] {
+            state.update_in(cx, |state, window, cx| {
+                state.step_thumb(start, 1., window, cx)
+            });
+        }
+        let after = state.read_with(cx, |state, _| state.value());
+        assert_eq!(
+            (after.start().to_bits(), after.end().to_bits()),
+            (before.start().to_bits(), before.end().to_bits()),
+            "{before:?} became {after:?}"
+        );
+        assert_eq!(changes.get(), 0, "{before:?} reported a change");
+    }
+}
+
+#[gpui::test]
+fn a_range_thumb_snaps_to_the_grid_and_stops_at_the_other(cx: &mut TestAppContext) {
+    let (state, cx) = sized(SliderState::new().step(10.).default_value((20., 25.)), cx);
+    let step = |start: bool, delta: f32, cx: &mut VisualTestContext| {
+        state.update_in(cx, |state, window, cx| {
+            state.set_value((20., 25.), window, cx);
+            state.step_thumb(start, delta, window, cx);
+        });
+        state.read_with(cx, |state, _| state.value())
+    };
+    // The end leaves 25 for the grid: 35 rounds to 40.
+    assert_eq!(step(false, 10., cx), SliderValue::Range(20., 40.));
+    // The start would land on 30, past the end: it stops at 25.
+    assert_eq!(step(true, 10., cx), SliderValue::Range(25., 25.));
+    // The end would snap to 20, onto the start, and stops there.
+    assert_eq!(step(false, -10., cx), SliderValue::Range(20., 20.));
+}

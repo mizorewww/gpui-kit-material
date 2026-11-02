@@ -151,6 +151,7 @@ pub struct MaterialDialog {
     on_dismiss: Option<Dismiss>,
     /// Set by the caller; each form has its own default.
     container: Option<ColorRole>,
+    safe_area: Edges<Pixels>,
 }
 
 /// The full-screen dialog's header: its close button's accessible name and
@@ -185,6 +186,7 @@ impl MaterialDialog {
             dismiss_on_escape: true,
             on_dismiss: None,
             container: None,
+            safe_area: Edges::default(),
         }
     }
     /// The hero icon above the headline; the headline then centers.
@@ -296,6 +298,16 @@ impl MaterialDialog {
         self.dismiss_on_escape = dismiss;
         self
     }
+    /// Window px a full-screen dialog keeps its header and content clear of
+    /// at each edge, such as an application-drawn title bar with the macOS
+    /// traffic lights in it. Its surface still fills the area behind them.
+    /// A dialog over the window also keeps clear of the window's own
+    /// [`Window::insets`] (notches, system bars, the keyboard), whichever is
+    /// larger at each edge.
+    pub fn safe_area(mut self, insets: Edges<Pixels>) -> Self {
+        self.safe_area = insets;
+        self
+    }
     /// Called when the person dismisses the dialog: Escape, the scrim, or a
     /// close button. The caller closes it.
     pub fn on_dismiss(mut self, f: impl Fn(&mut Window, &mut App) + 'static) -> Self {
@@ -315,6 +327,20 @@ impl MaterialDialog {
             DialogSize::FullWidth => DIALOG_MAX_WIDTH,
         };
         width.min(available - 2. * DIALOG_MARGIN).max(0.)
+    }
+}
+
+/// A full-screen dialog's insets: the caller's, and over the window the
+/// window's own, whichever is larger at each edge.
+fn full_screen_insets(caller: Edges<Pixels>, window: Option<Edges<Pixels>>) -> Edges<Pixels> {
+    match window {
+        Some(window) => Edges {
+            top: caller.top.max(window.top),
+            right: caller.right.max(window.right),
+            bottom: caller.bottom.max(window.bottom),
+            left: caller.left.max(window.left),
+        },
+        None => caller,
     }
 }
 
@@ -613,6 +639,7 @@ impl MaterialDialog {
     fn basic_surface(
         self,
         width: f32,
+        max_height: Option<Pixels>,
         dismiss: Option<Dismiss>,
         measure: Option<Entity<MeasuredSize>>,
     ) -> Stateful<Div> {
@@ -620,9 +647,13 @@ impl MaterialDialog {
         let dividers = self.dividers;
         let has_close = self.close_label.is_some();
         let supporting = self.supporting;
+        let has_header = self.icon.is_some() || self.headline.is_some() || self.subtitle.is_some();
+        // The header (icon, headline, subtitle) and the actions stay put; the
+        // body between them scrolls when the dialog is taller than its area.
         let text = div()
             .flex()
             .flex_col()
+            .flex_shrink_0()
             .gap(rem(16.))
             .pt(rem(24.))
             .px(rem(24.))
@@ -642,21 +673,26 @@ impl MaterialDialog {
             })
             .when_some(self.subtitle, |text, subtitle| {
                 text.child(Self::supporting_element(subtitle).when(centered, |s| s.text_center()))
-            })
-            .when(!dividers, |text| {
-                text.when_some(supporting.clone(), |text, supporting| {
-                    text.child(Self::supporting_element(supporting))
-                })
             });
         let content = self.content;
         let has_content = !content.is_empty();
+        let body = || {
+            div()
+                .id("dialog-body")
+                .when(cfg!(test), |body| {
+                    body.debug_selector(|| "dialog-body".into())
+                })
+                .flex()
+                .flex_col()
+                .flex_shrink(1.)
+                .min_h_0()
+                .overflow_y_scroll()
+        };
         // With dividers, the supporting text and content form the body
-        // between them; otherwise the content follows the text.
+        // between them; otherwise the body follows the header.
         let middle = if dividers {
             Some(
-                div()
-                    .flex()
-                    .flex_col()
+                body()
                     .gap(rem(16.))
                     .py(rem(16.))
                     .when_some(supporting, |body, supporting| {
@@ -669,7 +705,20 @@ impl MaterialDialog {
                     .children(content),
             )
         } else {
-            has_content.then(|| div().pt(rem(16.)).flex().flex_col().children(content))
+            (supporting.is_some() || has_content).then(|| {
+                body()
+                    .when_some(supporting, |body, supporting| {
+                        body.child(
+                            div()
+                                .px(rem(24.))
+                                .when(has_header, |text| text.pt(rem(16.)))
+                                .child(Self::supporting_element(supporting)),
+                        )
+                    })
+                    .when(has_content, |body| {
+                        body.child(div().pt(rem(16.)).flex().flex_col().children(content))
+                    })
+            })
         };
         let actions = Self::actions_row(self.alignment, self.actions);
         let has_actions = actions.is_some();
@@ -696,6 +745,7 @@ impl MaterialDialog {
             .flex_col()
             .flex_shrink_0()
             .w(rem(width))
+            .when_some(max_height, |surface, max| surface.max_h(max))
             .overflow_hidden()
             .rounded(DIALOG_RADIUS)
             .bg(color(
@@ -706,7 +756,7 @@ impl MaterialDialog {
         match middle {
             Some(body) if dividers => {
                 surface = surface
-                    .child(div().pt(rem(16.)).child(divider_line()))
+                    .child(div().flex_shrink_0().pt(rem(16.)).child(divider_line()))
                     .child(body)
                     .child(divider_line());
             }
@@ -715,10 +765,12 @@ impl MaterialDialog {
         }
         surface
             .when(self.divider && !dividers, |surface| {
-                surface.child(div().pt(rem(16.)).child(divider_line()))
+                surface.child(div().flex_shrink_0().pt(rem(16.)).child(divider_line()))
             })
             .children(actions)
-            .when(!has_actions, |surface| surface.child(div().h(rem(24.))))
+            .when(!has_actions, |surface| {
+                surface.child(div().flex_shrink_0().h(rem(24.)))
+            })
             .children(close)
             .when_some(measure, |surface, measure| {
                 surface.child(
@@ -739,7 +791,11 @@ impl MaterialDialog {
 }
 
 impl MaterialDialog {
-    fn full_screen_surface(mut self, dismiss: Option<Dismiss>) -> Stateful<Div> {
+    fn full_screen_surface(
+        mut self,
+        insets: Edges<Pixels>,
+        dismiss: Option<Dismiss>,
+    ) -> Stateful<Div> {
         let full = self.full_screen.take().unwrap_or(FullScreen {
             close_label: None,
             confirm: None,
@@ -752,9 +808,16 @@ impl MaterialDialog {
             .flex()
             .flex_col()
             .size_full()
+            .pt(insets.top)
+            .pr(insets.right)
+            .pb(insets.bottom)
+            .pl(insets.left)
             .bg(color(self.container.unwrap_or(ColorRole::SURFACE)))
             .child(
                 div()
+                    .when(cfg!(test), |header| {
+                        header.debug_selector(|| "dialog-full-screen-header".into())
+                    })
                     .flex()
                     .flex_shrink_0()
                     .items_center()
@@ -817,11 +880,13 @@ impl RenderOnce for MaterialDialog {
         let Some(open) = self.modal else {
             // A specimen: the container in place.
             return if full_screen {
-                self.full_screen_surface(None).into_any_element()
+                let insets = self.safe_area;
+                self.full_screen_surface(insets, None).into_any_element()
             } else {
                 let width = self.basic_width(f32::INFINITY);
                 let dismiss = self.on_dismiss.clone();
-                self.basic_surface(width, dismiss, None).into_any_element()
+                self.basic_surface(width, None, dismiss, None)
+                    .into_any_element()
             };
         };
         let id = self.id.clone();
@@ -853,7 +918,13 @@ impl RenderOnce for MaterialDialog {
                 .opacity(opacity)
                 // A press on the surface is not a press on the scrim under it.
                 .occlude()
-                .child(self.full_screen_surface(dismiss.filter(|_| open)))
+                .child({
+                    let insets = full_screen_insets(
+                        self.safe_area,
+                        (!self.contained).then(|| window.insets().effective()),
+                    );
+                    self.full_screen_surface(insets, dismiss.filter(|_| open))
+                })
                 .into_any_element()
         } else {
             let rem_size = window.rem_size();
@@ -866,7 +937,11 @@ impl RenderOnce for MaterialDialog {
                 window.use_keyed_state((id.clone(), "dialog-size"), cx, |_, _| MeasuredSize(None))
             });
             let measured = measure.as_ref().and_then(|measure| measure.read(cx).0);
-            let basic = self.basic_surface(width, dismiss.filter(|_| open), measure);
+            // The container never outgrows its area: the body scrolls instead.
+            let max_height =
+                (area.size.height - rem(2. * DIALOG_MARGIN).to_pixels(rem_size)).max(px(0.));
+            let basic =
+                self.basic_surface(width, Some(max_height), dismiss.filter(|_| open), measure);
             let positioned = div()
                 .relative()
                 .top(rem(slide_offset(animation, frame.spatial)))
@@ -922,7 +997,9 @@ impl RenderOnce for MaterialDialog {
                     }
                 }),
             )
-            .popup(surface);
+            // The host draws deferred, after any enclosing scope has left the
+            // stack; the surface re-enters it to keep the scope's scheme.
+            .popup(crate::scope::current_scope(surface));
         let host = if container.is_some() {
             place_host(host, area)
         } else {
@@ -1304,5 +1381,184 @@ mod tests {
         cx.simulate_click(close.center(), Modifiers::default());
         draw(cx);
         assert_eq!(view.read_with(cx, |v, _| v.dismissals), 2);
+    }
+
+    /// A modal dialog with more content than its window holds.
+    struct Tall {
+        full_screen: bool,
+        safe_area: Edges<Pixels>,
+    }
+    impl Render for Tall {
+        fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+            window.set_rem_size(px(14.));
+            let rows = (0..30).map(|index| {
+                div()
+                    .debug_selector(move || format!("tall-row-{index}"))
+                    .h(px(40.))
+                    .flex_shrink_0()
+            });
+            let dialog = MaterialDialog::new("tall")
+                .headline("Title")
+                .supporting_text("Body")
+                .content(div().flex().flex_col().children(rows))
+                .action(div().debug_selector(|| "tall-action".into()).size(px(40.)))
+                .safe_area(self.safe_area)
+                .modal(true)
+                .on_dismiss(|_, _| {});
+            let dialog = if self.full_screen {
+                dialog.full_screen("Close", None)
+            } else {
+                dialog
+            };
+            div().size_full().child(dialog)
+        }
+    }
+
+    #[gpui::test]
+    fn a_tall_dialog_fits_its_window_and_scrolls_its_body(cx: &mut TestAppContext) {
+        cx.update(|cx| {
+            gpui_base::init(cx);
+            cx.set_reduce_motion(true);
+        });
+        let (_, cx) = cx.add_window_view(|_, _| Tall {
+            full_screen: false,
+            safe_area: Edges::default(),
+        });
+        cx.simulate_resize(size(px(400.), px(600.)));
+        draw(cx);
+        draw(cx);
+        let body = cx.debug_bounds("dialog-body").unwrap();
+        let action = cx.debug_bounds("tall-action").unwrap();
+        assert!(body.top() >= px(24.), "inside the margin: {body:?}");
+        assert!(
+            action.bottom() <= px(600. - 24.),
+            "the actions stay in the window: {action:?}"
+        );
+        assert!(body.bottom() <= action.top(), "the body ends above them");
+        let first = cx.debug_bounds("tall-row-0").unwrap();
+        assert!(first.top() > body.top());
+        cx.simulate_event(ScrollEvent {
+            position: body.center(),
+            delta: ScrollDelta::Pixels(point(px(0.), px(-200.))),
+            ..Default::default()
+        });
+        draw(cx);
+        let scrolled = cx.debug_bounds("tall-row-0").unwrap();
+        assert!(
+            scrolled.top() < first.top() - px(100.),
+            "the body scrolled: {first:?} -> {scrolled:?}"
+        );
+        assert_eq!(
+            cx.debug_bounds("tall-action").unwrap(),
+            action,
+            "the actions are pinned"
+        );
+    }
+
+    #[test]
+    fn full_screen_insets_take_the_larger_of_caller_and_window() {
+        let edges = |top: f32, left: f32| Edges {
+            top: px(top),
+            left: px(left),
+            ..Default::default()
+        };
+        assert_eq!(full_screen_insets(edges(56., 0.), None), edges(56., 0.));
+        assert_eq!(
+            full_screen_insets(edges(56., 0.), Some(edges(20., 8.))),
+            edges(56., 8.)
+        );
+    }
+
+    #[gpui::test]
+    fn a_full_screen_dialog_keeps_its_header_clear_of_the_safe_area(cx: &mut TestAppContext) {
+        cx.update(|cx| {
+            gpui_base::init(cx);
+            cx.set_reduce_motion(true);
+        });
+        let (view, cx) = cx.add_window_view(|_, _| Tall {
+            full_screen: true,
+            safe_area: Edges::default(),
+        });
+        draw(cx);
+        draw(cx);
+        let close = cx.debug_bounds("dialog-close").unwrap();
+        assert!(close.top() < px(21.), "no inset: under the title bar");
+        // A 56px title bar with the traffic lights at x 20–74, y 21–35.
+        view.update(cx, |v, cx| {
+            v.safe_area = Edges {
+                top: px(56.),
+                ..Default::default()
+            };
+            cx.notify();
+        });
+        draw(cx);
+        draw(cx);
+        let header = cx.debug_bounds("dialog-full-screen-header").unwrap();
+        let close = cx.debug_bounds("dialog-close").unwrap();
+        assert_eq!(header.top(), px(56.));
+        assert!(
+            close.top() >= px(56.),
+            "below the traffic lights: {close:?}"
+        );
+    }
+
+    /// Reads the scheme while painting, in a dialog's deferred host: the host
+    /// paints after the enclosing scope has left the stack.
+    #[derive(gpui::IntoElement)]
+    struct SchemeProbe(Rc<Cell<Option<Rgba>>>);
+    impl RenderOnce for SchemeProbe {
+        fn render(self, _: &mut Window, _: &mut App) -> impl IntoElement {
+            let seen = self.0;
+            canvas(
+                |_, _, _| {},
+                move |_, _, _, _| seen.set(Some(color(ColorRole::SURFACE))),
+            )
+            .size(px(4.))
+        }
+    }
+
+    struct Scoped(Rc<Cell<Option<Rgba>>>);
+    impl Render for Scoped {
+        fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+            let seen = self.0.clone();
+            crate::scope::Scope::new("scoped")
+                .scheme(crate::color::Scheme::from_palette(
+                    crate::color::PaletteId::Ink,
+                ))
+                .child_with(move |_, _| {
+                    div()
+                        .size_full()
+                        .child(
+                            MaterialDialog::new("scoped-dialog")
+                                .headline("Title")
+                                .content(SchemeProbe(seen))
+                                .modal(true),
+                        )
+                        .into_any_element()
+                })
+        }
+    }
+
+    #[gpui::test]
+    fn a_dialog_in_a_scope_draws_in_its_scheme(cx: &mut TestAppContext) {
+        use crate::color::{PaletteId, Scheme};
+        cx.update(|cx| {
+            gpui_kit::init(cx);
+            crate::theme::init_component_theme(Scheme::from_palette(PaletteId::Paper), 1., cx);
+            cx.set_reduce_motion(true);
+        });
+        let seen = Rc::new(Cell::new(None));
+        let (_, cx) = cx.add_window_view({
+            let seen = seen.clone();
+            move |_, _| Scoped(seen)
+        });
+        draw(cx);
+        draw(cx);
+        let ink = crate::theme::rgba(Scheme::from_palette(PaletteId::Ink).get(ColorRole::SURFACE));
+        assert_eq!(
+            seen.get(),
+            Some(ink),
+            "the deferred surface keeps the scope"
+        );
     }
 }

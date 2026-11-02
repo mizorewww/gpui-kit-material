@@ -435,7 +435,9 @@ mod tests {
     }
 
     /// Only the focused handle's key is looked up among the items: nothing
-    /// without focus, at most one pass over the items with it.
+    /// without focus; with it, one pass that stops at the focused item, or,
+    /// when that item is gone, one full pass and one lookup for the neighbor.
+    /// A lookup per handle, or a pass per handle, gives other counts.
     #[gpui::test]
     fn keeping_focus_scans_the_items_once_at_most(cx: &mut TestAppContext) {
         let (_, cx) = cx.add_window_view(|_, _| Blank);
@@ -447,34 +449,38 @@ mod tests {
                 .collect();
             let focused = entries[3].1.clone();
             let handles = cx.new(|_| entries.into_iter().collect::<BTreeMap<_, _>>());
-            let calls = std::cell::Cell::new(0);
-            let key = |item: &SharedString| {
-                calls.set(calls.get() + 1);
-                item.clone()
+            let lookups = |items: &[SharedString], window: &mut Window, cx: &mut App| {
+                let calls = std::cell::Cell::new(0);
+                keep_focus_in_handles(
+                    &handles,
+                    items,
+                    |item| {
+                        calls.set(calls.get() + 1);
+                        item
+                    },
+                    window,
+                    cx,
+                );
+                calls.get()
             };
-            keep_focus_in_handles(
-                &handles,
-                &keys,
-                |item| {
-                    key(item);
-                    item
-                },
-                window,
-                cx,
-            );
-            assert_eq!(calls.get(), 0, "no focus, no lookups");
+            assert_eq!(lookups(&keys, window, cx), 0, "no focus, no lookups");
             focused.focus(window, cx);
-            keep_focus_in_handles(
-                &handles,
-                &keys,
-                |item| {
-                    key(item);
-                    item
-                },
-                window,
-                cx,
+            assert!(focused.is_focused(window), "the lookups below have focus");
+            assert_eq!(
+                lookups(&keys, window, cx),
+                4,
+                "one pass, up to the focused item"
             );
-            assert!(calls.get() <= keys.len(), "{} lookups", calls.get());
+            let without: Vec<SharedString> = keys
+                .iter()
+                .filter(|key| key.as_ref() != "3")
+                .cloned()
+                .collect();
+            assert_eq!(
+                lookups(&without, window, cx),
+                without.len() + 1,
+                "one full pass, then the last item that stays"
+            );
         });
     }
 

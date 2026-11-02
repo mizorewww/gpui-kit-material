@@ -280,8 +280,22 @@ fn sliders_report_a_usable_step_and_range_thumbs_their_bounds(cx: &mut TestAppCo
     let volume = labelled(&all, "slider", "Volume", &tree);
     assert_eq!(volume["numeric_value_step"], 2.0, "{volume}");
 
-    // Each range thumb is bounded by the other. The range's own slider node, which
-    // also carries the end value, keeps the whole range.
+    // A range is two sliders, its thumbs, in a named group that has no value or
+    // actions of its own.
+    let group = labelled(&all, "group", "Price", &tree);
+    assert!(
+        group.get("numeric_value").is_none_or(Value::is_null),
+        "{group}"
+    );
+    let actions = group["on_action"].as_array().cloned().unwrap_or_default();
+    assert!(
+        !actions
+            .iter()
+            .any(|action| action == "Increment" || action == "Decrement"),
+        "{group}"
+    );
+
+    // Each range thumb is bounded by the other.
     let price: Vec<&Value> = all
         .iter()
         .filter(|node| {
@@ -291,6 +305,7 @@ fn sliders_report_a_usable_step_and_range_thumbs_their_bounds(cx: &mut TestAppCo
                     .is_some_and(|r| r.eq_ignore_ascii_case("slider"))
         })
         .collect();
+    assert_eq!(price.len(), 2, "only the thumbs are sliders: {tree}");
     let start: Vec<&&Value> = price
         .iter()
         .filter(|node| node["numeric_value"] == 40.0)

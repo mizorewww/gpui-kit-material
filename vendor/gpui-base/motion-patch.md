@@ -73,6 +73,22 @@ The local compatibility surface is restricted to:
   `a_zero_step_drags_continuously`, `an_accessibility_step_lands_on_the_step_grid`,
   `a_continuous_slider_steps_by_a_hundredth_of_its_range`; and in Base,
   `dragging_snaps_from_min`, `accessibility_steps_land_on_the_step_grid`.
+- `src/slider.rs`, step guards. `step_thumb` stepped any value: a NaN value became NaN
+  plus the delta, which `min`/`max` turned into `max`, so one Increment threw the thumb
+  to the end; a `min` above `max` and a range whose start is past its end were stepped
+  through bounds that cannot hold. As Material's keyboard (`stepped_value`) does, such a
+  value now comes back unchanged and `SliderState::step_thumb` emits nothing. Tests, in
+  `crates/material/tests/slider_state.rs`:
+  `stepping_leaves_an_invalid_value_or_range_alone`,
+  `a_range_thumb_snaps_to_the_grid_and_stops_at_the_other`; and in Base,
+  `stepping_leaves_an_invalid_value_or_range_alone`.
+- `src/slider.rs`, a range's node. A range slider's own node was a `Role::Slider` with
+  the end value and Increment/Decrement, beside its two `SliderThumb` sliders, so
+  assistive technology found three sliders for two thumbs. With a range value the node
+  is now a `Role::Group` that names the thumbs, with no value, bounds, step or step
+  actions; a single value keeps the slider node. Tests, in `crates/material`:
+  `sliders_report_a_usable_step_and_range_thumbs_their_bounds` and
+  `range_thumbs_report_their_step_and_a_disabled_slider`.
 
 - `src/dialog.rs`: `Dialog::accessibility_label`. The dialog host is the
   `Role::Dialog` node but upstream gives it no name and no way to set one,
