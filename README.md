@@ -70,7 +70,7 @@ gpui-kit-material = { git = "...", rev = "...", default-features = false, featur
 | `buttons` | `MaterialButton`, `IconButton`, `ButtonGroup`, `ConnectedButtonGroup`, `SplitButton`, `Fab`, `ExtendedFab`, `FabMenu` | `menus`, `progress` |
 | `progress` | `LinearProgress`, `CircularProgress`, `Stepper` | |
 | `loading` | `LoadingIndicator`, `PullToRefresh` | `progress`, `shapes` |
-| `feedback` | `Badge`, `Snackbar`, `MaterialTooltip`, `MaterialCard`, status chips, notices | |
+| `feedback` | `Badge`, `Snackbar`, `MaterialTooltip`, `MaterialCard`, `drop_target`, status chips, notices | |
 | `selection` | `MaterialCheckbox`, `MaterialRadio`, `MaterialSwitch`, chips, `ChipSet`, `MaterialSlider`, tiles, choice tiles | |
 | `inputs` | `TextField`, `SearchField`, `SearchView` | |
 | `menus` | `MaterialMenu`, `MenuPopup`, `MaterialContextMenu`, and `ExposedDropdown` when `inputs` is on too | |
