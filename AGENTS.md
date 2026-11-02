@@ -92,6 +92,10 @@
   treats `-x` as a second pattern and kills every process whose command line
   contains "cat" (Application, Notification...), which took down the user's
   desktop session. Never change power settings (`pmset`) or system services.
+- This machine has 16 GB of memory and is shared with other sessions and CI
+  runners. Run heavy cargo commands with `CARGO_BUILD_JOBS=3 nice -n 15`, keep
+  at most two building agents at once, and check `uptime` before release or
+  WASM builds; parallel builds have frozen it.
 - Keep disk use bounded; Rust build output is the main risk. Check free space
   before heavy builds and stop below 40 GB. Avoid scratch copies of the repo; delete
   any you make, and every extra `target/`, as soon as you have the result. Remove
