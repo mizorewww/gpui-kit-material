@@ -1380,6 +1380,31 @@ mod window_tests {
         );
     }
 
+    /// The results open without taking focus from the field: it never blurs
+    /// while typing, so nothing has to give it back.
+    #[gpui::test]
+    fn the_compact_results_open_without_blurring_the_field(cx: &mut TestAppContext) {
+        let (gallery, top_bar, mut cx) = open_window(480., cx);
+        let blurs = std::rc::Rc::new(std::cell::Cell::new(0));
+        let _subscription = cx.update(|_, cx| {
+            let search = top_bar.read(cx).search.clone();
+            let blurs = blurs.clone();
+            cx.subscribe(&search, move |_, event, _| {
+                if matches!(event, gpui_base::input::InputEvent::Blur) {
+                    blurs.set(blurs.get() + 1);
+                }
+            })
+        });
+        let toggle = cx.debug_bounds("top-search-toggle").unwrap();
+        cx.simulate_click(toggle.center(), gpui::Modifiers::none());
+        settle(&mut cx);
+        cx.simulate_input("sli");
+        settle(&mut cx);
+        assert!(cx.read(|cx| gallery.read(cx).drawer_open));
+        assert!(field_focused(&top_bar, &mut cx));
+        assert_eq!(blurs.get(), 0, "the field kept focus throughout");
+    }
+
     /// Enter with no query opens nothing; a dismissed results drawer comes back
     /// on focus and on Enter; a first match that is the current page closes it.
     #[gpui::test]

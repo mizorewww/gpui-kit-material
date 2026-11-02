@@ -108,6 +108,8 @@ pub(crate) struct TopBar {
     pub(crate) toggle_focus: FocusHandle,
     /// Whether focus the closed search's drawer gives back goes to the toggle.
     restore_toggle: bool,
+    /// Whether focus last left the drawer, which gives it back to the field.
+    from_drawer: bool,
     /// Keeps Tab in the bar while the compact search's results cover the page.
     trap_focus: FocusHandle,
     /// A caption style forced by a capture or test, which the bar leaves room for.
@@ -142,41 +144,36 @@ impl TopBar {
         let search = cx.new(|cx| InputState::new(window, cx).placeholder("Search"));
         let shared = gallery.read(cx).shared.clone();
         let subscriptions = vec![
-            cx.subscribe_in(
-                &search,
-                window,
-                |this: &mut Self, search, event, window, cx| {
-                    match event {
-                        InputEvent::Change => {
-                            let query = search.read(cx).value();
-                            this.gallery
-                                .update(cx, |gallery, cx| gallery.set_query(query, cx));
-                        }
-                        InputEvent::PressEnter { .. } => {
-                            this.gallery
-                                .update(cx, |gallery, cx| gallery.open_first_match(cx));
-                        }
-                        // A compact window shows the results the query still has.
-                        InputEvent::Focus => {
+            cx.subscribe_in(&search, window, |this: &mut Self, search, event, _, cx| {
+                match event {
+                    InputEvent::Change => {
+                        let query = search.read(cx).value();
+                        this.gallery
+                            .update(cx, |gallery, cx| gallery.set_query(query, cx));
+                    }
+                    InputEvent::PressEnter { .. } => {
+                        this.gallery
+                            .update(cx, |gallery, cx| gallery.open_first_match(cx));
+                    }
+                    // A compact window shows the results the query still
+                    // has, unless focus is coming back from them: the
+                    // drawer gives it back as it closes.
+                    InputEvent::Focus => {
+                        if !std::mem::take(&mut this.from_drawer) {
                             this.gallery
                                 .update(cx, |gallery, cx| gallery.show_results(cx));
                         }
-                        // The modal drawer takes focus as it opens to show the
-                        // results; typing goes on in the field.
-                        InputEvent::Blur => {
-                            let gallery = this.gallery.read(cx);
-                            if this.search_open
-                                && gallery.drawer_open
-                                && gallery.drawer_focus.contains_focused(window, cx)
-                            {
-                                let search = search.clone();
-                                window.defer(cx, move |window, cx| {
-                                    search.update(cx, |search, cx| search.focus(window, cx))
-                                });
-                            }
-                        }
                     }
-                },
+                    InputEvent::Blur => {}
+                }
+            }),
+            // Focus leaving the drawer (a result, or the holder a scrim
+            // press focuses) comes back to the field as the drawer closes,
+            // which is no reason to show the results again.
+            cx.on_focus_out(
+                &gallery.read(cx).drawer_focus.clone(),
+                window,
+                |this: &mut Self, _, _, _| this.from_drawer = true,
             ),
             // Closing the search gives focus back to its toggle. The drawer
             // gives it back to the field it took it from once it closes, which
@@ -212,6 +209,7 @@ impl TopBar {
             was_compact: false,
             toggle_focus: cx.focus_handle(),
             restore_toggle: false,
+            from_drawer: false,
             trap_focus: cx.focus_handle(),
             caption: None,
             _subscriptions: subscriptions,
