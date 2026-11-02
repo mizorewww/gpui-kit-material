@@ -533,7 +533,7 @@ impl GalleryPage for Page {
         let shared = self.page.shared.read(cx);
         let (theme, mode, contrast, palette) = (
             shared.reference_theme,
-            shared.reference_mode,
+            shared.painted_mode(),
             shared.contrast,
             shared.palette,
         );
@@ -589,14 +589,8 @@ impl GalleryPage for Page {
                     } else {
                         "light"
                     })
-                    .on_change(update(|shared, name| {
-                        shared.reference_mode = if name == "dark" {
-                            ThemeMode::Dark
-                        } else {
-                            ThemeMode::Light
-                        };
-                        shared.reference_theme.get_or_insert(ThemeId::Baseline);
-                    }))
+                    // A palette changes to its family's other mode.
+                    .on_change(update(|shared, name| shared.set_dark(name == "dark")))
                     .reveal("reveal-mode", &list),
             )
             .into_any_element(),

@@ -516,11 +516,8 @@ impl Gallery {
         let tab = props.tab;
         let gallery = props.gallery.clone();
         let shared = props.shared.read(cx);
-        let theme = shared
-            .preview_theme
-            .or(shared.reference_theme)
-            .and_then(|theme| THEMES.iter().position(|(id, _)| *id == theme));
-        let dark = shared.preview_mode.unwrap_or(shared.reference_mode) == ThemeMode::Dark;
+        let (theme_options, theme, app_option) = preview_theme_choice(shared);
+        let dark = shared.preview_mode.unwrap_or(shared.painted_mode()) == ThemeMode::Dark;
         let rtl = shared.preview_rtl;
         let update_shared = |f: fn(&mut GalleryShared, usize)| {
             let shared = props.shared.clone();
@@ -531,9 +528,18 @@ impl Gallery {
                 })
             }
         };
-        let select_theme = update_shared(|shared, index| {
-            shared.preview_theme = Some(THEMES[index].0);
-        });
+        let select_theme = {
+            let shared = props.shared.clone();
+            move |index: usize, cx: &mut App| {
+                shared.update(cx, |shared, cx| {
+                    // The application's own palette or seed is the first option.
+                    shared.preview_theme = index
+                        .checked_sub(usize::from(app_option))
+                        .map(|theme| THEMES[theme].0);
+                    cx.notify();
+                })
+            }
+        };
         let select_mode = update_shared(|shared, dark| {
             shared.preview_mode = Some(if dark == 1 {
                 ThemeMode::Dark
@@ -608,8 +614,8 @@ impl Gallery {
                     })
                     .child(
                         CompactSelect::new("preview-theme", "Theme")
-                            .options(THEMES.map(|(_, label)| SharedString::new_static(label)))
-                            .selected(theme.unwrap_or(0))
+                            .options(theme_options)
+                            .selected(theme)
                             .open(props.theme_menu_open)
                             .width(116.)
                             .on_open_change({
@@ -954,6 +960,33 @@ pub(crate) fn preview_canvas(
                 .child(content),
         )
         .into_any_element()
+}
+
+/// The preview's theme select: its options, the selected one, and whether the
+/// first is the application's own palette or seed, which no reference theme
+/// describes and which the preview follows until it picks a theme.
+pub(crate) fn preview_theme_choice(shared: &GalleryShared) -> (Vec<SharedString>, usize, bool) {
+    let app = if shared.seed.is_some() {
+        Some(SharedString::new_static("Seed color"))
+    } else if shared.paints_palette() {
+        Some(SharedString::new_static(shared.palette.name()))
+    } else {
+        None
+    };
+    let offset = usize::from(app.is_some());
+    let theme = match shared.preview_theme {
+        Some(theme) => Some(theme),
+        None if offset == 1 => None,
+        None => shared.reference_theme,
+    };
+    let selected = theme
+        .and_then(|theme| THEMES.iter().position(|(id, _)| *id == theme))
+        .map_or(0, |index| index + offset);
+    let themes = THEMES
+        .iter()
+        .map(|(_, label)| SharedString::new_static(label));
+    let options = app.into_iter().chain(themes).collect();
+    (options, selected, offset == 1)
 }
 
 /// What a list row shows: see [`Gallery::row_parts`].

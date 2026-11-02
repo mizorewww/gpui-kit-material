@@ -138,25 +138,59 @@ impl GalleryShared {
         )
     }
     /// The preview's scheme, when it differs from the application's. A mode of
-    /// its own keeps the application's seed, if one is painted.
+    /// its own keeps the application's seed, if one is painted, or its palette's
+    /// family.
     pub fn preview_scheme(&self) -> Option<gpui_kit_material::color::Scheme> {
         if self.preview_theme.is_none() && self.preview_mode.is_none() {
             return None;
         }
-        let mode = self.preview_mode.unwrap_or(self.reference_mode);
+        let mode = self.preview_mode.unwrap_or(self.painted_mode());
         let theme = self.preview_theme.or(self.reference_theme);
         let seed = self.seed.filter(|_| self.preview_theme.is_none());
-        let source = (self.palette, theme, seed, mode, self.contrast);
+        let palette = palette_for(self.palette, mode);
+        let source = (palette, theme, seed, mode, self.contrast);
         Some(self.memoized_scheme(1, source, || {
             if seed.is_some()
                 && let Some(seed) = self.seed_scheme(mode)
             {
                 return seed;
             }
-            theme
-                .unwrap_or(ThemeId::Baseline)
-                .scheme(mode, self.contrast)
+            theme.map_or_else(
+                || gpui_kit_material::color::Scheme::from_palette(palette),
+                |theme| theme.scheme(mode, self.contrast),
+            )
         }))
+    }
+    /// Whether the application paints `palette` rather than a reference theme
+    /// or a seed.
+    pub fn paints_palette(&self) -> bool {
+        self.reference_theme.is_none() && self.seed.is_none()
+    }
+    /// The mode of the scheme the application paints. A palette is light or
+    /// dark of itself, whatever `reference_mode` says.
+    pub fn painted_mode(&self) -> ThemeMode {
+        if self.paints_palette() {
+            if self.palette.is_dark() {
+                ThemeMode::Dark
+            } else {
+                ThemeMode::Light
+            }
+        } else {
+            self.reference_mode
+        }
+    }
+    /// Paint the application light or dark, keeping what it paints: a palette
+    /// turns into its family's other mode, a theme or seed changes its mode.
+    pub fn set_dark(&mut self, dark: bool) {
+        let mode = if dark {
+            ThemeMode::Dark
+        } else {
+            ThemeMode::Light
+        };
+        self.reference_mode = mode;
+        if self.paints_palette() {
+            self.palette = palette_for(self.palette, mode);
+        }
     }
     /// The live preview's overrides, as a [`Scope`]. With none set it changes nothing.
     pub fn preview_scope(&self) -> gpui_kit_material::scope::Scope {
@@ -171,6 +205,27 @@ impl GalleryShared {
     }
     pub fn text_scale(&self) -> f32 {
         self.scale.parse().unwrap_or(1.)
+    }
+}
+
+/// The palette of `palette`'s family in `mode`: itself when it is already
+/// that light or dark.
+pub fn palette_for(palette: PaletteId, mode: ThemeMode) -> PaletteId {
+    let dark = mode == ThemeMode::Dark;
+    if palette.is_dark() == dark {
+        return palette;
+    }
+    match palette {
+        PaletteId::Paper => PaletteId::Ink,
+        PaletteId::Ink => PaletteId::Paper,
+        PaletteId::NordSnow => PaletteId::Nord,
+        PaletteId::Nord => PaletteId::NordSnow,
+        PaletteId::TokyoDay => PaletteId::TokyoNight,
+        PaletteId::TokyoNight => PaletteId::TokyoDay,
+        PaletteId::CatppuccinLatte => PaletteId::CatppuccinMocha,
+        PaletteId::CatppuccinFrappe
+        | PaletteId::CatppuccinMacchiato
+        | PaletteId::CatppuccinMocha => PaletteId::CatppuccinLatte,
     }
 }
 
@@ -397,5 +452,46 @@ mod scheme_tests {
             shared.target_scheme(),
             gpui_kit_material::color::Scheme::from_palette(shared.palette)
         );
+    }
+
+    /// A dark palette reads as dark wherever the mode shows, and switching the
+    /// mode keeps the palette's family instead of falling back to a theme.
+    #[test]
+    fn the_mode_follows_the_painted_palette_and_keeps_it() {
+        use gpui_kit_material::color::Scheme;
+        let mut shared = GalleryShared {
+            palette: PaletteId::TokyoNight,
+            reference_theme: None,
+            ..GalleryShared::default()
+        };
+        assert_eq!(shared.reference_mode, ThemeMode::Light);
+        assert_eq!(shared.painted_mode(), ThemeMode::Dark);
+        shared.set_dark(false);
+        assert_eq!(shared.reference_theme, None, "the palette stays painted");
+        assert_eq!(shared.palette, PaletteId::TokyoDay);
+        assert_eq!(shared.painted_mode(), ThemeMode::Light);
+        shared.set_dark(true);
+        assert_eq!(shared.palette, PaletteId::TokyoNight);
+        // The preview's own mode keeps the palette's family too.
+        shared.preview_mode = Some(ThemeMode::Light);
+        assert_eq!(
+            shared.preview_scheme(),
+            Some(Scheme::from_palette(PaletteId::TokyoDay))
+        );
+        // Every palette has a family member in each mode.
+        for palette in gpui_kit_material::color::palette::ALL {
+            for mode in [ThemeMode::Light, ThemeMode::Dark] {
+                assert_eq!(
+                    palette_for(palette, mode).is_dark(),
+                    mode == ThemeMode::Dark,
+                    "{palette:?} in {mode:?}"
+                );
+            }
+        }
+        // A reference theme only changes its mode.
+        shared.reference_theme = Some(ThemeId::Ocean);
+        shared.set_dark(false);
+        assert_eq!(shared.painted_mode(), ThemeMode::Light);
+        assert_eq!(shared.reference_theme, Some(ThemeId::Ocean));
     }
 }

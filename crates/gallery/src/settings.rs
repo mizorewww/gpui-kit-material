@@ -76,7 +76,7 @@ impl Render for Settings {
             .flex_col()
             .gap(px(12.))
             .when_some(self.shared.clone(), |content, shared| {
-                let dark = shared.read(cx).reference_mode == ThemeMode::Dark;
+                let dark = shared.read(cx).painted_mode() == ThemeMode::Dark;
                 content.child(
                     div()
                         .debug_selector(|| "gallery-settings-dark".into())
