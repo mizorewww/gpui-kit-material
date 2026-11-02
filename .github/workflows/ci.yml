@@ -71,6 +71,8 @@ jobs:
           cargo check --locked --release -p gpui-kit-material-gallery --bin gallery --features instruction-bench
       - name: The browser profiler's report
         run: node scripts/check-web-profile.mjs
+      - name: The profiler's report rules
+        run: python3 scripts/test_profile_gallery.py
       - name: Linux present mode rules
         if: runner.os == 'Linux'
         run: |

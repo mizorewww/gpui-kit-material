@@ -617,6 +617,9 @@ impl RenderOnce for MaterialSlider {
         let value = state.value();
         let is_range = value.is_range();
         let (min, max, step) = (state.min_value(), state.max_value(), state.step_value());
+        // What a range thumb's Increment and Decrement move by and report: the step, or a
+        // hundredth of the range for a continuous slider, as the keyboard's arrows do.
+        let a11y_step = state.accessibility_step();
         let percentage = state.percentage();
         let handles: Vec<f32> = if is_range {
             vec![percentage.start, percentage.end]
@@ -721,6 +724,14 @@ impl RenderOnce for MaterialSlider {
             .map(|(i, (&p, &v))| {
                 let start = is_range && i == 0;
                 let focused = thumb_focused(i);
+                // Each range thumb is bounded by the other.
+                let (thumb_min, thumb_max) = if !is_range {
+                    (min, max)
+                } else if start {
+                    (min, value.end())
+                } else {
+                    (value.start(), max)
+                };
                 let thumb = SliderThumb::new(&self.state)
                     .axis(self.axis)
                     .start(start)
@@ -733,9 +744,9 @@ impl RenderOnce for MaterialSlider {
                             .role(Role::Slider)
                             .aria_label(label.clone())
                             .aria_numeric_value(v as f64)
-                            .aria_min_numeric_value(min as f64)
-                            .aria_max_numeric_value(max as f64)
-                            .aria_numeric_value_step(step as f64)
+                            .aria_min_numeric_value(thumb_min as f64)
+                            .aria_max_numeric_value(thumb_max as f64)
+                            .aria_numeric_value_step(a11y_step as f64)
                             .aria_orientation(orientation)
                             .when(live, |thumb| {
                                 let increment = self.state.clone();
@@ -747,7 +758,7 @@ impl RenderOnce for MaterialSlider {
                                         AccessibleAction::Increment,
                                         move |_, window, cx| {
                                             increment.update(cx, |state, cx| {
-                                                state.step_thumb(start, step, window, cx);
+                                                state.step_thumb(start, a11y_step, window, cx);
                                             });
                                         },
                                     )
@@ -755,7 +766,7 @@ impl RenderOnce for MaterialSlider {
                                         AccessibleAction::Decrement,
                                         move |_, window, cx| {
                                             decrement.update(cx, |state, cx| {
-                                                state.step_thumb(start, -step, window, cx);
+                                                state.step_thumb(start, -a11y_step, window, cx);
                                             });
                                         },
                                     )

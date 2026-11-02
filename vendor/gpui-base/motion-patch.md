@@ -61,6 +61,18 @@ The local compatibility surface is restricted to:
   since this crate's own do not run in the workspace:
   `a_dropped_handle_stands_at_its_value`, `an_accessibility_step_reports_a_change`,
   `each_range_thumb_steps_by_itself`, `min_can_be_set_above_the_default_max_before_max`.
+- `src/slider.rs`, steps. A step of 0, a negative step or a non-finite one divided by
+  zero in `snap_to_step`, and the NaN clamped to `max`, so a drag threw the handle to the
+  end; such a step now leaves the value continuous. Increment and Decrement moved by
+  `step_value()`, so a continuous slider took 0 and reported a 0 step; the new
+  `SliderState::accessibility_step` is the step, or a hundredth of the range when the step
+  is not positive and finite, as Material's keyboard does, and Base's slider node reports
+  it and moves by it. `step_thumb` added its delta without snapping (step 10 at 33 went
+  to 43 where the arrow keys give 40); it now lands on the grid counted from `min`, as the
+  keyboard does. Tests, in `crates/material/tests/slider_state.rs`:
+  `a_zero_step_drags_continuously`, `an_accessibility_step_lands_on_the_step_grid`,
+  `a_continuous_slider_steps_by_a_hundredth_of_its_range`; and in Base,
+  `dragging_snaps_from_min`, `accessibility_steps_land_on_the_step_grid`.
 
 - `src/dialog.rs`: `Dialog::accessibility_label`. The dialog host is the
   `Role::Dialog` node but upstream gives it no name and no way to set one,

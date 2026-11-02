@@ -113,3 +113,44 @@ fn each_range_thumb_steps_by_itself(cx: &mut TestAppContext) {
         "a thumb stops at the other"
     );
 }
+
+#[gpui::test]
+fn a_zero_step_drags_continuously(cx: &mut TestAppContext) {
+    for step in [0., -5., f32::NAN, f32::INFINITY] {
+        let (state, cx) = sized(SliderState::new().step(step), cx);
+        state.update_in(cx, |state, window, cx| {
+            let position = point(px(30.), px(0.));
+            state.update_value_by_position(Axis::Horizontal, position, false, window, cx);
+        });
+        state.read_with(cx, |state, _| {
+            // It used to divide by zero, and the handle jumped to the max.
+            let value = state.value().end();
+            assert!((value - 30.).abs() < 1e-3, "step {step}: {value}");
+            assert!((state.percentage().end - 0.3).abs() < 1e-5, "step {step}");
+        });
+    }
+}
+
+#[gpui::test]
+fn an_accessibility_step_lands_on_the_step_grid(cx: &mut TestAppContext) {
+    let (state, cx) = sized(SliderState::new().step(10.).default_value(33.), cx);
+    let step = |delta: f32, cx: &mut VisualTestContext| {
+        state.update_in(cx, |state, window, cx| {
+            state.step_thumb(false, delta, window, cx)
+        });
+        state.read_with(cx, |state, _| state.value().end())
+    };
+    // As the keyboard's arrows do: 33 + 10 snaps to 40, not 43.
+    assert_eq!(step(10., cx), 40.);
+    state.update_in(cx, |state, window, cx| state.set_value(33., window, cx));
+    assert_eq!(step(-10., cx), 20.);
+}
+
+#[test]
+fn a_continuous_slider_steps_by_a_hundredth_of_its_range() {
+    for step in [0., -1., f32::NAN] {
+        let state = SliderState::new().min(0.).max(200.).step(step);
+        assert_eq!(state.accessibility_step(), 2., "step {step}");
+    }
+    assert_eq!(SliderState::new().step(5.).accessibility_step(), 5.);
+}

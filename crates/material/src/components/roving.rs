@@ -355,11 +355,15 @@ pub(crate) fn keep_focus_in_handles<T>(
     cx: &mut App,
 ) {
     let current = handles.read(cx);
+    // One handle at most holds focus: find it, then look for its item alone.
     // Not by the counts: a tab can go as another comes.
-    let leaving = current.iter().any(|(value, handle)| {
-        handle.is_focused(window) && !items.iter().any(|item| key(item) == value)
-    });
-    if !leaving {
+    let Some(focused) = current
+        .iter()
+        .find_map(|(value, handle)| handle.is_focused(window).then_some(value))
+    else {
+        return;
+    };
+    if items.iter().any(|item| key(item) == focused) {
         return;
     }
     // Of those with a handle: an item that came this render has none yet.
@@ -428,6 +432,50 @@ mod tests {
         });
         cx.run_until_parked();
         assert!(cx.update(|window, _| kept.is_focused(window)));
+    }
+
+    /// Only the focused handle's key is looked up among the items: nothing
+    /// without focus, at most one pass over the items with it.
+    #[gpui::test]
+    fn keeping_focus_scans_the_items_once_at_most(cx: &mut TestAppContext) {
+        let (_, cx) = cx.add_window_view(|_, _| Blank);
+        cx.update(|window, cx| {
+            let keys: Vec<SharedString> = (0..20).map(|i| format!("{i}").into()).collect();
+            let entries: Vec<_> = keys
+                .iter()
+                .map(|k| (k.clone(), cx.focus_handle()))
+                .collect();
+            let focused = entries[3].1.clone();
+            let handles = cx.new(|_| entries.into_iter().collect::<BTreeMap<_, _>>());
+            let calls = std::cell::Cell::new(0);
+            let key = |item: &SharedString| {
+                calls.set(calls.get() + 1);
+                item.clone()
+            };
+            keep_focus_in_handles(
+                &handles,
+                &keys,
+                |item| {
+                    key(item);
+                    item
+                },
+                window,
+                cx,
+            );
+            assert_eq!(calls.get(), 0, "no focus, no lookups");
+            focused.focus(window, cx);
+            keep_focus_in_handles(
+                &handles,
+                &keys,
+                |item| {
+                    key(item);
+                    item
+                },
+                window,
+                cx,
+            );
+            assert!(calls.get() <= keys.len(), "{} lookups", calls.get());
+        });
     }
 
     /// `index_handles` under a view that renders, and a view beside it that reads them.
