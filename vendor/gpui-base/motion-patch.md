@@ -82,6 +82,13 @@ The local compatibility surface is restricted to:
   `stepping_leaves_an_invalid_value_or_range_alone`,
   `a_range_thumb_snaps_to_the_grid_and_stops_at_the_other`; and in Base,
   `stepping_leaves_an_invalid_value_or_range_alone`.
+- `src/slider.rs`, a range's node. A range slider's own node was a `Role::Slider` with
+  the end value and Increment/Decrement, beside its two `SliderThumb` sliders, so
+  assistive technology found three sliders for two thumbs. With a range value the node
+  is now a `Role::Group` that names the thumbs, with no value, bounds, step or step
+  actions; a single value keeps the slider node. Tests, in `crates/material`:
+  `sliders_report_a_usable_step_and_range_thumbs_their_bounds` and
+  `range_thumbs_report_their_step_and_a_disabled_slider`.
 
 - `src/dialog.rs`: `Dialog::accessibility_label`. The dialog host is the
   `Role::Dialog` node but upstream gives it no name and no way to set one,

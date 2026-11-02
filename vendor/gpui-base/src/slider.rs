@@ -627,19 +627,25 @@ impl RenderOnce for Slider {
         let entity_id = self.state.entity_id();
         let state = self.state.read(cx);
         let slider_state = self.state.clone();
+        // A range's thumbs are its sliders (`SliderThumb`), each with its own value and
+        // steps; the container only groups and names them, so assistive technology finds
+        // two sliders, not three.
+        let range = state.value().is_range();
 
         self.base
             .id(("slider", entity_id))
             .test_support()
             .when_some(self.focus, |this, focus| this.track_focus(&focus))
-            .role(Role::Slider)
+            .role(if range { Role::Group } else { Role::Slider })
             .when_some(self.accessibility_label, |this, label| {
                 this.aria_label(label)
             })
-            .aria_numeric_value(state.value().end() as f64)
-            .aria_min_numeric_value(state.min_value() as f64)
-            .aria_max_numeric_value(state.max_value() as f64)
-            .aria_numeric_value_step(state.accessibility_step() as f64)
+            .when(!range, |this| {
+                this.aria_numeric_value(state.value().end() as f64)
+                    .aria_min_numeric_value(state.min_value() as f64)
+                    .aria_max_numeric_value(state.max_value() as f64)
+                    .aria_numeric_value_step(state.accessibility_step() as f64)
+            })
             .aria_orientation(if axis.is_vertical() {
                 Orientation::Vertical
             } else {
@@ -648,21 +654,23 @@ impl RenderOnce for Slider {
             // A disabled slider takes no value, from the pointer or from
             // assistive technology.
             .when(!self.disabled, |this| {
-                this.on_a11y_action(AccessibleAction::Increment, {
-                    let state = slider_state.clone();
-                    move |_, window, cx| {
-                        state.update(cx, |state, cx| {
-                            state.step_thumb(false, state.accessibility_step(), window, cx);
-                        });
-                    }
-                })
-                .on_a11y_action(AccessibleAction::Decrement, {
-                    let state = slider_state.clone();
-                    move |_, window, cx| {
-                        state.update(cx, |state, cx| {
-                            state.step_thumb(false, -state.accessibility_step(), window, cx);
-                        });
-                    }
+                this.when(!range, |this| {
+                    this.on_a11y_action(AccessibleAction::Increment, {
+                        let state = slider_state.clone();
+                        move |_, window, cx| {
+                            state.update(cx, |state, cx| {
+                                state.step_thumb(false, state.accessibility_step(), window, cx);
+                            });
+                        }
+                    })
+                    .on_a11y_action(AccessibleAction::Decrement, {
+                        let state = slider_state.clone();
+                        move |_, window, cx| {
+                            state.update(cx, |state, cx| {
+                                state.step_thumb(false, -state.accessibility_step(), window, cx);
+                            });
+                        }
+                    })
                 })
                 .on_mouse_up(
                     MouseButton::Left,
