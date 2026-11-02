@@ -1,10 +1,16 @@
 //! Cards: the outlined, elevated and filled cards composed like the kit's
 //! specimens (header, media, text and actions), their horizontal form, and
-//! the kit's card states (hover, focus, press, drag).
+//! the kit's card states (hover, focus, press, drag), selectable cards
+//! (toggles) and a card group (one choice, a radio group).
 use super::prelude::*;
 use gpui_kit_material::icons::Symbol;
 
-pub struct Page;
+pub struct Page {
+    /// Which of the selectable cards are selected.
+    selected: [bool; 3],
+    /// The card group's choice.
+    choice: usize,
+}
 
 /// The kit's column order.
 const VARIANTS: [(CardVariant, &str); 3] = [
@@ -149,14 +155,77 @@ impl GalleryPage for Page {
     };
 
     fn new(_: PageCx, _: &mut Window, _: &mut Context<Self>) -> Self {
-        Page
+        Page {
+            selected: [true, false, false],
+            choice: 0,
+        }
     }
 
     fn row_count(&self, _: &Window) -> usize {
-        3
+        5
     }
 
-    fn render_row(&mut self, row: usize, _: &mut Window, _: &mut Context<Self>) -> AnyElement {
+    fn render_row(&mut self, row: usize, _: &mut Window, cx: &mut Context<Self>) -> AnyElement {
+        if row == 4 {
+            let mut group = CardGroup::new("card-group", "Card group")
+                .flex()
+                .flex_wrap()
+                .gap(rem(8.))
+                .on_change(cx.listener(|page, index: &usize, _, cx| {
+                    page.choice = *index;
+                    cx.notify();
+                }));
+            for (i, name) in ["First", "Second", "Third"].into_iter().enumerate() {
+                group = group.card(
+                    MaterialCard::new(("card-choice", i), CardVariant::Outlined)
+                        .selected(self.choice == i)
+                        .accessibility_label(name)
+                        .w(rem(160.))
+                        .child(media().h(rem(72.)))
+                        .child(div().p(rem(16.)).child(spec::type_role(
+                            accessible_text(("card-choice-title", i), name),
+                            TypeRole::TitleMedium,
+                        ))),
+                );
+            }
+            return board("card-choice")
+                .caption("Card group: one choice")
+                .columns(1)
+                .cells([group])
+                .into_any_element();
+        }
+        if row == 3 {
+            return board("card-selectable")
+                .caption("Selectable cards")
+                .columns(3)
+                .column_labels(VARIANTS.map(|(_, name)| name))
+                .cells(
+                    VARIANTS
+                        .into_iter()
+                        .enumerate()
+                        .map(|(i, (variant, name))| {
+                            MaterialCard::new(("card-select", i), variant)
+                                .selected(self.selected[i])
+                                .accessibility_label(name)
+                                .on_click(cx.listener(move |page, _, _, cx| {
+                                    page.selected[i] = !page.selected[i];
+                                    cx.notify();
+                                }))
+                                .w(rem(160.))
+                                .child(media().h(rem(72.)))
+                                .child(
+                                    div()
+                                        .p(rem(16.))
+                                        .debug_selector(move || format!("card-select-{i}"))
+                                        .child(spec::type_role(
+                                            accessible_text(("card-select-title", i), name),
+                                            TypeRole::TitleMedium,
+                                        )),
+                                )
+                        }),
+                )
+                .into_any_element();
+        }
         if row == 2 {
             return board("card-states")
                 .caption("Building blocks: card states")

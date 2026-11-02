@@ -51,6 +51,11 @@ Distribution is by Git revision for now; see the [quick start](README.md#quick-s
 - `ListDensity::Minus3`: density −3, 44/60/76dp items, one step above `Compact`. The
   heights are derived from Material's density scale (−4dp per step); the Figma kit has no
   −3 list. It is a density level, not an M3 navigation height.
+- `MaterialCard::selected` and `CardSurface::selected`: M3's checked card, with values from
+  Material Components for Android's M3 card (the Figma kit, md3.io and m3e give none): a 16%
+  secondary layer, a secondary edge when outlined, and a secondary check-circle icon at the
+  top-end corner. `MaterialCard::selection_role` with `CardSelection` says whether selecting is
+  a toggle or one choice of several; `CardGroup` makes cards a radio group with roving focus.
 
 ### Changed
 

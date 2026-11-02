@@ -185,10 +185,11 @@ pub use dialog::{
 };
 #[cfg(feature = "feedback")]
 pub use feedback::{
-    BADGE_CONTAINER, BADGE_LABEL, CARD_PADDING, CardState, CardSurface, CardVariant,
-    LARGE_BADGE_PADDING, LARGE_BADGE_SIZE, MEDIA_LABEL_CONTAINER, MEDIA_LABEL_TEXT, MaterialCard,
-    NoticeKind, SMALL_BADGE_SIZE, StatusKind, card, card_surface, large_badge, media_label,
-    notice_banner, outlined_status_chip, small_badge, status_chip, status_fact_chip,
+    BADGE_CONTAINER, BADGE_LABEL, CARD_PADDING, CARD_SELECTED_LAYER, CardGroup, CardSelection,
+    CardState, CardSurface, CardVariant, LARGE_BADGE_PADDING, LARGE_BADGE_SIZE,
+    MEDIA_LABEL_CONTAINER, MEDIA_LABEL_TEXT, MaterialCard, NoticeKind, SMALL_BADGE_SIZE,
+    StatusKind, card, card_surface, large_badge, media_label, notice_banner, outlined_status_chip,
+    small_badge, status_chip, status_fact_chip,
 };
 #[cfg(feature = "feedback")]
 #[allow(deprecated)]

@@ -342,3 +342,149 @@ fn a_dragged_card_stays_under_the_pointer_right_to_left(cx: &mut TestAppContext)
     let carried = cx.debug_bounds("action-card-body").unwrap();
     assert_eq!(carried.origin - home.origin, point(px(30.), px(20.)));
 }
+
+struct SelectedCard(bool);
+impl Render for SelectedCard {
+    fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        window.set_rem_size(px(14.));
+        div().p(px(20.)).child(
+            super::MaterialCard::new("selected-card", CardVariant::Outlined)
+                .selected(self.0)
+                .accessibility_label("Option")
+                .on_click(|_, _, _| {})
+                .w(px(100.))
+                .child(
+                    div()
+                        .h(px(60.))
+                        .debug_selector(|| "selected-card-body".into()),
+                ),
+        )
+    }
+}
+#[gpui::test]
+fn a_selected_outlined_card_draws_a_secondary_edge_and_a_check(cx: &mut TestAppContext) {
+    use crate::color::ColorRole;
+    let (view, cx) = cx.add_window_view(|_, _| SelectedCard(true));
+    cx.run_until_parked();
+    let edge = |cx: &mut gpui::VisualTestContext| {
+        cx.update(|window, _| {
+            let scale = window.scale_factor();
+            let quads = window.painted_quads();
+            let edge = quads
+                .iter()
+                .find(|q| q.border_widths.top.0 > 0. && q.bounds.size.width.0 == 100. * scale)
+                .expect("the card's edge");
+            (edge.border_widths.top.0 / scale, edge.border_color)
+        })
+    };
+    let secondary: gpui::Hsla = crate::theme::color(ColorRole::SECONDARY).into();
+    assert_eq!(edge(cx), (1., secondary), "selected: 1dp secondary");
+    // MDC Android's check: 24dp, 8dp in from the top-end corner.
+    let card = cx.debug_bounds("selected-card-body").unwrap();
+    let check = cx
+        .debug_bounds("material-card-check")
+        .expect("a selected card shows its check");
+    assert_eq!(check.size, gpui::size(px(24.), px(24.)));
+    assert_eq!(check.top(), card.top() + px(8.));
+    assert_eq!(check.right(), card.right() - px(8.));
+
+    view.update(cx, |view, cx| {
+        view.0 = false;
+        cx.notify();
+    });
+    super::tests::redraw(cx);
+    let outline: gpui::Hsla = crate::theme::color(ColorRole::OUTLINE_VARIANT).into();
+    assert_eq!(edge(cx), (1., outline), "unselected: 1dp outline-variant");
+    assert!(cx.debug_bounds("material-card-check").is_none(), "no check");
+}
+
+/// The fill of the 100px-wide card in the last frame.
+fn card_fill(cx: &mut gpui::VisualTestContext) -> gpui::Background {
+    cx.update(|window, _| {
+        let scale = window.scale_factor();
+        window
+            .painted_quads()
+            .iter()
+            .find(|q| q.bounds.size.width.0 == 100. * scale && !q.background.is_transparent())
+            .map(|q| q.background)
+            .expect("the card's fill")
+    })
+}
+
+struct Composed(bool);
+impl Render for Composed {
+    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        let card = CardSurface::new(CardVariant::Filled).w(px(100.)).h(px(60.));
+        div().child(if self.0 {
+            card.selected(true).state(super::CardState::Hovered)
+        } else {
+            card.state(super::CardState::Hovered).selected(true)
+        })
+    }
+}
+#[gpui::test]
+fn selection_and_state_compose_in_either_order(cx: &mut TestAppContext) {
+    let (view, cx) = cx.add_window_view(|_, _| Composed(true));
+    cx.run_until_parked();
+    let first = card_fill(cx);
+    view.update(cx, |view, cx| {
+        view.0 = false;
+        cx.notify();
+    });
+    super::tests::redraw(cx);
+    assert_eq!(card_fill(cx), first);
+}
+
+struct GroupHarness {
+    selected: usize,
+    changes: Vec<usize>,
+}
+impl Render for GroupHarness {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        window.set_rem_size(px(14.));
+        let mut group = super::CardGroup::new("choices", "Choices")
+            .flex()
+            .gap(px(8.))
+            .on_change(cx.listener(|this, index: &usize, _, cx| {
+                this.selected = *index;
+                this.changes.push(*index);
+                cx.notify();
+            }));
+        for index in 0..3 {
+            group = group.card(
+                super::MaterialCard::new(("choice", index), CardVariant::Outlined)
+                    .selected(self.selected == index)
+                    .w(px(80.))
+                    .child(div().h(px(40.))),
+            );
+        }
+        group
+    }
+}
+#[gpui::test]
+fn a_card_group_is_one_tab_stop_whose_arrows_choose(cx: &mut TestAppContext) {
+    cx.update(|cx| {
+        gpui_base::init(cx);
+        crate::components::init(cx);
+        cx.set_reduce_motion(true);
+    });
+    let (view, cx) = cx.add_window_view(|_, _| GroupHarness {
+        selected: 1,
+        changes: Vec::new(),
+    });
+    super::tests::redraw(cx);
+    // The selected card is the group's only tab stop.
+    cx.update(|window, cx| window.focus_next(cx));
+    let entry = cx.update(|window, cx| window.focused(cx));
+    assert!(entry.is_some());
+    cx.update(|window, cx| window.focus_next(cx));
+    assert_eq!(cx.update(|window, cx| window.focused(cx)), entry);
+    cx.simulate_keystrokes("right");
+    super::tests::redraw(cx);
+    view.read_with(cx, |h, _| {
+        assert_eq!((h.selected, &h.changes[..]), (2, &[2][..]))
+    });
+    cx.simulate_keystrokes("left");
+    super::tests::redraw(cx);
+    view.read_with(cx, |h, _| assert_eq!(h.changes, [2, 1]));
+}
