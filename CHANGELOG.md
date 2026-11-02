@@ -60,6 +60,9 @@ Distribution is by Git revision for now; see the [quick start](README.md#quick-s
   secondary layer, a secondary edge when outlined, and a secondary check-circle icon at the
   top-end corner. `MaterialCard::selection_role` with `CardSelection` says whether selecting is
   a toggle or one choice of several; `CardGroup` makes cards a radio group with roving focus.
+- `MaterialDialog::max_width`: caps the basic dialog (no lower than 280dp), so a `FullWidth`
+  dialog can be wider than `Large` on a large window and still narrow with it. Like the other
+  dialog widths it is in dp and grows with the text scale; full-screen dialogs ignore it.
 
 ### Changed
 
