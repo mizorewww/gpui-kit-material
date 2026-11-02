@@ -1,4 +1,4 @@
-//! Dialog playground: md3.io's Dialog configuration (size, animation,
+//! Dialog playground: md3.io's Dialog configuration (size, maximum width, animation,
 //! dividers, title, subtitle, body, actions and their alignment, open, close
 //! button, scrim and Escape dismissal) on the real `MaterialDialog`, opened
 //! from a button and presented over the preview's screen.
@@ -70,6 +70,14 @@ pub static PLAYGROUND: Playground = Playground {
                     id: "size",
                     label: "Size",
                     options: &["small", "medium", "large", "fullwidth", "fullscreen"],
+                    default: 0,
+                },
+                // A cap on the basic dialog, for a full-width one wider
+                // than the large size on a large window.
+                Control::Select {
+                    id: "max-width",
+                    label: "Maximum width",
+                    options: &["none", "840", "960", "1200"],
                     default: 0,
                 },
                 Control::Select {
@@ -213,6 +221,9 @@ fn preview(
             |dialog, role| dialog.container(role),
         )
         .size(DialogSize::ALL[config.choice("size")])
+        .when_some(config.option("max-width").parse().ok(), |dialog, width| {
+            dialog.max_width(width)
+        })
         .animation(DialogAnimation::ALL[config.choice("animation")])
         .dividers(config.bool("dividers"))
         .action_alignment(DialogActionAlignment::ALL[config.choice("alignment")])

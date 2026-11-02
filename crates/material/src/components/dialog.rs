@@ -140,6 +140,7 @@ pub struct MaterialDialog {
     dividers: bool,
     width: f32,
     size: DialogSize,
+    max_width: Option<f32>,
     animation: DialogAnimation,
     alignment: DialogActionAlignment,
     close_label: Option<SharedString>,
@@ -176,6 +177,7 @@ impl MaterialDialog {
             dividers: false,
             width: DIALOG_WIDTH,
             size: DialogSize::Small,
+            max_width: None,
             animation: DialogAnimation::default(),
             alignment: DialogActionAlignment::End,
             close_label: None,
@@ -248,6 +250,27 @@ impl MaterialDialog {
     /// The dialog's size; [`DialogSize::Small`] uses [`Self::width`].
     pub fn size(mut self, size: DialogSize) -> Self {
         self.size = size;
+        self
+    }
+
+    /// The widest the basic dialog grows, in dp, no less than M3's 280dp
+    /// minimum. With [`DialogSize::FullWidth`] it gives a dialog wider than
+    /// [`DialogSize::Large`] on a large window that still narrows with its
+    /// container (less 24dp margins). It also narrows
+    /// [`DialogSize::Small`], [`DialogSize::Medium`] and
+    /// [`DialogSize::Large`] when it is below their width, and a full-screen
+    /// dialog ([`DialogSize::FullScreen`], [`Self::full_screen`]) ignores
+    /// it.
+    ///
+    /// Like every dialog width it is in dp, so it grows with the text scale:
+    /// at 200% a 960dp cap is 1920 pixels, until the container stops it.
+    /// It bounds the dialog, not the content's layout; content that must
+    /// fit a number of columns lays itself out for the width it is given.
+    ///
+    /// M3's basic dialog stops at 560dp and md3.io's large one at 720dp;
+    /// neither reference has a wider one, so the width is the caller's.
+    pub fn max_width(mut self, width: f32) -> Self {
+        self.max_width = Some(width.max(DIALOG_MIN_WIDTH));
         self
     }
     pub fn animation(mut self, animation: DialogAnimation) -> Self {
@@ -326,7 +349,10 @@ impl MaterialDialog {
             DialogSize::FullWidth if available.is_finite() => available - 2. * DIALOG_MARGIN,
             DialogSize::FullWidth => DIALOG_MAX_WIDTH,
         };
-        width.min(available - 2. * DIALOG_MARGIN).max(0.)
+        width
+            .min(self.max_width.unwrap_or(f32::INFINITY))
+            .min(available - 2. * DIALOG_MARGIN)
+            .max(0.)
     }
 }
 
@@ -1204,6 +1230,116 @@ mod tests {
         // A specimen (no container) shows the widest basic dialog.
         let specimen = MaterialDialog::new("d").size(DialogSize::FullWidth);
         assert_eq!(specimen.basic_width(f32::INFINITY), 560.);
+    }
+
+    #[test]
+    fn a_maximum_width_caps_a_full_width_dialog_within_the_container() {
+        let capped = MaterialDialog::new("d")
+            .size(DialogSize::FullWidth)
+            .max_width(920.);
+        // A large window: the cap, wider than the large size.
+        assert_eq!(capped.basic_width(1440.), 920.);
+        // Under the cap: the container less its margins.
+        assert_eq!(capped.basic_width(900.), 852.);
+        // A narrow window: still the container less its margins.
+        assert_eq!(capped.basic_width(400.), 352.);
+        // A cap only narrows: a small dialog keeps its width under it.
+        let small = MaterialDialog::new("d").max_width(920.);
+        assert_eq!(small.basic_width(1440.), DIALOG_WIDTH);
+        let tight = MaterialDialog::new("d")
+            .size(DialogSize::Large)
+            .max_width(600.);
+        assert_eq!(tight.basic_width(1440.), 600.);
+        // No cap goes below M3's minimum basic width.
+        let floor = MaterialDialog::new("d")
+            .size(DialogSize::FullWidth)
+            .max_width(100.);
+        assert_eq!(floor.basic_width(1440.), DIALOG_MIN_WIDTH);
+    }
+
+    struct Capped(f32);
+    impl Render for Capped {
+        fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+            window.set_rem_size(px(self.0));
+            div().w(px(1600.)).h(px(600.)).relative().child(
+                MaterialDialog::new("capped")
+                    .headline("Title")
+                    .content(
+                        div()
+                            .w_full()
+                            .h(px(10.))
+                            .debug_selector(|| "capped-content".into()),
+                    )
+                    .size(DialogSize::FullWidth)
+                    .max_width(600.)
+                    .contained(true)
+                    .modal(true),
+            )
+        }
+    }
+
+    struct CappedFullScreen;
+    impl Render for CappedFullScreen {
+        fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+            window.set_rem_size(px(14.));
+            div().w(px(900.)).h(px(600.)).relative().child(
+                MaterialDialog::new("capped-full")
+                    .headline("Title")
+                    .content(
+                        div()
+                            .w_full()
+                            .h(px(10.))
+                            .debug_selector(|| "capped-full-content".into()),
+                    )
+                    .size(DialogSize::FullScreen)
+                    .max_width(300.)
+                    .contained(true)
+                    .modal(true),
+            )
+        }
+    }
+
+    #[gpui::test]
+    fn a_full_screen_dialog_ignores_the_cap(cx: &mut TestAppContext) {
+        cx.update(|cx| {
+            gpui_base::init(cx);
+            cx.set_reduce_motion(true);
+        });
+        let (_, cx) = cx.add_window_view(|_, _| CappedFullScreen);
+        for _ in 0..3 {
+            draw(cx);
+        }
+        let content = cx.debug_bounds("capped-full-content").unwrap();
+        assert!(
+            content.size.width > px(300.),
+            "the page is wider than the 300dp cap: {content:?}"
+        );
+    }
+
+    #[gpui::test]
+    fn a_capped_dialog_scales_with_the_text(cx: &mut TestAppContext) {
+        cx.update(|cx| {
+            gpui_base::init(cx);
+            cx.set_reduce_motion(true);
+        });
+        let (view, cx) = cx.add_window_view(|_, _| Capped(14.));
+        for _ in 0..3 {
+            draw(cx);
+        }
+        let base = cx.debug_bounds("capped-content").unwrap().size.width;
+        // The content spans the 600dp dialog (14px rems: 1dp is 1px).
+        assert_eq!(base, px(600.));
+        view.update(cx, |view, cx| {
+            view.0 = 28.;
+            cx.notify();
+        });
+        for _ in 0..3 {
+            draw(cx);
+        }
+        // At twice the text size the cap is twice as many pixels: the
+        // 1600px container (800dp) still has room for it.
+        let doubled = cx.debug_bounds("capped-content").unwrap().size.width;
+        assert_eq!(doubled, base * 2.);
     }
 
     #[test]

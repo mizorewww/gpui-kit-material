@@ -51,6 +51,9 @@ Distribution is by Git revision for now; see the [quick start](README.md#quick-s
 - `ListDensity::Minus3`: density −3, 44/60/76dp items, one step above `Compact`. The
   heights are derived from Material's density scale (−4dp per step); the Figma kit has no
   −3 list. It is a density level, not an M3 navigation height.
+- `MaterialDialog::max_width`: caps the basic dialog (no lower than 280dp), so a `FullWidth`
+  dialog can be wider than `Large` on a large window and still narrow with it. Like the other
+  dialog widths it is in dp and grows with the text scale; full-screen dialogs ignore it.
 
 ### Changed
 
