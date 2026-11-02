@@ -228,9 +228,7 @@ fn preview(
         .disabled(disabled)
         .read_only(config.bool("read_only"))
         .required(config.bool("required"))
-        // Its reference width where the canvas has room for it.
-        .w_full()
-        .max_w(rem(280.));
+        .w_full();
     if !label.is_empty() {
         field = field.label(label);
     }
@@ -276,8 +274,11 @@ fn preview(
                 }),
         );
     }
+    // Its reference width where the canvas has room for it.
     div()
         .debug_selector(|| "playground-text-field".into())
+        .w_full()
+        .max_w(rem(280.))
         .child(field)
         .into_any_element()
 }

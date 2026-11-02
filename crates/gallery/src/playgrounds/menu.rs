@@ -373,6 +373,7 @@ fn preview(
     }
     div()
         .debug_selector(|| "playground-menu".into())
+        .w_full()
         .flex()
         .flex_col()
         .items_center()

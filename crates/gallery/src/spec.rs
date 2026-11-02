@@ -327,6 +327,9 @@ struct Fit {
     scale: f32,
     viewport: Size<Pixels>,
     rem: Pixels,
+    /// The last frame overflowed: one that overflows again shrinks. A single
+    /// frame's overflow can be a preview that sizes itself on its next frame.
+    overflowed: bool,
 }
 
 /// Records how far `bounds` reach in the [`FitWidth`] being prepainted.
@@ -341,8 +344,9 @@ fn note_extent(bounds: Bounds<Pixels>) {
 
 /// Content that is drawn at a smaller rem when it is wider than its row: a
 /// specimen of fixed reference width, or a demo row's item, on a phone or at
-/// a large text scale. Content that reflows never needs it. Its first frame
-/// at a new width measures; the next draws at the scale that fits.
+/// a large text scale. Content that reflows never needs it. Content that
+/// overflows on two frames in a row is drawn at the scale that fits on the
+/// next.
 #[derive(gpui::IntoElement)]
 pub(crate) struct FitWidth {
     id: ElementId,
@@ -374,9 +378,9 @@ impl RenderOnce for FitWidth {
         let viewport = window.viewport_size();
         let view = window.current_view();
         let found = FITS.with(|fits| fits.borrow().get(&key).copied());
-        let scale = found
-            .filter(|fit| fit.rem == rem && fit.viewport == viewport)
-            .map_or(1., |fit| fit.scale);
+        let current = found.filter(|fit| fit.rem == rem && fit.viewport == viewport);
+        let scale = current.map_or(1., |fit| fit.scale);
+        let pending = current.is_some_and(|fit| fit.overflowed);
         let content = if scale < 1. {
             RemScaled::new(rem * scale, self.content).into_any_element()
         } else {
@@ -402,7 +406,7 @@ impl RenderOnce for FitWidth {
             let width = right - left;
             let overflowing = width > available + px(1.);
             // The content's width at the full size, shrunk to the row.
-            let next = if overflowing {
+            let next = if overflowing && pending {
                 fit_scale_down_to(
                     f32::from(width) / scale,
                     f32::from(available),
@@ -414,7 +418,7 @@ impl RenderOnce for FitWidth {
             };
             // Nothing smaller to draw it at: it is clipped.
             #[cfg(test)]
-            if overflowing && next >= scale {
+            if overflowing && pending && next >= scale {
                 OVERFLOWS.with(|overflows| {
                     overflows
                         .borrow_mut()
@@ -425,6 +429,7 @@ impl RenderOnce for FitWidth {
                 scale: next,
                 viewport,
                 rem,
+                overflowed: overflowing && !pending,
             };
             FITS.with(|fits| {
                 let mut fits = fits.borrow_mut();
@@ -433,7 +438,7 @@ impl RenderOnce for FitWidth {
                 }
                 fits.insert(key, fit);
             });
-            if next < scale {
+            if next < scale || overflowing && !pending {
                 cx.defer(move |cx| cx.notify(view));
             }
         })

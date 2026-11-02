@@ -362,6 +362,8 @@ pub struct PaneHint {
     pub height: Option<f32>,
     /// Use the canvas's whole width: no padding around the preview.
     pub flush: bool,
+    /// The preview scales itself to the canvas, so the canvas does not.
+    pub fits_itself: bool,
 }
 
 /// What a preview uses to write back to its playground. See the module
@@ -1258,7 +1260,7 @@ impl Render for PreviewView {
         }
         let stacked = panes_stacked(window, hint);
         let canvas = scope.build(window, cx, |window, _| {
-            preview_canvas(stacked, false, hint.flush, window, preview)
+            preview_canvas(stacked, false, hint, window, preview)
         });
         scope.child(canvas)
     }

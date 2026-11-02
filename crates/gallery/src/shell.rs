@@ -931,14 +931,16 @@ impl Gallery {
 
 /// The preview's canvas around `content`, built in the preview's scope because
 /// it paints in the preview's scheme. `fallback` is the stacked demos of a page
-/// without a playground, which take the full width from the top.
+/// without a playground, which take the full width from the top. `hint` is
+/// what the preview asked of the canvas.
 pub(crate) fn preview_canvas(
     stacked: bool,
     fallback: bool,
-    flush: bool,
+    hint: PaneHint,
     window: &Window,
     content: AnyElement,
 ) -> AnyElement {
+    let flush = hint.flush;
     let layout = ShellLayout::of(window);
     div()
         .id("preview-canvas")
@@ -971,7 +973,7 @@ pub(crate) fn preview_canvas(
                 })
                 // A preview of fixed reference width is drawn smaller where the
                 // canvas is narrower: a phone, or a large text scale.
-                .child(if fallback {
+                .child(if fallback || hint.fits_itself {
                     content
                 } else {
                     spec::fit_width("preview-fit", content)
@@ -1514,7 +1516,7 @@ impl Render for LeadView {
             let stacked = panes_stacked(window, PaneHint::default());
             let canvas = scope.build(window, cx, |window, cx| {
                 let demos = gallery.update(cx, |gallery, cx| gallery.render_demos(window, cx));
-                preview_canvas(stacked, true, false, window, demos)
+                preview_canvas(stacked, true, PaneHint::default(), window, demos)
             });
             scope.child(canvas).into_any_element()
         });

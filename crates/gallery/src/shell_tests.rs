@@ -504,7 +504,8 @@ fn every_overview_thumbnail_fits_its_card(cx: &mut TestAppContext) {
                     cx.notify();
                 })
                 .unwrap();
-            // The first frame measures a thumbnail; the next draws it to fit.
+            // Two frames measure a thumbnail; the next draws it to fit.
+            draw(&window, &mut cx);
             draw(&window, &mut cx);
             THUMBNAILS_DRAWN.with(|drawn| drawn.borrow_mut().clear());
             draw(&window, &mut cx);

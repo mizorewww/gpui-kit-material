@@ -80,6 +80,7 @@ fn preview(
             window,
         )),
         flush,
+        fits_itself: true,
     });
     let playground = cx.weak_entity();
     let app = preview.local("example-app", window, cx, move |window, cx| {
@@ -117,13 +118,19 @@ fn preview(
         return device.into_any_element();
     }
     gpui_base::v_flex()
+        .w_full()
         .items_center()
         .child(
+            // Wraps where a large text scale leaves it no room on one line.
             div()
                 .debug_selector(|| "example-device-scale".into())
-                .h(rem(SCALE_LABEL))
+                .w_full()
+                .min_h(rem(SCALE_LABEL))
                 .flex()
                 .items_center()
+                .justify_center()
+                .whitespace_normal()
+                .text_center()
                 .map(|text| type_role(text, TypeRole::LabelMedium))
                 .text_color(color(ColorRole::ON_SURFACE_VARIANT))
                 .child(SharedString::from(format!(
