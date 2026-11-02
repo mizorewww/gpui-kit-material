@@ -439,3 +439,76 @@ fn keyboard_focus_paints_a_rows_focus_layer_and_a_pointer_does_not(cx: &mut Test
     settle(cx);
     assert!(painted(cx), "the keyboard does");
 }
+
+#[test]
+fn a_drawer_narrows_to_its_cap_at_any_text_scale() {
+    assert_eq!(fitted_width(360., None, px(28.)), 360.);
+    // 200% text: 360 design px would draw 720 px; a 264 px cap allows 132.
+    assert_eq!(fitted_width(360., Some(px(264.)), px(28.)), 132.);
+    assert_eq!(fitted_width(200., Some(px(1000.)), px(14.)), 200.);
+    assert_eq!(fitted_width(360., Some(px(-10.)), px(14.)), 0.);
+}
+
+/// A drawer at 200% text in a phone-width window.
+struct Scaled {
+    max_width: Option<Pixels>,
+    modal: bool,
+}
+
+impl Render for Scaled {
+    fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        window.set_rem_size(px(28.));
+        let drawer = NavigationDrawer::new("scaled", "Main")
+            .items(items(3))
+            .selected("d0")
+            .modal(self.modal)
+            .width(360.)
+            .on_dismiss(|_, _| {});
+        let drawer = match self.max_width {
+            Some(max) => drawer.max_width(max),
+            None => drawer,
+        };
+        div().relative().size_full().flex().child(drawer)
+    }
+}
+
+#[gpui::test]
+fn a_scaled_modal_drawer_leaves_its_scrim_in_a_narrow_window(cx: &mut TestAppContext) {
+    cx.update(|cx| {
+        gpui_base::init(cx);
+        super::super::roving::init(cx);
+    });
+    let (view, cx) = cx.add_window_view(|_, _| Scaled {
+        max_width: None,
+        modal: true,
+    });
+    cx.simulate_resize(size(px(320.), px(640.)));
+    settle(cx);
+    let sheet = cx.debug_bounds("navigation-drawer-sheet").unwrap();
+    assert!(
+        sheet.size.width <= px(320. - DRAWER_SCRIM_MARGIN + 0.5),
+        "the sheet fits beside its scrim: {sheet:?}"
+    );
+    assert!(
+        sheet.size.width > px(200.),
+        "and still takes its share: {sheet:?}"
+    );
+
+    // A caller's narrower cap wins over the window's.
+    view.update(cx, |view, cx| {
+        view.max_width = Some(px(150.));
+        cx.notify();
+    });
+    settle(cx);
+    let sheet = cx.debug_bounds("navigation-drawer-sheet").unwrap();
+    assert!((sheet.size.width - px(150.)).abs() < px(0.5), "{sheet:?}");
+
+    // A standard drawer honours a cap too.
+    view.update(cx, |view, cx| {
+        view.modal = false;
+        cx.notify();
+    });
+    settle(cx);
+    let sheet = cx.debug_bounds("navigation-drawer-sheet").unwrap();
+    assert!((sheet.size.width - px(150.)).abs() < px(0.5), "{sheet:?}");
+}
