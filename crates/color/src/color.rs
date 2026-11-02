@@ -71,7 +71,8 @@ impl Color {
         0.2126 * linear(self.r) + 0.7152 * linear(self.g) + 0.0722 * linear(self.b)
     }
 
-    /// The WCAG 2.x contrast ratio with `other`, from 1 to 21, whichever is lighter.
+    /// The WCAG 2.x contrast ratio with `other`: the lighter color's relative
+    /// luminance over the darker's, each plus 0.05, from 1 to 21.
     pub fn contrast(self, other: Self) -> f32 {
         let (a, b) = (self.luminance() + 0.05, other.luminance() + 0.05);
         a.max(b) / a.min(b)

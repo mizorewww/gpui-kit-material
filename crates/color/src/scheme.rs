@@ -421,8 +421,12 @@ impl Scheme {
     /// every lifted container derived here, so it is kept where it already
     /// reads and otherwise moved away from the surfaces in HCT tone until it
     /// reads 4.5:1 on all of them, the error container included, since status
-    /// chips and notices paint error on it. On-error is held to the same
-    /// 4.5:1 text minimum, which every palette's on-accent already exceeds.
+    /// chips and notices paint error on it.
+    ///
+    /// On-error departs from the reference: it is held to the 4.5:1 text
+    /// minimum, not the curve's 7:1. Light palettes' white on-error reaches
+    /// 5.75 to 6.81:1 and could only reach 7:1 by darkening error further;
+    /// dark palettes already exceed 7:1.
     fn with_readable_error(self) -> Self {
         let grounds = ERROR_GROUNDS.map(|role| self.get(role));
         let error = readable(self.get(ColorRole::ERROR), &grounds, self.dark);
