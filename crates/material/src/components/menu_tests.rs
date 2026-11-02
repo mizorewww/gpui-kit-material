@@ -1836,3 +1836,16 @@ fn a_submenu_that_fits_only_above_turns_its_menu_above(cx: &mut TestAppContext) 
     );
     assert_off_the_trigger(trigger, submenu, "sub-menu");
 }
+
+#[gpui::test]
+fn a_trigger_below_the_window_keeps_its_submenu_inside_it(cx: &mut TestAppContext) {
+    let (_, surface, submenu) = tall_submenu(640., 14, cx);
+    assert!(
+        surface.top() >= px(8.) && surface.bottom() <= px(592.),
+        "menu {surface:?}"
+    );
+    assert!(
+        submenu.top() >= px(8.) && submenu.bottom() <= px(592.),
+        "sub-menu {submenu:?}"
+    );
+}

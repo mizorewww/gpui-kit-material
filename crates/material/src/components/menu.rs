@@ -469,16 +469,19 @@ fn window_room(window: &Window) -> f32 {
 /// give no gap.
 const POPUP_GAP: f32 = 4.;
 
-/// The room a popup has `(above, below)` a `trigger`, in design px.
+/// The room a popup has `(above, below)` a `trigger`, in design px, never more
+/// than the window's: a trigger outside the window would otherwise promise
+/// room past its edge.
 fn room_beside(trigger: Bounds<Pixels>, window: &Window) -> (f32, f32) {
+    let most = window_room(window);
     let rem_size = window.rem_size();
     let edge = popup_edge(window);
     let gap = rem(POPUP_GAP).to_pixels(rem_size);
     let above = trigger.top() - edge - gap;
     let below = window.viewport_size().height - edge - trigger.bottom() - gap;
     (
-        design_px(above, rem_size).max(0.),
-        design_px(below, rem_size).max(0.),
+        design_px(above, rem_size).clamp(0., most),
+        design_px(below, rem_size).clamp(0., most),
     )
 }
 
@@ -1370,9 +1373,10 @@ pub(crate) fn opens_upward(anchor: Anchor) -> bool {
 /// heights above and below the anchor, and at the whole window when the anchor
 /// is off it (`calculateMaxHeight`). Base's side positioner follows the same
 /// order. Kit's popover places a popup by its corner and only clamps it into
-/// the window, which slides one too tall for its side back over its trigger;
-/// with `None` the caller keeps that clamping, as Compose falls back to the
-/// window.
+/// the window, which slides one too tall for its side back over its trigger.
+/// The one-row threshold, and keeping that clamping with `None` for a trigger
+/// that leaves less, are a kit choice: Compose gives its menu the whole window
+/// only when the anchor is off it.
 pub(crate) fn popup_side(
     asks_above: bool,
     (need_above, need_below): (f32, f32),
