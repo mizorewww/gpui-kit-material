@@ -133,9 +133,14 @@ Distribution is by Git revision for now; see the [quick start](README.md#quick-s
 - `page_heading` takes a caller's `text_size` and `line_height`: its type style is on the
   returned element, which its text inherits. Without them it is unchanged.
 - A sub-menu fits the room past its owner item, so a tall one no longer leaves the window.
-- A `MenuPopup` or `ExposedDropdown` menu with no room on its side of the trigger opens on
-  the other side when it fits there, and otherwise scrolls on the side with more room. It
-  no longer slides back over its own trigger or field in a short window.
+- A menu with no room on its side of the trigger opens on the other side when it fits there,
+  and otherwise scrolls on the side with more room, counting a cascading sub-menu's column.
+  It no longer slides back over its own trigger in a short window. This applies to
+  `MenuPopup`, `ExposedDropdown`, `MaterialContextMenu` (one near the window's bottom opens
+  above the pointer), the split button's menu and `FabMenu`'s menu (below the FAB when there
+  is no room above it). A trigger that moves while its menu is open chooses again on the
+  next frame; one that leaves less than a row on both sides keeps the menu clamped inside
+  the window as before.
 - The first arrow key in a menu moves from its selected item, not from the top or the end.
 - A keyboard-focused menu item paints the focus layer as well as the ring.
 - An accent, filled toggle shows whether it is selected, on `MaterialButton`, `IconButton`
