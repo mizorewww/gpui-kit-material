@@ -246,7 +246,8 @@ impl Page {
             "list-demo",
             "Lists in use",
             div()
-                .w(rem(360.))
+                .w_full()
+                .max_w(rem(360.))
                 .flex()
                 .flex_col()
                 .py(rem(8.))

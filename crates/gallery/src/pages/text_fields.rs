@@ -163,7 +163,8 @@ impl GalleryPage for Page {
                             .supporting_text("Grows up to five lines")
                             .max_length(120)
                             .error(self.bio.read(cx).value().chars().count() > 120)
-                            .w(rem(320.)),
+                            .w_full()
+                            .max_w(rem(320.)),
                     )
                     .child(
                         TextField::multi_line("outlined-bio", &self.outlined_bio)
@@ -172,7 +173,8 @@ impl GalleryPage for Page {
                             .supporting_text("Grows up to five lines")
                             .max_length(120)
                             .error(self.outlined_bio.read(cx).value().chars().count() > 120)
-                            .w(rem(320.)),
+                            .w_full()
+                            .max_w(rem(320.)),
                     ),
             )
             .into_any_element(),

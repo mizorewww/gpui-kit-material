@@ -232,7 +232,8 @@ impl Page {
             "live-full-screen-search",
             "Full-screen search view",
             div()
-                .w(rem(412.))
+                .w_full()
+                .max_w(rem(412.))
                 .h(rem(480.))
                 .rounded(rem(28.))
                 .overflow_hidden()

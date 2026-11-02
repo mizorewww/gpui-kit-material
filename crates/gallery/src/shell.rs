@@ -957,7 +957,15 @@ pub(crate) fn preview_canvas(
                         let _ = children;
                     })
                 })
-                .child(content),
+                // A preview of fixed reference width is drawn smaller where the
+                // canvas is narrower: a phone, or a large text scale.
+                .child(if fallback {
+                    content
+                } else {
+                    spec::fit_width("preview-fit", content)
+                        .centered()
+                        .into_any_element()
+                }),
         )
         .into_any_element()
 }

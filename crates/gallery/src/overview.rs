@@ -569,6 +569,25 @@ impl RenderOnce for SliderThumbnail {
     }
 }
 
+#[cfg(test)]
+thread_local! {
+    /// Where each overview thumbnail was last drawn, by its entry id.
+    pub(crate) static THUMBNAILS_DRAWN: std::cell::RefCell<
+        std::collections::HashMap<&'static str, Bounds<Pixels>>,
+    > = Default::default();
+}
+
+/// Entry `id`'s thumbnail, whose bounds tests read from [`THUMBNAILS_DRAWN`].
+fn drawn_thumbnail(id: &'static str) -> AnyElement {
+    #[cfg(test)]
+    return gpui_kit_material::components::prepaint_bounds(thumbnail(id), move |bounds, _, _| {
+        THUMBNAILS_DRAWN.with(|drawn| drawn.borrow_mut().insert(id, bounds));
+    })
+    .into_any_element();
+    #[cfg(not(test))]
+    thumbnail(id)
+}
+
 impl Gallery {
     /// One overview group: its heading over the reflowing card grid.
     pub(super) fn render_overview_group(
@@ -633,11 +652,17 @@ impl Gallery {
                     .flex()
                     .items_center()
                     .justify_center()
+                    .px(rem(12.))
                     .overflow_hidden()
                     .bg(color(ColorRole::SURFACE))
                     .border_b_1()
                     .border_color(outline)
-                    .child(thumbnail(entry.id)),
+                    // A card narrower than a thumbnail's specimen draws it
+                    // smaller rather than cutting it off.
+                    .child(
+                        spec::fit_width(("overview-thumbnail", index), drawn_thumbnail(entry.id))
+                            .centered(),
+                    ),
             )
             .child(
                 gpui_base::v_flex()

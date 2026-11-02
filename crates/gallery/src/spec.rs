@@ -293,10 +293,151 @@ const MEASURE_LIMIT: usize = 4096;
 
 #[cfg(test)]
 thread_local! {
-    /// Measured boards whose frame was drawn wider than their row.
+    /// Measured boards whose frame was drawn wider than their row, and demos
+    /// whose content was drawn past their row's edge.
     pub static OVERFLOWS: std::cell::RefCell<Vec<String>> = const {
         std::cell::RefCell::new(Vec::new())
     };
+    /// The smallest scale a measured board drew a group at, with the board.
+    pub static BOARD_SCALES: std::cell::RefCell<Vec<(String, f32)>> = const {
+        std::cell::RefCell::new(Vec::new())
+    };
+}
+
+thread_local! {
+    /// The horizontal extent of what each [`FitWidth`] being prepainted drew,
+    /// innermost last: its content and the items of its demo rows.
+    static EXTENTS: std::cell::RefCell<Vec<(Pixels, Pixels)>> = const {
+        std::cell::RefCell::new(Vec::new())
+    };
+    /// Each [`FitWidth`]'s scale, for the width and rem it was found at. Each
+    /// owns its entry's invalidation as a board does: a measurement that
+    /// changes the scale re-renders the view that drew it once. Cleared if it
+    /// ever grows past `MEASURE_LIMIT` entries.
+    static FITS: std::cell::RefCell<std::collections::HashMap<GlobalElementId, Fit>> =
+        Default::default();
+}
+
+/// What a [`FitWidth`] found: the scale its content fits at, in a window of
+/// `viewport` at `rem`. A new window size or rem starts again from the full
+/// size; otherwise it only ever shrinks, so content whose row is sized by the
+/// content itself settles instead of trading size with its row.
+#[derive(Clone, Copy)]
+struct Fit {
+    scale: f32,
+    viewport: Size<Pixels>,
+    rem: Pixels,
+}
+
+/// Records how far `bounds` reach in the [`FitWidth`] being prepainted.
+fn note_extent(bounds: Bounds<Pixels>) {
+    EXTENTS.with(|extents| {
+        if let Some((left, right)) = extents.borrow_mut().last_mut() {
+            *left = (*left).min(bounds.left());
+            *right = (*right).max(bounds.right());
+        }
+    });
+}
+
+/// Content that is drawn at a smaller rem when it is wider than its row: a
+/// specimen of fixed reference width, or a demo row's item, on a phone or at
+/// a large text scale. Content that reflows never needs it. Its first frame
+/// at a new width measures; the next draws at the scale that fits.
+#[derive(gpui::IntoElement)]
+pub(crate) struct FitWidth {
+    id: ElementId,
+    content: AnyElement,
+    centered: bool,
+}
+
+/// `content` in a [`FitWidth`] that keeps it at its leading edge.
+pub(crate) fn fit_width(id: impl Into<ElementId>, content: impl IntoElement) -> FitWidth {
+    FitWidth {
+        id: id.into(),
+        content: content.into_any_element(),
+        centered: false,
+    }
+}
+
+impl FitWidth {
+    /// Center the content in the row, as a preview canvas does.
+    pub(crate) fn centered(mut self) -> Self {
+        self.centered = true;
+        self
+    }
+}
+
+impl RenderOnce for FitWidth {
+    fn render(self, window: &mut Window, _: &mut App) -> impl IntoElement {
+        let key = window.with_global_id(self.id.clone(), |id, _| id.clone());
+        let rem = window.rem_size();
+        let viewport = window.viewport_size();
+        let view = window.current_view();
+        let found = FITS.with(|fits| fits.borrow().get(&key).copied());
+        let scale = found
+            .filter(|fit| fit.rem == rem && fit.viewport == viewport)
+            .map_or(1., |fit| fit.scale);
+        let content = if scale < 1. {
+            RemScaled::new(rem * scale, self.content).into_any_element()
+        } else {
+            self.content
+        };
+        let start = prepaint_bounds(div(), |_, _, _| {
+            EXTENTS.with(|extents| extents.borrow_mut().push((px(f32::MAX), px(f32::MIN))))
+        });
+        let content = prepaint_bounds(content, |bounds, _, _| note_extent(bounds));
+        let holder = div()
+            .w_full()
+            .min_w_0()
+            .flex()
+            .flex_col()
+            .when(self.centered, |holder| holder.items_center())
+            .child(start)
+            .child(content);
+        prepaint_bounds(holder, move |row, _, cx| {
+            let Some((left, right)) = EXTENTS.with(|extents| extents.borrow_mut().pop()) else {
+                return;
+            };
+            let available = row.size.width;
+            let width = right - left;
+            let overflowing = width > available + px(1.);
+            // The content's width at the full size, shrunk to the row.
+            let next = if overflowing {
+                fit_scale_down_to(
+                    f32::from(width) / scale,
+                    f32::from(available),
+                    min_fit_scale(rem),
+                )
+                .min(scale)
+            } else {
+                scale
+            };
+            // Nothing smaller to draw it at: it is clipped.
+            #[cfg(test)]
+            if overflowing && next >= scale {
+                OVERFLOWS.with(|overflows| {
+                    overflows
+                        .borrow_mut()
+                        .push(format!("{key}: {width:?} wide in {available:?} at {scale}"))
+                });
+            }
+            let fit = Fit {
+                scale: next,
+                viewport,
+                rem,
+            };
+            FITS.with(|fits| {
+                let mut fits = fits.borrow_mut();
+                if fits.len() >= MEASURE_LIMIT && !fits.contains_key(&key) {
+                    fits.clear();
+                }
+                fits.insert(key, fit);
+            });
+            if next < scale {
+                cx.defer(move |cx| cx.notify(view));
+            }
+        })
+    }
 }
 
 /// Split columns of `widths` px into runs of adjacent columns that each fit
@@ -329,18 +470,34 @@ pub fn wrap_columns(
     runs
 }
 
-/// The least a board's group shrinks to. Four extra-large buttons in a row need
-/// it on a phone.
+/// The least a board's group shrinks to at the 100% text scale. Four
+/// extra-large buttons in a row need it on a phone.
 const MIN_FIT_SCALE: f32 = 0.15;
+
+/// The least a group is drawn at as a share of the 100% text size, whatever
+/// the text scale: a larger scale draws the same specimen wider in the same
+/// window, with wider gutters, and it still has to fit rather than be clipped.
+/// Extra-large button groups on a 320px phone at 200% need it.
+const MIN_DRAWN_SCALE: f32 = 0.1;
+
+/// The least a group shrinks to at `rem`.
+pub(crate) fn min_fit_scale(rem: Pixels) -> f32 {
+    (MIN_DRAWN_SCALE * BASE_PX / f32::from(rem)).min(MIN_FIT_SCALE)
+}
 
 /// The scale that fits `needed` px into `available` px: 1 when it fits,
 /// else a little under the ratio (borders do not scale), never below
 /// [`MIN_FIT_SCALE`].
 pub fn fit_scale(needed: f32, available: f32) -> f32 {
+    fit_scale_down_to(needed, available, MIN_FIT_SCALE)
+}
+
+/// [`fit_scale`], never below `least`.
+fn fit_scale_down_to(needed: f32, available: f32, least: f32) -> f32 {
     if needed <= available + 0.5 || needed <= 0. {
         1.
     } else {
-        (available / needed * 0.97).clamp(MIN_FIT_SCALE, 1.)
+        (available / needed * 0.97).clamp(least, 1.)
     }
 }
 
@@ -417,22 +574,34 @@ impl RenderOnce for Board {
         let radius = rem(BOARD_RADIUS);
         let width = self.column_width;
         let labelled_rows = !self.row_labels.is_empty();
+        // In a narrow card each row's label goes over its cells, giving the
+        // specimens the label column's width (a phone, or a large text scale).
+        let narrow = content_width(window) < STACKED_LABELS_CONTENT;
+        let stacked_labels = labelled_rows && narrow;
         let columns = self.columns;
         let rem_size = window.rem_size();
         let to_px = |design: f32| f32::from(rem(design).to_pixels(rem_size));
         let gap = to_px(CELL_GAP);
+        let least = min_fit_scale(rem_size);
         // The row-label column: at least `ROW_LABEL_WIDTH`, wider for a
         // longer label (labels never break inside a word).
         let min_label = to_px(ROW_LABEL_WIDTH);
         let lead_of = move |label: f32| {
-            if labelled_rows {
+            if labelled_rows && !stacked_labels {
                 label.max(min_label) + gap
             } else {
                 0.
             }
         };
         // The frame's padding and dashed border around the grid.
-        let chrome = 2. * to_px(BOARD_PADDING) + 2.;
+        // A narrow card keeps the 100% padding at a larger text scale: the
+        // specimens need the room more.
+        let side_padding = if narrow {
+            to_px(BOARD_PADDING).min(BOARD_PADDING)
+        } else {
+            to_px(BOARD_PADDING)
+        };
+        let chrome = 2. * side_padding + 2.;
         let key = window.with_global_id(self.id.clone(), |id, _| id.clone());
         let view = window.current_view();
         let measured = MEASURES.with(|measures| measures.borrow().get(&key).cloned());
@@ -458,7 +627,7 @@ impl RenderOnce for Board {
                     let needed = lead_of(measure.columns[columns])
                         + widths[group.clone()].iter().sum::<f32>()
                         + gap * group.len().saturating_sub(1) as f32;
-                    fit_scale(needed, measure.available - chrome)
+                    fit_scale_down_to(needed, measure.available - chrome, least)
                 }
                 None => 1.,
             })
@@ -466,6 +635,11 @@ impl RenderOnce for Board {
         let wrapped = groups.len() > 1;
         // Until the board is measured, keep its first frame inside its row.
         let unmeasured = measured.is_none();
+        #[cfg(test)]
+        if !unmeasured {
+            let least = scales.iter().copied().fold(1f32, f32::min);
+            BOARD_SCALES.with(|scales| scales.borrow_mut().push((key.to_string(), least)));
+        }
 
         let cell = move |content: AnyElement| {
             div()
@@ -496,12 +670,12 @@ impl RenderOnce for Board {
         let mut grids: Vec<AnyElement> = Vec::with_capacity(groups.len());
         for (group_index, group) in groups.iter().enumerate() {
             let span = group.len();
-            let grid_columns = span + usize::from(labelled_rows);
+            let grid_columns = span + usize::from(labelled_rows && !stacked_labels);
             let mut items: Vec<AnyElement> = Vec::new();
             // Which board column each grid item measures, if any.
             let mut item_columns: Vec<Option<usize>> = Vec::new();
             if show_column_labels {
-                if labelled_rows {
+                if labelled_rows && !stacked_labels {
                     items.push(row_label(None));
                     item_columns.push(None);
                 }
@@ -517,7 +691,30 @@ impl RenderOnce for Board {
                 }
             }
             for row in 0..rows {
-                if labelled_rows {
+                if stacked_labels {
+                    // A line of its own over the row, across every column. Out
+                    // of the flow, so a long label does not widen the columns.
+                    let label = row_labels.get(row).cloned().unwrap_or_default();
+                    items.push(
+                        div()
+                            .col_span_full()
+                            .relative()
+                            .h(rem(STACKED_LABEL_HEIGHT))
+                            .when(cfg!(test), |label| {
+                                label.debug_selector(move || format!("stacked-row-label-{row}"))
+                            })
+                            .child(
+                                small_label(("row-label", group_index * rows + row), label)
+                                    .absolute()
+                                    .top_0()
+                                    .left_0()
+                                    .right_0()
+                                    .truncate(),
+                            )
+                            .into_any_element(),
+                    );
+                    item_columns.push(None);
+                } else if labelled_rows {
                     let label = row_labels.get(row).map(|label| {
                         small_label(("row-label", group_index * rows + row), label.clone())
                             .into_any_element()
@@ -602,7 +799,7 @@ impl RenderOnce for Board {
             .min_w(relative(1.))
             .flex()
             .flex_col()
-            .px(rem(BOARD_PADDING))
+            .px(px(side_padding))
             .pt(rem(if band.has_top() {
                 BOARD_PADDING
             } else {
@@ -712,8 +909,7 @@ impl RenderOnce for Board {
                                     let needed = lead
                                         + widths[group.clone()].iter().sum::<f32>()
                                         + gap * group.len().saturating_sub(1) as f32;
-                                    *scale > MIN_FIT_SCALE
-                                        && needed * scale > available - chrome + 1.
+                                    *scale > least && needed * scale > available - chrome + 1.
                                 });
                             let changed = regrouped != rendered || overflowing;
                             MEASURES.with(|measures| {
@@ -746,16 +942,57 @@ pub fn content_width(window: &Window) -> f32 {
 
 /// Below this content width a board's side label goes over the board.
 const NARROW_CONTENT: f32 = 560.;
+/// Below this content width, in design px, a board's row labels go over their
+/// rows instead of beside them.
+const STACKED_LABELS_CONTENT: f32 = 400.;
+/// A stacked row label's line: Label medium's 16dp line height.
+const STACKED_LABEL_HEIGHT: f32 = 16.;
 
 /// A free-form specimen row: wrapped items with the board cell gap, for
-/// live demos that are not a state matrix.
-pub fn demo_row() -> Div {
-    div()
-        .w_full()
-        .flex()
-        .flex_wrap()
-        .items_center()
-        .gap(rem(CELL_GAP))
+/// live demos that are not a state matrix. An item wider than the row has the
+/// demo around it drawn smaller (see [`FitWidth`]), which needs each item's
+/// extent: the row itself is never wider than its parent.
+pub fn demo_row() -> DemoRow {
+    DemoRow {
+        row: div()
+            .w_full()
+            .flex()
+            .flex_wrap()
+            .items_center()
+            .gap(rem(CELL_GAP)),
+    }
+}
+
+/// See [`demo_row`].
+pub struct DemoRow {
+    row: Div,
+}
+
+impl ParentElement for DemoRow {
+    fn extend(&mut self, elements: impl IntoIterator<Item = AnyElement>) {
+        self.row.extend(elements.into_iter().map(|item| {
+            prepaint_bounds(item, |bounds, _, _| note_extent(bounds)).into_any_element()
+        }));
+    }
+}
+
+impl Styled for DemoRow {
+    fn style(&mut self) -> &mut StyleRefinement {
+        self.row.style()
+    }
+}
+
+impl InteractiveElement for DemoRow {
+    fn interactivity(&mut self) -> &mut Interactivity {
+        self.row.interactivity()
+    }
+}
+
+impl IntoElement for DemoRow {
+    type Element = Div;
+    fn into_element(self) -> Div {
+        self.row
+    }
 }
 
 /// A captioned demo: the board caption over free-form content.
@@ -776,7 +1013,7 @@ pub fn demo(
                 .map(|text| type_role(text, TypeRole::LabelLarge))
                 .text_color(color(ColorRole::ON_SURFACE)),
         )
-        .child(content)
+        .child(fit_width("demo-fit", content))
 }
 
 #[cfg(test)]

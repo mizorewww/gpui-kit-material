@@ -379,19 +379,49 @@ fn shared_theme_changes_start_a_transition_and_other_changes_rerender(cx: &mut T
         .unwrap();
 }
 
-/// No spec board is drawn wider than its row at the Gallery's reference
-/// widths: wide boards wrap their columns instead (no horizontal
-/// scrolling, nothing clipped).
+/// The text scale, as the theme sets the rem: the layout's breakpoints are in
+/// design px, which window px match at the 100% scale.
+fn text_scale(window: &WindowHandle<Gallery>, cx: &mut VisualTestContext, scale: f32) {
+    window
+        .update(cx, |_, window, _| {
+            window.set_rem_size(px(gpui_kit_material::tokens::typography::BASE_PX * scale))
+        })
+        .unwrap();
+}
+
+/// The widths and text scales the fit tests check: every reference width at
+/// 100%, and a phone's at 200%.
+const FIT_SIZES: [(f32, f32); 9] = [
+    (320., 1.),
+    (390., 1.),
+    (600., 1.),
+    (840., 1.),
+    (1000., 1.),
+    (1280., 1.),
+    (1600., 1.),
+    (320., 2.),
+    (360., 2.),
+];
+
+/// The least a spec board's group is drawn at, as a share of the 100% text
+/// size, at any text scale (`spec::MIN_DRAWN_SCALE`).
+const LEAST_DRAWN_SCALE: f32 = 0.1;
+
+/// No spec board or demo is drawn wider than its row at the Gallery's
+/// reference widths and a phone's at 200% text: wide boards wrap their
+/// columns, and demos reflow, instead (no horizontal scrolling, nothing
+/// clipped). Row labels go over their rows on a phone, and a board shrinks a
+/// group that still does not fit, but never below a least drawn size.
 #[gpui::test]
 fn every_spec_board_fits_its_row(cx: &mut TestAppContext) {
-    use super::spec::OVERFLOWS;
+    use super::spec::{BOARD_SCALES, OVERFLOWS};
     use gpui::{ListOffset, VisualContext as _};
     init(cx);
     let mut failures = Vec::new();
-    for width in [320., 390., 600., 840., 1000., 1280., 1600.] {
+    for (width, scale) in FIT_SIZES {
         let window = cx.open_window(size(px(width), px(900.)), Gallery::new);
         let mut cx = VisualTestContext::from_window(window.into(), cx);
-        design_rem(&window, &mut cx);
+        text_scale(&window, &mut cx, scale);
         cx.simulate_resize(size(px(width), px(900.)));
         for (index, entry) in CATALOG.iter().enumerate() {
             if entry.spec.is_none() {
@@ -417,15 +447,74 @@ fn every_spec_board_fits_its_row(cx: &mut TestAppContext) {
                         cx.notify();
                     })
                     .unwrap();
-                // The first frame measures a new board; the next regroups.
+                // The first frame measures a new board; the next regroups, and
+                // a group that still overflows shrinks on the one after.
+                draw(&window, &mut cx);
                 draw(&window, &mut cx);
                 OVERFLOWS.with(|overflows| overflows.borrow_mut().clear());
+                BOARD_SCALES.with(|scales| scales.borrow_mut().clear());
                 draw(&window, &mut cx);
                 let overflows = OVERFLOWS.with(|overflows| overflows.take());
                 if !overflows.is_empty() {
                     failures.push(format!(
-                        "{} at {width}px, row {row}: {overflows:?}",
+                        "{} at {width}px and {scale}x, row {row}: {overflows:?}",
                         entry.id
+                    ));
+                }
+                let unreadable: Vec<_> = BOARD_SCALES
+                    .with(|scales| scales.take())
+                    .into_iter()
+                    .filter(|(_, least)| least * scale < LEAST_DRAWN_SCALE - 0.001)
+                    .collect();
+                if !unreadable.is_empty() {
+                    failures.push(format!(
+                        "{} at {width}px and {scale}x, row {row}: unreadable {unreadable:?}",
+                        entry.id
+                    ));
+                }
+            }
+        }
+        let _ = cx.window_handle();
+    }
+    assert!(failures.is_empty(), "{}", failures.join("\n"));
+}
+
+/// Every overview thumbnail fits its card at every fit size: a card narrower
+/// than a specimen draws it smaller instead of cutting it off.
+#[gpui::test]
+fn every_overview_thumbnail_fits_its_card(cx: &mut TestAppContext) {
+    use super::overview::THUMBNAILS_DRAWN;
+    use gpui::{ListOffset, VisualContext as _};
+    init(cx);
+    let mut failures = Vec::new();
+    for (width, scale) in FIT_SIZES {
+        let window = cx.open_window(size(px(width), px(900.)), Gallery::new);
+        let mut cx = VisualTestContext::from_window(window.into(), cx);
+        text_scale(&window, &mut cx, scale);
+        cx.simulate_resize(size(px(width), px(900.)));
+        go(&window, &mut cx, "overview");
+        let rows = window.update(&mut cx, |g, _, _| g.row_count()).unwrap();
+        for row in 0..rows {
+            window
+                .update(&mut cx, |g, _, cx| {
+                    g.list.scroll_to(ListOffset {
+                        item_ix: row,
+                        offset_in_item: px(0.),
+                    });
+                    cx.notify();
+                })
+                .unwrap();
+            // The first frame measures a thumbnail; the next draws it to fit.
+            draw(&window, &mut cx);
+            THUMBNAILS_DRAWN.with(|drawn| drawn.borrow_mut().clear());
+            draw(&window, &mut cx);
+            for (id, thumbnail) in THUMBNAILS_DRAWN.with(|drawn| drawn.take()) {
+                let card = bounds(&mut cx, Box::leak(format!("overview-{id}").into()));
+                if thumbnail.left() < card.left() - px(0.5)
+                    || thumbnail.right() > card.right() + px(0.5)
+                {
+                    failures.push(format!(
+                        "{id} at {width}px and {scale}x: {thumbnail:?} in {card:?}"
                     ));
                 }
             }
@@ -488,26 +577,32 @@ fn the_shell_arranges_itself_for_the_window_width(cx: &mut TestAppContext) {
     }
 }
 
-/// Every preview at every reference width and at a short window stays inside
-/// its canvas: the page never scrolls sideways, the canvas grows with a tall
-/// preview, and nothing covers the card's header or is clipped by the card.
+/// Every preview at every reference width, at a short window and at a phone's
+/// width with 200% text stays inside its canvas: the page never scrolls
+/// sideways, the canvas grows with a tall preview, and nothing covers the
+/// card's header or is clipped by the card. A preview of live demos keeps each
+/// demo in its row too.
 #[gpui::test]
 fn every_preview_fits_its_canvas_at_every_width(cx: &mut TestAppContext) {
     use super::shell::PREVIEW_DRAWN;
+    use super::spec::OVERFLOWS;
     let (window, mut cx) = open(cx);
     let mut overflows = Vec::new();
-    // Each width upright and, for a phone, on its side.
+    // Each width upright and, for a phone, on its side; then a phone at 200%.
     let sizes = WIDTHS
         .iter()
-        .flat_map(|(width, _)| [(*width, 780.), (*width, 1200.)])
-        .chain([(844., 390.), (568., 320.)]);
-    for (width, height) in sizes {
+        .flat_map(|(width, _)| [(*width, 780., 1.), (*width, 1200., 1.)])
+        .chain([(844., 390., 1.), (568., 320., 1.)])
+        .chain([(320., 780., 2.), (360., 780., 2.)]);
+    for (width, height, scale) in sizes {
+        text_scale(&window, &mut cx, scale);
         cx.simulate_resize(size(px(width), px(height)));
         settle(&window, &mut cx);
         for entry in CATALOG {
             if !matches!(entry.kind, Kind::Component { .. }) {
                 continue;
             }
+            OVERFLOWS.with(|overflows| overflows.borrow_mut().clear());
             go(&window, &mut cx, entry.id);
             let canvas = bounds(&mut cx, "preview-canvas");
             let drawn = PREVIEW_DRAWN
@@ -519,7 +614,14 @@ fn every_preview_fits_its_canvas_at_every_width(cx: &mut TestAppContext) {
                 || drawn.bottom() > canvas.bottom() + px(0.5)
             {
                 overflows.push(format!(
-                    "{} at {width}x{height}: {drawn:?} in {canvas:?}",
+                    "{} at {width}x{height} and {scale}x: {drawn:?} in {canvas:?}",
+                    entry.id
+                ));
+            }
+            let demos = OVERFLOWS.with(|overflows| overflows.take());
+            if !demos.is_empty() {
+                overflows.push(format!(
+                    "{} at {width}x{height} and {scale}x: {demos:?}",
                     entry.id
                 ));
             }

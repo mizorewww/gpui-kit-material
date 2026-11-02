@@ -248,8 +248,11 @@ fn preview(
         window,
         cx,
     );
+    // The position bar gives way first, then the controls wrap.
     let controls = div()
+        .w_full()
         .flex()
+        .flex_wrap()
         .items_center()
         .justify_center()
         .gap(rem(8.))
@@ -267,7 +270,13 @@ fn preview(
             current.saturating_sub(1),
             current > 0,
         ))
-        .child(div().w(rem(220.)).child(position))
+        .child(
+            div()
+                .flex_1()
+                .min_w(rem(48.))
+                .max_w(rem(220.))
+                .child(position),
+        )
         .child(button(
             "carousel-next",
             "chevron_right",

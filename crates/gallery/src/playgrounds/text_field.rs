@@ -228,7 +228,9 @@ fn preview(
         .disabled(disabled)
         .read_only(config.bool("read_only"))
         .required(config.bool("required"))
-        .w(rem(280.));
+        // Its reference width where the canvas has room for it.
+        .w_full()
+        .max_w(rem(280.));
     if !label.is_empty() {
         field = field.label(label);
     }
