@@ -97,6 +97,30 @@ fn title_bar_height(window: &Window) -> Pixels {
     TITLE_BAR.max(TITLE_BAR * (f32::from(window.rem_size()) / BASE_PX))
 }
 
+/// Whether the Gallery's bar is a window's title bar, with the platform's
+/// caption buttons in or over it. On the web it is only the page's top app
+/// bar, which a full-screen overlay covers like the rest of the page.
+const DRAWS_WINDOW_TITLE_BAR: bool = !cfg!(target_family = "wasm");
+
+/// How far below the window's top edge a full-screen overlay's content keeps
+/// clear of: the window's top inset, and the title bar where the Gallery
+/// draws one in the window's caption area.
+pub(crate) fn overlay_safe_top(window: &Window) -> Pixels {
+    safe_top(
+        window.insets().effective().top,
+        title_bar_height(window),
+        DRAWS_WINDOW_TITLE_BAR,
+    )
+}
+
+fn safe_top(inset: Pixels, title_bar: Pixels, title_bar_drawn: bool) -> Pixels {
+    if title_bar_drawn {
+        inset + title_bar
+    } else {
+        inset
+    }
+}
+
 /// The settings whose change starts a theme transition.
 type ThemeKey = (
     PaletteId,
@@ -1055,6 +1079,15 @@ mod window_tests {
         cx.update_window(window, |_, window, cx| window.draw(cx).clear(cx))
             .unwrap();
         cx.run_until_parked();
+    }
+
+    /// A full-screen overlay keeps clear of a window title bar, not of a web
+    /// page's top app bar, which it covers.
+    #[test]
+    fn overlays_clear_the_title_bar_only_where_the_window_has_one() {
+        assert_eq!(super::safe_top(px(20.), px(56.), true), px(76.));
+        assert_eq!(super::safe_top(px(20.), px(56.), false), px(20.));
+        assert_eq!(super::DRAWS_WINDOW_TITLE_BAR, !cfg!(target_family = "wasm"));
     }
 
     /// Every control of the top bar is inside the bar's room and clear of the

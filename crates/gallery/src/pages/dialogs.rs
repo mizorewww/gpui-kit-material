@@ -137,9 +137,9 @@ impl GalleryPage for Page {
         cx: &mut Context<Self>,
     ) -> AnyElement {
         // The full-screen dialog keeps its header clear of the title bar and the
-        // macOS traffic lights in it.
+        // macOS traffic lights in it, where there is a window title bar.
         let title_bar = Edges {
-            top: window.insets().effective().top + crate::title_bar_height(window),
+            top: crate::overlay_safe_top(window),
             ..Default::default()
         };
         if row < LIVE {
