@@ -406,6 +406,13 @@ impl Gallery {
             })
             .selected(CATALOG[self.current].id)
             .focus_on_open(!searching)
+            .when_some(
+                self.search_focus.clone().filter(|_| searching),
+                |drawer, field| {
+                    // The results' first row goes back up to the field.
+                    drawer.on_exit_start(move |window, cx| field.focus(window, cx))
+                },
+            )
             .on_change(cx.listener(|this, id: &SharedString, _, cx| {
                 if let Some(entry) = catalog::position(id) {
                     this.navigate(entry, cx);

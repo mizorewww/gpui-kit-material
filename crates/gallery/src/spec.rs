@@ -320,16 +320,115 @@ thread_local! {
 
 /// What a [`FitWidth`] found: the scale its content fits at, in a window of
 /// `viewport` at `rem`. A new window size or rem starts again from the full
-/// size; otherwise it only ever shrinks, so content whose row is sized by the
-/// content itself settles instead of trading size with its row.
+/// size. Otherwise it shrinks when its content overflows, and grows back as
+/// far as the content would fit, judged from its width at the current scale,
+/// so content that changed (a smaller specimen picked) is drawn at its size
+/// again. Content whose row is sized by the content itself
+/// never looks as if it would fit, so it settles instead of trading size with
+/// its row.
 #[derive(Clone, Copy)]
 struct Fit {
-    scale: f32,
+    step: FitStep,
     viewport: Size<Pixels>,
     rem: Pixels,
+}
+
+/// The scale a [`FitWidth`] draws at and what its last frames found, apart
+/// from the window it was found in.
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct FitStep {
+    scale: f32,
     /// The last frame overflowed: one that overflows again shrinks. A single
     /// frame's overflow can be a preview that sizes itself on its next frame.
+    /// Content still overflowing at the least scale keeps it, so that it
+    /// stays settled rather than asking for a frame on every render.
     overflowed: bool,
+    /// Whether the content may go back to the full size, see [`Regrow`].
+    regrow: Regrow,
+}
+
+/// Growing estimates the content's full width from its width at a smaller
+/// scale, which content that does not scale in proportion can get wrong. A
+/// try that overflows again blocks the next until the content's width at its
+/// scale changes, so a wrong estimate cannot loop.
+#[derive(Clone, Copy, Debug, PartialEq)]
+enum Regrow {
+    Allowed,
+    /// A larger scale was tried from an estimate; overflowing again blocks it.
+    Trying,
+    /// A try overflowed; the width to measure at the new scale is still to come.
+    Failed,
+    /// Blocked while the content is this wide at its scale.
+    Blocked(f32),
+}
+
+/// The least growth worth another frame.
+const REGROW_STEP: f32 = 1.02;
+
+impl FitStep {
+    const FULL: Self = Self {
+        scale: 1.,
+        overflowed: false,
+        regrow: Regrow::Allowed,
+    };
+
+    /// The step after a frame drew the content `width` px wide in a row
+    /// `available` px wide, never shrinking below `least`; and whether that
+    /// frame needs another, drawn at the new scale.
+    fn next(self, width: f32, available: f32, least: f32) -> (Self, bool) {
+        let scale = self.scale;
+        let overflowing = width > available + 1.;
+        if overflowing {
+            if !self.overflowed {
+                // Confirm on the next frame.
+                let step = Self {
+                    overflowed: true,
+                    ..self
+                };
+                return (step, true);
+            }
+            let next = fit_scale_down_to(width / scale, available, least).min(scale);
+            if next < scale {
+                let regrow = match self.regrow {
+                    Regrow::Trying => Regrow::Failed,
+                    _ => Regrow::Allowed,
+                };
+                let step = Self {
+                    scale: next,
+                    overflowed: false,
+                    regrow,
+                };
+                return (step, true);
+            }
+            // Nothing smaller to draw it at: it stays clipped, and settled.
+            return (self, false);
+        }
+        let regrow = match self.regrow {
+            Regrow::Trying => Regrow::Allowed,
+            Regrow::Failed => Regrow::Blocked(width),
+            Regrow::Blocked(at) if (width - at).abs() > 1. => Regrow::Allowed,
+            regrow => regrow,
+        };
+        let settled = Self {
+            scale,
+            overflowed: false,
+            regrow,
+        };
+        // The content would fit at a larger scale, the full size if it can:
+        // try it. Content in proportion to its scale lands at its fit at once;
+        // content with parts that do not scale looks wider than it is, so it
+        // gets there in steps.
+        let fits = fit_scale_down_to(width / scale, available, least);
+        if regrow == Regrow::Allowed && fits > scale * REGROW_STEP {
+            let step = Self {
+                scale: fits,
+                overflowed: false,
+                regrow: Regrow::Trying,
+            };
+            return (step, true);
+        }
+        (settled, false)
+    }
 }
 
 /// Records how far `bounds` reach in the [`FitWidth`] being prepainted.
@@ -378,9 +477,11 @@ impl RenderOnce for FitWidth {
         let viewport = window.viewport_size();
         let view = window.current_view();
         let found = FITS.with(|fits| fits.borrow().get(&key).copied());
-        let current = found.filter(|fit| fit.rem == rem && fit.viewport == viewport);
-        let scale = current.map_or(1., |fit| fit.scale);
-        let pending = current.is_some_and(|fit| fit.overflowed);
+        let stored = found
+            .filter(|fit| fit.rem == rem && fit.viewport == viewport)
+            .map(|fit| fit.step);
+        let step = stored.unwrap_or(FitStep::FULL);
+        let scale = step.scale;
         let content = if scale < 1. {
             RemScaled::new(rem * scale, self.content).into_any_element()
         } else {
@@ -402,43 +503,36 @@ impl RenderOnce for FitWidth {
             let Some((left, right)) = EXTENTS.with(|extents| extents.borrow_mut().pop()) else {
                 return;
             };
-            let available = row.size.width;
-            let width = right - left;
-            let overflowing = width > available + px(1.);
-            // The content's width at the full size, shrunk to the row.
-            let next = if overflowing && pending {
-                fit_scale_down_to(
-                    f32::from(width) / scale,
-                    f32::from(available),
-                    min_fit_scale(rem),
-                )
-                .min(scale)
-            } else {
-                scale
-            };
+            let available = f32::from(row.size.width);
+            let width = f32::from(right - left);
+            let (next, redraw) = step.next(width, available, min_fit_scale(rem));
             // Nothing smaller to draw it at: it is clipped.
             #[cfg(test)]
-            if overflowing && pending && next >= scale {
+            if next.overflowed && step.overflowed && next.scale >= scale {
                 OVERFLOWS.with(|overflows| {
                     overflows
                         .borrow_mut()
                         .push(format!("{key}: {width:?} wide in {available:?} at {scale}"))
                 });
             }
-            let fit = Fit {
-                scale: next,
-                viewport,
-                rem,
-                overflowed: overflowing && !pending,
-            };
-            FITS.with(|fits| {
-                let mut fits = fits.borrow_mut();
-                if fits.len() >= MEASURE_LIMIT && !fits.contains_key(&key) {
-                    fits.clear();
-                }
-                fits.insert(key, fit);
-            });
-            if next < scale || overflowing && !pending {
+            // Only a change is written.
+            if stored != Some(next) {
+                FITS.with(|fits| {
+                    let mut fits = fits.borrow_mut();
+                    if fits.len() >= MEASURE_LIMIT && !fits.contains_key(&key) {
+                        fits.clear();
+                    }
+                    fits.insert(
+                        key,
+                        Fit {
+                            step: next,
+                            viewport,
+                            rem,
+                        },
+                    );
+                });
+            }
+            if redraw {
                 cx.defer(move |cx| cx.notify(view));
             }
         })
@@ -1034,6 +1128,71 @@ mod tests {
         let scale = super::fit_scale(400., 200.);
         assert!(scale < 0.5 && 400. * scale <= 200.);
         assert_eq!(super::fit_scale(10_000., 200.), super::MIN_FIT_SCALE);
+    }
+
+    use super::{FitStep, Regrow};
+
+    /// Runs frames of content whose width at a scale is `width(scale)` in a
+    /// row `available` wide until a frame asks for no other, and returns
+    /// where it settled with the number of frames it asked for.
+    fn settle(mut step: FitStep, width: impl Fn(f32) -> f32, available: f32) -> (FitStep, usize) {
+        for asked in 0..20 {
+            let (next, redraw) = step.next(width(step.scale), available, 0.1);
+            step = next;
+            if !redraw {
+                return (step, asked);
+            }
+        }
+        panic!("the fit never settled: {step:?}");
+    }
+
+    /// Picking a smaller specimen after a wide one draws it at its size again,
+    /// rather than at the scale the wide one needed.
+    #[test]
+    fn a_fit_grows_back_when_its_content_narrows() {
+        let (wide, _) = settle(FitStep::FULL, |scale| 900. * scale, 300.);
+        assert!(wide.scale < 0.34, "{wide:?}");
+        assert!(900. * wide.scale <= 300.);
+        let (narrow, asked) = settle(wide, |scale| 200. * scale, 300.);
+        assert_eq!(narrow.scale, 1., "{narrow:?}");
+        assert_eq!(asked, 1, "one frame to draw it at the full size");
+        // Something that still needs shrinking regrows to its own fit.
+        let (middle, _) = settle(wide, |scale| 450. * scale, 300.);
+        assert!(middle.scale > wide.scale && 450. * middle.scale <= 300.);
+    }
+
+    /// Content still too wide at the least scale settles: later renders of
+    /// the same content ask for no frame.
+    #[test]
+    fn content_clipped_at_the_least_scale_stays_settled() {
+        let (floor, _) = settle(FitStep::FULL, |scale| 100_000. * scale, 300.);
+        assert_eq!(floor.scale, 0.1);
+        for _ in 0..3 {
+            assert_eq!(
+                floor.next(100_000. * floor.scale, 300., 0.1),
+                (floor, false)
+            );
+        }
+    }
+
+    /// Content wider at the full size than its width at a smaller scale
+    /// suggests tries the full size once, and does not loop.
+    #[test]
+    fn a_wrong_estimate_regrows_once() {
+        // Wide at the full size, but narrow below it.
+        let width = |scale: f32| if scale >= 1. { 400. } else { 250. * scale };
+        let (settled, _) = settle(FitStep::FULL, width, 300.);
+        assert!(settled.scale < 1.);
+        assert!(matches!(settled.regrow, Regrow::Blocked(_)), "{settled:?}");
+        for _ in 0..3 {
+            assert_eq!(
+                settled.next(width(settled.scale), 300., 0.1),
+                (settled, false)
+            );
+        }
+        // A real change of the content lifts the block.
+        let (narrow, _) = settle(settled, |scale| 100. * scale, 300.);
+        assert_eq!(narrow.scale, 1.);
     }
 
     #[test]

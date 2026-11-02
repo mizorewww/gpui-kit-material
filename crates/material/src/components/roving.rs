@@ -166,7 +166,11 @@ pub(crate) struct Roving {
     select_on_focus: Option<Select>,
     reveal: Option<ScrollHandle>,
     rtl: bool,
+    exit_start: Option<Exit>,
 }
+
+/// Called instead of wrapping when Previous moves past the first item.
+pub(crate) type Exit = Rc<dyn Fn(&mut Window, &mut App)>;
 
 impl Roving {
     /// Resolve left and right arrows for this direction. Key handling runs
@@ -188,7 +192,16 @@ impl Roving {
             select_on_focus: None,
             reveal: None,
             rtl: false,
+            exit_start: None,
         }
+    }
+
+    /// Previous (Up in a column) on the first item that can take focus calls
+    /// `exit` instead of wrapping to the last: focus leaves for a control
+    /// before the widget, such as a search field above its results.
+    pub(crate) fn exit_start(mut self, exit: Option<Exit>) -> Self {
+        self.exit_start = exit;
+        self
     }
 
     /// Items that cannot take focus (disabled), one entry per item; arrows,
@@ -238,11 +251,16 @@ impl Roving {
     }
 
     pub(crate) fn navigate(&self, direction: Direction, window: &mut Window, cx: &mut App) {
-        let current = self
-            .focus
-            .iter()
-            .position(|focus| focus.is_focused(window))
-            .or(self.selected);
+        let focused = self.focus.iter().position(|focus| focus.is_focused(window));
+        if direction == Direction::Previous
+            && let Some(exit) = &self.exit_start
+            && focused.is_some()
+            && focused == target(&self.skip, None, Direction::First)
+        {
+            exit(window, cx);
+            return;
+        }
+        let current = focused.or(self.selected);
         let Some(index) = target(&self.skip, current, direction) else {
             return;
         };

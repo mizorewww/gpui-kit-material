@@ -382,7 +382,7 @@ impl RenderOnce for MaterialSideSheet {
             let open = self.open;
             let container = self.contained.then(|| container_state(&id, window, cx));
             let frame = overlay_frame(&id, open, window, cx);
-            let focus = modal_focus(&id, open, window, cx);
+            let focus = modal_focus(&id, open, true, window, cx);
             if frame.settled_closed(open) {
                 return with_container_probe(container, div().into_any_element());
             }
@@ -865,7 +865,7 @@ impl RenderOnce for MaterialBottomSheet {
         let id = self.id.clone();
         let container = (modal && self.contained).then(|| container_state(&id, window, cx));
         let frame = overlay_frame(&id, open, window, cx);
-        let focus = modal.then(|| modal_focus(&id, open, window, cx));
+        let focus = modal.then(|| modal_focus(&id, open, true, window, cx));
         let state = window.use_keyed_state((id.clone(), "bottom-sheet"), cx, |window, _| {
             BottomSheetState {
                 height: window.viewport_size().height,

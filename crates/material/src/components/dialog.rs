@@ -344,6 +344,14 @@ fn full_screen_insets(caller: Edges<Pixels>, window: Option<Edges<Pixels>>) -> E
     }
 }
 
+/// The most a basic dialog's container grows to in an area `height` tall:
+/// its `margins` above and below, and the window's `insets` when the dialog
+/// covers the window rather than a container.
+fn basic_max_height(height: Pixels, margins: Pixels, insets: Option<Edges<Pixels>>) -> Pixels {
+    let insets = insets.map_or(px(0.), |insets| insets.top + insets.bottom);
+    (height - margins - insets).max(px(0.))
+}
+
 /// The clip a scaling dialog paints at spatial progress `spatial`, for a
 /// container `size`: the clip's size and the container's offset inside it.
 pub(crate) fn scale_clip(size: Size<Pixels>, spatial: f32) -> (Size<Pixels>, Point<Pixels>) {
@@ -428,10 +436,13 @@ pub(crate) struct ModalFocus {
 }
 
 /// The focus handle of the modal surface keyed by `id`, after applying the
-/// open/close focus moves for this frame.
+/// open/close focus moves for this frame. With `take_focus` off, opening
+/// leaves focus where it is (a surface that opens in response to typing
+/// elsewhere); closing still gives focus back to what had it on opening.
 pub(crate) fn modal_focus(
     id: &ElementId,
     open: bool,
+    take_focus: bool,
     window: &mut Window,
     cx: &mut App,
 ) -> FocusHandle {
@@ -447,9 +458,11 @@ pub(crate) fn modal_focus(
             state.shown = true;
             state.previous = previous;
         });
-        let target = state.read(cx).focus.clone();
-        // The host's focus handle is attached during this frame's paint.
-        window.defer(cx, move |window, cx| target.focus(window, cx));
+        if take_focus {
+            let target = state.read(cx).focus.clone();
+            // The host's focus handle is attached during this frame's paint.
+            window.defer(cx, move |window, cx| target.focus(window, cx));
+        }
     } else if !open && shown {
         let previous = state.update(cx, |state, _| {
             state.shown = false;
@@ -892,7 +905,7 @@ impl RenderOnce for MaterialDialog {
         let id = self.id.clone();
         let container = self.contained.then(|| container_state(&id, window, cx));
         let frame = overlay_frame(&id, open, window, cx);
-        let focus = modal_focus(&id, open, window, cx);
+        let focus = modal_focus(&id, open, true, window, cx);
         if frame.settled_closed(open) {
             return with_container_probe(container, div().into_any_element());
         }
@@ -938,8 +951,13 @@ impl RenderOnce for MaterialDialog {
             });
             let measured = measure.as_ref().and_then(|measure| measure.read(cx).0);
             // The container never outgrows its area: the body scrolls instead.
-            let max_height =
-                (area.size.height - rem(2. * DIALOG_MARGIN).to_pixels(rem_size)).max(px(0.));
+            // A window's own insets (a notch, a home indicator, an on-screen
+            // keyboard) take from it too, as they do from a full-screen dialog.
+            let max_height = basic_max_height(
+                area.size.height,
+                rem(2. * DIALOG_MARGIN).to_pixels(rem_size),
+                (!self.contained).then(|| window.insets().effective()),
+            );
             let basic =
                 self.basic_surface(width, Some(max_height), dismiss.filter(|_| open), measure);
             let positioned = div()
@@ -1453,6 +1471,21 @@ mod tests {
             action,
             "the actions are pinned"
         );
+    }
+
+    #[test]
+    fn a_basic_dialog_keeps_clear_of_the_window_insets() {
+        let insets = Edges {
+            top: px(47.),
+            bottom: px(34.),
+            ..Default::default()
+        };
+        assert_eq!(basic_max_height(px(800.), px(48.), None), px(752.));
+        assert_eq!(
+            basic_max_height(px(800.), px(48.), Some(insets)),
+            px(800. - 48. - 47. - 34.)
+        );
+        assert_eq!(basic_max_height(px(60.), px(48.), Some(insets)), px(0.));
     }
 
     #[test]
