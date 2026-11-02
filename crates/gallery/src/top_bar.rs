@@ -240,10 +240,12 @@ impl TopBar {
     /// Close the compact search, which ends the filter as well, and give focus
     /// back to its toggle.
     pub(crate) fn close_search(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        // Only an open drawer gives focus back to the field as it closes.
+        let drawer_open = self.gallery.read(cx).drawer_open;
         self.search_open = false;
         self.clear_query(window, cx);
         self.toggle_focus.focus(window, cx);
-        self.restore_toggle = true;
+        self.restore_toggle = drawer_open;
         cx.notify();
     }
 

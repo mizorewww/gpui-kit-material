@@ -1454,6 +1454,25 @@ mod window_tests {
         assert!(cx.read(|cx| gallery.read(cx).drawer_open));
     }
 
+    /// Closing the search with no results open leaves nothing to give focus
+    /// back to the toggle later: focus lost afterwards stays lost.
+    #[gpui::test]
+    fn closing_the_search_without_results_leaves_no_pending_restore(cx: &mut TestAppContext) {
+        let (_gallery, top_bar, mut cx) = open_window(480., cx);
+        let toggle = cx.debug_bounds("top-search-toggle").unwrap();
+        cx.simulate_click(toggle.center(), gpui::Modifiers::none());
+        settle(&mut cx);
+        cx.simulate_keystrokes("escape");
+        settle(&mut cx);
+        assert!(toggle_focused(&top_bar, &mut cx));
+        cx.update(|window, cx| window.blur(cx));
+        settle(&mut cx);
+        assert!(
+            !toggle_focused(&top_bar, &mut cx),
+            "focus did not jump back to the toggle"
+        );
+    }
+
     /// Enter with no query opens nothing; a dismissed results drawer comes back
     /// on focus and on Enter; a first match that is the current page closes it.
     #[gpui::test]
