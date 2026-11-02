@@ -54,6 +54,9 @@ const SIDE_SHEET_RADIUS: Pixels = px(16.);
 const BOTTOM_SHEET_RADIUS: Pixels = px(28.);
 /// M3 caps a bottom sheet's width on large windows.
 const BOTTOM_SHEET_MAX_WIDTH: f32 = 640.;
+/// The room an expanded bottom sheet leaves above it, so its handle and the
+/// scrim stay in view however tall its content (M3 bottom sheet spec, 72dp).
+const BOTTOM_SHEET_TOP_MARGIN: f32 = 72.;
 /// Pointer travel before a press on a bottom sheet becomes a drag.
 const DRAG_SLOP: f32 = 4.;
 
@@ -764,9 +767,13 @@ impl MaterialBottomSheet {
     /// The sheet surface. `drag_layer` sits under the handle and content;
     /// the content blocks it, so drags start from the handle row and the
     /// sheet's own background, never from text, sliders or buttons inside.
+    ///
+    /// A presented sheet is at most `max_height` tall; its content scrolls
+    /// under the handle when it would be taller.
     fn surface(
         modal: bool,
         max_width: Rems,
+        max_height: Option<Pixels>,
         drag_layer: Option<AnyElement>,
         handle: Option<AnyElement>,
         children: Vec<AnyElement>,
@@ -775,6 +782,7 @@ impl MaterialBottomSheet {
             .relative()
             .w_full()
             .max_w(max_width)
+            .when_some(max_height, |sheet, max| sheet.max_h(max))
             .flex()
             .flex_col()
             .items_center()
@@ -785,9 +793,16 @@ impl MaterialBottomSheet {
             .children(handle)
             .child(
                 div()
+                    .id("bottom-sheet-content")
+                    .when(cfg!(test), |content| {
+                        content.debug_selector(|| "bottom-sheet-content".into())
+                    })
                     .w_full()
                     .flex()
                     .flex_col()
+                    .flex_shrink(1.)
+                    .min_h_0()
+                    .overflow_y_scroll()
                     .block_mouse_except_scroll()
                     .children(children),
             )
@@ -830,7 +845,7 @@ impl RenderOnce for MaterialBottomSheet {
                 .flex_col()
                 .justify_end()
                 .items_center()
-                .child(Self::surface(modal, max_width, None, handle, self.children).flex_1())
+                .child(Self::surface(modal, max_width, None, None, handle, self.children).flex_1())
                 .into_any_element();
         };
         let id = self.id.clone();
@@ -877,6 +892,9 @@ impl RenderOnce for MaterialBottomSheet {
         let Some(area) = overlay_area(container.as_ref(), window, cx) else {
             return with_container_probe(container, div().into_any_element());
         };
+        let max_height = (area.size.height
+            - rem(BOTTOM_SHEET_TOP_MARGIN).to_pixels(window.rem_size()))
+        .max(px(0.));
         let on_detent = self.on_detent_change.clone();
         let reduced = cx.reduce_motion();
         let partial = self
@@ -1053,117 +1071,120 @@ impl RenderOnce for MaterialBottomSheet {
             .child(
                 // The surface takes the pointer, not this full-width frame: past
                 // the surface's maximum width is the scrim, or the page.
-                Self::surface(modal, max_width, Some(drag_layer), handle, self.children)
-                    .occlude()
-                    .child(
-                        canvas(
-                            |_, _, _| {},
-                            move |_, _, window, _| {
-                                if !dragging {
-                                    return;
-                                }
-                                let moving = tracker.clone();
-                                window.on_mouse_event(
-                                    move |event: &MouseMoveEvent, phase, window, cx| {
-                                        if phase != DispatchPhase::Bubble {
-                                            return;
+                Self::surface(
+                    modal,
+                    max_width,
+                    Some(max_height),
+                    Some(drag_layer),
+                    handle,
+                    self.children,
+                )
+                .occlude()
+                .child(
+                    canvas(
+                        |_, _, _| {},
+                        move |_, _, window, _| {
+                            if !dragging {
+                                return;
+                            }
+                            let moving = tracker.clone();
+                            window.on_mouse_event(
+                                move |event: &MouseMoveEvent, phase, window, cx| {
+                                    if phase != DispatchPhase::Bubble {
+                                        return;
+                                    }
+                                    let now = cx.background_executor().now();
+                                    moving.update(cx, |state, _| {
+                                        if !event.dragging() {
+                                            // The button came up where we could not
+                                            // see it: nothing was decided, so the
+                                            // sheet goes back to where it rested.
+                                            if let Some(drag) = state.drag.take() {
+                                                state.settle_from(drag, now);
+                                            }
+                                        } else if let Some(drag) = state.drag.as_mut() {
+                                            let delta = f32::from(event.position.y) - drag.start;
+                                            drag.moved |= delta.abs() > DRAG_SLOP;
+                                            drag.offset = delta;
                                         }
+                                    });
+                                    window.refresh();
+                                },
+                            );
+                            let releasing = tracker.clone();
+                            let dismiss = release_dismiss.clone();
+                            let report = release_report.clone();
+                            window.on_mouse_event(
+                                move |event: &MouseUpEvent, phase, window, cx| {
+                                    if phase != DispatchPhase::Bubble
+                                        || event.button != MouseButton::Left
+                                    {
+                                        return;
+                                    }
+                                    let Some(drag) =
+                                        releasing.update(cx, |state, _| state.drag.take())
+                                    else {
+                                        return;
+                                    };
+                                    window.refresh();
+                                    if !drag.moved {
                                         let now = cx.background_executor().now();
-                                        moving.update(cx, |state, _| {
-                                            if !event.dragging() {
-                                                // The button came up where we could not
-                                                // see it: nothing was decided, so the
-                                                // sheet goes back to where it rested.
-                                                if let Some(drag) = state.drag.take() {
-                                                    state.settle_from(drag, now);
-                                                }
-                                            } else if let Some(drag) = state.drag.as_mut() {
-                                                let delta =
-                                                    f32::from(event.position.y) - drag.start;
-                                                drag.moved |= delta.abs() > DRAG_SLOP;
-                                                drag.offset = delta;
-                                            }
-                                        });
-                                        window.refresh();
-                                    },
-                                );
-                                let releasing = tracker.clone();
-                                let dismiss = release_dismiss.clone();
-                                let report = release_report.clone();
-                                window.on_mouse_event(
-                                    move |event: &MouseUpEvent, phase, window, cx| {
-                                        if phase != DispatchPhase::Bubble
-                                            || event.button != MouseButton::Left
-                                        {
-                                            return;
+                                        releasing
+                                            .update(cx, |state, _| state.settle_from(drag, now));
+                                        return;
+                                    }
+                                    releasing.update(cx, |state, _| state.dragged = true);
+                                    let position = (rest + drag.from + drag.offset).max(0.);
+                                    let target = snap_target(position, height, partial);
+                                    let new_rest = match target {
+                                        SnapTarget::Expanded => 0.,
+                                        SnapTarget::Partial => height - partial.unwrap_or(height),
+                                        SnapTarget::Dismiss => height,
+                                    };
+                                    let now = cx.background_executor().now();
+                                    releasing.update(cx, |state, _| {
+                                        // A dismissal is the caller's to make: until it
+                                        // closes the sheet, the sheet rests where it did.
+                                        if target != SnapTarget::Dismiss {
+                                            state.expanded = target == SnapTarget::Expanded;
                                         }
-                                        let Some(drag) =
-                                            releasing.update(cx, |state, _| state.drag.take())
-                                        else {
-                                            return;
-                                        };
-                                        window.refresh();
-                                        if !drag.moved {
-                                            let now = cx.background_executor().now();
-                                            releasing.update(cx, |state, _| {
-                                                state.settle_from(drag, now)
-                                            });
-                                            return;
-                                        }
-                                        releasing.update(cx, |state, _| state.dragged = true);
-                                        let position = (rest + drag.from + drag.offset).max(0.);
-                                        let target = snap_target(position, height, partial);
-                                        let new_rest = match target {
-                                            SnapTarget::Expanded => 0.,
-                                            SnapTarget::Partial => {
-                                                height - partial.unwrap_or(height)
-                                            }
-                                            SnapTarget::Dismiss => height,
-                                        };
-                                        let now = cx.background_executor().now();
-                                        releasing.update(cx, |state, _| {
-                                            // A dismissal is the caller's to make: until it
-                                            // closes the sheet, the sheet rests where it did.
-                                            if target != SnapTarget::Dismiss {
-                                                state.expanded = target == SnapTarget::Expanded;
-                                            }
-                                            let from = position
-                                                - if target == SnapTarget::Dismiss {
-                                                    rest
-                                                } else {
-                                                    new_rest
-                                                };
-                                            state.settle = Some(Settle { from, started: now });
-                                        });
-                                        match target {
-                                            SnapTarget::Dismiss => {
-                                                if let Some(dismiss) = &dismiss {
-                                                    dismiss(window, cx);
-                                                }
-                                            }
-                                            SnapTarget::Expanded | SnapTarget::Partial => {
-                                                if let Some(report) = &report {
-                                                    report(
-                                                        if target == SnapTarget::Expanded
-                                                            || partial.is_none()
-                                                        {
-                                                            BottomSheetDetent::Expanded
-                                                        } else {
-                                                            BottomSheetDetent::Partial
-                                                        },
-                                                        window,
-                                                        cx,
-                                                    );
-                                                }
+                                        let from = position
+                                            - if target == SnapTarget::Dismiss {
+                                                rest
+                                            } else {
+                                                new_rest
+                                            };
+                                        state.settle = Some(Settle { from, started: now });
+                                    });
+                                    match target {
+                                        SnapTarget::Dismiss => {
+                                            if let Some(dismiss) = &dismiss {
+                                                dismiss(window, cx);
                                             }
                                         }
-                                    },
-                                );
-                            },
-                        )
-                        .absolute()
-                        .size_full(),
-                    ),
+                                        SnapTarget::Expanded | SnapTarget::Partial => {
+                                            if let Some(report) = &report {
+                                                report(
+                                                    if target == SnapTarget::Expanded
+                                                        || partial.is_none()
+                                                    {
+                                                        BottomSheetDetent::Expanded
+                                                    } else {
+                                                        BottomSheetDetent::Partial
+                                                    },
+                                                    window,
+                                                    cx,
+                                                );
+                                            }
+                                        }
+                                    }
+                                },
+                            );
+                        },
+                    )
+                    .absolute()
+                    .size_full(),
+                ),
             )
             .child(
                 // Measure the sheet's height for the next frame's offsets.
@@ -1991,6 +2012,70 @@ mod tests {
         let beside = point(px(5.), body.center().y);
         assert!(body.left() > beside.x);
         cx.simulate_click(beside, Modifiers::default());
+        assert_eq!(dismissals.get(), 1);
+    }
+
+    /// A modal bottom sheet with more content than its window holds.
+    struct TallSheet(Rc<Cell<usize>>);
+    impl Render for TallSheet {
+        fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+            window.set_rem_size(px(crate::tokens::typography::BASE_PX));
+            let dismissals = self.0.clone();
+            let rows = (0..30).map(|index| {
+                div()
+                    .debug_selector(move || format!("tall-sheet-row-{index}"))
+                    .h(px(40.))
+                    .flex_shrink_0()
+            });
+            div().size_full().child(
+                MaterialBottomSheet::new("tall-sheet")
+                    .modal(true)
+                    .open(true)
+                    .drag_handle("Drag handle")
+                    .on_dismiss(move |_, _| dismissals.set(dismissals.get() + 1))
+                    .children(rows),
+            )
+        }
+    }
+
+    #[gpui::test]
+    fn a_tall_modal_bottom_sheet_keeps_its_handle_and_scrim(cx: &mut TestAppContext) {
+        cx.update(|cx| {
+            gpui_base::init(cx);
+            cx.set_reduce_motion(true);
+        });
+        let dismissals = Rc::new(Cell::new(0));
+        let (_, cx) = cx.add_window_view({
+            let dismissals = dismissals.clone();
+            move |_, _| TallSheet(dismissals)
+        });
+        cx.simulate_resize(size(px(400.), px(600.)));
+        for _ in 0..3 {
+            draw(cx);
+        }
+        let handle = cx.debug_bounds("drag-handle").unwrap();
+        assert!(
+            handle.top() >= px(BOTTOM_SHEET_TOP_MARGIN - 0.5),
+            "the handle stays below the top margin: {handle:?}"
+        );
+        let content = cx.debug_bounds("bottom-sheet-content").unwrap();
+        assert_eq!(content.bottom(), px(600.), "the sheet meets the bottom");
+        // The content scrolls inside the sheet.
+        let first = cx.debug_bounds("tall-sheet-row-0").unwrap();
+        cx.simulate_event(ScrollEvent {
+            position: content.center(),
+            delta: ScrollDelta::Pixels(point(px(0.), px(-200.))),
+            ..Default::default()
+        });
+        draw(cx);
+        let scrolled = cx.debug_bounds("tall-sheet-row-0").unwrap();
+        assert!(
+            scrolled.top() < first.top() - px(100.),
+            "the content scrolled: {first:?} -> {scrolled:?}"
+        );
+        assert_eq!(cx.debug_bounds("drag-handle").unwrap(), handle);
+        // The scrim above the sheet is still there to dismiss it.
+        cx.simulate_click(point(px(200.), px(20.)), Modifiers::default());
         assert_eq!(dismissals.get(), 1);
     }
 
