@@ -724,6 +724,14 @@ impl RenderOnce for MaterialSlider {
             .map(|(i, (&p, &v))| {
                 let start = is_range && i == 0;
                 let focused = thumb_focused(i);
+                // Each range thumb is bounded by the other.
+                let (thumb_min, thumb_max) = if !is_range {
+                    (min, max)
+                } else if start {
+                    (min, value.end())
+                } else {
+                    (value.start(), max)
+                };
                 let thumb = SliderThumb::new(&self.state)
                     .axis(self.axis)
                     .start(start)
@@ -736,8 +744,8 @@ impl RenderOnce for MaterialSlider {
                             .role(Role::Slider)
                             .aria_label(label.clone())
                             .aria_numeric_value(v as f64)
-                            .aria_min_numeric_value(min as f64)
-                            .aria_max_numeric_value(max as f64)
+                            .aria_min_numeric_value(thumb_min as f64)
+                            .aria_max_numeric_value(thumb_max as f64)
                             .aria_numeric_value_step(a11y_step as f64)
                             .aria_orientation(orientation)
                             .when(live, |thumb| {

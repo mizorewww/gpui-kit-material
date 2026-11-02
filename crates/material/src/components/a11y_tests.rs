@@ -225,13 +225,13 @@ impl Render for Sliders {
 }
 
 #[gpui::test]
-fn a_continuous_slider_reports_a_usable_step(cx: &mut TestAppContext) {
+fn sliders_report_a_usable_step_and_range_thumbs_their_bounds(cx: &mut TestAppContext) {
     const SLIDER_MARKER: &str = "material-a11y-slider-verified";
     if std::env::var("GPUI_A11Y_ACTIVE").as_deref() != Ok("1") {
         let output = std::process::Command::new(std::env::current_exe().unwrap())
             .args([
                 "--exact",
-                "components::a11y_tests::a_continuous_slider_reports_a_usable_step",
+                "components::a11y_tests::sliders_report_a_usable_step_and_range_thumbs_their_bounds",
                 "--nocapture",
             ])
             .env("GPUI_A11Y_ACTIVE", "1")
@@ -280,6 +280,8 @@ fn a_continuous_slider_reports_a_usable_step(cx: &mut TestAppContext) {
     let volume = labelled(&all, "slider", "Volume", &tree);
     assert_eq!(volume["numeric_value_step"], 2.0, "{volume}");
 
+    // Each range thumb is bounded by the other. The range's own slider node, which
+    // also carries the end value, keeps the whole range.
     let price: Vec<&Value> = all
         .iter()
         .filter(|node| {
@@ -289,7 +291,18 @@ fn a_continuous_slider_reports_a_usable_step(cx: &mut TestAppContext) {
                     .is_some_and(|r| r.eq_ignore_ascii_case("slider"))
         })
         .collect();
-    assert!(price.len() >= 2, "{tree}");
+    let start: Vec<&&Value> = price
+        .iter()
+        .filter(|node| node["numeric_value"] == 40.0)
+        .collect();
+    assert_eq!(start.len(), 1, "{tree}");
+    assert_eq!(start[0]["min_numeric_value"], 0.0, "{}", start[0]);
+    assert_eq!(start[0]["max_numeric_value"], 120.0, "{}", start[0]);
+    let end = price
+        .iter()
+        .find(|node| node["numeric_value"] == 120.0 && node["min_numeric_value"] == 40.0)
+        .unwrap_or_else(|| panic!("no end thumb bounded by the start in {tree}"));
+    assert_eq!(end["max_numeric_value"], 200.0, "{end}");
     for node in price {
         assert_eq!(node["numeric_value_step"], 2.0, "{node}");
     }
