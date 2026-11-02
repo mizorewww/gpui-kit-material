@@ -29,6 +29,7 @@ script's docstring (`--help`) and [docs/DEVELOPMENT.md](../docs/DEVELOPMENT.md).
 | `check-package.sh` | Checks that each package ships its license texts and notices, and not the Gallery's fonts |
 | `check-web-profile.mjs` | Runs `www/profile.js` under Node as far as its report, which CI has no browser to reach |
 | `profile-gallery.py` | Builds and records a native Gallery CPU frame profile with provenance, and judges AGENTS.md's performance targets |
+| `test_profile_gallery.py` | Tests `profile-gallery.py`'s rules that need no build or browser, such as how a probe's unknown movement is reported |
 | `figma/figma.py` | `figma-*.json` token fixtures and page specs from the Figma kit (below) |
 | `build-reference-fonts.py` | Gallery `fonts/roboto/Roboto-{Regular,Medium,SemiBold}.ttf` from the pinned md3.io WOFF2, hash-checked against `SOURCES.json` |
 | `freeze-conformance-fonts.py` | Static Noto Arabic/Hebrew/Emoji instances under `fonts/conformance/`, recorded in its `SOURCES.json` |

@@ -639,6 +639,17 @@ def summarize(paths, *, kit_baseline_ns=None):
     return code
 
 
+def probe_movement_warning(url, moved):
+    """The warning a probe result's `moved` calls for, or None. `moved` is true, false, or
+    null when the probe could not tell (a canvas page that does not report its draws):
+    only false says the page stood still, and null is reported as unknown, not as idle."""
+    if moved is False:
+        return f"{url}: the wheel moved nothing, so this measured an idle page"
+    if moved is None:
+        return f"{url}: whether the wheel moved the page is unknown"
+    return None
+
+
 def md3io_probe(args, destination):
     """Run `www/profile.js`'s frame probe on a third-party page (md3.io) in
     Chromium via agent-browser, with the same flags as `--web`."""
@@ -678,9 +689,9 @@ def md3io_probe(args, destination):
                 (destination / "probe.json").write_text(json.dumps(value, indent=2) + "\n")
                 print(f"{args.md3io}: {value['frames']} frames, p50 {value['p50_ms']} ms, "
                       f"p95 {value['p95_ms']} ms, max {value['max_ms']} ms")
-                if not value["moved"]:
-                    print(f"{args.md3io}: the wheel moved nothing, so this measured an idle page",
-                          file=sys.stderr)
+                warning = probe_movement_warning(args.md3io, value.get("moved"))
+                if warning:
+                    print(warning, file=sys.stderr)
                 code = 0
                 break
         else:
