@@ -49,6 +49,25 @@ impl Render for Screen {
                     .menu(MaterialMenu::new("models").item(MaterialMenuItem::new("Deep")))
                     .value("Deep"),
             )
+            .child(
+                MaterialCard::new("toggle-card", CardVariant::Outlined)
+                    .selected(true)
+                    .accessibility_label("Toggle card")
+                    .on_click(|_, _, _| {}),
+            )
+            .child(
+                CardGroup::new("card-group", "Card choices")
+                    .card(
+                        MaterialCard::new("choice-a", CardVariant::Outlined)
+                            .selected(false)
+                            .accessibility_label("First choice"),
+                    )
+                    .card(
+                        MaterialCard::new("choice-b", CardVariant::Outlined)
+                            .selected(true)
+                            .accessibility_label("Second choice"),
+                    ),
+            )
             .child(MaterialTooltip::plain("tip", "Save a copy").trigger(div().size(px(20.))))
             .child(progress_with_label("copy", "Copy", 0.25, window, cx))
             .child(indeterminate_progress_with_label("index", "Index", cx))
@@ -187,6 +206,23 @@ fn overlays_rows_and_items_announce_names_and_states(cx: &mut TestAppContext) {
         "{row}"
     );
     assert_eq!(row["description"], "Connected", "{row}");
+
+    // A selectable card is a toggle button by default…
+    let toggled = |node: &Value| {
+        node["toggled"]
+            .as_str()
+            .is_some_and(|t| t.eq_ignore_ascii_case("true"))
+    };
+    let card = labelled(&all, "button", "Toggle card", &tree);
+    assert!(toggled(card), "{card}");
+    // …and in a card group a radio button with its place in the set.
+    labelled(&all, "radioGroup", "Card choices", &tree);
+    for (position, name, chosen) in [(1, "First choice", false), (2, "Second choice", true)] {
+        let node = labelled(&all, "radioButton", name, &tree);
+        assert_eq!(toggled(node), chosen, "{node}");
+        assert_eq!(node["position_in_set"], position, "{node}");
+        assert_eq!(node["size_of_set"], 2, "{node}");
+    }
 
     // Overlays are named by the caller's headline or label.
     labelled(&all, "dialog", "Discard draft?", &tree);

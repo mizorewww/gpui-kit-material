@@ -369,6 +369,82 @@ fn card_style(variant: CardVariant) -> CardStyle {
     }
 }
 
+// A selected card. M3 cards can be checked, but neither the Figma kit,
+// md3.io nor m3e.kyralabs.dev gives the checked state's values; these come
+// from Material Components for Android's M3 card (`Widget.Material3.CardView`
+// and its `res/color` selectors), the one reference that does.
+
+/// The secondary layer over a selected card's container: MDC Android's
+/// `m3_card_foreground_color.xml` lays `colorSecondary` at 16% over a checked
+/// card of every variant.
+pub const CARD_SELECTED_LAYER: f32 = 0.16;
+
+/// The selected card's check icon: MDC Android's `ic_mtrl_checked_circle`,
+/// 24dp, 8dp from the top-end corner (`checkedIconSize`, `checkedIconMargin`).
+const CARD_CHECK_SIZE: f32 = 24.;
+const CARD_CHECK_MARGIN: f32 = 8.;
+
+/// The edge of a card: `selected` turns an outlined card's edge to the
+/// secondary role (MDC Android's `m3_card_stroke_color.xml`, `state_checked`),
+/// at its unchanged 1dp width; the other variants have no edge to turn.
+fn card_outline(variant: CardVariant, selected: bool) -> Option<ColorRole> {
+    card_style(variant)
+        .outline
+        .map(|outline| if selected { SECONDARY } else { outline })
+}
+
+/// The color of a card's state layer in `state`. A selected card's hover,
+/// focus and drag layers are secondary, and its press on-surface-variant,
+/// since a press returns it to unselected (MDC Android's
+/// `m3_card_ripple_color.xml`). An unselected card keeps the Figma kit's
+/// on-surface card states even when it can be selected, where MDC Android
+/// presses a checkable card in secondary: the kit's card states come from
+/// the Figma kit, which outranks MDC, and only the checked state, which the
+/// Figma kit lacks, comes from MDC.
+fn card_layer_content(selected: bool, state: CardState) -> ColorRole {
+    match (selected, state) {
+        (true, CardState::Pressed) => ON_SURFACE_VARIANT,
+        (true, _) => SECONDARY,
+        (false, _) => ON_SURFACE,
+    }
+}
+
+/// A card's container under its selection layer, when selected.
+fn card_container(variant: CardVariant, selected: bool) -> Rgba {
+    let container = color(card_style(variant).container);
+    if selected {
+        state::layer(container, color(SECONDARY), CARD_SELECTED_LAYER)
+    } else {
+        container
+    }
+}
+
+/// The filled check-circle a selected card shows at its top-end corner, in
+/// the secondary role (MDC Android tints it with the checked stroke color).
+fn card_check() -> Div {
+    static PATH: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+    let path = PATH.get_or_init(|| {
+        IconName::CheckCircle
+            .symbol()
+            .icon()
+            .filled(true)
+            .asset_path()
+    });
+    div()
+        .absolute()
+        .top(rem(CARD_CHECK_MARGIN))
+        .right(rem(CARD_CHECK_MARGIN))
+        .size(rem(CARD_CHECK_SIZE))
+        .when(cfg!(test), |check| {
+            check.debug_selector(|| "material-card-check".into())
+        })
+        .child(
+            crate::icons::Icon::new(SharedString::new_static(path.as_str()))
+                .size(rem(CARD_CHECK_SIZE))
+                .color(color(SECONDARY)),
+        )
+}
+
 /// Compatibility helper padding from the reference's 16px content examples.
 /// The reference card surface itself has no padding.
 pub const CARD_PADDING: Rems = rem(16.);
@@ -387,6 +463,13 @@ pub struct CardSurface {
     inner: Div,
     outline: Option<ColorRole>,
     variant: CardVariant,
+    selected: bool,
+    /// A specimen's fixed state.
+    state: Option<CardState>,
+    /// Whether hovering lays a state layer over it.
+    hover: bool,
+    /// Whether the check icon has joined the children.
+    checked: bool,
     /// A specimen's forced focus: the 3dp secondary ring 2dp outside.
     focus_ring: bool,
 }
@@ -402,24 +485,32 @@ impl CardSurface {
                 .shadow(elevation::level(style.elevation)),
             outline: style.outline,
             variant,
+            selected: false,
+            state: None,
+            hover: false,
+            checked: false,
             focus_ring: false,
         }
     }
 
-    /// Render a fixed interaction state as a specimen: the on-surface state
-    /// layer, the state's elevation and, when focused, the focus ring.
+    /// Show the card selected (M3's checked card, after MDC Android): a 16%
+    /// secondary layer over its container, a secondary edge on an outlined
+    /// card and a secondary check-circle icon at its top-end corner. It
+    /// combines with [`Self::state`] and [`Self::interactive`] in any order.
+    /// Each of the three repaints the card's container, so a background the
+    /// caller set before them (`.bg(..)`) is replaced; set one after.
+    pub fn selected(mut self, selected: bool) -> Self {
+        self.selected = selected;
+        self.outline = card_outline(self.variant, selected);
+        self.restyle()
+    }
+
+    /// Render a fixed interaction state as a specimen: the state layer, the
+    /// state's elevation and, when focused, the focus ring.
     pub fn state(mut self, state: CardState) -> Self {
-        let container = color(card_style(self.variant).container);
-        self.inner = self
-            .inner
-            .bg(state::layer(
-                container,
-                color(ON_SURFACE),
-                state.layer_opacity(),
-            ))
-            .shadow(elevation::level(card_elevation(self.variant, state)));
+        self.state = Some(state);
         self.focus_ring = state == CardState::Focused;
-        self
+        self.restyle()
     }
 
     /// [`Self::state`] for one of the shared interaction previews.
@@ -431,12 +522,34 @@ impl CardSurface {
     /// state layer over it and raises it to its hovered elevation. The
     /// caller supplies the action (and focus) on the content.
     pub fn interactive(mut self) -> Self {
-        let container = color(card_style(self.variant).container);
-        let hover = state::hovered(container, color(ON_SURFACE));
-        let shadow = elevation::level(card_elevation(self.variant, CardState::Hovered));
+        self.hover = true;
+        self.restyle()
+    }
+
+    /// Paint the container, elevation and hover layer from the selection,
+    /// fixed state and hover together, so their builders compose in any
+    /// order.
+    fn restyle(mut self) -> Self {
+        let container = card_container(self.variant, self.selected);
+        let state = self.state.unwrap_or_default();
         self.inner = self
             .inner
-            .hover(move |style| style.bg(hover).shadow(shadow.clone()));
+            .bg(state::layer(
+                container,
+                color(card_layer_content(self.selected, state)),
+                state.layer_opacity(),
+            ))
+            .shadow(elevation::level(card_elevation(self.variant, state)));
+        if self.hover {
+            let hover = state::hovered(
+                container,
+                color(card_layer_content(self.selected, CardState::Hovered)),
+            );
+            let shadow = elevation::level(card_elevation(self.variant, CardState::Hovered));
+            self.inner = self
+                .inner
+                .hover(move |style| style.bg(hover).shadow(shadow.clone()));
+        }
         self
     }
 }
@@ -561,6 +674,11 @@ impl Element for CardSurface {
         window: &mut Window,
         cx: &mut App,
     ) -> (LayoutId, Self::RequestLayoutState) {
+        if self.selected && !self.checked {
+            // Last, so it draws over the content.
+            self.checked = true;
+            self.inner.extend([card_check().into_any_element()]);
+        }
         self.inner.request_layout(id, inspector, window, cx)
     }
     fn prepaint(
@@ -656,11 +774,18 @@ const CARD_DRAG_SLOP: Pixels = px(4.);
 /// and the focus ring) and optionally draggable (the dragged state layer
 /// and elevation while the pointer carries it; on release it springs back
 /// to its place on the default spatial spring, or returns at once under
-/// reduced motion). The accessible label names the action.
+/// reduced motion). The accessible label names the action. A selectable
+/// card ([`Self::selected`]) shows and announces whether it is selected.
 #[derive(gpui::IntoElement)]
 pub struct MaterialCard {
     id: ElementId,
     variant: CardVariant,
+    /// Whether it is selected, for a card that can be; `None` for one that
+    /// cannot.
+    selected: Option<bool>,
+    selection: CardSelection,
+    /// A [`CardGroup`]'s focus handle and whether the card is its tab stop.
+    focus: Option<(FocusHandle, bool)>,
     label: Option<SharedString>,
     on_click: Option<CardClick>,
     draggable: bool,
@@ -674,6 +799,9 @@ impl MaterialCard {
         Self {
             id: id.into(),
             variant,
+            selected: None,
+            selection: CardSelection::Toggle,
+            focus: None,
             label: None,
             on_click: None,
             draggable: false,
@@ -695,6 +823,24 @@ impl MaterialCard {
     /// The action's accessible name.
     pub fn accessibility_label(mut self, label: impl Into<SharedString>) -> Self {
         self.label = Some(label.into());
+        self
+    }
+
+    /// Make the card selectable, and say whether it is selected (M3's
+    /// checked card, after MDC Android; see [`CardSurface::selected`]). Its
+    /// action, from [`Self::on_click`], changes it; a card without one shows
+    /// the state but announces none, having nothing to change it with.
+    pub fn selected(mut self, selected: bool) -> Self {
+        self.selected = Some(selected);
+        self
+    }
+
+    /// What selecting the card means to assistive technology:
+    /// [`CardSelection::Toggle`] (the default) or one choice of several,
+    /// [`CardSelection::Radio`]. A [`CardGroup`] sets the radio meaning and
+    /// adds the radio group's roving focus.
+    pub fn selection_role(mut self, selection: CardSelection) -> Self {
+        self.selection = selection;
         self
     }
 
@@ -746,10 +892,14 @@ impl RenderOnce for MaterialCard {
         let dragging = grabbed && drag.read(cx).moved;
         let clickable = self.on_click.is_some() && self.preview.is_none();
         let pressed = clickable && grabbed && !dragging;
-        let container = color(card_style(self.variant).container);
+        let selected = self.selected.unwrap_or(false);
+        let container = card_container(self.variant, selected);
+        let hover_ink = color(card_layer_content(selected, CardState::Hovered));
+        let press_ink = color(card_layer_content(selected, CardState::Pressed));
         let group: SharedString = format!("material-card-{id:?}").into();
 
         let mut surface = CardSurface::new(self.variant)
+            .selected(selected)
             .w_full()
             .children(self.children);
         surface = match (self.preview, dragging) {
@@ -757,7 +907,7 @@ impl RenderOnce for MaterialCard {
             (Some(state), _) => surface.state(state),
             (None, false) if pressed => surface.state(CardState::Pressed),
             (None, false) if clickable => {
-                let hover = state::hovered(container, color(ON_SURFACE));
+                let hover = state::hovered(container, hover_ink);
                 let hovered = elevation::level(card_elevation(self.variant, CardState::Hovered));
                 surface.group_hover(group.clone(), move |style| {
                     style.bg(hover).shadow(hovered.clone())
@@ -767,19 +917,39 @@ impl RenderOnce for MaterialCard {
         };
 
         let body: AnyElement = if let Some(on_click) = self.on_click.clone().filter(|_| clickable) {
-            let focus = window
-                .use_keyed_state((id.clone(), "card-focus"), cx, |_, cx| cx.focus_handle())
-                .read(cx)
-                .clone();
+            let (focus, tab_stop) = self.focus.clone().unwrap_or_else(|| {
+                let focus = window
+                    .use_keyed_state((id.clone(), "card-focus"), cx, |_, cx| cx.focus_handle())
+                    .read(cx)
+                    .clone();
+                (focus, true)
+            });
             let click_drag = drag.clone();
             let button = gpui_base::Button::new((id.clone(), "card-button"))
                 .group(group)
                 .track_focus(&focus)
+                .tab_stop(tab_stop)
                 .w_full()
                 .rounded(RADIUS_CARD)
                 .cursor_pointer()
                 .when_some(self.label.clone(), |button, label| {
                     button.accessibility_label(label)
+                })
+                .when_some(self.selected, |button, selected| {
+                    let toggled = if selected {
+                        accesskit::Toggled::True
+                    } else {
+                        accesskit::Toggled::False
+                    };
+                    match self.selection {
+                        CardSelection::Toggle => button.aria_toggled(toggled),
+                        CardSelection::Radio { index, count } => button
+                            .role(Role::RadioButton)
+                            .aria_toggled(toggled)
+                            .aria_selected(selected)
+                            .aria_position_in_set(index + 1)
+                            .aria_size_of_set(count),
+                    }
                 })
                 .child(surface)
                 .on_click(move |event, window, cx| {
@@ -795,7 +965,7 @@ impl RenderOnce for MaterialCard {
                 true,
                 super::ripple::ripple_corners(RADIUS_CARD),
                 Edges::all(px(0.).into()),
-                color(ON_SURFACE),
+                press_ink,
                 window,
                 cx,
             );
@@ -920,6 +1090,112 @@ impl RenderOnce for MaterialCard {
     }
 }
 
+/// What selecting a [`MaterialCard`] means to assistive technology.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum CardSelection {
+    /// A card that is on or off by itself, as in a multiple selection: a
+    /// toggle button.
+    #[default]
+    Toggle,
+    /// One choice of `count`, the `index`th (from 0): a radio button. Put
+    /// the cards in a [`CardGroup`] for the radio group and its keyboard.
+    Radio { index: usize, count: usize },
+}
+
+type CardGroupChange = Rc<dyn Fn(&usize, &mut Window, &mut App)>;
+
+/// A single choice among selectable [`MaterialCard`]s: a radio group named
+/// by its label, with roving focus as a `ChoiceGroup` has. Tab
+/// enters at the selected card; arrow keys, Home and End move focus among
+/// the cards and select them. Each card is a radio button with its place
+/// in the set. The caller lays the cards out (`Styled`: a wrapping row, a
+/// grid) and keeps the selection.
+#[derive(gpui::IntoElement)]
+pub struct CardGroup {
+    id: ElementId,
+    label: SharedString,
+    cards: Vec<MaterialCard>,
+    on_change: Option<CardGroupChange>,
+    style: StyleRefinement,
+}
+
+impl CardGroup {
+    /// `label` is the radio group's accessible name.
+    pub fn new(id: impl Into<ElementId>, label: impl Into<SharedString>) -> Self {
+        Self {
+            id: id.into(),
+            label: label.into(),
+            cards: Vec::new(),
+            on_change: None,
+            style: StyleRefinement::default(),
+        }
+    }
+
+    /// Append a choice; give it [`MaterialCard::selected`]. Its action is
+    /// the group's.
+    pub fn card(mut self, card: MaterialCard) -> Self {
+        self.cards.push(card);
+        self
+    }
+
+    /// Called with the index of a newly chosen card.
+    pub fn on_change(mut self, f: impl Fn(&usize, &mut Window, &mut App) + 'static) -> Self {
+        self.on_change = Some(Rc::new(f));
+        self
+    }
+}
+
+impl Styled for CardGroup {
+    fn style(&mut self) -> &mut StyleRefinement {
+        &mut self.style
+    }
+}
+
+impl RenderOnce for CardGroup {
+    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
+        use super::roving::{Orientation, Roving, Select, index_handles};
+        let count = self.cards.len();
+        let focus = index_handles((self.id.clone(), "card-group-focus"), count, window, cx);
+        let selected = self
+            .cards
+            .iter()
+            .position(|card| card.selected == Some(true));
+        let on_select = self.on_change.clone().map(|on_change| {
+            Rc::new(move |index: usize, window: &mut Window, cx: &mut App| {
+                on_change(&index, window, cx)
+            }) as Select
+        });
+        let roving = Roving::new(focus.clone(), Orientation::Both)
+            .rtl(crate::scope::is_rtl(window))
+            .selected(selected)
+            .select_on_focus(on_select);
+        let entry = roving.tab_stop(window);
+        let mut group = div()
+            .id(self.id)
+            .role(Role::RadioGroup)
+            .aria_label(self.label);
+        group.style().refine(&self.style);
+        let cards = self.cards.into_iter().enumerate().map(|(index, card)| {
+            let chosen = card.selected == Some(true);
+            let handle = focus[index].clone();
+            let on_change = self.on_change.clone();
+            let card = MaterialCard {
+                selected: Some(chosen),
+                selection: CardSelection::Radio { index, count },
+                focus: Some((handle.clone(), entry == Some(index))),
+                ..card
+            };
+            card.on_click(move |_, window, cx| {
+                handle.focus(window, cx);
+                if !chosen && let Some(on_change) = &on_change {
+                    on_change(&index, window, cx);
+                }
+            })
+        });
+        roving.install(group).children(cards)
+    }
+}
+
 /// Compatibility appearance helper: full width and 16dp example padding.
 /// Returns [`CardSurface`] instead of the earlier `Div`; Styled and
 /// ParentElement chains remain supported. Use [`CardSurface::new`] for the
@@ -1006,6 +1282,50 @@ mod tests {
         );
         assert_eq!(RADIUS_CARD, px(12.));
         assert_eq!(CARD_PADDING, rem(16.));
+    }
+
+    #[test]
+    fn a_selected_card_takes_the_secondary_roles() {
+        // MDC Android's M3 card, checked: a secondary edge on the outlined card…
+        assert_eq!(
+            card_outline(CardVariant::Outlined, false),
+            Some(OUTLINE_VARIANT)
+        );
+        assert_eq!(card_outline(CardVariant::Outlined, true), Some(SECONDARY));
+        for variant in [
+            CardVariant::Elevated,
+            CardVariant::Filled,
+            CardVariant::Surface,
+        ] {
+            assert_eq!(card_outline(variant, true), None, "{variant:?}");
+        }
+        // …and a 16% secondary layer over every container, under which the
+        // state layers draw in secondary, except a press, which leads back
+        // to unselected and so draws in on-surface-variant.
+        assert_eq!(CARD_SELECTED_LAYER, 0.16);
+        assert_eq!((CARD_CHECK_SIZE, CARD_CHECK_MARGIN), (24., 8.));
+        for state in CardState::ALL {
+            let selected = if state == CardState::Pressed {
+                ON_SURFACE_VARIANT
+            } else {
+                SECONDARY
+            };
+            assert_eq!(card_layer_content(true, state), selected, "{state:?}");
+            assert_eq!(card_layer_content(false, state), ON_SURFACE, "{state:?}");
+        }
+        for variant in [
+            CardVariant::Elevated,
+            CardVariant::Filled,
+            CardVariant::Outlined,
+            CardVariant::Surface,
+        ] {
+            let container = color(card_style(variant).container);
+            assert_eq!(card_container(variant, false), container);
+            assert_eq!(
+                card_container(variant, true),
+                state::layer(container, color(SECONDARY), 0.16)
+            );
+        }
     }
 
     #[test]

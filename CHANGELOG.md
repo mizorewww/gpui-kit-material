@@ -55,6 +55,11 @@ Distribution is by Git revision for now; see the [quick start](README.md#quick-s
 - `ExposedDropdown::menu` and `ExposedDropdown::value`: a dropdown opens a `MaterialMenu` the
   caller builds, with supporting text, icons, labelled groups or an action item, and shows the
   value text it is given.
+- `MaterialCard::selected` and `CardSurface::selected`: M3's checked card, with values from
+  Material Components for Android's M3 card (the Figma kit, md3.io and m3e give none): a 16%
+  secondary layer, a secondary edge when outlined, and a secondary check-circle icon at the
+  top-end corner. `MaterialCard::selection_role` with `CardSelection` says whether selecting is
+  a toggle or one choice of several; `CardGroup` makes cards a radio group with roving focus.
 
 ### Changed
 
