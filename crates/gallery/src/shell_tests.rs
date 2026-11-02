@@ -630,6 +630,58 @@ fn every_preview_fits_its_canvas_at_every_width(cx: &mut TestAppContext) {
     assert!(overflows.is_empty(), "{}", overflows.join("\n"));
 }
 
+/// Every configuration row keeps its control clear of its label, wrapping it
+/// below where the two do not fit side by side, and inside the card, as does
+/// the card's header, on a phone at 100% and 200% text.
+#[gpui::test]
+fn every_configuration_fits_a_phone(cx: &mut TestAppContext) {
+    let (window, mut cx) = open(cx);
+    let mut failures = Vec::new();
+    for (width, scale) in [(390., 1.), (320., 2.), (360., 2.)] {
+        text_scale(&window, &mut cx, scale);
+        cx.simulate_resize(size(px(width), px(800.)));
+        settle(&window, &mut cx);
+        for entry in CATALOG {
+            let Kind::Component {
+                playground: Some(playground),
+            } = entry.kind
+            else {
+                continue;
+            };
+            super::playground::CONTROLS_DRAWN.with(|drawn| drawn.borrow_mut().clear());
+            go(&window, &mut cx, entry.id);
+            let at = format!("{} at {width}px and {scale}x", entry.id);
+            let card = bounds(&mut cx, "configuration-card");
+            let inside = |control: Bounds<Pixels>| {
+                control.left() >= card.left() - px(0.5) && control.right() <= card.right() + px(0.5)
+            };
+            let reset = bounds(&mut cx, "configuration-reset");
+            if !inside(reset) {
+                failures.push(format!("{at}: Reset {reset:?} leaves {card:?}"));
+            }
+            let ids = std::iter::once("scenario").chain(playground.controls().map(|c| c.id()));
+            for id in ids {
+                let label = cx.debug_bounds(Box::leak(format!("playground-label-{id}").into()));
+                let value =
+                    super::playground::CONTROLS_DRAWN.with(|drawn| drawn.borrow().get(id).copied());
+                let (Some(label), Some(value)) = (label, value) else {
+                    // A control the scenario hides, or one scrolled out of a list.
+                    continue;
+                };
+                let clear = label.right() <= value.left() + px(0.5)
+                    || value.top() >= label.bottom() - px(0.5);
+                if !clear {
+                    failures.push(format!("{at}: {id} {value:?} overlaps its label {label:?}"));
+                }
+                if !inside(value) {
+                    failures.push(format!("{at}: {id} {value:?} leaves {card:?}"));
+                }
+            }
+        }
+    }
+    assert!(failures.is_empty(), "{}", failures.join("\n"));
+}
+
 /// A preview that fills its parent has one with a width of its own: the canvas
 /// centers previews at their own width, where a percentage or a flexible width
 /// inside a shrink-wrapped column resolves against its content and collapses.

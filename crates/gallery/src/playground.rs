@@ -43,7 +43,7 @@
 //! editor once, and `local` for other preview-only state. Configuration
 //! survives navigation: each page keeps its [`PlaygroundState`].
 use super::page::GalleryShared;
-use super::shell::{LeadView, ShellLayout, panes_stacked, preview_canvas};
+use super::shell::{LeadView, ShellLayout, panes_stacked, preview_canvas, shell_width};
 use super::spec::type_role;
 use gpui::{prelude::*, *};
 use gpui_base::input::{InputEvent, InputState, TextareaState};
@@ -745,7 +745,13 @@ impl PlaygroundState {
                 .pt(rem(16.))
                 .pb(rem(16.))
                 .debug_selector(|| "playground-scenario".into())
-                .child(control_row(compact, control_label("Scenario"), scenario))
+                .child(control_row(
+                    compact,
+                    "scenario",
+                    true,
+                    control_label("Scenario"),
+                    scenario,
+                ))
                 .child(
                     accessible_text(
                         "scenario-supporting",
@@ -809,6 +815,8 @@ impl PlaygroundState {
             Control::Select { options, .. } => row
                 .child(control_row(
                     compact,
+                    id,
+                    true,
                     control_label(label),
                     CompactSelect::new("select", label)
                         .options(options.iter().copied().map(SharedString::new_static))
@@ -828,6 +836,8 @@ impl PlaygroundState {
             Control::Segmented { options, .. } => row
                 .child(control_row(
                     compact,
+                    id,
+                    false,
                     control_label(label),
                     ConnectedButtonGroup::new("segmented", label)
                         .button_size(ButtonSize::ExtraSmall)
@@ -846,6 +856,8 @@ impl PlaygroundState {
                 let selected = self.config.choice(id);
                 row.child(control_row(
                     compact,
+                    id,
+                    false,
                     control_label(label),
                     div()
                         .id("icon-options")
@@ -876,6 +888,8 @@ impl PlaygroundState {
             Control::Switch { .. } => row
                 .child(control_row(
                     compact,
+                    id,
+                    false,
                     control_label(label),
                     MaterialSwitch::new("switch", label)
                         .checked(self.config.bool(id))
@@ -892,6 +906,8 @@ impl PlaygroundState {
                     .gap(rem(2.))
                     .child(control_row(
                         compact,
+                        id,
+                        false,
                         control_label(label),
                         accessible_text("slider-value", format!("{value}"))
                             .map(|text| type_role(text, TypeRole::LabelLarge))
@@ -907,6 +923,8 @@ impl PlaygroundState {
             Control::Text { .. } => row
                 .child(control_row(
                     compact,
+                    id,
+                    true,
                     control_label(label),
                     compact_input("text", label, compact, &self.texts[id]),
                 ))
@@ -918,8 +936,15 @@ impl PlaygroundState {
 /// A configuration row: `label` leading, `control` trailing, vertically
 /// centred at md3.io's 36dp row height, or a 48dp touch target's in the
 /// compact layout; the control wraps below the label when the two do not fit
-/// side by side.
-fn control_row(compact: bool, label: impl IntoElement, control: impl IntoElement) -> Div {
+/// side by side. A `fixed` control is a compact select or input, which asks
+/// for its reference width and narrows to the row's; any other takes its own.
+fn control_row(
+    compact: bool,
+    id: &'static str,
+    fixed: bool,
+    label: impl IntoElement,
+    control: impl IntoElement,
+) -> Div {
     div()
         .w_full()
         .min_h(rem(if compact { TOUCH_TARGET } else { 36. }))
@@ -929,8 +954,49 @@ fn control_row(compact: bool, label: impl IntoElement, control: impl IntoElement
         .justify_between()
         .gap_x(rem(12.))
         .gap_y(rem(4.))
-        .child(div().flex_shrink_0().child(label))
-        .child(div().flex_1().min_w_0().flex().justify_end().child(control))
+        .child(
+            div()
+                .debug_selector(move || format!("playground-label-{id}"))
+                .flex_shrink_0()
+                .max_w_full()
+                .child(label),
+        )
+        .child(
+            div()
+                .debug_selector(move || format!("playground-value-{id}"))
+                .flex_grow(1.)
+                .max_w_full()
+                // What the row wraps by: a fixed control's reference width,
+                // which it narrows from, or the control's own.
+                .when(fixed, |value| {
+                    value.flex_basis(rem(COMPACT_CONTROL_WIDTH)).min_w_0()
+                })
+                .flex()
+                .justify_end()
+                .child(drawn_control(id, control.into_any_element())),
+        )
+}
+
+#[cfg(test)]
+thread_local! {
+    /// Where each configuration control was last drawn, by its id.
+    pub(crate) static CONTROLS_DRAWN: std::cell::RefCell<
+        std::collections::HashMap<&'static str, Bounds<Pixels>>,
+    > = Default::default();
+}
+
+/// `control`, whose bounds tests read from [`CONTROLS_DRAWN`].
+#[cfg(test)]
+fn drawn_control(id: &'static str, control: AnyElement) -> AnyElement {
+    gpui_kit_material::components::prepaint_bounds(control, move |bounds, _, _| {
+        CONTROLS_DRAWN.with(|drawn| drawn.borrow_mut().insert(id, bounds));
+    })
+    .into_any_element()
+}
+
+#[cfg(not(test))]
+fn drawn_control(_: &'static str, control: AnyElement) -> AnyElement {
+    control
 }
 
 fn control_label(label: &'static str) -> impl IntoElement {
@@ -941,6 +1007,13 @@ fn control_label(label: &'static str) -> impl IntoElement {
 
 /// The width of compact selects and inputs in the configuration card.
 pub const COMPACT_CONTROL_WIDTH: f32 = 180.;
+/// What a stacked card leaves a select of the window's width, in design px:
+/// the gutters, the configuration's padding and the card's border.
+const SELECT_INSET: f32 = 2. * 12. + 2. * 20. + 2.;
+/// The narrowest a select gets: its arrow and a few characters.
+const SELECT_MIN: f32 = 64.;
+/// A select's menu keeps this far from the window's edges, in design px.
+const MENU_MARGIN: f32 = 16.;
 const COMPACT_CONTROL_HEIGHT: f32 = 32.;
 /// What a finger needs: the height of a compact layout's control and its row.
 const TOUCH_CONTROL_HEIGHT: f32 = 40.;
@@ -977,7 +1050,8 @@ fn compact_input(
     use gpui_kit::component::{Sizable as _, Size, input::Input};
     compact_frame(compact)
         .id(id)
-        .w(rem(COMPACT_CONTROL_WIDTH))
+        .w_full()
+        .max_w(rem(COMPACT_CONTROL_WIDTH))
         .child(
             Input::new(state)
                 .appearance(false)
@@ -1049,6 +1123,12 @@ impl CompactSelect {
 impl RenderOnce for CompactSelect {
     fn render(self, window: &mut Window, _: &mut App) -> impl IntoElement {
         let compact = ShellLayout::of(window) == ShellLayout::Compact;
+        // Its frame goes through Material's focus ring, which keeps its child's
+        // width, so the room is worked out: a stacked card's, inside the
+        // configuration's padding, or the window's for the menu.
+        let window_width = shell_width(window);
+        let width = self.width.min(window_width - SELECT_INSET).max(SELECT_MIN);
+        let menu_width = self.width.max(width).min(window_width - 2. * MENU_MARGIN);
         let value = self.options.get(self.selected).cloned().unwrap_or_default();
         let open = self.open;
         let toggle = self.on_open_change.clone();
@@ -1067,7 +1147,7 @@ impl RenderOnce for CompactSelect {
                 })
                 .child(
                     compact_frame(compact)
-                        .w(rem(self.width))
+                        .w(rem(width))
                         .hover(move |style| style.bg(on_surface.opacity(0.08)))
                         .child(div().flex_1().min_w_0().truncate().child(value))
                         .child(
@@ -1084,7 +1164,7 @@ impl RenderOnce for CompactSelect {
         let selected = self.selected;
         let on_select = self.on_select.clone();
         let menu = MaterialMenu::new((self.id.clone(), "menu"))
-            .width(self.width)
+            .width(menu_width)
             .items(self.options.into_iter().enumerate().map(|(index, option)| {
                 let on_select = on_select.clone();
                 MaterialMenuItem::new(option)

@@ -739,11 +739,17 @@ impl Gallery {
         stacked: bool,
         pane: f32,
     ) -> AnyElement {
+        // At least md3.io's 56dp; on a phone at a large text scale the title
+        // and Reset wrap onto two lines instead of being cut off.
         let header = div()
+            .debug_selector(|| "configuration-header".into())
             .flex()
+            .flex_wrap()
             .items_center()
             .justify_between()
-            .h(rem(56.))
+            .gap_x(rem(8.))
+            .min_h(rem(56.))
+            .py(rem(8.))
             .px(rem(20.))
             .border_b_1()
             .border_color(outline())
