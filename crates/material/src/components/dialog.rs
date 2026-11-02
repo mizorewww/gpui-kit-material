@@ -151,6 +151,7 @@ pub struct MaterialDialog {
     on_dismiss: Option<Dismiss>,
     /// Set by the caller; each form has its own default.
     container: Option<ColorRole>,
+    safe_area: Edges<Pixels>,
 }
 
 /// The full-screen dialog's header: its close button's accessible name and
@@ -185,6 +186,7 @@ impl MaterialDialog {
             dismiss_on_escape: true,
             on_dismiss: None,
             container: None,
+            safe_area: Edges::default(),
         }
     }
     /// The hero icon above the headline; the headline then centers.
@@ -296,6 +298,16 @@ impl MaterialDialog {
         self.dismiss_on_escape = dismiss;
         self
     }
+    /// Window px a full-screen dialog keeps its header and content clear of
+    /// at each edge, such as an application-drawn title bar with the macOS
+    /// traffic lights in it. Its surface still fills the area behind them.
+    /// A dialog over the window also keeps clear of the window's own
+    /// [`Window::insets`] (notches, system bars, the keyboard), whichever is
+    /// larger at each edge.
+    pub fn safe_area(mut self, insets: Edges<Pixels>) -> Self {
+        self.safe_area = insets;
+        self
+    }
     /// Called when the person dismisses the dialog: Escape, the scrim, or a
     /// close button. The caller closes it.
     pub fn on_dismiss(mut self, f: impl Fn(&mut Window, &mut App) + 'static) -> Self {
@@ -315,6 +327,20 @@ impl MaterialDialog {
             DialogSize::FullWidth => DIALOG_MAX_WIDTH,
         };
         width.min(available - 2. * DIALOG_MARGIN).max(0.)
+    }
+}
+
+/// A full-screen dialog's insets: the caller's, and over the window the
+/// window's own, whichever is larger at each edge.
+fn full_screen_insets(caller: Edges<Pixels>, window: Option<Edges<Pixels>>) -> Edges<Pixels> {
+    match window {
+        Some(window) => Edges {
+            top: caller.top.max(window.top),
+            right: caller.right.max(window.right),
+            bottom: caller.bottom.max(window.bottom),
+            left: caller.left.max(window.left),
+        },
+        None => caller,
     }
 }
 
@@ -765,7 +791,11 @@ impl MaterialDialog {
 }
 
 impl MaterialDialog {
-    fn full_screen_surface(mut self, dismiss: Option<Dismiss>) -> Stateful<Div> {
+    fn full_screen_surface(
+        mut self,
+        insets: Edges<Pixels>,
+        dismiss: Option<Dismiss>,
+    ) -> Stateful<Div> {
         let full = self.full_screen.take().unwrap_or(FullScreen {
             close_label: None,
             confirm: None,
@@ -778,9 +808,16 @@ impl MaterialDialog {
             .flex()
             .flex_col()
             .size_full()
+            .pt(insets.top)
+            .pr(insets.right)
+            .pb(insets.bottom)
+            .pl(insets.left)
             .bg(color(self.container.unwrap_or(ColorRole::SURFACE)))
             .child(
                 div()
+                    .when(cfg!(test), |header| {
+                        header.debug_selector(|| "dialog-full-screen-header".into())
+                    })
                     .flex()
                     .flex_shrink_0()
                     .items_center()
@@ -843,7 +880,8 @@ impl RenderOnce for MaterialDialog {
         let Some(open) = self.modal else {
             // A specimen: the container in place.
             return if full_screen {
-                self.full_screen_surface(None).into_any_element()
+                let insets = self.safe_area;
+                self.full_screen_surface(insets, None).into_any_element()
             } else {
                 let width = self.basic_width(f32::INFINITY);
                 let dismiss = self.on_dismiss.clone();
@@ -880,7 +918,13 @@ impl RenderOnce for MaterialDialog {
                 .opacity(opacity)
                 // A press on the surface is not a press on the scrim under it.
                 .occlude()
-                .child(self.full_screen_surface(dismiss.filter(|_| open)))
+                .child({
+                    let insets = full_screen_insets(
+                        self.safe_area,
+                        (!self.contained).then(|| window.insets().effective()),
+                    );
+                    self.full_screen_surface(insets, dismiss.filter(|_| open))
+                })
                 .into_any_element()
         } else {
             let rem_size = window.rem_size();
@@ -1340,6 +1384,7 @@ mod tests {
     /// A modal dialog with more content than its window holds.
     struct Tall {
         full_screen: bool,
+        safe_area: Edges<Pixels>,
     }
     impl Render for Tall {
         fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
@@ -1355,6 +1400,7 @@ mod tests {
                 .supporting_text("Body")
                 .content(div().flex().flex_col().children(rows))
                 .action(div().debug_selector(|| "tall-action".into()).size(px(40.)))
+                .safe_area(self.safe_area)
                 .modal(true)
                 .on_dismiss(|_, _| {});
             let dialog = if self.full_screen {
@@ -1372,7 +1418,10 @@ mod tests {
             gpui_base::init(cx);
             cx.set_reduce_motion(true);
         });
-        let (_, cx) = cx.add_window_view(|_, _| Tall { full_screen: false });
+        let (_, cx) = cx.add_window_view(|_, _| Tall {
+            full_screen: false,
+            safe_area: Edges::default(),
+        });
         cx.simulate_resize(size(px(400.), px(600.)));
         draw(cx);
         draw(cx);
@@ -1401,6 +1450,53 @@ mod tests {
             cx.debug_bounds("tall-action").unwrap(),
             action,
             "the actions are pinned"
+        );
+    }
+
+    #[test]
+    fn full_screen_insets_take_the_larger_of_caller_and_window() {
+        let edges = |top: f32, left: f32| Edges {
+            top: px(top),
+            left: px(left),
+            ..Default::default()
+        };
+        assert_eq!(full_screen_insets(edges(56., 0.), None), edges(56., 0.));
+        assert_eq!(
+            full_screen_insets(edges(56., 0.), Some(edges(20., 8.))),
+            edges(56., 8.)
+        );
+    }
+
+    #[gpui::test]
+    fn a_full_screen_dialog_keeps_its_header_clear_of_the_safe_area(cx: &mut TestAppContext) {
+        cx.update(|cx| {
+            gpui_base::init(cx);
+            cx.set_reduce_motion(true);
+        });
+        let (view, cx) = cx.add_window_view(|_, _| Tall {
+            full_screen: true,
+            safe_area: Edges::default(),
+        });
+        draw(cx);
+        draw(cx);
+        let close = cx.debug_bounds("dialog-close").unwrap();
+        assert!(close.top() < px(21.), "no inset: under the title bar");
+        // A 56px title bar with the traffic lights at x 20–74, y 21–35.
+        view.update(cx, |v, cx| {
+            v.safe_area = Edges {
+                top: px(56.),
+                ..Default::default()
+            };
+            cx.notify();
+        });
+        draw(cx);
+        draw(cx);
+        let header = cx.debug_bounds("dialog-full-screen-header").unwrap();
+        let close = cx.debug_bounds("dialog-close").unwrap();
+        assert_eq!(header.top(), px(56.));
+        assert!(
+            close.top() >= px(56.),
+            "below the traffic lights: {close:?}"
         );
     }
 }
