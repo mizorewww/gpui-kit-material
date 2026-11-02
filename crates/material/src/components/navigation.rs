@@ -847,6 +847,7 @@ pub struct NavigationRail {
     fab: Option<AnyElement>,
     hide_collapsed: bool,
     ripple: bool,
+    container: ColorRole,
     on_change: Option<Change>,
     on_dismiss: Option<ClickHandler>,
 }
@@ -868,9 +869,25 @@ impl NavigationRail {
             fab: None,
             hide_collapsed: false,
             ripple: true,
+            container: ColorRole::SURFACE,
             on_change: None,
             on_dismiss: None,
         }
+    }
+    /// The role the docked rail paints behind its items, for a page whose
+    /// ground is another surface role, such as `SURFACE_CONTAINER`: the rail
+    /// then sits on the page's ground instead of a band of surface. M3's rail container is the
+    /// surface (`md.comp.navigation-rail.container.color`), and its items'
+    /// roles (on-surface-variant icons and labels, the secondary-container
+    /// indicator, on-surface state layers) are specified on it. They hold on
+    /// the surface family, the surface and its tonal steps
+    /// (`SURFACE_DIM` to `SURFACE_BRIGHT`, `SURFACE_CONTAINER_LOWEST` to
+    /// `SURFACE_CONTAINER_HIGHEST`), which share the on-surface content
+    /// roles; give one of those. A modal expanded rail keeps its floating
+    /// surface-container.
+    pub fn container(mut self, role: ColorRole) -> Self {
+        self.container = role;
+        self
     }
     /// The destinations. Values must be unique.
     pub fn items(mut self, items: impl IntoIterator<Item = NavItem>) -> Self {
@@ -1079,7 +1096,7 @@ impl RenderOnce for NavigationRail {
                         .rounded_r(RADIUS_LARGE)
                         .shadow(elevation::level(2))
                 } else {
-                    rail.bg(color(ColorRole::SURFACE))
+                    rail.bg(color(self.container))
                 }
             })
             .when(has_header, |rail| {

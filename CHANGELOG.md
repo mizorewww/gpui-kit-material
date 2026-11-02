@@ -66,6 +66,8 @@ Distribution is by Git revision for now; see the [quick start](README.md#quick-s
 - `drop_target`: a named region that takes dropped files, with a dashed outline that turns
   primary under a state layer while files are dragged over it (GPUI's own drag state, which
   clears itself), or while the caller forces it. `DROP_TARGET_GROUP` lets its content follow.
+- `NavigationRail::container`: the surface-family role behind a docked rail, so it can sit on
+  a page whose ground is another surface role, such as `SURFACE_CONTAINER`.
 
 ### Changed
 

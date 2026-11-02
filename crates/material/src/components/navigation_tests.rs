@@ -556,3 +556,68 @@ fn focus_on_a_removed_item_stays_in_the_bar(cx: &mut TestAppContext) {
         .expect("focus stayed in the bar");
     assert_ne!(now, on_last, "on an item that is still there");
 }
+
+struct GroundRail {
+    container: Option<ColorRole>,
+    modal: bool,
+}
+impl Render for GroundRail {
+    fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        window.set_rem_size(px(14.));
+        div().h(px(400.)).child(
+            NavigationRail::new("ground-rail", "Main")
+                .items(items(2))
+                .selected("d0")
+                .expanded(self.modal)
+                .modal(self.modal)
+                .when_some(self.container, |rail, role| rail.container(role)),
+        )
+    }
+}
+
+/// The colors the frame filled whole quads with.
+fn fills(cx: &mut VisualTestContext) -> Vec<Hsla> {
+    cx.update(|window, _| {
+        window
+            .painted_quads()
+            .iter()
+            .filter_map(|q| q.background.as_solid())
+            .collect()
+    })
+}
+
+#[gpui::test]
+fn a_docked_rail_paints_the_container_it_is_given_and_a_modal_one_its_own(cx: &mut TestAppContext) {
+    cx.update(|cx| {
+        gpui_base::init(cx);
+        super::roving::init(cx);
+        cx.set_reduce_motion(true);
+    });
+    let (view, cx) = cx.add_window_view(|_, _| GroundRail {
+        container: None,
+        modal: false,
+    });
+    settle(cx);
+    let role = |role| Hsla::from(color(role));
+    assert!(
+        fills(cx).contains(&role(ColorRole::SURFACE)),
+        "M3's surface"
+    );
+    view.update(cx, |view, cx| {
+        view.container = Some(ColorRole::SURFACE_CONTAINER_LOW);
+        cx.notify();
+    });
+    settle(cx);
+    let painted = fills(cx);
+    assert!(painted.contains(&role(ColorRole::SURFACE_CONTAINER_LOW)));
+    assert!(!painted.contains(&role(ColorRole::SURFACE)));
+    // A modal expanded rail floats on surface-container whatever the ground.
+    view.update(cx, |view, cx| {
+        view.modal = true;
+        cx.notify();
+    });
+    settle(cx);
+    let painted = fills(cx);
+    assert!(painted.contains(&role(ColorRole::SURFACE_CONTAINER)));
+    assert!(!painted.contains(&role(ColorRole::SURFACE_CONTAINER_LOW)));
+}
