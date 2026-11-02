@@ -12,9 +12,9 @@ use std::rc::Rc;
 
 /// The Models set: each model's name, its supporting text and its icon.
 const MODELS: [(&str, &str, &str); 3] = [
-    ("Fast", "Quick answers for short notes", "bolt"),
+    ("Fast", "Quick replies to short questions", "bolt"),
     ("Balanced", "Good summaries at a moderate cost", "balance"),
-    ("Deep", "Careful reasoning for long lectures", "psychology"),
+    ("Deep", "Careful reasoning for long documents", "psychology"),
 ];
 
 const SETS: [&[&str]; 4] = [
@@ -58,7 +58,7 @@ pub static PLAYGROUND: Playground = Playground {
                 ("set", Set::Option("Models")),
                 ("label", Set::Text("Model")),
                 ("selected", Set::Option("3")),
-                ("supporting", Set::Text("Used for every new note")),
+                ("supporting", Set::Text("Used for new requests")),
                 ("full_width", Set::Bool(true)),
             ],
         },
@@ -168,6 +168,19 @@ fn preview(
     let is_open = *open.read(cx);
     let label = config.text("label");
     let select = Rc::new(preview.setter("selected", cx));
+    // The Models menu's action shows that it ran, in a snackbar under the field.
+    let managed = preview.local("managed", window, cx, |_, _| false);
+    let is_managed = *managed.read(cx);
+    let set_managed = {
+        let managed = managed.clone();
+        move |on: bool, cx: &mut App| {
+            managed.update(cx, |managed, cx| {
+                *managed = on;
+                cx.notify();
+            })
+        }
+    };
+    let models = config.option("set") == "Models";
     let supporting = config.text("supporting");
     let mut dropdown = ExposedDropdown::new("playground-select", label)
         .variant(if config.option("variant") == "filled" {
@@ -200,9 +213,15 @@ fn preview(
         });
     // A custom menu carries its items' selection, disabled state and
     // handlers itself, so the Models set sets none of the options' own.
-    dropdown = if config.option("set") == "Models" {
+    dropdown = if models {
+        let set_managed = set_managed.clone();
         dropdown
-            .menu(models_menu(selected, select, config.bool("disable_second")))
+            .menu(models_menu(
+                selected,
+                select,
+                config.bool("disable_second"),
+                move |_, cx| set_managed(true, cx),
+            ))
             .value(selected.map_or("", |index| MODELS[index].0))
     } else {
         dropdown
@@ -225,9 +244,25 @@ fn preview(
         dropdown = dropdown.full_width();
     }
     div()
-        .debug_selector(|| "playground-select".into())
-        .when(full_width, |select| select.w_full())
-        .child(dropdown)
+        .flex()
+        .flex_col()
+        .gap(rem(16.))
+        .when(full_width, |column| column.w_full())
+        .child(
+            div()
+                .debug_selector(|| "playground-select".into())
+                .when(full_width, |select| select.w_full())
+                .child(dropdown),
+        )
+        .when(models, |column| {
+            column.child(
+                Snackbar::new("playground-select-managed", "Opened model management")
+                    .debug_name("playground-select-managed")
+                    .open(is_managed)
+                    .duration(SnackbarDuration::Short)
+                    .on_dismiss(move |_, cx| set_managed(false, cx)),
+            )
+        })
         .into_any_element()
 }
 
@@ -237,6 +272,7 @@ fn models_menu(
     selected: Option<usize>,
     select: Rc<impl Fn(Value, &mut Window, &mut App) + 'static>,
     disable_second: bool,
+    on_manage: impl Fn(&mut Window, &mut App) + 'static,
 ) -> MaterialMenu {
     let models = MODELS
         .iter()
@@ -257,7 +293,7 @@ fn models_menu(
             MenuGroup::new().item(
                 MaterialMenuItem::new("Manage models…")
                     .leading(symbol("settings", 24.))
-                    .on_click(|_, _, _| {}),
+                    .on_click(move |_, window, cx| on_manage(window, cx)),
             ),
         )
 }
@@ -325,7 +361,12 @@ mod tests {
         open_menu(cx);
         let surface = rect(cx, "menu-popup-surface");
         // Under the group label, the second model's two-line row.
-        let menu = models_menu(None, Rc::new(|_, _: &mut Window, _: &mut App| {}), false);
+        let menu = models_menu(
+            None,
+            Rc::new(|_, _: &mut Window, _: &mut App| {}),
+            false,
+            |_, _| {},
+        );
         let (top, bottom) = (menu.item_top(1).unwrap(), menu.item_bottom(1).unwrap());
         cx.simulate_click(
             point(surface.center().x, surface.top() + px((top + bottom) / 2.)),
@@ -334,5 +375,42 @@ mod tests {
         settle(cx);
         assert_eq!(config(&state, cx).option("selected"), "2");
         assert!(cx.debug_bounds("menu-popup-surface").is_none(), "closed");
+    }
+
+    #[gpui::test]
+    fn the_models_menus_action_shows_a_snackbar(cx: &mut TestAppContext) {
+        let (state, cx) = open(cx, &PLAYGROUND);
+        set(&state, cx, "set", Value::Choice(3));
+        assert!(cx.debug_bounds("playground-select-managed").is_none());
+        open_menu(cx);
+        let surface = rect(cx, "menu-popup-surface");
+        let menu = models_menu(
+            None,
+            Rc::new(|_, _: &mut Window, _: &mut App| {}),
+            false,
+            |_, _| {},
+        );
+        // The action after the three models; the Gallery's rem follows its text
+        // scale, so design px scale to the surface.
+        let (top, bottom) = (menu.item_top(3).unwrap(), menu.item_bottom(3).unwrap());
+        let scale = f32::from(surface.size.height) / menu.visible_height();
+        cx.simulate_click(
+            point(
+                surface.center().x,
+                surface.top() + px((top + bottom) / 2. * scale),
+            ),
+            Modifiers::none(),
+        );
+        settle(cx);
+        assert!(cx.debug_bounds("menu-popup-surface").is_none(), "closed");
+        assert!(
+            cx.debug_bounds("playground-select-managed").is_some(),
+            "the snackbar says the action ran"
+        );
+        assert_eq!(
+            config(&state, cx).option("selected"),
+            "1",
+            "no model chosen"
+        );
     }
 }

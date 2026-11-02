@@ -1891,10 +1891,11 @@ impl ExposedDropdown {
     /// whose items carry their own click handlers, selection and disabled
     /// state; [`Self::options`], [`Self::selected`], [`Self::disabled_options`]
     /// and [`Self::on_select`] then go unused, and [`Self::value`] gives the
-    /// field's text. The menu keeps its own style and density. It takes the
-    /// field's width (the field's [`Self::width`] unless it set one, or the
-    /// field's own with [`Self::full_width`]) and [`Self::menu_max_height`]
-    /// unless it set one. Activating an item closes it through
+    /// field's text. The menu keeps its own style and density, and
+    /// [`Self::menu_max_height`] applies unless it set a height limit. Its
+    /// width is the field's [`Self::width`] unless it set one; with
+    /// [`Self::full_width`] the field's width always wins, over a width the
+    /// menu set too. Activating an item closes it through
     /// [`Self::on_open_change`], as an option does.
     pub fn menu(mut self, menu: MaterialMenu) -> Self {
         self.menu = Some(menu);

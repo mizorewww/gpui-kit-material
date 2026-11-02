@@ -1508,7 +1508,6 @@ fn a_dropdowns_value_text_overrides_its_selected_option() {
     );
 }
 
-#[cfg(feature = "inputs")]
 #[test]
 fn options_configuration_beside_a_callers_menu_is_detected_as_inert() {
     let menu = || ExposedDropdown::new("dropdown", "Model").menu(MaterialMenu::new("menu"));
