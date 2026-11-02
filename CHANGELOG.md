@@ -48,6 +48,9 @@ Distribution is by Git revision for now; see the [quick start](README.md#quick-s
   16dp when it is selected, pressed or focused.
 - `MaterialDivider::subhead`: the kit's divider with subhead.
 - `media_label`: a short fact over a picture, such as a duration on a cover.
+- `ListDensity::Minus3`: density −3, 44/60/76dp items, one step above `Compact`. The
+  heights are derived from Material's density scale (−4dp per step); the Figma kit has no
+  −3 list. It is a density level, not an M3 navigation height.
 
 ### Changed
 
@@ -86,6 +89,8 @@ Distribution is by Git revision for now; see the [quick start](README.md#quick-s
   `CardVariant`) are now `#[non_exhaustive]`: a `match` on one outside this crate needs a `_`
   arm, and adding to them later is no longer breaking. Before this, the added variants
   themselves broke any exhaustive match.
+- **Breaking:** `ListDensity` gained `Minus3` and is now `#[non_exhaustive]`: a `match` on it
+  outside this crate needs a `_` arm, and adding further density levels is no longer breaking.
 - A tile's label has the list headline's weight.
 - A `TextField::hero` that is `required` shows its mark on the placeholder, or on the label
   in its place, and an `ExposedDropdown` in the hero variant shows its label as a placeholder.

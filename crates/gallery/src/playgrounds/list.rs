@@ -159,12 +159,20 @@ pub static PLAYGROUND: Playground = Playground {
     sections: &[
         Section {
             title: "Appearance",
-            controls: &[Control::Segmented {
-                id: "variant",
-                label: "Variant",
-                options: &["standard", "segmented"],
-                default: 0,
-            }],
+            controls: &[
+                Control::Segmented {
+                    id: "variant",
+                    label: "Variant",
+                    options: &["standard", "segmented"],
+                    default: 0,
+                },
+                Control::Segmented {
+                    id: "density",
+                    label: "Density",
+                    options: &["standard", "compact", "−3"],
+                    default: 0,
+                },
+            ],
         },
         Section {
             title: "Layout",
@@ -302,6 +310,11 @@ fn preview(
     let selection = config.option("selection");
     let trailing = config.option("trailing");
     let segmented = config.option("variant") == "segmented";
+    let density = match config.option("density") {
+        "compact" => ListDensity::Compact,
+        "−3" => ListDensity::Minus3,
+        _ => ListDensity::Standard,
+    };
     let mut selected: Vec<bool> = SELECTED.iter().map(|id| config.bool(id)).collect();
     // The selection the last frame showed, to tell which row was just turned on.
     let shown = preview.local("shown-selection", window, cx, |_, _| {
@@ -357,6 +370,7 @@ fn preview(
                     .switch_icons(SWITCH_ICONS[config.choice("switch_icons")])
                     .selected(on && selection != "none")
                     .expressive(config.bool("expressive"))
+                    .density(density)
                     .disabled(config.bool("disable_last") && index + 1 == count)
                     .container(if segmented {
                         ColorRole::SURFACE_CONTAINER
@@ -511,6 +525,22 @@ mod tests {
         harness.set("count", Value::Choice(1));
         harness.set("subheader", Value::Bool(true));
         assert!(harness.expect("playground-list").size.height > list.size.height);
+    }
+
+    #[gpui::test]
+    fn density_minus3_rows_are_44dp(cx: &mut TestAppContext) {
+        let mut harness = Harness::open(cx, &PLAYGROUND);
+        harness.expect("playground-list");
+        harness.set("lines", Value::Choice(0));
+        let standard = harness.expect("playground-list").size.height;
+        harness.set("density", Value::Choice(2));
+        // One-line rows, 44dp where a standard item is 56dp
+        // (the Gallery's rem follows its text scale).
+        let minus3 = harness.expect("playground-list").size.height;
+        assert!(
+            (minus3 / standard - 44. / 56.).abs() < 0.01,
+            "{minus3:?} against {standard:?}"
+        );
     }
 
     #[gpui::test]
