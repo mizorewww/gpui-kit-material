@@ -49,7 +49,37 @@ use std::{
     rc::Rc,
 };
 
-gpui::actions!(gallery, [FocusNext, FocusPrevious]);
+gpui::actions!(gallery, [FocusNext, FocusPrevious, Quit, CloseWindow]);
+
+/// The application's own commands: Quit and Close Window, bound where the
+/// platform's convention has the application handle them (macOS's Command-Q
+/// and Command-W, and its application menu). Windows and Linux close and quit
+/// a single-window application from the window manager (Alt-F4).
+fn install_app_commands(cx: &mut App) {
+    cx.on_action(|_: &Quit, cx| cx.quit());
+    cx.on_action(|_: &CloseWindow, cx| {
+        // The key's window is being updated while it dispatches the action.
+        if let Some(window) = cx.active_window() {
+            cx.defer(move |cx| {
+                let _ = window.update(cx, |_, window, _| window.remove_window());
+            });
+        }
+    });
+    cx.bind_keys(app_command_bindings());
+    #[cfg(target_os = "macos")]
+    cx.set_menus([Menu::new("gpui-kit-material").items([MenuItem::action("Quit", Quit)])]);
+}
+
+fn app_command_bindings() -> Vec<KeyBinding> {
+    if cfg!(target_os = "macos") {
+        vec![
+            KeyBinding::new("cmd-q", Quit, None),
+            KeyBinding::new("cmd-w", CloseWindow, None),
+        ]
+    } else {
+        Vec::new()
+    }
+}
 
 /// The Gallery's element nests inside Root, so these bindings win over Root's
 /// focus-cycling keys; a Tab the Gallery does not handle falls through to them.
@@ -974,6 +1004,7 @@ pub fn run(application: gpui::Application, initialize: impl FnOnce(&mut App) + '
         startup_mark("kit_init");
         gpui_kit_material::init(cx);
         startup_mark("material_init");
+        install_app_commands(cx);
         initialize(cx);
         let viewport = size(px(1280.), px(900.));
         #[cfg(not(target_family = "wasm"))]
@@ -1079,6 +1110,29 @@ mod window_tests {
         cx.update_window(window, |_, window, cx| window.draw(cx).clear(cx))
             .unwrap();
         cx.run_until_parked();
+    }
+
+    /// Command-W closes the window and Command-Q is bound to quit on macOS;
+    /// elsewhere the window manager's keys do both.
+    #[gpui::test]
+    fn command_w_closes_the_window_and_command_q_quits_on_macos(cx: &mut TestAppContext) {
+        cx.update(super::install_app_commands);
+        let quit = cx.update(|cx| {
+            cx.all_bindings_for_input(&[gpui::Keystroke::parse("cmd-q").unwrap()])
+                .into_iter()
+                .any(|binding| binding.action().partial_eq(&super::Quit))
+        });
+        assert_eq!(quit, cfg!(target_os = "macos"));
+        let window = cx.add_window(|_, _| gpui::Empty);
+        let mut window_cx = gpui::VisualTestContext::from_window(window.into(), cx);
+        window_cx.update(|window, cx| {
+            window.activate_window();
+            window.draw(cx).clear(cx);
+        });
+        window_cx.run_until_parked();
+        window_cx.simulate_keystrokes("cmd-w");
+        let open = cx.update(|cx| cx.windows().len());
+        assert_eq!(open, usize::from(!cfg!(target_os = "macos")));
     }
 
     /// A full-screen overlay keeps clear of a window title bar, not of a web
