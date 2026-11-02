@@ -179,6 +179,7 @@ pub struct NavigationDrawer {
     focus_on_open: bool,
     on_change: Option<Change>,
     on_dismiss: Option<ClickHandler>,
+    on_exit_start: Option<super::roving::Exit>,
 }
 
 impl NavigationDrawer {
@@ -202,6 +203,7 @@ impl NavigationDrawer {
             focus_on_open: true,
             on_change: None,
             on_dismiss: None,
+            on_exit_start: None,
         }
     }
     /// The title-small headline above the destinations.
@@ -282,6 +284,33 @@ impl NavigationDrawer {
         self.on_change = Some(Rc::new(handler));
         self
     }
+    /// Up on the first destination calls this instead of wrapping to the
+    /// last: a search field whose results the drawer shows takes focus back.
+    pub fn on_exit_start(mut self, handler: impl Fn(&mut Window, &mut App) + 'static) -> Self {
+        self.on_exit_start = Some(Rc::new(handler));
+        self
+    }
+
+    /// Move focus to the first destination of the drawer drawn inside
+    /// `container`, a focusable element around it: a search field's Down
+    /// arrow going to its results. Nothing moves when the drawer has none.
+    pub fn focus_first(container: &FocusHandle, window: &mut Window, cx: &mut App) {
+        let previous = window.focused(cx);
+        // Focusing a container and moving to the next stop descends into it:
+        // to the drawer's one tab stop, from which Home goes to the first.
+        container.focus(window, cx);
+        window.focus_next(cx);
+        match window.focused(cx) {
+            Some(row) if row != *container && container.contains_focused(window, cx) => {
+                row.dispatch_action(&super::roving::FocusFirstItem, window, cx);
+            }
+            _ => match previous {
+                Some(previous) => previous.focus(window, cx),
+                None => window.blur(cx),
+            },
+        }
+    }
+
     /// A modal drawer's Escape key and scrim click call this; without it
     /// the drawer is not dismissible.
     pub fn on_dismiss(mut self, handler: impl Fn(&mut Window, &mut App) + 'static) -> Self {
@@ -646,7 +675,7 @@ impl RenderOnce for NavigationDrawer {
                 .render(window, cx),
             );
         }
-        let lane = list.roving.install(lane);
+        let lane = list.roving.exit_start(self.on_exit_start).install(lane);
         // A closing drawer keeps its scrim until it settles: only an open one
         // has anything left to dismiss.
         let on_dismiss = self.on_dismiss.filter(|_| modal && open);

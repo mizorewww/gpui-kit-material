@@ -352,6 +352,80 @@ fn a_drawer_that_does_not_focus_on_open_leaves_focus_alone(cx: &mut TestAppConte
     cx.update(|window, cx| assert!(view.read(cx).trigger.is_focused(window)));
 }
 
+/// A field above an open drawer of its results, as a search shows them.
+struct Results {
+    field: FocusHandle,
+    container: FocusHandle,
+}
+
+impl Render for Results {
+    fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        window.set_rem_size(px(14.));
+        let field = self.field.clone();
+        div()
+            .relative()
+            .w(px(800.))
+            .h(px(600.))
+            .child(div().id("field").track_focus(&self.field).size(px(20.)))
+            .child(
+                div()
+                    .absolute()
+                    .inset_0()
+                    .track_focus(&self.container)
+                    .child(
+                        NavigationDrawer::new("results", "Results")
+                            .items(items(3))
+                            // The selection is not first: focus_first still goes first.
+                            .selected("d1")
+                            .modal(true)
+                            .focus_on_open(false)
+                            .on_exit_start(move |window, cx| field.focus(window, cx)),
+                    ),
+            )
+    }
+}
+
+/// A field's Down goes to the first result and Up from there comes back, so
+/// the results are reachable from the keyboard while focus starts in the field.
+#[gpui::test]
+fn a_field_reaches_the_first_destination_and_up_comes_back(cx: &mut TestAppContext) {
+    cx.update(|cx| {
+        gpui_base::init(cx);
+        super::super::roving::init(cx);
+        cx.set_reduce_motion(true);
+    });
+    let (view, cx) = cx.add_window_view(|_, cx| Results {
+        field: cx.focus_handle(),
+        container: cx.focus_handle(),
+    });
+    settle_open(cx);
+    cx.update(|window, cx| view.read(cx).field.clone().focus(window, cx));
+    settle_open(cx);
+    cx.update(|window, cx| {
+        let container = view.read(cx).container.clone();
+        NavigationDrawer::focus_first(&container, window, cx);
+    });
+    settle_open(cx);
+    cx.update(|window, cx| {
+        let view = view.read(cx);
+        assert!(view.container.contains_focused(window, cx));
+        assert!(!view.field.is_focused(window));
+    });
+    // Down and Up rove between the results.
+    cx.simulate_keystrokes("down up");
+    settle_open(cx);
+    cx.update(|window, cx| assert!(!view.read(cx).field.is_focused(window)));
+    // Up on the first result leaves for the field instead of wrapping.
+    cx.simulate_keystrokes("up");
+    settle_open(cx);
+    cx.update(|window, cx| {
+        assert!(
+            view.read(cx).field.is_focused(window),
+            "Up from the first result is back in the field"
+        );
+    });
+}
+
 #[gpui::test]
 fn a_closing_drawer_does_not_dismiss_again(cx: &mut TestAppContext) {
     let (view, cx) = trapped(cx, false);
