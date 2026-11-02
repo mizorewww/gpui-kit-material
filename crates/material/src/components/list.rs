@@ -141,6 +141,10 @@ fn row_metrics(lines: ListLines, density: ListDensity) -> (f32, f32) {
         (ListDensity::Compact, ListLines::Two) => (56., 4.),
         (ListDensity::Compact, ListLines::Three) => (72., 4.),
         // Density −3, derived from the density scale (−12dp); not in the Figma kit.
+        // Padding: the minimum height sets one- and two-line rows, so they keep
+        // Compact's 0 and 4dp. A three-line row's padding steps 2dp per density
+        // level, Standard's 12dp to Compact's 4dp, so −3 is 6dp, which with its
+        // 64dp of text fills the 76dp row.
         (ListDensity::Minus3, ListLines::One) => (44., 0.),
         (ListDensity::Minus3, ListLines::Two) => (60., 4.),
         (ListDensity::Minus3, ListLines::Three) => (76., 6.),
