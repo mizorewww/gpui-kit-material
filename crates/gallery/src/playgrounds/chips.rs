@@ -202,13 +202,24 @@ impl ChipsState {
         }
     }
 
-    /// Move the chip at display position `from` to position `to`.
+    /// Move the chip at display position `from` to position `to`. Display positions
+    /// count only the chips still shown; `order` still holds the removed ones.
     fn reorder(&mut self, from: usize, to: usize) {
-        if from >= self.order.len() || to >= self.order.len() || from == to {
+        let position = |shown| {
+            self.order
+                .iter()
+                .enumerate()
+                .filter(|(_, chip)| !self.removed[**chip])
+                .map(|(position, _)| position)
+                .nth(shown)
+        };
+        let (Some(from), Some(to)) = (position(from), position(to)) else {
             return;
+        };
+        if from != to {
+            let chip = self.order.remove(from);
+            self.order.insert(to, chip);
         }
-        let chip = self.order.remove(from);
-        self.order.insert(to, chip);
     }
 }
 
@@ -443,6 +454,43 @@ mod tests {
         assert_eq!(state.order, [2, 0, 1]);
         state.reorder(0, 9);
         assert_eq!(state.order, [2, 0, 1], "out of range is ignored");
+    }
+
+    #[test]
+    fn reordering_counts_only_the_chips_shown() {
+        let mut state = ChipsState::new(4);
+        state.removed[0] = true;
+        // Shown: 1, 2, 3. The last goes first.
+        state.reorder(2, 0);
+        let shown = |state: &ChipsState| -> Vec<usize> {
+            let chips = state.order.iter().copied();
+            chips.filter(|chip| !state.removed[*chip]).collect()
+        };
+        assert_eq!(shown(&state), [3, 1, 2]);
+        state.reorder(0, 2);
+        assert_eq!(shown(&state), [1, 2, 3]);
+        state.reorder(0, 3);
+        assert_eq!(shown(&state), [1, 2, 3], "past the chips shown is ignored");
+    }
+
+    #[gpui::test]
+    fn reset_forgets_what_the_preview_holds(cx: &mut TestAppContext) {
+        let (state, cx) = open(cx, &PLAYGROUND);
+        click(cx, "chip-0");
+        let chips = |state: &Entity<PlaygroundState>, cx: &mut VisualTestContext| {
+            state.read_with(cx, |state, cx| {
+                state
+                    .local_entity::<ChipsState>("chips")
+                    .unwrap()
+                    .read(cx)
+                    .selected
+                    .clone()
+            })
+        };
+        assert!(chips(&state, cx)[0], "selected");
+        cx.update(|window, cx| state.update(cx, |state, cx| state.reset(window, cx)));
+        settle(cx);
+        assert!(chips(&state, cx).iter().all(|selected| !selected), "reset");
     }
 
     #[gpui::test]

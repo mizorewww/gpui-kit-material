@@ -295,6 +295,7 @@ fn write_back(
 fn build(
     build: Build,
     value: DateSelection,
+    close_on_selection: bool,
     picker: &Entity<Picker>,
     window: &mut Window,
     cx: &mut Context<PlaygroundState>,
@@ -318,7 +319,9 @@ fn build(
                     DateMatcher::custom(move |d: &NaiveDate| *d < earliest || *d > latest),
                 );
             }
-            state = state.selection(value);
+            state = state
+                .selection(value)
+                .close_on_selection(close_on_selection);
             // Month is the docked picker's list; the modal shows the year grid.
             state = match (build.view, build.docked) {
                 (1, true) => state.view(DatePickerView::Month),
@@ -383,7 +386,7 @@ fn preview(
     });
     let rebuild = preview.changed("picker-build", spec) || picker.read(cx).state.is_none();
     let state = if rebuild {
-        let state = build(spec, value, &picker, window, cx);
+        let state = build(spec, value, config.bool("close"), &picker, window, cx);
         picker.update(cx, |picker, _| picker.state = Some(state.clone()));
         state
     } else {
@@ -556,5 +559,18 @@ mod tests {
         settle(cx);
         assert_eq!(config(&state, cx).text("date"), "2025-09-02");
         assert!(cx.debug_bounds("date-surface").is_none(), "closed");
+
+        // A control that rebuilds the picker keeps it closing on a choice.
+        set(&state, cx, "format", Value::Choice(1));
+        let field = rect(cx, "date-field");
+        cx.simulate_click(
+            point(field.left() + px(40.), field.top() + px(30.)),
+            Modifiers::none(),
+        );
+        settle(cx);
+        assert!(cx.debug_bounds("date-surface").is_some(), "open again");
+        cx.simulate_keystrokes("right enter");
+        settle(cx);
+        assert!(cx.debug_bounds("date-surface").is_none(), "closed again");
     }
 }

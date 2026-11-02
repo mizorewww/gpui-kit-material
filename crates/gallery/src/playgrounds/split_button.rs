@@ -187,9 +187,15 @@ fn preview(
                 });
             });
             if preset.selects {
-                item = item
-                    .selected(text.as_ref() == label)
-                    .trailing(symbol("check", 20.));
+                let selected = text.as_ref() == label;
+                item = item.selected(selected);
+                if selected {
+                    item = item.trailing(
+                        div()
+                            .debug_selector(move || format!("split-check-{label}"))
+                            .child(symbol("check", 20.)),
+                    );
+                }
             } else if !icon.is_empty() {
                 item = item.leading(symbol(icon, 20.));
             }
@@ -265,6 +271,15 @@ mod tests {
             h.cx.debug_bounds("material-menu").is_some(),
             "the menu opens"
         );
+        // Only the chosen speed has a check.
+        let checks = [
+            "split-check-0.5×",
+            "split-check-1×",
+            "split-check-1.5×",
+            "split-check-2×",
+        ];
+        let checks = checks.map(|check| h.cx.debug_bounds(check).is_some());
+        assert_eq!(checks, [false, true, false, false]);
         // The keyboard starts from the selected "1×": Up reaches "0.5×"; Enter chooses it and
         // closes the menu.
         h.cx.simulate_keystrokes("up enter");

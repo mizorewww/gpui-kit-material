@@ -6,15 +6,17 @@
 use super::fab::{position as fab_position, stage};
 use super::prelude::*;
 
-/// One item preset: the FAB's icon and up to six (label, icon) items.
+/// One item preset: the FAB's icon and accessible name, and up to six (label, icon) items.
 struct Items {
     fab: &'static str,
+    name: &'static str,
     items: [(&'static str, &'static str); 6],
 }
 
 const ITEMS: [Items; 4] = [
     Items {
         fab: "edit",
+        name: "Message actions",
         items: [
             ("Reply", "reply"),
             ("Forward", "forward"),
@@ -26,6 +28,7 @@ const ITEMS: [Items; 4] = [
     },
     Items {
         fab: "add",
+        name: "New music",
         items: [
             ("Album", "album"),
             ("Playlist", "queue_music"),
@@ -37,6 +40,7 @@ const ITEMS: [Items; 4] = [
     },
     Items {
         fab: "photo_library",
+        name: "Photo categories",
         items: [
             ("People", "person"),
             ("Places", "place"),
@@ -48,6 +52,7 @@ const ITEMS: [Items; 4] = [
     },
     Items {
         fab: "share",
+        name: "Share",
         items: [
             ("Message", "chat"),
             ("Email", "mail"),
@@ -194,22 +199,18 @@ fn preview(
         });
     let placement = config.option("placement");
     let toggle = set_open.clone();
-    let menu = FabMenu::new(
-        "playground-fab-menu",
-        symbol(preset.fab, 24.),
-        config.option("items"),
-    )
-    .presentation(FabMenuPresentation::ALL[config.choice("presentation")])
-    .color(FabMenuColor::ALL[config.choice("color")])
-    .size([FabSize::Regular, FabSize::Medium, FabSize::Large][config.choice("size")])
-    .align(if placement == "bottom start" {
-        FabMenuAlign::Start
-    } else {
-        FabMenuAlign::End
-    })
-    .open(config.bool("open"))
-    .on_toggle(move |open, window, cx| toggle(open, window, cx))
-    .items(items);
+    let menu = FabMenu::new("playground-fab-menu", symbol(preset.fab, 24.), preset.name)
+        .presentation(FabMenuPresentation::ALL[config.choice("presentation")])
+        .color(FabMenuColor::ALL[config.choice("color")])
+        .size([FabSize::Regular, FabSize::Medium, FabSize::Large][config.choice("size")])
+        .align(if placement == "bottom start" {
+            FabMenuAlign::Start
+        } else {
+            FabMenuAlign::End
+        })
+        .open(config.bool("open"))
+        .on_toggle(move |open, window, cx| toggle(open, window, cx))
+        .items(items);
     let position = match placement {
         "bottom end" => "bottom right",
         "bottom start" => "bottom left",
