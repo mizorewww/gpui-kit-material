@@ -78,12 +78,20 @@ pub enum ListTrailing {
 
 /// Vertical density. Standard is the M3 list (56/72/88dp); Compact is the
 /// design kit's −4 density baseline (40/56/72dp, 88dp with an overline over
-/// two supporting lines).
+/// two supporting lines). More levels of the density scale may be added, so
+/// the enum is non-exhaustive.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum ListDensity {
     #[default]
     Standard,
     Compact,
+    /// Density −3: 44/60/76dp, one step above Compact. Source: derived from
+    /// Material's density scale, where each step takes 4dp from a
+    /// component's height (Standard −12dp); the Figma kit draws lists only
+    /// at 0 and −4, so these heights are not in it. It is a density level,
+    /// not an M3 navigation height: M3's navigation drawer item stays 56dp.
+    Minus3,
 }
 
 /// How many lines an item's text occupies, which sets its height and the
@@ -132,6 +140,10 @@ fn row_metrics(lines: ListLines, density: ListDensity) -> (f32, f32) {
         (ListDensity::Compact, ListLines::One) => (40., 0.),
         (ListDensity::Compact, ListLines::Two) => (56., 4.),
         (ListDensity::Compact, ListLines::Three) => (72., 4.),
+        // Density −3, derived from the density scale (−12dp); not in the Figma kit.
+        (ListDensity::Minus3, ListLines::One) => (44., 0.),
+        (ListDensity::Minus3, ListLines::Two) => (60., 4.),
+        (ListDensity::Minus3, ListLines::Three) => (76., 6.),
     }
 }
 
@@ -828,6 +840,10 @@ mod tests {
         assert_eq!(row_metrics(ListLines::One, ListDensity::Compact).0, 40.);
         assert_eq!(row_metrics(ListLines::Two, ListDensity::Compact).0, 56.);
         assert_eq!(row_metrics(ListLines::Three, ListDensity::Compact).0, 72.);
+        // Density −3: one 4dp step above Compact.
+        assert_eq!(row_metrics(ListLines::One, ListDensity::Minus3).0, 44.);
+        assert_eq!(row_metrics(ListLines::Two, ListDensity::Minus3).0, 60.);
+        assert_eq!(row_metrics(ListLines::Three, ListDensity::Minus3).0, 76.);
     }
 
     #[test]
@@ -1136,5 +1152,16 @@ mod tests {
             assert_eq!(line.bounds.origin.y.0, (48. + 56. - 1.) * scale);
             assert_eq!(line.border_widths.bottom.0, 0., "a fill, not the border");
         });
+    }
+
+    #[gpui::test]
+    fn a_minus3_one_line_item_is_44dp(cx: &mut TestAppContext) {
+        let (_, cx) = one(cx, || {
+            ListItem::new("item", "All items")
+                .density(ListDensity::Minus3)
+                .leading(ListLeading::Icon(crate::icons::IconName::Info.icon()))
+                .trailing_text("128")
+        });
+        assert_eq!(cx.debug_bounds("one-item").unwrap().size.height, px(44.));
     }
 }
