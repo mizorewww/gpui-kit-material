@@ -51,6 +51,9 @@ Distribution is by Git revision for now; see the [quick start](README.md#quick-s
 - `ListDensity::Minus3`: density −3, 44/60/76dp items, one step above `Compact`. The
   heights are derived from Material's density scale (−4dp per step); the Figma kit has no
   −3 list. It is a density level, not an M3 navigation height.
+- `ExposedDropdown::menu` and `ExposedDropdown::value`: a dropdown opens a `MaterialMenu` the
+  caller builds, with supporting text, icons, labelled groups or an action item, and shows the
+  value text it is given.
 
 ### Changed
 
