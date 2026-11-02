@@ -51,6 +51,8 @@ Distribution is by Git revision for now; see the [quick start](README.md#quick-s
 - `ListDensity::Minus3`: density −3, 44/60/76dp items, one step above `Compact`. The
   heights are derived from Material's density scale (−4dp per step); the Figma kit has no
   −3 list. It is a density level, not an M3 navigation height.
+- `NavigationRail::container`: the surface-family role behind a docked rail, so it can sit on
+  a page whose ground is another surface role, such as `SURFACE_CONTAINER`.
 
 ### Changed
 

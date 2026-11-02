@@ -1,6 +1,7 @@
 //! Navigation rail playground: md3.io's Navigation rail configuration
 //! (standard or modal layout, expanded, expanded width, hide collapsed,
-//! destinations, selection, badges, menu button, ripple) on the real
+//! destinations, selection, badges, menu button, ripple), plus the rail's
+//! container, on the real
 //! `NavigationRail` beside a content pane. The menu button expands and
 //! collapses the rail; a modal expanded rail floats over a scrim that,
 //! like Escape, collapses it.
@@ -73,6 +74,13 @@ pub static PLAYGROUND: Playground = Playground {
                     id: "hide_collapsed",
                     label: "Hide collapsed",
                     default: false,
+                },
+                // The surface, or the content pane's ground beside it.
+                Control::Segmented {
+                    id: "container",
+                    label: "Container",
+                    options: &["surface", "ground"],
+                    default: 0,
                 },
             ],
         },
@@ -211,6 +219,9 @@ fn preview(
     let expanded = config.bool("expanded");
     let hide = config.bool("hide_collapsed");
     let badges = config.bool("badges");
+    // The content pane's ground, which the rail can sit on.
+    let ground = ColorRole::SURFACE_CONTAINER;
+    let on_ground = config.option("container") == "ground";
     let selected = config.option("selected");
     let width = config.number("expanded_width");
     let ripple = config.bool("ripple");
@@ -240,6 +251,7 @@ fn preview(
         let select = select.clone();
         let mut rail = NavigationRail::new(id, "Main navigation")
             .items(items(set, badges))
+            .when(on_ground, |rail| rail.container(ground))
             .selected(selected)
             .expanded(open)
             .expanded_width(width)
@@ -294,7 +306,7 @@ fn preview(
         .min_w_0()
         .h_full()
         .p(rem(24.))
-        .bg(color(ColorRole::SURFACE_CONTAINER))
+        .bg(color(ground))
         .child(
             div()
                 .map(|text| type_role(text, TypeRole::TitleLarge))
@@ -355,6 +367,15 @@ mod tests {
             harness.set("layout", Value::Choice(layout));
             harness.set("expanded", Value::Bool(expanded));
             harness.set("hide_collapsed", Value::Bool(hide));
+            harness.advance(2000);
+            harness.expect("playground-navigation-rail");
+        }
+        // On the content's ground, collapsed and expanded.
+        harness.set("layout", Value::Choice(0));
+        harness.set("hide_collapsed", Value::Bool(false));
+        harness.set("container", Value::Choice(1));
+        for expanded in [false, true] {
+            harness.set("expanded", Value::Bool(expanded));
             harness.advance(2000);
             harness.expect("playground-navigation-rail");
         }
