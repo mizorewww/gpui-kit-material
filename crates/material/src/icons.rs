@@ -112,19 +112,39 @@ impl<F: AssetSource> AssetSource for Assets<F> {
 const PENDING_PATH: &str = "material-symbols/pending.svg";
 const PENDING_SVG: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4" fill-opacity="0.4"/></svg>"#;
 
-static SYMBOLS_PENDING: AtomicBool = AtomicBool::new(false);
+/// By [`Style`], whose discriminants are its positions in [`Style::ALL`].
+static PENDING_STYLES: [AtomicBool; Style::ALL.len()] = [const { AtomicBool::new(false) }; 3];
 
-/// Whether the symbol fonts are still on their way, for a page that downloads
-/// them: until it says otherwise, icons draw a placeholder instead of nothing.
+/// Whether the fonts of every symbol style are still on their way, for a page that
+/// downloads them: until it says otherwise, icons draw a placeholder instead of nothing.
 /// Change it before a window redraw, which this does not cause.
 pub fn set_symbols_pending(pending: bool) {
-    SYMBOLS_PENDING.store(pending, Ordering::Relaxed);
+    for style in Style::ALL {
+        set_style_pending(style, pending);
+    }
+}
+
+/// [`set_symbols_pending`] for one style. A font that will not come is no longer pending:
+/// its icons then draw nothing, and the icons of the styles that came are not held back.
+pub fn set_style_pending(style: Style, pending: bool) {
+    PENDING_STYLES[style as usize].store(pending, Ordering::Relaxed);
+}
+
+/// The style of a symbol's asset path; `None` for a caller's own asset.
+fn symbol_path_style(path: &str) -> Option<Style> {
+    let path = path.strip_prefix("material-symbols/")?;
+    Style::ALL.into_iter().find(|style| {
+        path.strip_prefix(style.name())
+            .is_some_and(|rest| rest.starts_with('/'))
+    })
 }
 
 /// Material's 20px default slot and legacy builder API over Component Icon.
 #[derive(IntoElement, Clone)]
 pub struct Icon {
     inner: gpui_kit::component::Icon,
+    /// The symbol style it draws in, which decides whether its font is awaited.
+    style: Option<Style>,
     /// Mirrors under right-to-left layout.
     directional: bool,
     rotation: Option<gpui::Radians>,
@@ -178,7 +198,9 @@ fn points_along_reading(name: &str) -> bool {
 }
 impl Icon {
     pub fn new(path: impl Into<SharedString>) -> Self {
+        let path = path.into();
         Self {
+            style: symbol_path_style(&path),
             inner: gpui_kit::component::Icon::default()
                 .path(path)
                 .size(crate::tokens::layout::ICON_SLOT),
@@ -226,6 +248,7 @@ impl From<SymbolIcon> for Icon {
     fn from(icon: SymbolIcon) -> Self {
         Self {
             directional: points_along_reading(icon.symbol().name()),
+            style: Some(icon.visual_style()),
             inner: icon.component().size(crate::tokens::layout::ICON_SLOT),
             rotation: None,
         }
@@ -233,7 +256,10 @@ impl From<SymbolIcon> for Icon {
 }
 impl RenderOnce for Icon {
     fn render(mut self, window: &mut Window, _: &mut App) -> impl IntoElement {
-        if SYMBOLS_PENDING.load(Ordering::Relaxed) {
+        if self
+            .style
+            .is_some_and(|style| PENDING_STYLES[style as usize].load(Ordering::Relaxed))
+        {
             self.inner = self.inner.path(PENDING_PATH);
         }
         if self.directional && window.layout_direction().is_rtl() {
@@ -251,6 +277,21 @@ impl RenderOnce for Icon {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn an_icon_awaits_only_the_font_of_its_style() {
+        let icon = |symbol: SymbolIcon| Icon::from(symbol).style;
+        let check = IconName::Check.symbol().icon();
+        assert_eq!(icon(check.style(Style::Sharp)), Some(Style::Sharp));
+        assert_eq!(Icon::from(IconName::Check).style, Some(Style::Rounded));
+        assert_eq!(
+            Icon::new(check.style(Style::Outlined).asset_path()).style,
+            Some(Style::Outlined)
+        );
+        // A caller's own asset has no font to wait for.
+        assert_eq!(Icon::new("assets/logo.svg").style, None);
+        assert_eq!(Icon::new("material-symbols/pending.svg").style, None);
+    }
+
     #[test]
     fn the_pending_placeholder_is_an_svg_of_its_own() {
         let assets = Assets::new();

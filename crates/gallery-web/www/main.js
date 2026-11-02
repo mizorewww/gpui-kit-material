@@ -120,8 +120,8 @@ async function fetchSymbol(path, name, onBytes) {
 }
 
 // The icon fonts are most of the download, and the page works without them: icons
-// stay empty until their font is provided. So a slow connection waits for the module
-// only. A font that can't be fetched is retried once, then its icons stay empty.
+// stay placeholders until their font is provided. So a slow connection waits for the module
+// only. A font that can't be fetched is retried once, then its icons draw nothing.
 async function loadSymbolsInBackground(module) {
   const box = document.getElementById("icons-progress");
   const fill = document.getElementById("icons-bar");
@@ -143,6 +143,7 @@ async function loadSymbolsInBackground(module) {
         console.warn(`Couldn't load ${name}`, error);
       }
     }
+    module.symbol_asset_failed(name);
   }));
   box.hidden = true;
 }
