@@ -1881,7 +1881,10 @@ impl ExposedDropdown {
     }
     /// Whether the field draws its label (the default). A dropdown that a list item's
     /// headline already names, beside it, draws none; the label still names it to
-    /// assistive technology.
+    /// assistive technology. With [`Self::required`] the required mark is then only in
+    /// that accessible name, so the row that names the dropdown shows the mark itself.
+    /// A [`TextFieldVariant::Hero`] dropdown draws no floating label anyway: it shows
+    /// its label as the placeholder whether or not this is set.
     pub fn show_label(mut self, show: bool) -> Self {
         self.show_label = show;
         self

@@ -37,6 +37,13 @@ impl Render for Screen {
                     .current(1)
                     .state_labels("Finished", "Current", "Upcoming"),
             )
+            .child(
+                ExposedDropdown::new("language", "Language")
+                    .show_label(false)
+                    .required(true)
+                    .options(["English", "Chinese"])
+                    .selected(Some(1)),
+            )
             .child(MaterialTooltip::plain("tip", "Save a copy").trigger(div().size(px(20.))))
             .child(progress_with_label("copy", "Copy", 0.25, window, cx))
             .child(indeterminate_progress_with_label("index", "Index", cx))
@@ -140,7 +147,9 @@ fn overlays_rows_and_items_announce_names_and_states(cx: &mut TestAppContext) {
         return;
     }
     cx.update(|cx| {
-        gpui_base::init(cx);
+        // The exposed dropdown's field draws through Kit's component theme.
+        gpui_kit::init(cx);
+        crate::init(cx);
         cx.set_reduce_motion(true);
     });
     let (_, cx) = cx.add_window_view(|window, cx| {
@@ -178,6 +187,25 @@ fn overlays_rows_and_items_announce_names_and_states(cx: &mut TestAppContext) {
     labelled(&all, "dialog", "Discard draft?", &tree);
     labelled(&all, "dialog", "Details", &tree);
     labelled(&all, "dialog", "Filters", &tree);
+    // A dropdown that draws no label is still named by it, required mark included,
+    // and announces its value.
+    let language = all
+        .iter()
+        .find(|node| {
+            node["role"]
+                .as_str()
+                .is_some_and(|r| r.eq_ignore_ascii_case("comboBox"))
+                && node["label"]
+                    .as_str()
+                    .is_some_and(|l| l.starts_with("Language"))
+        })
+        .unwrap_or_else(|| panic!("no comboBox named Language in {tree}"));
+    assert_ne!(
+        language["label"], "Language",
+        "the required mark: {language}"
+    );
+    assert_eq!(language["value"], "Chinese", "{language}");
+
     // A time picker is named for the mode it is in, here the input.
     labelled(&all, "dialog", "Enter time", &tree);
 
