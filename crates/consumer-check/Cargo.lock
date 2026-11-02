@@ -2514,6 +2514,7 @@ dependencies = [
  "gpui-kit",
  "gpui-kit-material-color",
  "gpui-material-symbols",
+ "log",
  "web-time",
 ]
 
