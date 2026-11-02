@@ -104,6 +104,10 @@ impl ImeMirror {
         style.set_property("width", "1px").ok();
         style.set_property("height", "1px").ok();
         style.set_property("opacity", "0").ok();
+        // It sits over the canvas at the caret: a click there is the canvas's.
+        style.set_property("pointer-events", "none").ok();
+        style.set_property("padding", "0").ok();
+        style.set_property("border", "0").ok();
         // Android Chrome zooms the visual viewport onto a focused text input
         // whose font is smaller than 16px; with page zoom disabled the user
         // can never zoom back out, so keep the hidden IME input at 16px.
