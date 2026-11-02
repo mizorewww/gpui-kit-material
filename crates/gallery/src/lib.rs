@@ -924,7 +924,12 @@ pub fn run(application: gpui::Application, initialize: impl FnOnce(&mut App) + '
     } else {
         performance::prepare()
     };
-    let application = application.with_assets(Assets::new());
+    // One window is the whole application: closing it quits, on macOS too,
+    // where GPUI's default keeps a windowless application running with no
+    // menu to quit or reopen it from.
+    let application = application
+        .with_assets(Assets::new())
+        .with_quit_mode(QuitMode::LastWindowClosed);
     application.run(move |cx: &mut App| {
         startup_mark("application_started");
         #[cfg(target_family = "wasm")]
