@@ -224,6 +224,48 @@ impl ColorRole {
     pub const DANGER_BG: Self = Self::ERROR_CONTAINER;
 }
 
+/// WCAG 2.x's minimum for body text, and M3's standard-contrast minimum for
+/// the error text roles.
+const TEXT_CONTRAST: f32 = 4.5;
+
+/// Every surface a palette scheme's error text and icons are painted on.
+const ERROR_GROUNDS: [ColorRole; 11] = [
+    ColorRole::SURFACE_DIM,
+    ColorRole::SURFACE,
+    ColorRole::SURFACE_BRIGHT,
+    ColorRole::SURFACE_CONTAINER_LOWEST,
+    ColorRole::SURFACE_CONTAINER_LOW,
+    ColorRole::SURFACE_CONTAINER,
+    ColorRole::SURFACE_CONTAINER_HIGH,
+    ColorRole::SURFACE_CONTAINER_HIGHEST,
+    ColorRole::SURFACE_VARIANT,
+    ColorRole::INSET,
+    ColorRole::ERROR_CONTAINER,
+];
+
+/// `color` if it reaches [`TEXT_CONTRAST`] on every ground; otherwise the
+/// nearest tone of its hue that does, lighter or darker as asked, or white or
+/// black when no tone of the hue reaches it.
+fn readable(color: Color, grounds: &[Color], lighter: bool) -> Color {
+    let reads = |color: Color| {
+        grounds
+            .iter()
+            .all(|ground| color.contrast(*ground) >= TEXT_CONTRAST)
+    };
+    if reads(color) {
+        return color;
+    }
+    let argb = color.to_argb();
+    let tone = crate::dynamic::utils::lstar_from_argb(argb);
+    let step = if lighter { 0.5 } else { -0.5 };
+    (1..=200)
+        .map(|n| tone + step * f64::from(n))
+        .take_while(|tone| (0. ..=100.).contains(tone))
+        .map(|tone| Color::argb(crate::dynamic::at_tone(argb, tone)))
+        .find(|color| reads(*color))
+        .unwrap_or(Color::hex(if lighter { 0xffffff } else { 0 }))
+}
+
 /// The number of roles in a [`Scheme`].
 pub const ROLE_COUNT: usize = ColorRole::ALL.len();
 
@@ -363,7 +405,31 @@ impl Scheme {
             | ColorRole::TINT_PURPLE
             | ColorRole::ON_TINT_PURPLE => hex(0),
         });
-        Self { colors, dark }.with_tints()
+        Self { colors, dark }.with_readable_error().with_tints()
+    }
+
+    /// Move the error roles to a tone that reads where they are painted,
+    /// keeping the palette's hue.
+    ///
+    /// Material's standard-contrast curves (material-color-utilities'
+    /// `DynamicColor`s, ported in `dynamic/spec_2021.rs`) hold error at least
+    /// 4.5:1 against the highest surface (surface bright in dark schemes,
+    /// surface dim in light ones), on-error-container 4.5:1 on error-container
+    /// and on-error 7:1 on error; the baseline dark tones are error 80 on
+    /// surfaces 4..24, and on-error-container 90 on error-container 30. A
+    /// palette's danger color is designed for its own background, not for
+    /// every lifted container derived here, so it is kept where it already
+    /// reads and otherwise moved away from the surfaces in HCT tone until it
+    /// reads 4.5:1 on all of them, the error container included, since status
+    /// chips and notices paint error on it. On-error is held to the same
+    /// 4.5:1 text minimum, which every palette's on-accent already exceeds.
+    fn with_readable_error(self) -> Self {
+        let grounds = ERROR_GROUNDS.map(|role| self.get(role));
+        let error = readable(self.get(ColorRole::ERROR), &grounds, self.dark);
+        let on_error = readable(self.get(ColorRole::ON_ERROR), &[error], !self.dark);
+        self.with_role(ColorRole::ERROR, error)
+            .with_role(ColorRole::ON_ERROR_CONTAINER, error)
+            .with_role(ColorRole::ON_ERROR, on_error)
     }
 
     /// Derive every [`TintFamily`]'s roles from the scheme's surface, text and primary.
@@ -498,8 +564,44 @@ mod tests {
     }
 
     fn contrast(a: Color, b: Color) -> f32 {
-        let (a, b) = (a.luminance() + 0.05, b.luminance() + 0.05);
-        a.max(b) / a.min(b)
+        a.contrast(b)
+    }
+
+    /// M3's standard contrast for the error text roles (see
+    /// [`Scheme::with_readable_error`]): error on every surface it is painted
+    /// on, and each on-error role on its container.
+    #[test]
+    fn error_text_reads_on_every_surface_in_every_palette() {
+        for id in ALL {
+            let scheme = Scheme::from_palette(id);
+            let error = scheme.get(ColorRole::ERROR);
+            for ground in ERROR_GROUNDS {
+                let ratio = contrast(error, scheme.get(ground));
+                assert!(ratio >= 4.5, "{} error on {ground:?}: {ratio}", id.name());
+            }
+            for (content, container) in [
+                (ColorRole::ON_ERROR_CONTAINER, ColorRole::ERROR_CONTAINER),
+                (ColorRole::ON_ERROR, ColorRole::ERROR),
+            ] {
+                let ratio = contrast(scheme.get(content), scheme.get(container));
+                assert!(ratio >= 4.5, "{} {content:?}: {ratio}", id.name());
+            }
+        }
+    }
+
+    #[cfg(feature = "dynamic")]
+    #[test]
+    fn a_readable_error_keeps_the_palette_hue() {
+        for id in ALL {
+            use crate::dynamic::Hct;
+            let hue = |color: Color| Hct::from_argb(color.to_argb()).hue();
+            let (from, to) = (
+                Color::hex(id.colors().danger),
+                Scheme::from_palette(id).get(ColorRole::ERROR),
+            );
+            let shift = crate::dynamic::utils::difference_degrees(hue(from), hue(to));
+            assert!(shift < 4., "{}: {shift}", id.name());
+        }
     }
 
     #[test]

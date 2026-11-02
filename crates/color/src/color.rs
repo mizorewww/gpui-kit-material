@@ -70,6 +70,12 @@ impl Color {
         }
         0.2126 * linear(self.r) + 0.7152 * linear(self.g) + 0.0722 * linear(self.b)
     }
+
+    /// The WCAG 2.x contrast ratio with `other`, from 1 to 21, whichever is lighter.
+    pub fn contrast(self, other: Self) -> f32 {
+        let (a, b) = (self.luminance() + 0.05, other.luminance() + 0.05);
+        a.max(b) / a.min(b)
+    }
 }
 
 #[cfg(test)]
@@ -85,6 +91,14 @@ mod tests {
         assert_eq!(black.blend(white, 2.), white, "t is clamped");
         assert_eq!(Color::hexa(0x10141680).a, 128. / 255.);
         assert!(white.luminance() > black.luminance());
+    }
+
+    #[test]
+    fn contrast_is_symmetric_and_spans_one_to_twenty_one() {
+        let (black, white) = (Color::hex(0x000000), Color::hex(0xffffff));
+        assert!((black.contrast(white) - 21.).abs() < 1e-4);
+        assert_eq!(black.contrast(white), white.contrast(black));
+        assert_eq!(white.contrast(white), 1.);
     }
 
     #[test]

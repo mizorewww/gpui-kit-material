@@ -25,6 +25,15 @@ Dark palettes also paint their surfaces with 4.5% of their text color, as
 Material 3 lifts dark surface containers. The stored colors above are
 unchanged.
 
+The error roles keep each palette's danger hue but are painted at a tone that
+meets Material 3's standard contrast: error text and icons at least 4.5:1 on
+every derived surface (surface dim through surface bright, the containers and
+the error container), and on-error and on-error-container at least 4.5:1 on
+their containers, as material-color-utilities' standard contrast curves
+require. A danger color that already reads is painted as stored; Nord's
+`#bf616a`, designed against Polar Night's darkest background, is lightened in
+HCT tone.
+
 Tint families (`TintFamily`) are the kit's own design colors for telling categories
 apart. Each is harmonized toward the scheme's primary, then mixed into its surface for the
 container and with its text for the content, so a family keeps its hue in every palette,
