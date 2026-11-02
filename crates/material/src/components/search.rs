@@ -563,7 +563,9 @@ impl RenderOnce for SearchView {
                 .id((id.clone(), "results"))
                 .flex()
                 .flex_col()
-                .w_full()
+                // The results box sets the height; the list fills it and
+                // scrolls what it does not hold.
+                .size_full()
                 .overflow_y_scroll()
                 .children(suggestions.into_iter().enumerate().map(|(ix, s)| {
                     s.render(

@@ -56,8 +56,8 @@
       "upstream_sha256": "cfbcc4cbe63aeb5bb6ffc27af0505b59c5fec3054310beaf29e947e14cf6424e"
     },
     "src/slider.rs": {
-      "local_sha256": "a0625f1691fcdd5eab21cb676b09b90c4e90460acf1ba1cf147a082169cbe30f",
-      "reason": "Step snapping counted from min, a dropped handle standing at its snapped value, AT Increment/Decrement that move one thumb onto the step grid and emit Change, no snapping for a step that is not positive and finite, SliderState::accessibility_step (a hundredth of the range for a continuous slider), a min above the default max in a builder, a thumb's disabled flag, and Slider::track_focus for a focusable slider node (motion-patch.md). Right-to-left pointer math on a horizontal slider (motion-patch.md).",
+      "local_sha256": "d86b1e921b52a08c463ff4fa6af24aa4f2c5aa1aa03c7fd916015c6a96b37e74",
+      "reason": "Step snapping counted from min, a dropped handle standing at its snapped value, AT Increment/Decrement that move one thumb onto the step grid and emit Change, no snapping for a step that is not positive and finite, SliderState::accessibility_step (a hundredth of the range for a continuous slider), a min above the default max in a builder, a thumb's disabled flag, and Slider::track_focus for a focusable slider node (motion-patch.md). Right-to-left pointer math on a horizontal slider (motion-patch.md). step_thumb leaves a NaN value, a min above max or a reversed range unchanged, as the keyboard does (motion-patch.md). A range's Slider node is a Role::Group without values or Increment/Decrement; its thumbs are the sliders (motion-patch.md).",
       "upstream_sha256": "71b801a92588d12f7931a5a9e1745fb62f4283ae87d651d4004ae9b41ad72da3"
     },
     "src/text/document.rs": {

@@ -55,6 +55,21 @@ const ITEM_TRAILING: f32 = 24.;
 const ITEM_GAP: f32 = 12.;
 /// The modal drawer's trailing corner radius (shape large).
 const MODAL_RADIUS: f32 = 16.;
+/// The scrim a modal drawer always leaves beside it, in window px: the M3
+/// modal drawer is at most the window width less 56dp.
+pub const DRAWER_SCRIM_MARGIN: f32 = 56.;
+
+/// The sheet width in design px: the caller's `width`, narrowed so that its
+/// rendered size (`width` scaled by the text scale `rem_size / BASE_PX`)
+/// fits within `cap` window px.
+pub(crate) fn fitted_width(width: f32, cap: Option<Pixels>, rem_size: Pixels) -> f32 {
+    let Some(cap) = cap else { return width };
+    let scale = f32::from(rem_size) / crate::tokens::typography::BASE_PX;
+    if scale <= 0. {
+        return width;
+    }
+    width.min((f32::from(cap) / scale).max(0.))
+}
 
 /// Which window edge a drawer sits on.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -158,6 +173,7 @@ pub struct NavigationDrawer {
     dense: bool,
     position: DrawerPosition,
     width: f32,
+    max_width: Option<Pixels>,
     icons: bool,
     ripple: bool,
     focus_on_open: bool,
@@ -180,6 +196,7 @@ impl NavigationDrawer {
             dense: false,
             position: DrawerPosition::Start,
             width: DRAWER_WIDTH,
+            max_width: None,
             icons: true,
             ripple: true,
             focus_on_open: true,
@@ -226,9 +243,18 @@ impl NavigationDrawer {
         self.position = position;
         self
     }
-    /// The sheet width in design px, clamped to 240–360dp.
+    /// The sheet width in design px, at most 360dp. It scales with the text
+    /// scale; see [`Self::max_width`] to bound the rendered size.
     pub fn width(mut self, width: f32) -> Self {
-        self.width = width.clamp(240., DRAWER_WIDTH);
+        self.width = width.clamp(0., DRAWER_WIDTH);
+        self
+    }
+    /// The most window px the sheet may take after text scaling, such as the
+    /// available width less a scrim margin. A modal drawer is always kept
+    /// [`DRAWER_SCRIM_MARGIN`] px narrower than the window, so its scrim stays
+    /// visible and dismissible at any text scale.
+    pub fn max_width(mut self, max_width: Pixels) -> Self {
+        self.max_width = Some(max_width);
         self
     }
     /// Show destination icons (true by default).
@@ -505,10 +531,16 @@ impl RenderOnce for NavigationDrawer {
             cx,
         );
         let visible = amount.clamp(0., 1.);
-        let width = self.width;
+        let modal = self.modal;
+        let cap = if modal {
+            let window_cap = window.viewport_size().width - px(DRAWER_SCRIM_MARGIN);
+            Some(self.max_width.map_or(window_cap, |cap| cap.min(window_cap)))
+        } else {
+            self.max_width
+        };
+        let width = fitted_width(self.width, cap, window.rem_size());
         #[cfg(test)]
         DRAWER_OPEN.with(|cell| cell.set((visible, width)));
-        let modal = self.modal;
         let end = self.position == DrawerPosition::End;
         // Remembers what had focus when it opens and gives it back when it
         // closes, so this runs whether or not there is anything to draw.

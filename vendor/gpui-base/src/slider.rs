@@ -426,6 +426,9 @@ impl SliderState {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
+        if !steppable(self.value, self.min, self.max) {
+            return;
+        }
         let value = step_thumb(self.value, start, delta, self.min, self.max, self.step);
         if value != self.value {
             self.set_value(value, window, cx);
@@ -479,8 +482,17 @@ fn snap_to_step(value: f32, min: f32, max: f32, step: f32) -> f32 {
         .max(min)
 }
 
+/// Whether `value` can be stepped inside `min..=max`: not for a NaN value or bound, a
+/// `min` above `max`, or a range whose start is past its end, as the keyboard's
+/// stepping refuses them (a NaN thumb used to jump to `max`).
+fn steppable(value: SliderValue, min: f32, max: f32) -> bool {
+    let (start, end) = (value.start(), value.end());
+    min <= max && !start.is_nan() && !end.is_nan() && (!value.is_range() || start <= end)
+}
+
 /// `value` with its end, or with `start` a range's start, moved by `delta` and snapped to
-/// `step` counted from `min`, inside `min..=max` and without passing the other thumb.
+/// `step` counted from `min`, inside `min..=max` and without passing the other thumb. A
+/// value that is not [`steppable`] comes back unchanged.
 fn step_thumb(
     value: SliderValue,
     start: bool,
@@ -489,6 +501,9 @@ fn step_thumb(
     max: f32,
     step: f32,
 ) -> SliderValue {
+    if !steppable(value, min, max) {
+        return value;
+    }
     let mut value = value;
     let moves_start = start && value.is_range();
     let current = if moves_start {
@@ -612,19 +627,25 @@ impl RenderOnce for Slider {
         let entity_id = self.state.entity_id();
         let state = self.state.read(cx);
         let slider_state = self.state.clone();
+        // A range's thumbs are its sliders (`SliderThumb`), each with its own value and
+        // steps; the container only groups and names them, so assistive technology finds
+        // two sliders, not three.
+        let range = state.value().is_range();
 
         self.base
             .id(("slider", entity_id))
             .test_support()
             .when_some(self.focus, |this, focus| this.track_focus(&focus))
-            .role(Role::Slider)
+            .role(if range { Role::Group } else { Role::Slider })
             .when_some(self.accessibility_label, |this, label| {
                 this.aria_label(label)
             })
-            .aria_numeric_value(state.value().end() as f64)
-            .aria_min_numeric_value(state.min_value() as f64)
-            .aria_max_numeric_value(state.max_value() as f64)
-            .aria_numeric_value_step(state.accessibility_step() as f64)
+            .when(!range, |this| {
+                this.aria_numeric_value(state.value().end() as f64)
+                    .aria_min_numeric_value(state.min_value() as f64)
+                    .aria_max_numeric_value(state.max_value() as f64)
+                    .aria_numeric_value_step(state.accessibility_step() as f64)
+            })
             .aria_orientation(if axis.is_vertical() {
                 Orientation::Vertical
             } else {
@@ -633,21 +654,23 @@ impl RenderOnce for Slider {
             // A disabled slider takes no value, from the pointer or from
             // assistive technology.
             .when(!self.disabled, |this| {
-                this.on_a11y_action(AccessibleAction::Increment, {
-                    let state = slider_state.clone();
-                    move |_, window, cx| {
-                        state.update(cx, |state, cx| {
-                            state.step_thumb(false, state.accessibility_step(), window, cx);
-                        });
-                    }
-                })
-                .on_a11y_action(AccessibleAction::Decrement, {
-                    let state = slider_state.clone();
-                    move |_, window, cx| {
-                        state.update(cx, |state, cx| {
-                            state.step_thumb(false, -state.accessibility_step(), window, cx);
-                        });
-                    }
+                this.when(!range, |this| {
+                    this.on_a11y_action(AccessibleAction::Increment, {
+                        let state = slider_state.clone();
+                        move |_, window, cx| {
+                            state.update(cx, |state, cx| {
+                                state.step_thumb(false, state.accessibility_step(), window, cx);
+                            });
+                        }
+                    })
+                    .on_a11y_action(AccessibleAction::Decrement, {
+                        let state = slider_state.clone();
+                        move |_, window, cx| {
+                            state.update(cx, |state, cx| {
+                                state.step_thumb(false, -state.accessibility_step(), window, cx);
+                            });
+                        }
+                    })
                 })
                 .on_mouse_up(
                     MouseButton::Left,
@@ -1082,6 +1105,22 @@ mod tests {
         );
         let state = SliderState::new().step(0.).min(0.).max(200.);
         assert_eq!(state.accessibility_step(), 2.);
+    }
+
+    #[test]
+    fn stepping_leaves_an_invalid_value_or_range_alone() {
+        let nan = step_thumb(SliderValue::Single(f32::NAN), false, 1., 0., 100., 1.);
+        assert!(nan.end().is_nan(), "a NaN value does not jump to max");
+        assert_eq!(
+            step_thumb(SliderValue::Single(50.), false, 1., 100., 0., 1.),
+            SliderValue::Single(50.),
+            "min above max"
+        );
+        assert_eq!(
+            step_thumb(SliderValue::Range(60., 20.), true, 1., 0., 100., 1.),
+            SliderValue::Range(60., 20.),
+            "a reversed range"
+        );
     }
 
     #[test]

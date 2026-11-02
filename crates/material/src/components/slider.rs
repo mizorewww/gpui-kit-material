@@ -1477,15 +1477,18 @@ mod tests {
             |s| s.disabled(true),
         );
         draw(cx);
-        let disabled = cx.update(|window, _| {
-            gpui_base::test_support::snapshots(window)
-                .into_iter()
-                .filter(|s| s.role() == Some(Role::Slider))
-                .map(|s| s.disabled())
-                .collect::<Vec<_>>()
-        });
-        // The slider's own node and each thumb's.
-        assert_eq!(disabled, vec![Some(true); 3]);
+        let mut disabled = |role| {
+            cx.update(|window, _| {
+                gpui_base::test_support::snapshots(window)
+                    .into_iter()
+                    .filter(|s| s.role() == Some(role))
+                    .map(|s| s.disabled())
+                    .collect::<Vec<_>>()
+            })
+        };
+        // Each thumb is a slider; the range's own node only groups them.
+        assert_eq!(disabled(Role::Slider), vec![Some(true); 2]);
+        assert_eq!(disabled(Role::Group), vec![Some(true)]);
     }
 
     #[gpui::test]
