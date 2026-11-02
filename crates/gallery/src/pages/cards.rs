@@ -176,6 +176,7 @@ fn drop_target_specimen(
 }
 
 /// The names of `paths`, joined for the live target's label.
+#[cfg(not(target_arch = "wasm32"))]
 fn file_names(paths: &[std::path::PathBuf]) -> SharedString {
     paths
         .iter()
@@ -221,50 +222,77 @@ impl GalleryPage for Page {
                     .preview_state(InteractionPreview::Enabled)
             };
             // The pointer-free way in: the button opens the file picker.
-            let choose = material_button(("drop-live", 1usize), ButtonVariant::Outlined).on_click(
-                cx.listener(|_, _, _, cx| {
-                    let picked = cx.prompt_for_paths(PathPromptOptions {
-                        files: true,
-                        directories: false,
-                        multiple: true,
-                        prompt: None,
-                    });
-                    cx.spawn(async move |page, cx| {
-                        if let Ok(Ok(Some(paths))) = picked.await {
-                            let _ = page.update(cx, |page, cx| {
-                                page.dropped = Some(file_names(&paths));
+            #[cfg(not(target_arch = "wasm32"))]
+            {
+                let choose = material_button(("drop-live", 1usize), ButtonVariant::Outlined)
+                    .on_click(cx.listener(|_, _, _, cx| {
+                        let picked = cx.prompt_for_paths(PathPromptOptions {
+                            files: true,
+                            directories: false,
+                            multiple: true,
+                            prompt: None,
+                        });
+                        cx.spawn(async move |page, cx| {
+                            if let Ok(Ok(Some(paths))) = picked.await {
+                                let _ = page.update(cx, |page, cx| {
+                                    page.dropped = Some(file_names(&paths));
+                                    cx.notify();
+                                });
+                            }
+                        })
+                        .detach();
+                    }));
+                return board("drop-target")
+                    .caption("Drop target")
+                    .columns(3)
+                    .column_labels(["At rest", "Dragged over", "Live"])
+                    .cells([
+                        drop_target_specimen(
+                            "drop-rest",
+                            false,
+                            "Drop a file here".into(),
+                            specimen("drop-rest"),
+                        ),
+                        drop_target_specimen(
+                            "drop-over",
+                            true,
+                            "Drop a file here".into(),
+                            specimen("drop-over"),
+                        ),
+                        drop_target_specimen("drop-live", false, live, choose).on_drop(
+                            cx.listener(|page, paths: &ExternalPaths, _, cx| {
+                                page.dropped = Some(file_names(paths.paths()));
                                 cx.notify();
-                            });
-                        }
-                    })
-                    .detach();
-                }),
-            );
-            return board("drop-target")
-                .caption("Drop target")
-                .columns(3)
-                .column_labels(["At rest", "Dragged over", "Live"])
-                .cells([
-                    drop_target_specimen(
-                        "drop-rest",
-                        false,
-                        "Drop a file here".into(),
-                        specimen("drop-rest"),
-                    ),
-                    drop_target_specimen(
-                        "drop-over",
-                        true,
-                        "Drop a file here".into(),
-                        specimen("drop-over"),
-                    ),
-                    drop_target_specimen("drop-live", false, live, choose).on_drop(cx.listener(
-                        |page, paths: &ExternalPaths, _, cx| {
-                            page.dropped = Some(file_names(paths.paths()));
-                            cx.notify();
-                        },
-                    )),
-                ])
-                .into_any_element();
+                            }),
+                        ),
+                    ])
+                    .into_any_element();
+            }
+            // A browser hands the page neither dropped files nor a file
+            // picker's paths, so the web gallery shows the specimens only.
+            #[cfg(target_arch = "wasm32")]
+            {
+                let _ = (live, cx);
+                return board("drop-target")
+                    .caption("Drop target (the live target is in the desktop gallery)")
+                    .columns(2)
+                    .column_labels(["At rest", "Dragged over"])
+                    .cells([
+                        drop_target_specimen(
+                            "drop-rest",
+                            false,
+                            "Drop a file here".into(),
+                            specimen("drop-rest"),
+                        ),
+                        drop_target_specimen(
+                            "drop-over",
+                            true,
+                            "Drop a file here".into(),
+                            specimen("drop-over"),
+                        ),
+                    ])
+                    .into_any_element();
+            }
         }
         if row == 2 {
             return board("card-states")

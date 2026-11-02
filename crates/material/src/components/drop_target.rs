@@ -28,11 +28,13 @@
 //! no strings.
 use crate::color::ColorRole::{self, *};
 use crate::theme::color;
-use crate::tokens::{shape::RADIUS_MEDIUM, state};
+use crate::tokens::{shape::RADIUS_MEDIUM, state, typography::rem};
 use gpui::{prelude::*, *};
 
-/// The width of a drop target's dashed outline.
-pub const DROP_TARGET_STROKE: Pixels = px(2.);
+/// The width of a drop target's dashed outline, 2dp: in rems, so it keeps
+/// its proportion to the target's content as the text scales, as a
+/// button's outline does.
+pub const DROP_TARGET_STROKE: Rems = rem(2.);
 
 /// The hover group a drop target's content follows with
 /// `group_drag_over::<ExternalPaths>`; the innermost target answers.
@@ -103,12 +105,13 @@ mod tests {
         assert_eq!(drop_target_paint(false), (OUTLINE, 0.));
         assert_eq!(drop_target_paint(true), (PRIMARY, state::HOVER));
         assert_eq!(state::HOVER, 0.08);
-        assert_eq!(DROP_TARGET_STROKE, px(2.));
+        assert_eq!(DROP_TARGET_STROKE, rem(2.));
     }
 
     struct Target(bool);
     impl Render for Target {
-        fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+            window.set_rem_size(px(14.));
             div()
                 .p(px(20.))
                 .child(drop_target("drop", "Files", self.0).w(px(200.)).h(px(120.)))
