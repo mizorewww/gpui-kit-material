@@ -67,6 +67,15 @@ Distribution is by Git revision for now; see the [quick start](README.md#quick-s
   16 ms first-frame limits are gone, and the first frame and Material list are judged
   against Kit.
 
+- A `MaterialSlider` handle dropped between steps stands at its value, and a screen reader's
+  Increment and Decrement emit `SliderEvent::Change`. A range's thumbs each take those actions and
+  report their step and when they are disabled. Keys with Cmd, Ctrl or Alt pass through a slider.
+- A browser IME's Enter on a candidate no longer presses a field's Enter, and replacing an emoji
+  no longer inserts U+FFFD. The hidden input over the caret no longer takes clicks.
+- `icons::set_style_pending`: icons wait only for the font of their style, and a caller's own
+  asset never waits.
+- A `TextFieldVariant::Hero` field set through `variant` without a label is named by its
+  placeholder, and with neither logs a warning once.
 - **Breaking:** `TextField::hero` takes the label, which is the field's only accessible name.
 - **Breaking:** the enums that gained a variant here (`Tint`, `NoticeKind`, `TextFieldVariant`,
   `CardVariant`) are now `#[non_exhaustive]`: a `match` on one outside this crate needs a `_`
