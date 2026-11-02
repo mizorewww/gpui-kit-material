@@ -16,10 +16,14 @@ const SUGGESTIONS: [(&str, &str); 6] = [
 
 pub struct Page {
     pub(crate) search: Entity<InputState>,
-    full_screen: Entity<InputState>,
-    docked_open: bool,
-    full_open: bool,
+    pub(crate) full_screen: Entity<InputState>,
+    pub(crate) docked_open: bool,
+    pub(crate) full_open: bool,
     picked: Option<&'static str>,
+    /// Hold each live view, so focus that leaves one collapses it while a
+    /// press on its suggestions does not.
+    docked_focus: FocusHandle,
+    full_focus: FocusHandle,
 }
 
 /// The kit's avatar: a 30dp primary circle with a monogram.
@@ -77,20 +81,29 @@ impl GalleryPage for Page {
     fn new(_: PageCx, window: &mut Window, cx: &mut Context<Self>) -> Self {
         let search = cx.new(|cx| InputState::new(window, cx).placeholder("Search components"));
         let full_screen = cx.new(|cx| InputState::new(window, cx).placeholder("Search components"));
-        // The views open when their bar takes focus and refilter as people type.
-        cx.subscribe_in(&search, window, |this, _, event: &InputEvent, _, cx| {
-            if matches!(event, InputEvent::Focus) {
-                this.docked_open = true;
-            }
-            cx.notify();
-        })
+        // The views open when their bar takes focus, refilter as people type
+        // and collapse when focus leaves them.
+        cx.subscribe_in(
+            &search,
+            window,
+            |this, _, event: &InputEvent, window, cx| {
+                match event {
+                    InputEvent::Focus => this.docked_open = true,
+                    InputEvent::Blur => this.collapse_unless_focused(false, window, cx),
+                    _ => {}
+                }
+                cx.notify();
+            },
+        )
         .detach();
         cx.subscribe_in(
             &full_screen,
             window,
-            |this, _, event: &InputEvent, _, cx| {
-                if matches!(event, InputEvent::Focus) {
-                    this.full_open = true;
+            |this, _, event: &InputEvent, window, cx| {
+                match event {
+                    InputEvent::Focus => this.full_open = true,
+                    InputEvent::Blur => this.collapse_unless_focused(true, window, cx),
+                    _ => {}
                 }
                 cx.notify();
             },
@@ -102,6 +115,8 @@ impl GalleryPage for Page {
             docked_open: false,
             full_open: false,
             picked: None,
+            docked_focus: cx.focus_handle(),
+            full_focus: cx.focus_handle(),
         }
     }
 
@@ -125,6 +140,50 @@ impl GalleryPage for Page {
 }
 
 impl Page {
+    /// Collapse a view once focus has settled outside it: a press on one of
+    /// its suggestions moves focus inside it, and picks.
+    fn collapse_unless_focused(&mut self, full: bool, window: &mut Window, cx: &mut Context<Self>) {
+        let holder = if full {
+            self.full_focus.clone()
+        } else {
+            self.docked_focus.clone()
+        };
+        cx.defer_in(window, move |this, window, cx| {
+            if !holder.contains_focused(window, cx) {
+                this.collapse(full, window, cx);
+            }
+        });
+    }
+
+    fn collapse(&mut self, full: bool, _: &mut Window, cx: &mut Context<Self>) {
+        if full {
+            self.full_open = false;
+        } else {
+            self.docked_open = false;
+        }
+        cx.notify();
+    }
+
+    /// Escape collapses a view and leaves its bar.
+    fn on_escape(
+        full: bool,
+        cx: &mut Context<Self>,
+    ) -> impl Fn(&KeyDownEvent, &mut Window, &mut App) + 'static {
+        cx.listener(move |this, event: &KeyDownEvent, window, cx| {
+            if event.keystroke.key == "escape"
+                && (if full {
+                    this.full_open
+                } else {
+                    this.docked_open
+                })
+            {
+                cx.stop_propagation();
+                this.collapse(full, window, cx);
+                window.blur(cx);
+            }
+        })
+    }
+
     fn suggestions(
         &self,
         query: &str,
@@ -193,6 +252,8 @@ impl Page {
             "live-docked-search",
             "Docked search view",
             div()
+                .track_focus(&self.docked_focus)
+                .on_key_down(Self::on_escape(false, cx))
                 .flex()
                 .flex_col()
                 .gap(rem(12.))
@@ -232,6 +293,8 @@ impl Page {
             "live-full-screen-search",
             "Full-screen search view",
             div()
+                .track_focus(&self.full_focus)
+                .on_key_down(Self::on_escape(true, cx))
                 .w_full()
                 .max_w(rem(412.))
                 .h(rem(480.))

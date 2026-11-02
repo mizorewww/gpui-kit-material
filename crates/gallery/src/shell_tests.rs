@@ -805,6 +805,68 @@ fn the_typography_sample_fits_a_phone(cx: &mut TestAppContext) {
     );
 }
 
+/// The Search page's live views collapse on Escape and when focus leaves
+/// them, as well as from their back buttons.
+#[gpui::test]
+fn the_live_search_views_collapse_on_escape_and_blur(cx: &mut TestAppContext) {
+    use super::pages::search::Page;
+    let (window, mut cx) = open(cx);
+    window
+        .update(&mut cx, |_, window, _| window.activate_window())
+        .unwrap();
+    let (page, first) = window
+        .update(&mut cx, |g, window, cx| g.show_page::<Page>(window, cx))
+        .unwrap();
+    for (full, row) in [(false, 3), (true, 4)] {
+        window
+            .update(&mut cx, |g, _, cx| {
+                g.list.scroll_to(gpui::ListOffset {
+                    item_ix: first + row,
+                    offset_in_item: px(0.),
+                });
+                cx.notify();
+            })
+            .unwrap();
+        settle(&window, &mut cx);
+        let focus = |window: &WindowHandle<Gallery>, cx: &mut VisualTestContext| {
+            window
+                .update(cx, |_, window, cx| {
+                    let page = page.read(cx);
+                    let input = if full {
+                        page.full_screen.clone()
+                    } else {
+                        page.search.clone()
+                    };
+                    input.update(cx, |input, cx| input.focus(window, cx));
+                })
+                .unwrap();
+            settle(window, cx);
+        };
+        let open = |cx: &mut VisualTestContext| {
+            cx.read(|cx| {
+                let page = page.read(cx);
+                if full {
+                    page.full_open
+                } else {
+                    page.docked_open
+                }
+            })
+        };
+        focus(&window, &mut cx);
+        assert!(open(&mut cx), "focus opens the view (full: {full})");
+        cx.simulate_keystrokes("escape");
+        settle(&window, &mut cx);
+        assert!(!open(&mut cx), "Escape collapses it (full: {full})");
+        focus(&window, &mut cx);
+        assert!(open(&mut cx));
+        window
+            .update(&mut cx, |_, window, cx| window.blur(cx))
+            .unwrap();
+        settle(&window, &mut cx);
+        assert!(!open(&mut cx), "leaving it collapses it (full: {full})");
+    }
+}
+
 /// On a phone at 200% text the text size is a select that fits the card,
 /// not four segments cut off at its edge.
 #[gpui::test]
