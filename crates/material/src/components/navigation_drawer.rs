@@ -678,6 +678,7 @@ impl RenderOnce for NavigationDrawer {
         let lane = list.roving.exit_start(self.on_exit_start).install(lane);
         // A closing drawer keeps its scrim until it settles: only an open one
         // has anything left to dismiss.
+        let dismissible = self.on_dismiss.is_some();
         let on_dismiss = self.on_dismiss.filter(|_| modal && open);
         let sheet = div()
             .id((self.id.clone(), "drawer-sheet"))
@@ -754,12 +755,20 @@ impl RenderOnce for NavigationDrawer {
                                 frame.left(offset)
                             }
                         })
-                        .child(
-                            sheet
-                                .track_focus(&trap)
-                                .tab_stop(false)
-                                .focus_trap((self.id.clone(), "drawer-trap"), &trap),
-                        ),
+                        .child({
+                            let sheet = sheet.track_focus(&trap).tab_stop(false);
+                            // Tab stays inside only where Escape or the scrim
+                            // can let it out: a drawer with no way to dismiss
+                            // it (a specimen drawn open) would hold the
+                            // keyboard for good.
+                            if dismissible {
+                                sheet
+                                    .focus_trap((self.id.clone(), "drawer-trap"), &trap)
+                                    .into_any_element()
+                            } else {
+                                sheet.into_any_element()
+                            }
+                        }),
                 )
                 .into_any_element()
         } else {

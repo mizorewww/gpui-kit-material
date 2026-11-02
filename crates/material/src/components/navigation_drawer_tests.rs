@@ -395,7 +395,7 @@ fn a_field_reaches_the_first_destination_and_up_comes_back(cx: &mut TestAppConte
         cx.set_reduce_motion(true);
     });
     let (view, cx) = cx.add_window_view(|_, cx| Results {
-        field: cx.focus_handle(),
+        field: cx.focus_handle().tab_stop(true),
         container: cx.focus_handle(),
     });
     settle_open(cx);
@@ -423,6 +423,32 @@ fn a_field_reaches_the_first_destination_and_up_comes_back(cx: &mut TestAppConte
             view.read(cx).field.is_focused(window),
             "Up from the first result is back in the field"
         );
+    });
+}
+
+/// A modal drawer that cannot be dismissed, such as a specimen drawn open on
+/// a page, does not hold Tab: nothing would ever let it out.
+#[gpui::test]
+fn an_undismissible_drawer_lets_tab_out(cx: &mut TestAppContext) {
+    cx.update(|cx| {
+        gpui_base::init(cx);
+        super::super::roving::init(cx);
+        cx.set_reduce_motion(true);
+    });
+    let (view, cx) = cx.add_window_view(|_, cx| Results {
+        field: cx.focus_handle().tab_stop(true),
+        container: cx.focus_handle(),
+    });
+    settle_open(cx);
+    cx.update(|window, cx| {
+        let container = view.read(cx).container.clone();
+        NavigationDrawer::focus_first(&container, window, cx);
+    });
+    settle_open(cx);
+    // Root's Tab confines focus to the active trap, and there is none.
+    cx.update(|window, cx| {
+        assert!(view.read(cx).container.contains_focused(window, cx));
+        assert!(gpui_base::active_focus_trap(window, cx).is_none());
     });
 }
 
