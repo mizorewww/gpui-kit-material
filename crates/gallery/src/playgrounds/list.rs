@@ -3,7 +3,8 @@
 //! subheader, item content presets, selection and per-item state) on the
 //! real `ListItem`s. Clicking a row selects it (single), toggles it
 //! (multi) or toggles its trailing control, writing back to the
-//! "… selected" switches.
+//! "… selected" switches. The pill shape makes the rows a sidebar's
+//! destinations, as the Sidebar destinations scenario shows.
 use super::prelude::*;
 
 const SWITCH_ICONS: [SwitchIcons; 3] =
@@ -14,6 +15,7 @@ const ITEM_SETS: &[&str] = &[
     "Color picker",
     "Plant cart",
     "Address book",
+    "Folders",
 ];
 const SELECTED: [&str; 5] = [
     "selected_0",
@@ -31,7 +33,7 @@ struct ItemSet {
     items: [(&'static str, &'static str, &'static str); 5],
 }
 
-const SETS: [ItemSet; 5] = [
+const SETS: [ItemSet; 6] = [
     ItemSet {
         subheader: "Ideas for today",
         overline: "Routine",
@@ -85,6 +87,17 @@ const SETS: [ItemSet; 5] = [
             ("Anna Lindström", "call", "Home"),
             ("Ben Okafor", "call", "Mobile"),
             ("Carla Ruiz", "call", "Work"),
+        ],
+    },
+    ItemSet {
+        subheader: "Folders",
+        overline: "Folder",
+        items: [
+            ("All items", "inbox", "128"),
+            ("Projects", "folder", "64"),
+            ("Reading", "folder", "31"),
+            ("Shared", "folder_shared", "18"),
+            ("Archive", "inventory_2", "15"),
         ],
     },
 ];
@@ -155,6 +168,22 @@ pub static PLAYGROUND: Playground = Playground {
                 ("selected_0", Set::Bool(false)),
             ],
         },
+        Scenario {
+            name: "Sidebar destinations",
+            values: &[
+                ("items", Set::Option("Folders")),
+                ("density", Set::Option("−3")),
+                ("shape", Set::Option("pill")),
+                ("lines", Set::Option("1")),
+                ("leading", Set::Option("icon")),
+                ("trailing", Set::Option("text")),
+                ("count", Set::Option("5")),
+                ("label", Set::Text("Folders")),
+                ("selection", Set::Option("single")),
+                ("selected_0", Set::Bool(false)),
+                ("selected_1", Set::Bool(true)),
+            ],
+        },
     ],
     sections: &[
         Section {
@@ -170,6 +199,12 @@ pub static PLAYGROUND: Playground = Playground {
                     id: "density",
                     label: "Density",
                     options: &["standard", "compact", "−3"],
+                    default: 0,
+                },
+                Control::Segmented {
+                    id: "shape",
+                    label: "Shape",
+                    options: &["rectangle", "pill"],
                     default: 0,
                 },
             ],
@@ -315,6 +350,7 @@ fn preview(
         "−3" => ListDensity::Minus3,
         _ => ListDensity::Standard,
     };
+    let pill = config.option("shape") == "pill";
     let mut selected: Vec<bool> = SELECTED.iter().map(|id| config.bool(id)).collect();
     // The selection the last frame showed, to tell which row was just turned on.
     let shown = preview.local("shown-selection", window, cx, |_, _| {
@@ -371,6 +407,7 @@ fn preview(
                     .selected(on && selection != "none")
                     .expressive(config.bool("expressive"))
                     .density(density)
+                    .pill(pill)
                     .disabled(config.bool("disable_last") && index + 1 == count)
                     .container(if segmented {
                         ColorRole::SURFACE_CONTAINER
@@ -451,7 +488,13 @@ fn preview(
     let list = if segmented {
         segmented_list(items)
     } else {
-        div().flex().flex_col().w_full().children(items)
+        // A pill stands in from the list's edges, as a navigation drawer's 12dp padding sets it.
+        div()
+            .flex()
+            .flex_col()
+            .w_full()
+            .when(pill, |list| list.px(rem(12.)))
+            .children(items)
     };
     let label = config.text("label");
     div()
@@ -483,6 +526,20 @@ mod tests {
         harness.render_every_scenario(|harness, _| {
             harness.expect("playground-list");
         });
+    }
+
+    #[gpui::test]
+    fn pill_destinations_select_by_click(cx: &mut TestAppContext) {
+        let mut harness = Harness::open(cx, &PLAYGROUND);
+        harness.expect("playground-list");
+        harness.set("shape", Value::Choice(1));
+        let list = harness.expect("playground-list");
+        // Default: three rows, the first selected; the pills stand 12dp in.
+        let third = gpui::point(list.center().x, list.origin.y + list.size.height * 5. / 6.);
+        harness.click_at(third);
+        let config = harness.config();
+        assert!(!config.bool("selected_0"));
+        assert!(config.bool("selected_2"));
     }
 
     #[gpui::test]

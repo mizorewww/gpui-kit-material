@@ -25,7 +25,7 @@ use crate::{
     motion,
     theme::color,
     tokens::{
-        shape::{OuterCorners, list_corners},
+        shape::{OuterCorners, RADIUS_FULL, list_corners},
         state,
         typography::{TypeRole, rem},
     },
@@ -215,6 +215,7 @@ pub struct ListItem {
     switch_icons: SwitchIcons,
     density: ListDensity,
     corners: Option<OuterCorners>,
+    pill: bool,
     expressive: bool,
     container: ColorRole,
     preview: Option<InteractionPreview>,
@@ -239,6 +240,7 @@ impl ListItem {
             switch_icons: SwitchIcons::None,
             density: ListDensity::Standard,
             corners: None,
+            pill: false,
             expressive: false,
             container: ColorRole::SURFACE,
             preview: None,
@@ -319,6 +321,18 @@ impl ListItem {
     }
     pub fn segment(mut self, corners: OuterCorners) -> Self {
         self.corners = Some(corners);
+        self
+    }
+    /// Give the item full (pill) corners: the container, the selected
+    /// container, the state layers, the ripple and the focus ring, as M3's
+    /// navigation drawer draws its active indicator (secondary container,
+    /// corner full). The pill changes the shape only: at rest the item still
+    /// paints its [`Self::container`] (surface by default), so on another
+    /// ground set the container to that ground's role. The pill overrides
+    /// [`Self::segment`] and the expressive corners. The parent supplies the
+    /// pill's inset from its edges, as the drawer's 12dp sheet padding does.
+    pub fn pill(mut self, pill: bool) -> Self {
+        self.pill = pill;
         self
     }
     /// Render a static specimen in one forced interaction state: the state
@@ -665,6 +679,7 @@ impl RenderOnce for ListItem {
         let corners = |dp: f32| Corners::all(rem(dp).to_pixels(rem_size));
         let forced = preview.is_some_and(|p| p.is_pressed() || p.is_focused());
         let radii = match self.corners {
+            _ if self.pill => Corners::all(RADIUS_FULL),
             Some(corners) => segment_radii(corners),
             None if expressive => {
                 // Selection morphs the corners, as a press does below.
@@ -678,7 +693,7 @@ impl RenderOnce for ListItem {
             }
             None => Corners::default(),
         };
-        let active_radius = (expressive && self.corners.is_none())
+        let active_radius = (expressive && self.corners.is_none() && !self.pill)
             .then(|| rem(expressive_radius(1.)).to_pixels(rem_size));
         let divider = self.divider;
         let inset = self.divider_inset;
@@ -1167,5 +1182,147 @@ mod tests {
                 .trailing_text("128")
         });
         assert_eq!(cx.debug_bounds("one-item").unwrap().size.height, px(44.));
+    }
+
+    /// A compact pill item with an icon and a trailing count.
+    fn destination(selected: bool) -> ListItem {
+        ListItem::new("item", "All items")
+            .density(ListDensity::Compact)
+            .pill(true)
+            .leading(ListLeading::Icon(crate::icons::IconName::Info.icon()))
+            .trailing_text("128")
+            .selected(selected)
+            .on_click(|_, _, _| {})
+    }
+
+    fn redraw(cx: &mut VisualTestContext) {
+        cx.update(|window, cx| {
+            window.refresh();
+            window.draw(cx).clear(cx);
+        });
+    }
+
+    /// Move the pointer off the item, whose hover layer would tint it.
+    fn leave(cx: &mut VisualTestContext) {
+        cx.simulate_mouse_move(point(px(10.), px(300.)), None, gpui::Modifiers::default());
+        redraw(cx);
+    }
+
+    /// Whether a painted quad of this background spans the item with all four
+    /// corners at half its height.
+    fn pill_painted(cx: &mut VisualTestContext, background: gpui::Background) -> bool {
+        let height = f32::from(cx.debug_bounds("one-item").unwrap().size.height);
+        cx.update(|window, _| {
+            let scale = window.scale_factor();
+            window.painted_quads().into_iter().any(|quad| {
+                quad.background == background
+                    && quad.bounds.size.height.0 == height * scale
+                    && quad.bounds.size.width.0 == 360. * scale
+                    && [
+                        quad.corner_radii.top_left,
+                        quad.corner_radii.top_right,
+                        quad.corner_radii.bottom_right,
+                        quad.corner_radii.bottom_left,
+                    ]
+                    .iter()
+                    .all(|radius| radius.0 == height / 2. * scale)
+            })
+        })
+    }
+
+    #[gpui::test]
+    fn a_selected_pill_paints_full_corners(cx: &mut TestAppContext) {
+        let (_, cx) = one(cx, || destination(true));
+        leave(cx);
+        assert_eq!(cx.debug_bounds("one-item").unwrap().size.height, px(40.));
+        let selected = gpui::Background::from(color(ColorRole::SECONDARY_CONTAINER));
+        assert!(
+            pill_painted(cx, selected),
+            "the selected container is a pill"
+        );
+    }
+
+    #[gpui::test]
+    fn a_pill_at_rest_keeps_the_callers_container(cx: &mut TestAppContext) {
+        let (_, cx) = one(cx, || {
+            destination(false).container(ColorRole::SURFACE_CONTAINER)
+        });
+        leave(cx);
+        let container = gpui::Background::from(color(ColorRole::SURFACE_CONTAINER));
+        assert!(
+            pill_painted(cx, container),
+            "the caller's container, as a pill"
+        );
+    }
+
+    #[gpui::test]
+    fn a_pills_focus_ring_has_full_corners(cx: &mut TestAppContext) {
+        let (_, cx) = one(cx, || {
+            destination(false).preview_state(InteractionPreview::Focused)
+        });
+        assert!(test_rings::painted("item").is_some(), "the ring is painted");
+        let height = f32::from(cx.debug_bounds("one-item").unwrap().size.height);
+        cx.update(|window, _| {
+            let scale = window.scale_factor();
+            let ring = window
+                .painted_quads()
+                .into_iter()
+                .find(|quad| quad.border_widths.top.0 > 0.)
+                .expect("the focus ring's outline");
+            let half = ring.bounds.size.height.0 / 2.;
+            assert!(ring.bounds.size.height.0 < height * scale, "an inner ring");
+            for radius in [
+                ring.corner_radii.top_left,
+                ring.corner_radii.top_right,
+                ring.corner_radii.bottom_right,
+                ring.corner_radii.bottom_left,
+            ] {
+                assert_eq!(radius.0, half, "half the ring's height");
+            }
+        });
+    }
+
+    #[gpui::test]
+    fn a_pills_ripple_and_expressive_press_keep_full_corners(cx: &mut TestAppContext) {
+        let (_, cx) = one(cx, || destination(false).expressive(true));
+        let center = cx.debug_bounds("one-item").unwrap().center();
+        let before = crate::components::interaction::waves_painted();
+        cx.simulate_mouse_down(center, gpui::MouseButton::Left, gpui::Modifiers::default());
+        redraw(cx);
+        cx.executor()
+            .advance_clock(std::time::Duration::from_millis(100));
+        redraw(cx);
+        assert!(
+            crate::components::interaction::waves_painted() > before,
+            "a wave"
+        );
+        let wave = crate::components::interaction::last_wave_corners().unwrap();
+        for radius in [
+            wave.top_left,
+            wave.top_right,
+            wave.bottom_right,
+            wave.bottom_left,
+        ] {
+            assert_eq!(radius, RADIUS_FULL, "the wave is clipped to the pill");
+        }
+        // An expressive row presses to 16dp corners; a pill stays a pill.
+        cx.executor()
+            .advance_clock(std::time::Duration::from_millis(600));
+        redraw(cx);
+        let pressed = gpui::Background::from(state::hovered(
+            color(ColorRole::SURFACE),
+            list_paint(false, false).layer,
+        ));
+        assert!(pill_painted(cx, pressed), "the pressed layer is a pill");
+        cx.update(|window, _| {
+            let corner = 16. * window.scale_factor();
+            assert!(
+                window
+                    .painted_quads()
+                    .iter()
+                    .all(|quad| quad.corner_radii.top_left.0 != corner),
+                "no 16dp press corners"
+            );
+        });
     }
 }

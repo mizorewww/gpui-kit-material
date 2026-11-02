@@ -173,6 +173,18 @@ thread_local! {
 
 #[cfg(test)]
 thread_local! {
+    static LAST_WAVE_CORNERS: std::cell::Cell<Option<Corners<Pixels>>> =
+        const { std::cell::Cell::new(None) };
+}
+
+/// The corners this thread's last painted wave was clipped to.
+#[cfg(test)]
+pub(crate) fn last_wave_corners() -> Option<Corners<Pixels>> {
+    LAST_WAVE_CORNERS.with(|corners| corners.get())
+}
+
+#[cfg(test)]
+thread_local! {
     static RIPPLE_WRITES: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
 }
 
@@ -424,6 +436,7 @@ impl Element for ButtonRipple {
                     #[cfg(feature = "buttons")]
                     tests::record_paint(color, radius, border);
                     WAVES_PAINTED.with(|painted| painted.set(painted.get() + 1));
+                    LAST_WAVE_CORNERS.with(|corners| corners.set(Some(radius)));
                 }
                 window.paint_path(path, color);
             }

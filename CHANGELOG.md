@@ -51,6 +51,9 @@ Distribution is by Git revision for now; see the [quick start](README.md#quick-s
 - `ListDensity::Minus3`: density −3, 44/60/76dp items, one step above `Compact`. The
   heights are derived from Material's density scale (−4dp per step); the Figma kit has no
   −3 list. It is a density level, not an M3 navigation height.
+- `ListItem::pill`: full (pill) corners on the item's container, selected container, state
+  layers, ripple and focus ring, as a navigation drawer's active indicator. It changes the
+  shape only; the resting `container` is still painted.
 
 ### Changed
 
