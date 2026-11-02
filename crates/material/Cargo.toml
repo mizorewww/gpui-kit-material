@@ -93,6 +93,10 @@ serde_json.workspace = true
 gpui-kit = { workspace = true, features = ["test-support"] }
 
 [[test]]
+name = "block_surface"
+required-features = ["full"]
+
+[[test]]
 name = "compose_shapes"
 required-features = ["shapes"]
 

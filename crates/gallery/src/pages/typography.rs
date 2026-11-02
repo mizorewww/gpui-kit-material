@@ -5,6 +5,8 @@
 use super::super::shell;
 use super::prelude::*;
 use gpui_base::input::{InputEvent, InputState};
+use gpui_base::text::{MarkdownExtensions, SelectionFormat, TextView, TextViewState};
+use gpui_kit_material::icons::{Icon, Style, Symbol};
 use gpui_kit_material::tokens::typography::TypeScale;
 
 const SAMPLE: &str = "The quick brown fox jumps over the lazy dog";
@@ -17,6 +19,46 @@ const STYLES: [(&str, &str); 3] = [
 /// The sample field's width, where the card has room.
 const SAMPLE_WIDTH: f32 = 360.;
 
+/// A document with a block surface: its fences hold ordinary blocks of the document.
+const RICH_TEXT: &str = "A reading view is one document, so a selection and a find go across all of it.\n\n<!-- surface:summary -->\n\nA block surface draws a run of blocks inside a container: background, shape, padding and a title of its own.\n\n- Selecting, finding and revealing work inside it and across its edges.\n- Copying leaves its fences and title behind.\n\n<!-- /surface -->\n\nThe text after it continues the same document. Drag from here up into the surface.";
+
+/// The summary surface of `RICH_TEXT`, in the current theme's roles.
+fn rich_text_extensions() -> MarkdownExtensions {
+    MarkdownExtensions::default().block_surface("summary", |_, _| {
+        gpui_base::v_flex()
+            .w_full()
+            .min_w_0()
+            .px(rem(24.))
+            .py(rem(20.))
+            .rounded(rem(20.))
+            .bg(color(ColorRole::SECONDARY_CONTAINER))
+            .text_color(color(ColorRole::ON_SECONDARY_CONTAINER))
+            .child(
+                gpui_base::h_flex()
+                    .gap(rem(8.))
+                    .pb(rem(12.))
+                    .items_center()
+                    .child(
+                        Icon::new(SharedString::from(
+                            Symbol::named("auto_awesome")
+                                .expect("a Material Symbol")
+                                .icon()
+                                .style(Style::Rounded)
+                                .asset_path(),
+                        ))
+                        .size(rem(18.))
+                        .color(color(ColorRole::ON_SECONDARY_CONTAINER)),
+                    )
+                    .child(
+                        div()
+                            .text_size(rem(14.))
+                            .font_weight(FontWeight::SEMIBOLD)
+                            .child("Summary"),
+                    ),
+            )
+    })
+}
+
 pub struct Page {
     page: PageCx,
     pub(crate) sample: Entity<InputState>,
@@ -25,6 +67,7 @@ pub struct Page {
     text: SharedString,
     /// Which styles each role shows: "regular", "emphasized" or "both".
     pub(crate) style: SharedString,
+    rich_text: Entity<TextViewState>,
     _subscription: Subscription,
 }
 
@@ -71,12 +114,13 @@ impl GalleryPage for Page {
             text: SAMPLE.into(),
             sample,
             style: "both".into(),
+            rich_text: cx.new(|cx| TextViewState::markdown(RICH_TEXT, cx)),
             _subscription: subscription,
         }
     }
 
     fn row_count(&self, _: &Window) -> usize {
-        1 + TypeRole::ALL.len()
+        2 + TypeRole::ALL.len()
     }
 
     fn row_gap(&self, row: usize) -> f32 {
@@ -155,6 +199,23 @@ impl GalleryPage for Page {
                 .into_any_element();
         }
         let index = row - 1;
+        if index == TypeRole::ALL.len() {
+            return gpui_base::v_flex()
+                .gap(rem(8.))
+                .child(
+                    spec::small_label("rich-text-label", "Block surface")
+                        .text_color(color(ColorRole::ON_SURFACE)),
+                )
+                .child(
+                    TextView::new(&self.rich_text)
+                        .selection_format(SelectionFormat::Source)
+                        .markdown_extensions(rich_text_extensions())
+                        .text_size(rem(16.))
+                        .line_height(rem(24.))
+                        .text_color(color(ColorRole::ON_SURFACE)),
+                )
+                .into_any_element();
+        }
         let role = TypeRole::ALL[index];
         let text: SharedString = if self.text.is_empty() {
             SAMPLE.into()

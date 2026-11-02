@@ -3,6 +3,10 @@
     ".cargo_vcs_info.json": {
       "reason": "Locally written marker naming the vendored Git revision bb85882 and crates/base; not an upstream file.",
       "sha256": "1ef59237513d2538e17724e17d21e739823f9bc085031aea97a7f816c9b6e2a6"
+    },
+    "src/text/block_surface_tests.rs": {
+      "reason": "Tests of the block surface patch (block-surface-patch.md); not an upstream file.",
+      "sha256": "f324704f404cc4f0b263796d309e2f2ff37e22b57e7d0fd28f7f61b7465ae25b"
     }
   },
   "development_examples_limit": "Upstream development examples are preserved, including references to sibling story-web font and repository example fixtures. Those external fixtures are not included in this Base-only vendor snapshot; standalone example execution is not asserted.",
@@ -14,6 +18,14 @@
     "src/lib.rs",
     "src/motion.rs",
     "src/slider.rs",
+    "src/text/document.rs",
+    "src/text/format/markdown.rs",
+    "src/text/markdown_ext.rs",
+    "src/text/mod.rs",
+    "src/text/node.rs",
+    "src/text/range_highlight.rs",
+    "src/text/state.rs",
+    "src/text/stream_fade.rs",
     "src/time_field.rs",
     "src/toolbar.rs"
   ],
@@ -47,6 +59,46 @@
       "local_sha256": "a0625f1691fcdd5eab21cb676b09b90c4e90460acf1ba1cf147a082169cbe30f",
       "reason": "Step snapping counted from min, a dropped handle standing at its snapped value, AT Increment/Decrement that move one thumb onto the step grid and emit Change, no snapping for a step that is not positive and finite, SliderState::accessibility_step (a hundredth of the range for a continuous slider), a min above the default max in a builder, a thumb's disabled flag, and Slider::track_focus for a focusable slider node (motion-patch.md). Right-to-left pointer math on a horizontal slider (motion-patch.md).",
       "upstream_sha256": "71b801a92588d12f7931a5a9e1745fb62f4283ae87d651d4004ae9b41ad72da3"
+    },
+    "src/text/document.rs": {
+      "local_sha256": "9a6bb5145daa9db2764b843b1d120c077bad3441ede58f45626a80dd93d36eec",
+      "reason": "BlockNode::Surface and MarkdownExtensions::block_surface: a run of top-level blocks drawn in a consumer's container (block-surface-patch.md).",
+      "upstream_sha256": "fbac8a9bfcfbc884eadafa4e1a6c4b897593e0c48917179267d6deed9e1b81fb"
+    },
+    "src/text/format/markdown.rs": {
+      "local_sha256": "2eddb6d77320f902245b5294645f67610940658311186ba9479fbe3ad0ad0dcb",
+      "reason": "BlockNode::Surface and MarkdownExtensions::block_surface: a run of top-level blocks drawn in a consumer's container (block-surface-patch.md).",
+      "upstream_sha256": "08be31515e0b041fd39e10007c883105015fa498d23e3bb7023b561e84eddf7e"
+    },
+    "src/text/markdown_ext.rs": {
+      "local_sha256": "eb95c08802bebe05c0e6773f41eff5996d9cf710316e36d5627f9e4ac14b5ef8",
+      "reason": "BlockNode::Surface and MarkdownExtensions::block_surface: a run of top-level blocks drawn in a consumer's container (block-surface-patch.md).",
+      "upstream_sha256": "44fa63ece976a0474f402a2a65d7d1f382f143c1a482dbb392b8f39f85e397b3"
+    },
+    "src/text/mod.rs": {
+      "local_sha256": "d945ddaf8663138092f2199ad5b57a52df11431aaa7b6fd5afa67f239f777009",
+      "reason": "BlockNode::Surface and MarkdownExtensions::block_surface: a run of top-level blocks drawn in a consumer's container (block-surface-patch.md).",
+      "upstream_sha256": "c88ba532a1d529ad16e89788685c7752cd701771d08699d0395a8ab196ff2be6"
+    },
+    "src/text/node.rs": {
+      "local_sha256": "a3f48081c35659ee79f3fc7b77022373da8947a3efd32c41773d3ce59a40c0c1",
+      "reason": "BlockNode::Surface and MarkdownExtensions::block_surface: a run of top-level blocks drawn in a consumer's container (block-surface-patch.md).",
+      "upstream_sha256": "9c98338199b5269791f0aefcb24038f4f59c681adc1ca5e6a6dcd676057ba219"
+    },
+    "src/text/range_highlight.rs": {
+      "local_sha256": "8cc268301204cd388a797c9662531fcbcf7795de85e3131fd6ea9b603e855161",
+      "reason": "BlockNode::Surface and MarkdownExtensions::block_surface: a run of top-level blocks drawn in a consumer's container (block-surface-patch.md).",
+      "upstream_sha256": "99ed9b73bcd26b30bda29135c2a2c0a2963aac82eff9ab720eb12563575078c0"
+    },
+    "src/text/state.rs": {
+      "local_sha256": "97fc34fc4df41deddb0740904defa2a296bb1df7207029cf5f0b5558b54daf87",
+      "reason": "BlockNode::Surface and MarkdownExtensions::block_surface: a run of top-level blocks drawn in a consumer's container (block-surface-patch.md).",
+      "upstream_sha256": "b22bf74f36e5fc0adcbb1200b4db64356272965e5fdecfdcd2b62d700de38bec"
+    },
+    "src/text/stream_fade.rs": {
+      "local_sha256": "7a5bfd294a8244422be45cc36f3efa593f20e5d62c239d8cf0bb0c00d010ff3e",
+      "reason": "BlockNode::Surface and MarkdownExtensions::block_surface: a run of top-level blocks drawn in a consumer's container (block-surface-patch.md).",
+      "upstream_sha256": "8070e549356951d29604a5e436afdf7606bfb6c0cd3fe284384acaf6195260b1"
     },
     "src/time_field.rs": {
       "local_sha256": "c25c9a63303979086d8762d6ea997e9206bd701fae4dec5b1e5c25d12819f14a",
@@ -91,7 +143,8 @@
     "SOURCE.json",
     "ime-anchor-patch.md",
     "motion-patch.md",
-    "input-move-patch.md"
+    "input-move-patch.md",
+    "block-surface-patch.md"
   ],
   "repository": "https://github.com/longbridge/gpui-kit",
   "revision": "bb85882e1faab845d9e7be33b69a152879a90f69",
@@ -339,26 +392,18 @@
     "src/table.rs": "b9101b8ff59b1514955e20ddb111fce7d8cb81cd27c170eb1fd77bcdb9512ad6",
     "src/tabs.rs": "301dce5f2715fbb9fe33dce6e7a6e2b2fe40d4fbab45ba9defe3a0c7e2bef141",
     "src/test_support.rs": "670b1eb9f66d3f7e9b02a424d85239f42872c008293fc8aab257cb86b9e67d94",
-    "src/text/document.rs": "fbac8a9bfcfbc884eadafa4e1a6c4b897593e0c48917179267d6deed9e1b81fb",
     "src/text/editor_host.rs": "358a6d45b287fdcea4a5f29dacc9a3738b20e62d2fc3ce7de5ddf358298e7b17",
     "src/text/editor_seam.rs": "d10d86c056d6792f5d1fe904efc410c97830d77d3dfb555867a371182fa1e101",
     "src/text/format/html.rs": "c67898d5e370cf994d367354b1a542be71b2ef95c91e06db320e97f77c2ce046",
     "src/text/format/html5minify/mod.rs": "139ae3bdc3c5a1d35f2c7439183b1f2aafc5514ced0e1a2f89917098cdc2d714",
-    "src/text/format/markdown.rs": "08be31515e0b041fd39e10007c883105015fa498d23e3bb7023b561e84eddf7e",
     "src/text/format/mod.rs": "a9c352dd0d58f53f6dffe14568378bc481c8352985b2653b0ad7dcea67f72ba8",
     "src/text/inline.rs": "ab846c327bed9dca4a165239faf6bc2a97afa43d6f458ee7a608497bdc78c7c6",
     "src/text/inline_element.rs": "ee002a6860ae76829568f994ea7ac92caba9ced2129c513a43da51c45ce96e37",
     "src/text/inline_flow.rs": "aefc083b5bc4214ab37e1bd19f53c6d3fe9c7b2a94f88dc900ab77e51d574c9c",
     "src/text/inline_object.rs": "4c4b7bf42048f8c2fa4c4deb328707445eaa8eb33d9414d2f8de156961657117",
     "src/text/inline_virtual_tests.rs": "e86c28cc7c0d918e10669c241129756cece9ea52ffd8f73b8e06125a259c4356",
-    "src/text/markdown_ext.rs": "44fa63ece976a0474f402a2a65d7d1f382f143c1a482dbb392b8f39f85e397b3",
-    "src/text/mod.rs": "c88ba532a1d529ad16e89788685c7752cd701771d08699d0395a8ab196ff2be6",
-    "src/text/node.rs": "9c98338199b5269791f0aefcb24038f4f59c681adc1ca5e6a6dcd676057ba219",
-    "src/text/range_highlight.rs": "99ed9b73bcd26b30bda29135c2a2c0a2963aac82eff9ab720eb12563575078c0",
     "src/text/selection.rs": "5a4923a2128cd6a3eea9f91b70dd9e7bd4369b020d1da4b209292c29e6ea870f",
     "src/text/selection_adapter.rs": "e59075ae32ed3c0e76bb045071ae77d8d403e30a98d3d8ea2853e16a88d908e1",
-    "src/text/state.rs": "b22bf74f36e5fc0adcbb1200b4db64356272965e5fdecfdcd2b62d700de38bec",
-    "src/text/stream_fade.rs": "8070e549356951d29604a5e436afdf7606bfb6c0cd3fe284384acaf6195260b1",
     "src/text/style.rs": "3d754d79c126ad2e7bf0f3cd9295662fca95767f300124b7631c5d73bb12217b",
     "src/text/text_view.rs": "094aa37246a2a26cab185122f0ea637ee05097177a07a287361ede92162354ef",
     "src/text/utils.rs": "22a31ad1915b9a5b0ff7c7f79747fdfaab72537f087a498269a4e2b292e93480",
