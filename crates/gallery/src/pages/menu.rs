@@ -8,6 +8,8 @@ use super::text_fields::symbol;
 
 const STATES: [InteractionPreview; 5] = InteractionPreview::ALL;
 const FRUITS: [&str; 5] = ["Apple", "Banana", "Cherry", "Grape", "Mango"];
+/// A selection too long for the select board's 240dp field.
+const LONG_FRUIT: &str = "Mango, Alphonso, hand-picked in Ratnagiri";
 
 const LIVE_MENUS: usize = 5;
 const LIVE_DROPDOWNS: usize = 6;
@@ -22,18 +24,20 @@ pub fn select_rows() -> Vec<usize> {
     vec![SELECT_BOARD, LIVE_DROPDOWNS]
 }
 
-/// The select's field: each variant empty, filled, in error and disabled.
+/// The select's field: each variant empty, filled, in error, disabled and
+/// holding a value too long for it, which ends in an ellipsis.
 fn select_board() -> AnyElement {
     // A board fills row by row.
-    let cells = (0..4).flat_map(|row| {
+    let cells = (0..5).flat_map(|row| {
         [TextFieldVariant::Filled, TextFieldVariant::Outlined]
             .into_iter()
             .enumerate()
             .map(move |(column, variant)| {
-                ExposedDropdown::new(("select-specimen", column * 4 + row), "Fruit")
+                let long = row == 4;
+                ExposedDropdown::new(("select-specimen", column * 5 + row), "Fruit")
                     .variant(variant)
-                    .options(FRUITS)
-                    .selected((row > 0).then_some(0))
+                    .options(FRUITS.into_iter().chain(long.then_some(LONG_FRUIT)))
+                    .selected((row > 0).then_some(if long { FRUITS.len() } else { 0 }))
                     .error(row == 2)
                     .disabled(row == 3)
                     .width(240.)
@@ -44,7 +48,7 @@ fn select_board() -> AnyElement {
         .columns(2)
         .column_width(240.)
         .column_labels(["Filled", "Outlined"])
-        .row_labels(["Empty", "Selected", "Error", "Disabled"])
+        .row_labels(["Empty", "Selected", "Error", "Disabled", "Long"])
         .cells(cells)
         .into_any_element()
 }
