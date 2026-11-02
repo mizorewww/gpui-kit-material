@@ -138,10 +138,11 @@ pub fn info_callout(id: impl Into<ElementId>, text: impl Into<SharedString>) -> 
 /// A page title: text alone in the regular-weight headline role. A title
 /// longer than its column wraps rather than running past the edge.
 ///
-/// The type style is on the returned `Div`, which the text inherits, so a
-/// caller's `text_size` and `line_height` reach the text: a page that needs
-/// a larger headline role (M3 type scale, Headline medium 28/36) sets it on
-/// the heading.
+/// The size, line height and weight are on the returned `Div`, which the text
+/// inherits, so a caller's `text_size`, `line_height` and `font_weight` reach
+/// the text: a page that needs a larger headline (M3 type scale, Headline
+/// medium 28/36) sets them on the heading. This is not a whole type role: the
+/// font family and letter spacing stay the heading's.
 pub fn page_heading(id: impl Into<ElementId>, title: impl Into<SharedString>) -> Div {
     div()
         .flex()
