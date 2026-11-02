@@ -1528,3 +1528,110 @@ fn options_configuration_beside_a_callers_menu_is_detected_as_inert() {
             .mixes_menu_and_options()
     );
 }
+
+#[test]
+fn a_menu_opens_on_its_side_then_the_other_then_where_there_is_more_room() {
+    // Below by default: it fits below, so it stays there.
+    assert!(!opens_above(false, 300., (400., 300.)));
+    // It fits only above.
+    assert!(opens_above(false, 300., (300., 299.)));
+    // It fits on neither side: the side with more room, where it scrolls.
+    assert!(opens_above(false, 300., (250., 200.)));
+    assert!(!opens_above(false, 300., (200., 250.)));
+    assert!(
+        !opens_above(false, 300., (200., 200.)),
+        "a tie keeps its side"
+    );
+    // Asked to open above, the same rules from the other side.
+    assert!(opens_above(true, 300., (300., 400.)));
+    assert!(!opens_above(true, 300., (299., 300.)));
+    assert!(opens_above(true, 300., (200., 200.)));
+}
+
+/// A six-option dropdown in a short window, its field `top` from the window's top.
+struct ShortWindowDropdown {
+    top: f32,
+}
+
+impl Render for ShortWindowDropdown {
+    fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        window.set_rem_size(px(14.));
+        div().pt(px(self.top)).pl(px(20.)).child(
+            ExposedDropdown::new("dropdown", "Fruit")
+                .options(["A", "B", "C", "D", "E", "F"])
+                .open(true),
+        )
+    }
+}
+
+fn short_window_dropdown(
+    top: f32,
+    cx: &mut TestAppContext,
+) -> (Bounds<Pixels>, Bounds<Pixels>, Pixels) {
+    cx.update(|cx| {
+        gpui_kit::init(cx);
+        crate::init(cx);
+        cx.set_reduce_motion(true);
+    });
+    let (_, cx) = cx.add_window_view(move |_, _| ShortWindowDropdown { top });
+    cx.simulate_resize(size(px(800.), px(620.)));
+    settle(cx);
+    let viewport = cx.update(|window, _| window.viewport_size());
+    (
+        cx.debug_bounds("dropdown-trigger").unwrap(),
+        cx.debug_bounds("menu-popup-surface").unwrap(),
+        viewport.height,
+    )
+}
+
+#[gpui::test]
+fn a_dropdown_with_no_room_below_opens_above_its_field(cx: &mut TestAppContext) {
+    // 6 × 56 + 2 × 8 = 352dp of menu: 172dp below the 56dp field, 368dp above it.
+    let (field, surface, _) = short_window_dropdown(380., cx);
+    assert_eq!(
+        surface.size.height,
+        px(6. * 56. + 16.),
+        "whole, not scrolled"
+    );
+    assert_eq!(
+        surface.bottom(),
+        field.top() - px(4.),
+        "the menu at {surface:?} opens above the field at {field:?}"
+    );
+}
+
+#[gpui::test]
+fn a_dropdown_that_fits_nowhere_scrolls_on_the_roomier_side_off_its_field(cx: &mut TestAppContext) {
+    // A field near the middle of the window has less than the menu's 352dp on either side:
+    // 258dp above it and 282dp below.
+    let (field, surface, height) = short_window_dropdown(270., cx);
+    assert!(
+        surface.top() >= field.bottom() + px(4.) || surface.bottom() <= field.top() - px(4.),
+        "the menu at {surface:?} covers the field at {field:?}"
+    );
+    assert!(
+        surface.top() >= field.bottom(),
+        "below, where there is more room"
+    );
+    assert!(surface.size.height < px(6. * 56. + 16.), "it scrolls");
+    assert!(surface.top() >= px(8.) && surface.bottom() <= height - px(8.));
+}
+
+#[gpui::test]
+fn a_menu_turned_above_its_trigger_cascades_upward_too(cx: &mut TestAppContext) {
+    let (view, cx) = cascade(cx, Anchor::TopLeft);
+    // The trigger spans 200..240 of a 300 tall window: no room below it.
+    cx.simulate_resize(size(px(1000.), px(300.)));
+    settle(cx);
+    cx.simulate_keystrokes("down down right");
+    settle(cx);
+    cx.update(|_, cx| assert!(view.read(cx).submenu));
+    let trigger = cx.debug_bounds("trigger").unwrap();
+    let surface = cx.debug_bounds("menu-popup-surface").unwrap();
+    let submenu = cx.debug_bounds("menu-popup-submenu").unwrap();
+    assert_eq!(surface.bottom(), trigger.top() - px(4.), "above");
+    // Above the trigger a sub-menu's last item lines up with its owner's bottom,
+    // and "Share" is the menu's last item.
+    assert_eq!(submenu.bottom(), surface.bottom());
+    assert_eq!(submenu.left(), surface.right() + px(4.));
+}

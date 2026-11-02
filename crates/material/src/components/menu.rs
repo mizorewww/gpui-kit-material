@@ -20,8 +20,10 @@
 //! motion back on close, retargeting from wherever it is.
 //!
 //! A menu taller than [`MaterialMenu::max_height`] scrolls, and a popup never
-//! outgrows its window. The keyboard's item stays in view and an open menu
-//! starts at its selected item.
+//! outgrows its window. A popup with no room on its side of the trigger opens
+//! on the other side, or scrolls on the side with more room; it never covers
+//! its trigger. The keyboard's item stays in view and an open menu starts at
+//! its selected item.
 use super::InteractionPreview;
 use super::focus::{RingPlacement, RingedButton};
 use super::roving::{Direction, target};
@@ -446,13 +448,33 @@ pub(crate) fn centered_offset((top, bottom): (f32, f32), viewport: f32, natural:
     ((top + bottom - viewport) / 2.).clamp(0., (natural - viewport).max(0.))
 }
 
-/// How much of the window a popup can fill, in design px: Base keeps it 8px
-/// from each edge of the content.
-fn window_room(window: &Window) -> f32 {
+/// The space Base keeps between a popup and each edge of the content: its 8px
+/// margin and the window's frame.
+fn popup_edge(window: &Window) -> Pixels {
     const POPUP_MARGIN: Pixels = px(8.);
-    let frame = window.client_inset().unwrap_or(px(0.));
-    let room = window.viewport_size().height - (POPUP_MARGIN + frame) * 2.;
+    POPUP_MARGIN + window.client_inset().unwrap_or(px(0.))
+}
+
+/// How much of the window a popup can fill, in design px.
+fn window_room(window: &Window) -> f32 {
+    let room = window.viewport_size().height - popup_edge(window) * 2.;
     design_px(room, window.rem_size()).max(0.)
+}
+
+/// The gap between a popup and its trigger, in design px.
+const POPUP_GAP: f32 = 4.;
+
+/// The room a popup has `(above, below)` a `trigger`, in design px.
+fn room_beside(trigger: Bounds<Pixels>, window: &Window) -> (f32, f32) {
+    let rem_size = window.rem_size();
+    let edge = popup_edge(window);
+    let gap = rem(POPUP_GAP).to_pixels(rem_size);
+    let above = trigger.top() - edge - gap;
+    let below = window.viewport_size().height - edge - trigger.bottom() - gap;
+    (
+        design_px(above, rem_size).max(0.),
+        design_px(below, rem_size).max(0.),
+    )
 }
 
 /// An M3 menu surface. Use [`MenuPopup`] to open it from a trigger.
@@ -1168,6 +1190,8 @@ struct PopupState {
     focus: FocusHandle,
     /// The trigger's size in design px, measured as it prepaints.
     trigger_size: Rc<std::cell::Cell<(f32, f32)>>,
+    /// The trigger's window bounds, once it has prepainted.
+    trigger_bounds: Rc<std::cell::Cell<Option<Bounds<Pixels>>>>,
     /// Closing the sub-menu by keyboard returns focus to its owner item.
     restore: Rc<std::cell::Cell<bool>>,
     reveal: motion::TokenTransitionPlayback<f32>,
@@ -1295,7 +1319,9 @@ impl MenuPopup {
     /// The popup's own anchor corner (Kit's convention; default top-left,
     /// below the trigger). `LeftCenter` and `RightCenter` place the menu
     /// beside the trigger, to its right or left, with their tops aligned
-    /// (M3's "right start" and "left start" placements).
+    /// (M3's "right start" and "left start" placements). A menu above or
+    /// below the trigger that does not fit there opens on the other side
+    /// when it fits there, and otherwise scrolls on the side with more room.
     pub fn anchor(mut self, anchor: Anchor) -> Self {
         self.anchor = anchor;
         self
@@ -1323,6 +1349,38 @@ pub(crate) fn opens_upward(anchor: Anchor) -> bool {
         anchor,
         Anchor::BottomLeft | Anchor::BottomCenter | Anchor::BottomRight
     )
+}
+
+/// Whether a menu `height` tall opens above its trigger, given whether it
+/// asks to and the room `(above, below)` the trigger, all in design px.
+///
+/// A menu opens on its side of the trigger, on the other side when it fits
+/// only there, and otherwise on whichever side has more room, where it
+/// scrolls: Jetpack Compose Material 3's dropdown menus place themselves so,
+/// and Base's side positioner follows the same rule. Kit's popover places a
+/// menu by its corner and only clamps it into the window, which slides a menu
+/// too tall for its side back over its own trigger.
+pub(crate) fn opens_above(asks_above: bool, height: f32, (above, below): (f32, f32)) -> bool {
+    let (asked, other) = if asks_above {
+        (above, below)
+    } else {
+        (below, above)
+    };
+    let flip = height > asked && (height <= other || other > asked);
+    asks_above != flip
+}
+
+/// The anchor on the other side of the trigger, at the same corner of it.
+fn vertically_flipped(anchor: Anchor) -> Anchor {
+    match anchor {
+        Anchor::TopLeft => Anchor::BottomLeft,
+        Anchor::TopCenter => Anchor::BottomCenter,
+        Anchor::TopRight => Anchor::BottomRight,
+        Anchor::BottomLeft => Anchor::TopLeft,
+        Anchor::BottomCenter => Anchor::TopCenter,
+        Anchor::BottomRight => Anchor::TopRight,
+        other => other,
+    }
 }
 
 /// Whether a sub-menu cascades to the left: popups anchored on their right
@@ -1382,14 +1440,16 @@ impl RenderOnce for MenuPopup {
             window.use_keyed_state((self.id.clone(), "menu-popup"), cx, |_, cx| PopupState {
                 focus: cx.focus_handle(),
                 trigger_size: Default::default(),
+                trigger_bounds: Default::default(),
                 restore: Default::default(),
                 reveal: Default::default(),
                 fade: Default::default(),
             });
         let state = state.read(cx);
-        let (focus, trigger_size, restore) = (
+        let (focus, trigger_size, trigger_bounds, restore) = (
             state.focus.clone(),
             state.trigger_size.clone(),
+            state.trigger_bounds.clone(),
             state.restore.clone(),
         );
         let (reveal_channel, fade_channel) = (state.reveal.clone(), state.fade.clone());
@@ -1422,10 +1482,22 @@ impl RenderOnce for MenuPopup {
             self.menu = self.menu.width(trigger_size.get().0);
         }
         let style = self.menu.style;
-        let height = self.menu.visible_height();
-        let anchor = self.anchor;
-        let upward = opens_upward(anchor);
+        let mut anchor = self.anchor;
         let side = matches!(anchor, Anchor::LeftCenter | Anchor::RightCenter);
+        // A menu too tall for its side of the trigger opens on the other side if it
+        // fits there, and otherwise scrolls on the side with more room. Base would
+        // only slide it back into the window, over its own trigger.
+        if !side && let Some(bounds) = trigger_bounds.get() {
+            let room = room_beside(bounds, window);
+            let asks_above = opens_upward(anchor);
+            let above = opens_above(asks_above, self.menu.visible_height(), room);
+            if above != asks_above {
+                anchor = vertically_flipped(anchor);
+            }
+            self.menu = self.menu.fit(if above { room.0 } else { room.1 });
+        }
+        let height = self.menu.visible_height();
+        let upward = opens_upward(anchor);
         let change = self.on_open_change.clone();
         let close = self.on_open_change.clone();
         let close_on_activate = self.close_on_activate;
@@ -1607,6 +1679,7 @@ impl RenderOnce for MenuPopup {
         let surface = std::cell::RefCell::new(Some(crate::scope::current_scope(content)));
         let open = self.open;
         let measure = trigger_size;
+        let measure_bounds = trigger_bounds;
         // Material buttons block the mouse for the elements under them, so
         // Kit's popover never sees a press on such a trigger. A window
         // listener toggles the menu instead (a press while open closes it
@@ -1644,6 +1717,7 @@ impl RenderOnce for MenuPopup {
                         / f32::from(window.rem_size())
                 };
                 measure.set((design(bounds.size.width), design(bounds.size.height)));
+                measure_bounds.set(Some(bounds));
             }));
         Popover::new(self.id.clone())
             .when(full_width, |popover| popover.w_full())
@@ -1653,7 +1727,7 @@ impl RenderOnce for MenuPopup {
             } else {
                 anchor
             })
-            .offset(rem(4.).to_pixels(window.rem_size()))
+            .offset(rem(POPUP_GAP).to_pixels(window.rem_size()))
             .track_focus(&focus)
             .open(visible)
             .on_open_change(move |next, window, cx| {
