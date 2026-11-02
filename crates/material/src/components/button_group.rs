@@ -534,9 +534,11 @@ fn item_style<T: Styled + StatefulInteractiveElement + gpui::prelude::FluentBuil
             Some(_) => item,
         })
 }
-/// The shared M3 keyboard focus ring around one option. Options sit 2dp
-/// apart, so the ring uses the M3 inner offset: an outer ring would be
-/// covered by the next option.
+/// The shared M3 keyboard focus ring around one option, at the M3 outer
+/// offset as a standalone button's. Options sit 2dp apart, so a ring painted
+/// in place would be covered by the next option, and an inner one is lost on
+/// a selected option's primary fill: the group's `layer` paints it above
+/// every option instead.
 fn focus_ring(
     option: impl IntoElement,
     focus: &FocusHandle,
@@ -544,6 +546,7 @@ fn focus_ring(
     forced: bool,
     paint: OptionPaint,
     vertical: bool,
+    layer: &super::interaction::RingLayer,
 ) -> super::interaction::ButtonFocusRing {
     let (start, end) = (paint.left_radius, paint.right_radius);
     super::interaction::ButtonFocusRing::with_corners(
@@ -566,7 +569,7 @@ fn focus_ring(
             }
         },
     )
-    .inward()
+    .painted_by(layer)
     .forced(forced)
 }
 
@@ -750,6 +753,7 @@ impl RenderOnce for ConnectedButtonGroup {
         let selection_root: std::sync::Arc<ElementId> =
             std::sync::Arc::new((self.id.clone(), "selection").into());
         let debug_kind = if fill { "full" } else { "content" };
+        let ring_layer = super::interaction::RingLayer::default();
         let mut lane = div()
             .flex()
             .map(|lane| {
@@ -880,7 +884,15 @@ impl RenderOnce for ConnectedButtonGroup {
                 let tab = option_ripple(tab, index, &paint, vertical)
                     .disabled(option_disabled)
                     .specimen(preview.is_some());
-                let ring = focus_ring(tab, &focus, option_disabled, forced_focus, paint, vertical);
+                let ring = focus_ring(
+                    tab,
+                    &focus,
+                    option_disabled,
+                    forced_focus,
+                    paint,
+                    vertical,
+                    &ring_layer,
+                );
                 lane = lane.child(equal_slot(ring, &widths[index], equal, widest));
             } else if toggles || self.selection == GroupSelection::None {
                 let click_focus = focus.clone();
@@ -954,6 +966,7 @@ impl RenderOnce for ConnectedButtonGroup {
                     forced_focus,
                     paint,
                     vertical,
+                    &ring_layer,
                 );
                 lane = lane.child(equal_slot(ring, &widths[index], equal, widest));
             } else {
@@ -994,6 +1007,7 @@ impl RenderOnce for ConnectedButtonGroup {
                     forced_focus,
                     paint,
                     vertical,
+                    &ring_layer,
                 );
                 lane = lane.child(equal_slot(ring, &widths[index], equal, widest));
             }
@@ -1015,7 +1029,9 @@ impl RenderOnce for ConnectedButtonGroup {
             .when(cfg!(test), |group| {
                 group.debug_selector(|| "full-choice-track".into())
             })
-            .child(lane);
+            .child(lane)
+            // After the options, so the focused one's ring is above its neighbours.
+            .child(ring_layer.element());
         let group = roving.install(group);
         if let Some(scroll) = self.reveal_in {
             let reveal_id = ElementId::from((self.id.clone(), "choice-reveal"));
@@ -2050,6 +2066,57 @@ mod tests {
             assert_eq!(view.read(cx).changes, 4);
         });
         assert_selected("full-0", px(40.));
+    }
+
+    #[gpui::test]
+    fn a_selected_options_keyboard_ring_sits_outside_it_above_its_neighbours(
+        cx: &mut TestAppContext,
+    ) {
+        use crate::components::interaction::{LAYERED_RING, PAINTED_RING_CHILDREN};
+        cx.update(|cx| {
+            cx.set_reduce_motion(true);
+            crate::components::roving::init(cx);
+        });
+        let (view, cx) = cx.add_window_view(|_, _| FullWidthHarness {
+            count: 3,
+            selected: 0,
+            width: px(420.),
+            changes: 0,
+            disabled: false,
+        });
+        let draw = |cx: &mut VisualTestContext| {
+            PAINTED_RING_CHILDREN.with(|count| count.set(0));
+            draw_choice(cx);
+            LAYERED_RING.with(|ring| ring.get())
+        };
+        draw(cx);
+        let first = choice_bounds(cx, "full-choice-option-0");
+        cx.simulate_click(first.center(), Modifiers::default());
+        assert_eq!(draw(cx), None, "pointer focus shows no ring");
+        cx.simulate_keystrokes("right");
+        let (ring, painted_before) = draw(cx).expect("keyboard focus shows a ring");
+        cx.update(|_, cx| assert_eq!(view.read(cx).selected, 1));
+        assert_selected("full-1", px(40.));
+        let option = choice_bounds(cx, "full-choice-option-1");
+        assert_eq!(
+            ring,
+            option.dilate(px(5.)),
+            "M3 outer offset: 2dp outside the selected option's primary fill, 3dp wide"
+        );
+        for neighbour in [0, 2] {
+            let neighbour = choice_bounds(
+                cx,
+                ["full-choice-option-0", "", "full-choice-option-2"][neighbour],
+            );
+            assert!(
+                ring.intersects(&neighbour),
+                "the ring reaches over the 2dp gap onto its neighbour"
+            );
+        }
+        assert_eq!(
+            painted_before, 3,
+            "the ring is painted after every option, so no neighbour covers it"
+        );
     }
 
     #[gpui::test]
