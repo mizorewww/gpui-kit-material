@@ -753,6 +753,23 @@ fn the_typography_sample_fits_a_phone(cx: &mut TestAppContext) {
     );
 }
 
+/// On a phone at 200% text the text size is a select that fits the card,
+/// not four segments cut off at its edge.
+#[gpui::test]
+fn the_text_size_control_fits_a_phone_at_200_percent(cx: &mut TestAppContext) {
+    let (window, mut cx) = open(cx);
+    text_scale(&window, &mut cx, 2.);
+    cx.simulate_resize(size(px(360.), px(800.)));
+    settle(&window, &mut cx);
+    go(&window, &mut cx, "typography");
+    let select = bounds(&mut cx, "scale-select");
+    assert!(
+        select.right() <= px(360.),
+        "the select ends at {:?}",
+        select.right()
+    );
+}
+
 /// On a phone a canonical layout takes its compact, single pane form, whatever
 /// "Width" asks for, with nothing cut off.
 #[gpui::test]

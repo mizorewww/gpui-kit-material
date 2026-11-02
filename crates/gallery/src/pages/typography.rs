@@ -2,7 +2,7 @@
 //! roles as live samples of editable text, in their regular and M3
 //! Expressive emphasized styles, with the text scale the whole Gallery
 //! follows.
-use super::super::shell;
+use super::super::{playground::CompactSelect, shell};
 use super::prelude::*;
 use gpui_base::input::{InputEvent, InputState};
 use gpui_base::text::{MarkdownExtensions, SelectionFormat, TextView, TextViewState};
@@ -68,8 +68,21 @@ pub struct Page {
     /// Which styles each role shows: "regular", "emphasized" or "both".
     pub(crate) style: SharedString,
     rich_text: Entity<TextViewState>,
+    /// Whether the text size select, which a narrow card shows, is open.
+    scale_menu_open: bool,
     _subscription: Subscription,
 }
+
+/// The text sizes, by the scale's option value.
+const SCALES: [(&str, &str); 4] = [
+    ("1", "100%"),
+    ("1.25", "125%"),
+    ("1.5", "150%"),
+    ("2", "200%"),
+];
+/// Below this card width, in design px, the text size is a select: four
+/// segments at 200% text do not fit a phone.
+const SCALE_SEGMENTS_WIDTH: f32 = 400.;
 
 /// Apply one role's metrics.
 fn scaled<E: Styled>(element: E, scale: TypeScale) -> E {
@@ -89,6 +102,57 @@ pub(crate) fn metrics(scale: TypeScale) -> String {
         px(scale.line_height),
         scale.font_weight
     )
+}
+
+impl Page {
+    /// The text size control: segments where the card has room for them, a
+    /// select where it does not.
+    fn text_scale_control(&self, window: &Window, cx: &mut Context<Self>) -> AnyElement {
+        let list = self.page.rows.list().clone();
+        let scale = self.page.shared.read(cx).scale.clone();
+        let set = |shared: Entity<GalleryShared>| {
+            move |value: SharedString, cx: &mut App| {
+                shared.update(cx, |shared, cx| {
+                    shared.scale = value;
+                    cx.notify();
+                })
+            }
+        };
+        if shell::spec_content_width(window) >= SCALE_SEGMENTS_WIDTH {
+            let set = set(self.page.shared.clone());
+            return ConnectedButtonGroup::new("scale", "Text size")
+                .options(SCALES)
+                .selected(scale)
+                .on_change(move |value: &SharedString, _, cx| set(value.clone(), cx))
+                .reveal("reveal-scale", &list)
+                .into_any_element();
+        }
+        let set = set(self.page.shared.clone());
+        div()
+            .debug_selector(|| "scale-select".into())
+            .child(
+                CompactSelect::new("scale-select", "Text size")
+                    .options(SCALES.map(|(_, label)| SharedString::new_static(label)))
+                    .selected(
+                        SCALES
+                            .iter()
+                            .position(|(value, _)| *value == scale.as_ref())
+                            .unwrap_or(0),
+                    )
+                    .open(self.scale_menu_open)
+                    .on_open_change(cx.listener(|this, open: &bool, _, cx| {
+                        this.scale_menu_open = *open;
+                        cx.notify();
+                    }))
+                    .on_select(cx.listener(move |this, index: &usize, _, cx| {
+                        this.scale_menu_open = false;
+                        set(SharedString::new_static(SCALES[*index].0), cx);
+                        cx.notify();
+                    })),
+            )
+            .reveal("reveal-scale", &list)
+            .into_any_element()
+    }
 }
 
 impl GalleryPage for Page {
@@ -115,6 +179,7 @@ impl GalleryPage for Page {
             sample,
             style: "both".into(),
             rich_text: cx.new(|cx| TextViewState::markdown(RICH_TEXT, cx)),
+            scale_menu_open: false,
             _subscription: subscription,
         }
     }
@@ -146,31 +211,13 @@ impl GalleryPage for Page {
             // The field and the focus reveal around it have no width to fill,
             // so its width is worked out rather than a percentage of nothing.
             let sample_width = SAMPLE_WIDTH.min(shell::spec_content_width(window));
-            let shared = self.page.shared.clone();
+            let scale = self.text_scale_control(window, cx);
             return div()
                 .flex()
                 .flex_wrap()
                 .items_end()
                 .gap(rem(24.))
-                .child(spec::demo(
-                    "scale-demo",
-                    "Text size",
-                    ConnectedButtonGroup::new("scale", "Text size")
-                        .options([
-                            ("1", "100%"),
-                            ("1.25", "125%"),
-                            ("1.5", "150%"),
-                            ("2", "200%"),
-                        ])
-                        .selected(self.page.shared.read(cx).scale.clone())
-                        .on_change(move |value: &SharedString, _, cx| {
-                            shared.update(cx, |shared, cx| {
-                                shared.scale = value.clone();
-                                cx.notify();
-                            })
-                        })
-                        .reveal("reveal-scale", &list),
-                ))
+                .child(spec::demo("scale-demo", "Text size", scale))
                 .child(spec::demo(
                     "type-style-demo",
                     "Style",
