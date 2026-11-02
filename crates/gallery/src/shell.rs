@@ -398,6 +398,12 @@ impl Gallery {
             .dense(true)
             .icons(false)
             .width(DRAWER_WIDTH.min(shell_width(window) - DRAWER_MARGIN))
+            // The width scales with the text; at 200% on a phone the window's
+            // own width bounds it, and the drawer keeps its scrim beside it.
+            .max_width({
+                let insets = window.insets().effective();
+                window.viewport_size().width - insets.left - insets.right
+            })
             .selected(CATALOG[self.current].id)
             .focus_on_open(!searching)
             .on_change(cx.listener(|this, id: &SharedString, _, cx| {

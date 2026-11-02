@@ -1039,6 +1039,24 @@ fn the_compact_drawer_opens_navigates_and_dismisses(cx: &mut TestAppContext) {
     assert!(!is_open(&window, &mut cx));
 }
 
+/// At 200% text on a phone the drawer still leaves its scrim, which dismisses.
+#[gpui::test]
+fn the_drawer_leaves_its_scrim_at_200_percent(cx: &mut TestAppContext) {
+    let (window, mut cx) = open(cx);
+    cx.update(|_, cx| cx.set_reduce_motion(true));
+    text_scale(&window, &mut cx, 2.);
+    resize(&window, &mut cx, 320.);
+    window
+        .update(&mut cx, |g, _, cx| g.set_drawer_open(true, cx))
+        .unwrap();
+    settle(&window, &mut cx);
+    click(&window, &mut cx, point(px(320. - 20.), px(600.)));
+    assert!(
+        !window.update(&mut cx, |g, _, _| g.drawer_open).unwrap(),
+        "the scrim beside the drawer dismisses it"
+    );
+}
+
 #[gpui::test]
 fn compact_search_shows_its_results_in_the_drawer(cx: &mut TestAppContext) {
     let (window, mut cx) = open(cx);

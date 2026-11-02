@@ -130,7 +130,18 @@ impl GalleryPage for Page {
         cx.notify();
     }
 
-    fn render_row(&mut self, row: usize, _: &mut Window, cx: &mut Context<Self>) -> AnyElement {
+    fn render_row(
+        &mut self,
+        row: usize,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> AnyElement {
+        // The full-screen dialog keeps its header clear of the title bar and the
+        // macOS traffic lights in it.
+        let title_bar = Edges {
+            top: window.insets().effective().top + crate::title_bar_height(window),
+            ..Default::default()
+        };
         if row < LIVE {
             let (kind, caption) = KINDS[row];
             return board(("dialogs", row))
@@ -224,6 +235,7 @@ impl GalleryPage for Page {
                                     .into_any_element(),
                             ),
                         )
+                        .safe_area(title_bar)
                         .modal(self.full_screen)
                         .on_dismiss(move |_, cx| {
                             let _ = entity_full.update(cx, |this, cx| {
