@@ -7,4 +7,4 @@ mod ripple_clip;
 pub(crate) use focus_ring::ButtonFocusRing;
 pub(crate) use ripple::ButtonRipple;
 #[cfg(test)]
-pub(crate) use ripple::{ripple_writes, waves_painted};
+pub(crate) use ripple::{last_wave_corners, ripple_writes, waves_painted};

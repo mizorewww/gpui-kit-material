@@ -68,6 +68,9 @@ Distribution is by Git revision for now; see the [quick start](README.md#quick-s
   clears itself), or while the caller forces it. `DROP_TARGET_GROUP` lets its content follow.
 - `NavigationRail::container`: the surface-family role behind a docked rail, so it can sit on
   a page whose ground is another surface role, such as `SURFACE_CONTAINER`.
+- `ListItem::pill`: full (pill) corners on the item's container, selected container, state
+  layers, ripple and focus ring, as a navigation drawer's active indicator. It changes the
+  shape only; the resting `container` is still painted.
 
 ### Changed
 
