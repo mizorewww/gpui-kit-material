@@ -4,10 +4,20 @@
 //! really selects.
 //!
 //! md3.io's Selected options are its default set's values; here they are
-//! positions in the chosen option set, so they work for every set.
+//! positions in the chosen option set, so they work for every set. The Models
+//! set opens a menu the caller builds, whose items carry supporting text and
+//! icons under a group label, followed by an action that is not a value.
 use super::prelude::*;
+use std::rc::Rc;
 
-const SETS: [&[&str]; 3] = [
+/// The Models set: each model's name, its supporting text and its icon.
+const MODELS: [(&str, &str, &str); 3] = [
+    ("Fast", "Quick answers for short notes", "bolt"),
+    ("Balanced", "Good summaries at a moderate cost", "balance"),
+    ("Deep", "Careful reasoning for long lectures", "psychology"),
+];
+
+const SETS: [&[&str]; 4] = [
     &["Apple", "Banana", "Cherry"],
     &["Alaska", "California", "Colorado", "New York", "Texas"],
     &[
@@ -17,6 +27,7 @@ const SETS: [&[&str]; 3] = [
         "Gluten-free",
         "Halal",
     ],
+    &["Fast", "Balanced", "Deep"],
 ];
 
 pub static PLAYGROUND: Playground = Playground {
@@ -39,6 +50,16 @@ pub static PLAYGROUND: Playground = Playground {
                 ("label", Set::Text("Diet")),
                 ("selected", Set::Option("2")),
                 ("supporting", Set::Text("We'll plan the menu around it")),
+            ],
+        },
+        Scenario {
+            name: "Model with a rich menu",
+            values: &[
+                ("set", Set::Option("Models")),
+                ("label", Set::Text("Model")),
+                ("selected", Set::Option("3")),
+                ("supporting", Set::Text("Used for every new note")),
+                ("full_width", Set::Bool(true)),
             ],
         },
     ],
@@ -76,7 +97,7 @@ pub static PLAYGROUND: Playground = Playground {
                 Control::Select {
                     id: "set",
                     label: "Select",
-                    options: &["Default", "State", "Diet"],
+                    options: &["Default", "State", "Diet", "Models"],
                     default: 0,
                 },
                 Control::Text {
@@ -146,7 +167,7 @@ fn preview(
     let open = preview.local("open", window, cx, |_, _| false);
     let is_open = *open.read(cx);
     let label = config.text("label");
-    let select = preview.setter("selected", cx);
+    let select = Rc::new(preview.setter("selected", cx));
     let supporting = config.text("supporting");
     let mut dropdown = ExposedDropdown::new("playground-select", label)
         .variant(if config.option("variant") == "filled" {
@@ -160,9 +181,6 @@ fn preview(
             TextFieldDensity::Default
         })
         .show_label(config.bool("show_label"))
-        .options(options.iter().copied())
-        .disabled_options(config.bool("disable_second").then_some(1))
-        .selected(selected)
         .open(is_open)
         .error(config.bool("error"))
         .required(config.bool("required"))
@@ -179,14 +197,26 @@ fn preview(
                     cx.notify();
                 })
             }
-        })
-        .on_select(move |index: &usize, window, cx| {
-            open.update(cx, |open, cx| {
-                *open = false;
-                cx.notify();
-            });
-            select(Value::Choice(index + 1), window, cx);
         });
+    // A custom menu carries its items' selection, disabled state and
+    // handlers itself, so the Models set sets none of the options' own.
+    dropdown = if config.option("set") == "Models" {
+        dropdown
+            .menu(models_menu(selected, select, config.bool("disable_second")))
+            .value(selected.map_or("", |index| MODELS[index].0))
+    } else {
+        dropdown
+            .options(options.iter().copied())
+            .disabled_options(config.bool("disable_second").then_some(1))
+            .selected(selected)
+            .on_select(move |index: &usize, window, cx| {
+                open.update(cx, |open, cx| {
+                    *open = false;
+                    cx.notify();
+                });
+                select(Value::Choice(index + 1), window, cx);
+            })
+    };
     if !supporting.is_empty() {
         dropdown = dropdown.supporting_text(supporting);
     }
@@ -199,6 +229,37 @@ fn preview(
         .when(full_width, |select| select.w_full())
         .child(dropdown)
         .into_any_element()
+}
+
+/// A menu of models with what each is for, under a group label, then an
+/// action that manages them rather than choosing one.
+fn models_menu(
+    selected: Option<usize>,
+    select: Rc<impl Fn(Value, &mut Window, &mut App) + 'static>,
+    disable_second: bool,
+) -> MaterialMenu {
+    let models = MODELS
+        .iter()
+        .enumerate()
+        .map(|(index, &(name, supporting, icon))| {
+            let select = select.clone();
+            MaterialMenuItem::new(name)
+                .supporting_text(supporting)
+                .leading(symbol(icon, 24.))
+                .selected(selected == Some(index))
+                .disabled(disable_second && index == 1)
+                .on_click(move |_, window, cx| select(Value::Choice(index + 1), window, cx))
+        });
+    MaterialMenu::new("playground-select-models")
+        .style(MenuStyle::Baseline)
+        .group(MenuGroup::new().label("Models").items(models))
+        .group(
+            MenuGroup::new().item(
+                MaterialMenuItem::new("Manage models…")
+                    .leading(symbol("settings", 24.))
+                    .on_click(|_, _, _| {}),
+            ),
+        )
 }
 
 #[cfg(test)]
@@ -254,5 +315,24 @@ mod tests {
         );
         settle(cx);
         assert_eq!(config(&state, cx).option("selected"), "3");
+    }
+
+    #[gpui::test]
+    fn the_models_set_opens_a_rich_menu_that_chooses_a_model(cx: &mut TestAppContext) {
+        let (state, cx) = open(cx, &PLAYGROUND);
+        set(&state, cx, "set", Value::Choice(3));
+        set(&state, cx, "selected", Value::Choice(0));
+        open_menu(cx);
+        let surface = rect(cx, "menu-popup-surface");
+        // Under the group label, the second model's two-line row.
+        let menu = models_menu(None, Rc::new(|_, _: &mut Window, _: &mut App| {}), false);
+        let (top, bottom) = (menu.item_top(1).unwrap(), menu.item_bottom(1).unwrap());
+        cx.simulate_click(
+            point(surface.center().x, surface.top() + px((top + bottom) / 2.)),
+            Modifiers::none(),
+        );
+        settle(cx);
+        assert_eq!(config(&state, cx).option("selected"), "2");
+        assert!(cx.debug_bounds("menu-popup-surface").is_none(), "closed");
     }
 }

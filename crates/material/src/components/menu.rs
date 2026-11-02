@@ -1819,6 +1819,16 @@ impl RenderOnce for MaterialContextMenu {
 }
 
 /// The M3 exposed dropdown menu: a text field that opens a menu of options.
+///
+/// The menu is built from [`Self::options`], or is the caller's own
+/// [`Self::menu`] when its items need more than a label: supporting text,
+/// leading icons, labelled groups or an action that is not a value. This
+/// follows Jetpack Compose Material 3, whose `ExposedDropdownMenuBox` pairs
+/// the text field with menu content the caller supplies
+/// (`ExposedDropdownMenu { DropdownMenuItem(...) }`). Items in a caller's menu
+/// that do not choose a value, such as an action that manages the values, are
+/// the caller's responsibility: their handlers decide what they do, and the
+/// field shows only what [`Self::value`] says.
 #[cfg(feature = "inputs")]
 #[derive(gpui::IntoElement)]
 pub struct ExposedDropdown {
@@ -1841,6 +1851,8 @@ pub struct ExposedDropdown {
     width: f32,
     menu_max_height: Option<f32>,
     full_width: bool,
+    menu: Option<MaterialMenu>,
+    value: Option<SharedString>,
     on_open_change: Option<OpenChange>,
     on_select: Option<Select>,
 }
@@ -1869,9 +1881,47 @@ impl ExposedDropdown {
             width: 210.,
             menu_max_height: None,
             full_width: false,
+            menu: None,
+            value: None,
             on_open_change: None,
             on_select: None,
         }
+    }
+    /// Open the caller's menu instead of one built from [`Self::options`],
+    /// whose items carry their own click handlers, selection and disabled
+    /// state; [`Self::options`], [`Self::selected`], [`Self::disabled_options`]
+    /// and [`Self::on_select`] then go unused, and [`Self::value`] gives the
+    /// field's text. The menu keeps its own style and density. It takes the
+    /// field's width (the field's [`Self::width`] unless it set one, or the
+    /// field's own with [`Self::full_width`]) and [`Self::menu_max_height`]
+    /// unless it set one. Activating an item closes it through
+    /// [`Self::on_open_change`], as an option does.
+    pub fn menu(mut self, menu: MaterialMenu) -> Self {
+        self.menu = Some(menu);
+        self
+    }
+    /// The field's text, and its accessible value, in place of the selected
+    /// option's label: what a [`Self::menu`] has chosen.
+    pub fn value(mut self, value: impl Into<SharedString>) -> Self {
+        self.value = Some(value.into());
+        self
+    }
+    /// Whether options-menu configuration is set alongside a [`Self::menu`],
+    /// which overrides it and leaves it inert.
+    fn mixes_menu_and_options(&self) -> bool {
+        self.menu.is_some()
+            && (!self.options.is_empty()
+                || self.selected.is_some()
+                || !self.disabled_options.is_empty()
+                || self.on_select.is_some()
+                || self.style != MenuStyle::Baseline)
+    }
+    /// The text the field shows: [`Self::value`], else the selected option.
+    fn value_text(&self) -> SharedString {
+        self.value
+            .clone()
+            .or_else(|| self.selected.and_then(|ix| self.options.get(ix).cloned()))
+            .unwrap_or_default()
     }
     /// Mark the choice as required: the label and accessible name gain the
     /// required mark. Enforcing it belongs to the form that owns the value.
@@ -1903,11 +1953,13 @@ impl ExposedDropdown {
         self.density = density;
         self
     }
+    /// The values the menu offers, one item each. A [`Self::menu`] overrides them.
     pub fn options<S: Into<SharedString>>(mut self, options: impl IntoIterator<Item = S>) -> Self {
         self.options = options.into_iter().map(Into::into).collect();
         self
     }
-    /// Options (by index) shown disabled: they cannot be chosen.
+    /// Options (by index) shown disabled: they cannot be chosen. A [`Self::menu`]
+    /// overrides them; its items carry their own disabled state.
     pub fn disabled_options(mut self, options: impl IntoIterator<Item = usize>) -> Self {
         self.disabled_options = options.into_iter().collect();
         self
@@ -1918,6 +1970,8 @@ impl ExposedDropdown {
         self.error = error;
         self
     }
+    /// The chosen option (by index), shown in the field and marked in the menu.
+    /// A [`Self::menu`] overrides it; [`Self::value`] gives the field's text.
     pub fn selected(mut self, selected: Option<usize>) -> Self {
         self.selected = selected;
         self
@@ -1938,6 +1992,8 @@ impl ExposedDropdown {
         self.supporting = Some(text.into());
         self
     }
+    /// The style of the menu built from [`Self::options`]. A [`Self::menu`]
+    /// overrides it with its own style.
     pub fn menu_style(mut self, style: MenuStyle) -> Self {
         self.style = style;
         self
@@ -1965,6 +2021,8 @@ impl ExposedDropdown {
         self.on_open_change = Some(Rc::new(handler));
         self
     }
+    /// Called with an option's index when it is chosen. A [`Self::menu`]
+    /// overrides it; its items carry their own click handlers.
     pub fn on_select(mut self, handler: impl Fn(&usize, &mut Window, &mut App) + 'static) -> Self {
         self.on_select = Some(Rc::new(handler));
         self
@@ -1983,10 +2041,16 @@ impl RenderOnce for ExposedDropdown {
             .clone();
         let open = self.open && !self.disabled;
         let keyboard_focus = focus.is_focused(window) && window.last_input_was_keyboard();
-        let value = self
-            .selected
-            .and_then(|ix| self.options.get(ix).cloned())
-            .unwrap_or_default();
+        if self.mixes_menu_and_options() {
+            static WARNED: std::sync::Once = std::sync::Once::new();
+            WARNED.call_once(|| {
+                log::warn!(
+                    "an ExposedDropdown with a custom `.menu()` ignores `options`, `selected`, \
+                     `disabled_options`, `on_select` and `menu_style`: set them on the menu's items"
+                )
+            });
+        }
+        let value = self.value_text();
         // The arrow turns over with the menu on the fast spatial token.
         let turn = motion::token_value(
             (id.clone(), "dropdown-arrow"),
@@ -2064,24 +2128,22 @@ impl RenderOnce for ExposedDropdown {
             })
             .on_action(move |_: &Confirm, window, cx| confirm(!open, window, cx))
             .child(field);
-        let selected = self.selected;
-        let on_select = self.on_select.clone();
-        let disabled_options = self.disabled_options;
-        let mut menu = MaterialMenu::new((id.clone(), "menu"))
-            .style(self.style)
-            .width(self.width)
-            .items(self.options.into_iter().enumerate().map(|(ix, option)| {
-                let on_select = on_select.clone();
-                MaterialMenuItem::new(option)
-                    .selected(selected == Some(ix))
-                    .disabled(disabled_options.contains(&ix))
-                    .on_click(move |_, window, cx| {
-                        if let Some(select) = on_select.as_ref() {
-                            select(&ix, window, cx);
-                        }
-                    })
-            }));
-        menu.max_height = self.menu_max_height;
+        let menu = match self.menu {
+            Some(menu) => menu,
+            None => options_menu(
+                MaterialMenu::new((id.clone(), "menu")).style(self.style),
+                self.options,
+                self.selected,
+                &self.disabled_options,
+                self.on_select,
+            ),
+        };
+        // A caller's menu keeps a width or height limit it set itself.
+        let menu = MaterialMenu {
+            width: menu.width.or(Some(self.width)),
+            max_height: menu.max_height.or(self.menu_max_height),
+            ..menu
+        };
         if self.disabled {
             return trigger.into_any_element();
         }
@@ -2091,6 +2153,28 @@ impl RenderOnce for ExposedDropdown {
             .on_open_change(move |next, window, cx| toggle(*next, window, cx))
             .into_any_element()
     }
+}
+
+/// `menu` with an item for each of an [`ExposedDropdown`]'s options, each choosing itself.
+#[cfg(feature = "inputs")]
+fn options_menu(
+    menu: MaterialMenu,
+    options: Vec<SharedString>,
+    selected: Option<usize>,
+    disabled: &[usize],
+    on_select: Option<Select>,
+) -> MaterialMenu {
+    menu.items(options.into_iter().enumerate().map(|(ix, option)| {
+        let on_select = on_select.clone();
+        MaterialMenuItem::new(option)
+            .selected(selected == Some(ix))
+            .disabled(disabled.contains(&ix))
+            .on_click(move |_, window, cx| {
+                if let Some(select) = on_select.as_ref() {
+                    select(&ix, window, cx);
+                }
+            })
+    }))
 }
 
 #[cfg(test)]

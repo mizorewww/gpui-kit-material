@@ -1380,3 +1380,152 @@ fn a_keyboard_focused_item_paints_the_focus_layer(cx: &mut TestAppContext) {
     settle(cx);
     assert!(painted(cx), "as a focused specimen paints it");
 }
+
+/// A dropdown whose menu is the caller's: a labelled group of values with
+/// supporting text and leading icons, then an action that is not a value.
+struct RichDropdown {
+    open: bool,
+    picked: Rc<RefCell<Vec<&'static str>>>,
+    full_width: bool,
+}
+
+fn rich_menu(picked: &Rc<RefCell<Vec<&'static str>>>) -> MaterialMenu {
+    let item = |label: &'static str| {
+        let picked = picked.clone();
+        MaterialMenuItem::new(label)
+            .leading(div().debug_selector(move || label.into()).size_full())
+            .on_click(move |_, _, _| picked.borrow_mut().push(label))
+    };
+    MaterialMenu::new("rich-menu")
+        .style(MenuStyle::Baseline)
+        .group(
+            MenuGroup::new()
+                .label("Models")
+                .item(item("Fast").supporting_text("Quick answers").divider(true))
+                .item(
+                    item("Deep")
+                        .supporting_text("Long reasoning")
+                        .selected(true),
+                ),
+        )
+        .group(MenuGroup::new().item(item("Manage")))
+}
+
+impl Render for RichDropdown {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        window.set_rem_size(px(14.));
+        div().w(px(400.)).p(px(20.)).child(
+            ExposedDropdown::new("dropdown", "Model")
+                .menu(rich_menu(&self.picked))
+                .value("Deep")
+                .when(self.full_width, |dropdown| dropdown.full_width())
+                .open(self.open)
+                .on_open_change(cx.listener(|this, open: &bool, _, cx| {
+                    this.open = *open;
+                    cx.notify();
+                })),
+        )
+    }
+}
+
+fn rich_dropdown(
+    full_width: bool,
+    cx: &mut TestAppContext,
+) -> (Entity<RichDropdown>, &mut VisualTestContext) {
+    cx.update(|cx| {
+        gpui_kit::init(cx);
+        crate::init(cx);
+        cx.set_reduce_motion(true);
+    });
+    cx.add_window_view(move |_, _| RichDropdown {
+        open: false,
+        picked: Rc::default(),
+        full_width,
+    })
+}
+
+#[gpui::test]
+fn a_dropdown_opens_the_callers_menu_and_closes_on_its_items(cx: &mut TestAppContext) {
+    let (view, cx) = rich_dropdown(false, cx);
+    draw(cx);
+    let trigger = cx.debug_bounds("dropdown-trigger").unwrap();
+    cx.simulate_click(trigger.center(), Modifiers::default());
+    settle(cx);
+    cx.update(|_, cx| assert!(view.read(cx).open));
+    for label in ["Fast", "Deep", "Manage"] {
+        assert!(cx.debug_bounds(label).is_some(), "{label} is in the menu");
+    }
+    // Without a width of its own, the menu takes the field's (210 by default).
+    let menu = cx.debug_bounds("material-menu").unwrap();
+    assert_eq!(menu.size.width, px(210.));
+    // The action item runs its own handler and closes the menu.
+    let manage = cx.debug_bounds("Manage").unwrap();
+    cx.simulate_click(manage.center(), Modifiers::default());
+    settle(cx);
+    cx.update(|_, cx| {
+        assert_eq!(*view.read(cx).picked.borrow(), vec!["Manage"]);
+        assert!(!view.read(cx).open);
+    });
+}
+
+#[gpui::test]
+fn the_keyboard_opens_a_callers_menu_and_chooses_in_it(cx: &mut TestAppContext) {
+    let (view, cx) = rich_dropdown(true, cx);
+    draw(cx);
+    let trigger = cx.debug_bounds("dropdown-trigger").unwrap();
+    assert_eq!(trigger.size.width, px(360.), "a full-width field");
+    cx.update(|window, cx| window.focus_next(cx));
+    draw(cx);
+    cx.simulate_keystrokes("down");
+    settle(cx);
+    cx.update(|_, cx| assert!(view.read(cx).open));
+    assert_eq!(
+        cx.debug_bounds("material-menu").unwrap().size.width,
+        px(360.),
+        "a full-width field's menu is as wide as the field"
+    );
+    // Down opens at the selected item; one more moves to the action.
+    cx.simulate_keystrokes("down enter");
+    settle(cx);
+    cx.update(|_, cx| {
+        assert_eq!(*view.read(cx).picked.borrow(), vec!["Manage"]);
+        assert!(!view.read(cx).open);
+    });
+}
+
+#[test]
+fn a_dropdowns_value_text_overrides_its_selected_option() {
+    let dropdown = ExposedDropdown::new("dropdown", "Fruit")
+        .options(["Apple", "Banana"])
+        .selected(Some(1));
+    assert_eq!(dropdown.value_text(), "Banana");
+    assert_eq!(dropdown.value("Pear").value_text(), "Pear");
+    assert_eq!(
+        ExposedDropdown::new("dropdown", "Model")
+            .menu(MaterialMenu::new("menu"))
+            .value_text(),
+        ""
+    );
+}
+
+#[cfg(feature = "inputs")]
+#[test]
+fn options_configuration_beside_a_callers_menu_is_detected_as_inert() {
+    let menu = || ExposedDropdown::new("dropdown", "Model").menu(MaterialMenu::new("menu"));
+    assert!(!menu().value("Deep").mixes_menu_and_options());
+    assert!(
+        !ExposedDropdown::new("dropdown", "Fruit")
+            .options(["Apple"])
+            .on_select(|_, _, _| {})
+            .mixes_menu_and_options()
+    );
+    assert!(menu().options(["Apple"]).mixes_menu_and_options());
+    assert!(menu().selected(Some(0)).mixes_menu_and_options());
+    assert!(menu().disabled_options([0]).mixes_menu_and_options());
+    assert!(menu().on_select(|_, _, _| {}).mixes_menu_and_options());
+    assert!(
+        menu()
+            .menu_style(MenuStyle::Standard)
+            .mixes_menu_and_options()
+    );
+}

@@ -44,6 +44,11 @@ impl Render for Screen {
                     .options(["English", "Chinese"])
                     .selected(Some(1)),
             )
+            .child(
+                ExposedDropdown::new("model", "Model")
+                    .menu(MaterialMenu::new("models").item(MaterialMenuItem::new("Deep")))
+                    .value("Deep"),
+            )
             .child(MaterialTooltip::plain("tip", "Save a copy").trigger(div().size(px(20.))))
             .child(progress_with_label("copy", "Copy", 0.25, window, cx))
             .child(indeterminate_progress_with_label("index", "Index", cx))
@@ -208,6 +213,10 @@ fn overlays_rows_and_items_announce_names_and_states(cx: &mut TestAppContext) {
 
     // A time picker is named for the mode it is in, here the input.
     labelled(&all, "dialog", "Enter time", &tree);
+
+    // A dropdown with the caller's menu announces the value it shows.
+    let model = labelled(&all, "comboBox", "Model", &tree);
+    assert_eq!(model["value"], "Deep", "{model}");
 
     // A status fact says in words what its color says.
     labelled(&all, "label", "Checked: passed", &tree);
