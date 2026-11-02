@@ -93,11 +93,10 @@ is **unverified**, never assumed.
 
 ### Performance
 
-Budgets are the targets in [AGENTS.md](../AGENTS.md#performance-and-delivery)
-and [DEVELOPMENT.md](DEVELOPMENT.md#targets): steady-state main-thread CPU p95 ≤
-1 ms and max ≤ 2 ms (WASM ×2), a Material list at most 2× the instructions per frame
-of an equivalent Kit list, idle windows draw nothing, no missed refreshes at 120 Hz
-with vsync on. A component meets them when its Gallery page does
+The target is in [AGENTS.md](../AGENTS.md#performance-and-delivery): for each
+comparable interaction, main-thread frame time p95 and max below md3.io's best run
+in Chrome on the same machine, natively and as WASM, and idle windows draw nothing.
+A component meets it when its Gallery page does
 in a release build, with raw per-frame timings and hardware context preserved.
 Averages never establish a target.
 

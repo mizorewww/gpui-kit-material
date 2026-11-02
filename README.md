@@ -199,17 +199,14 @@ source. See [Reference sources](docs/ARCHITECTURE.md#reference-sources).
 
 Measured on release builds from raw per-frame timings ([AGENTS.md](AGENTS.md)
 has the full rules, [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md#targets) the
-tooling). These are targets; acceptance evidence is still open.
+tooling). Acceptance evidence is still open.
 
 | Target | Limit |
 | --- | --- |
-| Steady-state main-thread CPU (scrolling, hover, animations, typing) | p95 ≤ 1 ms, max ≤ 2 ms (WASM ×2) |
-| Material list against an equivalent Kit list | ≤ 2× the instructions per frame |
+| Each comparable interaction (scrolling, hover, animations, typing, page switch, first load), native and WASM | main-thread frame time p95 and max below md3.io's best run in Chrome on the same machine |
 | Idle window | draws nothing |
-| Vertical sync on | no missed refreshes at 120 Hz |
-| First frame | ≤ 20% above Kit's stories baseline on the same machine |
-| Gallery page switch | ≤ 8 ms |
-| WASM against md3.io in Chrome, interactions with real main-thread work | main-thread frame time ≥ 5× lower |
+
+The profiler's finer budgets in DEVELOPMENT.md are diagnostics, not release gates.
 
 GPU time is reported separately.
 

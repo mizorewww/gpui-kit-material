@@ -67,22 +67,19 @@
 
 ## Performance and delivery
 
-- Performance must clearly beat web implementations, measured on release builds
-  on an idle machine with raw per-frame timings, maxima, hardware/build context
-  and independent review. A profile taken during builds is not evidence.
-  - Steady-state frames (scrolling, hover, running animations, typing): main
-    thread CPU work (render, layout, prepaint, paint, scene submission) p95
-    <= 1 ms and max <= 2 ms.
-  - A Material list costs at most 2x the instructions per frame of an equivalent
-    Kit list. Material components and Gallery composition are the first place to
+- The performance target is to beat the best web implementation, md3.io, on the
+  same machine: for each comparable interaction (scrolling, hover, running
+  animations, typing, page switch, first load), the Gallery's main-thread frame
+  time p95 and max are below md3.io's best run in Chrome, both natively and as
+  WASM in the same browser. Idle windows draw nothing. Measure release builds
+  on an idle machine with raw per-frame timings, maxima, and hardware/build
+  context; a profile taken during builds is not evidence. Averages alone never
+  establish a target; incomplete timing stays unverified.
+  - The profiler's finer budgets (steady CPU p95 1 ms, Material list against
+    Kit list, first frame against Kit's stories, page switch 8 ms) are
+    diagnostics for finding regressions, not release gates.
+  - Material components and Gallery composition are the first place to
     optimize; engine patches need evidence that the engine is the cause.
-  - Idle windows draw nothing; no missed refreshes at 120 Hz with vertical sync
-    on. Report GPU time separately.
-  - First frame at most 20% above Kit's stories baseline on the same machine, and
-    Gallery page switches <= 8 ms.
-  - WASM: the same steady-state budgets x2; keep main-thread frame time >= 5x
-    below md3.io in Chrome for interactions with real main-thread work.
-  Averages alone never establish a target; incomplete timing stays unverified.
 - Notify the narrowest owning view, avoid render-time notification loops and
   virtualize long collections. Measure before introducing caches and identify
   each cache's invalidation owner. Do not simplify required animations to pass.

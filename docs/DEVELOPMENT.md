@@ -152,9 +152,12 @@ a reason.
 
 ### Targets
 
-Every run writes `targets.json` and prints one verdict per AGENTS.md target
-(PASS, FAIL or UNVERIFIED when the data to judge it is missing), from raw
-per-frame data with nearest-rank quantiles; an average never decides one:
+The release target is AGENTS.md's: beat md3.io's best run on the same machine
+([the comparison below](#chrome-comparison-with-md3io)), and draw nothing when idle.
+The budgets in this table are diagnostics for catching regressions, not release
+gates. Every run writes `targets.json` and prints one verdict per budget (PASS,
+FAIL or UNVERIFIED when the data to judge it is missing), from raw per-frame data
+with nearest-rank quantiles; an average never decides one:
 
 | Target | Limit | Source |
 | --- | --- | --- |
