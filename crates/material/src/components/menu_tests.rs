@@ -1313,6 +1313,37 @@ fn a_hero_dropdown_shows_its_label_where_a_field_puts_its_placeholder(cx: &mut T
     assert!(cx.debug_bounds("text-field-placeholder").is_some());
 }
 
+struct RowDropdown(bool);
+impl Render for RowDropdown {
+    fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        window.set_rem_size(px(14.));
+        ExposedDropdown::new("dropdown", "Language")
+            .variant(TextFieldVariant::Outlined)
+            .show_label(self.0)
+            .options(["English", "Chinese"])
+            .selected(Some(0))
+    }
+}
+
+#[gpui::test]
+fn a_dropdown_named_by_its_row_draws_no_label(cx: &mut TestAppContext) {
+    cx.update(|cx| {
+        gpui_kit::init(cx);
+        crate::init(cx);
+        cx.set_reduce_motion(true);
+    });
+    let (view, cx) = cx.add_window_view(|_, _| RowDropdown(true));
+    draw(cx);
+    assert!(cx.debug_bounds("text-field-label").is_some());
+    view.update(cx, |view, cx| {
+        view.0 = false;
+        cx.notify();
+    });
+    draw(cx);
+    assert!(cx.debug_bounds("text-field-label").is_none());
+    assert!(cx.debug_bounds("dropdown-trigger").is_some());
+}
+
 #[gpui::test]
 fn a_keyboard_focused_item_paints_the_focus_layer(cx: &mut TestAppContext) {
     let (_, cx) = cascade(cx, Anchor::TopLeft);

@@ -19,6 +19,7 @@ Distribution is by Git revision for now; see the [quick start](README.md#quick-s
   scrolls, with the keyboard's item kept in view and the selected item shown on open.
   A `MenuPopup` also scrolls rather than outgrow its window.
 - `ExposedDropdown::full_width`: the field fills its parent and the menu matches it.
+- `ExposedDropdown::show_label`: a dropdown that a list item's headline names draws no label of its own.
 - `NoticeKind::Warning`, for a notice that needs attention when nothing has failed.
 - `MaterialContextMenu`: a Material menu that opens at the pointer on a right press.
 - `TintFamily`, and `ColorRole`s for its seven container and content pairs: hue families
