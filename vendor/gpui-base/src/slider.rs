@@ -426,6 +426,9 @@ impl SliderState {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
+        if !steppable(self.value, self.min, self.max) {
+            return;
+        }
         let value = step_thumb(self.value, start, delta, self.min, self.max, self.step);
         if value != self.value {
             self.set_value(value, window, cx);
@@ -479,8 +482,17 @@ fn snap_to_step(value: f32, min: f32, max: f32, step: f32) -> f32 {
         .max(min)
 }
 
+/// Whether `value` can be stepped inside `min..=max`: not for a NaN value or bound, a
+/// `min` above `max`, or a range whose start is past its end, as the keyboard's
+/// stepping refuses them (a NaN thumb used to jump to `max`).
+fn steppable(value: SliderValue, min: f32, max: f32) -> bool {
+    let (start, end) = (value.start(), value.end());
+    min <= max && !start.is_nan() && !end.is_nan() && (!value.is_range() || start <= end)
+}
+
 /// `value` with its end, or with `start` a range's start, moved by `delta` and snapped to
-/// `step` counted from `min`, inside `min..=max` and without passing the other thumb.
+/// `step` counted from `min`, inside `min..=max` and without passing the other thumb. A
+/// value that is not [`steppable`] comes back unchanged.
 fn step_thumb(
     value: SliderValue,
     start: bool,
@@ -489,6 +501,9 @@ fn step_thumb(
     max: f32,
     step: f32,
 ) -> SliderValue {
+    if !steppable(value, min, max) {
+        return value;
+    }
     let mut value = value;
     let moves_start = start && value.is_range();
     let current = if moves_start {
@@ -1082,6 +1097,22 @@ mod tests {
         );
         let state = SliderState::new().step(0.).min(0.).max(200.);
         assert_eq!(state.accessibility_step(), 2.);
+    }
+
+    #[test]
+    fn stepping_leaves_an_invalid_value_or_range_alone() {
+        let nan = step_thumb(SliderValue::Single(f32::NAN), false, 1., 0., 100., 1.);
+        assert!(nan.end().is_nan(), "a NaN value does not jump to max");
+        assert_eq!(
+            step_thumb(SliderValue::Single(50.), false, 1., 100., 0., 1.),
+            SliderValue::Single(50.),
+            "min above max"
+        );
+        assert_eq!(
+            step_thumb(SliderValue::Range(60., 20.), true, 1., 0., 100., 1.),
+            SliderValue::Range(60., 20.),
+            "a reversed range"
+        );
     }
 
     #[test]
