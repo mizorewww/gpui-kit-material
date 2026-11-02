@@ -1827,6 +1827,7 @@ pub struct ExposedDropdown {
     density: TextFieldDensity,
     shape: TextFieldShape,
     label: SharedString,
+    show_label: bool,
     options: Vec<SharedString>,
     disabled_options: Vec<usize>,
     selected: Option<usize>,
@@ -1853,6 +1854,7 @@ impl ExposedDropdown {
             shape: TextFieldShape::Standard,
             density: TextFieldDensity::Default,
             label: label.into(),
+            show_label: true,
             options: Vec::new(),
             disabled_options: Vec::new(),
             selected: None,
@@ -1875,6 +1877,13 @@ impl ExposedDropdown {
     /// required mark. Enforcing it belongs to the form that owns the value.
     pub fn required(mut self, required: bool) -> Self {
         self.required = required;
+        self
+    }
+    /// Whether the field draws its label (the default). A dropdown that a list item's
+    /// headline already names, beside it, draws none; the label still names it to
+    /// assistive technology.
+    pub fn show_label(mut self, show: bool) -> Self {
+        self.show_label = show;
         self
     }
     pub fn variant(mut self, variant: TextFieldVariant) -> Self {
@@ -1992,7 +2001,7 @@ impl RenderOnce for ExposedDropdown {
             .variant(self.variant)
             .shape(self.shape)
             .density(self.density)
-            .label(self.label.clone())
+            .when(self.show_label, |field| field.label(self.label.clone()))
             // A hero field draws no label, and a dropdown has no placeholder of its own.
             .when(self.variant == TextFieldVariant::Hero, |field| {
                 field.placeholder(self.label.clone())

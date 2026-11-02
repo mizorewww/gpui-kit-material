@@ -1,5 +1,5 @@
 //! Select playground: md3.io's Select configuration (variant, density,
-//! option set, label, selection, supporting text, a disabled option, error,
+//! option set, label and whether it shows, selection, supporting text, a disabled option, error,
 //! required, disabled) on the real `ExposedDropdown`, whose menu opens and
 //! really selects.
 //!
@@ -84,6 +84,11 @@ pub static PLAYGROUND: Playground = Playground {
                     label: "Label",
                     default: "Fruit",
                 },
+                Control::Switch {
+                    id: "show_label",
+                    label: "Show label",
+                    default: true,
+                },
                 Control::Select {
                     id: "selected",
                     label: "Selected",
@@ -154,6 +159,7 @@ fn preview(
         } else {
             TextFieldDensity::Default
         })
+        .show_label(config.bool("show_label"))
         .options(options.iter().copied())
         .disabled_options(config.bool("disable_second").then_some(1))
         .selected(selected)
