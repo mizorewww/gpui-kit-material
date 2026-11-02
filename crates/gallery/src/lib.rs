@@ -205,6 +205,8 @@ pub(crate) struct Gallery {
     counted: Cell<Option<Counted>>,
     row_focus: Vec<FocusHandle>,
     navigation_focus: FocusHandle,
+    /// Holds the compact drawer, to tell focus it took from focus elsewhere.
+    pub(crate) drawer_focus: FocusHandle,
     /// The column of pages: see [`shell::NavigationView`].
     navigation: Entity<shell::NavigationView>,
     pending_focus: Option<(usize, bool)>,
@@ -277,6 +279,7 @@ impl Gallery {
             counted: Cell::new(None),
             row_focus: Vec::new(),
             navigation_focus,
+            drawer_focus: cx.focus_handle(),
             navigation,
             pending_focus: None,
             last_rem: window.rem_size(),
@@ -460,6 +463,33 @@ impl Gallery {
                 self.drawer_open = true;
             }
             cx.notify();
+        }
+    }
+
+    /// Show a query's results again in the compact layout, whose drawer holds
+    /// them, after the drawer was dismissed.
+    pub(crate) fn show_results(&mut self, cx: &mut Context<Self>) {
+        if self.shell_layout == shell::ShellLayout::Compact && !self.query.trim().is_empty() {
+            self.set_drawer_open(true, cx);
+        }
+    }
+
+    /// The top bar's Enter: open the first match. An empty query opens
+    /// nothing; a dismissed compact drawer shows the results first, and a
+    /// first match that is the current page closes the drawer.
+    pub(crate) fn open_first_match(&mut self, cx: &mut Context<Self>) {
+        if self.query.trim().is_empty() {
+            return;
+        }
+        if self.shell_layout == shell::ShellLayout::Compact && !self.drawer_open {
+            self.set_drawer_open(true, cx);
+            return;
+        }
+        let first = self.matches().next();
+        match first {
+            Some(first) if first != self.current => self.navigate(first, cx),
+            Some(_) => self.set_drawer_open(false, cx),
+            None => {}
         }
     }
 
@@ -715,8 +745,13 @@ impl Render for Gallery {
             });
         }
         let layout = shell::ShellLayout::of(window);
-        self.shell_layout = layout;
         let compact = layout == shell::ShellLayout::Compact;
+        // A query typed in a wider layout shows its results once compact: its
+        // drawer holds them, and the top bar opens its search with it.
+        if compact && self.shell_layout != layout && !self.query.trim().is_empty() {
+            self.drawer_open = true;
+        }
+        self.shell_layout = layout;
         // A window widened past the drawer leaves nothing to reopen.
         self.drawer_open &= compact;
         let navigation = (!compact).then(|| self.navigation.clone());
@@ -746,7 +781,16 @@ impl Render for Gallery {
                     .children(navigation)
                     .child(self.content.clone()),
             )
-            .children(drawer)
+            .children(drawer.map(|drawer| {
+                // Only while open: the scrim covers the page then, so the
+                // holder's focus on a press takes none from the page.
+                let open = self.drawer_open;
+                div()
+                    .absolute()
+                    .inset_0()
+                    .when(open, |holder| holder.track_focus(&self.drawer_focus))
+                    .child(drawer)
+            }))
             .when(snackbar, |root| {
                 let dismiss = |shared: Entity<GalleryShared>| {
                     move |_: &ClickEvent, _: &mut Window, cx: &mut App| {
@@ -789,24 +833,26 @@ impl Render for GalleryWindow {
         // A phone's cutouts and home indicator: the content stays clear of them
         // and the bar's color reaches the window's edges.
         let insets = window.insets().effective();
-        let settings = title_bar_control(div().debug_selector(|| "gallery-settings-open".into()))
-            .child(if compact {
-                IconButton::new(
-                    "gallery-settings-open",
-                    playground::symbol("settings", 24.),
-                    "Settings",
-                )
+        let settings = top_bar::bar_control(
+            div().debug_selector(|| "gallery-settings-open".into()),
+        )
+        .child(if compact {
+            IconButton::new(
+                "gallery-settings-open",
+                playground::symbol("settings", 24.),
+                "Settings",
+            )
+            .on_click(move |_, window, cx| settings::open(shared.clone(), window, cx))
+            .into_any_element()
+        } else {
+            MaterialButton::new("gallery-settings-open")
+                .variant(ButtonVariant::Text)
+                .button_size(ButtonSize::ExtraSmall)
+                .accessibility_label("Settings")
+                .child("Settings")
                 .on_click(move |_, window, cx| settings::open(shared.clone(), window, cx))
                 .into_any_element()
-            } else {
-                MaterialButton::new("gallery-settings-open")
-                    .variant(ButtonVariant::Text)
-                    .button_size(ButtonSize::ExtraSmall)
-                    .accessibility_label("Settings")
-                    .child("Settings")
-                    .on_click(move |_, window, cx| settings::open(shared.clone(), window, cx))
-                    .into_any_element()
-            });
+        });
         let settings = if compact {
             top_bar::compact_control(settings, window)
         } else {
@@ -1124,6 +1170,233 @@ mod window_tests {
                 }
             }
         }
+    }
+
+    type Parts = (
+        gpui::Entity<Gallery>,
+        gpui::Entity<top_bar::TopBar>,
+        gpui::VisualTestContext,
+    );
+
+    /// A Gallery window with its top bar, `width` px wide at the 100% text
+    /// scale, drawn once.
+    fn open_window(width: f32, cx: &mut TestAppContext) -> Parts {
+        cx.update(|cx| {
+            gpui_kit::init(cx);
+            gpui_kit_material::init(cx);
+            cx.set_reduce_motion(true);
+        });
+        let mut parts = None;
+        let window = cx.open_window(size(px(width), px(800.)), |window, cx| {
+            window.set_rem_size(px(gpui_kit_material::tokens::typography::BASE_PX));
+            let gallery = cx.new(|cx| Gallery::new(window, cx));
+            let top_bar = cx.new(|cx| top_bar::TopBar::new(gallery.clone(), window, cx));
+            parts = Some((gallery.clone(), top_bar.clone()));
+            GalleryWindow {
+                gallery,
+                top_bar,
+                fps: None,
+                caption: None,
+            }
+        });
+        let (gallery, top_bar) = parts.unwrap();
+        let mut cx = gpui::VisualTestContext::from_window(window.into(), cx);
+        // Focus events need an active window, as on a screen.
+        cx.update(|window, _| window.activate_window());
+        settle(&mut cx);
+        (gallery, top_bar, cx)
+    }
+
+    fn settle(cx: &mut gpui::VisualTestContext) {
+        for _ in 0..3 {
+            cx.update(|window, cx| {
+                window.refresh();
+                window.draw(cx).clear(cx);
+            });
+            cx.run_until_parked();
+        }
+    }
+
+    fn field_focused(
+        top_bar: &gpui::Entity<top_bar::TopBar>,
+        cx: &mut gpui::VisualTestContext,
+    ) -> bool {
+        cx.update(|window, cx| {
+            let search = top_bar.read(cx).search.clone();
+            gpui::Focusable::focus_handle(search.read(cx), cx).is_focused(window)
+        })
+    }
+
+    fn toggle_focused(
+        top_bar: &gpui::Entity<top_bar::TopBar>,
+        cx: &mut gpui::VisualTestContext,
+    ) -> bool {
+        cx.update(|window, cx| top_bar.read(cx).toggle_focus.is_focused(window))
+    }
+
+    /// The compact search keeps the keyboard: typing stays in its field while
+    /// the drawer shows the results, Tab stays in the bar over the scrim, and
+    /// Escape closes it and gives focus back to its toggle.
+    #[gpui::test]
+    fn the_compact_search_keeps_the_keyboard_and_escape_closes_it(cx: &mut TestAppContext) {
+        let (gallery, top_bar, mut cx) = open_window(480., cx);
+        let toggle = cx.debug_bounds("top-search-toggle").unwrap();
+        cx.simulate_click(toggle.center(), gpui::Modifiers::none());
+        settle(&mut cx);
+        assert!(cx.read(|cx| top_bar.read(cx).search_open));
+        assert!(
+            field_focused(&top_bar, &mut cx),
+            "opening focuses the field"
+        );
+        cx.simulate_input("sli");
+        settle(&mut cx);
+        assert!(
+            cx.read(|cx| gallery.read(cx).drawer_open),
+            "the results show"
+        );
+        assert!(
+            field_focused(&top_bar, &mut cx),
+            "typing stays in the field"
+        );
+        // Tab walks the bar, never the page under the scrim.
+        for _ in 0..4 {
+            cx.simulate_keystrokes("tab");
+            settle(&mut cx);
+            assert!(
+                field_focused(&top_bar, &mut cx) || toggle_focused(&top_bar, &mut cx),
+                "Tab left the bar"
+            );
+        }
+        // Back in the field, Escape closes the search.
+        cx.update(|window, cx| {
+            let search = top_bar.read(cx).search.clone();
+            search.update(cx, |search, cx| search.focus(window, cx));
+        });
+        cx.simulate_keystrokes("escape");
+        settle(&mut cx);
+        assert!(
+            !cx.read(|cx| top_bar.read(cx).search_open),
+            "Escape closes it"
+        );
+        cx.read(|cx| {
+            let gallery = gallery.read(cx);
+            assert!(gallery.query.is_empty() && !gallery.drawer_open);
+        });
+        assert!(
+            toggle_focused(&top_bar, &mut cx),
+            "focus is back on the toggle"
+        );
+    }
+
+    /// Enter with no query opens nothing; a dismissed results drawer comes back
+    /// on focus and on Enter; a first match that is the current page closes it.
+    #[gpui::test]
+    fn the_top_bar_enter_opens_the_first_match_or_the_results(cx: &mut TestAppContext) {
+        let (gallery, top_bar, mut cx) = open_window(480., cx);
+        let current = || super::catalog::position("overview").unwrap();
+        let toggle = cx.debug_bounds("top-search-toggle").unwrap();
+        cx.simulate_click(toggle.center(), gpui::Modifiers::none());
+        settle(&mut cx);
+        cx.simulate_keystrokes("enter");
+        settle(&mut cx);
+        assert_eq!(
+            cx.read(|cx| gallery.read(cx).current),
+            current(),
+            "nothing to open"
+        );
+        assert!(!cx.read(|cx| gallery.read(cx).drawer_open));
+        cx.simulate_input("overview");
+        settle(&mut cx);
+        assert!(cx.read(|cx| gallery.read(cx).drawer_open));
+        // The first match is the page shown: Enter closes the results.
+        cx.simulate_keystrokes("enter");
+        settle(&mut cx);
+        assert!(!cx.read(|cx| gallery.read(cx).drawer_open));
+        // Dismissed, they come back on Enter, and on focus.
+        cx.simulate_keystrokes("enter");
+        settle(&mut cx);
+        assert!(cx.read(|cx| gallery.read(cx).drawer_open));
+        cx.update(|window, cx| {
+            gallery.update(cx, |gallery, cx| gallery.set_drawer_open(false, cx));
+            window.blur(cx);
+        });
+        settle(&mut cx);
+        cx.update(|window, cx| {
+            let search = top_bar.read(cx).search.clone();
+            search.update(cx, |search, cx| search.focus(window, cx));
+        });
+        settle(&mut cx);
+        assert!(
+            cx.read(|cx| gallery.read(cx).drawer_open),
+            "focus shows the results"
+        );
+        // Another page's match opens it.
+        for _ in "overview".chars() {
+            cx.simulate_keystrokes("backspace");
+        }
+        cx.simulate_input("slider");
+        settle(&mut cx);
+        cx.simulate_keystrokes("enter");
+        settle(&mut cx);
+        assert_eq!(
+            cx.read(|cx| gallery.read(cx).current),
+            super::catalog::position("slider").unwrap()
+        );
+    }
+
+    /// A query typed in the medium layout is not left filtering out of sight
+    /// when the window narrows: the compact bar opens its search and drawer.
+    #[gpui::test]
+    fn a_query_typed_wide_stays_visible_when_compact(cx: &mut TestAppContext) {
+        let (gallery, top_bar, mut cx) = open_window(1280., cx);
+        cx.update(|window, cx| {
+            let search = top_bar.read(cx).search.clone();
+            search.update(cx, |search, cx| search.focus(window, cx));
+        });
+        cx.simulate_input("sli");
+        settle(&mut cx);
+        cx.simulate_resize(size(px(480.), px(800.)));
+        settle(&mut cx);
+        assert!(
+            cx.read(|cx| top_bar.read(cx).search_open),
+            "the field shows"
+        );
+        assert!(cx.debug_bounds("top-search").is_some());
+        assert!(
+            cx.read(|cx| gallery.read(cx).drawer_open),
+            "the results show"
+        );
+    }
+
+    /// The bar shows the mode the application paints, and its toggle keeps a
+    /// palette's family rather than painting a reference theme.
+    #[gpui::test]
+    fn the_mode_toggle_follows_and_keeps_a_painted_palette(cx: &mut TestAppContext) {
+        use gpui_kit_material::prelude::{PaletteId, ThemeMode};
+        let (gallery, top_bar, mut cx) = open_window(1280., cx);
+        let shared = cx.read(|cx| gallery.read(cx).shared.clone());
+        cx.update(|_, cx| {
+            shared.update(cx, |shared, cx| {
+                shared.palette = PaletteId::TokyoNight;
+                shared.reference_theme = None;
+                cx.notify();
+            })
+        });
+        settle(&mut cx);
+        assert_eq!(cx.read(|cx| top_bar.read(cx).shown.mode), ThemeMode::Dark);
+        let toggle = cx.debug_bounds("mode-toggle").unwrap();
+        cx.simulate_click(toggle.center(), gpui::Modifiers::none());
+        settle(&mut cx);
+        cx.read(|cx| {
+            let shared = shared.read(cx);
+            assert_eq!(shared.reference_theme, None);
+            assert_eq!(shared.palette, PaletteId::TokyoDay);
+        });
+        assert_eq!(cx.read(|cx| top_bar.read(cx).shown.mode), ThemeMode::Light);
+        // The preview card's theme select names the palette, not Baseline.
+        let (options, selected, _) =
+            cx.read(|cx| super::shell::preview_theme_choice(shared.read(cx)));
+        assert_eq!(options[selected].as_ref(), "Tokyo Day");
     }
 
     // Fast retains views: upstream builds every view under a notified one again.
