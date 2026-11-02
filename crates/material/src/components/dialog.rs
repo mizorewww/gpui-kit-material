@@ -613,6 +613,7 @@ impl MaterialDialog {
     fn basic_surface(
         self,
         width: f32,
+        max_height: Option<Pixels>,
         dismiss: Option<Dismiss>,
         measure: Option<Entity<MeasuredSize>>,
     ) -> Stateful<Div> {
@@ -620,9 +621,13 @@ impl MaterialDialog {
         let dividers = self.dividers;
         let has_close = self.close_label.is_some();
         let supporting = self.supporting;
+        let has_header = self.icon.is_some() || self.headline.is_some() || self.subtitle.is_some();
+        // The header (icon, headline, subtitle) and the actions stay put; the
+        // body between them scrolls when the dialog is taller than its area.
         let text = div()
             .flex()
             .flex_col()
+            .flex_shrink_0()
             .gap(rem(16.))
             .pt(rem(24.))
             .px(rem(24.))
@@ -642,21 +647,26 @@ impl MaterialDialog {
             })
             .when_some(self.subtitle, |text, subtitle| {
                 text.child(Self::supporting_element(subtitle).when(centered, |s| s.text_center()))
-            })
-            .when(!dividers, |text| {
-                text.when_some(supporting.clone(), |text, supporting| {
-                    text.child(Self::supporting_element(supporting))
-                })
             });
         let content = self.content;
         let has_content = !content.is_empty();
+        let body = || {
+            div()
+                .id("dialog-body")
+                .when(cfg!(test), |body| {
+                    body.debug_selector(|| "dialog-body".into())
+                })
+                .flex()
+                .flex_col()
+                .flex_shrink(1.)
+                .min_h_0()
+                .overflow_y_scroll()
+        };
         // With dividers, the supporting text and content form the body
-        // between them; otherwise the content follows the text.
+        // between them; otherwise the body follows the header.
         let middle = if dividers {
             Some(
-                div()
-                    .flex()
-                    .flex_col()
+                body()
                     .gap(rem(16.))
                     .py(rem(16.))
                     .when_some(supporting, |body, supporting| {
@@ -669,7 +679,20 @@ impl MaterialDialog {
                     .children(content),
             )
         } else {
-            has_content.then(|| div().pt(rem(16.)).flex().flex_col().children(content))
+            (supporting.is_some() || has_content).then(|| {
+                body()
+                    .when_some(supporting, |body, supporting| {
+                        body.child(
+                            div()
+                                .px(rem(24.))
+                                .when(has_header, |text| text.pt(rem(16.)))
+                                .child(Self::supporting_element(supporting)),
+                        )
+                    })
+                    .when(has_content, |body| {
+                        body.child(div().pt(rem(16.)).flex().flex_col().children(content))
+                    })
+            })
         };
         let actions = Self::actions_row(self.alignment, self.actions);
         let has_actions = actions.is_some();
@@ -696,6 +719,7 @@ impl MaterialDialog {
             .flex_col()
             .flex_shrink_0()
             .w(rem(width))
+            .when_some(max_height, |surface, max| surface.max_h(max))
             .overflow_hidden()
             .rounded(DIALOG_RADIUS)
             .bg(color(
@@ -706,7 +730,7 @@ impl MaterialDialog {
         match middle {
             Some(body) if dividers => {
                 surface = surface
-                    .child(div().pt(rem(16.)).child(divider_line()))
+                    .child(div().flex_shrink_0().pt(rem(16.)).child(divider_line()))
                     .child(body)
                     .child(divider_line());
             }
@@ -715,10 +739,12 @@ impl MaterialDialog {
         }
         surface
             .when(self.divider && !dividers, |surface| {
-                surface.child(div().pt(rem(16.)).child(divider_line()))
+                surface.child(div().flex_shrink_0().pt(rem(16.)).child(divider_line()))
             })
             .children(actions)
-            .when(!has_actions, |surface| surface.child(div().h(rem(24.))))
+            .when(!has_actions, |surface| {
+                surface.child(div().flex_shrink_0().h(rem(24.)))
+            })
             .children(close)
             .when_some(measure, |surface, measure| {
                 surface.child(
@@ -821,7 +847,8 @@ impl RenderOnce for MaterialDialog {
             } else {
                 let width = self.basic_width(f32::INFINITY);
                 let dismiss = self.on_dismiss.clone();
-                self.basic_surface(width, dismiss, None).into_any_element()
+                self.basic_surface(width, None, dismiss, None)
+                    .into_any_element()
             };
         };
         let id = self.id.clone();
@@ -866,7 +893,11 @@ impl RenderOnce for MaterialDialog {
                 window.use_keyed_state((id.clone(), "dialog-size"), cx, |_, _| MeasuredSize(None))
             });
             let measured = measure.as_ref().and_then(|measure| measure.read(cx).0);
-            let basic = self.basic_surface(width, dismiss.filter(|_| open), measure);
+            // The container never outgrows its area: the body scrolls instead.
+            let max_height =
+                (area.size.height - rem(2. * DIALOG_MARGIN).to_pixels(rem_size)).max(px(0.));
+            let basic =
+                self.basic_surface(width, Some(max_height), dismiss.filter(|_| open), measure);
             let positioned = div()
                 .relative()
                 .top(rem(slide_offset(animation, frame.spatial)))
@@ -1304,5 +1335,72 @@ mod tests {
         cx.simulate_click(close.center(), Modifiers::default());
         draw(cx);
         assert_eq!(view.read_with(cx, |v, _| v.dismissals), 2);
+    }
+
+    /// A modal dialog with more content than its window holds.
+    struct Tall {
+        full_screen: bool,
+    }
+    impl Render for Tall {
+        fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+            window.set_rem_size(px(14.));
+            let rows = (0..30).map(|index| {
+                div()
+                    .debug_selector(move || format!("tall-row-{index}"))
+                    .h(px(40.))
+                    .flex_shrink_0()
+            });
+            let dialog = MaterialDialog::new("tall")
+                .headline("Title")
+                .supporting_text("Body")
+                .content(div().flex().flex_col().children(rows))
+                .action(div().debug_selector(|| "tall-action".into()).size(px(40.)))
+                .modal(true)
+                .on_dismiss(|_, _| {});
+            let dialog = if self.full_screen {
+                dialog.full_screen("Close", None)
+            } else {
+                dialog
+            };
+            div().size_full().child(dialog)
+        }
+    }
+
+    #[gpui::test]
+    fn a_tall_dialog_fits_its_window_and_scrolls_its_body(cx: &mut TestAppContext) {
+        cx.update(|cx| {
+            gpui_base::init(cx);
+            cx.set_reduce_motion(true);
+        });
+        let (_, cx) = cx.add_window_view(|_, _| Tall { full_screen: false });
+        cx.simulate_resize(size(px(400.), px(600.)));
+        draw(cx);
+        draw(cx);
+        let body = cx.debug_bounds("dialog-body").unwrap();
+        let action = cx.debug_bounds("tall-action").unwrap();
+        assert!(body.top() >= px(24.), "inside the margin: {body:?}");
+        assert!(
+            action.bottom() <= px(600. - 24.),
+            "the actions stay in the window: {action:?}"
+        );
+        assert!(body.bottom() <= action.top(), "the body ends above them");
+        let first = cx.debug_bounds("tall-row-0").unwrap();
+        assert!(first.top() > body.top());
+        cx.simulate_event(ScrollEvent {
+            position: body.center(),
+            delta: ScrollDelta::Pixels(point(px(0.), px(-200.))),
+            ..Default::default()
+        });
+        draw(cx);
+        let scrolled = cx.debug_bounds("tall-row-0").unwrap();
+        assert!(
+            scrolled.top() < first.top() - px(100.),
+            "the body scrolled: {first:?} -> {scrolled:?}"
+        );
+        assert_eq!(
+            cx.debug_bounds("tall-action").unwrap(),
+            action,
+            "the actions are pinned"
+        );
     }
 }
