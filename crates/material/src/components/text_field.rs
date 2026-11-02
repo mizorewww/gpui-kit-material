@@ -89,7 +89,9 @@ pub enum TextFieldVariant {
     Outlined,
     /// A 72dp pill on surface, with a 2dp ring while focused or populated and no ring at
     /// rest. It has no floating label: the label is its accessible name and the
-    /// placeholder says what to enter. Its trailing slot takes a labeled button, so the
+    /// placeholder says what to enter. Set through [`TextField::hero`], which takes that
+    /// name. Through [`TextField::variant`] without a label, its placeholder is the name,
+    /// and with neither a warning is logged, once. Its trailing slot takes a labeled button, so the
     /// field's action reads as part of the input.
     Hero,
 }
@@ -1018,6 +1020,17 @@ impl RenderOnce for TextField {
         };
         // Kit's editors align physically; they do not mirror with layout.
         let rtl = crate::scope::is_rtl(window);
+        // A hero field shows its placeholder at rest, so it can stand in for a missing label.
+        let name = self.label.clone().or_else(|| {
+            let name = self.placeholder.clone().filter(|_| hero);
+            if hero && name.is_none() && !matches!(self.input, FieldInput::Static(_)) {
+                static WARNED: std::sync::Once = std::sync::Once::new();
+                WARNED.call_once(|| {
+                    log::warn!("a hero TextField has no label or placeholder to name it: use `.hero(label)`")
+                });
+            }
+            name
+        });
         let editor: AnyElement = match &self.input {
             FieldInput::Single(state) => Input::new(state)
                 .appearance(false)
@@ -1025,7 +1038,7 @@ impl RenderOnce for TextField {
                 .disabled(disabled)
                 .readonly(self.read_only)
                 .when(rtl, |this| this.text_right())
-                .when_some(self.label.clone(), |this, label| this.aria_label(label))
+                .when_some(name.clone(), |this, label| this.aria_label(label))
                 .p_0()
                 .h(rem(24.))
                 .text_size(TypeRole::BodyLarge.scale().font_size)
@@ -1037,7 +1050,7 @@ impl RenderOnce for TextField {
                 .disabled(disabled)
                 .readonly(self.read_only)
                 .when(rtl, |this| this.text_right())
-                .when_some(self.label.clone(), |this, label| this.aria_label(label))
+                .when_some(name.clone(), |this, label| this.aria_label(label))
                 .p_0()
                 // Kit insets multi-line text by the XSmall input padding.
                 .mx(px(-4.))

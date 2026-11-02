@@ -73,6 +73,7 @@ shapes = []
 dynamic-color = ["gpui-kit-material-color/dynamic"]
 
 [dependencies]
+log = "0.4"
 gpui-kit-material-color.workspace = true
 gpui-kit.workspace = true
 gpui-material-symbols = { git = "https://github.com/mizorewww/gpui-material-symbols", rev = "593aa15a46076f3e2870c23c0e4fd79f94f105bd", default-features = false, features = ["gpui-kit"] }
