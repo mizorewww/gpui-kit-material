@@ -585,3 +585,20 @@ fn a_hero_field_hovers_under_the_pointer(cx: &mut TestAppContext) {
     draw(cx);
     assert!(painted(cx));
 }
+
+#[test]
+fn a_specimen_value_too_long_for_the_field_ends_in_an_ellipsis() {
+    // An exposed dropdown shows its selection through this specimen value.
+    let value = SharedString::from("本机 · Qwen3 1.7B · Apple");
+    for masked in [false, true] {
+        let mut line = static_value(&value, masked);
+        let style = line.style();
+        assert!(
+            matches!(style.text.text_overflow, Some(TextOverflow::Truncate(_))),
+            "masked: {masked}"
+        );
+        assert_eq!(style.text.white_space, Some(WhiteSpace::Nowrap));
+        assert_eq!(style.overflow.x, Some(Overflow::Hidden));
+        assert_eq!(style.min_size.width, Some(px(0.).into()));
+    }
+}
