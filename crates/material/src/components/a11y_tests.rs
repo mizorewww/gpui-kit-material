@@ -5,6 +5,7 @@ use super::*;
 use gpui::{
     Context, Entity, IntoElement, Render, SharedString, TestAppContext, Window, div, prelude::*, px,
 };
+use gpui_base::slider::SliderState;
 use serde_json::Value;
 
 const MARKER: &str = "material-a11y-names-verified";
@@ -211,4 +212,86 @@ fn overlays_rows_and_items_announce_names_and_states(cx: &mut TestAppContext) {
         "{tree}"
     );
     println!("{MARKER}");
+}
+
+struct Sliders(Entity<SliderState>, Entity<SliderState>);
+impl Render for Sliders {
+    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        div()
+            .w(px(400.))
+            .child(MaterialSlider::new(&self.0, "Volume"))
+            .child(MaterialSlider::new(&self.1, "Price"))
+    }
+}
+
+#[gpui::test]
+fn a_continuous_slider_reports_a_usable_step(cx: &mut TestAppContext) {
+    const SLIDER_MARKER: &str = "material-a11y-slider-verified";
+    if std::env::var("GPUI_A11Y_ACTIVE").as_deref() != Ok("1") {
+        let output = std::process::Command::new(std::env::current_exe().unwrap())
+            .args([
+                "--exact",
+                "components::a11y_tests::a_continuous_slider_reports_a_usable_step",
+                "--nocapture",
+            ])
+            .env("GPUI_A11Y_ACTIVE", "1")
+            .output()
+            .unwrap();
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        assert!(
+            output.status.success(),
+            "{stdout}{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        assert!(
+            stdout.contains(SLIDER_MARKER),
+            "the child ran no assertions"
+        );
+        return;
+    }
+    cx.update(|cx| {
+        gpui_base::init(cx);
+        cx.set_reduce_motion(true);
+    });
+    let (_, cx) = cx.add_window_view(|window, cx| {
+        window.set_rem_size(px(crate::tokens::typography::BASE_PX));
+        // Two continuous sliders (step 0): a single one and a range.
+        Sliders(
+            cx.new(|_| SliderState::new().step(0.).max(200.).default_value(50.)),
+            cx.new(|_| {
+                SliderState::new()
+                    .step(0.)
+                    .max(200.)
+                    .default_value((40., 120.))
+            }),
+        )
+    });
+    for _ in 0..3 {
+        cx.update(|window, cx| {
+            window.refresh();
+            window.draw(cx).clear(cx);
+        });
+        cx.run_until_parked();
+    }
+    let tree = cx.update(|window, _| window.debug_a11y_tree_json().expect("accessibility on"));
+    let all = nodes(&tree);
+
+    // A continuous slider reports the keyboard's step, a hundredth of its range, not 0.
+    let volume = labelled(&all, "slider", "Volume", &tree);
+    assert_eq!(volume["numeric_value_step"], 2.0, "{volume}");
+
+    let price: Vec<&Value> = all
+        .iter()
+        .filter(|node| {
+            node["label"] == "Price"
+                && node["role"]
+                    .as_str()
+                    .is_some_and(|r| r.eq_ignore_ascii_case("slider"))
+        })
+        .collect();
+    assert!(price.len() >= 2, "{tree}");
+    for node in price {
+        assert_eq!(node["numeric_value_step"], 2.0, "{node}");
+    }
+    println!("{SLIDER_MARKER}");
 }

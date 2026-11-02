@@ -306,6 +306,17 @@ impl SliderState {
         self.step
     }
 
+    /// The amount an assistive technology's Increment and Decrement move a thumb, and the
+    /// step reported to it: the step, or a hundredth of the range for a step that is not a
+    /// positive finite number (a continuous slider), as the keyboard does.
+    pub fn accessibility_step(&self) -> f32 {
+        if is_step(self.step) {
+            self.step
+        } else {
+            (self.max - self.min) / 100.
+        }
+    }
+
     /// Converts a value between 0.0 and 1.0 to a value between the minimum and maximum value,
     /// depending on the chosen scale.
     fn percentage_to_value(&self, percentage: f32) -> f32 {
@@ -405,7 +416,8 @@ impl SliderState {
 
     /// Moves the end thumb or, with `start`, a range's start thumb by `delta`, as an
     /// assistive technology's Increment and Decrement do, and reports the change if it
-    /// moved. A thumb stops at the other one and at the slider's ends.
+    /// moved. A thumb lands on the step grid counted from `min`, as the keyboard's does, and
+    /// stops at the other one and at the slider's ends.
     #[doc(hidden)]
     pub fn step_thumb(
         &mut self,
@@ -414,7 +426,7 @@ impl SliderState {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        let value = step_thumb(self.value, start, delta, self.min, self.max);
+        let value = step_thumb(self.value, start, delta, self.min, self.max, self.step);
         if value != self.value {
             self.set_value(value, window, cx);
             cx.emit(SliderEvent::Change(value));
@@ -450,21 +462,51 @@ impl SliderState {
     }
 }
 
-/// `value` on the nearest step counted from `min`, kept inside the range.
+/// Whether `step` divides the range into steps: a positive finite number.
+fn is_step(step: f32) -> bool {
+    step > 0. && step.is_finite()
+}
+
+/// `value` on the nearest step counted from `min`, kept inside the range. A step that is
+/// not a positive finite number leaves the value continuous (it used to divide by zero,
+/// and the NaN clamped to `max`).
 fn snap_to_step(value: f32, min: f32, max: f32, step: f32) -> f32 {
+    if !is_step(step) {
+        return value;
+    }
     (min + ((value - min) / step).round() * step)
         .min(max)
         .max(min)
 }
 
-/// `value` with its end, or with `start` a range's start, moved by `delta` inside
-/// `min..=max`, without passing the other thumb.
-fn step_thumb(value: SliderValue, start: bool, delta: f32, min: f32, max: f32) -> SliderValue {
+/// `value` with its end, or with `start` a range's start, moved by `delta` and snapped to
+/// `step` counted from `min`, inside `min..=max` and without passing the other thumb.
+fn step_thumb(
+    value: SliderValue,
+    start: bool,
+    delta: f32,
+    min: f32,
+    max: f32,
+    step: f32,
+) -> SliderValue {
     let mut value = value;
-    if start && value.is_range() {
-        value.set_start((value.start() + delta).min(max).max(min));
+    let moves_start = start && value.is_range();
+    let current = if moves_start {
+        value.start()
     } else {
-        value.set_end((value.end() + delta).min(max).max(min));
+        value.end()
+    };
+    let next = current + delta;
+    let next = if is_step(step) {
+        min + ((next - min) / step).round() * step
+    } else {
+        next
+    };
+    let next = next.min(max).max(min);
+    if moves_start {
+        value.set_start(next);
+    } else {
+        value.set_end(next);
     }
     value
 }
@@ -582,7 +624,7 @@ impl RenderOnce for Slider {
             .aria_numeric_value(state.value().end() as f64)
             .aria_min_numeric_value(state.min_value() as f64)
             .aria_max_numeric_value(state.max_value() as f64)
-            .aria_numeric_value_step(state.step_value() as f64)
+            .aria_numeric_value_step(state.accessibility_step() as f64)
             .aria_orientation(if axis.is_vertical() {
                 Orientation::Vertical
             } else {
@@ -595,7 +637,7 @@ impl RenderOnce for Slider {
                     let state = slider_state.clone();
                     move |_, window, cx| {
                         state.update(cx, |state, cx| {
-                            state.step_thumb(false, state.step_value(), window, cx);
+                            state.step_thumb(false, state.accessibility_step(), window, cx);
                         });
                     }
                 })
@@ -603,7 +645,7 @@ impl RenderOnce for Slider {
                     let state = slider_state.clone();
                     move |_, window, cx| {
                         state.update(cx, |state, cx| {
-                            state.step_thumb(false, -state.step_value(), window, cx);
+                            state.step_thumb(false, -state.accessibility_step(), window, cx);
                         });
                     }
                 })
@@ -1016,29 +1058,53 @@ mod tests {
         // A step past the end stays inside the range.
         assert_eq!(snap_to_step(99., 3., 100., 5.), 98.);
         assert_eq!(snap_to_step(100., 0., 99., 10.), 99.);
+        // A step that is not a positive finite number leaves the value continuous.
+        assert_eq!(snap_to_step(42.5, 0., 100., 0.), 42.5);
+        assert_eq!(snap_to_step(42.5, 0., 100., -5.), 42.5);
+        assert_eq!(snap_to_step(42.5, 0., 100., f32::NAN), 42.5);
+        assert_eq!(snap_to_step(42.5, 0., 100., f32::INFINITY), 42.5);
+    }
+
+    #[test]
+    fn accessibility_steps_land_on_the_step_grid() {
+        assert_eq!(
+            step_thumb(SliderValue::Single(33.), false, 10., 0., 100., 10.),
+            SliderValue::Single(40.)
+        );
+        assert_eq!(
+            step_thumb(SliderValue::Single(33.), false, -10., 0., 100., 10.),
+            SliderValue::Single(20.)
+        );
+        assert_eq!(
+            step_thumb(SliderValue::Single(33.), false, 0.5, 0., 100., 0.),
+            SliderValue::Single(33.5),
+            "a continuous slider does not snap"
+        );
+        let state = SliderState::new().step(0.).min(0.).max(200.);
+        assert_eq!(state.accessibility_step(), 2.);
     }
 
     #[test]
     fn accessibility_steps_move_only_the_stepped_thumb() {
         assert_eq!(
-            step_thumb(SliderValue::Range(20., 60.), false, 1., 0., 100.),
+            step_thumb(SliderValue::Range(20., 60.), false, 1., 0., 100., 1.),
             SliderValue::Range(20., 61.)
         );
         assert_eq!(
-            step_thumb(SliderValue::Range(20., 20.), false, -1., 0., 100.),
+            step_thumb(SliderValue::Range(20., 20.), false, -1., 0., 100., 1.),
             SliderValue::Range(20., 20.),
             "the end never passes the start"
         );
         assert_eq!(
-            step_thumb(SliderValue::Single(99.5), false, 1., 0., 100.),
+            step_thumb(SliderValue::Single(99.5), false, 1., 0., 100., 1.),
             SliderValue::Single(100.)
         );
         assert_eq!(
-            step_thumb(SliderValue::Range(20., 60.), true, -1., 0., 100.),
+            step_thumb(SliderValue::Range(20., 60.), true, -1., 0., 100., 1.),
             SliderValue::Range(19., 60.)
         );
         assert_eq!(
-            step_thumb(SliderValue::Range(60., 60.), true, 1., 0., 100.),
+            step_thumb(SliderValue::Range(60., 60.), true, 1., 0., 100., 1.),
             SliderValue::Range(60., 60.),
             "the start never passes the end"
         );
