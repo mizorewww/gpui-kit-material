@@ -584,6 +584,27 @@ fn observe_press(
 type HoverCallback = std::rc::Rc<dyn Fn(&bool, &mut Window, &mut App)>;
 
 /// Sized, shaped Material presentation; activation, keyboard and focus stay in Base.
+///
+/// # Example
+///
+/// ```
+/// use gpui_kit::prelude::*;
+/// use gpui_kit_material::prelude::*;
+/// use gpui_kit_material::icons::Symbol;
+///
+/// let save = MaterialButton::new("save")
+///     .variant(ButtonVariant::Tonal)
+///     .button_size(ButtonSize::Medium)
+///     .icon(Symbol::CHECK)
+///     .on_click(|_, _window, _cx| println!("Saved"))
+///     .child("Save");
+/// let favorite = MaterialButton::new("favorite")
+///     .toggle(true)
+///     .selected(false)
+///     .on_change(|selected, _, _window, _cx| println!("Favorite: {selected}"))
+///     .child("Favorite");
+/// # let _ = (save, favorite);
+/// ```
 #[derive(gpui::IntoElement)]
 pub struct MaterialButton {
     #[cfg(test)]

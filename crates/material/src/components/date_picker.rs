@@ -142,6 +142,54 @@ impl DateFormat {
 /// Every caller-supplied string and formatter of a date picker. Nothing
 /// user-facing is hard-coded in the component; galleries and apps build
 /// this from their locale.
+///
+/// # Example
+///
+/// ```
+/// use gpui_kit_material::prelude::*;
+/// use gpui_kit::SharedString;
+/// use std::rc::Rc;
+///
+/// let s = SharedString::new_static;
+/// let labels = DatePickerLabels {
+///     title: s("Select date"),
+///     confirm: s("OK"),
+///     cancel: s("Cancel"),
+///     headline: Rc::new(|date: NaiveDate| date.format("%a, %b %-d").to_string().into()),
+///     // …and every other string and formatter, from the app's locale.
+/// #     no_selection: s("Selected date"),
+/// #     input_headline: s("Enter date"),
+/// #     clear: s("Clear"),
+/// #     save: s("Save"),
+/// #     close: s("Close"),
+/// #     previous_month: s("Previous month"),
+/// #     next_month: s("Next month"),
+/// #     previous_year: s("Previous year"),
+/// #     next_year: s("Next year"),
+/// #     switch_to_input: s("Switch to text input"),
+/// #     switch_to_calendar: s("Switch to calendar"),
+/// #     choose_year: s("Choose year"),
+/// #     choose_month: s("Choose month"),
+/// #     date_field: s("Date"),
+/// #     start_field: s("Start date"),
+/// #     end_field: s("End date"),
+/// #     input_placeholder: s("MM/DD/YYYY"),
+/// #     invalid_input: s("Use MM/DD/YYYY"),
+/// #     weekday: Rc::new(|day: Weekday| day.to_string()[..1].to_string().into()),
+/// #     month: Rc::new(|month| month.to_string().into()),
+/// #     month_short: Rc::new(|month| month.to_string().into()),
+/// #     month_year: Rc::new(|year, month| format!("{month}/{year}").into()),
+/// #     range_headline: Rc::new(|start, end| format!("{start:?} – {end:?}").into()),
+/// #     accessible_date: Rc::new(|date: NaiveDate| date.to_string().into()),
+/// #     number: Rc::new(|n| n.to_string().into()),
+/// #     format_input: Rc::new(|date| DateFormat::MonthDayYear.format(date)),
+/// #     parse_input: Rc::new(|text| DateFormat::MonthDayYear.parse(text)),
+/// }
+/// // Type dates as DD/MM/YYYY.
+/// .date_format(DateFormat::DayMonthYear);
+/// let date = NaiveDate::from_ymd_opt(2025, 8, 17).unwrap();
+/// assert_eq!((labels.format_input)(date), "17/08/2025");
+/// ```
 #[derive(Clone)]
 pub struct DatePickerLabels {
     /// The modal header's supporting text, e.g. "Select date".
@@ -247,6 +295,67 @@ struct Slide {
 /// A date picker's state: selection, displayed month, view, mode and the
 /// keyboard cursor. Create it once per picker with `cx.new` and hand it to
 /// [`DatePicker`].
+///
+/// # Example
+///
+/// ```
+/// # use gpui_kit::{prelude::*, *};
+/// use gpui_kit_material::prelude::*;
+/// # use std::rc::Rc;
+/// # fn date_picker_labels() -> DatePickerLabels {
+/// #     let s = SharedString::new_static;
+/// #     DatePickerLabels {
+/// #         title: s("Select date"),
+/// #         no_selection: s("Selected date"),
+/// #         input_headline: s("Enter date"),
+/// #         confirm: s("OK"),
+/// #         cancel: s("Cancel"),
+/// #         clear: s("Clear"),
+/// #         save: s("Save"),
+/// #         close: s("Close"),
+/// #         previous_month: s("Previous month"),
+/// #         next_month: s("Next month"),
+/// #         previous_year: s("Previous year"),
+/// #         next_year: s("Next year"),
+/// #         switch_to_input: s("Switch to text input"),
+/// #         switch_to_calendar: s("Switch to calendar"),
+/// #         choose_year: s("Choose year"),
+/// #         choose_month: s("Choose month"),
+/// #         date_field: s("Date"),
+/// #         start_field: s("Start date"),
+/// #         end_field: s("End date"),
+/// #         input_placeholder: s("MM/DD/YYYY"),
+/// #         invalid_input: s("Use MM/DD/YYYY"),
+/// #         weekday: Rc::new(|day: Weekday| day.to_string()[..1].to_string().into()),
+/// #         month: Rc::new(|month| month.to_string().into()),
+/// #         month_short: Rc::new(|month| month.to_string().into()),
+/// #         month_year: Rc::new(|year, month| format!("{month}/{year}").into()),
+/// #         headline: Rc::new(|date: NaiveDate| date.format("%a, %b %-d").to_string().into()),
+/// #         range_headline: Rc::new(|start, end| format!("{start:?} – {end:?}").into()),
+/// #         accessible_date: Rc::new(|date: NaiveDate| date.format("%A %B %-d, %Y").to_string().into()),
+/// #         number: Rc::new(|n| n.to_string().into()),
+/// #         format_input: Rc::new(|date| DateFormat::MonthDayYear.format(date)),
+/// #         parse_input: Rc::new(|text| DateFormat::MonthDayYear.parse(text)),
+/// #     }
+/// # }
+///
+/// struct Trip {
+///     dates: Entity<DatePickerState>,
+/// }
+///
+/// impl Trip {
+///     fn new(cx: &mut Context<Self>) -> Self {
+///         let start = NaiveDate::from_ymd_opt(2025, 8, 17);
+///         let dates = cx.new(|cx| {
+///             DatePickerState::new(date_picker_labels(), today(), cx)
+///                 .range()
+///                 .selection(DateSelection::Range(start, None))
+///                 .close_on_selection(true)
+///         });
+///         Self { dates }
+///     }
+/// }
+/// ```
 pub struct DatePickerState {
     focus: FocusHandle,
     labels: Rc<DatePickerLabels>,
@@ -867,6 +976,39 @@ pub(crate) fn cursor_target(
 type Confirm = Rc<dyn Fn(DateSelection, &mut Window, &mut App)>;
 
 /// An M3 date picker over a [`DatePickerState`].
+///
+/// # Example
+///
+/// ```
+/// # use gpui_kit::{prelude::*, *};
+/// use gpui_kit_material::prelude::*;
+///
+/// struct Booking {
+///     picker: Entity<DatePickerState>,
+///     date: DateSelection,
+///     open: bool,
+/// }
+///
+/// impl Render for Booking {
+///     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+///         let (confirm, cancel) = (cx.weak_entity(), cx.weak_entity());
+///         let picker = DatePicker::new("date", &self.picker)
+///             .on_confirm(move |date, _, cx| {
+///                 let _ = confirm.update(cx, |this, cx| {
+///                     (this.date, this.open) = (date, false);
+///                     cx.notify();
+///                 });
+///             })
+///             .on_cancel(move |_, cx| {
+///                 let _ = cancel.update(cx, |this, cx| {
+///                     this.open = false;
+///                     cx.notify();
+///                 });
+///             });
+///         PickerDialog::new("date-dialog", self.open, picker)
+///     }
+/// }
+/// ```
 #[derive(gpui::IntoElement)]
 pub struct DatePicker {
     id: ElementId,
@@ -2023,6 +2165,31 @@ pub fn today() -> NaiveDate {
 /// A modal host for pickers: a scrim and a centered dialog over the
 /// window, built on GPUI Base's dialog (focus trap, Escape and outside
 /// press dismissal). The surface enters on the default spatial spring.
+///
+/// # Example
+///
+/// ```
+/// # use gpui_kit::{prelude::*, *};
+/// use gpui_kit_material::prelude::*;
+///
+/// struct Form {
+///     picker: Entity<DatePickerState>,
+///     open: bool,
+/// }
+///
+/// impl Render for Form {
+///     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+///         let view = cx.weak_entity();
+///         PickerDialog::new("dialog", self.open, DatePicker::new("date", &self.picker))
+///             .on_dismiss(move |_, cx| {
+///                 let _ = view.update(cx, |this, cx| {
+///                     this.open = false;
+///                     cx.notify();
+///                 });
+///             })
+///     }
+/// }
+/// ```
 #[derive(gpui::IntoElement)]
 pub struct PickerDialog {
     id: ElementId,

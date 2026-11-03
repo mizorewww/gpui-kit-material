@@ -69,6 +69,24 @@ fn unique_options(options: impl IntoIterator<Item = OptionItem>) -> (Vec<OptionI
     (options, unique)
 }
 
+/// # Example
+///
+/// ```
+/// use gpui_kit_material::prelude::*;
+/// use gpui_kit_material::icons::Symbol;
+///
+/// let view = ConnectedButtonGroup::new("view", "View")
+///     .options([("day", "Day"), ("week", "Week"), ("month", "Month")])
+///     .icon("day", Symbol::TODAY)
+///     .selected("week")
+///     .on_change(|value, _window, _cx| println!("Show the {value}"));
+/// let style = ConnectedButtonGroup::new("style", "Text style")
+///     .selection(GroupSelection::Multi)
+///     .options([("bold", "Bold"), ("italic", "Italic")])
+///     .selected_values(["bold"])
+///     .on_toggle(|value, on, _window, _cx| println!("{value}: {on}"));
+/// # let _ = (view, style);
+/// ```
 #[derive(gpui::IntoElement)]
 pub struct ConnectedButtonGroup {
     id: ElementId,

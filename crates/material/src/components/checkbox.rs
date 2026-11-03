@@ -143,6 +143,21 @@ type Change = Rc<dyn Fn(&CheckboxState, &mut Window, &mut App)>;
 
 /// Controlled tri-state M3 checkbox. Activation reports the next state:
 /// unchecked and indeterminate become checked, checked becomes unchecked.
+///
+/// # Example
+///
+/// ```
+/// use gpui_kit_material::prelude::*;
+///
+/// let terms = MaterialCheckbox::new("terms", "I accept the terms")
+///     .show_label(true)
+///     .checked(true)
+///     .on_change(|state, _window, _cx| {
+///         println!("Accepted: {}", *state == CheckboxState::Checked);
+///     });
+/// let all = MaterialCheckbox::new("all", "Select all").state(CheckboxState::Indeterminate);
+/// # let _ = (terms, all);
+/// ```
 #[derive(gpui::IntoElement)]
 pub struct MaterialCheckbox {
     id: ElementId,

@@ -140,6 +140,18 @@ type Select = Rc<dyn Fn(&bool, &mut Window, &mut App)>;
 /// Controlled M3 radio button. It has no visible label unless
 /// [`MaterialRadio::visible_label`] is set; its label is always its
 /// accessible name.
+///
+/// # Example
+///
+/// ```
+/// use gpui_kit_material::prelude::*;
+///
+/// let express = MaterialRadio::new("express", "Express delivery")
+///     .visible_label(true)
+///     .selected(true)
+///     .on_change(|_, _window, _cx| println!("Express chosen"));
+/// # let _ = express;
+/// ```
 #[derive(gpui::IntoElement)]
 pub struct MaterialRadio {
     id: ElementId,
@@ -362,6 +374,20 @@ struct GroupOption {
 /// A labelled set of [`MaterialRadio`]s with one selection: Tab enters at
 /// the selected option; arrow keys, Home and End move focus among the
 /// available options and select them.
+///
+/// # Example
+///
+/// ```
+/// use gpui_kit_material::prelude::*;
+///
+/// let theme = MaterialRadioGroup::new("theme", "Theme")
+///     .option("Light", true)
+///     .option("Dark", true)
+///     .option("Follow the system", false)
+///     .selected(Some(1))
+///     .on_change(|index, _window, _cx| println!("Theme {index}"));
+/// # let _ = theme;
+/// ```
 #[derive(gpui::IntoElement)]
 pub struct MaterialRadioGroup {
     id: ElementId,

@@ -49,6 +49,20 @@ const SUBHEAD_GAP: f32 = 4.;
 /// is not implemented.
 /// Default thickness and spacing are fixed CSS pixel geometry, independent of
 /// typography. Callers can supply rem-valued insets when aligning with text.
+///
+/// # Example
+///
+/// ```
+/// use gpui_kit_material::prelude::*;
+///
+/// let between = MaterialDivider::new("between");
+/// let inset = MaterialDivider::new("inset")
+///     .variant(DividerVariant::Inset)
+///     .inset_start(rem(72.));
+/// let headed = MaterialDivider::new("recent").subhead("Recent");
+/// let beside = MaterialDivider::new("beside").orientation(DividerOrientation::Vertical);
+/// # let _ = (between, inset, headed, beside);
+/// ```
 #[derive(gpui::IntoElement)]
 pub struct MaterialDivider {
     id: ElementId,

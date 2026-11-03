@@ -207,6 +207,36 @@ enum FieldInput {
 }
 
 /// An M3 text field over a Kit input state.
+///
+/// # Example
+///
+/// ```
+/// # use gpui_kit::{prelude::*, *};
+/// use gpui_kit_material::prelude::*;
+/// use gpui_kit::base::input::InputState;
+///
+/// struct SignIn {
+///     email: Entity<InputState>,
+/// }
+///
+/// impl SignIn {
+///     fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
+///         let email = cx.new(|cx| InputState::new(window, cx));
+///         Self { email }
+///     }
+/// }
+///
+/// impl Render for SignIn {
+///     fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+///         TextField::new("email", &self.email)
+///             .variant(TextFieldVariant::Outlined)
+///             .input_type(TextFieldInputType::Email)
+///             .label("Email")
+///             .supporting_text("We never share it")
+///             .required(true)
+///     }
+/// }
+/// ```
 #[derive(gpui::IntoElement)]
 pub struct TextField {
     id: ElementId,

@@ -16,6 +16,19 @@ use std::rc::Rc;
 const CHIP_GAP: f32 = 8.;
 
 /// The selection rules of a chip set.
+///
+/// # Example
+///
+/// ```
+/// use gpui_kit_material::prelude::*;
+///
+/// let rules = ChipSelection { multiple: false, required: true };
+/// let mut selected = [true, false, false];
+/// assert!(rules.apply(&mut selected, 1, true));
+/// assert_eq!(selected, [false, true, false]);
+/// // The last selected chip stays selected.
+/// assert!(!rules.apply(&mut selected, 1, false));
+/// ```
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub struct ChipSelection {
     /// Several chips may be selected; otherwise choosing one clears the rest.
@@ -50,6 +63,19 @@ impl ChipSelection {
 type DragPreview = Rc<dyn Fn(&mut Window, &mut App) -> AnyElement>;
 
 /// One chip in a [`ChipSet`].
+///
+/// # Example
+///
+/// ```
+/// use gpui_kit::prelude::*;
+/// use gpui_kit_material::prelude::*;
+///
+/// let item = ChipSetItem::new("tomato", InputChip::new("tomato", "Tomato"))
+///     .drag_preview(|_window, _cx| {
+///         InputChip::new("tomato-dragged", "Tomato").dragged(true).into_any_element()
+///     });
+/// # let _ = item;
+/// ```
 pub struct ChipSetItem {
     key: ElementId,
     chip: AnyElement,
@@ -98,6 +124,22 @@ impl Render for DraggedChip {
 type Reorder = Rc<dyn Fn(usize, usize, &mut Window, &mut App)>;
 
 /// Chips arranged in a wrapping row or a column, named as one group.
+///
+/// # Example
+///
+/// ```
+/// use gpui_kit_material::prelude::*;
+///
+/// let categories = ["Shoes", "Bags", "Hats"];
+/// let set = ChipSet::new("categories", "Categories")
+///     .items(categories.into_iter().enumerate().map(|(index, label)| {
+///         let chip = FilterChip::new(("category", index), label)
+///             .on_toggle(move |on, _window, _cx| println!("{label}: {on}"));
+///         ChipSetItem::new(label, chip)
+///     }))
+///     .on_reorder(|from, to, _window, _cx| println!("Move {from} to {to}"));
+/// # let _ = set;
+/// ```
 #[derive(gpui::IntoElement)]
 pub struct ChipSet {
     id: ElementId,

@@ -476,6 +476,19 @@ macro_rules! chip_common {
 
 /// M3 assist chip: a smart or automated action, with an optional primary
 /// leading icon.
+///
+/// # Example
+///
+/// ```
+/// use gpui_kit_material::prelude::*;
+/// use gpui_kit_material::icons::Symbol;
+///
+/// let chip = AssistChip::new("calendar", "Add to calendar")
+///     .icon(Symbol::EVENT)
+///     .elevated(true)
+///     .on_click(|_, _window, _cx| println!("Added"));
+/// # let _ = chip;
+/// ```
 #[derive(gpui::IntoElement)]
 pub struct AssistChip(ChipBase);
 chip_common!(AssistChip);
@@ -503,6 +516,17 @@ impl AssistChip {
 
 /// M3 filter chip: a toggle among filter options. Selecting slides a check
 /// in before the label (or shows it in place of the leading icon).
+///
+/// # Example
+///
+/// ```
+/// use gpui_kit_material::prelude::*;
+///
+/// let chip = FilterChip::new("vegan", "Vegan")
+///     .selected(true)
+///     .on_toggle(|selected, _window, _cx| println!("Vegan: {selected}"));
+/// # let _ = chip;
+/// ```
 #[derive(gpui::IntoElement)]
 pub struct FilterChip(ChipBase);
 chip_common!(FilterChip);
@@ -537,6 +561,17 @@ impl FilterChip {
 
 /// M3 input chip: a piece of information the person entered, with an
 /// optional leading icon or avatar and a remove icon.
+///
+/// # Example
+///
+/// ```
+/// use gpui_kit_material::prelude::*;
+///
+/// let chip = InputChip::new("ada", "Ada Lovelace")
+///     .avatar(Avatar::new("ada-avatar", "Ada Lovelace").monogram("A").size(24.))
+///     .on_remove("Remove Ada Lovelace", |_window, _cx| println!("Removed"));
+/// # let _ = chip;
+/// ```
 #[derive(gpui::IntoElement)]
 pub struct InputChip(ChipBase);
 chip_common!(InputChip);
@@ -574,6 +609,16 @@ impl InputChip {
 }
 
 /// M3 suggestion chip: a dynamically generated suggestion, such as a reply.
+///
+/// # Example
+///
+/// ```
+/// use gpui_kit_material::prelude::*;
+///
+/// let chip = SuggestionChip::new("reply", "Sounds good!")
+///     .on_click(|_, _window, _cx| println!("Replied"));
+/// # let _ = chip;
+/// ```
 #[derive(gpui::IntoElement)]
 pub struct SuggestionChip(ChipBase);
 chip_common!(SuggestionChip);

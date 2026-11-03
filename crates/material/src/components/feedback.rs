@@ -776,6 +776,20 @@ const CARD_DRAG_SLOP: Pixels = px(4.);
 /// to its place on the default spatial spring, or returns at once under
 /// reduced motion). The accessible label names the action. A selectable
 /// card ([`Self::selected`]) shows and announces whether it is selected.
+///
+/// # Example
+///
+/// ```
+/// use gpui_kit::{div, prelude::*};
+/// use gpui_kit_material::prelude::*;
+///
+/// let trip = MaterialCard::new("trip", CardVariant::Outlined)
+///     .accessibility_label("Trip to Lisbon")
+///     .on_click(|_, _window, _cx| println!("Open the trip"))
+///     .child(div().p(rem(16.)).child("Trip to Lisbon"));
+/// let pinned = MaterialCard::new("note", CardVariant::Filled).draggable(true);
+/// # let _ = (trip, pinned);
+/// ```
 #[derive(gpui::IntoElement)]
 pub struct MaterialCard {
     id: ElementId,

@@ -56,6 +56,32 @@ type PeriodChange = Rc<dyn Fn(bool, &mut Window, &mut App)>;
 type TimeConfirm = Rc<dyn Fn(NaiveTime, &mut Window, &mut App)>;
 
 /// Every caller-supplied string of a time picker.
+///
+/// # Example
+///
+/// ```
+/// use gpui_kit_material::prelude::*;
+/// use gpui_kit::SharedString;
+/// use std::rc::Rc;
+///
+/// let s = SharedString::new_static;
+/// let labels = TimePickerLabels {
+///     select_title: s("Select time"),
+///     enter_title: s("Enter time"),
+///     hour: s("Hour"),
+///     minute: s("Minute"),
+///     am: s("AM"),
+///     pm: s("PM"),
+///     confirm: s("OK"),
+///     cancel: s("Cancel"),
+///     switch_to_input: s("Switch to text input"),
+///     switch_to_dial: s("Switch to clock"),
+///     number: Rc::new(|n| n.to_string().into()),
+///     two_digits: Rc::new(|n| format!("{n:02}").into()),
+///     separator: s(":"),
+/// };
+/// assert_eq!((labels.two_digits)(7), "07");
+/// ```
 #[derive(Clone)]
 pub struct TimePickerLabels {
     /// The dial picker's title, e.g. "Select time".
@@ -116,6 +142,48 @@ pub enum TimeUnit {
 
 /// A time picker's state. Create it with `cx.new` and hand it to
 /// [`TimePicker`].
+///
+/// # Example
+///
+/// ```
+/// # use gpui_kit::{prelude::*, *};
+/// use gpui_kit_material::prelude::*;
+/// # use std::rc::Rc;
+/// # fn time_picker_labels() -> TimePickerLabels {
+/// #     let s = SharedString::new_static;
+/// #     TimePickerLabels {
+/// #         select_title: s("Select time"),
+/// #         enter_title: s("Enter time"),
+/// #         hour: s("Hour"),
+/// #         minute: s("Minute"),
+/// #         am: s("AM"),
+/// #         pm: s("PM"),
+/// #         confirm: s("OK"),
+/// #         cancel: s("Cancel"),
+/// #         switch_to_input: s("Switch to text input"),
+/// #         switch_to_dial: s("Switch to clock"),
+/// #         number: Rc::new(|n| n.to_string().into()),
+/// #         two_digits: Rc::new(|n| format!("{n:02}").into()),
+/// #         separator: s(":"),
+/// #     }
+/// # }
+///
+/// struct Alarm {
+///     picker: Entity<TimePickerState>,
+/// }
+///
+/// impl Alarm {
+///     fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
+///         let wake = NaiveTime::from_hms_opt(7, 30, 0).unwrap();
+///         let picker = cx.new(|cx| {
+///             TimePickerState::new(time_picker_labels(), wake, window, cx)
+///                 .format(TimeFormat::TwentyFourHour, window, cx)
+///                 .minute_step(5)
+///         });
+///         Self { picker }
+///     }
+/// }
+/// ```
 pub struct TimePickerState {
     labels: Rc<TimePickerLabels>,
     time: NaiveTime,
@@ -1152,6 +1220,32 @@ impl RenderOnce for PeriodSelector {
 }
 
 /// An M3 time picker over a [`TimePickerState`].
+///
+/// # Example
+///
+/// ```
+/// # use gpui_kit::{prelude::*, *};
+/// use gpui_kit_material::prelude::*;
+///
+/// struct Alarm {
+///     picker: Entity<TimePickerState>,
+///     wake: NaiveTime,
+/// }
+///
+/// impl Render for Alarm {
+///     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+///         let view = cx.weak_entity();
+///         TimePicker::new("wake", &self.picker)
+///             .orientation(TimeOrientation::Horizontal)
+///             .on_confirm(move |time, _, cx| {
+///                 let _ = view.update(cx, |this, cx| {
+///                     this.wake = time;
+///                     cx.notify();
+///                 });
+///             })
+///     }
+/// }
+/// ```
 #[derive(gpui::IntoElement)]
 pub struct TimePicker {
     id: ElementId,

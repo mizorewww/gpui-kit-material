@@ -65,6 +65,23 @@ type ChangeHandler = Box<dyn Fn(bool, &ClickEvent, &mut Window, &mut App)>;
 type ClickHandler = Box<dyn Fn(&ClickEvent, &mut Window, &mut App)>;
 
 /// An icon-only button. `label` names it for assistive technology.
+///
+/// # Example
+///
+/// ```
+/// use gpui_kit_material::prelude::*;
+/// use gpui_kit_material::icons::Symbol;
+///
+/// let settings = IconButton::new("settings", Symbol::SETTINGS, "Settings")
+///     .on_click(|_, _window, _cx| println!("Open settings"));
+/// let favorite = IconButton::new("favorite", Symbol::FAVORITE, "Favorite")
+///     .variant(IconButtonVariant::Tonal)
+///     .toggle(true)
+///     .selected(true)
+///     .selected_icon(Symbol::FAVORITE.icon().filled(true))
+///     .on_change(|selected, _, _window, _cx| println!("Favorite: {selected}"));
+/// # let _ = (settings, favorite);
+/// ```
 #[derive(gpui::IntoElement)]
 pub struct IconButton {
     id: ElementId,
