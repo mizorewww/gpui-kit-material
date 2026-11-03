@@ -77,7 +77,7 @@ pub static PLAYGROUND: Playground = Playground {
         },
     ],
     preview,
-    code: Some(code),
+    code,
 };
 
 /// Starts a refresh: the app bar's button and a released pull share it.

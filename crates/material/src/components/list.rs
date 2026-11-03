@@ -198,6 +198,24 @@ type Click = Rc<dyn Fn(&ClickEvent, &mut Window, &mut App)>;
 
 /// One M3 list item. Strings come from the caller. Give it `on_click` to make
 /// the whole row a button; without one it is static content.
+///
+/// # Example
+///
+/// ```
+/// use gpui_kit_material::prelude::*;
+/// use gpui_kit_material::icons::Symbol;
+///
+/// let item = ListItem::new("walk", "Morning walk")
+///     .supporting("Make a little time for yourself")
+///     .leading(ListLeading::Icon(Symbol::DIRECTIONS_WALK.into()))
+///     .trailing_text("5 min")
+///     .divider(true)
+///     .on_click(|_, _window, _cx| println!("Open"));
+/// let contact = ListItem::new("ada", "Ada Lovelace")
+///     .leading(ListLeading::Monogram("A".into()))
+///     .trailing(ListTrailing::Checkbox(true));
+/// # let _ = (item, contact);
+/// ```
 #[derive(gpui::IntoElement)]
 pub struct ListItem {
     id: ElementId,

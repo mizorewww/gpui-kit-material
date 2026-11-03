@@ -151,7 +151,7 @@ pub static PLAYGROUND: Playground = Playground {
         },
     ],
     preview,
-    code: Some(code),
+    code,
 };
 
 /// The dismissing and confirming actions' labels for a title.

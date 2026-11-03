@@ -157,7 +157,7 @@ pub static PLAYGROUND: Playground = Playground {
         },
     ],
     preview,
-    code: Some(code),
+    code,
 };
 
 /// One destination: label, Material Symbol and badge text.

@@ -132,7 +132,7 @@ pub static PLAYGROUND: Playground = Playground {
         },
     ],
     preview,
-    code: Some(code),
+    code,
 };
 
 /// A position option's side and alignment.

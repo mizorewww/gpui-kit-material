@@ -75,7 +75,7 @@ pub static PLAYGROUND: Playground = Playground {
         },
     ],
     preview,
-    code: Some(code),
+    code,
 };
 
 /// Each action set's actions `(symbol, label)` and FAB symbol.

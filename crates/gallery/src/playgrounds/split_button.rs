@@ -150,7 +150,7 @@ pub static PLAYGROUND: Playground = Playground {
         },
     ],
     preview,
-    code: None,
+    code,
 };
 
 /// The preview's own state: whether the menu is open and the last action.
@@ -250,6 +250,83 @@ fn preview(
         .into_any_element()
 }
 
+fn code(config: &Config) -> String {
+    const VARIANT_NAMES: [&str; 4] = ["Filled", "Tonal", "Outlined", "Elevated"];
+    const SIZE_NAMES: [&str; 5] = ["ExtraSmall", "Small", "Medium", "Large", "ExtraLarge"];
+    let preset = &MENUS[config.choice("menu")];
+    let text = config.text("text");
+    let icon = config.option("icon");
+    let (variant, size) = (config.choice("variant"), config.choice("size"));
+    let menu = if preset.selects {
+        // Choices: the button shows the chosen one, checked in the menu.
+        let choices: Vec<String> = preset.items.iter().map(|(label, _)| lit(label)).collect();
+        let item = chain(
+            "MaterialMenuItem::new(choice)",
+            [
+                Some("selected(self.choice == choice)".into()),
+                Some(format!(
+                    "on_click({})",
+                    listener(
+                        "move |this, _: &ClickEvent, _, cx|",
+                        "this.choice = choice;"
+                    )
+                )),
+            ],
+        );
+        chain(
+            "MaterialMenu::new(\"split-menu\")",
+            [
+                Some("width(200.)".into()),
+                Some(format!(
+                    "items([{}].map(|choice| {{\n    let item = {};\n    if self.choice == choice {{\n        item.trailing(Icon::from(Symbol::CHECK))\n    }} else {{\n        item\n    }}\n}}))",
+                    choices.join(", "),
+                    indent(&item)
+                )),
+            ],
+        )
+    } else {
+        let items = preset.items.iter().map(|&(label, icon)| {
+            let item = chain(
+                format!("MaterialMenuItem::new({})", lit(label)),
+                [
+                    (!icon.is_empty())
+                        .then(|| format!("leading(Icon::from({}))", symbol_code(icon))),
+                    Some(format!("on_click(|_, _, _| println!({}))", lit(label))),
+                ],
+            );
+            Some(call("item", &item))
+        });
+        chain(
+            "MaterialMenu::new(\"split-menu\")",
+            [Some("width(200.)".into())].into_iter().chain(items),
+        )
+    };
+    chain(
+        format!(
+            "SplitButton::new(\"split-button\", {}, {})",
+            if preset.selects {
+                "self.choice".to_string()
+            } else {
+                lit(&text)
+            },
+            lit(&config.text("menu_label"))
+        ),
+        [
+            (variant != 0).then(|| format!("variant(ButtonVariant::{})", VARIANT_NAMES[variant])),
+            (size != 1).then(|| format!("button_size(ButtonSize::{})", SIZE_NAMES[size])),
+            (!icon.is_empty()).then(|| format!("icon({})", symbol_code(icon))),
+            config.bool("disabled").then(|| "disabled(true)".into()),
+            Some(call("menu", &menu)),
+            Some("open(self.open)".into()),
+            Some(format!(
+                "on_toggle({})",
+                listener("|this, open: &bool, _, cx|", "this.open = *open;")
+            )),
+            Some(format!("on_click(|_, _, _| println!({}))", lit(&text))),
+        ],
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::super::harness::open;
@@ -300,5 +377,22 @@ mod tests {
             h.bounds("playground-split-status").size.width > px(0.),
             "the action is reported"
         );
+    }
+
+    #[test]
+    fn the_code_follows_the_configuration() {
+        let mut config = Config::defaults(&PLAYGROUND);
+        let code = super::code(&config);
+        assert!(
+            code.starts_with("SplitButton::new(\"split-button\", \"Save\", \"More save options\")"),
+            "{code}"
+        );
+        assert!(
+            code.contains("MaterialMenuItem::new(\"Save as…\")"),
+            "{code}"
+        );
+        assert!(!code.contains(".icon("));
+        config.set("icon", Value::Choice(1));
+        assert!(super::code(&config).contains(".icon(Symbol::DOWNLOAD)"));
     }
 }

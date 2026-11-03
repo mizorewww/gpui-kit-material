@@ -750,9 +750,7 @@ mod tests {
             else {
                 continue;
             };
-            let Some(code) = playground.code else {
-                continue;
-            };
+            let code = playground.code;
             let configs = std::iter::once(Config::defaults(playground)).chain(
                 playground
                     .scenarios

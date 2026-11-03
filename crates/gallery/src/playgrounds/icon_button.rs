@@ -145,7 +145,7 @@ pub static PLAYGROUND: Playground = Playground {
         },
     ],
     preview,
-    code: None,
+    code,
 };
 
 /// The filled Material Symbol a selected toggle shows.
@@ -198,6 +198,53 @@ fn preview(
         .into_any_element()
 }
 
+fn code(config: &Config) -> String {
+    const VARIANT_NAMES: [&str; 4] = ["Standard", "Filled", "Tonal", "Outlined"];
+    const TONE_NAMES: [&str; 3] = ["Standard", "Neutral", "Accent"];
+    const SIZE_NAMES: [&str; 5] = ["ExtraSmall", "Small", "Medium", "Large", "ExtraLarge"];
+    const WIDTH_NAMES: [&str; 3] = ["Narrow", "Default", "Wide"];
+    let icon = config.option("icon");
+    let label = config.text("label");
+    let label = if label.is_empty() { icon } else { &label };
+    let toggle = config.bool("toggle");
+    let (variant, tone, size, width) = (
+        config.choice("variant"),
+        config.choice("tone"),
+        config.choice("size"),
+        config.choice("width"),
+    );
+    chain(
+        format!(
+            "IconButton::new(\"icon-button\", {}, {})",
+            symbol_code(icon),
+            lit(label)
+        ),
+        [
+            (variant != 0)
+                .then(|| format!("variant(IconButtonVariant::{})", VARIANT_NAMES[variant])),
+            (tone != 0).then(|| format!("tone(ButtonTone::{})", TONE_NAMES[tone])),
+            (size != 1).then(|| format!("button_size(ButtonSize::{})", SIZE_NAMES[size])),
+            (width != 1).then(|| format!("width(IconButtonWidth::{})", WIDTH_NAMES[width])),
+            config
+                .bool("square")
+                .then(|| "shape(ButtonShape::Square)".into()),
+            config.bool("disabled").then(|| "disabled(true)".into()),
+            toggle.then(|| "toggle(true)".into()),
+            toggle.then(|| format!("selected({})", config.bool("selected"))),
+            // A selected toggle shows the filled symbol.
+            toggle.then(|| format!("selected_icon({}.icon().filled(true))", symbol_code(icon))),
+            Some(if toggle {
+                format!(
+                    "on_change({})",
+                    view_update("move |selected, _, _, cx|", "this.selected = selected;")
+                )
+            } else {
+                format!("on_click(|_, _, _| println!({}))", lit(label))
+            }),
+        ],
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::super::harness::open;
@@ -236,5 +283,22 @@ mod tests {
         assert!(h.config().bool("selected"));
         h.click_on("playground-icon-button");
         assert!(!h.config().bool("selected"));
+    }
+
+    #[test]
+    fn the_code_follows_the_configuration() {
+        let mut config = Config::defaults(&PLAYGROUND);
+        let code = super::code(&config);
+        assert!(
+            code.starts_with(
+                "IconButton::new(\"icon-button\", Symbol::FAVORITE, \"Add to favorites\")"
+            ),
+            "{code}"
+        );
+        assert!(!code.contains(".toggle("));
+        config.set("toggle", Value::Bool(true));
+        let code = super::code(&config);
+        assert!(code.contains(".toggle(true)"));
+        assert!(code.contains(".selected_icon(Symbol::FAVORITE.icon().filled(true))"));
     }
 }

@@ -150,7 +150,7 @@ pub static PLAYGROUND: Playground = Playground {
         },
     ],
     preview,
-    code: None,
+    code,
 };
 
 fn preview(
@@ -299,6 +299,116 @@ fn models_menu(
         )
 }
 
+fn code(config: &Config) -> String {
+    let options = SETS[config.choice("set")];
+    let selected = config
+        .choice("selected")
+        .checked_sub(1)
+        .filter(|&index| index < options.len());
+    let models = config.option("set") == "Models";
+    let supporting = config.text("supporting");
+    let disable_second = config.bool("disable_second");
+    let choice = if models {
+        // The caller's menu: models with supporting text under a group
+        // label, then an action that is not a value.
+        let item = chain(
+            "MaterialMenuItem::new(name)",
+            [
+                Some("supporting_text(supporting)".into()),
+                Some("leading(Icon::from(icon))".into()),
+                Some("selected(self.model == Some(index))".into()),
+                disable_second.then(|| "disabled(index == 1)".into()),
+                Some(format!(
+                    "on_click({})",
+                    listener(
+                        "move |this, _: &ClickEvent, _, cx|",
+                        "this.model = Some(index);"
+                    )
+                )),
+            ],
+        );
+        let entries: Vec<String> = MODELS
+            .iter()
+            .map(|(name, supporting, icon)| {
+                format!(
+                    "({}, {}, {})",
+                    lit(name),
+                    lit(supporting),
+                    symbol_code(icon)
+                )
+            })
+            .collect();
+        let menu = chain(
+            "MaterialMenu::new(\"models\")",
+            [
+                Some("style(MenuStyle::Baseline)".into()),
+                Some(format!(
+                    "group(MenuGroup::new().label(\"Models\").items(\n    [{}]\n        .into_iter()\n        .enumerate()\n        .map(|(index, (name, supporting, icon))| {{\n            {}\n        }}),\n))",
+                    entries.join(", "),
+                    item.replace('\n', "\n            ")
+                )),
+                Some(
+                    "group(MenuGroup::new().item(\n    MaterialMenuItem::new(\"Manage models…\")\n        .leading(Icon::from(Symbol::SETTINGS))\n        .on_click(|_, _, _| println!(\"Manage models\")),\n))"
+                        .into(),
+                ),
+            ],
+        );
+        vec![
+            Some(call("menu", &menu)),
+            Some(format!(
+                "value({})",
+                lit(selected.map_or("", |index| MODELS[index].0))
+            )),
+        ]
+    } else {
+        let options: Vec<String> = options.iter().map(|option| lit(option)).collect();
+        vec![
+            Some(format!("options([{}])", options.join(", "))),
+            disable_second.then(|| "disabled_options([1])".into()),
+            Some(format!("selected({selected:?})")),
+            Some(format!(
+                "on_select({})",
+                listener(
+                    "|this, index: &usize, _, cx|",
+                    "this.selected = Some(*index);\nthis.open = false;"
+                )
+            )),
+        ]
+    };
+    chain(
+        format!(
+            "ExposedDropdown::new(\"select\", {})",
+            lit(&config.text("label"))
+        ),
+        [
+            (config.option("variant") == "outlined")
+                .then(|| "variant(TextFieldVariant::Outlined)".into()),
+            (config.option("density") == "compact")
+                .then(|| "density(TextFieldDensity::Compact)".into()),
+            (!config.bool("show_label")).then(|| "show_label(false)".into()),
+            Some("open(self.open)".into()),
+            Some(format!(
+                "on_open_change({})",
+                listener("|this, open: &bool, _, cx|", "this.open = *open;")
+            )),
+            config.bool("error").then(|| "error(true)".into()),
+            config.bool("required").then(|| "required(true)".into()),
+            config.bool("disabled").then(|| "disabled(true)".into()),
+            if config.bool("full_width") {
+                Some("full_width()".into())
+            } else {
+                Some("width(280.)".into())
+            },
+            config
+                .bool("limit_height")
+                .then(|| "menu_max_height(120.)".into()),
+            (!supporting.is_empty()).then(|| format!("supporting_text({})", lit(&supporting))),
+        ]
+        .into_iter()
+        .chain(choice),
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::super::testing::*;
@@ -413,5 +523,22 @@ mod tests {
             "1",
             "no model chosen"
         );
+    }
+
+    #[test]
+    fn the_code_follows_the_configuration() {
+        let mut config = Config::defaults(&PLAYGROUND);
+        let code = super::code(&config);
+        assert!(
+            code.starts_with("ExposedDropdown::new(\"select\", \"Fruit\")"),
+            "{code}"
+        );
+        assert!(code.contains(".options([\"Apple\", \"Banana\", \"Cherry\"])"));
+        assert!(code.contains(".selected(Some(0))"));
+        assert!(!code.contains(".error("));
+        config.set("error", Value::Bool(true));
+        assert!(super::code(&config).contains(".error(true)"));
+        config.set("set", Value::Choice(3));
+        assert!(super::code(&config).contains("MaterialMenu::new(\"models\")"));
     }
 }

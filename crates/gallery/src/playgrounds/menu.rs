@@ -111,7 +111,7 @@ pub static PLAYGROUND: Playground = Playground {
         },
     ],
     preview,
-    code: Some(code),
+    code,
 };
 
 /// One menu item: label, Material Symbol and supporting text.

@@ -84,7 +84,7 @@ pub static PLAYGROUND: Playground = Playground {
         },
     ],
     preview,
-    code: None,
+    code,
 };
 
 fn preview(
@@ -125,6 +125,65 @@ fn preview(
         .into_any_element()
 }
 
+/// `option` ("top right", "secondary") as a Rust variant name.
+fn variant_name(option: &str) -> String {
+    option
+        .split(' ')
+        .map(|word| {
+            let mut chars = word.chars();
+            chars
+                .next()
+                .map(|first| first.to_uppercase().chain(chars).collect::<String>())
+                .unwrap_or_default()
+        })
+        .collect()
+}
+
+fn code(config: &Config) -> String {
+    let small = config.option("variant") == "small";
+    let label = config.text("label");
+    let visible = config.bool("visible");
+    let name = match (visible, small) {
+        (false, _) => "Inbox".to_string(),
+        (true, true) => "Inbox, new messages".to_string(),
+        (true, false) => format!(
+            "Inbox, {}",
+            badge_label(&label, config.option("max").parse().ok())
+        ),
+    };
+    let head = if small {
+        "Badge::small(\"badge\")".to_string()
+    } else {
+        format!("Badge::large(\"badge\", {})", lit(&label))
+    };
+    let target = chain(
+        format!("IconButton::new(\"inbox\", Symbol::INBOX, {})", lit(&name)),
+        [Some("variant(IconButtonVariant::Tonal)".into())],
+    );
+    chain(
+        head,
+        [
+            (!small).then(|| format!("max_count({})", config.option("max"))),
+            (config.option("color") != "error").then(|| {
+                format!(
+                    "color(BadgeColor::{})",
+                    variant_name(config.option("color"))
+                )
+            }),
+            (config.option("position") != "top right").then(|| {
+                format!(
+                    "position(BadgePosition::{})",
+                    variant_name(config.option("position"))
+                )
+            }),
+            (!visible).then(|| "visible(false)".into()),
+            // The 24dp icon sits 8dp inside the 40dp button.
+            Some("inset(8.)".into()),
+            Some(call("anchor", &target)),
+        ],
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::super::test_support::*;
@@ -150,5 +209,20 @@ mod tests {
         assert_eq!(element_bounds(&mut cx, "playground-badge"), shown);
         toggle_switch(&mut cx, "visible");
         assert!(config(&state, &mut cx).bool("visible"));
+    }
+
+    #[test]
+    fn the_code_follows_the_configuration() {
+        let mut config = Config::defaults(&PLAYGROUND);
+        let code = super::code(&config);
+        assert!(code.starts_with("Badge::large(\"badge\", \"8\")"), "{code}");
+        assert!(code.contains(".max_count(99)"));
+        assert!(!code.contains(".position("));
+        config.set("position", Value::Choice(3));
+        assert!(super::code(&config).contains(".position(BadgePosition::BottomLeft)"));
+        config.set("variant", Value::Choice(0));
+        let code = super::code(&config);
+        assert!(code.starts_with("Badge::small(\"badge\")"));
+        assert!(!code.contains(".max_count("));
     }
 }

@@ -178,7 +178,7 @@ pub static PLAYGROUND: Playground = Playground {
         },
     ],
     preview,
-    code: None,
+    code,
 };
 
 /// The chip set's live state: display order (indices into the set), which
@@ -442,6 +442,168 @@ fn preview(
         .into_any_element()
 }
 
+fn code(config: &Config) -> String {
+    let set = SETS[config.choice("set")];
+    let kind = config.option("type");
+    let disabled = config.bool("disabled");
+    let draggable = config.bool("draggable") && !disabled;
+    let menu = config.bool("menu") && kind == "filter";
+    let elevated = config.bool("elevated") && kind != "input";
+    let avatar = config.bool("avatar") && kind == "input";
+    let icons = config.bool("icons") && !avatar;
+    let rules = format!(
+        "ChipSelection {{ multiple: {}, required: {} }}",
+        config.bool("multiple"),
+        config.bool("required")
+    );
+    let head = match kind {
+        "assist" => "AssistChip",
+        "input" => "InputChip",
+        "suggestion" => "SuggestionChip",
+        _ => "FilterChip",
+    };
+    let chip = chain(
+        format!("{head}::new((\"chip\", index), label)"),
+        [
+            elevated.then(|| "elevated(true)".into()),
+            (kind != "assist").then(|| "selected(self.selected[index])".into()),
+            disabled.then(|| "disabled(true)".into()),
+            icons.then(|| "icon(icon)".into()),
+            avatar.then(|| {
+                "avatar(Avatar::new((\"avatar\", index), label).monogram(monogram_initials(label)).size(24.))"
+                    .into()
+            }),
+            menu.then(|| "trailing_icon(Symbol::ARROW_DROP_DOWN)".into()),
+            (kind == "input").then(|| {
+                format!(
+                    "on_remove(format!(\"Remove {{label}}\"), {})",
+                    view_update("move |_, cx|", "this.removed[index] = true;")
+                )
+            }),
+            match kind {
+                "assist" => Some("on_click(move |_, _, _| println!(\"{label}\"))".into()),
+                "filter" if menu => None,
+                "filter" => Some(format!(
+                    "on_toggle({})",
+                    listener(
+                        "move |this, on: &bool, _, cx|",
+                        &format!("{rules}.apply(&mut this.selected, index, *on);")
+                    )
+                )),
+                _ => Some(format!(
+                    "on_click({})",
+                    listener(
+                        "move |this, _: &ClickEvent, _, cx|",
+                        &format!(
+                            "let on = !this.selected[index];\n{rules}.apply(&mut this.selected, index, on);"
+                        )
+                    )
+                )),
+            },
+        ],
+    );
+    // A filter chip with a menu opens it; a choice selects the chip.
+    let chip = if menu {
+        let item = chain(
+            "MaterialMenuItem::new(choice)",
+            [
+                Some("selected(self.choice[index] == Some(position))".into()),
+                Some(format!(
+                    "on_click({})",
+                    listener(
+                        "move |this, _: &ClickEvent, _, cx|",
+                        "this.choice[index] = Some(position);\nthis.selected[index] = position > 0;"
+                    )
+                )),
+            ],
+        );
+        let choices: Vec<String> = MENU.iter().map(|choice| lit(choice)).collect();
+        chain(
+            format!(
+                "MenuPopup::new(\n    (\"chip-menu\", index),\n    {},\n    MaterialMenu::new((\"chip-menu-items\", index)).items(\n        [{}].into_iter().enumerate().map(|(position, choice)| {{\n            {}\n        }}),\n    ),\n)",
+                indent(&chip),
+                choices.join(", "),
+                item.replace('\n', "\n            ")
+            ),
+            [
+                Some("open(self.open_menu == Some(index))".into()),
+                Some(format!(
+                    "on_open_change({})",
+                    listener(
+                        "move |this, open: &bool, _, cx|",
+                        "this.open_menu = open.then_some(index);"
+                    )
+                )),
+            ],
+        )
+    } else {
+        chip
+    };
+    let mut item = format!("ChipSetItem::new(\n    label,\n    {},\n)", indent(&chip));
+    if draggable {
+        // The chip under the pointer while it is dragged.
+        item = chain(
+            item,
+            [Some(format!(
+                "drag_preview(move |_, _| {head}::new(\"dragged\", label).dragged(true).into_any_element())"
+            ))],
+        );
+    }
+    let chips: Vec<String> = set
+        .iter()
+        .map(|(label, icon)| {
+            if icons {
+                format!("({}, {})", lit(label), symbol_code(icon))
+            } else {
+                lit(label)
+            }
+        })
+        .collect();
+    let binding = if icons { "(label, icon)" } else { "label" };
+    // A set that reorders shows its chips in the view's order.
+    let items = if draggable {
+        format!(
+            "items(self.order.iter().map(|&index| {{\n    let {binding} = CHIPS[index];\n    {}\n}}))",
+            indent(&item)
+        )
+    } else {
+        format!(
+            "items([{}].into_iter().enumerate().map(|(index, {binding})| {{\n    {}\n}}))",
+            chips.join(", "),
+            indent(&item)
+        )
+    };
+    let chip_set = chain(
+        format!(
+            "ChipSet::new(\"chips\", {})",
+            lit(&config.text("group_label"))
+        ),
+        [
+            config.bool("vertical").then(|| "vertical(true)".into()),
+            Some(items),
+            draggable.then(|| {
+                format!(
+                    "on_reorder({})",
+                    view_update(
+                        "move |from, to, _, cx|",
+                        "let chip = this.order.remove(from);\nthis.order.insert(to, chip);"
+                    )
+                )
+            }),
+        ],
+    );
+    if draggable {
+        let element = if icons { "(&str, Symbol)" } else { "&str" };
+        format!(
+            "// const CHIPS: [{element}; {}] = [{}];\n{chip_set}",
+            chips.len(),
+            chips.join(", ")
+        )
+    } else {
+        chip_set
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::super::testing::*;
@@ -524,5 +686,27 @@ mod tests {
         settle(cx);
         assert!(cx.debug_bounds("chip-0").is_none(), "removed");
         assert!(cx.debug_bounds("chip-3").is_some());
+    }
+
+    #[test]
+    fn the_code_follows_the_configuration() {
+        let mut config = Config::defaults(&PLAYGROUND);
+        let code = super::code(&config);
+        assert!(
+            code.starts_with("ChipSet::new(\"chips\", \"Reminders\")"),
+            "{code}"
+        );
+        assert!(
+            code.contains("FilterChip::new((\"chip\", index), label)"),
+            "{code}"
+        );
+        assert!(code.contains("(\"Event\", Symbol::EVENT)"), "{code}");
+        assert!(!code.contains(".elevated("));
+        config.set("elevated", Value::Bool(true));
+        assert!(super::code(&config).contains(".elevated(true)"));
+        config.set("menu", Value::Bool(true));
+        assert!(super::code(&config).contains("MenuPopup::new("));
+        config.set("draggable", Value::Bool(true));
+        assert!(super::code(&config).contains(".on_reorder("));
     }
 }

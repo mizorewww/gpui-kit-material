@@ -2015,6 +2015,35 @@ impl RenderOnce for MaterialContextMenu {
 /// that do not choose a value, such as an action that manages the values, are
 /// the caller's responsibility: their handlers decide what they do, and the
 /// field shows only what [`Self::value`] says.
+///
+/// # Example
+///
+/// ```
+/// # use gpui_kit::{prelude::*, *};
+/// use gpui_kit_material::prelude::*;
+///
+/// struct Order {
+///     fruit: Option<usize>,
+///     open: bool,
+/// }
+///
+/// impl Render for Order {
+///     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+///         ExposedDropdown::new("fruit", "Fruit")
+///             .options(["Apple", "Banana", "Cherry"])
+///             .selected(self.fruit)
+///             .open(self.open)
+///             .on_open_change(cx.listener(|this, open: &bool, _, cx| {
+///                 this.open = *open;
+///                 cx.notify();
+///             }))
+///             .on_select(cx.listener(|this, index: &usize, _, cx| {
+///                 (this.fruit, this.open) = (Some(*index), false);
+///                 cx.notify();
+///             }))
+///     }
+/// }
+/// ```
 #[cfg(feature = "inputs")]
 #[derive(gpui::IntoElement)]
 pub struct ExposedDropdown {

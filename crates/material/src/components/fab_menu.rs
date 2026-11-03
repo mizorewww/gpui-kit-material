@@ -116,6 +116,18 @@ type ToggleHandler = Rc<dyn Fn(&bool, &mut Window, &mut App)>;
 /// One action of a FAB menu. Rendered on its own (e.g. a building-block
 /// specimen) it is the open item in its `color`; inside a menu it takes the
 /// menu's color.
+///
+/// # Example
+///
+/// ```
+/// use gpui_kit_material::prelude::*;
+/// use gpui_kit_material::icons::Symbol;
+///
+/// let archive = FabMenuItem::new("archive", Symbol::ARCHIVE, "Archive")
+///     .on_click(|_, _window, _cx| println!("Archived"));
+/// let snooze = FabMenuItem::label_only("snooze", "Snooze");
+/// # let _ = (archive, snooze);
+/// ```
 #[derive(gpui::IntoElement)]
 pub struct FabMenuItem {
     id: ElementId,
@@ -205,6 +217,34 @@ impl RenderOnce for FabMenuItem {
     }
 }
 
+/// # Example
+///
+/// ```
+/// # use gpui_kit::{prelude::*, *};
+/// use gpui_kit_material::prelude::*;
+/// use gpui_kit_material::icons::Symbol;
+///
+/// struct Inbox {
+///     open: bool,
+/// }
+///
+/// impl Render for Inbox {
+///     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+///         let close = cx.listener(|this, _: &ClickEvent, _, cx| {
+///             this.open = false;
+///             cx.notify();
+///         });
+///         FabMenu::new("actions", Symbol::EDIT, "Message actions")
+///             .open(self.open)
+///             .on_toggle(cx.listener(|this, open: &bool, _, cx| {
+///                 this.open = *open;
+///                 cx.notify();
+///             }))
+///             .item(FabMenuItem::new("reply", Symbol::REPLY, "Reply").on_click(close))
+///             .item(FabMenuItem::new("forward", Symbol::FORWARD, "Forward"))
+///     }
+/// }
+/// ```
 #[derive(gpui::IntoElement)]
 pub struct FabMenu {
     id: ElementId,

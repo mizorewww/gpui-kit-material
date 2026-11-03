@@ -83,7 +83,7 @@ pub static PLAYGROUND: Playground = Playground {
         },
     ],
     preview,
-    code: None,
+    code,
 };
 
 fn preview(
@@ -128,4 +128,39 @@ fn preview(
             .on_click(move |_, window, cx| toggle(&!selected, window, cx)),
     )
     .into_any_element()
+}
+
+fn code(config: &Config) -> String {
+    let size = config.number("size");
+    chain(
+        format!("Avatar::new(\"avatar\", {})", lit(&config.text("name"))),
+        [
+            match config.option("style") {
+                "monogram" => Some(format!("monogram({})", lit(&config.text("initials")))),
+                "icon" => Some(format!("icon({})", symbol_code(config.option("icon")))),
+                _ => None,
+            },
+            (size != AVATAR_SIZE).then(|| format!("size({size:?})")),
+            config.bool("selected").then(|| "selected(true)".into()),
+            config.bool("disabled").then(|| "disabled(true)".into()),
+        ],
+    )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use core::prelude::v1::test;
+
+    #[test]
+    fn the_code_follows_the_configuration() {
+        let mut config = Config::defaults(&PLAYGROUND);
+        let code = super::code(&config);
+        assert_eq!(code, "Avatar::new(\"avatar\", \"Ali Connors\")");
+        config.set("style", Value::Choice(1));
+        config.set("size", Value::Number(72.));
+        let code = super::code(&config);
+        assert!(code.contains(".monogram(\"A\")"), "{code}");
+        assert!(code.contains(".size(72.0)"), "{code}");
+    }
 }

@@ -272,6 +272,19 @@ fn blend_into(out: &mut Vec<Keyline>, a: &[Keyline], b: &[Keyline], t: f32) {
 
 /// One carousel item: caller content (e.g. an image) masked by the item,
 /// with an optional label and supporting text on large items.
+///
+/// # Example
+///
+/// ```
+/// use gpui_kit::{img, prelude::*};
+/// use gpui_kit_material::prelude::*;
+///
+/// let item = CarouselItem::new()
+///     .content(img("harbor.jpg").size_full())
+///     .label("Harbor Pier")
+///     .supporting("Australia");
+/// # let _ = item;
+/// ```
 pub struct CarouselItem {
     content: Option<AnyElement>,
     label: Option<SharedString>,
@@ -461,6 +474,23 @@ const LABEL_ON_IMAGERY: Rgba = Rgba {
 };
 
 /// An M3 carousel. `label` names it for assistive technology.
+///
+/// # Example
+///
+/// ```
+/// use gpui_kit::{img, prelude::*};
+/// use gpui_kit_material::prelude::*;
+///
+/// let places = [("harbor.jpg", "Harbor Pier"), ("fjord.jpg", "Fjord Morning")];
+/// let carousel = MaterialCarousel::new("places", "Places")
+///     .layout(CarouselLayout::Hero)
+///     .current(0)
+///     .on_change(|index, _window, _cx| println!("Showing item {index}"))
+///     .items(places.into_iter().map(|(photo, name)| {
+///         CarouselItem::new().content(img(photo).size_full()).label(name)
+///     }));
+/// # let _ = carousel;
+/// ```
 #[derive(gpui::IntoElement)]
 pub struct MaterialCarousel {
     id: ElementId,

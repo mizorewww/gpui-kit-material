@@ -329,7 +329,7 @@ pub static PLAYGROUND: Playground = Playground {
         },
     ],
     preview,
-    code: None,
+    code,
 };
 
 fn preview(
@@ -514,9 +514,159 @@ fn preview(
         .into_any_element()
 }
 
+fn code(config: &Config) -> String {
+    let set = &SETS[config.choice("items")];
+    let count: usize = if config.option("count") == "5" { 5 } else { 3 };
+    let last = count - 1;
+    let lines = config.option("lines");
+    let supporting = config.text("supporting");
+    let overline = lines == "3" && config.bool("overline");
+    let selection = config.option("selection");
+    let trailing = config.option("trailing");
+    let leading = config.option("leading");
+    let segmented = config.option("variant") == "segmented";
+    let pill = config.option("shape") == "pill";
+    let dividers = config.option("dividers");
+    // What the item's selection or control reads, by selection rule.
+    let state = match selection {
+        "single" => "self.selected == Some(index)",
+        "multi" => "self.selected[index]",
+        _ => "self.on[index]",
+    };
+    let uses_icon = matches!(leading, "icon" | "tinted");
+    let uses_trailing = trailing == "text";
+    let interactive = selection != "none" || trailing == "control";
+    let trailing_icon = if set.items[0].1 == "call" {
+        "Symbol::CALL"
+    } else {
+        "Symbol::CHEVRON_RIGHT"
+    };
+    let item = chain(
+        "ListItem::new((\"item\", index), headline)",
+        [
+            (config.choice("switch_icons") != 0).then(|| {
+                format!(
+                    "switch_icons(SwitchIcons::{})",
+                    ["None", "Selected", "Both"][config.choice("switch_icons")]
+                )
+            }),
+            overline.then(|| format!("overline({})", lit(set.overline))),
+            (lines != "1" && !supporting.is_empty())
+                .then(|| format!("supporting({})", lit(&supporting))),
+            (lines == "3" && !overline && !supporting.is_empty())
+                .then(|| "three_line(true)".into()),
+            match leading {
+                "icon" => Some("leading(ListLeading::Icon(icon.into()))".into()),
+                "tinted" => Some("leading(ListLeading::Tinted(icon.into(), Tint::Teal, 40.))".into()),
+                "avatar" => Some("leading(ListLeading::Monogram(headline[..1].into()))".into()),
+                "image" => Some(
+                    "leading(ListLeading::Image(Some(img(\"photo.jpg\").size_full().into_any_element())))"
+                        .into(),
+                ),
+                "video" => Some(
+                    "leading(ListLeading::Video(Some(img(\"poster.jpg\").size_full().into_any_element())))"
+                        .into(),
+                ),
+                _ => None,
+            },
+            match trailing {
+                "text" => Some("trailing_text(trailing)".into()),
+                "icon" => Some(format!("trailing(ListTrailing::Icon({trailing_icon}.into()))")),
+                "control" => Some(format!(
+                    "trailing(ListTrailing::{}({state}))",
+                    match selection {
+                        "single" => "Radio",
+                        "multi" => "Checkbox",
+                        _ => "Switch",
+                    }
+                )),
+                _ => None,
+            },
+            (selection != "none").then(|| format!("selected({state})")),
+            config.bool("expressive").then(|| "expressive(true)".into()),
+            match config.option("density") {
+                "compact" => Some("density(ListDensity::Compact)".into()),
+                "−3" => Some("density(ListDensity::Minus3)".into()),
+                _ => None,
+            },
+            pill.then(|| "pill(true)".into()),
+            config
+                .bool("disable_last")
+                .then(|| format!("disabled(index == {last})")),
+            segmented.then(|| "container(ColorRole::SURFACE_CONTAINER)".into()),
+            (dividers != "none").then(|| format!("divider(index < {last})")),
+            (dividers == "inset").then(|| "divider_inset(true)".into()),
+            interactive.then(|| {
+                format!(
+                    "on_click({})",
+                    listener(
+                        "move |this, _: &ClickEvent, _, cx|",
+                        match selection {
+                            "single" => "this.selected = Some(index);",
+                            "multi" => "this.selected[index] = !this.selected[index];",
+                            _ => "this.on[index] = !this.on[index];",
+                        }
+                    )
+                )
+            }),
+        ],
+    );
+    let entries: Vec<String> = set.items[..count]
+        .iter()
+        .map(|(headline, icon, trailing)| {
+            let mut fields = vec![lit(headline)];
+            if uses_icon {
+                fields.push(symbol_code(icon));
+            }
+            if uses_trailing {
+                fields.push(lit(trailing));
+            }
+            if fields.len() == 1 {
+                fields.remove(0)
+            } else {
+                format!("({})", fields.join(", "))
+            }
+        })
+        .collect();
+    let binding = match (uses_icon, uses_trailing) {
+        (false, false) => "headline",
+        (true, false) => "(headline, icon)",
+        (false, true) => "(headline, trailing)",
+        (true, true) => "(headline, icon, trailing)",
+    };
+    let items = format!(
+        "[{}].into_iter().enumerate().map(|(index, {binding})| {{\n    {}\n}})",
+        entries.join(", "),
+        indent(&item)
+    );
+    let label = config.text("label");
+    chain(
+        "div()",
+        [
+            Some("id(\"list\")".into()),
+            Some("flex()".into()),
+            Some("flex_col()".into()),
+            Some("role(Role::List)".into()),
+            (!label.is_empty()).then(|| format!("aria_label({})", lit(&label))),
+            config.bool("subheader").then(|| {
+                format!(
+                    "child(list_subheader(\"subheader\", {}))",
+                    lit(set.subheader)
+                )
+            }),
+            (pill && !segmented).then(|| "px(rem(12.))".into()),
+            Some(if segmented {
+                call("child", &call("segmented_list", &items))
+            } else {
+                format!("children({items})")
+            }),
+        ],
+    )
+}
+
 #[cfg(test)]
 mod tests {
-    use super::super::super::playground::Value;
+    use super::super::super::playground::{Config, Value};
     use super::super::nav_harness::Harness;
     use super::PLAYGROUND;
     use gpui::TestAppContext;
@@ -616,5 +766,27 @@ mod tests {
         let config = harness.config();
         assert!(config.bool("selected_0"));
         assert!(!config.bool("selected_2"));
+    }
+
+    #[test]
+    fn the_code_follows_the_configuration() {
+        let mut config = Config::defaults(&PLAYGROUND);
+        let code = super::code(&config);
+        assert!(code.starts_with("div()"), "{code}");
+        assert!(
+            code.contains("ListItem::new((\"item\", index), headline)"),
+            "{code}"
+        );
+        assert!(
+            code.contains("(\"Morning walk\", Symbol::FAVORITE, \"5 min\")"),
+            "{code}"
+        );
+        assert!(
+            code.contains(".selected(self.selected == Some(index))"),
+            "{code}"
+        );
+        assert!(!code.contains("segmented_list("));
+        config.set("variant", Value::Choice(1));
+        assert!(super::code(&config).contains("segmented_list("));
     }
 }

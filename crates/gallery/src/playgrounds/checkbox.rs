@@ -130,7 +130,7 @@ pub static PLAYGROUND: Playground = Playground {
         },
     ],
     preview,
-    code: None,
+    code,
 };
 
 /// The parent's state for its children's selection.
@@ -316,6 +316,82 @@ fn preview(
         .into_any_element()
 }
 
+fn code(config: &Config) -> String {
+    const STATE_NAMES: [&str; 3] = ["Unchecked", "Checked", "Indeterminate"];
+    let style = |required: bool| {
+        [
+            Some("show_label(true)".to_string()),
+            (config.option("position") == "start")
+                .then(|| "label_position(LabelPosition::Start)".into()),
+            (required && config.bool("required")).then(|| "required(true)".into()),
+            config.bool("error").then(|| "error(true)".into()),
+            config.bool("disabled").then(|| "disabled(true)".into()),
+        ]
+    };
+    let state = config.choice("state");
+    let label = lit(&config.text("label"));
+    if !config.bool("parent") {
+        return chain(
+            format!("MaterialCheckbox::new(\"checkbox\", {label})"),
+            style(true).into_iter().chain([
+                (state != 0).then(|| format!("state(CheckboxState::{})", STATE_NAMES[state])),
+                Some(format!(
+                    "on_change({})",
+                    listener(
+                        "|this, state: &CheckboxState, _, cx|",
+                        "this.state = *state;"
+                    )
+                )),
+            ]),
+        );
+    }
+    let set = &SETS[config.choice("options")];
+    let children: Vec<String> = set.children.iter().map(|(name, _)| lit(name)).collect();
+    // The parent is checked when every child is, indeterminate when some are.
+    let parent = chain(
+        format!("MaterialCheckbox::new(\"all\", {label})"),
+        style(true).into_iter().chain([
+            Some(
+                "state(match self.checked.iter().filter(|checked| **checked).count() {\n    0 => CheckboxState::Unchecked,\n    n if n == self.checked.len() => CheckboxState::Checked,\n    _ => CheckboxState::Indeterminate,\n})"
+                    .into(),
+            ),
+            Some(format!(
+                "on_change({})",
+                listener(
+                    "|this, state: &CheckboxState, _, cx|",
+                    "this.checked.fill(*state == CheckboxState::Checked);"
+                )
+            )),
+        ]),
+    );
+    let child = chain(
+        "MaterialCheckbox::new((\"option\", index), name)",
+        style(false).into_iter().chain([
+            Some("checked(self.checked[index])".into()),
+            Some(format!(
+                "on_change({})",
+                listener(
+                    "move |this, state: &CheckboxState, _, cx|",
+                    "this.checked[index] = *state == CheckboxState::Checked;"
+                )
+            )),
+        ]),
+    );
+    chain(
+        "div()",
+        [
+            Some("flex()".into()),
+            Some("flex_col()".into()),
+            Some(call("child", &parent)),
+            Some(format!(
+                "children([{}].into_iter().enumerate().map(|(index, name)| {{\n    {}\n}}))",
+                children.join(", "),
+                indent(&child)
+            )),
+        ],
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::super::testing::*;
@@ -356,5 +432,27 @@ mod tests {
                 assert_eq!(parent_state(&children_for(state, set)), state);
             }
         }
+    }
+
+    #[test]
+    fn the_code_follows_the_configuration() {
+        let mut config = Config::defaults(&PLAYGROUND);
+        let code = super::code(&config);
+        assert!(code.starts_with("div()"), "{code}");
+        assert!(
+            code.contains("MaterialCheckbox::new(\"all\", \"Additions\")"),
+            "{code}"
+        );
+        assert!(code.contains("\"Pickles\", \"Tomato\""), "{code}");
+        config.set("parent", Value::Bool(false));
+        let code = super::code(&config);
+        assert!(
+            code.starts_with("MaterialCheckbox::new(\"checkbox\", \"Additions\")"),
+            "{code}"
+        );
+        assert!(code.contains(".state(CheckboxState::Indeterminate)"));
+        assert!(!code.contains(".error("));
+        config.set("error", Value::Bool(true));
+        assert!(super::code(&config).contains(".error(true)"));
     }
 }

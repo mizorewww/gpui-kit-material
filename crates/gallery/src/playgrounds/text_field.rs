@@ -185,7 +185,7 @@ pub static PLAYGROUND: Playground = Playground {
         },
     ],
     preview,
-    code: None,
+    code,
 };
 
 fn preview(
@@ -284,6 +284,94 @@ fn preview(
         .into_any_element()
 }
 
+fn code(config: &Config) -> String {
+    let kind = config.option("type");
+    let multiline = kind == "multiline";
+    let value = config.text("value");
+    let disabled = config.bool("disabled");
+    let state = if multiline {
+        "TextareaState::new(window, cx).auto_grow(1, 5)"
+    } else {
+        "InputState::new(window, cx)"
+    };
+    let state = if value.is_empty() {
+        state.to_string()
+    } else {
+        format!("{state}.default_value({})", lit(&value))
+    };
+    let head = if multiline {
+        "TextField::multi_line(\"text-field\", &self.input)"
+    } else {
+        "TextField::new(\"text-field\", &self.input)"
+    };
+    let label = config.text("label");
+    let text_call = |id: &str, method: &str| {
+        let text = config.text(id);
+        (!text.is_empty()).then(|| format!("{method}({})", lit(&text)))
+    };
+    let max_length = config.number("max_length") as usize;
+    let leading = config.option("leading");
+    let trailing = config.option("trailing");
+    let trailing_button = (!trailing.is_empty()).then(|| {
+        let name = config.text("trailing_label");
+        let name = if name.is_empty() { trailing } else { &name };
+        chain(
+            format!(
+                "IconButton::new(\"trailing\", {}, {})",
+                symbol_code(trailing),
+                lit(name)
+            ),
+            [
+                disabled.then(|| "disabled(true)".into()),
+                Some(if trailing == "cancel" {
+                    format!(
+                        "on_click({})",
+                        listener(
+                            "|this, _: &ClickEvent, window, cx|",
+                            "this.input.update(cx, |input, cx| input.set_value(\"\", window, cx));"
+                        )
+                    )
+                } else {
+                    format!("on_click(|_, _, _| println!({}))", lit(name))
+                }),
+            ],
+        )
+    });
+    let field = chain(
+        head,
+        [
+            match kind {
+                "password" => Some("input_type(TextFieldInputType::Password)".into()),
+                "email" => Some("input_type(TextFieldInputType::Email)".into()),
+                "number" => Some("input_type(TextFieldInputType::Number)".into()),
+                "tel" => Some("input_type(TextFieldInputType::Tel)".into()),
+                "url" => Some("input_type(TextFieldInputType::Url)".into()),
+                _ => None,
+            },
+            (config.option("variant") == "outlined")
+                .then(|| "variant(TextFieldVariant::Outlined)".into()),
+            (config.option("density") == "compact")
+                .then(|| "density(TextFieldDensity::Compact)".into()),
+            (!label.is_empty()).then(|| format!("label({})", lit(&label))),
+            text_call("placeholder", "placeholder"),
+            text_call("prefix", "prefix"),
+            text_call("suffix", "suffix"),
+            text_call("supporting", "supporting_text"),
+            (max_length > 0).then(|| format!("max_length({max_length})")),
+            (!leading.is_empty())
+                .then(|| format!("leading_icon(Icon::from({}))", symbol_code(leading))),
+            trailing_button.map(|button| call("trailing_icon", &button)),
+            config.bool("error").then(|| "error(true)".into()),
+            config.bool("required").then(|| "required(true)".into()),
+            config.bool("read_only").then(|| "read_only(true)".into()),
+            disabled.then(|| "disabled(true)".into()),
+        ],
+    );
+    format!(
+        "// Once, in the view's constructor:\nlet input = cx.new(|cx| {state});\n\n// In render:\n{field}"
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::super::testing::*;
@@ -345,5 +433,24 @@ mod tests {
             (lost - 8. * 16. / 14.).abs() < 1.,
             "8dp shorter, not {lost}"
         );
+    }
+
+    #[test]
+    fn the_code_follows_the_configuration() {
+        let mut config = Config::defaults(&PLAYGROUND);
+        let code = super::code(&config);
+        assert!(
+            code.contains("let input = cx.new(|cx| InputState::new(window, cx));"),
+            "{code}"
+        );
+        assert!(
+            code.contains("TextField::new(\"text-field\", &self.input)\n    .label(\"Label\")"),
+            "{code}"
+        );
+        assert!(!code.contains(".error("));
+        config.set("error", Value::Bool(true));
+        assert!(super::code(&config).contains(".error(true)"));
+        config.set("type", Value::Choice(7));
+        assert!(super::code(&config).contains("TextField::multi_line("));
     }
 }

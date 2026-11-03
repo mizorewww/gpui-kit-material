@@ -110,6 +110,20 @@ struct ItemState {
     natural: Rc<Cell<f32>>,
 }
 
+/// # Example
+///
+/// ```
+/// use gpui_kit::prelude::*;
+/// use gpui_kit_material::prelude::*;
+/// use gpui_kit_material::icons::Symbol;
+///
+/// let playback = ButtonGroup::new("playback", "Playback")
+///     .button_size(ButtonSize::Medium)
+///     .item(IconButton::new("previous", Symbol::SKIP_PREVIOUS, "Previous"))
+///     .item(MaterialButton::new("play").icon(Symbol::PLAY_ARROW).child("Play"))
+///     .item(IconButton::new("next", Symbol::SKIP_NEXT, "Next"));
+/// # let _ = playback;
+/// ```
 #[derive(gpui::IntoElement)]
 pub struct ButtonGroup {
     id: ElementId,

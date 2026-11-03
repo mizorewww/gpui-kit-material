@@ -201,7 +201,7 @@ pub struct Playground {
     pub scenarios: &'static [Scenario],
     pub sections: &'static [Section],
     pub preview: PreviewFn,
-    pub code: Option<CodeFn>,
+    pub code: CodeFn,
 }
 
 /// A builder chain as the Code card shows it: `head`, then each present call
@@ -236,6 +236,42 @@ pub fn array(items: impl IntoIterator<Item = String>) -> String {
     code
 }
 
+/// `code` one level (four spaces) further in, after its first line: an
+/// argument or block nested in other code.
+pub fn indent(code: &str) -> String {
+    code.replace('\n', "\n    ")
+}
+
+/// `method(arg)`, with a multi-line `arg` (a nested chain) on lines of its
+/// own one level in, as rustfmt writes it.
+pub fn call(method: &str, arg: &str) -> String {
+    if arg.contains('\n') {
+        format!("{method}(\n    {},\n)", indent(arg))
+    } else {
+        format!("{method}({arg})")
+    }
+}
+
+/// A `cx.listener` handler for the Code card: the closure's `head` (e.g.
+/// `|this, checked: &bool, _, cx|`), then `body`'s statements and
+/// `cx.notify()`.
+pub fn listener(head: &str, body: &str) -> String {
+    format!(
+        "cx.listener({head} {{\n    {}\n    cx.notify();\n}})",
+        indent(body)
+    )
+}
+
+/// A handler whose signature `cx.listener` cannot produce (an owned value or
+/// several arguments): `head`'s closure updates the view through a weak
+/// handle with `body`'s statements, then notifies.
+pub fn view_update(head: &str, body: &str) -> String {
+    format!(
+        "{{\n    let view = cx.weak_entity();\n    {head} {{\n        view.update(cx, |this, cx| {{\n            {}\n            cx.notify();\n        }})\n        .ok();\n    }}\n}}",
+        body.replace('\n', "\n            ")
+    )
+}
+
 /// The Rust for a Material Symbol by name, e.g. `Symbol::PRESENT_TO_ALL`
 /// (a name starting with a digit takes a leading underscore, `Symbol::_10K`).
 /// [`with_imports`] adds its `use` line.
@@ -250,8 +286,13 @@ pub fn symbol_code(name: &str) -> String {
 
 /// `code` after the `use` lines for the names it takes from outside
 /// `gpui_kit_material::prelude` and `gpui`'s prelude, which a view already
-/// imports: Material Symbols, Base's placement types and `Duration`.
+/// imports: Material icons, Base's placement and editor state types and
+/// `Duration`. Code that already starts with its imports is returned as is,
+/// so the Code card can apply this to every playground's code.
 pub fn with_imports(code: String) -> String {
+    if code.starts_with("use ") {
+        return code;
+    }
     // `name::` as a whole path segment, not the end of e.g. `FabMenuAlign::`.
     let names = |name: &str| {
         let path = format!("{name}::");
@@ -263,18 +304,25 @@ pub fn with_imports(code: String) -> String {
         })
     };
     let mut imports = Vec::new();
-    if names("Symbol") {
-        imports.push("use gpui_kit_material::icons::Symbol;".to_string());
-    }
-    let base: Vec<_> = ["Align", "Placement"]
-        .into_iter()
-        .filter(|name| names(name))
-        .collect();
-    match base.as_slice() {
-        [] => {}
-        [name] => imports.push(format!("use gpui_kit::base::{name};")),
-        names => imports.push(format!("use gpui_kit::base::{{{}}};", names.join(", "))),
-    }
+    let mut import = |path: &str, candidates: &[&str]| {
+        let found: Vec<_> = candidates.iter().filter(|name| names(name)).collect();
+        match found.as_slice() {
+            [] => {}
+            [name] => imports.push(format!("use {path}::{name};")),
+            found => imports.push(format!(
+                "use {path}::{{{}}};",
+                found
+                    .iter()
+                    .map(|name| **name)
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            )),
+        }
+    };
+    import("gpui_kit_material::icons", &["Icon", "Symbol"]);
+    import("gpui_kit::base", &["Align", "Placement"]);
+    import("gpui_kit::base::input", &["InputState", "TextareaState"]);
+    import("gpui_kit::base::slider", &["SliderState"]);
     if names("Duration") {
         imports.push("use std::time::Duration;".to_string());
     }
@@ -1430,18 +1478,16 @@ impl CodeView {
         }
     }
 
-    /// The code for the current configuration, if the playground writes any.
-    pub fn code(&self, cx: &App) -> Option<String> {
+    /// The code for the current configuration, with its imports.
+    pub fn code(&self, cx: &App) -> String {
         let state = self.state.read(cx);
-        state.playground.code.map(|code| code(&state.config))
+        with_imports((state.playground.code)(&state.config))
     }
 }
 
 impl Render for CodeView {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let Some(code) = self.code(cx) else {
-            return div().into_any_element();
-        };
+        let code = self.code(cx);
         let copied = self.copied.as_deref() == Some(code.as_str());
         let header = div()
             .flex()
@@ -1468,7 +1514,7 @@ impl Render for CodeView {
                     .icon(symbol(if copied { "check" } else { "content_copy" }, 20.))
                     .child(if copied { "Copied" } else { "Copy" })
                     .on_click(cx.listener(move |this, _, _, cx| {
-                        let Some(code) = this.code(cx) else { return };
+                        let code = this.code(cx);
                         cx.write_to_clipboard(ClipboardItem::new_string(code.clone()));
                         this.copied = Some(code);
                         cx.notify();
@@ -1564,8 +1610,24 @@ mod tests {
             },
         ],
         preview,
-        code: None,
+        code: |_| String::new(),
     };
+
+    #[test]
+    fn the_code_card_imports_what_the_preludes_leave_out_once() {
+        let code = with_imports(
+            "let volume = cx.new(|_| SliderState::new());\nIcon::from(Symbol::FAVORITE)".into(),
+        );
+        assert!(code.starts_with(
+            "use gpui_kit_material::icons::{Icon, Symbol};\nuse gpui_kit::base::slider::SliderState;\n\n"
+        ));
+        assert_eq!(with_imports(code.clone()), code);
+        // A path's last segment is not an import.
+        assert_eq!(
+            with_imports("FabMenuAlign::End".into()),
+            "FabMenuAlign::End"
+        );
+    }
 
     #[test]
     fn scenarios_apply_over_the_defaults() {

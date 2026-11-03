@@ -105,7 +105,7 @@ pub static PLAYGROUND: Playground = Playground {
         },
     ],
     preview,
-    code: Some(code),
+    code,
 };
 
 /// Each context's navigation icon and two actions: (symbol, label).

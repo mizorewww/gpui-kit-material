@@ -45,6 +45,20 @@ pub enum AvatarContent {
 }
 
 /// A circular avatar. See the module documentation.
+///
+/// # Example
+///
+/// ```
+/// use gpui_kit_material::prelude::*;
+/// use gpui_kit_material::icons::Symbol;
+///
+/// let person = Avatar::new("ada", "Ada Lovelace").monogram("AL");
+/// let pet = Avatar::new("pet", "Biscuit")
+///     .icon(Symbol::PETS)
+///     .size(56.)
+///     .selected(true);
+/// # let _ = (person, pet);
+/// ```
 #[derive(gpui::IntoElement)]
 pub struct Avatar {
     id: ElementId,

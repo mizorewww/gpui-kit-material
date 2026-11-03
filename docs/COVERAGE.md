@@ -157,7 +157,7 @@ Status of each [production criterion](PRODUCTION.md) across all components.
 | Criterion | Status |
 | --- | --- |
 | Controlled state, caller-supplied strings | Followed in source; no automated check |
-| Rustdoc with runnable examples | **Not met**: almost no doc examples |
+| Rustdoc with runnable examples | Met for every component the Gallery previews and the crate root (merged doctests); helper and token types mostly have prose only. The Gallery's Code card writes each configuration's Rust |
 | Pointer and keyboard | Implemented and tested per component to varying depth |
 | Touch | Press feedback and cancellation on scroll through the shared ripple, tested on public touch events; a system cancel of a still finger releases only at a 5 s hold limit; only the first finger starts a wave; no real touch device run; the 48 dp target is implemented and tested for compact buttons, not audited elsewhere |
 | Focus ring | Implemented; carousel has focus but no other states |

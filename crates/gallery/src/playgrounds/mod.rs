@@ -59,7 +59,7 @@ pub mod prelude {
     #[allow(unused_imports)]
     pub(crate) use super::super::playground::{
         Config, Control, Playground, PlaygroundState, Preview, Scenario, Section, Set, Value,
-        array, chain, lit, symbol, symbol_code, with_imports,
+        array, call, chain, indent, listener, lit, symbol, symbol_code, view_update, with_imports,
     };
     pub(crate) use super::super::spec::type_role;
     pub use gpui::{prelude::*, *};

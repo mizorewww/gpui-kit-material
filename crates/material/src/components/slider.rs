@@ -159,6 +159,33 @@ const ICON_MIN_FRACTION: f32 = 0.25;
 /// A value-indicator formatter.
 type ValueFormat = std::rc::Rc<dyn Fn(f32) -> SharedString>;
 
+/// # Example
+///
+/// ```
+/// # use gpui_kit::{prelude::*, *};
+/// use gpui_kit_material::prelude::*;
+/// use gpui_kit_material::icons::Symbol;
+/// use gpui_kit::base::slider::SliderState;
+///
+/// struct Settings {
+///     volume: Entity<SliderState>,
+/// }
+///
+/// impl Settings {
+///     fn new(cx: &mut Context<Self>) -> Self {
+///         let volume = cx.new(|_| SliderState::new().step(5.).default_value(40.));
+///         Self { volume }
+///     }
+/// }
+///
+/// impl Render for Settings {
+///     fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+///         MaterialSlider::new(&self.volume, "Volume")
+///             .size(SliderSize::Medium)
+///             .icon(Symbol::VOLUME_UP)
+///     }
+/// }
+/// ```
 #[derive(gpui::IntoElement)]
 pub struct MaterialSlider {
     id: ElementId,

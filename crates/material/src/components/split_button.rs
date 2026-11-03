@@ -31,6 +31,32 @@ pub enum SplitButtonPart {
 type ClickHandler = Rc<dyn Fn(&ClickEvent, &mut Window, &mut App)>;
 type ToggleHandler = Rc<dyn Fn(&bool, &mut Window, &mut App)>;
 
+/// # Example
+///
+/// ```
+/// # use gpui_kit::{prelude::*, *};
+/// use gpui_kit_material::prelude::*;
+///
+/// struct Editor {
+///     open: bool,
+/// }
+///
+/// impl Render for Editor {
+///     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+///         let menu = MaterialMenu::new("save-options")
+///             .item(MaterialMenuItem::new("Save as…"))
+///             .item(MaterialMenuItem::new("Export as PDF"));
+///         SplitButton::new("save", "Save", "More save options")
+///             .menu(menu)
+///             .open(self.open)
+///             .on_toggle(cx.listener(|this, open: &bool, _, cx| {
+///                 this.open = *open;
+///                 cx.notify();
+///             }))
+///             .on_click(|_, _window, _cx| println!("Saved"))
+///     }
+/// }
+/// ```
 #[derive(gpui::IntoElement)]
 pub struct SplitButton {
     id: ElementId,

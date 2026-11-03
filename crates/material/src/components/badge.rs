@@ -102,6 +102,22 @@ pub fn badge_label(label: &str, max: Option<u32>) -> SharedString {
 /// [`Self::position`]'s corner of that element's [`Self::inset`] box (the
 /// icon inside it); without one it renders alone. [`Self::visible`]
 /// animates it in and out. The caller supplies the label.
+///
+/// # Example
+///
+/// ```
+/// use gpui_kit_material::prelude::*;
+/// use gpui_kit_material::icons::Symbol;
+///
+/// let inbox = Badge::large("unread", "120")
+///     .max_count(99)
+///     // The 24dp icon sits 8dp inside the 40dp button.
+///     .inset(8.)
+///     .anchor(IconButton::new("inbox", Symbol::INBOX, "Inbox, 99+ unread"));
+/// let new = Badge::small("new").color(BadgeColor::Primary);
+/// assert_eq!(Badge::large("count", "120").max_count(99).text().as_deref(), Some("99+"));
+/// # let _ = (inbox, new);
+/// ```
 #[derive(gpui::IntoElement)]
 pub struct Badge {
     id: ElementId,

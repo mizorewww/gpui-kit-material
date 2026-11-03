@@ -210,6 +210,21 @@ macro_rules! fab_builders {
 }
 
 /// A square FAB holding one icon. `label` names it for assistive technology.
+///
+/// # Example
+///
+/// ```
+/// use gpui_kit_material::prelude::*;
+/// use gpui_kit_material::icons::Symbol;
+///
+/// let create = Fab::new("create", Symbol::ADD, "Create")
+///     .color(FabColor::TertiaryContainer)
+///     .size(FabSize::Large)
+///     // Float at the bottom end of the nearest positioned ancestor.
+///     .position(FabPosition::BottomEnd)
+///     .on_click(|_, _window, _cx| println!("Create"));
+/// # let _ = create;
+/// ```
 #[derive(gpui::IntoElement)]
 pub struct Fab {
     id: ElementId,
@@ -291,6 +306,21 @@ impl RenderOnce for Fab {
 /// and icon-label gap close on the default spatial spring (reduced motion
 /// jumps). A label-only FAB ([`ExtendedFab::label_only`]) has nothing to
 /// collapse to and stays extended.
+///
+/// # Example
+///
+/// ```
+/// use gpui_kit_material::prelude::*;
+/// use gpui_kit_material::icons::Symbol;
+///
+/// let scrolled = true;
+/// let compose = ExtendedFab::new("compose", Symbol::EDIT, "Compose")
+///     .expanded(!scrolled)
+///     .position(FabPosition::BottomEnd)
+///     .on_click(|_, _window, _cx| println!("Compose"));
+/// let save = ExtendedFab::label_only("save", "Save draft").lowered(true);
+/// # let _ = (compose, save);
+/// ```
 #[derive(gpui::IntoElement)]
 pub struct ExtendedFab {
     id: ElementId,

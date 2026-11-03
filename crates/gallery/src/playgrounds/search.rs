@@ -118,7 +118,7 @@ pub static PLAYGROUND: Playground = Playground {
         },
     ],
     preview,
-    code: Some(code),
+    code,
 };
 
 /// The places matching `query` (case-insensitive, city or country).
@@ -448,7 +448,7 @@ mod tests {
         let mut config = Config::defaults(&PLAYGROUND);
         let code = super::code(&config);
         assert!(code.starts_with(
-            "use gpui_kit_material::icons::Symbol;\n\n// self.query = cx.new(|cx| InputState::new(window, cx).placeholder(\"Search places\"));\nSearchView::new(\n    \"search\",\n    SearchField::new(&self.query)"
+            "use gpui_kit_material::icons::Symbol;\nuse gpui_kit::base::input::InputState;\n\n// self.query = cx.new(|cx| InputState::new(window, cx).placeholder(\"Search places\"));\nSearchView::new(\n    \"search\",\n    SearchField::new(&self.query)"
         ), "{code}");
         assert!(code.contains(".leading(Symbol::SEARCH.icon().component())"));
         assert!(code.contains("SearchSuggestion::new(city)"));
