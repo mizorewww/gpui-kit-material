@@ -47,12 +47,17 @@ fn notice_tone(kind: NoticeKind) -> (ColorRole, ColorRole, IconName, Role) {
 
 /// A page-level notice: tinted surface, status icon and wrapping text.
 /// Callers append the notice's actions, which wrap below the text when narrow.
+///
+/// The icon stands on the text's first line, so a notice of several lines
+/// reads from its icon; the icon and text together centre on the actions.
 pub fn notice_banner(
     id: impl Into<ElementId>,
     kind: NoticeKind,
     text: impl Into<SharedString>,
 ) -> Div {
+    let id = id.into();
     let (bg, tone, icon, role) = notice_tone(kind);
+    let icon_selector = format!("{id}-icon");
     div()
         .flex()
         .flex_wrap()
@@ -63,14 +68,32 @@ pub fn notice_banner(
         .p(rem(12.))
         .rounded(RADIUS_SMALL)
         .bg(color(bg))
-        .child(icon.icon().size(ICON_SLOT).color(color(tone)))
         .child(
-            accessible_text(id, text)
-                .role(role)
+            div()
+                .flex()
+                .items_start()
                 .flex_1()
-                .flex_basis(rem(200.))
+                .flex_basis(rem(200.) + ICON_SLOT + rem(12.))
                 .min_w_0()
-                .whitespace_normal(),
+                .gap(rem(12.))
+                .child(
+                    // A line of the text's height (an empty word sets it), so the icon
+                    // centres on the first line whatever size the caller's text is.
+                    div()
+                        .flex()
+                        .flex_shrink_0()
+                        .items_center()
+                        .debug_selector(move || icon_selector.clone())
+                        .child(icon.icon().size(ICON_SLOT).color(color(tone)))
+                        .child("\u{2060}"),
+                )
+                .child(
+                    accessible_text(id, text)
+                        .role(role)
+                        .flex_1()
+                        .min_w_0()
+                        .whitespace_normal(),
+                ),
         )
 }
 
@@ -1389,6 +1412,56 @@ mod tests {
         assert_eq!(long.size.height, px(16.));
         assert!(long.size.width > px(16.));
         assert_eq!(dot.size, gpui::size(px(6.), px(6.)));
+    }
+
+    #[gpui::test]
+    fn a_notice_icon_stands_on_the_first_line_and_centres_on_actions(cx: &mut TestAppContext) {
+        struct Notices;
+        impl Render for Notices {
+            fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+                window.set_rem_size(px(14.));
+                div()
+                    .flex()
+                    .flex_col()
+                    // Wide enough for the short notice's action beside its text.
+                    .w(px(400.))
+                    .child(
+                        notice_banner(
+                            "long",
+                            NoticeKind::Danger,
+                            "A failure explained at length wraps onto several lines, \
+                             and its icon stays beside the first of them, however many \
+                             lines follow it below.",
+                        )
+                        .debug_selector(|| "notice-long".into()),
+                    )
+                    .child(
+                        notice_banner("short", NoticeKind::Info, "Short").child(
+                            div()
+                                .w(px(40.))
+                                .h(px(40.))
+                                .debug_selector(|| "action".into()),
+                        ),
+                    )
+            }
+        }
+        let (_, cx) = cx.add_window_view(|_, _| Notices);
+        cx.run_until_parked();
+        let notice = cx.debug_bounds("notice-long").unwrap();
+        let icon = cx.debug_bounds("long-icon").unwrap();
+        assert!(
+            notice.size.height > icon.size.height * 2.5,
+            "{notice:?} {icon:?}"
+        );
+        let inset = icon.origin.y - notice.origin.y;
+        assert!(
+            inset < icon.size.height,
+            "the icon sits {inset:?} down a {notice:?}"
+        );
+        let short = cx.debug_bounds("short-icon").unwrap();
+        let action = cx.debug_bounds("action").unwrap();
+        let centre = |bounds: Bounds<Pixels>| bounds.origin.y + bounds.size.height / 2.;
+        assert!((centre(short) - centre(action)).abs() < px(1.));
     }
 
     pub(crate) fn redraw(cx: &mut gpui::VisualTestContext) {
