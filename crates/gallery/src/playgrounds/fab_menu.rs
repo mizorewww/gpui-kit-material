@@ -157,6 +157,7 @@ pub static PLAYGROUND: Playground = Playground {
         },
     ],
     preview,
+    code: None,
 };
 
 /// The last chosen item, reported under the menu.

@@ -112,6 +112,7 @@ pub static PLAYGROUND: Playground = Playground {
         },
     ],
     preview,
+    code: None,
 };
 
 /// The preview's screen: fills the canvas and floats `child` at

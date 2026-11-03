@@ -43,7 +43,7 @@
 //! editor once, and `local` for other preview-only state. Configuration
 //! survives navigation: each page keeps its [`PlaygroundState`].
 use super::page::GalleryShared;
-use super::shell::{LeadView, ShellLayout, panes_stacked, preview_canvas, shell_width};
+use super::shell::{LeadView, ShellLayout, card, panes_stacked, preview_canvas, shell_width};
 use super::spec::type_role;
 use gpui::{prelude::*, *};
 use gpui_base::input::{InputEvent, InputState, TextareaState};
@@ -190,12 +190,37 @@ pub struct Scenario {
 pub type PreviewFn =
     fn(&Config, &mut Preview, &mut Window, &mut Context<PlaygroundState>) -> AnyElement;
 
+/// Writes the Rust that builds the preview's component as configured, for
+/// the Code card, as md3.io shows the markup of its preview. Builder calls
+/// that only restate a default are left out; see [`chain`].
+pub type CodeFn = fn(&Config) -> String;
+
 /// A component's playground. See the module documentation.
 pub struct Playground {
     /// Presets after "Default" (the controls' defaults).
     pub scenarios: &'static [Scenario],
     pub sections: &'static [Section],
     pub preview: PreviewFn,
+    pub code: Option<CodeFn>,
+}
+
+/// A builder chain as the Code card shows it: `head`, then each present call
+/// on its own line, e.g. `chain("MaterialSwitch::new(\"switch\", \"Wi-Fi\")",
+/// [config.bool("checked").then(|| "checked(true)".into())])`.
+pub fn chain(head: impl Into<String>, calls: impl IntoIterator<Item = Option<String>>) -> String {
+    let mut code = head.into();
+    for call in calls.into_iter().flatten() {
+        code.push_str("\n    .");
+        // A multi-line argument (a closure, a nested chain) keeps its shape
+        // one level in.
+        code.push_str(&call.replace('\n', "\n    "));
+    }
+    code
+}
+
+/// A string literal for `text`, escaped as Rust writes it.
+pub fn lit(text: &str) -> String {
+    format!("{text:?}")
 }
 
 impl Playground {
@@ -1322,6 +1347,92 @@ impl Render for PanelView {
     }
 }
 
+/// The Code card under the preview: the Rust for the configured component,
+/// with a Copy button, as on md3.io's component pages. Its own view, so a
+/// configuration change rebuilds only it, the panel and the preview.
+pub struct CodeView {
+    state: Entity<PlaygroundState>,
+    /// What Copy last wrote; the button says "Copied" while that is still
+    /// the code shown.
+    copied: Option<String>,
+    _observe: Subscription,
+}
+
+impl CodeView {
+    pub fn new(state: Entity<PlaygroundState>, cx: &mut Context<Self>) -> Self {
+        let observe = cx.observe(&state, |_, _, cx| cx.notify());
+        Self {
+            state,
+            copied: None,
+            _observe: observe,
+        }
+    }
+
+    /// The code for the current configuration, if the playground writes any.
+    pub fn code(&self, cx: &App) -> Option<String> {
+        let state = self.state.read(cx);
+        state.playground.code.map(|code| code(&state.config))
+    }
+}
+
+impl Render for CodeView {
+    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let Some(code) = self.code(cx) else {
+            return div().into_any_element();
+        };
+        let copied = self.copied.as_deref() == Some(code.as_str());
+        let header = div()
+            .flex()
+            .flex_wrap()
+            .items_center()
+            .justify_between()
+            .gap_x(rem(8.))
+            .min_h(rem(56.))
+            .py(rem(8.))
+            .px(rem(20.))
+            .border_b_1()
+            .border_color(color(ColorRole::OUTLINE_VARIANT))
+            .child(
+                accessible_text("code-title", "Code")
+                    .role(Role::Heading)
+                    .map(|text| type_role(text, TypeRole::TitleSmall))
+                    .text_color(color(ColorRole::ON_SURFACE)),
+            )
+            .child(
+                MaterialButton::new("code-copy")
+                    .variant(ButtonVariant::Text)
+                    .button_size(ButtonSize::ExtraSmall)
+                    .debug_selector(|| "code-copy".into())
+                    .icon(symbol(if copied { "check" } else { "content_copy" }, 20.))
+                    .child(if copied { "Copied" } else { "Copy" })
+                    .on_click(cx.listener(move |this, _, _, cx| {
+                        let Some(code) = this.code(cx) else { return };
+                        cx.write_to_clipboard(ClipboardItem::new_string(code.clone()));
+                        this.copied = Some(code);
+                        cx.notify();
+                    })),
+            );
+        // Long lines wrap: the Gallery never scrolls sideways.
+        let body = div().px(rem(20.)).py(rem(16.)).child(
+            accessible_text("code", code)
+                .debug_selector(|| "playground-code".into())
+                .whitespace_normal()
+                .font_family(CODE_FONT)
+                .text_size(rem(13.))
+                .line_height(rem(20.))
+                .text_color(color(ColorRole::ON_SURFACE)),
+        );
+        card()
+            .debug_selector(|| "code-card".into())
+            .child(header)
+            .child(body)
+            .into_any_element()
+    }
+}
+
+/// The Code card's monospace face, bundled for the web build.
+pub const CODE_FONT: &str = "Roboto Mono";
+
 #[cfg(test)]
 impl Render for PlaygroundState {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
@@ -1391,6 +1502,7 @@ mod tests {
             },
         ],
         preview,
+        code: None,
     };
 
     #[test]

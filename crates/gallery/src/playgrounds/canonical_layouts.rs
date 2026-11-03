@@ -110,6 +110,7 @@ pub static PLAYGROUND: Playground = Playground {
         },
     ],
     preview,
+    code: None,
 };
 
 fn headline(text: impl Into<SharedString>) -> impl IntoElement {

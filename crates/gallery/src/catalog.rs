@@ -738,6 +738,40 @@ mod tests {
     /// Entries sharing a kit page each open on their own rows, not on another
     /// component's: only a live demo the components share may repeat, and never
     /// first.
+    /// Every playground's Code card, in every scenario, is a balanced
+    /// builder chain that starts with the component it previews.
+    #[test]
+    fn every_playground_writes_balanced_code_in_every_scenario() {
+        use super::super::playground::Config;
+        for entry in CATALOG {
+            let Kind::Component {
+                playground: Some(playground),
+            } = entry.kind
+            else {
+                continue;
+            };
+            let Some(code) = playground.code else {
+                continue;
+            };
+            let configs = std::iter::once(Config::defaults(playground)).chain(
+                playground
+                    .scenarios
+                    .iter()
+                    .map(|scenario| Config::scenario(playground, scenario)),
+            );
+            for config in configs {
+                let code = code(&config);
+                assert!(!code.trim().is_empty(), "{} writes code", entry.id);
+                for (open, close) in [('(', ')'), ('{', '}'), ('[', ']')] {
+                    let depth = code.chars().fold(0i32, |depth, c| {
+                        depth + i32::from(c == open) - i32::from(c == close)
+                    });
+                    assert_eq!(depth, 0, "{}: {open}{close} balance in\n{code}", entry.id);
+                }
+            }
+        }
+    }
+
     #[test]
     fn entries_sharing_a_kit_page_open_on_their_own_specs() {
         let mut firsts = Vec::new();

@@ -118,6 +118,7 @@ pub static PLAYGROUND: Playground = Playground {
         },
     ],
     preview,
+    code: None,
 };
 
 /// The places matching `query` (case-insensitive, city or country).

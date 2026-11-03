@@ -145,6 +145,7 @@ pub static PLAYGROUND: Playground = Playground {
         },
     ],
     preview,
+    code: None,
 };
 
 /// The filled Material Symbol a selected toggle shows.

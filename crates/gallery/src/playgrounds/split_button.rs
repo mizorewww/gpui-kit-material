@@ -150,6 +150,7 @@ pub static PLAYGROUND: Playground = Playground {
         },
     ],
     preview,
+    code: None,
 };
 
 /// The preview's own state: whether the menu is open and the last action.

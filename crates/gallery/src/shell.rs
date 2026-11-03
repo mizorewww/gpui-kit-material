@@ -266,7 +266,7 @@ fn breadcrumb(entry: usize) -> SharedString {
 }
 
 /// A full-width card with md3.io's outline.
-fn card() -> Div {
+pub(crate) fn card() -> Div {
     div()
         .flex()
         .flex_col()
@@ -712,13 +712,20 @@ impl Gallery {
             .child(Self::render_card_header(props, window, cx))
             .child(canvas);
         let config_card = Self::render_config_card(playground, props.views.clone(), stacked, pane);
-        div()
+        let panes = div()
             .w_full()
             .flex()
             .gap(rem(PANE_GAP))
             .when(stacked, |panes| panes.flex_col())
             .child(preview_card)
-            .child(config_card)
+            .child(config_card);
+        gpui_base::v_flex()
+            .w_full()
+            .gap(rem(PANE_GAP))
+            .child(panes)
+            .when_some(props.views.as_ref(), |column, views| {
+                column.child(views.code.clone())
+            })
             .into_any_element()
     }
 

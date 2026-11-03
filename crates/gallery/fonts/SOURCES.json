@@ -40,5 +40,14 @@
     "license": "roboto/OFL.txt",
     "purpose": "Reference component font; Latin subset; weight 600 for the Figma kit's emphasized type styles",
     "conversion": "fonttools 4.60.1 instantiateVariableFont wght=600 updateFontNames=True; WOFF2 to TTF; recalcTimestamp=False"
+  },
+  "robotomono/RobotoMono-Regular.ttf": {
+    "source": "https://github.com/google/fonts/blob/2fe1e8c6b137fb13041a7cfca6fdcd8a910ea4dc/ofl/robotomono/RobotoMono%5Bwght%5D.ttf",
+    "observed_on": "2026-11-03",
+    "version": "3.001",
+    "sha256": "da91c2241e42c2cbbec4b2326155857475638c185571ae9f2ae292f6679c12a5",
+    "license": "robotomono/OFL.txt",
+    "purpose": "Monospace face of the Gallery's Code card; bundled so the web build has one",
+    "conversion": "fonttools 4.60.1 varLib.instancer wght=400 --update-name-table"
   }
 }

@@ -178,6 +178,7 @@ pub static PLAYGROUND: Playground = Playground {
         },
     ],
     preview,
+    code: None,
 };
 
 /// The chip set's live state: display order (indices into the set), which

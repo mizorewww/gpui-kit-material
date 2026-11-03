@@ -103,6 +103,7 @@ pub static PLAYGROUND: Playground = Playground {
         },
     ],
     preview,
+    code: Some(code),
 };
 
 fn preview(
@@ -136,6 +137,32 @@ fn preview(
         .into_any_element()
 }
 
+fn code(config: &Config) -> String {
+    let supporting = config.text("supporting");
+    chain(
+        format!("MaterialSwitch::new(\"switch\", {})", lit(&config.text("label"))),
+        [
+            Some("show_label(true)".into()),
+            (!supporting.is_empty()).then(|| format!("supporting_text({})", lit(&supporting))),
+            (config.option("position") == "start")
+                .then(|| "label_position(LabelPosition::Start)".into()),
+            Some(format!("checked({})", config.bool("checked"))),
+            match config.option("icons") {
+                "selected" => Some("icons(SwitchIcons::Selected)".into()),
+                "both" => Some("icons(SwitchIcons::Both)".into()),
+                _ => None,
+            },
+            config.bool("required").then(|| "required(true)".into()),
+            config.bool("error").then(|| "error(true)".into()),
+            config.bool("disabled").then(|| "disabled(true)".into()),
+            Some(
+                "on_change(cx.listener(|this, checked: &bool, _, cx| {\n    this.checked = *checked;\n    cx.notify();\n}))"
+                    .into(),
+            ),
+        ],
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::super::testing::*;
@@ -154,5 +181,16 @@ mod tests {
         set(&state, cx, "error", Value::Bool(true));
         click(cx, "playground-switch");
         assert!(config(&state, cx).bool("checked"));
+    }
+
+    #[test]
+    fn the_code_follows_the_configuration() {
+        let mut config = Config::defaults(&PLAYGROUND);
+        let code = super::code(&config);
+        assert!(code.starts_with("MaterialSwitch::new(\"switch\", \"Notifications\")"));
+        assert!(code.contains(".icons(SwitchIcons::Selected)"));
+        assert!(!code.contains(".disabled("));
+        config.set("disabled", Value::Bool(true));
+        assert!(super::code(&config).contains(".disabled(true)"));
     }
 }

@@ -149,6 +149,7 @@ pub static PLAYGROUND: Playground = Playground {
         },
     ],
     preview,
+    code: None,
 };
 
 /// The slider state for each step, created on first use.

@@ -174,6 +174,7 @@ pub static PLAYGROUND: Playground = Playground {
         },
     ],
     preview,
+    code: None,
 };
 
 /// The caption of item `index` in `collection`.

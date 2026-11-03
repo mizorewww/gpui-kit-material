@@ -124,6 +124,7 @@ pub static PLAYGROUND: Playground = Playground {
         },
     ],
     preview,
+    code: None,
 };
 
 /// A 24-hour `HH:MM` or `HH:MM:SS` time.

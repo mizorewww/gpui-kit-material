@@ -274,6 +274,33 @@ fn configuration_controls_drive_the_preview_and_reset_restores_it(cx: &mut TestA
 }
 
 #[gpui::test]
+fn the_code_card_follows_the_configuration_and_copies_it(cx: &mut TestAppContext) {
+    let (window, mut cx) = open(cx);
+    go(&window, &mut cx, "switch");
+    // Under the preview and the configuration, at every width.
+    let card = bounds(&mut cx, "code-card");
+    assert!(card.top() >= bounds(&mut cx, "configuration-card").bottom());
+    let copy = bounds(&mut cx, "code-copy");
+    window
+        .update(&mut cx, |g, _, cx| {
+            let state = g.entries[g.current].playground.clone().unwrap();
+            state.update(cx, |state, cx| {
+                state.config.set("disabled", Value::Bool(true));
+                cx.notify();
+            });
+        })
+        .unwrap();
+    settle(&window, &mut cx);
+    click(&window, &mut cx, copy.center());
+    let copied = cx
+        .read_from_clipboard()
+        .and_then(|item| item.text())
+        .expect("Copy writes the code");
+    assert!(copied.starts_with("MaterialSwitch::new("), "{copied}");
+    assert!(copied.contains(".disabled(true)"), "{copied}");
+}
+
+#[gpui::test]
 fn the_preview_writes_back_to_its_configuration(cx: &mut TestAppContext) {
     let (window, mut cx) = open(cx);
     go(&window, &mut cx, "switch");

@@ -152,6 +152,7 @@ pub static PLAYGROUND: Playground = Playground {
         },
     ],
     preview,
+    code: None,
 };
 
 fn short_month(month: u32) -> &'static str {

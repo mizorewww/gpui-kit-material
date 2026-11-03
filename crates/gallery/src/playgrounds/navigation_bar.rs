@@ -85,6 +85,7 @@ pub static PLAYGROUND: Playground = Playground {
         },
     ],
     preview,
+    code: None,
 };
 
 const MAIL: &[(&str, &str)] = &[

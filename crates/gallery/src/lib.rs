@@ -43,7 +43,7 @@ use gpui_kit_material::icons::Assets;
 use gpui_kit_material::prelude::*;
 use gpui_kit_material::theme;
 use page::{AnyPage, CaptureState, GalleryShared, PageCx, PageRows};
-use playground::{PaneHint, PanelView, PlaygroundState, PreviewView, Value};
+use playground::{CodeView, PaneHint, PanelView, PlaygroundState, PreviewView, Value};
 use std::{
     cell::{Cell, RefCell},
     rc::Rc,
@@ -204,6 +204,8 @@ struct BuiltPage {
 struct PlaygroundViews {
     preview: Entity<PreviewView>,
     panel: Entity<PanelView>,
+    /// The Code card under the panes.
+    code: Entity<CodeView>,
     /// The arrangement the preview last asked for: see [`PreviewView`].
     hint: Rc<Cell<PaneHint>>,
 }
@@ -428,6 +430,7 @@ impl Gallery {
             let state = cx.new(|cx| PlaygroundState::new(playground, window, cx));
             let hint = Rc::new(Cell::new(PaneHint::default()));
             let panel = cx.new(|cx| PanelView::new(state.clone(), hint.clone(), cx));
+            let code = cx.new(|cx| CodeView::new(state.clone(), cx));
             let dependents = (self.lead.downgrade(), panel.downgrade());
             let shared = self.shared.clone();
             let preview =
@@ -435,6 +438,7 @@ impl Gallery {
             self.entries[entry].views = Some(PlaygroundViews {
                 preview,
                 panel,
+                code,
                 hint,
             });
             self.entries[entry].playground = Some(state);
@@ -1001,8 +1005,11 @@ pub fn run(application: gpui::Application, initialize: impl FnOnce(&mut App) + '
                 std::borrow::Cow::Borrowed(include_bytes!("../fonts/roboto/Roboto-Regular.ttf")),
                 std::borrow::Cow::Borrowed(include_bytes!("../fonts/roboto/Roboto-Medium.ttf")),
                 std::borrow::Cow::Borrowed(include_bytes!("../fonts/roboto/Roboto-SemiBold.ttf")),
+                std::borrow::Cow::Borrowed(include_bytes!(
+                    "../fonts/robotomono/RobotoMono-Regular.ttf"
+                )),
             ])
-            .expect("Failed to load the reference Roboto fonts");
+            .expect("Failed to load the Roboto fonts");
         startup_mark("fonts");
         gpui_kit::init(cx);
         startup_mark("kit_init");
