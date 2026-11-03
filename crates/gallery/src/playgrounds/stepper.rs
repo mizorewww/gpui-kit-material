@@ -74,7 +74,7 @@ pub static PLAYGROUND: Playground = Playground {
         },
     ],
     preview,
-    code: None,
+    code: Some(code),
 };
 
 fn preview(
@@ -102,6 +102,29 @@ fn preview(
         .into_any_element()
 }
 
+fn code(config: &Config) -> String {
+    let labels = if config.option("labels") == "long" {
+        LONG
+    } else {
+        SHORT
+    };
+    let steps = (config.number("steps") as usize).clamp(1, labels.len());
+    let steps = labels[..steps]
+        .iter()
+        .map(|label| lit(label))
+        .collect::<Vec<_>>()
+        .join(", ");
+    let current = (config.number("current") as usize).saturating_sub(1);
+    chain(
+        "Stepper::new(\"setup\", \"Setup progress\")",
+        [
+            Some(format!("steps([{steps}])")),
+            (current != 0).then(|| format!("current({current})")),
+            Some("state_labels(\"Finished\", \"Current\", \"Upcoming\")".into()),
+        ],
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::super::test_support::*;
@@ -127,5 +150,19 @@ mod tests {
         set(&state, &mut cx, "labels", Value::Choice(1));
         let long = element_bounds(&mut cx, "playground-stepper").size.height;
         assert!(long > short, "{long:?} is not taller than {short:?}");
+    }
+
+    #[test]
+    fn the_code_follows_the_configuration() {
+        let mut config = Config::defaults(&PLAYGROUND);
+        let code = super::code(&config);
+        assert!(code.starts_with("Stepper::new(\"setup\", \"Setup progress\")"));
+        assert!(
+            code.contains(".steps([\"Source\", \"Service\", \"Account\"])"),
+            "{code}"
+        );
+        assert!(code.contains(".current(1)"));
+        config.set("current", Value::Number(1.));
+        assert!(!super::code(&config).contains(".current("));
     }
 }

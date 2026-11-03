@@ -223,6 +223,68 @@ pub fn lit(text: &str) -> String {
     format!("{text:?}")
 }
 
+/// An array literal of `items`, one per line, as an argument of a [`chain`]
+/// call, e.g. `format!("items({})", array(items))`.
+pub fn array(items: impl IntoIterator<Item = String>) -> String {
+    let mut code = String::from("[");
+    for item in items {
+        code.push_str("\n    ");
+        code.push_str(&item.replace('\n', "\n    "));
+        code.push(',');
+    }
+    code.push_str("\n]");
+    code
+}
+
+/// The Rust for a Material Symbol by name, e.g. `Symbol::PRESENT_TO_ALL`
+/// (a name starting with a digit takes a leading underscore, `Symbol::_10K`).
+/// [`with_imports`] adds its `use` line.
+pub fn symbol_code(name: &str) -> String {
+    let constant = name.to_uppercase();
+    if constant.starts_with(|c: char| c.is_ascii_digit()) {
+        format!("Symbol::_{constant}")
+    } else {
+        format!("Symbol::{constant}")
+    }
+}
+
+/// `code` after the `use` lines for the names it takes from outside
+/// `gpui_kit_material::prelude` and `gpui`'s prelude, which a view already
+/// imports: Material Symbols, Base's placement types and `Duration`.
+pub fn with_imports(code: String) -> String {
+    // `name::` as a whole path segment, not the end of e.g. `FabMenuAlign::`.
+    let names = |name: &str| {
+        let path = format!("{name}::");
+        code.match_indices(&path).any(|(at, _)| {
+            !code[..at]
+                .chars()
+                .next_back()
+                .is_some_and(|c| c.is_alphanumeric() || c == '_' || c == ':')
+        })
+    };
+    let mut imports = Vec::new();
+    if names("Symbol") {
+        imports.push("use gpui_kit_material::icons::Symbol;".to_string());
+    }
+    let base: Vec<_> = ["Align", "Placement"]
+        .into_iter()
+        .filter(|name| names(name))
+        .collect();
+    match base.as_slice() {
+        [] => {}
+        [name] => imports.push(format!("use gpui_kit::base::{name};")),
+        names => imports.push(format!("use gpui_kit::base::{{{}}};", names.join(", "))),
+    }
+    if names("Duration") {
+        imports.push("use std::time::Duration;".to_string());
+    }
+    if imports.is_empty() {
+        code
+    } else {
+        format!("{}\n\n{code}", imports.join("\n"))
+    }
+}
+
 impl Playground {
     pub fn controls(&self) -> impl Iterator<Item = &'static Control> + use<> {
         let sections: &'static [Section] = self.sections;

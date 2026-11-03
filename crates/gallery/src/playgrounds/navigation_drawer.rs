@@ -157,7 +157,7 @@ pub static PLAYGROUND: Playground = Playground {
         },
     ],
     preview,
-    code: None,
+    code: Some(code),
 };
 
 /// One destination: label, Material Symbol and badge text.
@@ -357,6 +357,93 @@ fn preview(
     }
 }
 
+fn code(config: &Config) -> String {
+    let set = ALL[config.choice("destinations")];
+    let badges = config.bool("badges");
+    let modal = config.option("variant") == "modal";
+    let end = config.option("position") == "end";
+    let open = config.bool("open");
+    let headline = config.text("headline");
+    let width = config.number("width");
+    let items = set.destinations.iter().map(|(label, icon, badge)| {
+        chain(
+            format!(
+                "NavItem::new({}, {}, NavIcon::symbol({}))",
+                lit(label),
+                lit(label),
+                symbol_code(icon)
+            ),
+            [badge
+                .filter(|_| badges)
+                .map(|text| format!("badge(NavBadge::Large({}.into()))", lit(text)))],
+        )
+    });
+    let mut calls = vec![
+        (!headline.is_empty()).then(|| format!("headline({})", lit(&headline))),
+        Some(format!("items({})", array(items))),
+    ];
+    if config.bool("sections") {
+        calls.extend(
+            set.sections
+                .iter()
+                .map(|(before, label)| Some(format!("section({before}, {})", lit(label)))),
+        );
+    }
+    calls.extend([
+        Some("selected(self.destination.clone())".into()),
+        Some("open(self.drawer_open)".into()),
+        modal.then(|| "modal(true)".into()),
+        config.bool("dense").then(|| "dense(true)".into()),
+        end.then(|| "position(DrawerPosition::End)".into()),
+        (width != DRAWER_WIDTH).then(|| format!("width({width:?})")),
+        (!config.bool("icons")).then(|| "icons(false)".into()),
+        Some(
+            "on_change(cx.listener(|this, value: &SharedString, _, cx| {\n    this.destination = value.clone();\n    cx.notify();\n}))"
+                .into(),
+        ),
+        config.bool("dismissible").then(|| {
+            "on_dismiss({\n    let view = cx.entity();\n    move |_, cx| {\n        view.update(cx, |this, cx| {\n            this.drawer_open = false;\n            cx.notify();\n        })\n    }\n})"
+                .into()
+        }),
+    ]);
+    let drawer = chain(
+        "NavigationDrawer::new(\"drawer\", \"Main navigation\")",
+        calls,
+    );
+    let (icon, label) = if open {
+        ("menu_open", "Close navigation")
+    } else {
+        ("menu", "Open navigation")
+    };
+    let menu = chain(
+        format!(
+            "IconButton::new(\"drawer-menu\", {}, {})",
+            symbol_code(icon),
+            lit(label)
+        ),
+        [Some(
+            "on_click(cx.listener(|this, _: &ClickEvent, _, cx| {\n    this.drawer_open = !this.drawer_open;\n    cx.notify();\n}))"
+                .into(),
+        )],
+    );
+    // A modal drawer overlays the content; a standard one sits on its edge.
+    let (first, second) = if modal || end {
+        (menu, drawer)
+    } else {
+        (drawer, menu)
+    };
+    with_imports(chain(
+        "div()",
+        [
+            Some("relative()".into()),
+            Some("flex()".into()),
+            Some("size_full()".into()),
+            Some(format!("child({first})")),
+            Some(format!("child({second})")),
+        ],
+    ))
+}
+
 #[cfg(test)]
 mod tests {
     use super::super::nav_harness::Harness;
@@ -405,5 +492,24 @@ mod tests {
         harness.keys("escape");
         harness.click_at(frame.origin + point(frame.size.width - px(20.), px(200.)));
         assert!(harness.config().bool("open"));
+    }
+
+    #[test]
+    fn the_code_follows_the_configuration() {
+        let mut config = Config::defaults(&PLAYGROUND);
+        let code = super::code(&config);
+        assert!(
+            code.starts_with("use gpui_kit_material::icons::Symbol;\n\ndiv()"),
+            "{code}"
+        );
+        assert!(code.contains("NavigationDrawer::new(\"drawer\", \"Main navigation\")"));
+        assert!(code.contains(".headline(\"Photos\")"));
+        assert!(code.contains(".width(280.0)"));
+        assert!(!code.contains(".section("));
+        config.set("sections", Value::Bool(true));
+        config.set("dense", Value::Bool(true));
+        let code = super::code(&config);
+        assert!(code.contains(".section(0, \"Library\")"));
+        assert!(code.contains(".dense(true)"));
     }
 }

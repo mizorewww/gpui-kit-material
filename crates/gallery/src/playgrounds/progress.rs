@@ -137,7 +137,7 @@ pub static PLAYGROUND: Playground = Playground {
         },
     ],
     preview,
-    code: None,
+    code: Some(code),
 };
 
 fn preview(
@@ -212,6 +212,61 @@ fn preview(
         .into_any_element()
 }
 
+fn code(config: &Config) -> String {
+    let indeterminate = config.bool("indeterminate");
+    let value = config.number("value");
+    let wavy = config.option("shape") == "wavy";
+    let thick = config.option("thickness") == "thick";
+    let circular = config.option("variant") == "circular";
+    let mut calls = vec![
+        (!indeterminate).then(|| format!("value(Some({:?}))", value / 100.)),
+        wavy.then(|| "wavy()".into()),
+        thick.then(|| "thick()".into()),
+    ];
+    let head = if circular {
+        let shape = if wavy {
+            ProgressShape::Wavy
+        } else {
+            ProgressShape::Flat
+        };
+        let thickness = if thick {
+            PROGRESS_THICK_THICKNESS
+        } else {
+            PROGRESS_THICKNESS
+        };
+        let size = config.number("size");
+        calls.push(
+            (size != circular_progress_size(shape, thickness)).then(|| format!("size({size:?})")),
+        );
+        "CircularProgress::new"
+    } else {
+        let buffer = config.number("buffer");
+        calls.push((!config.bool("stop")).then(|| "stop_indicator(false)".into()));
+        calls.push((buffer < 100.).then(|| format!("buffer(Some({:?}))", buffer / 100.)));
+        "LinearProgress::new"
+    };
+    calls.push(config.bool("disabled").then(|| "disabled(true)".into()));
+    let progress = chain(
+        format!("{head}(\"progress\", {})", lit(&config.text("label"))),
+        calls,
+    );
+    if !config.bool("percentage") || indeterminate {
+        return progress;
+    }
+    // The percentage is the caller's own text beside the indicator.
+    chain(
+        "div()",
+        [
+            Some("flex()".into()),
+            circular.then(|| "flex_col()".into()),
+            Some("items_center()".into()),
+            Some("gap(rem(16.))".into()),
+            Some(format!("child({progress})")),
+            Some(format!("child({})", lit(&format!("{}%", value.round())))),
+        ],
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::super::test_support::*;
@@ -255,5 +310,20 @@ mod tests {
             element_bounds(&mut cx, "playground-progress").size.height,
             gpui::px(96.)
         );
+    }
+
+    #[test]
+    fn the_code_follows_the_configuration() {
+        let mut config = Config::defaults(&PLAYGROUND);
+        let code = super::code(&config);
+        assert!(code.starts_with("LinearProgress::new(\"progress\", \"Uploading files\")"));
+        assert!(code.contains(".value(Some(0.45))"), "{code}");
+        assert!(!code.contains(".buffer("));
+        config.set("variant", Value::Choice(1));
+        let code = super::code(&config);
+        assert!(code.starts_with("CircularProgress::new("));
+        assert!(code.contains(".size(48.0)"), "{code}");
+        config.set("indeterminate", Value::Bool(true));
+        assert!(!super::code(&config).contains(".value("));
     }
 }

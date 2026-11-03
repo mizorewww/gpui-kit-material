@@ -122,7 +122,7 @@ pub static PLAYGROUND: Playground = Playground {
         },
     ],
     preview,
-    code: None,
+    code: Some(code),
 };
 
 fn preview(
@@ -183,6 +183,45 @@ fn preview(
         )
         .child(snackbar)
         .into_any_element()
+}
+
+fn code(config: &Config) -> String {
+    const HIDE: &str = "cx.listener(|this, _: &ClickEvent, _, cx| {\n    this.snackbar_open = false;\n    cx.notify();\n})";
+    chain(
+        format!(
+            "Snackbar::new(\"snackbar\", {})",
+            lit(&config.text("message"))
+        ),
+        [
+            Some("open(self.snackbar_open)".into()),
+            config
+                .bool("action")
+                .then(|| format!("action({}, {HIDE})", lit(&config.text("action_text")))),
+            config
+                .bool("close")
+                .then(|| format!("close({}, {HIDE})", lit(&config.text("dismiss")))),
+            config
+                .bool("new_line")
+                .then(|| "longer_action(true)".into()),
+            match config.option("duration") {
+                "short" => Some("duration(SnackbarDuration::Short)".into()),
+                "long" => Some("duration(SnackbarDuration::Long)".into()),
+                _ => None,
+            },
+            Some(format!(
+                "position(SnackbarPosition::{})",
+                match config.option("position") {
+                    "start" => "Start",
+                    "end" => "End",
+                    _ => "Center",
+                }
+            )),
+            Some(
+                "on_dismiss({\n    let view = cx.entity();\n    move |_, cx| {\n        view.update(cx, |this, cx| {\n            this.snackbar_open = false;\n            cx.notify();\n        })\n    }\n})"
+                    .into(),
+            ),
+        ],
+    )
 }
 
 #[cfg(test)]
@@ -275,5 +314,20 @@ mod tests {
         cx.executor().advance_clock(SnackbarDuration::LONG * 3);
         settle(&mut cx);
         assert!(visible(&state, &mut cx));
+    }
+
+    #[test]
+    fn the_code_follows_the_configuration() {
+        let mut config = Config::defaults(&PLAYGROUND);
+        let code = super::code(&config);
+        assert!(code.starts_with("Snackbar::new(\"snackbar\", \"Your changes have been saved\")"));
+        assert!(code.contains(".action(\"Undo\", cx.listener("));
+        assert!(code.contains(".close(\"Dismiss\", cx.listener("));
+        assert!(!code.contains(".duration("));
+        config.set("duration", Value::Choice(0));
+        config.set("close", Value::Bool(false));
+        let code = super::code(&config);
+        assert!(code.contains(".duration(SnackbarDuration::Short)"));
+        assert!(!code.contains(".close("));
     }
 }

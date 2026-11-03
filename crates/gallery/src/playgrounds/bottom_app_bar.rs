@@ -75,7 +75,7 @@ pub static PLAYGROUND: Playground = Playground {
         },
     ],
     preview,
-    code: None,
+    code: Some(code),
 };
 
 /// Each action set's actions `(symbol, label)` and FAB symbol.
@@ -189,6 +189,36 @@ fn preview(
         .into_any_element()
 }
 
+fn code(config: &Config) -> String {
+    let (actions, fab_icon) = ACTIONS[config.choice("actions")];
+    let count = config.choice("count") + 1;
+    let mut calls: Vec<_> = actions[..count]
+        .iter()
+        .map(|(icon, label)| {
+            Some(format!(
+                "action(IconButton::new({}, {}, {}))",
+                lit(icon),
+                symbol_code(icon),
+                lit(label)
+            ))
+        })
+        .collect();
+    calls.push(config.bool("fab").then(|| {
+        let label = config.text("fab_label");
+        format!(
+            "fab(Fab::new(\"fab\", {}, {}))",
+            symbol_code(fab_icon),
+            lit(if label.is_empty() { fab_icon } else { &label })
+        )
+    }));
+    calls.push((config.option("position") == "center").then(|| "fab_centered(true)".into()));
+    calls.push((!config.bool("visible")).then(|| "visible(false)".into()));
+    with_imports(chain(
+        "BottomAppBar::new(\"bottom-app-bar\", \"Actions\")",
+        calls,
+    ))
+}
+
 #[cfg(test)]
 mod tests {
     use super::super::nav_harness::Harness;
@@ -237,5 +267,21 @@ mod tests {
             harness.expect("playground-bottom-app-bar").size.height,
             shown
         );
+    }
+
+    #[test]
+    fn the_code_follows_the_configuration() {
+        let mut config = Config::defaults(&PLAYGROUND);
+        let code = super::code(&config);
+        assert!(code.starts_with(
+            "use gpui_kit_material::icons::Symbol;\n\nBottomAppBar::new(\"bottom-app-bar\", \"Actions\")"
+        ), "{code}");
+        assert!(code.contains(".fab(Fab::new(\"fab\", Symbol::ADD, \"Compose\"))"));
+        assert!(!code.contains(".fab_centered("));
+        config.set("position", Value::Choice(0));
+        config.set("fab", Value::Bool(false));
+        let code = super::code(&config);
+        assert!(code.contains(".fab_centered(true)"));
+        assert!(!code.contains(".fab(Fab"));
     }
 }

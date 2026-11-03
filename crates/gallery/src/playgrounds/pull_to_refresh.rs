@@ -77,7 +77,7 @@ pub static PLAYGROUND: Playground = Playground {
         },
     ],
     preview,
-    code: None,
+    code: Some(code),
 };
 
 /// Starts a refresh: the app bar's button and a released pull share it.
@@ -176,6 +176,31 @@ fn preview(
         .into_any_element()
 }
 
+fn code(config: &Config) -> String {
+    let threshold = config.number("threshold");
+    chain(
+        format!("PullToRefresh::new(\"feed\", {})", lit(&config.text("label"))),
+        [
+            Some("refreshing(self.refreshing)".into()),
+            (config.option("indicator") == "loading indicator")
+                .then(|| "indicator(PullToRefreshIndicator::LoadingIndicator)".into()),
+            (threshold != PULL_TO_REFRESH_THRESHOLD).then(|| format!("threshold({threshold:?})")),
+            (!config.bool("mouse_drag")).then(|| "mouse_drag(false)".into()),
+            config.bool("disabled").then(|| "disabled(true)".into()),
+            // The same handler serves a visible Refresh button, the
+            // keyboard path.
+            Some(
+                "on_refresh({\n    let view = cx.entity();\n    move |_, cx| view.update(cx, |this, cx| this.refresh(cx))\n})"
+                    .into(),
+            ),
+            Some(
+                "child(div().flex().flex_col().children(\n    self.items\n        .iter()\n        .enumerate()\n        .map(|(index, item)| ListItem::new(index, item.clone())),\n))"
+                    .into(),
+            ),
+        ],
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::super::test_support::*;
@@ -217,5 +242,19 @@ mod tests {
         cx.simulate_mouse_up(end, MouseButton::Left, Modifiers::none());
         draw(&mut cx);
         assert!(config(&state, &mut cx).bool("refreshing"));
+    }
+
+    #[test]
+    fn the_code_follows_the_configuration() {
+        let mut config = Config::defaults(&PLAYGROUND);
+        let code = super::code(&config);
+        assert!(code.starts_with("PullToRefresh::new(\"feed\", \"Refreshing items\")"));
+        assert!(!code.contains(".threshold("));
+        assert!(!code.contains(".indicator("));
+        config.set("threshold", Value::Number(120.));
+        config.set("indicator", Value::Choice(1));
+        let code = super::code(&config);
+        assert!(code.contains(".threshold(120.0)"));
+        assert!(code.contains(".indicator(PullToRefreshIndicator::LoadingIndicator)"));
     }
 }

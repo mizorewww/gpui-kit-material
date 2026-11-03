@@ -105,7 +105,7 @@ pub static PLAYGROUND: Playground = Playground {
         },
     ],
     preview,
-    code: None,
+    code: Some(code),
 };
 
 /// Each context's navigation icon and two actions: (symbol, label).
@@ -250,6 +250,45 @@ fn preview(
         .into_any_element()
 }
 
+fn code(config: &Config) -> String {
+    let icons = CONTEXT_ICONS[config.choice("context")];
+    let button = |id: &str, (icon, label): (&str, &str)| {
+        format!(
+            "IconButton::new({}, {}, {})",
+            lit(id),
+            symbol_code(icon),
+            lit(label)
+        )
+    };
+    let mut calls = vec![
+        Some(format!("title({})", lit(&config.text("title")))),
+        config
+            .bool("navigation")
+            .then(|| format!("navigation_icon({})", button("navigation", icons[0]))),
+    ];
+    calls.extend(
+        icons[1..=config.choice("actions")]
+            .iter()
+            .map(|action| Some(format!("action({})", button(action.0, *action)))),
+    );
+    // The offset of the content under the bar, which the view keeps from
+    // its scroll handle.
+    let compressible = config.bool("compressible");
+    calls.push(compressible.then(|| "scroll_offset(self.scroll_offset)".into()));
+    calls.push(if config.bool("scrolled") {
+        Some("scrolled_under(true)".into())
+    } else {
+        (!compressible).then(|| "scrolled_under(self.scroll_offset > 0.)".into())
+    });
+    with_imports(chain(
+        format!(
+            "TopAppBar::new(\"app-bar\", TopAppBarVariant::{:?})",
+            variant(config)
+        ),
+        calls,
+    ))
+}
+
 #[cfg(test)]
 mod tests {
     use super::super::nav_harness::Harness;
@@ -302,5 +341,28 @@ mod tests {
         assert!(harness.expect("playground-top-app-bar").size.height > row);
         harness.set("scrolled", Value::Bool(true));
         assert_eq!(harness.expect("playground-top-app-bar").size.height, row);
+    }
+
+    #[test]
+    fn the_code_follows_the_configuration() {
+        let mut config = Config::defaults(&PLAYGROUND);
+        let code = super::code(&config);
+        assert!(code.starts_with(
+            "use gpui_kit_material::icons::Symbol;\n\nTopAppBar::new(\"app-bar\", TopAppBarVariant::Small)"
+        ), "{code}");
+        assert!(code.contains(
+            ".navigation_icon(IconButton::new(\"navigation\", Symbol::MENU, \"Open navigation\"))"
+        ));
+        assert!(
+            code.contains(
+                ".action(IconButton::new(\"favorite\", Symbol::FAVORITE, \"Favorites\"))"
+            )
+        );
+        assert!(!code.contains("Symbol::MORE_VERT"));
+        config.set("type", Value::Choice(3));
+        config.set("actions", Value::Choice(2));
+        let code = super::code(&config);
+        assert!(code.contains("TopAppBarVariant::LargeFlexible"));
+        assert!(code.contains("Symbol::MORE_VERT"));
     }
 }

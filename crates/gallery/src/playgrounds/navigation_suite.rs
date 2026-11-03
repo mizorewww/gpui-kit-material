@@ -130,7 +130,7 @@ pub static PLAYGROUND: Playground = Playground {
         },
     ],
     preview,
-    code: None,
+    code: Some(code),
 };
 
 fn icons() -> &'static [NavIcon] {
@@ -267,6 +267,58 @@ fn preview(
         .into_any_element()
 }
 
+// The Window sliders stand in for the window the suite reads by itself, so
+// the code leaves them out (`size_class` is for a suite framed in a preview).
+fn code(config: &Config) -> String {
+    let badges = config.bool("badges");
+    let items = LABELS.iter().zip(ICONS).map(|(label, icon)| {
+        chain(
+            format!(
+                "NavItem::new({}, {}, NavIcon::symbol({}))",
+                lit(label),
+                lit(label),
+                symbol_code(icon)
+            ),
+            [match *label {
+                "Search" if badges => Some("badge(NavBadge::Small)".into()),
+                "Mail" if badges => Some("badge(NavBadge::Large(\"3\".into()))".into()),
+                _ => None,
+            }],
+        )
+    });
+    let fixed = fixed_type(config.option("type"));
+    let from = expanded_from(config.option("expanded_from"));
+    with_imports(chain(
+        "NavigationSuite::new(\"navigation\", \"Main\")",
+        [
+            Some(format!("items({})", array(items))),
+            Some("selected(self.destination.clone())".into()),
+            fixed.map(|fixed| format!("layout_type(Some(NavigationSuiteType::{fixed:?}))")),
+            match from {
+                Some(WindowWidthClass::Large) => None,
+                Some(from) => Some(format!("expanded_from(Some(WindowWidthClass::{from:?}))")),
+                None => Some("expanded_from(None)".into()),
+            },
+            (config.option("expanded") == "rail")
+                .then(|| "expanded_type(NavigationSuiteType::RailExpanded)".into()),
+            config
+                .bool("hidden")
+                .then(|| "navigation_hidden(true)".into()),
+            config.bool("action").then(|| {
+                format!(
+                    "primary_action(Fab::new(\"compose\", {}, \"Compose\"))",
+                    symbol_code("edit")
+                )
+            }),
+            Some(
+                "on_change(cx.listener(|this, value: &SharedString, _, cx| {\n    this.destination = value.clone();\n    cx.notify();\n}))"
+                    .into(),
+            ),
+            Some("child(div().size_full().p(rem(24.)).child(self.destination.clone()))".into()),
+        ],
+    ))
+}
+
 #[cfg(test)]
 mod tests {
     use super::super::test_support::*;
@@ -347,5 +399,22 @@ mod tests {
         assert!(config(&state, &mut cx).bool("hidden"));
         let after = element_bounds(&mut cx, "navigation-suite-content");
         assert!(after.size.width > before.size.width);
+    }
+
+    #[test]
+    fn the_code_follows_the_configuration() {
+        let mut config = Config::defaults(&PLAYGROUND);
+        let code = super::code(&config);
+        assert!(code.starts_with(
+            "use gpui_kit_material::icons::Symbol;\n\nNavigationSuite::new(\"navigation\", \"Main\")"
+        ), "{code}");
+        assert!(!code.contains(".layout_type("));
+        assert!(!code.contains(".expanded_from("));
+        assert!(!code.contains(".size_class("));
+        config.set("type", Value::Choice(3));
+        config.set("expanded_from", Value::Choice(4));
+        let code = super::code(&config);
+        assert!(code.contains(".layout_type(Some(NavigationSuiteType::RailCollapsed))"));
+        assert!(code.contains(".expanded_from(None)"));
     }
 }

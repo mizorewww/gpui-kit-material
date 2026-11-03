@@ -70,7 +70,7 @@ pub static PLAYGROUND: Playground = Playground {
         },
     ],
     preview,
-    code: None,
+    code: Some(code),
 };
 
 fn preview(
@@ -89,6 +89,22 @@ fn preview(
                 .progress(progress),
         )
         .into_any_element()
+}
+
+fn code(config: &Config) -> String {
+    let size = config.number("size");
+    chain(
+        format!(
+            "LoadingIndicator::new(\"loading\", {})",
+            lit(&config.text("label"))
+        ),
+        [
+            config.bool("contained").then(|| "contained(true)".into()),
+            (size != 48.).then(|| format!("size({size:?})")),
+            (!config.bool("indeterminate"))
+                .then(|| format!("progress(Some({:?}))", config.number("value") / 100.)),
+        ],
+    )
 }
 
 #[cfg(test)]
@@ -119,5 +135,18 @@ mod tests {
             element_bounds(&mut cx, "playground-loading-indicator").size,
             large.size
         );
+    }
+
+    #[test]
+    fn the_code_follows_the_configuration() {
+        let mut config = Config::defaults(&PLAYGROUND);
+        let code = super::code(&config);
+        assert!(code.starts_with("LoadingIndicator::new(\"loading\", \"Loading your content\")"));
+        assert!(!code.contains(".progress("));
+        config.set("indeterminate", Value::Bool(false));
+        config.set("size", Value::Number(96.));
+        let code = super::code(&config);
+        assert!(code.contains(".progress(Some(0.5))"), "{code}");
+        assert!(code.contains(".size(96.0)"), "{code}");
     }
 }

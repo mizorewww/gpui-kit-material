@@ -85,7 +85,7 @@ pub static PLAYGROUND: Playground = Playground {
         },
     ],
     preview,
-    code: None,
+    code: Some(code),
 };
 
 const MAIL: &[(&str, &str)] = &[
@@ -188,6 +188,48 @@ fn preview(
         .into_any_element()
 }
 
+fn code(config: &Config) -> String {
+    let kind = config.option("destinations");
+    let set = if kind == "Default" || kind == "Unread" {
+        MAIL
+    } else {
+        MUSIC
+    };
+    let items = set.iter().map(|(label, icon)| {
+        chain(
+            format!(
+                "NavItem::new({}, {}, NavIcon::symbol({}))",
+                lit(label),
+                lit(label),
+                symbol_code(icon)
+            ),
+            [match (kind, *label) {
+                ("Unread", "Inbox") => Some("badge(NavBadge::Large(\"3\".into()))".into()),
+                ("New in music", "Music") => Some("badge(NavBadge::Small)".into()),
+                ("Ten in music", "Music") => Some("badge(NavBadge::Large(\"10\".into()))".into()),
+                _ => None,
+            }],
+        )
+    });
+    with_imports(chain(
+        format!("NavigationBar::new(\"navigation\", {})", lit(&config.text("label"))),
+        [
+            Some(format!("items({})", array(items))),
+            Some("selected(self.destination.clone())".into()),
+            match config.option("layout") {
+                "Vertical" => None,
+                "Horizontal" => Some("layout(NavItemLayout::Horizontal)".into()),
+                _ => Some("adaptive(true)".into()),
+            },
+            (!config.bool("ripple")).then(|| "ripple(false)".into()),
+            Some(
+                "on_change(cx.listener(|this, value: &SharedString, _, cx| {\n    this.destination = value.clone();\n    cx.notify();\n}))"
+                    .into(),
+            ),
+        ],
+    ))
+}
+
 #[cfg(test)]
 mod tests {
     use super::super::nav_harness::Harness;
@@ -233,5 +275,24 @@ mod tests {
         harness.set("layout", Value::Choice(1));
         harness.click_at(item(frame, 1, 3, false));
         assert_eq!(harness.config().option("selected"), "Favorites");
+    }
+
+    #[test]
+    fn the_code_follows_the_configuration() {
+        let mut config = Config::defaults(&PLAYGROUND);
+        let code = super::code(&config);
+        assert!(code.starts_with(
+            "use gpui_kit_material::icons::Symbol;\n\nNavigationBar::new(\"navigation\", \"Mail navigation\")"
+        ), "{code}");
+        assert!(
+            code.contains("NavItem::new(\"Inbox\", \"Inbox\", NavIcon::symbol(Symbol::INBOX))")
+        );
+        assert!(code.contains(".adaptive(true)"));
+        assert!(!code.contains(".badge("));
+        config.set("layout", Value::Choice(1));
+        config.set("destinations", Value::Choice(1));
+        let code = super::code(&config);
+        assert!(!code.contains(".adaptive("));
+        assert!(code.contains(".badge(NavBadge::Large(\"3\".into()))"));
     }
 }
