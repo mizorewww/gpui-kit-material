@@ -52,7 +52,7 @@ pub static PLAYGROUND: Playground = Playground {
         ],
     }],
     preview,
-    code: None,
+    code: Some(code),
 };
 
 fn preview(
@@ -167,5 +167,110 @@ impl Render for DeviceView {
         self.app.update(cx, |app, cx| {
             app.render_device(device, body, scale, window, cx)
         })
+    }
+}
+
+// The app's frame: the screen beside or above its navigation. A screen's own
+// content is the app's (`self.home(window, cx)` and the like), and the device
+// frame and its scale are the Gallery's.
+fn code(config: &Config) -> String {
+    use super::super::pages::examples::app::{NAV, nav_value};
+    let device = Device::ALL[config.choice("device")];
+    let body = Body::ALL[config.choice("screen")];
+    let screen = format!(
+        "self.{}(window, cx)",
+        Body::NAMES[body.index()].to_lowercase()
+    );
+    let items = NAV.iter().map(|(_, value, label, icon)| {
+        format!(
+            "NavItem::new({}, {}, NavIcon::symbol({}))",
+            lit(value),
+            lit(label),
+            symbol_code(icon)
+        )
+    });
+    let on_change = "on_change(cx.listener(|this, value: &SharedString, _, cx| {\n    this.destination = value.clone();\n    cx.notify();\n}))";
+    // Screens pushed over the destinations, such as a detail, have no navigation.
+    let has_nav = !nav_value(body).is_empty();
+    if device == Device::Phone {
+        let bar = chain(
+            "NavigationBar::new(\"navigation\", \"Destinations\")",
+            [
+                Some(format!("items({})", array(items))),
+                Some("selected(self.destination.clone())".into()),
+                Some(on_change.into()),
+            ],
+        );
+        return with_imports(chain(
+            "div()",
+            [
+                Some("flex()".into()),
+                Some("flex_col()".into()),
+                Some("size_full()".into()),
+                Some(format!("child(div().flex_1().min_h_0().child({screen}))")),
+                has_nav.then(|| format!("child({bar})")),
+            ],
+        ));
+    }
+    let rail = chain(
+        "NavigationRail::new(\"rail\", \"Destinations\")",
+        [
+            Some(format!("items({})", array(items))),
+            Some("selected(self.destination.clone())".into()),
+            Some("expanded(self.rail_expanded)".into()),
+            Some(format!(
+                "menu({})",
+                chain(
+                    format!(
+                        "IconButton::new(\"rail-menu\", {}, \"Expand navigation\")",
+                        symbol_code("menu")
+                    ),
+                    [Some(
+                        "on_click(cx.listener(|this, _: &ClickEvent, _, cx| {\n    this.rail_expanded = !this.rail_expanded;\n    cx.notify();\n}))"
+                            .into(),
+                    )],
+                )
+            )),
+            Some(format!(
+                "fab(ExtendedFab::new(\"compose\", {}, \"Compose\").expanded(self.rail_expanded))",
+                symbol_code("edit")
+            )),
+            Some(on_change.into()),
+        ],
+    );
+    // Messaging lays out panes of its own, without the rail.
+    with_imports(chain(
+        "div()",
+        [
+            Some("flex()".into()),
+            Some("size_full()".into()),
+            (body != Body::Messaging).then(|| format!("child({rail})")),
+            Some(format!("child(div().flex_1().min_w_0().child({screen}))")),
+        ],
+    ))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use core::prelude::v1::test;
+
+    #[test]
+    fn the_code_follows_the_configuration() {
+        let mut config = Config::defaults(&PLAYGROUND);
+        let code = super::code(&config);
+        assert!(
+            code.starts_with("use gpui_kit_material::icons::Symbol;\n\ndiv()"),
+            "{code}"
+        );
+        assert!(code.contains("NavigationBar::new(\"navigation\", \"Destinations\")"));
+        assert!(code.contains("self.home(window, cx)"));
+        assert!(!code.contains("NavigationRail::new("));
+        config.set("device", Value::Choice(2));
+        config.set("screen", Value::Choice(4));
+        let code = super::code(&config);
+        assert!(code.contains("NavigationRail::new(\"rail\", \"Destinations\")"));
+        assert!(code.contains("self.library(window, cx)"));
+        assert!(!code.contains("NavigationBar::new("));
     }
 }

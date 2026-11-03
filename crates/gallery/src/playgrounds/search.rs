@@ -118,7 +118,7 @@ pub static PLAYGROUND: Playground = Playground {
         },
     ],
     preview,
-    code: None,
+    code: Some(code),
 };
 
 /// The places matching `query` (case-insensitive, city or country).
@@ -259,6 +259,131 @@ fn preview(
         .into_any_element()
 }
 
+fn code(config: &Config) -> String {
+    let disabled = config.bool("disabled");
+    let expanded = config.option("state") == "view" && !disabled;
+    let messages = config.option("preset") == "Messages";
+    let query = config.text("query");
+    let leading = if expanded {
+        chain(
+            format!("IconButton::new(\"search-back\", {}, \"Back\")", symbol_code("arrow_back")),
+            [Some(
+                "on_click(cx.listener(|this, _: &ClickEvent, _, cx| {\n    this.search_expanded = false;\n    cx.notify();\n}))"
+                    .into(),
+            )],
+        )
+    } else if messages {
+        chain(
+            format!(
+                "IconButton::new(\"search-menu\", {}, \"Menu\")",
+                symbol_code("menu")
+            ),
+            [disabled.then(|| "disabled(true)".into())],
+        )
+    } else {
+        format!("{}.icon().component()", symbol_code("search"))
+    };
+    let clear = (config.bool("clear") && !query.is_empty()).then(|| {
+        format!(
+            "trailing({})",
+            chain(
+                format!(
+                    "IconButton::new(\"search-clear\", {}, \"Clear search\")",
+                    symbol_code("close")
+                ),
+                [
+                    disabled.then(|| "disabled(true)".into()),
+                    Some(
+                        "on_click(cx.listener(|this, _: &ClickEvent, window, cx| {\n    this.query.update(cx, |query, cx| query.set_value(\"\", window, cx));\n}))"
+                            .into(),
+                    ),
+                ],
+            )
+        )
+    });
+    let field = config.choice("field");
+    let bar = chain(
+        "SearchField::new(&self.query)",
+        [
+            (field != 0).then(|| {
+                format!(
+                    "field_style(SearchFieldStyle::{:?})",
+                    SearchFieldStyle::ALL[field]
+                )
+            }),
+            Some(format!("leading({leading})")),
+            clear,
+            // The account's monogram.
+            (messages && !expanded).then(|| {
+                format!(
+                    "trailing({})",
+                    chain(
+                        "div()",
+                        [
+                            Some("size(rem(30.))".into()),
+                            Some("rounded_full()".into()),
+                            Some("flex()".into()),
+                            Some("items_center()".into()),
+                            Some("justify_center()".into()),
+                            Some("bg(color(ColorRole::PRIMARY_CONTAINER))".into()),
+                            Some("text_color(color(ColorRole::ON_PRIMARY_CONTAINER))".into()),
+                            Some("child(\"A\")".into()),
+                        ],
+                    )
+                )
+            }),
+            disabled.then(|| "disabled(true)".into()),
+        ],
+    );
+    let suggestions = (config.option("suggestions") == "places").then(|| {
+        format!(
+            "suggestions(PLACES.iter().map(|&(city, country)| {{\n    {}\n}}))",
+            chain(
+                "SearchSuggestion::new(city)",
+                [
+                    Some("supporting_text(country)".into()),
+                    Some(format!("leading({}.icon().component())", symbol_code("location_on"))),
+                    Some(
+                        "on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {\n    this.query.update(cx, |query, cx| query.set_value(city, window, cx));\n    this.search_expanded = false;\n    cx.notify();\n}))"
+                            .into(),
+                    ),
+                ],
+            )
+            .replace('\n', "\n    ")
+        )
+    });
+    // The placeholder belongs to the query's input state, which the view
+    // creates once.
+    with_imports(format!(
+        "// self.query = cx.new(|cx| InputState::new(window, cx).placeholder({}));\n{}",
+        lit(&config.text("placeholder")),
+        chain(
+            format!(
+                "SearchView::new(\n    \"search\",\n    {},\n)",
+                bar.replace('\n', "\n    ")
+            ),
+            [
+                (config.option("mode") == "fullscreen")
+                    .then(|| "layout(SearchViewLayout::FullScreen)".into()),
+                (config.option("style") == "divided")
+                    .then(|| "view_style(SearchViewStyle::Divided)".into()),
+                Some("expanded(self.search_expanded)".into()),
+                config
+                    .bool("expand_on_focus")
+                    .then(|| "expand_on_focus(true)".into()),
+                config
+                    .bool("collapse_on_blur")
+                    .then(|| "collapse_on_blur(true)".into()),
+                Some(
+                    "on_expanded_change(cx.listener(|this, expanded: &bool, _, cx| {\n    this.search_expanded = *expanded;\n    cx.notify();\n}))"
+                        .into(),
+                ),
+                suggestions,
+            ],
+        )
+    ))
+}
+
 #[cfg(test)]
 mod tests {
     use super::super::testing::*;
@@ -316,5 +441,22 @@ mod tests {
         );
         settle(cx);
         assert_eq!(config(&state, cx).option("state"), "bar");
+    }
+
+    #[test]
+    fn the_code_follows_the_configuration() {
+        let mut config = Config::defaults(&PLAYGROUND);
+        let code = super::code(&config);
+        assert!(code.starts_with(
+            "use gpui_kit_material::icons::Symbol;\n\n// self.query = cx.new(|cx| InputState::new(window, cx).placeholder(\"Search places\"));\nSearchView::new(\n    \"search\",\n    SearchField::new(&self.query)"
+        ), "{code}");
+        assert!(code.contains(".leading(Symbol::SEARCH.icon().component())"));
+        assert!(code.contains("SearchSuggestion::new(city)"));
+        assert!(!code.contains(".view_style("));
+        config.set("style", Value::Choice(1));
+        config.set("suggestions", Value::Choice(1));
+        let code = super::code(&config);
+        assert!(code.contains(".view_style(SearchViewStyle::Divided)"));
+        assert!(!code.contains(".suggestions("));
     }
 }

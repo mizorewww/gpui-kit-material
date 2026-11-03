@@ -132,7 +132,7 @@ pub static PLAYGROUND: Playground = Playground {
         },
     ],
     preview,
-    code: None,
+    code: Some(code),
 };
 
 /// A position option's side and alignment.
@@ -220,6 +220,82 @@ fn preview(
         .into_any_element()
 }
 
+fn code(config: &Config) -> String {
+    let rich = config.option("variant") == "rich";
+    let target = config.option("target");
+    let trigger = match target {
+        "Present now" => chain(
+            "MaterialButton::new(\"present\")",
+            [
+                Some(format!("icon({})", symbol_code("present_to_all"))),
+                Some(format!("child({})", lit(target))),
+            ],
+        ),
+        _ => {
+            let (id, icon) = if target == "Upload" {
+                ("upload", "upload")
+            } else {
+                ("favorite", "favorite")
+            };
+            chain(
+                format!(
+                    "IconButton::new({}, {}, {})",
+                    lit(id),
+                    symbol_code(icon),
+                    lit(target)
+                ),
+                [Some("variant(IconButtonVariant::Tonal)".into())],
+            )
+        }
+    };
+    let (side, align) = placement(config.option("position"));
+    let default_side = if rich {
+        Placement::Bottom
+    } else {
+        Placement::Top
+    };
+    let subhead = config.text("subhead");
+    let action = config.text("action");
+    let millis = |id| config.number(id).max(0.) as u64;
+    with_imports(chain(
+        format!(
+            "MaterialTooltip::{}(\"tooltip\", {})",
+            if rich { "rich" } else { "plain" },
+            lit(&config.text("text"))
+        ),
+        [
+            (rich && !subhead.is_empty()).then(|| format!("subhead({})", lit(&subhead))),
+            (rich && !action.is_empty()).then(|| {
+                format!(
+                    "action({})",
+                    chain(
+                        "MaterialButton::new(\"tooltip-action\")",
+                        [
+                            Some("variant(ButtonVariant::Text)".into()),
+                            Some(format!("child({})", lit(&action))),
+                            Some("on_click(|_, _, _| println!(\"Action\"))".into()),
+                        ],
+                    )
+                )
+            }),
+            (side != default_side).then(|| format!("placement(Placement::{side:?})")),
+            (align != Align::Center).then(|| format!("align(Align::{align:?})")),
+            (!config.bool("hover")).then(|| "show_on_hover(false)".into()),
+            (!config.bool("focus")).then(|| "show_on_focus(false)".into()),
+            Some(format!(
+                "show_delay(Duration::from_millis({}))",
+                millis("show_delay")
+            )),
+            Some(format!(
+                "hide_delay(Duration::from_millis({}))",
+                millis("hide_delay")
+            )),
+            config.bool("visible").then(|| "force_visible(true)".into()),
+            Some(format!("trigger({trigger})")),
+        ],
+    ))
+}
+
 #[cfg(test)]
 mod tests {
     use super::super::test_support::*;
@@ -290,5 +366,23 @@ mod tests {
             cx.debug_bounds("playground-tooltip-action").is_some(),
             "shown after the show delay"
         );
+    }
+
+    #[test]
+    fn the_code_follows_the_configuration() {
+        let mut config = Config::defaults(&PLAYGROUND);
+        let code = super::code(&config);
+        assert!(code.starts_with(
+            "use gpui_kit_material::icons::Symbol;\nuse gpui_kit::base::Placement;\nuse std::time::Duration;\n\nMaterialTooltip::plain(\"tooltip\", \"Save to favorites\")"
+        ), "{code}");
+        assert!(code.contains(".placement(Placement::Bottom)"));
+        assert!(code.contains("IconButton::new(\"favorite\", Symbol::FAVORITE, \"Favorite\")"));
+        assert!(!code.contains(".subhead("));
+        // A rich tooltip's default side is the bottom.
+        config.set("variant", Value::Choice(2));
+        let code = super::code(&config);
+        assert!(code.contains("MaterialTooltip::rich(\"tooltip\", \"Save to favorites\")"));
+        assert!(code.contains(".subhead(\"Favorites\")"));
+        assert!(!code.contains(".placement("));
     }
 }

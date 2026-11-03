@@ -172,7 +172,7 @@ pub static PLAYGROUND: Playground = Playground {
         },
     ],
     preview,
-    code: None,
+    code: Some(code),
 };
 
 fn preview(
@@ -243,6 +243,45 @@ fn preview(
         .into_any_element()
 }
 
+fn code(config: &Config) -> String {
+    let tabs = &TABS[config.choice("tabs")];
+    let count = if config.option("count") == "6" { 6 } else { 3 };
+    let icons = config.bool("icons");
+    let badges = config.bool("badges");
+    let items = tabs[..count]
+        .iter()
+        .enumerate()
+        .map(|(index, (label, icon))| {
+            chain(
+                format!("TabItem::new({}, {})", lit(label), lit(label)),
+                [
+                    icons.then(|| format!("icon({})", symbol_code(icon))),
+                    match index {
+                        0 if badges => Some("badge(NavBadge::Large(\"3\".into()))".into()),
+                        2 if badges => Some("badge(NavBadge::Small)".into()),
+                        _ => None,
+                    },
+                ],
+            )
+        });
+    with_imports(chain(
+        "MaterialTabs::new(\"tabs\", \"Sections\")",
+        [
+            (config.option("variant") == "secondary")
+                .then(|| "variant(TabsVariant::Secondary)".into()),
+            (!config.bool("divider")).then(|| "divider(false)".into()),
+            config.bool("scrollable").then(|| "scrollable(true)".into()),
+            config.bool("auto").then(|| "auto_activate(true)".into()),
+            Some(format!("items({})", array(items))),
+            Some("selected(self.tab.clone())".into()),
+            Some(
+                "on_change(cx.listener(|this, value: &SharedString, _, cx| {\n    this.tab = value.clone();\n    cx.notify();\n}))"
+                    .into(),
+            ),
+        ],
+    ))
+}
+
 #[cfg(test)]
 mod tests {
     use super::super::nav_harness::Harness;
@@ -279,5 +318,25 @@ mod tests {
         harness.set("auto", Value::Bool(true));
         harness.keys("left");
         assert_eq!(harness.config().option("selected"), "Inbox");
+    }
+
+    #[test]
+    fn the_code_follows_the_configuration() {
+        let mut config = Config::defaults(&PLAYGROUND);
+        let code = super::code(&config);
+        assert!(
+            code.starts_with(
+                "use gpui_kit_material::icons::Symbol;\n\nMaterialTabs::new(\"tabs\", \"Sections\")"
+            ),
+            "{code}"
+        );
+        assert!(code.contains("TabItem::new(\"Sent\", \"Sent\")"));
+        assert!(!code.contains("\"Drafts\""));
+        assert!(!code.contains(".variant("));
+        config.set("variant", Value::Choice(1));
+        config.set("icons", Value::Bool(false));
+        let code = super::code(&config);
+        assert!(code.starts_with("MaterialTabs::new("));
+        assert!(code.contains(".variant(TabsVariant::Secondary)"));
     }
 }

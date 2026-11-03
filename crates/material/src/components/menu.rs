@@ -486,6 +486,26 @@ fn room_beside(trigger: Bounds<Pixels>, window: &Window) -> (f32, f32) {
 }
 
 /// An M3 menu surface. Use [`MenuPopup`] to open it from a trigger.
+///
+/// # Example
+///
+/// ```
+/// use gpui_kit::prelude::*;
+/// use gpui_kit_material::{icons::Symbol, prelude::*};
+///
+/// let icon = |symbol: Symbol| symbol.icon().component().size(rem(20.));
+/// // Expressive groups, 2dp apart; a baseline menu divides items instead.
+/// let menu = MaterialMenu::new("edit-menu")
+///     .group(MenuGroup::new().items([
+///         MaterialMenuItem::new("Cut").leading(icon(Symbol::CONTENT_CUT)),
+///         MaterialMenuItem::new("Copy").leading(icon(Symbol::CONTENT_COPY)),
+///     ]))
+///     .group(MenuGroup::new().item(
+///         MaterialMenuItem::new("Select all").on_click(|_, _, _| println!("Select all")),
+///     ))
+///     .density(MenuDensity::Dense);
+/// # let _ = menu;
+/// ```
 #[derive(gpui::IntoElement)]
 pub struct MaterialMenu {
     id: ElementId,
@@ -1248,6 +1268,39 @@ impl RenderOnce for Trigger {
 /// sub-menu, which takes focus); Left or Escape inside the sub-menu reports
 /// `false` through [`Self::on_submenu_change`] and returns focus to the
 /// parent menu.
+///
+/// # Example
+///
+/// ```
+/// use gpui_kit::{ClickEvent, Window, prelude::*};
+/// use gpui_kit_material::prelude::*;
+///
+/// struct Editor {
+///     menu_open: bool,
+/// }
+///
+/// impl Render for Editor {
+///     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+///         let button = material_button("format", ButtonVariant::Tonal).child("Format").on_click(
+///             // Pointer presses reach the popup; keys arrive here.
+///             cx.listener(|this, event: &ClickEvent, _, cx| {
+///                 if matches!(event, ClickEvent::Keyboard(_)) {
+///                     this.menu_open = !this.menu_open;
+///                     cx.notify();
+///                 }
+///             }),
+///         );
+///         let menu = MaterialMenu::new("format-menu")
+///             .items([MaterialMenuItem::new("Bold"), MaterialMenuItem::new("Italic")]);
+///         MenuPopup::new("format-popup", button, menu)
+///             .open(self.menu_open)
+///             .on_open_change(cx.listener(|this, open: &bool, _, cx| {
+///                 this.menu_open = *open;
+///                 cx.notify();
+///             }))
+///     }
+/// }
+/// ```
 #[derive(gpui::IntoElement)]
 pub struct MenuPopup {
     id: ElementId,

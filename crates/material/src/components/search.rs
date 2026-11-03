@@ -77,6 +77,36 @@ enum BarInput {
 
 /// The M3 search bar: a 56dp pill on surface-container-high with a leading
 /// icon, the query and up to two trailing icons or an avatar.
+///
+/// # Example
+///
+/// The query lives in Base's `InputState`, which the view creates once; its
+/// placeholder is the bar's.
+///
+/// ```
+/// use gpui_kit::base::input::InputState;
+/// use gpui_kit::{Entity, Window, prelude::*};
+/// use gpui_kit_material::{icons::Symbol, prelude::*};
+///
+/// struct Messages {
+///     query: Entity<InputState>,
+/// }
+///
+/// impl Messages {
+///     fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
+///         let query = cx.new(|cx| InputState::new(window, cx).placeholder("Search messages"));
+///         Self { query }
+///     }
+/// }
+///
+/// impl Render for Messages {
+///     fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+///         SearchField::new(&self.query)
+///             .leading(Symbol::SEARCH.icon().component())
+///             .field_style(SearchFieldStyle::Surface)
+///     }
+/// }
+/// ```
 #[derive(gpui::IntoElement)]
 pub struct SearchField {
     id: ElementId,
@@ -420,6 +450,35 @@ type ExpandedChange = Rc<dyn Fn(&bool, &mut Window, &mut App)>;
 /// closing from a back button or a chosen suggestion). The results grow from
 /// the bar on the default spatial token and fade on fast effects; collapsing
 /// plays the same motion back and keeps the rows painted until it settles.
+///
+/// # Example
+///
+/// ```
+/// use gpui_kit::base::input::InputState;
+/// use gpui_kit::{Entity, Window, prelude::*};
+/// use gpui_kit_material::{icons::Symbol, prelude::*};
+///
+/// struct Places {
+///     query: Entity<InputState>,
+///     expanded: bool,
+/// }
+///
+/// impl Render for Places {
+///     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+///         let bar = SearchField::new(&self.query).leading(Symbol::SEARCH.icon().component());
+///         SearchView::new("places", bar)
+///             .expanded(self.expanded)
+///             .expand_on_focus(true)
+///             .collapse_on_blur(true)
+///             .on_expanded_change(cx.listener(|this, expanded: &bool, _, cx| {
+///                 this.expanded = *expanded;
+///                 cx.notify();
+///             }))
+///             .suggestion(SearchSuggestion::new("Paris").supporting_text("France"))
+///             .suggestion(SearchSuggestion::new("Tokyo").supporting_text("Japan"))
+///     }
+/// }
+/// ```
 #[derive(gpui::IntoElement)]
 pub struct SearchView {
     id: ElementId,

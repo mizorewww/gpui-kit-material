@@ -195,6 +195,22 @@ thread_local! {
 type ClickHandler = Rc<dyn Fn(&ClickEvent, &mut Window, &mut App)>;
 
 /// An M3 Expressive top app bar.
+///
+/// # Example
+///
+/// ```
+/// use gpui_kit_material::{icons::Symbol, prelude::*};
+///
+/// let scroll_offset = 0.; // how far the content under the bar has scrolled, in dp
+/// let bar = TopAppBar::new("app-bar", TopAppBarVariant::LargeFlexible)
+///     .title("Trail guide")
+///     .navigation_icon(IconButton::new("back", Symbol::ARROW_BACK, "Back"))
+///     .action(IconButton::new("map", Symbol::MAP, "Show map"))
+///     .action(IconButton::new("save", Symbol::BOOKMARK, "Save trail"))
+///     // A flexible bar collapses as the content scrolls under it.
+///     .scroll_offset(scroll_offset);
+/// # let _ = bar;
+/// ```
 #[derive(IntoElement)]
 pub struct TopAppBar {
     id: ElementId,
@@ -553,6 +569,20 @@ thread_local! {
 }
 
 /// The M3 bottom app bar: actions and an optional trailing FAB.
+///
+/// # Example
+///
+/// ```
+/// use gpui_kit_material::{icons::Symbol, prelude::*};
+///
+/// let scrolling_down = false; // the caller's, from its content's scroll
+/// let bar = BottomAppBar::new("note-actions", "Actions")
+///     .action(IconButton::new("checklist", Symbol::CHECK_BOX, "New checklist"))
+///     .action(IconButton::new("drawing", Symbol::BRUSH, "New drawing"))
+///     .fab(Fab::new("new-note", Symbol::ADD, "New note"))
+///     .visible(!scrolling_down);
+/// # let _ = bar;
+/// ```
 #[derive(IntoElement)]
 pub struct BottomAppBar {
     id: ElementId,

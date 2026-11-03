@@ -454,6 +454,36 @@ impl RenderOnce for ToolbarButton {
 }
 
 /// A toolbar: caller items in a floating pill or a docked band.
+///
+/// # Example
+///
+/// ```
+/// use gpui_kit::{ClickEvent, Window, prelude::*};
+/// use gpui_kit_material::{icons::Symbol, prelude::*};
+///
+/// struct Note {
+///     bold: bool,
+/// }
+///
+/// impl Render for Note {
+///     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+///         let bold = ToolbarButton::icon("bold", NavIcon::symbol(Symbol::FORMAT_BOLD), "Bold")
+///             .color(ToolbarColor::Vibrant)
+///             .toggle(true)
+///             .selected(self.bold)
+///             .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+///                 this.bold = !this.bold;
+///                 cx.notify();
+///             }));
+///         let undo = ToolbarButton::icon("undo", NavIcon::symbol(Symbol::UNDO), "Undo")
+///             .color(ToolbarColor::Vibrant);
+///         Toolbar::new("format-toolbar", "Formatting")
+///             .color(ToolbarColor::Vibrant)
+///             .item(bold)
+///             .item(undo)
+///     }
+/// }
+/// ```
 #[derive(IntoElement)]
 pub struct Toolbar {
     id: ElementId,

@@ -146,7 +146,7 @@ pub static PLAYGROUND: Playground = Playground {
         },
     ],
     preview,
-    code: None,
+    code: Some(code),
 };
 
 fn preview(
@@ -243,6 +243,71 @@ fn preview(
         .into_any_element()
 }
 
+fn code(config: &Config) -> String {
+    let peek = config.number("peek");
+    let title = config.text("title");
+    let body = chain(
+        "div()",
+        [
+            Some("flex()".into()),
+            Some("flex_col()".into()),
+            Some("gap(rem(8.))".into()),
+            Some("px(rem(24.))".into()),
+            Some("pb(rem(24.))".into()),
+            (!title.is_empty()).then(|| format!("child({})", lit(&title))),
+            Some(format!("child({})", lit(&config.text("body")))),
+        ],
+    );
+    let sheet = chain(
+        "MaterialBottomSheet::new(\"sheet\")",
+        [
+            Some("detent(self.sheet)".into()),
+            (config.option("variant") == "modal").then(|| "modal(true)".into()),
+            Some(format!(
+                "label({})",
+                lit(if title.is_empty() {
+                    "Bottom sheet"
+                } else {
+                    &title
+                })
+            )),
+            config
+                .bool("handle")
+                .then(|| "drag_handle(\"Drag handle\")".into()),
+            (peek > 0.).then(|| format!("partial_height(rem({peek:?}))")),
+            (config.number("width") != 640.)
+                .then(|| format!("max_width(rem({:?}))", config.number("width"))),
+            (!config.bool("scrim")).then(|| "dismiss_on_scrim(false)".into()),
+            (!config.bool("escape")).then(|| "dismiss_on_escape(false)".into()),
+            Some(
+                "on_detent_change({\n    let view = cx.entity();\n    move |detent, _, cx| {\n        view.update(cx, |this, cx| {\n            this.sheet = detent;\n            cx.notify();\n        })\n    }\n})"
+                    .into(),
+            ),
+            Some(format!("child({body})")),
+        ],
+    );
+    // Opening shows the peek (the partial detent) when there is one.
+    let opened = if peek > 0. { "Partial" } else { "Expanded" };
+    let open = chain(
+        "material_button(\"open-sheet\", ButtonVariant::Tonal)",
+        [
+            Some("child(\"Open bottom sheet\")".into()),
+            Some(format!(
+                "on_click(cx.listener(|this, _: &ClickEvent, _, cx| {{\n    this.sheet = BottomSheetDetent::{opened};\n    cx.notify();\n}}))"
+            )),
+        ],
+    );
+    chain(
+        "div()",
+        [
+            Some("relative()".into()),
+            Some("size_full()".into()),
+            Some(format!("child({open})")),
+            Some(format!("child({sheet})")),
+        ],
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::super::nav_harness::Harness;
@@ -302,5 +367,22 @@ mod tests {
         assert!(h.bounds("bottom-sheet-body").is_some());
         h.keys("escape");
         assert_eq!(h.config().option("state"), "hidden");
+    }
+
+    #[test]
+    fn the_code_follows_the_configuration() {
+        let mut config = Config::defaults(&PLAYGROUND);
+        let code = super::code(&config);
+        assert!(code.starts_with("div()"), "{code}");
+        assert!(code.contains("MaterialBottomSheet::new(\"sheet\")"));
+        assert!(code.contains(".modal(true)"));
+        assert!(code.contains(".partial_height(rem(120.0))"));
+        assert!(code.contains("BottomSheetDetent::Partial"));
+        config.set("variant", Value::Choice(0));
+        config.set("peek", Value::Number(0.));
+        let code = super::code(&config);
+        assert!(!code.contains(".modal("));
+        assert!(!code.contains(".partial_height("));
+        assert!(code.contains("BottomSheetDetent::Expanded"));
     }
 }

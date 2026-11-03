@@ -121,7 +121,7 @@ pub static PLAYGROUND: Playground = Playground {
         },
     ],
     preview,
-    code: None,
+    code: Some(code),
 };
 
 /// One destination: label, Material Symbol and badge.
@@ -330,6 +330,100 @@ fn preview(
         .into_any_element()
 }
 
+/// A `Fn(&mut Window, &mut App)` closure that collapses the rail, in the
+/// Code card.
+const COLLAPSE: &str = "{\n    let view = cx.entity();\n    move |_, cx| {\n        view.update(cx, |this, cx| {\n            this.rail_expanded = false;\n            cx.notify();\n        })\n    }\n}";
+
+fn code(config: &Config) -> String {
+    let set = match config.option("destinations") {
+        "Default" => MAIL,
+        _ => CLOCK,
+    };
+    let badges = config.bool("badges");
+    let modal = config.option("layout") == "modal";
+    let expanded = config.bool("expanded");
+    let width = config.number("expanded_width");
+    let items = set.iter().map(|destination| {
+        chain(
+            format!(
+                "NavItem::new({}, {}, NavIcon::symbol({}))",
+                lit(destination.label),
+                lit(destination.label),
+                symbol_code(destination.symbol)
+            ),
+            [match destination.badge {
+                Some("") if badges => Some("badge(NavBadge::Small)".into()),
+                Some(text) if badges => {
+                    Some(format!("badge(NavBadge::Large({}.into()))", lit(text)))
+                }
+                _ => None,
+            }],
+        )
+    });
+    let menu = config.bool("menu").then(|| {
+        let (icon, label) = if expanded {
+            ("menu_open", "Collapse navigation")
+        } else {
+            ("menu", "Expand navigation")
+        };
+        format!(
+            "menu({})",
+            chain(
+                format!(
+                    "IconButton::new(\"rail-menu\", {}, {})",
+                    symbol_code(icon),
+                    lit(label)
+                ),
+                [Some(
+                    "on_click(cx.listener(|this, _: &ClickEvent, _, cx| {\n    this.rail_expanded = !this.rail_expanded;\n    cx.notify();\n}))"
+                        .into(),
+                )],
+            )
+        )
+    });
+    let sections = config.option("destinations") == "Expanded clock";
+    let rail = chain(
+        "NavigationRail::new(\"rail\", \"Main navigation\")",
+        [
+            Some(format!("items({})", array(items))),
+            sections.then(|| "section(0, \"Time\")".into()),
+            sections.then(|| "section(2, \"Tools\")".into()),
+            Some("selected(self.destination.clone())".into()),
+            Some("expanded(self.rail_expanded)".into()),
+            (width != RAIL_EXPANDED_WIDTH).then(|| format!("expanded_width({width:?})")),
+            config
+                .bool("hide_collapsed")
+                .then(|| "hide_collapsed(true)".into()),
+            (config.option("container") == "ground")
+                .then(|| "container(ColorRole::SURFACE_CONTAINER)".into()),
+            (!config.bool("ripple")).then(|| "ripple(false)".into()),
+            menu,
+            modal.then(|| "modal(true)".into()),
+            modal.then(|| format!("on_dismiss({COLLAPSE})")),
+            Some(
+                "on_change(cx.listener(|this, value: &SharedString, _, cx| {\n    this.destination = value.clone();\n    cx.notify();\n}))"
+                    .into(),
+            ),
+        ],
+    );
+    if !modal {
+        return with_imports(rail);
+    }
+    // A modal expanded rail floats over a scrim that also collapses it.
+    with_imports(chain(
+        "div()",
+        [
+            Some("relative()".into()),
+            Some("size_full()".into()),
+            Some(format!(
+                "when(self.rail_expanded, |area| {{\n    area.child(navigation_scrim(\"rail-scrim\", {}))\n}})",
+                COLLAPSE.replace('\n', "\n    ")
+            )),
+            Some(format!("child({rail})")),
+        ],
+    ))
+}
+
 #[cfg(test)]
 mod tests {
     use super::super::nav_harness::Harness;
@@ -409,5 +503,21 @@ mod tests {
         harness.cx.update(|window, cx| window.focus_next(cx));
         harness.keys("escape");
         assert!(!harness.config().bool("expanded"));
+    }
+
+    #[test]
+    fn the_code_follows_the_configuration() {
+        let mut config = Config::defaults(&PLAYGROUND);
+        let code = super::code(&config);
+        assert!(code.starts_with(
+            "use gpui_kit_material::icons::Symbol;\n\nNavigationRail::new(\"rail\", \"Main navigation\")"
+        ), "{code}");
+        assert!(code.contains(".badge(NavBadge::Large(\"8\".into()))"));
+        assert!(code.contains(".expanded_width(280.0)"));
+        assert!(!code.contains(".modal("));
+        config.set("layout", Value::Choice(1));
+        let code = super::code(&config);
+        assert!(code.contains("navigation_scrim(\"rail-scrim\""));
+        assert!(code.contains(".modal(true)"));
     }
 }

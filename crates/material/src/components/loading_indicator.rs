@@ -212,6 +212,20 @@ fn frame_path(frame: LoadingFrame, center: Point<Pixels>, container: f32) -> Opt
 /// on the reference's spring while rotating. [`Self::progress`] makes it
 /// determinate (a circle growing into a soft burst). Reduced motion holds
 /// the first frame. The caller supplies the accessible label.
+///
+/// # Example
+///
+/// ```
+/// use gpui_kit_material::prelude::*;
+///
+/// // Indeterminate, on its round container.
+/// let loading = LoadingIndicator::new("loading", "Loading your content").contained(true);
+/// // Determinate and larger: 70% of the way to the soft burst.
+/// let refresh = LoadingIndicator::new("refresh", "Pull to refresh")
+///     .size(96.)
+///     .progress(Some(0.7));
+/// # let _ = (loading, refresh);
+/// ```
 #[derive(gpui::IntoElement)]
 pub struct LoadingIndicator {
     id: ElementId,

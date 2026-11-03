@@ -134,7 +134,7 @@ pub static PLAYGROUND: Playground = Playground {
         },
     ],
     preview,
-    code: None,
+    code: Some(code),
 };
 
 /// One toolbar item: a Material Symbol (or a label when `icon` is empty),
@@ -355,6 +355,58 @@ fn preview(
         .into_any_element()
 }
 
+fn code(config: &Config) -> String {
+    let docked = config.option("variant") == "docked";
+    let vibrant = config.option("color") == "vibrant";
+    let count = config.choice("count") + 2;
+    let toggles = config.bool("toggles");
+    let items = ACTIONS[config.choice("actions")][..count].iter().map(|action| {
+        let id = action.label.to_lowercase().replace(' ', "-");
+        let head = if action.icon.is_empty() {
+            format!("ToolbarButton::label({}, {})", lit(&id), lit(action.label))
+        } else {
+            format!(
+                "ToolbarButton::icon({}, NavIcon::symbol({}), {})",
+                lit(&id),
+                symbol_code(action.icon),
+                lit(action.label)
+            )
+        };
+        // A formatting toggle's state is a field of the view.
+        let field = id.replace('-', "_");
+        let toggle = action.toggle && toggles;
+        chain(
+            head,
+            [
+                vibrant.then(|| "color(ToolbarColor::Vibrant)".into()),
+                action.danger.then(|| "ink(ColorRole::ERROR)".into()),
+                toggle.then(|| "toggle(true)".into()),
+                toggle.then(|| format!("selected(self.{field})")),
+                toggle.then(|| {
+                    format!(
+                        "on_click(cx.listener(|this, _: &ClickEvent, _, cx| {{\n    this.{field} = !this.{field};\n    cx.notify();\n}}))"
+                    )
+                }),
+            ],
+        )
+    });
+    let elevated = config.bool("elevated");
+    with_imports(chain(
+        "Toolbar::new(\"toolbar\", \"Actions\")",
+        [
+            docked.then(|| "configuration(ToolbarConfiguration::Docked)".into()),
+            (config.option("orientation") == "vertical")
+                .then(|| "orientation(ToolbarOrientation::Vertical)".into()),
+            vibrant.then(|| "color(ToolbarColor::Vibrant)".into()),
+            // Floating toolbars are elevated by default, docked ones flat.
+            (elevated == docked).then(|| format!("elevated({elevated})")),
+            (docked && config.option("docked_items") == "center")
+                .then(|| "docked_centered(true)".into()),
+            Some(format!("items({})", array(items))),
+        ],
+    ))
+}
+
 #[cfg(test)]
 mod tests {
     use super::super::nav_harness::Harness;
@@ -405,5 +457,27 @@ mod tests {
         harness.set("toggles", Value::Bool(false));
         harness.click_at(italic);
         assert_eq!(SELECTED.get(), 0b001);
+    }
+
+    #[test]
+    fn the_code_follows_the_configuration() {
+        let mut config = Config::defaults(&PLAYGROUND);
+        let code = super::code(&config);
+        assert!(
+            code.starts_with(
+                "use gpui_kit_material::icons::Symbol;\n\nToolbar::new(\"toolbar\", \"Actions\")"
+            ),
+            "{code}"
+        );
+        assert!(code.contains(".selected(self.bold)"));
+        assert!(!code.contains(".elevated("));
+        assert!(!code.contains("Symbol::MORE_VERT"));
+        // Docked toolbars are flat by default, so an elevated one says so.
+        config.set("variant", Value::Choice(0));
+        config.set("toggles", Value::Bool(false));
+        let code = super::code(&config);
+        assert!(code.contains(".configuration(ToolbarConfiguration::Docked)"));
+        assert!(code.contains(".elevated(true)"));
+        assert!(!code.contains(".toggle("));
     }
 }

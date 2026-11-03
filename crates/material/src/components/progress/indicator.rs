@@ -37,6 +37,19 @@ pub fn circular_progress_size(shape: ProgressShape, thickness: Pixels) -> f32 {
 /// track and gap after it); `None` plays the reference's six-second growing
 /// arc, whose track is hidden unless [`Self::show_track`] asks for it.
 /// Reduced motion holds still. The caller supplies the accessible label.
+///
+/// # Example
+///
+/// ```
+/// use gpui_kit_material::prelude::*;
+///
+/// let loading = CircularProgress::new("loading", "Loading").wavy();
+/// let paused = CircularProgress::new("download", "Download paused")
+///     .value(Some(0.8))
+///     .size(48.)
+///     .disabled(true);
+/// # let _ = (loading, paused);
+/// ```
 #[derive(gpui::IntoElement)]
 pub struct CircularProgress {
     id: ElementId,

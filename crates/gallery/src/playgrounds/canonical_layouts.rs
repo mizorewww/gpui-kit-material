@@ -110,7 +110,7 @@ pub static PLAYGROUND: Playground = Playground {
         },
     ],
     preview,
-    code: None,
+    code: Some(code),
 };
 
 fn headline(text: impl Into<SharedString>) -> impl IntoElement {
@@ -409,6 +409,79 @@ fn preview(
         .into_any_element()
 }
 
+// The Window sliders stand in for the window the layouts read by themselves,
+// so the code leaves them out (`size_class` is for a framed preview). The
+// panes' contents are the caller's: `self.message(cx)` and the like.
+fn code(config: &Config) -> String {
+    let layout = config.option("layout");
+    if layout == "feed" {
+        let feed = chain(
+            "FeedLayout::new(\"feed\")",
+            POSTS.iter().enumerate().map(|(index, post)| {
+                Some(format!(
+                    "{}(post_card({}))",
+                    if index == 0 { "wide_item" } else { "item" },
+                    lit(post)
+                ))
+            }),
+        );
+        return chain(
+            "div()",
+            [
+                Some("id(\"feed-scroll\")".into()),
+                Some("size_full()".into()),
+                Some("overflow_y_scroll()".into()),
+                Some(format!("child({feed})")),
+            ],
+        );
+    }
+    let supporting = layout == "supporting pane";
+    let (constructor, panes) = if supporting {
+        (
+            "supporting_pane",
+            [
+                Some("pane(PaneRole::Primary, \"Article\", self.article(cx))".into()),
+                Some("pane(PaneRole::Secondary, \"Related\", self.related(cx))".into()),
+            ],
+        )
+    } else {
+        let rows = "div().children(MAIL.iter().enumerate().map(|(index, (from, subject))| {\n    let navigator = self.navigator.clone();\n    ListItem::new(index, *from)\n        .supporting(*subject)\n        .on_click(move |_, _, cx| {\n            navigator.update(cx, |navigator, cx| {\n                navigator.navigate_to(PaneRole::Primary, Some(index));\n                cx.notify();\n            });\n        })\n}))";
+        (
+            "list_detail",
+            [
+                Some(format!(
+                    "pane(\n    PaneRole::Secondary,\n    \"Inbox\",\n    {},\n)",
+                    rows.replace('\n', "\n    ")
+                )),
+                Some("pane(PaneRole::Primary, \"Message\", self.message(cx))".into()),
+            ],
+        )
+    };
+    let mut calls =
+        vec![(config.option("rule") == "compose").then(|| "rule(PaneRule::Compose)".into())];
+    calls.extend(panes);
+    calls.push(
+        config
+            .bool("extra")
+            .then(|| "pane(PaneRole::Tertiary, \"Notes\", self.notes(cx))".into()),
+    );
+    calls.push(
+        config
+            .bool("handle")
+            .then(|| "drag_handle(\"Resize panes\")".into()),
+    );
+    format!(
+        "// self.navigator = cx.new(|_| PaneNavigator::<usize>::{constructor}());\n{}",
+        chain(
+            format!(
+                "PaneScaffold::{constructor}({}, &self.navigator)",
+                lit(&constructor.replace('_', "-"))
+            ),
+            calls,
+        )
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::super::test_support::*;
@@ -486,5 +559,23 @@ mod tests {
         set(&state, &mut cx, "layout", Value::Choice(2));
         settle_motion(&mut cx);
         assert!(cx.debug_bounds("feed-layout").is_some());
+    }
+
+    #[test]
+    fn the_code_follows_the_configuration() {
+        let mut config = Config::defaults(&PLAYGROUND);
+        let code = super::code(&config);
+        assert!(code.starts_with(
+            "// self.navigator = cx.new(|_| PaneNavigator::<usize>::list_detail());\nPaneScaffold::list_detail(\"list-detail\", &self.navigator)"
+        ), "{code}");
+        assert!(code.contains("navigator.navigate_to(PaneRole::Primary, Some(index));"));
+        assert!(code.contains(".drag_handle(\"Resize panes\")"));
+        assert!(!code.contains(".rule("));
+        config.set("rule", Value::Choice(1));
+        assert!(super::code(&config).contains(".rule(PaneRule::Compose)"));
+        config.set("layout", Value::Choice(2));
+        let code = super::code(&config);
+        assert!(code.contains("FeedLayout::new(\"feed\")"));
+        assert!(code.contains(".wide_item(post_card(\"Mountains\"))"));
     }
 }

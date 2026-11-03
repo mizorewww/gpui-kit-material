@@ -151,7 +151,7 @@ pub static PLAYGROUND: Playground = Playground {
         },
     ],
     preview,
-    code: None,
+    code: Some(code),
 };
 
 /// The dismissing and confirming actions' labels for a title.
@@ -280,6 +280,101 @@ fn preview(
         .into_any_element()
 }
 
+/// A click listener that sets `self.dialog_open`, in the Code card.
+fn set_open(open: bool) -> String {
+    format!(
+        "cx.listener(|this, _: &ClickEvent, _, cx| {{\n    this.dialog_open = {open};\n    cx.notify();\n}})"
+    )
+}
+
+fn code(config: &Config) -> String {
+    let title = config.text("title");
+    let (dismiss_label, confirm_label) = action_labels(&title);
+    let text = |id: &str, call: &str| {
+        let text = config.text(id);
+        (!text.is_empty()).then(|| format!("{call}({})", lit(&text)))
+    };
+    let actions = config.bool("actions");
+    let action = |id: &str, label: &str| {
+        actions.then(|| {
+            format!(
+                "action({})",
+                chain(
+                    format!("material_button({}, ButtonVariant::Text)", lit(id)),
+                    [
+                        Some(format!("child({})", lit(label))),
+                        Some(format!("on_click({})", set_open(false))),
+                    ],
+                )
+            )
+        })
+    };
+    let dialog = chain(
+        "MaterialDialog::new(\"dialog\")",
+        [
+            Some("modal(self.dialog_open)".into()),
+            if title.is_empty() {
+                Some(format!("label({})", lit(confirm_label)))
+            } else {
+                Some(format!("headline({})", lit(&title)))
+            },
+            text("subtitle", "subtitle"),
+            text("body", "supporting_text"),
+            match config.option("container") {
+                "surface container" => Some("container(ColorRole::SURFACE_CONTAINER)".into()),
+                "surface container low" => {
+                    Some("container(ColorRole::SURFACE_CONTAINER_LOW)".into())
+                }
+                _ => None,
+            },
+            match DialogSize::ALL[config.choice("size")] {
+                DialogSize::Small => None,
+                size => Some(format!("size(DialogSize::{size:?})")),
+            },
+            config
+                .option("max-width")
+                .parse::<f32>()
+                .ok()
+                .map(|width| format!("max_width({width:?})")),
+            match DialogAnimation::ALL[config.choice("animation")] {
+                DialogAnimation::SlideDown => None,
+                animation => Some(format!("animation(DialogAnimation::{animation:?})")),
+            },
+            config.bool("dividers").then(|| "dividers(true)".into()),
+            (config.bool("close") || config.option("size") == "fullscreen")
+                .then(|| "close_button(\"Close dialog\")".into()),
+            action("dismiss", dismiss_label),
+            action("confirm", confirm_label),
+            match DialogActionAlignment::ALL[config.choice("alignment")] {
+                DialogActionAlignment::End => None,
+                alignment => Some(format!(
+                    "action_alignment(DialogActionAlignment::{alignment:?})"
+                )),
+            },
+            (!config.bool("scrim")).then(|| "dismiss_on_scrim(false)".into()),
+            (!config.bool("escape")).then(|| "dismiss_on_escape(false)".into()),
+            Some(
+                "on_dismiss({\n    let view = cx.entity();\n    move |_, cx| {\n        view.update(cx, |this, cx| {\n            this.dialog_open = false;\n            cx.notify();\n        })\n    }\n})"
+                    .into(),
+            ),
+        ],
+    );
+    let open = chain(
+        "material_button(\"open-dialog\", ButtonVariant::Tonal)",
+        [
+            Some("child(\"Open dialog\")".into()),
+            Some(format!("on_click({})", set_open(true))),
+        ],
+    );
+    chain(
+        "div()",
+        [
+            Some(format!("child({open})")),
+            Some(format!("child({dialog})")),
+        ],
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::super::nav_harness::Harness;
@@ -354,5 +449,21 @@ mod tests {
         let close = h.expect("dialog-close");
         h.click_at(close.center());
         assert!(!h.config().bool("open"));
+    }
+
+    #[test]
+    fn the_code_follows_the_configuration() {
+        let mut config = Config::defaults(&PLAYGROUND);
+        let code = super::code(&config);
+        assert!(code.starts_with("div()"), "{code}");
+        assert!(code.contains("MaterialDialog::new(\"dialog\")"));
+        assert!(code.contains(".headline(\"Save your changes?\")"));
+        assert!(code.contains(".animation(DialogAnimation::Scale)"));
+        assert!(!code.contains(".size("));
+        config.set("size", Value::Choice(1));
+        config.set("actions", Value::Bool(false));
+        let code = super::code(&config);
+        assert!(code.contains(".size(DialogSize::Medium)"));
+        assert!(!code.contains(".action("));
     }
 }

@@ -123,7 +123,7 @@ pub static PLAYGROUND: Playground = Playground {
         },
     ],
     preview,
-    code: None,
+    code: Some(code),
 };
 
 fn preview(
@@ -203,6 +203,72 @@ fn preview(
         .into_any_element()
 }
 
+fn code(config: &Config) -> String {
+    const CLOSE: &str = "cx.listener(|this, _: &ClickEvent, _, cx| {\n    this.sheet_open = false;\n    cx.notify();\n})";
+    let title = config.text("title");
+    let width = config.number("width");
+    let action = |id: &str, variant: &str, label: &str| {
+        Some(format!(
+            "action({})",
+            chain(
+                format!("material_button({}, ButtonVariant::{variant})", lit(id)),
+                [
+                    Some(format!("child({})", lit(label))),
+                    Some(format!("on_click({CLOSE})")),
+                ],
+            )
+        ))
+    };
+    let sheet = chain(
+        "MaterialSideSheet::new(\"sheet\")",
+        [
+            Some("open(self.sheet_open)".into()),
+            (config.option("variant") == "modal").then(|| "modal(true)".into()),
+            (config.option("position") == "start").then(|| "edge(SideSheetEdge::Start)".into()),
+            (width != 320.).then(|| format!("width(rem({width:?}))")),
+            if title.is_empty() {
+                Some("label(\"Side sheet\")".into())
+            } else {
+                Some(format!("headline({})", lit(&title)))
+            },
+            config
+                .bool("close")
+                .then(|| "close_button(\"Close sheet\")".into()),
+            (!config.bool("scrim")).then(|| "dismiss_on_scrim(false)".into()),
+            (!config.bool("escape")).then(|| "dismiss_on_escape(false)".into()),
+            Some(
+                "on_dismiss({\n    let view = cx.entity();\n    move |_, cx| {\n        view.update(cx, |this, cx| {\n            this.sheet_open = false;\n            cx.notify();\n        })\n    }\n})"
+                    .into(),
+            ),
+            Some(format!(
+                "child(div().px(rem(24.)).child({}))",
+                lit(&config.text("body"))
+            )),
+            action("save", "Filled", "Save"),
+            action("cancel", "Outlined", "Cancel"),
+        ],
+    );
+    let open = chain(
+        "material_button(\"open-sheet\", ButtonVariant::Tonal)",
+        [
+            Some("child(\"Open side sheet\")".into()),
+            Some(
+                "on_click(cx.listener(|this, _: &ClickEvent, _, cx| {\n    this.sheet_open = true;\n    cx.notify();\n}))"
+                    .into(),
+            ),
+        ],
+    );
+    chain(
+        "div()",
+        [
+            Some("relative()".into()),
+            Some("size_full()".into()),
+            Some(format!("child({open})")),
+            Some(format!("child({sheet})")),
+        ],
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::super::nav_harness::Harness;
@@ -256,5 +322,21 @@ mod tests {
         h.advance(1000);
         h.click("sheet-close");
         assert!(!h.config().bool("open"), "the close button dismisses");
+    }
+
+    #[test]
+    fn the_code_follows_the_configuration() {
+        let mut config = Config::defaults(&PLAYGROUND);
+        let code = super::code(&config);
+        assert!(code.starts_with("div()"), "{code}");
+        assert!(code.contains("MaterialSideSheet::new(\"sheet\")"));
+        assert!(code.contains(".headline(\"Details\")"));
+        assert!(!code.contains(".edge("));
+        assert!(!code.contains(".width("));
+        config.set("position", Value::Choice(0));
+        config.set("width", Value::Number(280.));
+        let code = super::code(&config);
+        assert!(code.contains(".edge(SideSheetEdge::Start)"));
+        assert!(code.contains(".width(rem(280.0))"));
     }
 }

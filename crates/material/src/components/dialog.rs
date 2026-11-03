@@ -126,6 +126,40 @@ impl DialogActionAlignment {
 
 /// An M3 dialog. Without [`MaterialDialog::modal`] it renders its container
 /// in place (a specimen); with it, it is a modal overlay over the window.
+///
+/// # Example
+///
+/// The caller owns whether it is open; its actions and dismissal close it.
+///
+/// ```
+/// use gpui_kit::{ClickEvent, Window, prelude::*};
+/// use gpui_kit_material::prelude::*;
+///
+/// struct Draft {
+///     discarding: bool,
+/// }
+///
+/// impl Render for Draft {
+///     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+///         let view = cx.entity();
+///         let cancel = cx.listener(|this, _: &ClickEvent, _, cx| {
+///             this.discarding = false;
+///             cx.notify();
+///         });
+///         MaterialDialog::new("discard-dialog")
+///             .modal(self.discarding)
+///             .headline("Discard draft?")
+///             .supporting_text("Discarding removes it permanently.")
+///             .action(material_button("cancel", ButtonVariant::Text).child("Cancel").on_click(cancel))
+///             .on_dismiss(move |_, cx| {
+///                 view.update(cx, |this, cx| {
+///                     this.discarding = false;
+///                     cx.notify();
+///                 })
+///             })
+///     }
+/// }
+/// ```
 #[derive(gpui::IntoElement)]
 pub struct MaterialDialog {
     id: ElementId,

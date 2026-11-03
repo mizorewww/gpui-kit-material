@@ -111,7 +111,7 @@ pub static PLAYGROUND: Playground = Playground {
         },
     ],
     preview,
-    code: None,
+    code: Some(code),
 };
 
 /// One menu item: label, Material Symbol and supporting text.
@@ -433,6 +433,175 @@ fn context_region(
         )
 }
 
+/// A view field's name for a label, e.g. `submenu_open`.
+fn field(label: &str) -> String {
+    label.to_lowercase().replace(' ', "_")
+}
+
+fn code(config: &Config) -> String {
+    let variant = config.option("variant");
+    let style = match variant {
+        "vibrant" => MenuStyle::Vibrant,
+        "baseline" => MenuStyle::Baseline,
+        _ => MenuStyle::Standard,
+    };
+    let icons = config.bool("icons");
+    let supporting = config.bool("supporting");
+    let with_submenu = config.bool("submenu");
+    let which = config.choice("menu");
+    let text_actions = which == 2;
+    let width = if supporting { 240. } else { 208. };
+    let (default_width, icon_size) = if style == MenuStyle::Baseline {
+        (200., 24.)
+    } else {
+        (208., 20.)
+    };
+    let menu_calls = |id: &str| {
+        chain(
+            format!("MaterialMenu::new({})", lit(id)),
+            [
+                (style != MenuStyle::Standard).then(|| format!("style(MenuStyle::{style:?})")),
+                config
+                    .bool("dense")
+                    .then(|| "density(MenuDensity::Dense)".into()),
+                (width != default_width).then(|| format!("width({width:?})")),
+            ],
+        )
+    };
+    // One item; `index` is its position in its section.
+    let item = |(label, icon, support): Item, section: usize, index: usize, last: bool| {
+        let (selected, click) = match section {
+            0 if text_actions => {
+                let field = field(label);
+                (
+                    Some(format!("selected(self.{field})")),
+                    format!(
+                        "cx.listener(|this, _: &ClickEvent, _, cx| {{\n    this.{field} = !this.{field};\n    cx.notify();\n}})"
+                    ),
+                )
+            }
+            1 if text_actions => (
+                Some(format!("selected(self.alignment == {index})")),
+                format!(
+                    "cx.listener(|this, _: &ClickEvent, _, cx| {{\n    this.alignment = {index};\n    cx.notify();\n}})"
+                ),
+            ),
+            _ => (None, format!("|_, _, _| println!({})", lit(label))),
+        };
+        chain(
+            format!("MaterialMenuItem::new({})", lit(label)),
+            [
+                icons.then(|| {
+                    format!(
+                        "leading({}.icon().component().size(rem({icon_size:?})))",
+                        symbol_code(icon)
+                    )
+                }),
+                supporting.then(|| format!("supporting_text({})", lit(support))),
+                selected,
+                (last && variant != "gap").then(|| "divider(true)".into()),
+                Some(format!("on_click({click})")),
+            ],
+        )
+    };
+    let sections = MENUS[which];
+    let mut menu_calls_list = Vec::new();
+    for (section, items) in sections.iter().enumerate() {
+        let last_section = section + 1 == sections.len();
+        let mut built: Vec<String> = items
+            .iter()
+            .enumerate()
+            .map(|(index, entry)| {
+                item(
+                    *entry,
+                    section,
+                    index,
+                    !last_section && index + 1 == items.len(),
+                )
+            })
+            .collect();
+        if last_section && with_submenu {
+            let (label, icon, support) = SHARE;
+            built.push(chain(
+                format!("MaterialMenuItem::new({})", lit(label)),
+                [
+                    Some("submenu(true)".into()),
+                    icons.then(|| {
+                        format!(
+                            "leading({}.icon().component().size(rem({icon_size:?})))",
+                            symbol_code(icon)
+                        )
+                    }),
+                    supporting.then(|| format!("supporting_text({})", lit(support))),
+                    Some("selected(self.submenu_open)".into()),
+                    Some(
+                        "on_click(cx.listener(|this, _: &ClickEvent, _, cx| {\n    this.submenu_open = !this.submenu_open;\n    cx.notify();\n}))"
+                            .into(),
+                    ),
+                ],
+            ));
+        }
+        menu_calls_list.push(Some(if variant == "gap" {
+            format!("group(MenuGroup::new().items({}))", array(built))
+        } else {
+            format!("items({})", array(built))
+        }));
+    }
+    if config.bool("max-height") {
+        menu_calls_list.push(Some("max_height(144.0)".into()));
+    }
+    let menu = chain(menu_calls("menu"), menu_calls_list);
+    let label = config.text("label");
+    let trigger = chain(
+        "MaterialButton::new(\"menu-button\")",
+        [
+            Some("variant(ButtonVariant::Tonal)".into()),
+            Some(format!("child({})", lit(&label))),
+            // Pointer presses reach the popup; keys arrive here.
+            Some(
+                "on_click(cx.listener(|this, event: &ClickEvent, _, cx| {\n    if matches!(event, ClickEvent::Keyboard(_)) {\n        this.menu_open = !this.menu_open;\n        cx.notify();\n    }\n}))"
+                    .into(),
+            ),
+        ],
+    );
+    let anchor = anchor(config.option("position"));
+    let submenu = with_submenu.then(|| {
+        let share = sections.iter().map(|items| items.len()).sum::<usize>();
+        let items = SUBMENU
+            .iter()
+            .map(|entry| item(*entry, usize::MAX, 0, false));
+        format!(
+            "submenu(\n    {share},\n    {},\n    self.submenu_open,\n)",
+            chain(
+                menu_calls("share-menu"),
+                [Some(format!("items({})", array(items)))]
+            )
+            .replace('\n', "\n    ")
+        )
+    });
+    with_imports(chain(
+        format!(
+            "MenuPopup::new(\n    \"menu-popup\",\n    {},\n    {},\n)",
+            trigger.replace('\n', "\n    "),
+            menu.replace('\n', "\n    ")
+        ),
+        [
+            Some("open(self.menu_open)".into()),
+            (anchor != Anchor::TopLeft).then(|| format!("anchor(Anchor::{anchor:?})")),
+            (!config.bool("close")).then(|| "close_on_activate(false)".into()),
+            Some(
+                "on_open_change(cx.listener(|this, open: &bool, _, cx| {\n    this.menu_open = *open;\n    cx.notify();\n}))"
+                    .into(),
+            ),
+            submenu,
+            with_submenu.then(|| {
+                "on_submenu_change(cx.listener(|this, open: &bool, _, cx| {\n    this.submenu_open = *open;\n    cx.notify();\n}))"
+                    .into()
+            }),
+        ],
+    ))
+}
+
 #[cfg(test)]
 mod tests {
     use super::super::nav_harness::Harness;
@@ -503,5 +672,24 @@ mod tests {
         harness.keys("left");
         assert!(!drawn().1, "Left closes the sub-menu");
         assert!(drawn().0, "the menu stays open");
+    }
+
+    #[test]
+    fn the_code_follows_the_configuration() {
+        let mut config = Config::defaults(&PLAYGROUND);
+        let code = super::code(&config);
+        assert!(code.starts_with(
+            "use gpui_kit_material::icons::Symbol;\n\nMenuPopup::new(\n    \"menu-popup\",\n    MaterialButton::new(\"menu-button\")"
+        ), "{code}");
+        assert!(code.contains("MaterialMenuItem::new(\"Paste\")"));
+        assert!(code.contains(".divider(true)"));
+        assert!(!code.contains(".anchor("));
+        assert!(!code.contains(".submenu("));
+        config.set("submenu", Value::Bool(true));
+        config.set("position", Value::Choice(1));
+        let code = super::code(&config);
+        assert!(code.contains(".anchor(Anchor::TopRight)"));
+        assert!(code.contains("MaterialMenu::new(\"share-menu\")"));
+        assert!(code.contains("    4,\n"), "{code}");
     }
 }

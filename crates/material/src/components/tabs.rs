@@ -103,6 +103,33 @@ impl TabItem {
 }
 
 /// M3 tabs over a caller-controlled selection.
+///
+/// # Example
+///
+/// ```
+/// use gpui_kit::{SharedString, Window, prelude::*};
+/// use gpui_kit_material::{icons::Symbol, prelude::*};
+///
+/// struct Trip {
+///     tab: SharedString,
+/// }
+///
+/// impl Render for Trip {
+///     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+///         MaterialTabs::new("tabs", "Trip sections")
+///             .items([
+///                 TabItem::new("flights", "Flights").icon(Symbol::FLIGHT),
+///                 TabItem::new("hotels", "Hotels").icon(Symbol::HOTEL),
+///                 TabItem::new("cars", "Cars").badge(NavBadge::Small),
+///             ])
+///             .selected(self.tab.clone())
+///             .on_change(cx.listener(|this, value: &SharedString, _, cx| {
+///                 this.tab = value.clone();
+///                 cx.notify();
+///             }))
+///     }
+/// }
+/// ```
 #[derive(IntoElement)]
 pub struct MaterialTabs {
     id: ElementId,
