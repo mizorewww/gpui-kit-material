@@ -1057,17 +1057,11 @@ impl RenderOnce for TextField {
                 .text_size(TypeRole::BodyLarge.scale().font_size)
                 .line_height(TypeRole::BodyLarge.scale().line_height)
                 .into_any_element(),
-            FieldInput::Static(value) => div()
-                .flex_1()
-                .min_w_0()
-                .overflow_hidden()
-                .whitespace_nowrap()
-                .child(if self.input_type.is_some_and(TextFieldInputType::masked) {
-                    SharedString::from("\u{2022}".repeat(value.chars().count()))
-                } else {
-                    value.clone()
-                })
-                .into_any_element(),
+            FieldInput::Static(value) => static_value(
+                value,
+                self.input_type.is_some_and(TextFieldInputType::masked),
+            )
+            .into_any_element(),
         };
         // Kit's input paints the theme caret (primary through the theme bridge); the
         // field's own caret follows its error state.
@@ -1283,6 +1277,17 @@ fn outline(
         )
         .into_any_element(),
     ]
+}
+
+/// A specimen's value on its one line, masked as bullets for a password type:
+/// too long for the field, it ends in an ellipsis rather than stopping
+/// mid-letter at the field's edge.
+fn static_value(value: &SharedString, masked: bool) -> Div {
+    div().flex_1().min_w_0().truncate().child(if masked {
+        SharedString::from("\u{2022}".repeat(value.chars().count()))
+    } else {
+        value.clone()
+    })
 }
 
 #[cfg(test)]

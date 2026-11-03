@@ -159,6 +159,8 @@ Distribution is by Git revision for now; see the [quick start](README.md#quick-s
 
 - A menu item's label or supporting text too long for the menu ends in an ellipsis
   instead of stopping mid-letter.
+- An `ExposedDropdown`'s value, or a `TextField::specimen`'s, too long for the field ends
+  in an ellipsis instead of stopping mid-letter.
 - Each crate ships the MIT text its `license` names, and the Apache notices.
 - The site publishes IBM Plex's OFL and the Material Symbols license and notice.
 - `gpui-kit-material-gallery` and `-gallery-web` declare OFL-1.1 and Apache-2.0. The
