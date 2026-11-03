@@ -81,6 +81,21 @@ pub fn horizontal_arrow(key: &str, rtl: bool) -> Option<i32> {
 type BuildChild = Box<dyn FnOnce(&mut Window, &mut App) -> AnyElement>;
 
 /// A subtree's overrides. Set a scheme, a direction or both.
+///
+/// # Example
+///
+/// A dark, right-to-left card inside a light, left-to-right window:
+///
+/// ```
+/// use gpui_kit::{div, prelude::*};
+/// use gpui_kit_material::color::themes::{Contrast, ThemeId, ThemeMode};
+/// use gpui_kit_material::prelude::*;
+///
+/// let card = Scope::new("dark-card")
+///     .scheme(ThemeId::Baseline.scheme(ThemeMode::Dark, Contrast::Standard))
+///     .direction(LayoutDirection::Rtl)
+///     .child(div().bg(color(ColorRole::SURFACE)).child("مرحبا"));
+/// ```
 #[derive(gpui::IntoElement)]
 pub struct Scope {
     id: ElementId,

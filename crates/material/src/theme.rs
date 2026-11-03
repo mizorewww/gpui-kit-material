@@ -131,6 +131,18 @@ pub fn rgba(color: Color) -> Rgba {
 
 /// The current paint of a role: the scheme of the [`crate::scope::Scope`] being
 /// drawn, or else the application's.
+///
+/// # Example
+///
+/// ```
+/// use gpui_kit::{div, prelude::*};
+/// use gpui_kit_material::prelude::*;
+///
+/// let panel = div()
+///     .bg(color(ColorRole::SURFACE_CONTAINER))
+///     .text_color(color(ColorRole::ON_SURFACE))
+///     .child("Paint with roles, never stored colors");
+/// ```
 pub fn color(role: ColorRole) -> Rgba {
     rgba(painted_role(role))
 }

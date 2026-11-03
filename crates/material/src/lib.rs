@@ -21,6 +21,56 @@
 //! render. Advance [`theme::advance_component_theme`] from input events and
 //! pre-frame callbacks. Base-only consumers can paint with
 //! [`theme::apply_scheme`] at the start of each root render.
+//!
+//! # Quick start
+//!
+//! A window with one controlled switch. Every component is a builder; the
+//! caller owns its state and stores what the handler reports.
+//!
+//! ```no_run
+//! use gpui_kit::{prelude::*, *};
+//! use gpui_kit_material::color::themes::{Contrast, ThemeId, ThemeMode};
+//! use gpui_kit_material::{icons::Assets, prelude::*, theme};
+//!
+//! struct Settings {
+//!     wifi: bool,
+//! }
+//!
+//! impl Render for Settings {
+//!     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+//!         div()
+//!             .p(rem(24.))
+//!             .bg(color(ColorRole::SURFACE))
+//!             .child(
+//!                 MaterialSwitch::new("wifi", "Wi-Fi")
+//!                     .show_label(true)
+//!                     .checked(self.wifi)
+//!                     .on_change(cx.listener(|this, on: &bool, _, cx| {
+//!                         this.wifi = *on;
+//!                         cx.notify();
+//!                     })),
+//!             )
+//!     }
+//! }
+//!
+//! fn main() {
+//!     gpui_kit::application()
+//!         .with_assets(Assets::new())
+//!         .run(|cx| {
+//!             gpui_kit::init(cx);
+//!             gpui_kit_material::init(cx);
+//!             let scheme = ThemeId::Baseline.scheme(ThemeMode::Light, Contrast::Standard);
+//!             theme::init_component_theme(scheme, 1.0, cx);
+//!             gpui_kit::open_window(WindowOptions::default(), cx, |_, cx| {
+//!                 cx.new(|_| Settings { wifi: true })
+//!             })
+//!             .unwrap();
+//!         });
+//! }
+//! ```
+//!
+//! The Gallery's component pages show the code for each configuration in
+//! their Code card, ready to copy.
 // Helpers shared across feature groups go unused when a consumer leaves some groups out.
 #![cfg_attr(not(feature = "full"), allow(dead_code, unused_imports))]
 
