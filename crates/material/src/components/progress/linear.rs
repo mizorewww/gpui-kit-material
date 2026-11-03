@@ -71,6 +71,23 @@ pub fn linear_indeterminate_lines(elapsed_ms: f32) -> [(f32, f32); 2] {
 /// motion. A wavy indicator flattens near empty and full (at or below 10%,
 /// at or above 95%). Reduced motion holds the wave still and shows one
 /// fixed indeterminate frame. The caller supplies the accessible label.
+///
+/// # Example
+///
+/// ```
+/// use gpui_kit_material::prelude::*;
+///
+/// let upload = LinearProgress::new("upload", "Uploading files")
+///     .value(Some(0.62))
+///     .wavy();
+/// // Thick, with the track ending where the content has loaded.
+/// let video = LinearProgress::new("video", "Buffering video")
+///     .value(Some(0.3))
+///     .buffer(Some(0.55))
+///     .thick();
+/// let waiting = LinearProgress::new("waiting", "Connecting").value(None);
+/// # let _ = (upload, video, waiting);
+/// ```
 #[derive(gpui::IntoElement)]
 pub struct LinearProgress {
     id: ElementId,

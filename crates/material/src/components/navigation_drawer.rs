@@ -160,6 +160,43 @@ thread_local! {
 }
 
 /// An M3 navigation drawer over caller-controlled selection and open state.
+///
+/// # Example
+///
+/// ```
+/// use gpui_kit::{SharedString, Window, prelude::*};
+/// use gpui_kit_material::prelude::*;
+///
+/// struct Photos {
+///     destinations: Vec<NavItem>,
+///     destination: SharedString,
+///     drawer_open: bool,
+/// }
+///
+/// impl Render for Photos {
+///     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+///         let view = cx.entity();
+///         NavigationDrawer::new("drawer", "Main navigation")
+///             .headline("Photos")
+///             .items(self.destinations.iter().cloned())
+///             .section(0, "Library")
+///             .selected(self.destination.clone())
+///             .modal(true)
+///             .open(self.drawer_open)
+///             .on_change(cx.listener(|this, value: &SharedString, _, cx| {
+///                 this.destination = value.clone();
+///                 cx.notify();
+///             }))
+///             // Escape and the scrim close a modal drawer.
+///             .on_dismiss(move |_, cx| {
+///                 view.update(cx, |this, cx| {
+///                     this.drawer_open = false;
+///                     cx.notify();
+///                 })
+///             })
+///     }
+/// }
+/// ```
 #[derive(IntoElement)]
 pub struct NavigationDrawer {
     id: ElementId,

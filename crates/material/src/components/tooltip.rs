@@ -67,6 +67,24 @@ enum Content {
 /// An M3 tooltip. With [`MaterialTooltip::trigger`] it wraps that element
 /// and shows on hover and keyboard focus; without one it renders the tooltip
 /// container in place (a specimen).
+///
+/// # Example
+///
+/// ```
+/// use gpui_kit::prelude::*;
+/// use gpui_kit_material::{icons::Symbol, prelude::*};
+/// use std::time::Duration;
+///
+/// let favorite = MaterialTooltip::plain("favorite-tip", "Save to favorites")
+///     .show_delay(Duration::from_millis(300))
+///     .trigger(IconButton::new("favorite", Symbol::FAVORITE, "Favorite"));
+/// // A rich tooltip with a subhead and an action; it opens below its trigger.
+/// let present = MaterialTooltip::rich("present-tip", "Share your screen with the call.")
+///     .subhead("Present to everyone")
+///     .action(material_button("learn-more", ButtonVariant::Text).child("Learn more"))
+///     .trigger(MaterialButton::new("present").child("Present now"));
+/// # let _ = (favorite, present);
+/// ```
 #[derive(gpui::IntoElement)]
 pub struct MaterialTooltip {
     id: ElementId,

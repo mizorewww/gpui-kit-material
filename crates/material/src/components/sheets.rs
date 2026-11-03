@@ -108,6 +108,27 @@ fn sheet_hidden(open: bool, reveal: f32) -> bool {
 /// [`MaterialSideSheet::modal`] presents it over the window instead, and
 /// [`MaterialSideSheet::specimen`] renders it in place. Its controlled
 /// visibility retargets the spatial spring, including on close.
+///
+/// # Example
+///
+/// ```
+/// use gpui_kit::{div, prelude::*};
+/// use gpui_kit_material::prelude::*;
+///
+/// let open = true; // the caller's state
+/// let details = MaterialSideSheet::new("details")
+///     .open(open)
+///     .modal(true)
+///     .edge(SideSheetEdge::Start)
+///     .width(rem(280.))
+///     .headline("Filters")
+///     .close_button("Close sheet")
+///     .child(div().px(rem(24.)).child("Narrow results by date and owner."))
+///     .action(material_button("apply", ButtonVariant::Filled).child("Apply"))
+///     // The close button, Escape and the scrim ask the caller to close it.
+///     .on_dismiss(|_, _| println!("Close the sheet"));
+/// # let _ = details;
+/// ```
 #[derive(gpui::IntoElement)]
 pub struct MaterialSideSheet {
     id: ElementId,
@@ -654,6 +675,39 @@ pub(crate) fn snap_target(position: f32, height: f32, partial: Option<f32>) -> S
 /// and leave the content interactive; modal ones present over the window.
 /// Dragging the sheet down past its nearest rest dismisses it; otherwise it
 /// snaps to the expanded or partial detent.
+///
+/// # Example
+///
+/// The caller owns the detent; a drag, the handle or a dismissal reports the
+/// new one.
+///
+/// ```
+/// use gpui_kit::{Window, div, prelude::*};
+/// use gpui_kit_material::prelude::*;
+///
+/// struct Photo {
+///     sheet: BottomSheetDetent,
+/// }
+///
+/// impl Render for Photo {
+///     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+///         let view = cx.entity();
+///         MaterialBottomSheet::new("share")
+///             .detent(self.sheet)
+///             .modal(true)
+///             .label("Share photo")
+///             .drag_handle("Drag handle")
+///             .partial_height(rem(120.))
+///             .on_detent_change(move |detent, _, cx| {
+///                 view.update(cx, |this, cx| {
+///                     this.sheet = detent;
+///                     cx.notify();
+///                 })
+///             })
+///             .child(div().p(rem(24.)).child("Send to people nearby or copy a link."))
+///     }
+/// }
+/// ```
 #[derive(gpui::IntoElement)]
 pub struct MaterialBottomSheet {
     id: ElementId,

@@ -84,6 +84,23 @@ struct AutoDismiss {
 /// [`Self::position`] along the bottom of its positioned ancestor.
 /// [`Self::duration`] asks for dismissal through [`Self::on_dismiss`], which
 /// also answers Escape; the pointer resting on it pauses the countdown.
+///
+/// # Example
+///
+/// ```
+/// use gpui_kit_material::prelude::*;
+///
+/// let open = true; // the caller's state
+/// let archived = Snackbar::new("archived", "Email archived")
+///     .open(open)
+///     .action("Undo", |_, _, _| println!("Undo"))
+///     .close("Dismiss", |_, _, _| println!("Dismissed"))
+///     .duration(SnackbarDuration::Short)
+///     .position(SnackbarPosition::Center)
+///     // Answer with `open(false)` on the next render.
+///     .on_dismiss(|_, _| println!("Time is up"));
+/// # let _ = archived;
+/// ```
 #[derive(gpui::IntoElement)]
 pub struct Snackbar {
     id: ElementId,

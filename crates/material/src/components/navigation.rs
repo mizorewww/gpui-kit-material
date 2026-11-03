@@ -90,6 +90,21 @@ impl NavIcon {
 
 /// One destination: a unique value, the caller's label and icon, and an
 /// optional badge. Cheap to clone; keep a list in view state.
+///
+/// # Example
+///
+/// ```
+/// use gpui_kit_material::{icons::Symbol, prelude::*};
+///
+/// // Built once, when the view is created: resolving the icons allocates.
+/// let destinations = vec![
+///     NavItem::new("inbox", "Inbox", NavIcon::symbol(Symbol::INBOX))
+///         .badge(NavBadge::Large("3".into())),
+///     NavItem::new("sent", "Sent", NavIcon::symbol(Symbol::SEND)),
+///     NavItem::new("drafts", "Drafts", NavIcon::symbol(Symbol::DRAFT)).badge(NavBadge::Small),
+/// ];
+/// assert_eq!(destinations[1].value(), "sent");
+/// ```
 #[derive(Clone, Debug)]
 pub struct NavItem {
     value: SharedString,
@@ -639,6 +654,34 @@ pub(crate) fn item_click(
 
 /// M3 Expressive flexible navigation bar: 3–5 primary destinations along
 /// the bottom of a compact or medium window, on surface-container.
+///
+/// # Example
+///
+/// The selection is controlled: the bar reports a chosen destination and the
+/// view passes it back.
+///
+/// ```
+/// use gpui_kit::{SharedString, Window, prelude::*};
+/// use gpui_kit_material::prelude::*;
+///
+/// struct Mail {
+///     destinations: Vec<NavItem>,
+///     destination: SharedString,
+/// }
+///
+/// impl Render for Mail {
+///     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+///         NavigationBar::new("navigation", "Mail navigation")
+///             .items(self.destinations.iter().cloned())
+///             .selected(self.destination.clone())
+///             .adaptive(true)
+///             .on_change(cx.listener(|this, value: &SharedString, _, cx| {
+///                 this.destination = value.clone();
+///                 cx.notify();
+///             }))
+///     }
+/// }
+/// ```
 #[derive(IntoElement)]
 pub struct NavigationBar {
     id: ElementId,
@@ -832,6 +875,39 @@ pub const RAIL_EXPANDED_WIDTH: f32 = 220.;
 ///
 /// A modal expanded rail floats on surface-container at level 2 with large
 /// trailing corners over a scrim ([`navigation_scrim`]); Escape dismisses it.
+///
+/// # Example
+///
+/// ```
+/// use gpui_kit::{ClickEvent, SharedString, Window, prelude::*};
+/// use gpui_kit_material::{icons::Symbol, prelude::*};
+///
+/// struct Clock {
+///     destinations: Vec<NavItem>,
+///     destination: SharedString,
+///     expanded: bool,
+/// }
+///
+/// impl Render for Clock {
+///     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+///         let menu = IconButton::new("rail-menu", Symbol::MENU, "Expand navigation").on_click(
+///             cx.listener(|this, _: &ClickEvent, _, cx| {
+///                 this.expanded = !this.expanded;
+///                 cx.notify();
+///             }),
+///         );
+///         NavigationRail::new("rail", "Main navigation")
+///             .items(self.destinations.iter().cloned())
+///             .selected(self.destination.clone())
+///             .expanded(self.expanded)
+///             .menu(menu)
+///             .on_change(cx.listener(|this, value: &SharedString, _, cx| {
+///                 this.destination = value.clone();
+///                 cx.notify();
+///             }))
+///     }
+/// }
+/// ```
 #[derive(IntoElement)]
 pub struct NavigationRail {
     id: ElementId,
