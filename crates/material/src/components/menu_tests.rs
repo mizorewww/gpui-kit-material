@@ -1528,3 +1528,324 @@ fn options_configuration_beside_a_callers_menu_is_detected_as_inert() {
             .mixes_menu_and_options()
     );
 }
+
+#[test]
+fn a_menu_opens_on_its_side_then_the_other_then_where_there_is_more_room() {
+    let side = |asks_above, need: f32, room| popup_side(asks_above, (need, need), room, 60.);
+    // Below by default: it fits below, so it stays there.
+    assert_eq!(side(false, 300., (400., 300.)), Some(false));
+    // It fits only above.
+    assert_eq!(side(false, 300., (300., 299.)), Some(true));
+    // It fits on neither side: the side with more room, where it scrolls.
+    assert_eq!(side(false, 300., (250., 200.)), Some(true));
+    assert_eq!(side(false, 300., (200., 250.)), Some(false));
+    assert_eq!(
+        side(false, 300., (200., 200.)),
+        Some(false),
+        "a tie keeps its side"
+    );
+    // Asked to open above, the same rules from the other side.
+    assert_eq!(side(true, 300., (300., 400.)), Some(true));
+    assert_eq!(side(true, 300., (299., 300.)), Some(false));
+    assert_eq!(side(true, 300., (200., 200.)), Some(true));
+    // Less than a row on both sides: no side, and the window's room instead.
+    assert_eq!(side(false, 300., (40., 50.)), None);
+    // A menu shorter than a row still opens where it fits.
+    assert_eq!(side(false, 30., (0., 40.)), Some(false));
+    // A sub-menu's column decides with the menu: here it fits only below.
+    assert_eq!(
+        popup_side(false, (500., 150.), (300., 200.), 60.),
+        Some(false)
+    );
+    assert_eq!(
+        popup_side(false, (150., 500.), (300., 200.), 60.),
+        Some(true)
+    );
+}
+
+/// A six-option dropdown in a short window, its field `top` from the window's top.
+struct ShortWindowDropdown {
+    top: f32,
+}
+
+impl Render for ShortWindowDropdown {
+    fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        window.set_rem_size(px(14.));
+        div().pt(px(self.top)).pl(px(20.)).child(
+            ExposedDropdown::new("dropdown", "Fruit")
+                .options(["A", "B", "C", "D", "E", "F"])
+                .open(true),
+        )
+    }
+}
+
+fn short_window_dropdown(
+    top: f32,
+    cx: &mut TestAppContext,
+) -> (Bounds<Pixels>, Bounds<Pixels>, Pixels) {
+    cx.update(|cx| {
+        gpui_kit::init(cx);
+        crate::init(cx);
+        cx.set_reduce_motion(true);
+    });
+    let (_, cx) = cx.add_window_view(move |_, _| ShortWindowDropdown { top });
+    cx.simulate_resize(size(px(800.), px(620.)));
+    settle(cx);
+    let viewport = cx.update(|window, _| window.viewport_size());
+    (
+        cx.debug_bounds("dropdown-trigger").unwrap(),
+        cx.debug_bounds("menu-popup-surface").unwrap(),
+        viewport.height,
+    )
+}
+
+#[gpui::test]
+fn a_dropdown_with_no_room_below_opens_above_its_field(cx: &mut TestAppContext) {
+    // 6 × 56 + 2 × 8 = 352dp of menu: 172dp below the 56dp field, 368dp above it.
+    let (field, surface, _) = short_window_dropdown(380., cx);
+    assert_eq!(
+        surface.size.height,
+        px(6. * 56. + 16.),
+        "whole, not scrolled"
+    );
+    assert_eq!(
+        surface.bottom(),
+        field.top() - px(4.),
+        "the menu at {surface:?} opens above the field at {field:?}"
+    );
+}
+
+#[gpui::test]
+fn a_dropdown_that_fits_nowhere_scrolls_on_the_roomier_side_off_its_field(cx: &mut TestAppContext) {
+    // A field near the middle of the window has less than the menu's 352dp on either side:
+    // 258dp above it and 282dp below.
+    let (field, surface, height) = short_window_dropdown(270., cx);
+    assert!(
+        surface.top() >= field.bottom() + px(4.) || surface.bottom() <= field.top() - px(4.),
+        "the menu at {surface:?} covers the field at {field:?}"
+    );
+    assert!(
+        surface.top() >= field.bottom(),
+        "below, where there is more room"
+    );
+    assert!(surface.size.height < px(6. * 56. + 16.), "it scrolls");
+    assert!(surface.top() >= px(8.) && surface.bottom() <= height - px(8.));
+}
+
+#[gpui::test]
+fn a_menu_turned_above_its_trigger_cascades_upward_too(cx: &mut TestAppContext) {
+    let (view, cx) = cascade(cx, Anchor::TopLeft);
+    // The trigger spans 200..240 of a 300 tall window: no room below it.
+    cx.simulate_resize(size(px(1000.), px(300.)));
+    settle(cx);
+    cx.simulate_keystrokes("down down right");
+    settle(cx);
+    cx.update(|_, cx| assert!(view.read(cx).submenu));
+    let trigger = cx.debug_bounds("trigger").unwrap();
+    let surface = cx.debug_bounds("menu-popup-surface").unwrap();
+    let submenu = cx.debug_bounds("menu-popup-submenu").unwrap();
+    assert_eq!(surface.bottom(), trigger.top() - px(4.), "above");
+    // Above the trigger a sub-menu's last item lines up with its owner's bottom,
+    // and "Share" is the menu's last item.
+    assert_eq!(submenu.bottom(), surface.bottom());
+    assert_eq!(submenu.left(), surface.right() + px(4.));
+}
+
+/// A trigger as tall as the window: there is no room beside it.
+struct WindowTallTrigger;
+
+impl Render for WindowTallTrigger {
+    fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        window.set_rem_size(px(14.));
+        let menu = MaterialMenu::new("menu").items((0..3).map(|_| MaterialMenuItem::new("Item")));
+        MenuPopup::new(
+            "popup",
+            div()
+                .debug_selector(|| "trigger".into())
+                .w(px(100.))
+                .h(px(600.)),
+            menu,
+        )
+        .open(true)
+    }
+}
+
+#[gpui::test]
+fn a_trigger_with_no_room_beside_it_keeps_its_menu_whole(cx: &mut TestAppContext) {
+    cx.update(|cx| {
+        gpui_kit::init(cx);
+        crate::init(cx);
+        cx.set_reduce_motion(true);
+    });
+    let (_, cx) = cx.add_window_view(|_, _| WindowTallTrigger);
+    cx.simulate_resize(size(px(800.), px(600.)));
+    settle(cx);
+    let surface = cx.debug_bounds("menu-popup-surface").unwrap();
+    assert_eq!(
+        surface.size.height,
+        px(3. * 48. + 4.),
+        "whole, inside the window"
+    );
+    assert!(surface.top() >= px(8.) && surface.bottom() <= px(592.));
+}
+
+/// A three-item menu whose last item owns a sub-menu of `items`, `top` from the
+/// window's top.
+struct TallSubmenu {
+    top: f32,
+    items: usize,
+}
+
+impl Render for TallSubmenu {
+    fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        window.set_rem_size(px(14.));
+        let menu = MaterialMenu::new("menu")
+            .items((0..3).map(|ix| MaterialMenuItem::new("Item").submenu(ix == 2)));
+        let submenu = MaterialMenu::new("submenu")
+            .items((0..self.items).map(|_| MaterialMenuItem::new("Sub")));
+        div().pt(px(self.top)).pl(px(20.)).child(
+            MenuPopup::new(
+                "popup",
+                div()
+                    .debug_selector(|| "trigger".into())
+                    .w(px(100.))
+                    .h(px(40.)),
+                menu,
+            )
+            .open(true)
+            .submenu(2, submenu, true),
+        )
+    }
+}
+
+fn tall_submenu(
+    top: f32,
+    items: usize,
+    cx: &mut TestAppContext,
+) -> (Bounds<Pixels>, Bounds<Pixels>, Bounds<Pixels>) {
+    cx.update(|cx| {
+        gpui_kit::init(cx);
+        crate::init(cx);
+        cx.set_reduce_motion(true);
+    });
+    let (_, cx) = cx.add_window_view(move |_, _| TallSubmenu { top, items });
+    cx.simulate_resize(size(px(800.), px(600.)));
+    settle(cx);
+    (
+        cx.debug_bounds("trigger").unwrap(),
+        cx.debug_bounds("menu-popup-surface").unwrap(),
+        cx.debug_bounds("menu-popup-submenu").unwrap(),
+    )
+}
+
+fn assert_off_the_trigger(trigger: Bounds<Pixels>, popup: Bounds<Pixels>, what: &str) {
+    assert!(
+        popup.top() >= trigger.bottom() + px(4.) || popup.bottom() <= trigger.top() - px(4.),
+        "the {what} at {popup:?} covers the trigger at {trigger:?}"
+    );
+    assert!(
+        popup.top() >= px(8.) && popup.bottom() <= px(592.),
+        "{what} {popup:?}"
+    );
+}
+
+#[gpui::test]
+fn a_tall_submenu_near_the_bottom_turns_the_menu_above_its_trigger(cx: &mut TestAppContext) {
+    let (trigger, surface, submenu) = tall_submenu(540., 12, cx);
+    assert_eq!(surface.bottom(), trigger.top() - px(4.), "above");
+    assert_off_the_trigger(trigger, surface, "menu");
+    assert_off_the_trigger(trigger, submenu, "sub-menu");
+}
+
+#[gpui::test]
+fn a_tall_submenu_that_fits_nowhere_scrolls_beside_its_menu(cx: &mut TestAppContext) {
+    let (trigger, surface, submenu) = tall_submenu(200., 12, cx);
+    assert_eq!(
+        surface.top(),
+        trigger.bottom() + px(4.),
+        "below, where there is more room"
+    );
+    assert_off_the_trigger(trigger, submenu, "sub-menu");
+}
+
+/// An open menu whose trigger moves to `top`.
+struct MovingTrigger {
+    top: f32,
+}
+
+impl Render for MovingTrigger {
+    fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        window.set_rem_size(px(14.));
+        let menu = MaterialMenu::new("menu").items((0..3).map(|_| MaterialMenuItem::new("Item")));
+        div().pt(px(self.top)).child(
+            MenuPopup::new(
+                "popup",
+                div().debug_selector(|| "trigger".into()).size(px(40.)),
+                menu,
+            )
+            .open(true),
+        )
+    }
+}
+
+#[gpui::test]
+fn a_moved_trigger_chooses_its_menus_side_again_on_the_next_frame(cx: &mut TestAppContext) {
+    cx.update(|cx| {
+        gpui_kit::init(cx);
+        crate::init(cx);
+        cx.set_reduce_motion(true);
+    });
+    let (view, cx) = cx.add_window_view(|_, _| MovingTrigger { top: 20. });
+    cx.simulate_resize(size(px(800.), px(600.)));
+    settle(cx);
+    // Nothing is left waiting for a frame.
+    while cx.update(|window, cx| window.simulate_next_frame(cx)) > 0 {
+        cx.update(|window, cx| window.draw(cx).clear(cx));
+    }
+    view.update(cx, |view, cx| {
+        view.top = 500.;
+        cx.notify();
+    });
+    // One frame lays the trigger out where it now is, from the side chosen before.
+    cx.update(|window, cx| window.draw(cx).clear(cx));
+    // The frame it asks for chooses again; nothing else redraws it.
+    cx.update(|window, cx| {
+        window.simulate_next_frame(cx);
+        window.draw(cx).clear(cx);
+    });
+    let trigger = cx.debug_bounds("trigger").unwrap();
+    let surface = cx.debug_bounds("menu-popup-surface").unwrap();
+    assert_eq!(
+        surface.bottom(),
+        trigger.top() - px(4.),
+        "above the moved trigger"
+    );
+}
+
+#[gpui::test]
+fn a_submenu_that_fits_only_above_turns_its_menu_above(cx: &mut TestAppContext) {
+    // The 148dp menu fits in the 228dp below its trigger, but the sub-menu's column, from
+    // the last item's top (96dp) plus its 292dp, does not; above, from that item's bottom,
+    // the 292dp fit in 308dp.
+    let (trigger, surface, submenu) = tall_submenu(320., 6, cx);
+    assert_eq!(surface.bottom(), trigger.top() - px(4.), "above");
+    assert_eq!(
+        submenu.size.height,
+        px(6. * 48. + 4.),
+        "whole, not scrolled"
+    );
+    assert_off_the_trigger(trigger, submenu, "sub-menu");
+}
+
+#[gpui::test]
+fn a_trigger_below_the_window_keeps_its_submenu_inside_it(cx: &mut TestAppContext) {
+    let (_, surface, submenu) = tall_submenu(640., 14, cx);
+    assert!(
+        surface.top() >= px(8.) && surface.bottom() <= px(592.),
+        "menu {surface:?}"
+    );
+    assert!(
+        submenu.top() >= px(8.) && submenu.bottom() <= px(592.),
+        "sub-menu {submenu:?}"
+    );
+}
