@@ -130,7 +130,7 @@ pub static PLAYGROUND: Playground = Playground {
         },
     ],
     preview,
-    code: None,
+    code: Some(code),
 };
 
 /// Clicks on the clickable card.
@@ -363,9 +363,80 @@ pub(crate) fn scene_variant(id: impl Into<ElementId>, variant: usize) -> Statefu
     )
 }
 
+fn code(config: &Config) -> String {
+    const VARIANT_NAMES: [&str; 4] = ["Elevated", "Filled", "Outlined", "Surface"];
+    let title = config.text("title");
+    let subtitle = config.text("subtitle");
+    let body = config.text("body");
+    let text_line = |text: &str, role: &str| {
+        (!text.is_empty()).then(|| {
+            format!(
+                "child(div().text_color(color(ColorRole::{role})).child({}))",
+                lit(text)
+            )
+        })
+    };
+    let actions = chain(
+        "div()",
+        [
+            Some("flex()".into()),
+            Some("justify_end()".into()),
+            Some("gap(rem(8.))".into()),
+            Some(
+                "child(MaterialButton::new(\"explore\").variant(ButtonVariant::Text).child(\"Explore\"))"
+                    .into(),
+            ),
+            Some(
+                "child(MaterialButton::new(\"save\").variant(ButtonVariant::Tonal).child(\"Save\"))"
+                    .into(),
+            ),
+        ],
+    );
+    let text = chain(
+        "div()",
+        [
+            Some("flex()".into()),
+            Some("flex_col()".into()),
+            Some("p(rem(16.))".into()),
+            Some("gap(rem(16.))".into()),
+            text_line(&title, "ON_SURFACE"),
+            text_line(&subtitle, "ON_SURFACE_VARIANT"),
+            text_line(&body, "ON_SURFACE_VARIANT"),
+            config.bool("actions").then(|| call("child", &actions)),
+        ],
+    );
+    let image = config.bool("image").then(|| {
+        let height = match config.option("ratio") {
+            "4:3" => WIDTH * 3. / 4.,
+            "1:1" => WIDTH,
+            _ => WIDTH * 9. / 16.,
+        };
+        format!("child(img(\"photo.jpg\").w_full().h(rem({height:?})))")
+    });
+    let bottom = config.option("position") == "bottom";
+    let clickable = config.bool("clickable");
+    let label = if title.is_empty() { "Card" } else { &title };
+    chain(
+        format!(
+            "MaterialCard::new(\"card\", CardVariant::{})",
+            VARIANT_NAMES[config.choice("variant")]
+        ),
+        [
+            Some("w_full()".into()),
+            Some(format!("max_w(rem({WIDTH:?}))")),
+            config.bool("draggable").then(|| "draggable(true)".into()),
+            clickable.then(|| format!("accessibility_label({})", lit(label))),
+            clickable.then(|| "on_click(|_, _, _| println!(\"Open the card\"))".into()),
+            image.clone().filter(|_| !bottom),
+            Some(call("child", &text)),
+            image.filter(|_| bottom),
+        ],
+    )
+}
+
 #[cfg(test)]
 mod tests {
-    use super::super::super::playground::Value;
+    use super::super::super::playground::{Config, Value};
     use super::super::nav_harness::Harness;
     use super::PLAYGROUND;
     use gpui::TestAppContext;
@@ -392,5 +463,21 @@ mod tests {
         harness.click("playground-card");
         harness.click("playground-card");
         assert!(harness.bounds("card-clicks-2").is_some());
+    }
+
+    #[test]
+    fn the_code_follows_the_configuration() {
+        let mut config = Config::defaults(&PLAYGROUND);
+        let code = super::code(&config);
+        assert!(
+            code.starts_with("MaterialCard::new(\"card\", CardVariant::Elevated)"),
+            "{code}"
+        );
+        assert!(code.contains("\"A little time outside\""));
+        assert!(!code.contains(".on_click("));
+        config.set("clickable", Value::Bool(true));
+        assert!(super::code(&config).contains(".on_click("));
+        config.set("image", Value::Bool(false));
+        assert!(!super::code(&config).contains("img("));
     }
 }

@@ -157,7 +157,7 @@ pub static PLAYGROUND: Playground = Playground {
         },
     ],
     preview,
-    code: None,
+    code: Some(code),
 };
 
 /// The last chosen item, reported under the menu.
@@ -241,6 +241,67 @@ fn preview(
         .into_any_element()
 }
 
+fn code(config: &Config) -> String {
+    const PRESENTATION_NAMES: [&str; 3] = ["List", "Menu", "Auto"];
+    const COLOR_NAMES: [&str; 3] = ["Primary", "Secondary", "Tertiary"];
+    let preset = &ITEMS[config.choice("items")];
+    let count = config.choice("count") + 2;
+    let icons = config.bool("icons");
+    let (presentation, color, size) = (
+        config.choice("presentation"),
+        config.choice("color"),
+        config.choice("size"),
+    );
+    let placement = config.option("placement");
+    let close = listener("|this, _: &ClickEvent, _, cx|", "this.open = false;");
+    let items = preset.items[..count].iter().map(|&(label, icon)| {
+        let id = label.to_lowercase().replace(' ', "-");
+        let item = if icons {
+            format!(
+                "FabMenuItem::new({}, {}, {})",
+                lit(&id),
+                symbol_code(icon),
+                lit(label)
+            )
+        } else {
+            format!("FabMenuItem::label_only({}, {})", lit(&id), lit(label))
+        };
+        // Choosing an item closes the menu.
+        let item = chain(item, [Some(format!("on_click({close})"))]);
+        Some(call("item", &item))
+    });
+    let menu = chain(
+        format!(
+            "FabMenu::new(\"fab-menu\", {}, {})",
+            symbol_code(preset.fab),
+            lit(preset.name)
+        ),
+        [
+            (presentation != 0).then(|| {
+                format!(
+                    "presentation(FabMenuPresentation::{})",
+                    PRESENTATION_NAMES[presentation]
+                )
+            }),
+            (color != 0).then(|| format!("color(FabMenuColor::{})", COLOR_NAMES[color])),
+            (size != 0).then(|| format!("size(FabSize::{})", super::fab::SIZE_NAMES[size])),
+            (placement == "bottom start").then(|| "align(FabMenuAlign::Start)".into()),
+            Some(format!("open({})", config.bool("open"))),
+            Some(format!(
+                "on_toggle({})",
+                listener("|this, open: &bool, _, cx|", "this.open = *open;")
+            )),
+        ]
+        .into_iter()
+        .chain(items),
+    );
+    match placement {
+        "bottom end" => format!("FabPosition::BottomEnd.place(\n    {}\n)", indent(&menu)),
+        "bottom start" => format!("FabPosition::BottomStart.place(\n    {}\n)", indent(&menu)),
+        _ => menu,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::super::harness::open;
@@ -283,5 +344,26 @@ mod tests {
         assert_eq!(fab.size, size(px(96.), px(96.)));
         assert_eq!(fab.left(), stage.left() + px(16.));
         assert_eq!(fab.bottom(), stage.bottom() - px(16.));
+    }
+
+    #[test]
+    fn the_code_follows_the_configuration() {
+        let mut config = Config::defaults(&PLAYGROUND);
+        let code = super::code(&config);
+        assert!(
+            code.starts_with("FabMenu::new(\"fab-menu\", Symbol::EDIT, \"Message actions\")"),
+            "{code}"
+        );
+        assert!(code.contains("FabMenuItem::new(\"archive\", Symbol::ARCHIVE, \"Archive\")"));
+        assert!(!code.contains("\"Snooze\""));
+        config.set("count", Value::Choice(2));
+        assert!(super::code(&config).contains("\"Snooze\""));
+        config.set("placement", Value::Choice(2));
+        let code = super::code(&config);
+        assert!(
+            code.starts_with("FabPosition::BottomStart.place("),
+            "{code}"
+        );
+        assert!(code.contains(".align(FabMenuAlign::Start)"));
     }
 }

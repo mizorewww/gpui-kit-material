@@ -174,7 +174,7 @@ pub static PLAYGROUND: Playground = Playground {
         },
     ],
     preview,
-    code: None,
+    code: Some(code),
 };
 
 /// The caption of item `index` in `collection`.
@@ -315,9 +315,59 @@ fn preview(
         .into_any_element()
 }
 
+fn code(config: &Config) -> String {
+    const LAYOUT_NAMES: [&str; 5] = [
+        "MultiBrowse",
+        "Uncontained",
+        "Hero",
+        "CenteredHero",
+        "FullScreen",
+    ];
+    let layout = config.choice("variant");
+    let (radius, width, gap, padding) = (
+        config.number("radius"),
+        config.number("width"),
+        config.number("gap"),
+        config.number("padding"),
+    );
+    let item = chain(
+        "CarouselItem::new()",
+        [
+            Some("content(img(place.photo.clone()).size_full())".into()),
+            config
+                .bool("captions")
+                .then(|| "label(place.name.clone())".into()),
+            config
+                .bool("captions")
+                .then(|| "supporting(place.region.clone())".into()),
+        ],
+    );
+    chain(
+        "MaterialCarousel::new(\"carousel\", \"Places\")",
+        [
+            (layout != 0).then(|| format!("layout(CarouselLayout::{})", LAYOUT_NAMES[layout])),
+            (px(radius) != CAROUSEL_ITEM_RADIUS).then(|| format!("corner_radius(px({radius:?}))")),
+            Some(format!("large_item_width({width:?})")),
+            Some("item_height(360.)".into()),
+            (gap != 8.).then(|| format!("gap({gap:?})")),
+            (padding != 16.).then(|| format!("padding({padding:?})")),
+            (!config.bool("snap")).then(|| "snap(false)".into()),
+            Some(format!("current({})", config.choice("current"))),
+            Some(format!(
+                "on_change({})",
+                listener("|this, index: &usize, _, cx|", "this.current = *index;")
+            )),
+            Some(format!(
+                "items(self.places.iter().map(|place| {{\n    {}\n}}))",
+                indent(&item)
+            )),
+        ],
+    )
+}
+
 #[cfg(test)]
 mod tests {
-    use super::super::super::playground::Value;
+    use super::super::super::playground::{Config, Value};
     use super::super::nav_harness::Harness;
     use super::PLAYGROUND;
     use gpui::TestAppContext;
@@ -345,5 +395,21 @@ mod tests {
         harness.click_at(photo.center());
         harness.keys("right");
         assert_eq!(harness.config().choice("current"), 4);
+    }
+
+    #[test]
+    fn the_code_follows_the_configuration() {
+        let mut config = Config::defaults(&PLAYGROUND);
+        let code = super::code(&config);
+        assert!(
+            code.starts_with("MaterialCarousel::new(\"carousel\", \"Places\")"),
+            "{code}"
+        );
+        assert!(code.contains(".current(0)"));
+        assert!(!code.contains(".layout("));
+        config.set("variant", Value::Choice(3));
+        assert!(super::code(&config).contains(".layout(CarouselLayout::CenteredHero)"));
+        config.set("captions", Value::Bool(false));
+        assert!(!super::code(&config).contains(".label("));
     }
 }

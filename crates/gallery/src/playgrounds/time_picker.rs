@@ -124,7 +124,7 @@ pub static PLAYGROUND: Playground = Playground {
         },
     ],
     preview,
-    code: None,
+    code: Some(code),
 };
 
 /// A 24-hour `HH:MM` or `HH:MM:SS` time.
@@ -264,6 +264,83 @@ fn preview(
     }
 }
 
+/// `time` as the Rust expression that builds it.
+fn time_code(time: NaiveTime) -> String {
+    format!(
+        "NaiveTime::from_hms_opt({}, {}, {}).unwrap()",
+        time.hour(),
+        time.minute(),
+        time.second()
+    )
+}
+
+fn code(config: &Config) -> String {
+    let title = config.text("title");
+    let step: u32 = config.option("step").parse().unwrap_or(1);
+    let limits = config
+        .bool("limit")
+        .then(|| {
+            Some((
+                parse_time(&config.text("earliest"))?,
+                parse_time(&config.text("latest"))?,
+            ))
+        })
+        .flatten();
+    let time = parse_time(&config.text("time"))
+        .unwrap_or_else(|| NaiveTime::from_hms_opt(9, 41, 0).expect("a valid time"));
+    // The labels carry the caller's strings; the title is the configured one.
+    let labels = format!(
+        "TimePickerLabels {{\n    select_title: {title}.into(),\n    enter_title: {title}.into(),\n    ..time_picker_labels()\n}}",
+        title = lit(&title)
+    );
+    let state = chain(
+        format!(
+            "TimePickerState::new(labels, {}, window, cx)",
+            time_code(time)
+        ),
+        [
+            (step != 1).then(|| format!("minute_step({step})")),
+            (config.option("format") == "24h")
+                .then(|| "format(TimeFormat::TwentyFourHour, window, cx)".into()),
+            config
+                .bool("seconds")
+                .then(|| "seconds(\"Second\", window, cx)".into()),
+            limits.map(|(earliest, latest)| {
+                format!(
+                    "limits(\n    {},\n    {},\n    window,\n    cx,\n)",
+                    time_code(earliest),
+                    time_code(latest)
+                )
+            }),
+            (config.option("mode") == "input").then(|| "input_mode()".into()),
+        ],
+    );
+    let picker = chain(
+        "TimePicker::new(\"time-picker\", &self.picker)",
+        [
+            (config.option("orientation") == "horizontal")
+                .then(|| "orientation(TimeOrientation::Horizontal)".into()),
+            Some(format!(
+                "on_confirm({})",
+                view_update("move |time, _, cx|", "this.time = time;")
+            )),
+            // Cancel returns the picker to the last confirmed time.
+            Some(format!(
+                "on_cancel({})",
+                view_update(
+                    "move |window, cx|",
+                    "let time = this.time;\nthis.picker.update(cx, |picker, cx| picker.set_time(time, window, cx));"
+                )
+            )),
+        ],
+    );
+    format!(
+        "// Once, in the view's constructor:\nlet picker = cx.new(|cx| {{\n    let labels = {};\n    {}\n}});\n\n// In render:\n{picker}",
+        indent(&labels),
+        indent(&state)
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::super::testing::*;
@@ -305,5 +382,24 @@ mod tests {
         cx.simulate_click(ok, Modifiers::none());
         settle(cx);
         assert_eq!(config(&state, cx).text("time"), "03:41");
+    }
+
+    #[test]
+    fn the_code_follows_the_configuration() {
+        let mut config = Config::defaults(&PLAYGROUND);
+        let code = super::code(&config);
+        assert!(code.contains("TimePickerState::new("), "{code}");
+        assert!(
+            code.contains("select_title: \"Select time\".into()"),
+            "{code}"
+        );
+        assert!(code.contains("NaiveTime::from_hms_opt(9, 41, 0)"), "{code}");
+        assert!(
+            code.contains("TimePicker::new(\"time-picker\", &self.picker)"),
+            "{code}"
+        );
+        assert!(!code.contains(".minute_step("));
+        config.set("step", Value::Choice(2));
+        assert!(super::code(&config).contains(".minute_step(15)"));
     }
 }

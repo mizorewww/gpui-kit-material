@@ -143,7 +143,7 @@ pub static PLAYGROUND: Playground = Playground {
         },
     ],
     preview,
-    code: None,
+    code: Some(code),
 };
 
 fn preview(
@@ -183,6 +183,36 @@ fn preview(
             }
         });
     stage(fab).into_any_element()
+}
+
+fn code(config: &Config) -> String {
+    let icon = config.option("icon");
+    let text = lit(&config.text("text"));
+    let head = if icon.is_empty() {
+        format!("ExtendedFab::label_only(\"extended-fab\", {text})")
+    } else {
+        format!(
+            "ExtendedFab::new(\"extended-fab\", {}, {text})",
+            symbol_code(icon)
+        )
+    };
+    let [color, size, lowered, position, disabled] = super::fab::common_calls(config);
+    chain(
+        head,
+        [
+            color,
+            size,
+            (config.option("width") == "fluid").then(|| "fluid(true)".into()),
+            lowered,
+            position,
+            (!icon.is_empty() && config.option("icon_position") == "end")
+                .then(|| "icon_position(ButtonIconPosition::Trailing)".into()),
+            // Collapse to the icon, e.g. while the page scrolls.
+            config.bool("collapsed").then(|| "expanded(false)".into()),
+            disabled,
+            Some(format!("on_click(|_, _, _| println!({text}))")),
+        ],
+    )
 }
 
 #[cfg(test)]
@@ -227,5 +257,20 @@ mod tests {
         h.set("icon", Value::Choice(8));
         h.set("collapsed", Value::Bool(true));
         assert!(h.bounds("playground-extended-fab").size.width > px(56.));
+    }
+
+    #[test]
+    fn the_code_follows_the_configuration() {
+        let mut config = Config::defaults(&PLAYGROUND);
+        let code = super::code(&config);
+        assert!(
+            code.starts_with("ExtendedFab::new(\"extended-fab\", Symbol::EDIT, \"Compose\")"),
+            "{code}"
+        );
+        assert!(!code.contains(".expanded("));
+        config.set("collapsed", Value::Bool(true));
+        assert!(super::code(&config).contains(".expanded(false)"));
+        config.set("icon", Value::Choice(8));
+        assert!(super::code(&config).starts_with("ExtendedFab::label_only("));
     }
 }

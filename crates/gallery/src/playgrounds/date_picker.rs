@@ -152,7 +152,7 @@ pub static PLAYGROUND: Playground = Playground {
         },
     ],
     preview,
-    code: None,
+    code: Some(code),
 };
 
 fn short_month(month: u32) -> &'static str {
@@ -528,6 +528,127 @@ fn preview(
         .into_any_element()
 }
 
+/// `date` as the Rust expression for an `Option<NaiveDate>`.
+fn date_code(date: Option<NaiveDate>) -> String {
+    match date {
+        Some(d) => format!(
+            "NaiveDate::from_ymd_opt({}, {}, {})",
+            d.year(),
+            d.month(),
+            d.day()
+        ),
+        None => "None".into(),
+    }
+}
+
+fn code(config: &Config) -> String {
+    const FORMAT_NAMES: [&str; 3] = ["MonthDayYear", "DayMonthYear", "YearMonthDay"];
+    let range = config.bool("range");
+    let variant = config.option("variant");
+    let (docked, input) = (variant == "docked", variant == "modal input");
+    let format = config.choice("format");
+    let start = iso(&config.text("date"));
+    let limits = config
+        .bool("limit")
+        .then(|| Some((iso(&config.text("earliest"))?, iso(&config.text("latest"))?)))
+        .flatten()
+        .filter(|(a, b)| a <= b);
+    let labels = if format == 0 {
+        "date_picker_labels()".to_string()
+    } else {
+        format!(
+            "date_picker_labels().date_format(DateFormat::{})",
+            FORMAT_NAMES[format]
+        )
+    };
+    let selection = if range {
+        format!(
+            "DateSelection::Range({}, {})",
+            date_code(start),
+            date_code(iso(&config.text("range_end")))
+        )
+    } else {
+        format!("DateSelection::Single({})", date_code(start))
+    };
+    let state = chain(
+        format!("DatePickerState::new({labels}, today(), cx)"),
+        [
+            range.then(|| "range()".into()),
+            Some(format!("selection({selection})")),
+            limits.map(|(earliest, latest)| format!("years({}..={})", earliest.year(), latest.year())),
+            limits.map(|(earliest, latest)| {
+                format!(
+                    "disabled_dates(DateMatcher::custom(|date: &NaiveDate| {{\n    Some(*date) < {} || Some(*date) > {}\n}}))",
+                    date_code(Some(earliest)),
+                    date_code(Some(latest))
+                )
+            }),
+            match (config.choice("view"), docked) {
+                (1, true) => Some("view(DatePickerView::Month)".into()),
+                (1, false) | (2, _) => Some("view(DatePickerView::Year)".into()),
+                _ => None,
+            },
+            config
+                .bool("close")
+                .then(|| "close_on_selection(true)".into()),
+            input.then(|| {
+                format!(
+                    "input_mode()\n.with_inputs(start, {}, cx)",
+                    if range { "Some(end)" } else { "None" }
+                )
+            }),
+        ],
+    );
+    let mut setup = String::from(
+        "// Once, in the view's constructor. The labels carry your locale's strings.\n",
+    );
+    if input {
+        setup.push_str("let start = cx.new(|cx| InputState::new(window, cx));\n");
+        if range {
+            setup.push_str("let end = cx.new(|cx| InputState::new(window, cx));\n");
+        }
+    }
+    setup.push_str(&format!(
+        "let picker = cx.new(|cx| {{\n    {}\n}});\n\n",
+        indent(&state)
+    ));
+    let picker = chain(
+        "DatePicker::new(\"date-picker\", &self.picker)",
+        [
+            docked.then(|| "docked()".into()),
+            (variant == "fullscreen").then(|| "full_screen()".into()),
+            Some(format!(
+                "on_confirm({})",
+                view_update(
+                    "move |dates, _, cx|",
+                    "this.dates = dates;\nthis.picking = false;"
+                )
+            )),
+            Some(format!(
+                "on_cancel({})",
+                view_update("move |_, cx|", "this.picking = false;")
+            )),
+        ],
+    );
+    if docked {
+        setup.push_str("// In render, below the date field while self.picking:\n");
+        setup.push_str(&picker);
+    } else {
+        setup.push_str("// In render:\n");
+        setup.push_str(&chain(
+            format!(
+                "PickerDialog::new(\n    \"date-dialog\",\n    self.picking,\n    {},\n)",
+                indent(&picker)
+            ),
+            [Some(format!(
+                "on_dismiss({})",
+                view_update("move |_, cx|", "this.picking = false;")
+            ))],
+        ));
+    }
+    setup
+}
+
 #[cfg(test)]
 mod tests {
     use super::super::testing::*;
@@ -573,5 +694,25 @@ mod tests {
         cx.simulate_keystrokes("right enter");
         settle(cx);
         assert!(cx.debug_bounds("date-surface").is_none(), "closed again");
+    }
+
+    #[test]
+    fn the_code_follows_the_configuration() {
+        let mut config = Config::defaults(&PLAYGROUND);
+        let code = super::code(&config);
+        assert!(code.starts_with("// Once"), "{code}");
+        assert!(code.contains("DatePickerState::new(date_picker_labels(), today(), cx)"));
+        assert!(
+            code.contains("NaiveDate::from_ymd_opt(2025, 8, 17)"),
+            "{code}"
+        );
+        assert!(code.contains(".docked()"));
+        assert!(!code.contains(".range()"));
+        config.set("range", Value::Bool(true));
+        config.set("variant", Value::Choice(3));
+        let code = super::code(&config);
+        assert!(code.contains(".range()"));
+        assert!(code.contains("PickerDialog::new("), "{code}");
+        assert!(code.contains(".full_screen()"));
     }
 }

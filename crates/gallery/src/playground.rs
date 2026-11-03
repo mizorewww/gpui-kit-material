@@ -223,6 +223,53 @@ pub fn lit(text: &str) -> String {
     format!("{text:?}")
 }
 
+/// `code` one level (four spaces) further in, after its first line: an
+/// argument or block nested in other code.
+pub fn indent(code: &str) -> String {
+    code.replace('\n', "\n    ")
+}
+
+/// `method(arg)`, with a multi-line `arg` (a nested chain) on lines of its
+/// own one level in, as rustfmt writes it.
+pub fn call(method: &str, arg: &str) -> String {
+    if arg.contains('\n') {
+        format!("{method}(\n    {},\n)", indent(arg))
+    } else {
+        format!("{method}({arg})")
+    }
+}
+
+/// A `cx.listener` handler for the Code card: the closure's `head` (e.g.
+/// `|this, checked: &bool, _, cx|`), then `body`'s statements and
+/// `cx.notify()`.
+pub fn listener(head: &str, body: &str) -> String {
+    format!(
+        "cx.listener({head} {{\n    {}\n    cx.notify();\n}})",
+        indent(body)
+    )
+}
+
+/// A handler whose signature `cx.listener` cannot produce (an owned value or
+/// several arguments): `head`'s closure updates the view through a weak
+/// handle with `body`'s statements, then notifies.
+pub fn view_update(head: &str, body: &str) -> String {
+    format!(
+        "{{\n    let view = cx.weak_entity();\n    {head} {{\n        view.update(cx, |this, cx| {{\n            {}\n            cx.notify();\n        }})\n        .ok();\n    }}\n}}",
+        body.replace('\n', "\n            ")
+    )
+}
+
+/// The `Symbol` constant of the Material Symbol `name`
+/// (`gpui_kit_material::icons::Symbol`), e.g. `Symbol::FAVORITE`.
+pub fn symbol_code(name: &str) -> String {
+    let constant = name.to_uppercase();
+    if constant.starts_with(|c: char| c.is_ascii_digit()) {
+        format!("Symbol::_{constant}")
+    } else {
+        format!("Symbol::{constant}")
+    }
+}
+
 impl Playground {
     pub fn controls(&self) -> impl Iterator<Item = &'static Control> + use<> {
         let sections: &'static [Section] = self.sections;

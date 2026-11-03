@@ -177,7 +177,7 @@ pub static PLAYGROUND: Playground = Playground {
         },
     ],
     preview,
-    code: None,
+    code: Some(code),
 };
 
 #[cfg(test)]
@@ -371,6 +371,172 @@ fn preview(
         .into_any_element()
 }
 
+/// The Rust names of the Variant, Tone, Size and Density options.
+const VARIANT_NAMES: [&str; 5] = ["Filled", "Tonal", "Outlined", "Elevated", "Text"];
+const TONE_NAMES: [&str; 3] = ["Standard", "Neutral", "Accent"];
+const SIZE_NAMES: [&str; 5] = ["ExtraSmall", "Small", "Medium", "Large", "ExtraLarge"];
+const DENSITY_NAMES: [&str; 3] = ["Default", "Comfortable", "Compact"];
+
+fn code(config: &Config) -> String {
+    let items = &ITEMS[config.choice("items")];
+    let selection = config.option("selection");
+    let required = config.bool("required");
+    let content = config.option("content");
+    let (icons, text) = (content != "text", content != "icons");
+    let labels_selected = config.option("labels") == "selected" && icons;
+    let (variant, tone, size) = (
+        config.choice("variant"),
+        config.choice("tone"),
+        config.choice("size"),
+    );
+    let square = config.bool("square");
+    let disabled = config.bool("disabled");
+    let density = config.choice("density");
+    let layout = [
+        (config.option("orientation") == "vertical").then(|| "vertical(true)".into()),
+        (density != 0).then(|| format!("density(ButtonDensity::{})", DENSITY_NAMES[density])),
+        config.bool("equal").then(|| "equal_widths(true)".into()),
+    ];
+    let initial = |count: usize| {
+        let values: Vec<String> = items.selected[..count.min(items.selected.len())]
+            .iter()
+            .map(|value| lit(value))
+            .collect();
+        values.join(", ")
+    };
+    if config.option("kind") == "standard" {
+        let toggle_body = match (selection, required) {
+            ("single", true) => "if on {\n    this.selected = vec![label];\n}",
+            ("single", false) => {
+                "if on {\n    this.selected = vec![label];\n} else {\n    this.selected.clear();\n}"
+            }
+            ("multi", true) => {
+                "if on {\n    this.selected.push(label);\n} else if this.selected.len() > 1 {\n    this.selected.retain(|v| *v != label);\n}"
+            }
+            _ => {
+                "this.selected.retain(|v| *v != label);\nif on {\n    this.selected.push(label);\n}"
+            }
+        };
+        let button = chain(
+            "MaterialButton::new(label)",
+            [
+                (variant != 0)
+                    .then(|| format!("variant(ButtonVariant::{})", VARIANT_NAMES[variant])),
+                (tone != 0).then(|| format!("tone(ButtonTone::{})", TONE_NAMES[tone])),
+                (size != 1).then(|| format!("button_size(ButtonSize::{})", SIZE_NAMES[size])),
+                square.then(|| "shape(ButtonShape::Square)".into()),
+                disabled.then(|| "disabled(true)".into()),
+                (!text || labels_selected).then(|| "accessibility_label(label)".into()),
+                icons.then(|| "icon(icon)".into()),
+                (selection != "none").then(|| "toggle(true)".into()),
+                (selection != "none").then(|| "selected(self.selected.contains(&label))".into()),
+                Some(if selection == "none" {
+                    "on_click(move |_, _, _| println!(\"{label}\"))".into()
+                } else {
+                    format!(
+                        "on_change({})",
+                        view_update("move |on, _, _, cx|", toggle_body)
+                    )
+                }),
+                match (text, labels_selected) {
+                    (false, _) => None,
+                    (true, true) => Some(
+                        "when(self.selected.contains(&label), |button| button.child(label))".into(),
+                    ),
+                    (true, false) => Some("child(label)".into()),
+                },
+            ],
+        );
+        let options: Vec<String> = items
+            .options
+            .iter()
+            .map(|(label, icon)| {
+                if icons {
+                    format!("({}, {})", lit(label), symbol_code(icon))
+                } else {
+                    lit(label)
+                }
+            })
+            .collect();
+        let map = if icons { "|(label, icon)|" } else { "|label|" };
+        return chain(
+            "ButtonGroup::new(\"button-group\", \"Options\")",
+            [(size != 1).then(|| format!("button_size(ButtonSize::{})", SIZE_NAMES[size]))]
+                .into_iter()
+                .chain(layout)
+                .chain([Some(format!(
+                    "items([{}].map({map} {{\n    {}\n}}))",
+                    options.join(", "),
+                    indent(&button)
+                ))]),
+        );
+    }
+    let options: Vec<String> = items
+        .options
+        .iter()
+        .map(|(label, _)| format!("({}, {})", lit(label), lit(label)))
+        .collect();
+    let selection_calls = match (selection, required) {
+        ("none", _) => vec![
+            "selection(GroupSelection::None)".into(),
+            "on_activate(|value, _, _| println!(\"{value}\"))".into(),
+        ],
+        ("single", true) => vec![
+            format!("selected({})", initial(1)),
+            format!(
+                "on_change({})",
+                listener(
+                    "|this, value: &SharedString, _, cx|",
+                    "this.selected = value.clone();"
+                )
+            ),
+        ],
+        _ => {
+            let multi = selection == "multi";
+            let count = if multi { items.selected.len() } else { 1 };
+            [
+                multi.then(|| "selection(GroupSelection::Multi)".to_string()),
+                (!required).then(|| "required(false)".into()),
+                Some(format!("selected_values([{}])", initial(count))),
+                Some(format!(
+                    "on_toggle({})",
+                    view_update(
+                        "move |value, on, _, cx|",
+                        "this.selected.retain(|v| v != value);\nif on {\n    this.selected.push(value.clone());\n}"
+                    )
+                )),
+            ]
+            .into_iter()
+            .flatten()
+            .collect()
+        }
+    };
+    chain(
+        "ConnectedButtonGroup::new(\"button-group\", \"Options\")",
+        [
+            (variant != 1).then(|| format!("variant(ButtonVariant::{})", VARIANT_NAMES[variant])),
+            (tone != 0).then(|| format!("tone(ButtonTone::{})", TONE_NAMES[tone])),
+            Some(format!("button_size(ButtonSize::{})", SIZE_NAMES[size])),
+            square.then(|| "shape(ButtonShape::Square)".into()),
+        ]
+        .into_iter()
+        .chain(layout)
+        .chain([
+            disabled.then(|| "disabled(true)".into()),
+            Some(format!("options([{}])", options.join(", "))),
+        ])
+        .chain(items.options.iter().map(|(label, icon)| {
+            icons.then(|| format!("icon({}, {})", lit(label), symbol_code(icon)))
+        }))
+        .chain([match (text, labels_selected) {
+            (false, _) => Some("labels(GroupLabels::Never)".into()),
+            (true, true) => Some("labels(GroupLabels::Selected)".into()),
+            (true, false) => None,
+        }])
+        .chain(selection_calls.into_iter().map(Some)),
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::super::harness::open;
@@ -443,5 +609,30 @@ mod tests {
         let column = h.bounds("playground-button-group");
         assert!(column.size.height > row.size.height * 2.);
         assert!(column.size.width < row.size.width);
+    }
+
+    #[test]
+    fn the_code_follows_the_configuration() {
+        let mut config = Config::defaults(&PLAYGROUND);
+        let code = super::code(&config);
+        assert!(
+            code.starts_with("ConnectedButtonGroup::new(\"button-group\", \"Options\")"),
+            "{code}"
+        );
+        assert!(code.contains(".variant(ButtonVariant::Filled)"), "{code}");
+        assert!(
+            code.contains(".selected_values([\"Bold\", \"Italic\"])"),
+            "{code}"
+        );
+        assert!(!code.contains(".vertical("));
+        config.set("orientation", Value::Choice(1));
+        assert!(super::code(&config).contains(".vertical(true)"));
+        config.set("kind", Value::Choice(0));
+        let code = super::code(&config);
+        assert!(
+            code.starts_with("ButtonGroup::new(\"button-group\", \"Options\")"),
+            "{code}"
+        );
+        assert!(code.contains(".toggle(true)"), "{code}");
     }
 }

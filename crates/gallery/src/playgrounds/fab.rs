@@ -112,7 +112,7 @@ pub static PLAYGROUND: Playground = Playground {
         },
     ],
     preview,
-    code: None,
+    code: Some(code),
 };
 
 /// The preview's screen: fills the canvas and floats `child` at
@@ -162,6 +162,51 @@ fn preview(
     stage(fab).into_any_element()
 }
 
+/// The Rust names of [`COLORS`] and of the Size options.
+pub(super) const COLOR_NAMES: [&str; 6] = [
+    "PrimaryContainer",
+    "SecondaryContainer",
+    "TertiaryContainer",
+    "Primary",
+    "Secondary",
+    "Tertiary",
+];
+pub(super) const SIZE_NAMES: [&str; 3] = ["Regular", "Medium", "Large"];
+
+/// The calls a FAB's shared configuration (color, size, lowered, position,
+/// disabled) writes, leaving out the library's defaults.
+pub(super) fn common_calls(config: &Config) -> [Option<String>; 5] {
+    let (color, size) = (config.choice("color"), config.choice("size"));
+    let position = match position(config.option("position")) {
+        FabPosition::Center => "Center",
+        FabPosition::BottomEnd => "BottomEnd",
+        FabPosition::BottomStart => "BottomStart",
+        FabPosition::TopEnd => "TopEnd",
+        FabPosition::TopStart => "TopStart",
+    };
+    [
+        (color != 0).then(|| format!("color(FabColor::{})", COLOR_NAMES[color])),
+        (size != 0).then(|| format!("size(FabSize::{})", SIZE_NAMES[size])),
+        config.bool("lowered").then(|| "lowered(true)".into()),
+        // Floats the FAB in its nearest positioned ancestor.
+        Some(format!("position(FabPosition::{position})")),
+        config.bool("disabled").then(|| "disabled(true)".into()),
+    ]
+}
+
+fn code(config: &Config) -> String {
+    let icon = config.option("icon");
+    let label = config.text("label");
+    let label = if label.is_empty() { icon } else { &label };
+    chain(
+        format!("Fab::new(\"fab\", {}, {})", symbol_code(icon), lit(label)),
+        common_calls(config).into_iter().chain([Some(format!(
+            "on_click(|_, _, _| println!({}))",
+            lit(label)
+        ))]),
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::super::harness::open;
@@ -186,5 +231,19 @@ mod tests {
         assert_eq!(fab.bottom(), stage.bottom() - px(16.));
         h.set("size", Value::Choice(2));
         assert_eq!(h.bounds("playground-fab").size, size(px(96.), px(96.)));
+    }
+
+    #[test]
+    fn the_code_follows_the_configuration() {
+        let mut config = Config::defaults(&PLAYGROUND);
+        let code = super::code(&config);
+        assert!(
+            code.starts_with("Fab::new(\"fab\", Symbol::ADD, \"Create new item\")"),
+            "{code}"
+        );
+        assert!(code.contains(".position(FabPosition::Center)"));
+        assert!(!code.contains(".size("));
+        config.set("size", Value::Choice(2));
+        assert!(super::code(&config).contains(".size(FabSize::Large)"));
     }
 }

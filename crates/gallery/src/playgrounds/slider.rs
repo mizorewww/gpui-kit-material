@@ -149,7 +149,7 @@ pub static PLAYGROUND: Playground = Playground {
         },
     ],
     preview,
-    code: None,
+    code: Some(code),
 };
 
 /// The slider state for each step, created on first use.
@@ -253,6 +253,49 @@ fn preview(
         .into_any_element()
 }
 
+fn code(config: &Config) -> String {
+    const SIZE_NAMES: [&str; 5] = ["XSmall", "Small", "Medium", "Large", "XLarge"];
+    const COLOR_NAMES: [&str; 4] = ["Primary", "Secondary", "Tertiary", "Error"];
+    let step = STEPS[config.choice("step")];
+    let start = config.number("value");
+    let value = if config.option("variant") == "range" {
+        let end = config.number("range_end");
+        format!("({:?}, {:?})", start.min(end), start.max(end))
+    } else {
+        format!("{start:?}")
+    };
+    let state = chain(
+        "SliderState::new()",
+        [
+            (step != 1.).then(|| format!("step({step:?})")),
+            Some(format!("default_value({value})")),
+        ],
+    );
+    let (size, color) = (config.choice("size"), config.choice("color"));
+    let slider = chain(
+        format!(
+            "MaterialSlider::new(&self.volume, {})",
+            lit(&config.text("label"))
+        ),
+        [
+            (size != 0).then(|| format!("size(SliderSize::{})", SIZE_NAMES[size])),
+            (config.option("orientation") == "vertical").then(|| "vertical()".into()),
+            (color != 0).then(|| format!("color(SliderColor::{})", COLOR_NAMES[color])),
+            (config.option("variant") == "centered").then(|| "centered(true)".into()),
+            config.bool("ticks").then(|| "stops(true)".into()),
+            (!config.bool("indicator")).then(|| "value_indicator(false)".into()),
+            config
+                .bool("icon")
+                .then(|| "icon(Symbol::VOLUME_UP)".into()),
+            config.bool("disabled").then(|| "disabled(true)".into()),
+        ],
+    );
+    format!(
+        "// Once, in the view's constructor (SliderState is gpui_kit::base::slider's;\n// read the value with self.volume.read(cx).value()):\nlet volume = cx.new(|_| {{\n    {}\n}});\n\n// In render:\n{slider}",
+        indent(&state)
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::super::testing::*;
@@ -285,5 +328,22 @@ mod tests {
         set(&state, cx, "range_end", Value::Number(60.));
         assert_eq!(config(&state, cx).number("range_end"), 60.);
         assert_eq!(config(&state, cx).number("value"), 20.);
+    }
+
+    #[test]
+    fn the_code_follows_the_configuration() {
+        let mut config = Config::defaults(&PLAYGROUND);
+        let code = super::code(&config);
+        assert!(
+            code.contains("SliderState::new()\n        .step(10.0)\n        .default_value(40.0)"),
+            "{code}"
+        );
+        assert!(
+            code.contains("MaterialSlider::new(&self.volume, \"Volume\")"),
+            "{code}"
+        );
+        assert!(!code.contains(".centered("));
+        config.set("variant", Value::Choice(2));
+        assert!(super::code(&config).contains(".default_value((40.0, 80.0))"));
     }
 }

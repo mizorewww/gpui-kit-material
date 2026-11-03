@@ -130,7 +130,7 @@ pub static PLAYGROUND: Playground = Playground {
         },
     ],
     preview,
-    code: None,
+    code: Some(code),
 };
 
 fn preview(
@@ -167,6 +167,46 @@ fn preview(
         .into_any_element()
 }
 
+fn code(config: &Config) -> String {
+    let options = SETS[config.choice("options")];
+    let selected = config
+        .choice("selected")
+        .checked_sub(1)
+        .filter(|&index| index < options.len());
+    let disable = config.bool("disable_option").then_some(1);
+    chain(
+        format!(
+            "MaterialRadioGroup::new(\"radio-group\", {})",
+            lit(&config.text("name"))
+        ),
+        [
+            (config.option("direction") == "horizontal").then(|| "axis(Axis::Horizontal)".into()),
+            config
+                .bool("labels_before")
+                .then(|| "labels_before(true)".into()),
+            config.bool("disabled").then(|| "disabled(true)".into()),
+        ]
+        .into_iter()
+        .chain(options.iter().enumerate().map(|(index, option)| {
+            Some(format!(
+                "option({}, {})",
+                lit(option),
+                disable != Some(index)
+            ))
+        }))
+        .chain([
+            Some(format!("selected({selected:?})")),
+            Some(format!(
+                "on_change({})",
+                listener(
+                    "|this, index: &usize, _, cx|",
+                    "this.selected = Some(*index);"
+                )
+            )),
+        ]),
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::super::testing::*;
@@ -198,5 +238,19 @@ mod tests {
         );
         settle(cx);
         assert_eq!(config(&state, cx).option("selected"), "4");
+    }
+
+    #[test]
+    fn the_code_follows_the_configuration() {
+        let mut config = Config::defaults(&PLAYGROUND);
+        let code = super::code(&config);
+        assert!(
+            code.starts_with("MaterialRadioGroup::new(\"radio-group\", \"Theme\")"),
+            "{code}"
+        );
+        assert!(code.contains(".option(\"Dark\", true)"));
+        assert!(code.contains(".selected(Some(0))"));
+        config.set("disable_option", Value::Bool(true));
+        assert!(super::code(&config).contains(".option(\"Dark\", false)"));
     }
 }

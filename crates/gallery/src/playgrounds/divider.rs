@@ -80,7 +80,7 @@ pub static PLAYGROUND: Playground = Playground {
         },
     ],
     preview,
-    code: None,
+    code: Some(code),
 };
 
 fn preview(
@@ -127,9 +127,38 @@ fn preview(
         .into_any_element()
 }
 
+fn code(config: &Config) -> String {
+    const VARIANT_NAMES: [&str; 3] = ["FullWidth", "Inset", "MiddleInset"];
+    const COLOR_NAMES: [&str; 4] = ["OUTLINE_VARIANT", "OUTLINE", "PRIMARY", "SECONDARY"];
+    let variant = config.choice("variant");
+    let (thickness, start, end) = (
+        config.number("thickness"),
+        config.number("start"),
+        config.number("end"),
+    );
+    // Insets apply to the inset variants, which start 16dp in and end 0dp
+    // (inset) or 16dp (middle inset) in by default.
+    let default_end = if variant == 2 { 16. } else { 0. };
+    let subhead = config.text("subhead");
+    let color = config.choice("color");
+    chain(
+        "MaterialDivider::new(\"divider\")",
+        [
+            (config.option("orientation") == "vertical")
+                .then(|| "orientation(DividerOrientation::Vertical)".into()),
+            (variant != 0).then(|| format!("variant(DividerVariant::{})", VARIANT_NAMES[variant])),
+            (thickness != 1.).then(|| format!("thickness(px({thickness:?}))")),
+            (color != 0).then(|| format!("color_role(ColorRole::{})", COLOR_NAMES[color])),
+            (variant != 0 && start != 16.).then(|| format!("inset_start(rem({start:?}))")),
+            (variant != 0 && end != default_end).then(|| format!("inset_end(rem({end:?}))")),
+            (!subhead.is_empty()).then(|| format!("subhead({})", lit(&subhead))),
+        ],
+    )
+}
+
 #[cfg(test)]
 mod tests {
-    use super::super::super::playground::Value;
+    use super::super::super::playground::{Config, Value};
     use super::super::nav_harness::Harness;
     use super::PLAYGROUND;
     use gpui::TestAppContext;
@@ -151,5 +180,16 @@ mod tests {
         assert!(vertical.size.height > vertical.size.width);
         assert_eq!(vertical.size.width, gpui::px(4.));
         assert_eq!(harness.config().option("color"), "primary");
+    }
+
+    #[test]
+    fn the_code_follows_the_configuration() {
+        let mut config = Config::defaults(&PLAYGROUND);
+        assert_eq!(super::code(&config), "MaterialDivider::new(\"divider\")");
+        config.set("variant", Value::Choice(1));
+        let code = super::code(&config);
+        assert!(code.contains(".variant(DividerVariant::Inset)"), "{code}");
+        assert!(code.contains(".inset_end(rem(16.0))"), "{code}");
+        assert!(!code.contains(".inset_start("));
     }
 }

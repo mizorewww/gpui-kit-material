@@ -124,7 +124,7 @@ pub static PLAYGROUND: Playground = Playground {
         },
     ],
     preview,
-    code: None,
+    code: Some(code),
 };
 
 fn preview(
@@ -166,4 +166,77 @@ fn preview(
         button = button.child(text);
     }
     button.into_any_element()
+}
+
+/// The Rust names of the Variant and Size options.
+const VARIANT_NAMES: [&str; 5] = ["Filled", "Tonal", "Outlined", "Elevated", "Text"];
+const SIZE_NAMES: [&str; 5] = ["ExtraSmall", "Small", "Medium", "Large", "ExtraLarge"];
+const TONE_NAMES: [&str; 3] = ["Standard", "Neutral", "Accent"];
+
+fn code(config: &Config) -> String {
+    let text = config.text("text");
+    let icon = config.option("icon");
+    let toggle = config.bool("toggle");
+    let (variant, tone, size) = (
+        config.choice("variant"),
+        config.choice("tone"),
+        config.choice("size"),
+    );
+    chain(
+        "MaterialButton::new(\"button\")",
+        [
+            (variant != 0).then(|| format!("variant(ButtonVariant::{})", VARIANT_NAMES[variant])),
+            (tone != 0).then(|| format!("tone(ButtonTone::{})", TONE_NAMES[tone])),
+            (size != 1).then(|| format!("button_size(ButtonSize::{})", SIZE_NAMES[size])),
+            config
+                .bool("square")
+                .then(|| "shape(ButtonShape::Square)".into()),
+            config.bool("disabled").then(|| "disabled(true)".into()),
+            (!icon.is_empty()).then(|| format!("icon({})", symbol_code(icon))),
+            // An icon-only button still needs a name.
+            text.is_empty()
+                .then(|| format!("accessibility_label({})", lit(icon))),
+            toggle.then(|| "toggle(true)".into()),
+            toggle.then(|| format!("selected({})", config.bool("selected"))),
+            Some(if toggle {
+                format!(
+                    "on_change({})",
+                    view_update("move |selected, _, _, cx|", "this.selected = selected;")
+                )
+            } else {
+                format!(
+                    "on_click(|_, _, _| println!({}))",
+                    lit(if text.is_empty() { icon } else { &text })
+                )
+            }),
+            (!text.is_empty()).then(|| format!("child({})", lit(&text))),
+        ],
+    )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use core::prelude::v1::test;
+
+    #[test]
+    fn the_code_follows_the_configuration() {
+        let mut config = Config::defaults(&PLAYGROUND);
+        let code = super::code(&config);
+        assert!(
+            code.starts_with("MaterialButton::new(\"button\")"),
+            "{code}"
+        );
+        assert!(code.ends_with(".child(\"Button\")"), "{code}");
+        assert!(!code.contains(".variant("));
+        config.set("variant", Value::Choice(2));
+        config.set("toggle", Value::Bool(true));
+        let code = super::code(&config);
+        assert!(code.contains(".variant(ButtonVariant::Outlined)"), "{code}");
+        assert!(
+            code.contains(".toggle(true)\n    .selected(false)"),
+            "{code}"
+        );
+        assert!(!code.contains(".on_click("));
+    }
 }
