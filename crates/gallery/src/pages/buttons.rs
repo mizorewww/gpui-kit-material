@@ -917,13 +917,29 @@ impl GalleryPage for Page {
             Row::GroupStates => board("button-group-states")
                 .caption("Connected button group")
                 .columns(1)
-                .row_labels(InteractionPreview::ALL.map(InteractionPreview::name))
-                .cells(InteractionPreview::ALL.into_iter().enumerate().map(|(index, state)| {
-                    ConnectedButtonGroup::new(("group-state", index), "Connected button group")
-                        .options([("first", "Label"), ("second", "Label"), ("third", "Label")])
-                        .selected("first")
-                        .preview_state("second", state)
-                }))
+                .row_labels(
+                    InteractionPreview::ALL
+                        .map(InteractionPreview::name)
+                        .into_iter()
+                        .chain(["Focused, selected"]),
+                )
+                .cells(
+                    InteractionPreview::ALL
+                        .into_iter()
+                        .map(|state| ("second", state))
+                        // The focus ring on the selected option's primary fill.
+                        .chain([("first", InteractionPreview::Focused)])
+                        .enumerate()
+                        .map(|(index, (value, state))| {
+                            ConnectedButtonGroup::new(
+                                ("group-state", index),
+                                "Connected button group",
+                            )
+                            .options([("first", "Label"), ("second", "Label"), ("third", "Label")])
+                            .selected("first")
+                            .preview_state(value, state)
+                        }),
+                )
                 .into_any_element(),
             Row::GroupDemo => spec::demo(
                 "button-group-demo",

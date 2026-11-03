@@ -130,6 +130,9 @@ Distribution is by Git revision for now; see the [quick start](README.md#quick-s
 
 ### Fixed
 
+- A `ConnectedButtonGroup` option's keyboard focus ring can be seen on a selected option: it is
+  drawn 2dp outside the option, as a standalone button's, above the neighbouring options,
+  instead of 3dp inside, where it was secondary on the selected option's primary fill.
 - `page_heading` takes a caller's `text_size` and `line_height`: its type style is on the
   returned element, which its text inherits. Without them it is unchanged.
 - A sub-menu fits the room past its owner item, so a tall one no longer leaves the window.

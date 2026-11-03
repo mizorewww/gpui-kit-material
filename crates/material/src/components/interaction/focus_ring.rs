@@ -2,9 +2,12 @@
 //! inside) a control without changing layout or hitboxes.
 //!
 //! The indicator is 3dp of secondary. Standalone controls use the M3 outer
-//! offset (2dp outside the border box); items packed edge to edge, such as
-//! connected tiles and connected button group options, use the M3 inner
-//! offset (3dp inside) so a neighbour painted later cannot cover it.
+//! offset (2dp outside the border box). Items packed edge to edge, such as
+//! connected tiles, use the M3 inner offset (3dp inside) so a neighbour
+//! painted later cannot cover it. Where the item's own fill can be primary,
+//! as a selected connected button group option is, an inner secondary ring
+//! cannot be seen; such a group keeps the outer offset and hands its rings to
+//! a [`RingLayer`] that it paints after every item.
 use crate::{color::ColorRole, theme::color};
 use gpui::*;
 
@@ -35,6 +38,8 @@ pub(crate) struct ButtonFocusRing {
     enabled: bool,
     radius: Radius,
     inward: bool,
+    /// Where the ring is painted instead of in place, when set.
+    layer: Option<RingLayer>,
     /// A specimen's forced focus: shown regardless of input modality.
     forced: bool,
     #[cfg(test)]
@@ -55,6 +60,7 @@ impl ButtonFocusRing {
             enabled,
             radius: Radius::Rems(radius),
             inward: false,
+            layer: None,
             forced: false,
             #[cfg(test)]
             observed: None,
@@ -85,6 +91,7 @@ impl ButtonFocusRing {
             enabled: true,
             radius: Radius::Rems(radius),
             inward: false,
+            layer: None,
             forced: false,
             #[cfg(test)]
             observed: None,
@@ -102,6 +109,13 @@ impl ButtonFocusRing {
     /// Draw the ring at the M3 inner offset instead of the outer one.
     pub(crate) fn inward(mut self) -> Self {
         self.inward = true;
+        self
+    }
+
+    /// Hand the ring to `layer`, which paints it after its later siblings,
+    /// instead of painting it in place, where they would cover an outer ring.
+    pub(crate) fn painted_by(mut self, layer: &RingLayer) -> Self {
+        self.layer = Some(layer.clone());
         self
     }
 
@@ -216,12 +230,120 @@ impl Element for ButtonFocusRing {
         if let Some(observed) = &self.observed {
             observed.set(visible.then_some(ring_bounds));
         }
+        #[cfg(test)]
+        PAINTED_RING_CHILDREN.with(|count| count.set(count.get() + 1));
         if visible {
-            window.paint_quad(
-                outline(ring_bounds, color(ColorRole::SECONDARY), BorderStyle::Solid)
-                    .border_widths(RING_WIDTH)
-                    .corner_radii(ring_corners),
-            );
+            match &self.layer {
+                Some(layer) => layer.ring.set(Some((ring_bounds, ring_corners))),
+                None => paint_ring(ring_bounds, ring_corners, window),
+            }
+        }
+    }
+}
+
+fn paint_ring(bounds: Bounds<Pixels>, corners: Corners<Pixels>, window: &mut Window) {
+    window.paint_quad(
+        outline(bounds, color(ColorRole::SECONDARY), BorderStyle::Solid)
+            .border_widths(RING_WIDTH)
+            .corner_radii(corners),
+    );
+}
+
+#[cfg(test)]
+thread_local! {
+    /// How many rings' children have painted, for checking a layer's order.
+    pub(crate) static PAINTED_RING_CHILDREN: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+    /// The last ring a layer painted, and how many rings' children had
+    /// painted before it.
+    pub(crate) static LAYERED_RING: std::cell::Cell<Option<(Bounds<Pixels>, usize)>> =
+        const { std::cell::Cell::new(None) };
+}
+
+/// A ring handed to a [`RingLayer`]: its bounds and corners, until painted.
+type PendingRing = std::rc::Rc<std::cell::Cell<Option<(Bounds<Pixels>, Corners<Pixels>)>>>;
+
+/// Paints, above a group of tightly packed items, the focus ring that one of
+/// them hands it with [`ButtonFocusRing::painted_by`]. Make one per render and
+/// add [`RingLayer::element`] to the group after every item: it is absolutely
+/// positioned and takes no space. The ring stays in the group's paint order and
+/// content mask, so overlays opened above the group still cover it.
+#[derive(Clone, Default)]
+pub(crate) struct RingLayer {
+    ring: PendingRing,
+}
+
+impl RingLayer {
+    pub(crate) fn element(&self) -> RingLayerElement {
+        RingLayerElement {
+            ring: self.ring.clone(),
+        }
+    }
+}
+
+pub(crate) struct RingLayerElement {
+    ring: PendingRing,
+}
+
+impl IntoElement for RingLayerElement {
+    type Element = Self;
+    fn into_element(self) -> Self {
+        self
+    }
+}
+
+impl Element for RingLayerElement {
+    type RequestLayoutState = ();
+    type PrepaintState = ();
+    fn id(&self) -> Option<ElementId> {
+        None
+    }
+    fn source_location(&self) -> Option<&'static std::panic::Location<'static>> {
+        None
+    }
+    fn request_layout(
+        &mut self,
+        _: Option<&GlobalElementId>,
+        _: Option<&InspectorElementId>,
+        window: &mut Window,
+        cx: &mut App,
+    ) -> (LayoutId, ()) {
+        let style = Style {
+            position: Position::Absolute,
+            size: size(px(0.).into(), px(0.).into()),
+            ..Style::default()
+        };
+        (window.request_layout(style, [], cx), ())
+    }
+    fn prepaint(
+        &mut self,
+        _: Option<&GlobalElementId>,
+        _: Option<&InspectorElementId>,
+        _: Bounds<Pixels>,
+        _: &mut (),
+        _: &mut Window,
+        _: &mut App,
+    ) {
+    }
+    fn paint(
+        &mut self,
+        _: Option<&GlobalElementId>,
+        _: Option<&InspectorElementId>,
+        _: Bounds<Pixels>,
+        _: &mut (),
+        _: &mut (),
+        window: &mut Window,
+        _: &mut App,
+    ) {
+        // Taken, so a ring from an earlier frame is never painted again.
+        let ring = self.ring.take();
+        #[cfg(test)]
+        LAYERED_RING.with(|layered| {
+            layered.set(
+                ring.map(|(bounds, _)| (bounds, PAINTED_RING_CHILDREN.with(|count| count.get()))),
+            )
+        });
+        if let Some((bounds, corners)) = ring {
+            paint_ring(bounds, corners, window);
         }
     }
 }
