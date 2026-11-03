@@ -48,8 +48,9 @@ fn notice_tone(kind: NoticeKind) -> (ColorRole, ColorRole, IconName, Role) {
 /// A page-level notice: tinted surface, status icon and wrapping text.
 /// Callers append the notice's actions, which wrap below the text when narrow.
 ///
-/// The icon stands on the text's first line, so a notice of several lines
-/// reads from its icon; the icon and text together centre on the actions.
+/// The icon centres on the text's first line, at whatever size the caller sets the
+/// text, so a notice of several lines reads from its icon; icon and text together
+/// centre on the actions. Debug selectors `{id}-icon` and `{id}-text` name the two.
 pub fn notice_banner(
     id: impl Into<ElementId>,
     kind: NoticeKind,
@@ -57,7 +58,6 @@ pub fn notice_banner(
 ) -> Div {
     let id = id.into();
     let (bg, tone, icon, role) = notice_tone(kind);
-    let icon_selector = format!("{id}-icon");
     div()
         .flex()
         .flex_wrap()
@@ -76,23 +76,53 @@ pub fn notice_banner(
                 .flex_basis(rem(200.) + ICON_SLOT + rem(12.))
                 .min_w_0()
                 .gap(rem(12.))
+                .child(first_line_icon(&id, icon, tone))
                 .child(
-                    // A line of the text's height (an empty word sets it), so the icon
-                    // centres on the first line whatever size the caller's text is.
-                    div()
-                        .flex()
-                        .flex_shrink_0()
-                        .items_center()
-                        .debug_selector(move || icon_selector.clone())
-                        .child(icon.icon().size(ICON_SLOT).color(color(tone)))
-                        .child("\u{2060}"),
-                )
-                .child(
-                    accessible_text(id, text)
+                    accessible_text(id.clone(), text)
+                        .debug_selector({
+                            let id = id.clone();
+                            move || format!("{id}-text")
+                        })
                         .role(role)
                         .flex_1()
                         .min_w_0()
                         .whitespace_normal(),
+                ),
+        )
+}
+
+/// The notice's icon in a slot exactly one line of the inherited text tall: a hidden
+/// strut of no width holds one letter, whose line box sets the height whatever the
+/// text system, and the icon centres on it, overflowing a line shorter than itself.
+fn first_line_icon(id: &ElementId, icon: IconName, tone: ColorRole) -> Div {
+    div()
+        .relative()
+        .flex_shrink_0()
+        .w(ICON_SLOT)
+        .child(
+            div()
+                .w_0()
+                .overflow_hidden()
+                .invisible()
+                .whitespace_nowrap()
+                .child("M"),
+        )
+        .child(
+            div()
+                .absolute()
+                .inset_0()
+                .flex()
+                .items_center()
+                .justify_center()
+                .child(
+                    div()
+                        .flex_shrink_0()
+                        .size(ICON_SLOT)
+                        .debug_selector({
+                            let id = id.clone();
+                            move || format!("{id}-icon")
+                        })
+                        .child(icon.icon().size(ICON_SLOT).color(color(tone))),
                 ),
         )
 }
@@ -1415,52 +1445,61 @@ mod tests {
     }
 
     #[gpui::test]
-    fn a_notice_icon_stands_on_the_first_line_and_centres_on_actions(cx: &mut TestAppContext) {
+    fn a_notice_icon_centres_on_the_first_line_at_every_text_size(cx: &mut TestAppContext) {
         struct Notices;
         impl Render for Notices {
             fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
                 window.set_rem_size(px(14.));
+                let long = "A failure explained at length wraps onto several lines, and its \
+                            icon stays beside the first of them, however many follow it.";
                 div()
                     .flex()
                     .flex_col()
                     // Wide enough for the short notice's action beside its text.
                     .w(px(400.))
-                    .child(
-                        notice_banner(
-                            "long",
-                            NoticeKind::Danger,
-                            "A failure explained at length wraps onto several lines, \
-                             and its icon stays beside the first of them, however many \
-                             lines follow it below.",
-                        )
-                        .debug_selector(|| "notice-long".into()),
+                    .children(
+                        [("small", 12., 16.), ("body", 14., 20.), ("large", 24., 32.)].map(
+                            |(id, size, line)| {
+                                notice_banner(id, NoticeKind::Danger, long)
+                                    .text_size(px(size))
+                                    .line_height(px(line))
+                            },
+                        ),
                     )
                     .child(
-                        notice_banner("short", NoticeKind::Info, "Short").child(
-                            div()
-                                .w(px(40.))
-                                .h(px(40.))
-                                .debug_selector(|| "action".into()),
-                        ),
+                        notice_banner("short", NoticeKind::Info, "Short")
+                            .line_height(px(20.))
+                            .child(
+                                div()
+                                    .w(px(40.))
+                                    .h(px(40.))
+                                    .debug_selector(|| "action".into()),
+                            ),
                     )
             }
         }
         let (_, cx) = cx.add_window_view(|_, _| Notices);
         cx.run_until_parked();
-        let notice = cx.debug_bounds("notice-long").unwrap();
-        let icon = cx.debug_bounds("long-icon").unwrap();
-        assert!(
-            notice.size.height > icon.size.height * 2.5,
-            "{notice:?} {icon:?}"
-        );
-        let inset = icon.origin.y - notice.origin.y;
-        assert!(
-            inset < icon.size.height,
-            "the icon sits {inset:?} down a {notice:?}"
-        );
+        let centre = |bounds: Bounds<Pixels>| bounds.origin.y + bounds.size.height / 2.;
+        for (id, icon, text, line) in [
+            ("small", "small-icon", "small-text", 16.),
+            ("body", "body-icon", "body-text", 20.),
+            ("large", "large-icon", "large-text", 32.),
+        ] {
+            let icon = cx.debug_bounds(icon).unwrap();
+            let text = cx.debug_bounds(text).unwrap();
+            assert!(text.size.height >= px(line * 2.), "{id}: {text:?} wraps");
+            let first_line = text.origin.y + px(line / 2.);
+            assert!(
+                (centre(icon) - first_line).abs() < px(1.),
+                "{id}: icon {icon:?}, text {text:?}"
+            );
+            // The icon's slot is as wide as the icon, then the 12dp gap.
+            let gap = text.origin.x - (icon.origin.x + icon.size.width);
+            assert!((gap - px(12.)).abs() < px(0.5), "{id}: gap {gap:?}");
+        }
         let short = cx.debug_bounds("short-icon").unwrap();
         let action = cx.debug_bounds("action").unwrap();
-        let centre = |bounds: Bounds<Pixels>| bounds.origin.y + bounds.size.height / 2.;
         assert!((centre(short) - centre(action)).abs() < px(1.));
     }
 

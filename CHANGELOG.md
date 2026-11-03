@@ -130,6 +130,10 @@ Distribution is by Git revision for now; see the [quick start](README.md#quick-s
 
 ### Fixed
 
+- A `notice_banner`'s icon stands beside its text's first line, centred on it at any text
+  size, instead of beside the middle of a notice of several lines; icon and text still
+  centre on the actions a caller appends. Debug selectors `{id}-icon` and `{id}-text`
+  name the two.
 - A `ConnectedButtonGroup` option's keyboard focus ring can be seen on a selected option: it is
   drawn 2dp outside the option, as a standalone button's, above the neighbouring options,
   instead of 3dp inside, where it was secondary on the selected option's primary fill.

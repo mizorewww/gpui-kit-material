@@ -149,6 +149,20 @@ impl GalleryPage for Page {
                         NoticeKind::Danger,
                         "A failure stays visible with its recovery action.",
                     ))
+                    .child(
+                        notice_banner(
+                            "notice-long",
+                            NoticeKind::Danger,
+                            "A failure explained at length wraps onto several lines: what \
+                             happened, why it stands in the way, and where to change it, \
+                             then what to do once it is changed. Its icon stays beside the \
+                             first line, and the action follows the text.",
+                        )
+                        .child(
+                            material_button("notice-long-action", ButtonVariant::Text)
+                                .child("Open settings"),
+                        ),
+                    )
                     .child(info_callout(
                         "callout",
                         "Standalone guidance sits in its own low-emphasis panel.",
