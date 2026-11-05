@@ -187,6 +187,8 @@ pub struct MaterialDialog {
     /// Set by the caller; each form has its own default.
     container: Option<ColorRole>,
     safe_area: Edges<Pixels>,
+    /// The caller's handle on the scrolling body, when it moves it.
+    body_scroll: Option<ScrollHandle>,
 }
 
 /// The full-screen dialog's header: its close button's accessible name and
@@ -223,6 +225,7 @@ impl MaterialDialog {
             on_dismiss: None,
             container: None,
             safe_area: Edges::default(),
+            body_scroll: None,
         }
     }
     /// The hero icon above the headline; the headline then centers.
@@ -305,6 +308,14 @@ impl MaterialDialog {
     /// neither reference has a wider one, so the width is the caller's.
     pub fn max_width(mut self, width: f32) -> Self {
         self.max_width = Some(width.max(DIALOG_MIN_WIDTH));
+        self
+    }
+    /// Tracks the scrolling body with `handle`, so the caller can move it: back
+    /// to the top when the content turns to a new subject (a guide's next step),
+    /// or to an element that needs attention. The body scrolls the same without
+    /// it.
+    pub fn track_body_scroll(mut self, handle: &ScrollHandle) -> Self {
+        self.body_scroll = Some(handle.clone());
         self
     }
     pub fn animation(mut self, animation: DialogAnimation) -> Self {
@@ -749,6 +760,7 @@ impl MaterialDialog {
             });
         let content = self.content;
         let has_content = !content.is_empty();
+        let body_scroll = self.body_scroll.clone();
         let body = || {
             div()
                 .id("dialog-body")
@@ -760,6 +772,9 @@ impl MaterialDialog {
                 .flex_shrink(1.)
                 .min_h_0()
                 .overflow_y_scroll()
+                .when_some(body_scroll.as_ref(), |body, handle| {
+                    body.track_scroll(handle)
+                })
         };
         // With dividers, the supporting text and content form the body
         // between them; otherwise the body follows the header.
@@ -929,6 +944,9 @@ impl MaterialDialog {
                     .flex_1()
                     .min_h_0()
                     .overflow_y_scroll()
+                    .when_some(self.body_scroll.as_ref(), |body, handle| {
+                        body.track_scroll(handle)
+                    })
                     .gap(rem(16.))
                     .px(rem(24.))
                     .when(dividers, |body| body.py(rem(16.)))
@@ -1571,10 +1589,44 @@ mod tests {
         assert_eq!(view.read_with(cx, |v, _| v.dismissals), 2);
     }
 
+    #[gpui::test]
+    fn a_tracked_body_reports_and_takes_its_scroll(cx: &mut TestAppContext) {
+        cx.update(|cx| {
+            gpui_base::init(cx);
+            cx.set_reduce_motion(true);
+        });
+        let handle = ScrollHandle::new();
+        let (_, cx) = cx.add_window_view({
+            let handle = handle.clone();
+            move |_, _| Tall {
+                full_screen: false,
+                safe_area: Edges::default(),
+                scroll: Some(handle),
+            }
+        });
+        cx.simulate_resize(size(px(400.), px(600.)));
+        draw(cx);
+        draw(cx);
+        let body = cx.debug_bounds("dialog-body").unwrap();
+        let first = cx.debug_bounds("tall-row-0").unwrap();
+        cx.simulate_event(ScrollEvent {
+            position: body.center(),
+            delta: ScrollDelta::Pixels(point(px(0.), px(-200.))),
+            ..Default::default()
+        });
+        draw(cx);
+        assert!(handle.offset().y < px(-100.), "{:?}", handle.offset());
+        // The caller moves it back to the top.
+        handle.set_offset(point(px(0.), px(0.)));
+        draw(cx);
+        assert_eq!(cx.debug_bounds("tall-row-0").unwrap(), first);
+    }
+
     /// A modal dialog with more content than its window holds.
     struct Tall {
         full_screen: bool,
         safe_area: Edges<Pixels>,
+        scroll: Option<ScrollHandle>,
     }
     impl Render for Tall {
         fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
@@ -1593,6 +1645,10 @@ mod tests {
                 .safe_area(self.safe_area)
                 .modal(true)
                 .on_dismiss(|_, _| {});
+            let dialog = match &self.scroll {
+                Some(handle) => dialog.track_body_scroll(handle),
+                None => dialog,
+            };
             let dialog = if self.full_screen {
                 dialog.full_screen("Close", None)
             } else {
@@ -1611,6 +1667,7 @@ mod tests {
         let (_, cx) = cx.add_window_view(|_, _| Tall {
             full_screen: false,
             safe_area: Edges::default(),
+            scroll: None,
         });
         cx.simulate_resize(size(px(400.), px(600.)));
         draw(cx);
@@ -1681,6 +1738,7 @@ mod tests {
         let (view, cx) = cx.add_window_view(|_, _| Tall {
             full_screen: true,
             safe_area: Edges::default(),
+            scroll: None,
         });
         draw(cx);
         draw(cx);
