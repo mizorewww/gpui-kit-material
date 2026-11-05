@@ -313,7 +313,8 @@ impl MaterialDialog {
     /// Tracks the scrolling body with `handle`, so the caller can move it: back
     /// to the top when the content turns to a new subject (a guide's next step),
     /// or to an element that needs attention. The body scrolls the same without
-    /// it.
+    /// it. Keep one handle with the view across renders: a new handle each render
+    /// starts the body at the top every frame.
     pub fn track_body_scroll(mut self, handle: &ScrollHandle) -> Self {
         self.body_scroll = Some(handle.clone());
         self
@@ -939,6 +940,9 @@ impl MaterialDialog {
             .child(
                 div()
                     .id("dialog-body")
+                    .when(cfg!(test), |body| {
+                        body.debug_selector(|| "dialog-body".into())
+                    })
                     .flex()
                     .flex_col()
                     .flex_1()
@@ -1591,6 +1595,15 @@ mod tests {
 
     #[gpui::test]
     fn a_tracked_body_reports_and_takes_its_scroll(cx: &mut TestAppContext) {
+        tracked_body_scroll(false, cx);
+    }
+
+    #[gpui::test]
+    fn a_full_screen_tracked_body_reports_and_takes_its_scroll(cx: &mut TestAppContext) {
+        tracked_body_scroll(true, cx);
+    }
+
+    fn tracked_body_scroll(full_screen: bool, cx: &mut TestAppContext) {
         cx.update(|cx| {
             gpui_base::init(cx);
             cx.set_reduce_motion(true);
@@ -1599,7 +1612,7 @@ mod tests {
         let (_, cx) = cx.add_window_view({
             let handle = handle.clone();
             move |_, _| Tall {
-                full_screen: false,
+                full_screen,
                 safe_area: Edges::default(),
                 scroll: Some(handle),
             }
