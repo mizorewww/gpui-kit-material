@@ -261,8 +261,8 @@
       },
       "src/elements/div.rs": {
         "upstream_sha256": "ba8f3d0b8dc931ab446f13014edcd2320d956915459fa824739d69944b3f4a74",
-        "local_sha256": "4efd30fa22df836dc6360b763cfc6b5e0d9baad6763cc3d55076846b87b58697",
-        "reason": "Material performance patch: the scroll-wheel listener ignores a wheel that cannot move the offset (already at that end, incl. a vertical wheel mapped onto a horizontal-only box): no notify, retained-subtree invalidation or note_scrolled, which repainted the enclosing scroll layer on every wheel event. scroll_max factored out of clamp_scroll_position. A wheel's hover freeze holds hover listeners of any input modality while a frame is drawn, so a row scrolled under a still pointer starts no transition that keeps a list off its layer, and the row under it does not stop hovering (hover_freeze::holds_listeners; docs/ARCHITECTURE.md). A listener is told of hover through hover_freeze::HoveredListener, which tracks it while hovered."
+        "local_sha256": "727f26f84edc1c724b31931264ee7d967bede63a40df54271c613cedec0a65b5",
+        "reason": "Material performance patches offered upstream, in the shape of their PR branches on mizorewww/gpui-fast: a wheel's hover freeze holds hover listeners of any input modality while a frame is drawn, through hover_freeze::track_listener and holds_listeners (material/hover-freeze-listeners), and the scroll-wheel listener returns for a wheel that cannot move the offset, through wheel::scroll_max and wheel::moves (material/wheel-at-limit): no notify, retained-subtree invalidation or note_scrolled."
       },
       "src/elements/text.rs": {
         "upstream_sha256": "10eafa86282d74c0060b8cb936a0421c6cb48ee016f65c406b88868f28e3d75d",
@@ -276,13 +276,18 @@
       },
       "src/fast/layers/hover_freeze.rs": {
         "upstream_sha256": "a8273a396988f3c420a9008525b20dbb8056d4751b4df395200f35ae4a9913d8",
-        "local_sha256": "637b333e4d0588b4dec48c0614d3a3b3a68bec64f2a7c109da6f87e86a7aa2a2",
-        "reason": "Doc: the freeze covers hover listeners for any input modality. Tracks the hover listeners that last heard true, and tells those a frame without the freeze left off the pointer, painted or not. A pending press keeps a listener hovered only while its element's hitbox is still drawn, so a pressed element removed before the release hears its hover end and is not held (upstream review of longbridge/gpui-fast#105)."
+        "local_sha256": "00d479d55fa8e8b477a482695e96623b446a64fad4b855479bccea7f1dd90247",
+        "reason": "Equals branch material/hover-freeze-listeners (be0482f, 471702c) on mizorewww/gpui-fast, ported to 0.1.13: the freeze holds hover listeners for any input modality, tracks the listeners that last heard true and tells those a frame without the freeze left off the pointer; a pending press keeps a listener hovered only while its element's hitbox is still drawn (upstream review of longbridge/gpui-fast#105)."
       },
       "src/fast/layers/reuse.rs": {
         "upstream_sha256": "8259c4c5b53a8d9818786dbdedc377b8da4a8b1c84baafa65dd89cfb562b3f3f",
         "local_sha256": "48ecbaa35f3707ab9dee2e3d4fb6bd1cc372a26e86a9a6875b51f8c20975f735",
         "reason": "Debug-bounds borrows moved inside the test-support cfg to avoid unused-variable warnings (warning_patches)."
+      },
+      "src/fast/layers/wheel.rs": {
+        "upstream_sha256": "56f648b1cf771d72d30efe51ba4d1222963359214efa5396e14d7e60852f2b2e",
+        "local_sha256": "5ecdaeb965b295632b25311f1f9e751d72237536ec6367198f8a290201eac20a",
+        "reason": "Equals branch material/wheel-at-limit (8dfeaa1) on mizorewww/gpui-fast, ported to 0.1.13: scroll_max and moves, which the scroll-wheel listener in src/elements/div.rs uses to ignore a wheel that cannot move its scroll container."
       },
       "src/fast/layout.rs": {
         "upstream_sha256": "65bcbd49c784363b25c67b9e536c48ac9f741e170f0160a1e822ebf1b543d3c5",
@@ -313,6 +318,11 @@
         "upstream_sha256": "95fbb8389daf15e227312b07d2794ba109406071a780d3f4d9224e61f722173b",
         "local_sha256": "8bc4d3b6b67464cebcc20a96feca3a93d9d7083f3d986a7bdfe3c44755479c6f",
         "reason": "Test of a spliced view forgetting released entities, measured on the records' replayed dependencies, as in upstream PR longbridge/gpui-fast#106."
+      },
+      "src/fast/tests/wheel_notifies.rs": {
+        "upstream_sha256": "0a9d1e943a2e9c0be3d83c52fcd138bb5ea83ff5c2bb22e9733b971c335eff23",
+        "local_sha256": "a41e607fe922ddd80e5a726a4784e307118fa56f5f831ed155cee70276a79ec7",
+        "reason": "Tests of branch material/wheel-at-limit (8dfeaa1), as on that branch."
       },
       "src/fast/text.rs": {
         "upstream_sha256": "3505d68e4a644b286521770bd26009667d21a4fa2e33c9bf06e87215dd61f3ea",
@@ -431,6 +441,6 @@
         "reason": "Package-level lockfile not retained; the workspace Cargo.lock owns resolution."
       }
     },
-    "unchanged_file_count": 141
+    "unchanged_file_count": 139
   }
 }

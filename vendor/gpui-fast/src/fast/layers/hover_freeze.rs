@@ -10,8 +10,9 @@
 //!
 //! So for [`HOVER_FREEZE`] after a wheel event, while the pointer stays where
 //! the event was, hover styling is held still: while a frame is drawn,
-//! [`crate::HitboxId::is_hovered`] is false, hover listeners hear nothing, and
-//! the hit test a list foretells for its rows is empty. Only drawing is held. The frame's hit test stays the
+//! [`crate::HitboxId::is_hovered`] is false, hover listeners of either
+//! [`HoverListenerMode`] hear nothing, and the hit test a list foretells for
+//! its rows is empty. Only drawing is held. The frame's hit test stays the
 //! geometry under the pointer, so the cursor follows it, and events dispatched
 //! between frames read it: a click at the spot the wheel scrolled under
 //! reaches its handler. When the wheel stops the window is drawn again, and
@@ -45,29 +46,34 @@ pub(crate) struct HoverFreeze {
 /// A hover listener, with what it takes to tell it hover has ended without
 /// painting it.
 #[derive(Clone)]
-pub(crate) struct HoveredListener {
-    pub(crate) was_hovered: Rc<RefCell<bool>>,
-    pub(crate) has_mouse_down: Rc<RefCell<Option<MouseDownEvent>>>,
-    pub(crate) listener: Rc<dyn Fn(&bool, &mut Window, &mut App)>,
+struct HoveredListener {
+    was_hovered: Rc<RefCell<bool>>,
+    has_mouse_down: Rc<RefCell<Option<MouseDownEvent>>>,
+    listener: Rc<dyn Fn(&bool, &mut Window, &mut App)>,
     /// The hitbox it was last painted with.
-    pub(crate) hitbox: Hitbox,
-    pub(crate) mode: HoverListenerMode,
+    hitbox: Hitbox,
+    mode: HoverListenerMode,
 }
 
 impl HoveredListener {
     /// Tells the listener a change of hover, tracking it while it is hovered.
-    pub(crate) fn update(&self, is_hovered: bool, window: &mut Window, cx: &mut App) {
+    fn update(&self, is_hovered: bool, window: &mut Window, cx: &mut App) {
         if is_hovered == *self.was_hovered.borrow() {
             return;
         }
         *self.was_hovered.borrow_mut() = is_hovered;
+        self.heard(is_hovered, window);
+        (self.listener)(&is_hovered, window, cx);
+    }
+
+    /// Tracks the listener while it is hovered, as it is told `is_hovered`.
+    fn heard(&self, is_hovered: bool, window: &mut Window) {
         if is_hovered {
             note_hovered(window, self);
         } else {
             let hovered = &mut window.fast_layers.hover_freeze.hovered;
             hovered.retain(|listener| !Rc::ptr_eq(&listener.was_hovered, &self.was_hovered));
         }
-        (self.listener)(&is_hovered, window, cx);
     }
 
     /// Whether a frame drawn now would leave the listener hovered. A press
@@ -85,8 +91,37 @@ impl HoveredListener {
     }
 }
 
+/// Wraps the hover listener an element paints with `hitbox`, which is told
+/// of each change of hover, so that it is tracked while it is hovered.
+pub(crate) fn track_listener(
+    window: &mut Window,
+    was_hovered: &Rc<RefCell<bool>>,
+    has_mouse_down: &Rc<RefCell<Option<MouseDownEvent>>>,
+    listener: impl Fn(&bool, &mut Window, &mut App) + 'static,
+    hitbox: &Hitbox,
+    mode: HoverListenerMode,
+) -> Rc<dyn Fn(&bool, &mut Window, &mut App)> {
+    let tracked = HoveredListener {
+        was_hovered: was_hovered.clone(),
+        has_mouse_down: has_mouse_down.clone(),
+        listener: Rc::new(listener),
+        hitbox: hitbox.clone(),
+        mode,
+    };
+    // A listener hearing it is hovered is painted with this hitbox now.
+    if *was_hovered.borrow() {
+        note_hovered(window, &tracked);
+    }
+    Rc::new(
+        move |is_hovered: &bool, window: &mut Window, cx: &mut App| {
+            tracked.heard(*is_hovered, window);
+            (tracked.listener)(is_hovered, window, cx);
+        },
+    )
+}
+
 /// Keeps `listener` as a hovered one, with the hitbox it was just painted with.
-pub(crate) fn note_hovered(window: &mut Window, listener: &HoveredListener) {
+fn note_hovered(window: &mut Window, listener: &HoveredListener) {
     let hovered = &mut window.fast_layers.hover_freeze.hovered;
     match hovered
         .iter_mut()
