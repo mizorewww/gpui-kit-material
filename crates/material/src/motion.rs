@@ -25,6 +25,8 @@ use std::cell::Cell;
 use std::time::Duration;
 
 pub mod expressive;
+mod repeat;
+pub use repeat::{RepeatAnimationPlayback, RepeatWhenVisible, RepeatWhenVisibleExt};
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum MotionScheme {

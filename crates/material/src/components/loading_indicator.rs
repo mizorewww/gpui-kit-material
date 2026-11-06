@@ -7,6 +7,7 @@
 //! The shapes and their morphs come from [`crate::shapes`], with Compose's
 //! `LoadingIndicator.kt` scale factor and centering; each frame is painted as
 //! one GPUI path.
+use crate::motion::{RepeatAnimationPlayback, RepeatWhenVisibleExt as _};
 use crate::{
     color::ColorRole,
     motion::Spring,
@@ -375,24 +376,18 @@ impl RenderOnce for LoadingIndicator {
             let canvas = held_canvas(frame, ink, &self.id, window, cx);
             return root.child(canvas);
         }
-        let animation = Animation::new(Duration::from_secs_f32(LOOP_MS / 1000.)).repeat();
+        let period = Duration::from_secs_f32(LOOP_MS / 1000.);
         let paint =
             move |slot: Div, t| slot.child(shape_canvas(loading_indicator_frame(t * LOOP_MS), ink));
-        let slot = div().size_full();
-        match self.playback {
-            // GPUI's stock repeating animation: its clock, and holding the
-            // first frame under reduced motion, are the element's own. It draws
-            // inside its bounds, so nothing calls for frames while it is clipped.
-            None => root.child(
-                slot.with_animation(self.id, animation, paint)
-                    .repeat_when_visible(),
-            ),
-            Some(playback) => root.child(
-                slot.with_animation(self.id, animation, paint)
-                    .with_repeat_playback(playback)
-                    .repeat_when_visible(),
-            ),
-        }
+        // The element's own clock unless the caller keeps one; it holds the first
+        // frame under reduced motion. It draws inside its bounds, so nothing calls
+        // for frames while it is clipped.
+        root.child(
+            div()
+                .size_full()
+                .repeat_when_visible(self.id, period, paint)
+                .playback(self.playback),
+        )
     }
 }
 
