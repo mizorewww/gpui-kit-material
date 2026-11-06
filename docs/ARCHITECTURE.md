@@ -152,13 +152,16 @@ as the dependency. CI builds that manifest from Git at the pushed commit
 from this checkout, on every target and both backends, beside upstream's `gpui-fps`.
 Its engine has upstream's `FrameEvent`, `PlatformWindow` and frame path.
 
-| Consumer crate | Why a consumer needs it |
-| --- | --- |
-| `gpui-kit` | Normalized manifest that keeps WASM single-threaded by default. |
-| `gpui-base` | Slider, dialog and toolbar corrections, transition behavior, and the input reporting its caret. |
-| `gpui-pre`, `gpui-fast` | The lazy tab-stop index, the quiet global swap, and the other engine rules in the table below. |
-| `gpui-pre-apple`, `gpui-fast-apple` | Non-Latin and app-private fallback fonts. |
-| `gpui-pre-web`, `gpui-fast-web` | The browser's IME panel opens at the caret; upstream's `update_ime_position` does nothing. Only matters on `wasm32`. |
+"To build" marks a patch whose API Material calls, so a consumer cannot build without
+it; the others change behavior only.
+
+| Consumer crate | To build | Why a consumer needs it |
+| --- | --- | --- |
+| `gpui-kit` | no | Normalized manifest that keeps WASM single-threaded by default. |
+| `gpui-base` | yes | Open upstream PRs (table below): transition reversal, per-transition reduced motion and `TransitionPlayback`, which Material calls; the vertical `Toolbar` axis, slider step snapping and block surfaces in `TextView`. |
+| `gpui-pre`, `gpui-fast` | yes | `App::swap_global_quietly`, which a `Scope`'s Kit theme and the text field's caret color use; it is the only engine API Material still needs. Behavior only: the lazy tab-stop index, `em` metrics for fonts without `m`, hanging overflow spaces and, in Fast, `record_entities_accessed`, which are being offered upstream. |
+| `gpui-pre-apple`, `gpui-fast-apple` | no | Non-Latin and app-private fallback fonts. |
+| `gpui-pre-web`, `gpui-fast-web` | no | The browser's IME panel opens at the caret; upstream's `update_ime_position` does nothing. Only matters on `wasm32`. |
 
 Everything else in `vendor/` is a **dev-only overlay**, marked in the table below,
 for the Gallery's FPS display
