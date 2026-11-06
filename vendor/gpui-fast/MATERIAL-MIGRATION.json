@@ -276,8 +276,8 @@
       },
       "src/fast/layers/hover_freeze.rs": {
         "upstream_sha256": "a8273a396988f3c420a9008525b20dbb8056d4751b4df395200f35ae4a9913d8",
-        "local_sha256": "ec86e9cf6315893dd2a480c0935d445557ac37cea4bf0a7a99e647ba1bc3da06",
-        "reason": "Doc: the freeze covers hover listeners for any input modality. Tracks the hover listeners that last heard true, and tells those a frame without the freeze left off the pointer, painted or not."
+        "local_sha256": "637b333e4d0588b4dec48c0614d3a3b3a68bec64f2a7c109da6f87e86a7aa2a2",
+        "reason": "Doc: the freeze covers hover listeners for any input modality. Tracks the hover listeners that last heard true, and tells those a frame without the freeze left off the pointer, painted or not. A pending press keeps a listener hovered only while its element's hitbox is still drawn, so a pressed element removed before the release hears its hover end and is not held (upstream review of longbridge/gpui-fast#105)."
       },
       "src/fast/layers/reuse.rs": {
         "upstream_sha256": "8259c4c5b53a8d9818786dbdedc377b8da4a8b1c84baafa65dd89cfb562b3f3f",
@@ -306,8 +306,8 @@
       },
       "src/fast/tests/layers_lists.rs": {
         "upstream_sha256": "d6cdd3cece19db6931bbcf2dcf5d7cda980eab7a507fee79f6f55444da53d0cf",
-        "local_sha256": "0c3e46667d160e071c55a6a13ec28979d3ffa4cf58c757743a30ef196917f863",
-        "reason": "Test: hover held still reaches no input-modality-independent listener. Test: a row scrolled away under a freeze hears its hover end."
+        "local_sha256": "bf5a4d1031166e2d97aa549083f38d08fbe8223efe4867683e1c2879f01a7baa",
+        "reason": "Test: hover held still reaches no input-modality-independent listener. Test: a row scrolled away under a freeze hears its hover end. Test: a pressed element removed before the release hears its hover end."
       },
       "src/fast/tests/retained.rs": {
         "upstream_sha256": "95fbb8389daf15e227312b07d2794ba109406071a780d3f4d9224e61f722173b",
