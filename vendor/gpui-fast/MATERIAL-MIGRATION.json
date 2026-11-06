@@ -299,11 +299,6 @@
         "local_sha256": "a41e607fe922ddd80e5a726a4784e307118fa56f5f831ed155cee70276a79ec7",
         "reason": "Tests of branch material/wheel-at-limit (8dfeaa1), as on that branch."
       },
-      "src/fast/text.rs": {
-        "upstream_sha256": "3505d68e4a644b286521770bd26009667d21a4fa2e33c9bf06e87215dd61f3ea",
-        "local_sha256": "85b07cfc96c89d1c323b6a2cca1d3cf200737b195d9bc67ae335bc4dd31bd1fb",
-        "reason": "Text measurement and shaping with letter spacing (vendor/gpui-pre/letter-spacing-patch.md)."
-      },
       "src/platform.rs": {
         "upstream_sha256": "a06df279dbf86a25d6eaf50b94ad9f2bd9ef9a5ea02ad75d5e145fcfbb5a9d59",
         "local_sha256": "cffa5ccc35433079e30812e40a892bb827b05f699bf4054bb83c592f944ed6ee",
@@ -331,13 +326,8 @@
       },
       "src/style.rs": {
         "upstream_sha256": "6a71ba312dc690b6e71793f5cf5590342612daffc9887f2511f006e2b86f3ba2",
-        "local_sha256": "4729a82f438864dca13bed04a5e8316638ad97f5f95bdcec9aeeb51d3846a979",
-        "reason": "Replace unpublished util_macros #[perf] with #[test] (vendor/gpui-pre/test-harness-patch.md). TextStyle::letter_spacing (vendor/gpui-pre/letter-spacing-patch.md)."
-      },
-      "src/styled.rs": {
-        "upstream_sha256": "94ecc23fb711e38ba674772cec54beee820d5cdafdc14de3bcfe101bf7ab984a",
-        "local_sha256": "a4901dab7fc76992e7937169c96c2bf4f0d7db65a7aab9755303f7906584be23",
-        "reason": "Styled::letter_spacing (vendor/gpui-pre/letter-spacing-patch.md)."
+        "local_sha256": "a623f5225d601508a52ac034e2f36a57dc9919e7e9c1a3d6b199a5a30a544b27",
+        "reason": "Replace unpublished util_macros #[perf] with #[test] (vendor/gpui-pre/test-harness-patch.md)."
       },
       "src/svg_renderer.rs": {
         "upstream_sha256": "4f002bcfa1be479e77665c6144629ab95a932e55e52d29142e46f31949e958ca",
@@ -351,18 +341,18 @@
       },
       "src/text_system.rs": {
         "upstream_sha256": "0b6dc4e8a62d272d1061d1590c53a94415c18cbe9d9f49d389d8c755ed603f4e",
-        "local_sha256": "71d2aa65ffbb27a0db3bfe97cd43381e95685f9593eb97f10e56e2ca6732b4f2",
-        "reason": "em_width/em_advance fallback (vendor/gpui-pre/em-fallback-patch.md). shape_text_spaced (vendor/gpui-pre/letter-spacing-patch.md)."
+        "local_sha256": "390759ee3fc3848d8383dec212056645b14a8d85e27bbf78eff2f6f3e5c81409",
+        "reason": "em_width/em_advance fallback (vendor/gpui-pre/em-fallback-patch.md)."
       },
       "src/text_system/line_layout.rs": {
         "upstream_sha256": "b89f78643cf253656f4d990c90c84ca1175cb0747dd827c13650fccc6702795e",
-        "local_sha256": "d4a92f6aeeb1af6ee276957166f2417ff1714974bc808de9842065792bd2366d",
-        "reason": "Spaced line layouts in the cache key and apply_letter_spacing; layout_wrapped_line_spaced replaces layout_wrapped_line, which nothing outside the crate could reach (vendor/gpui-pre/letter-spacing-patch.md). Hanging overflow space in compute_wrap_boundaries (vendor/gpui-pre/hanging-space-patch.md)."
+        "local_sha256": "a6154102dccdd88dc55416ec8a7466f5a6459690a12ca1ee13d89fb651b70d97",
+        "reason": "Hanging overflow space in compute_wrap_boundaries (vendor/gpui-pre/hanging-space-patch.md)."
       },
       "src/text_system/line_wrapper.rs": {
         "upstream_sha256": "8912c5d16dc00bbcc1f19f56c2f2f4e3b826aa244b4f7c04c62a3934b22f7c4f",
-        "local_sha256": "a718bb0efbf5e37a5a4cca860f1829dcdf96da368138013656c59b321d4a4ebb",
-        "reason": "Hanging overflow space: a space that overflows a row after content no longer starts the next row; it hangs past the edge and the following word is the break (LineWrapper::wrap_line, the multi-line truncation that replicates it in Fast, LineLayout::compute_wrap_boundaries), with tests (vendor/gpui-pre/hanging-space-patch.md). Letter spacing state (vendor/gpui-pre/letter-spacing-patch.md)."
+        "local_sha256": "fb5698fdef112a5daf981103ad2af0eb60ca854e134a03f297901cf28f6bc952",
+        "reason": "Hanging overflow space: a space that overflows a row after content no longer starts the next row; it hangs past the edge and the following word is the break (LineWrapper::wrap_line, the multi-line truncation that replicates it in Fast, LineLayout::compute_wrap_boundaries), with tests (vendor/gpui-pre/hanging-space-patch.md)."
       },
       "src/window.rs": {
         "upstream_sha256": "a6b900b49d9a5c8ae2ac32083251a7979b8730008f5e643155ddb56716c0b6c7",
@@ -406,6 +396,6 @@
         "reason": "Package-level lockfile not retained; the workspace Cargo.lock owns resolution."
       }
     },
-    "unchanged_file_count": 145
+    "unchanged_file_count": 147
   }
 }
