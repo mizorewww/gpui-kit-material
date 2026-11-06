@@ -674,12 +674,8 @@ impl ClockDial {
 }
 
 impl RenderOnce for ClockDial {
-    /// A clock does not mirror: its numerals keep their places in every direction.
-    fn render(self, _: &mut Window, _: &mut App) -> impl IntoElement {
-        let id = self.id.clone();
-        crate::scope::Scope::new((id, "clock-direction"))
-            .direction(crate::scope::LayoutDirection::Ltr)
-            .child_with(move |window, cx| self.render_dial(window, cx))
+    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
+        self.render_dial(window, cx)
     }
 }
 
@@ -1404,10 +1400,6 @@ impl RenderOnce for TimePicker {
                     label,
                 ))
             });
-        // A clock reads hours first whatever the text around it does.
-        let time_row = crate::scope::Scope::new(named(&id, "time-row"))
-            .direction(LayoutDirection::Ltr)
-            .child(time_row);
         let dial = if specimen {
             ClockDial::specimen(named(&id, "dial"), labels.clone(), time, unit, format)
         } else {
@@ -1618,10 +1610,6 @@ impl RenderOnce for TimePicker {
                             )
                             .into_any_element()
                     });
-                // Hours first here too, as on the dial.
-                let input = crate::scope::Scope::new(named(&id, "field-direction"))
-                    .direction(LayoutDirection::Ltr)
-                    .child(input);
                 surface
                     .gap(rem(20.))
                     .child(header)

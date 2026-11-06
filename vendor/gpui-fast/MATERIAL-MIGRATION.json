@@ -236,8 +236,8 @@
       },
       "src/app.rs": {
         "upstream_sha256": "4c2fc3737887421d536e7559a4c811c7877ee7c486ab7045bbbd62bc4f8e3692",
-        "local_sha256": "b484f865ab7bb0509936e78a53540bbb5391c088c7aa6762d8e853410d82cae0",
-        "reason": "CpuFrameScope around initial and test-app draws (vendor/gpui-pre/cpu-frame-scope-patch.md). GPUI-core engine patch, kept local: App::record_entities_accessed is GPUI core (the same function as gpui-pre 0.3.11's), and it now updates only the entities that entered or left the tracked set instead of removing and re-inserting all of them each frame; the resulting maps are identical. vendor/gpui-pre does not carry this change. Application layout direction (vendor/gpui-pre/layout-direction-patch.md). App::swap_global_quietly (vendor/gpui-pre/quiet-global-swap-patch.md)."
+        "local_sha256": "6a978bd4db2a2d8fba977228cc22929769ae3506df7831bb36ebae5fc69a02b3",
+        "reason": "CpuFrameScope around initial and test-app draws (vendor/gpui-pre/cpu-frame-scope-patch.md). GPUI-core engine patch, kept local: App::record_entities_accessed is GPUI core (the same function as gpui-pre 0.3.11's), and it now updates only the entities that entered or left the tracked set instead of removing and re-inserting all of them each frame; the resulting maps are identical. vendor/gpui-pre does not carry this change. App::swap_global_quietly (vendor/gpui-pre/quiet-global-swap-patch.md)."
       },
       "src/app/bench_context.rs": {
         "upstream_sha256": "2fe59222d05a2dead8cf3e12ed00f61e90362f7a04cadc468e1ef9b08f7c8e47",
@@ -259,11 +259,6 @@
         "local_sha256": "727f26f84edc1c724b31931264ee7d967bede63a40df54271c613cedec0a65b5",
         "reason": "Material performance patches offered upstream, in the shape of their PR branches on mizorewww/gpui-fast: a wheel's hover freeze holds hover listeners of any input modality while a frame is drawn, through hover_freeze::track_listener and holds_listeners (material/hover-freeze-listeners), and the scroll-wheel listener returns for a wheel that cannot move the offset, through wheel::scroll_max and wheel::moves (material/wheel-at-limit): no notify, retained-subtree invalidation or note_scrolled."
       },
-      "src/elements/text.rs": {
-        "upstream_sha256": "10eafa86282d74c0060b8cb936a0421c6cb48ee016f65c406b88868f28e3d75d",
-        "local_sha256": "d9218bc52d48b7760ef0640e9cc278e6cac70a3876ac7d7ec72ebf79f6a9c4d0",
-        "reason": "Logical text alignment (vendor/gpui-pre/layout-direction-patch.md)."
-      },
       "src/fast/dependencies.rs": {
         "upstream_sha256": "a421eab09d4f6f976b564f64e8c9d4393d5860d453f80ac43cfdd08b089282c1",
         "local_sha256": "0e1284863e2620ee2f91201b7e07bc74fef0b113fe38205be22704b905ae060f",
@@ -279,20 +274,10 @@
         "local_sha256": "5ecdaeb965b295632b25311f1f9e751d72237536ec6367198f8a290201eac20a",
         "reason": "Equals branch material/wheel-at-limit (8dfeaa1) on mizorewww/gpui-fast, ported to 0.1.13: scroll_max and moves, which the scroll-wheel listener in src/elements/div.rs uses to ignore a wheel that cannot move its scroll container."
       },
-      "src/fast/layout.rs": {
-        "upstream_sha256": "65bcbd49c784363b25c67b9e536c48ac9f741e170f0160a1e822ebf1b543d3c5",
-        "local_sha256": "7e19b52b61070977e31623ed8eb9132681265102275f1aa81de1f1ff5f54b49e",
-        "reason": "Forgets released nodes in the mirrored set (vendor/gpui-pre/layout-direction-patch.md)."
-      },
-      "src/fast/rounded_clip.rs": {
-        "upstream_sha256": "d80d082a83591b472225fcc821c2ed8ffa27ec29efc82b12c3d3cf77006a8b19",
-        "local_sha256": "c751391f1af269c08025381ed9ce508562c551f2b3dea046f9d010f3822d0e1c",
-        "reason": "Mirrored clip in right-to-left layout (vendor/gpui-pre/layout-direction-patch.md)."
-      },
       "src/fast/splice.rs": {
         "upstream_sha256": "d796d7528b8a2dfcef69cbe358a6f17a84ca385d78e06aa9c7092b54efeb674a",
-        "local_sha256": "bae7927e78f99d70536803ffcd7236cbcf36d5e46a5f767773a669e415da52ef",
-        "reason": "A view rebuilt alone keeps its direction (vendor/gpui-pre/layout-direction-patch.md). A spliced view forgets released entities when its dependency list grew; without it a window's root keeps every entity a page ever read and replays them each frame (Material performance patch; equals upstream PR longbridge/gpui-fast#106). Otherwise upstream 0.1.13: what a gap writes as it paints counts as a change to what the view around it read."
+        "local_sha256": "c6e4d69b5508891803bea4e4e963d603569d456e6a299097ba7c08d076352abb",
+        "reason": "A spliced view forgets released entities when its dependency list grew; without it a window's root keeps every entity a page ever read and replays them each frame (Material performance patch; equals upstream PR longbridge/gpui-fast#106). Otherwise upstream 0.1.13: what a gap writes as it paints counts as a change to what the view around it read."
       },
       "src/fast/tests/dependencies.rs": {
         "upstream_sha256": "131164fada000e865db0a14855e4eab5446f89b45e70a1904414408cd0cdb6b0",
@@ -318,11 +303,6 @@
         "upstream_sha256": "3505d68e4a644b286521770bd26009667d21a4fa2e33c9bf06e87215dd61f3ea",
         "local_sha256": "85b07cfc96c89d1c323b6a2cca1d3cf200737b195d9bc67ae335bc4dd31bd1fb",
         "reason": "Text measurement and shaping with letter spacing (vendor/gpui-pre/letter-spacing-patch.md)."
-      },
-      "src/geometry.rs": {
-        "upstream_sha256": "c28a238493c9fa423d860ca46b2e4741925a9d81f55671eeda1389408f2b9dd5",
-        "local_sha256": "8f7c297cc42d68ff6ae58565098c3c55b8b792b0188adac321f579f2eaadd9c6",
-        "reason": "LayoutDirection and Corners/Edges::flip_x (vendor/gpui-pre/layout-direction-patch.md)."
       },
       "src/platform.rs": {
         "upstream_sha256": "a06df279dbf86a25d6eaf50b94ad9f2bd9ef9a5ea02ad75d5e145fcfbb5a9d59",
@@ -351,8 +331,8 @@
       },
       "src/style.rs": {
         "upstream_sha256": "6a71ba312dc690b6e71793f5cf5590342612daffc9887f2511f006e2b86f3ba2",
-        "local_sha256": "f85c9530c62e7be4fc2c26accae580989176a7ec66fcdf8cad63f7c38dfd1ebd",
-        "reason": "Replace unpublished util_macros #[perf] with #[test] (vendor/gpui-pre/test-harness-patch.md). Mirrored corner radii and border widths when painting; TextAlign::in_direction (vendor/gpui-pre/layout-direction-patch.md). TextStyle::letter_spacing (vendor/gpui-pre/letter-spacing-patch.md)."
+        "local_sha256": "4729a82f438864dca13bed04a5e8316638ad97f5f95bdcec9aeeb51d3846a979",
+        "reason": "Replace unpublished util_macros #[perf] with #[test] (vendor/gpui-pre/test-harness-patch.md). TextStyle::letter_spacing (vendor/gpui-pre/letter-spacing-patch.md)."
       },
       "src/styled.rs": {
         "upstream_sha256": "94ecc23fb711e38ba674772cec54beee820d5cdafdc14de3bcfe101bf7ab984a",
@@ -368,11 +348,6 @@
         "upstream_sha256": "0c14aec0196ad632601015e166dfcd3df72228292646120bbc3857c3631cd680",
         "local_sha256": "1675934f90bd8dec84cb920dec09587c3681a5bc843fb8a0bebd9e8203eda120",
         "reason": "Material performance patch: TabStopMap records only its insertion history while painting and builds the tab order and focus lookup lazily on the first query (Tab navigation, a11y dump); query results unchanged. Replaying a reused view's or composited layer's tab stops no longer updates a SumTree per insertion."
-      },
-      "src/taffy.rs": {
-        "upstream_sha256": "8086381577b4e5f298e46c9f50a4a0ddc221016d0024c1dde9911658e0e54859",
-        "local_sha256": "dcfa82d73005d7ca2b8d33c7df799855b49c0b76752a7f90833ceef9c66f4cd7",
-        "reason": "Mirrors children of right-to-left nodes in layout_bounds (vendor/gpui-pre/layout-direction-patch.md)."
       },
       "src/text_system.rs": {
         "upstream_sha256": "0b6dc4e8a62d272d1061d1590c53a94415c18cbe9d9f49d389d8c755ed603f4e",
@@ -391,8 +366,8 @@
       },
       "src/window.rs": {
         "upstream_sha256": "a6b900b49d9a5c8ae2ac32083251a7979b8730008f5e643155ddb56716c0b6c7",
-        "local_sha256": "6b7c8aed8612dc6901a3376c1919e00677a562a0e9a5716558284a4ce9a7a8d5",
-        "reason": "Same GPUI window patches as vendor/gpui-pre (CPU frame scope, submission stats/vsync/throttle retry, present outcome, focused_input_selection_bounds); FrameDirtyAccumulator made pub(crate) to match the public field holding it, used nowhere else. Layout direction on the window, recorded per layout node (vendor/gpui-pre/layout-direction-patch.md). Draw ends with hover_freeze::release_unhovered."
+        "local_sha256": "6de10e675ffc6e682c3d84a7140676723ad033765bd291911baa8b800e008275",
+        "reason": "Same GPUI window patches as vendor/gpui-pre (CPU frame scope, submission stats/vsync/throttle retry, present outcome, focused_input_selection_bounds); FrameDirtyAccumulator made pub(crate) to match the public field holding it, used nowhere else. Draw ends with hover_freeze::release_unhovered."
       }
     },
     "added": {
@@ -431,6 +406,6 @@
         "reason": "Package-level lockfile not retained; the workspace Cargo.lock owns resolution."
       }
     },
-    "unchanged_file_count": 140
+    "unchanged_file_count": 145
   }
 }

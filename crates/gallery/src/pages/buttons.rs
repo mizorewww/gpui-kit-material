@@ -738,24 +738,21 @@ impl GalleryPage for Page {
                     .flex_col()
                     .gap(rem(12.))
                     .when(size_index == 0, |column| {
-                        column.child(spec::small_label("button-icons", "Icons and direction"))
+                        column.child(spec::small_label("button-icons", "Icons"))
                     })
                     .child(spec::demo_row().children(
                         [
-                            ("Leading", ButtonIconPosition::Leading, ButtonDirection::Ltr, ButtonVariant::Filled),
-                            ("Trailing", ButtonIconPosition::Trailing, ButtonDirection::Ltr, ButtonVariant::Filled),
-                            ("RTL leading", ButtonIconPosition::Leading, ButtonDirection::Rtl, ButtonVariant::Text),
-                            ("RTL trailing", ButtonIconPosition::Trailing, ButtonDirection::Rtl, ButtonVariant::Text),
+                            ("Leading", ButtonIconPosition::Leading),
+                            ("Trailing", ButtonIconPosition::Trailing),
                         ]
                         .into_iter()
                         .enumerate()
-                        .map(|(position_index, (label, position, direction, variant))| {
-                            let sample = size_index * 4 + position_index;
-                            material_button(("icon", sample), variant)
+                        .map(|(position_index, (label, position))| {
+                            let sample = size_index * 2 + position_index;
+                            material_button(("icon", sample), ButtonVariant::Filled)
                                 .button_size(size)
                                 .icon(IconName::Check)
                                 .icon_position(position)
-                                .direction(direction)
                                 .child(label)
                                 .reveal(("reveal-icon", sample), &list)
                         }),

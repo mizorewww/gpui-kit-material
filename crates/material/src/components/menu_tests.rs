@@ -93,15 +93,11 @@ struct ContextHarness {
     picked: Rc<Cell<usize>>,
     built: Rc<Cell<usize>>,
     focus: FocusHandle,
-    rtl: bool,
 }
 
 impl Render for ContextHarness {
     fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
         window.set_rem_size(px(14.));
-        if self.rtl {
-            window.set_layout_direction(gpui::LayoutDirection::Rtl);
-        }
         let (picked, built) = (self.picked.clone(), self.built.clone());
         let region = move |id: &'static str, label: &'static str| {
             let (picked, built) = (picked.clone(), built.clone());
@@ -137,10 +133,7 @@ impl Render for ContextHarness {
     }
 }
 
-fn context_menu(
-    cx: &mut TestAppContext,
-    rtl: bool,
-) -> (Entity<ContextHarness>, &mut VisualTestContext) {
+fn context_menu(cx: &mut TestAppContext) -> (Entity<ContextHarness>, &mut VisualTestContext) {
     cx.update(|cx| {
         gpui_kit::init(cx);
         crate::init(cx);
@@ -150,7 +143,6 @@ fn context_menu(
         picked: Rc::default(),
         built: Rc::default(),
         focus: cx.focus_handle(),
-        rtl,
     });
     settle(cx);
     (view, cx)
@@ -164,7 +156,7 @@ fn right_press(cx: &mut VisualTestContext, at: Point<Pixels>) {
 
 #[gpui::test]
 fn a_right_press_opens_the_menu_at_the_pointer(cx: &mut TestAppContext) {
-    let (view, cx) = context_menu(cx, false);
+    let (view, cx) = context_menu(cx);
     let built = view.update(cx, |v, _| v.built.clone());
     assert_eq!(built.get(), 0, "nothing is built before the press");
     let row = cx.debug_bounds("row").unwrap();
@@ -188,18 +180,8 @@ fn a_right_press_opens_the_menu_at_the_pointer(cx: &mut TestAppContext) {
 }
 
 #[gpui::test]
-fn a_right_press_opens_the_menu_at_the_pointer_right_to_left(cx: &mut TestAppContext) {
-    let (_, cx) = context_menu(cx, true);
-    let row = cx.debug_bounds("row").unwrap();
-    let at = row.origin + point(px(200.), px(150.));
-    right_press(cx, at);
-    let menu = cx.debug_bounds("material-menu").expect("the menu opened");
-    assert_eq!(menu.right(), at.x, "its start is at the pointer");
-}
-
-#[gpui::test]
 fn an_activated_context_item_runs_and_the_menu_leaves_the_tree(cx: &mut TestAppContext) {
-    let (view, cx) = context_menu(cx, false);
+    let (view, cx) = context_menu(cx);
     let (picked, built) = view.update(cx, |v, _| (v.picked.clone(), v.built.clone()));
     let row = cx.debug_bounds("row").unwrap();
     right_press(cx, row.origin + point(px(200.), px(150.)));
@@ -215,7 +197,7 @@ fn an_activated_context_item_runs_and_the_menu_leaves_the_tree(cx: &mut TestAppC
 
 #[gpui::test]
 fn escape_closes_a_context_menu_and_returns_focus(cx: &mut TestAppContext) {
-    let (view, cx) = context_menu(cx, false);
+    let (view, cx) = context_menu(cx);
     let focus = view.update(cx, |v, _| v.focus.clone());
     cx.update(|window, cx| focus.focus(window, cx));
     settle(cx);
@@ -232,7 +214,7 @@ fn escape_closes_a_context_menu_and_returns_focus(cx: &mut TestAppContext) {
 
 #[gpui::test]
 fn a_press_outside_closes_a_context_menu(cx: &mut TestAppContext) {
-    let (_, cx) = context_menu(cx, false);
+    let (_, cx) = context_menu(cx);
     let row = cx.debug_bounds("row").unwrap();
     right_press(cx, row.origin + point(px(200.), px(150.)));
     assert!(cx.debug_bounds("material-menu").is_some());
@@ -244,7 +226,7 @@ fn a_press_outside_closes_a_context_menu(cx: &mut TestAppContext) {
 
 #[gpui::test]
 fn the_innermost_context_menu_under_the_pointer_opens(cx: &mut TestAppContext) {
-    let (_, cx) = context_menu(cx, false);
+    let (_, cx) = context_menu(cx);
     let inner = cx.debug_bounds("inner").unwrap().center();
     right_press(cx, inner);
     assert!(cx.debug_bounds("inner-item").is_some());

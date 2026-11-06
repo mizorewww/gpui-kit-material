@@ -130,6 +130,17 @@ Distribution is by Git revision for now; see the [quick start](README.md#quick-s
 - Text wrapping: `?` and `!` stay off the start of a line, as other closing marks do. A
   long URL no longer wraps before `?`; it still wraps at `/` and `&`.
 
+### Removed
+
+- Right-to-left layout. GPUI has no layout direction and the engine patch that added
+  one is gone, so `gpui-kit-material` builds on published GPUI. Removed:
+  `scope::LayoutDirection` (and its prelude export), `scope::is_rtl`,
+  `scope::set_app_direction`, `scope::set_window_direction`, `Scope::direction`,
+  `Icon::directional`, `ButtonDirection` and `MaterialButton::direction`,
+  `DividerDirection` and `MaterialDivider::direction`, and the Gallery's RTL switch
+  and `--rtl` capture option. `scope::horizontal_arrow` no longer takes a direction.
+  Left-to-right layout is unchanged.
+
 ### Fixed
 
 - A `notice_banner`'s icon stands beside its text's first line, centred on it at any text

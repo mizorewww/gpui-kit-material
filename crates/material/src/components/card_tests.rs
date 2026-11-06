@@ -305,31 +305,27 @@ fn a_material_card_clicks_drags_and_springs_home(cx: &mut TestAppContext) {
     assert_eq!(clicks.get(), 2);
 }
 
-struct RtlCard;
-impl Render for RtlCard {
+struct DragCard;
+impl Render for DragCard {
     fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
         window.set_rem_size(px(14.));
-        crate::scope::Scope::new("rtl-card")
-            .direction(gpui::LayoutDirection::Rtl)
-            .child(
-                div().p(px(40.)).child(
-                    super::MaterialCard::new("action-card", CardVariant::Elevated)
-                        .draggable(true)
-                        .w(px(100.))
-                        .child(
-                            div()
-                                .h(px(60.))
-                                .debug_selector(|| "action-card-body".into()),
-                        ),
+        div().p(px(40.)).child(
+            super::MaterialCard::new("action-card", CardVariant::Elevated)
+                .draggable(true)
+                .w(px(100.))
+                .child(
+                    div()
+                        .h(px(60.))
+                        .debug_selector(|| "action-card-body".into()),
                 ),
-            )
+        )
     }
 }
 
 #[gpui::test]
-fn a_dragged_card_stays_under_the_pointer_right_to_left(cx: &mut TestAppContext) {
+fn a_dragged_card_stays_under_the_pointer(cx: &mut TestAppContext) {
     use gpui::{Modifiers, MouseButton, point};
-    let (_, cx) = cx.add_window_view(|_, _| RtlCard);
+    let (_, cx) = cx.add_window_view(|_, _| DragCard);
     cx.run_until_parked();
     super::tests::redraw(cx);
     let home = cx.debug_bounds("action-card-body").unwrap();

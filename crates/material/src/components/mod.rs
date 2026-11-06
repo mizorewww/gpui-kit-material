@@ -7,9 +7,9 @@
 mod button;
 #[cfg(feature = "buttons")]
 pub use button::{
-    ButtonDirection, ButtonIconPosition, ButtonProgressPlayback, ButtonShape, ButtonSize,
-    ButtonTone, ButtonTransitionInputs, ButtonTransitionPlayback, ButtonVariant, FabSize,
-    IconButtonWidth, MaterialButton, material_button,
+    ButtonIconPosition, ButtonProgressPlayback, ButtonShape, ButtonSize, ButtonTone,
+    ButtonTransitionInputs, ButtonTransitionPlayback, ButtonVariant, FabSize, IconButtonWidth,
+    MaterialButton, material_button,
 };
 #[cfg(feature = "buttons")]
 mod fab;
@@ -59,9 +59,7 @@ mod switch;
 #[cfg(feature = "navigation")]
 mod toolbar;
 #[cfg(feature = "containment")]
-pub use divider::{
-    DividerContext, DividerDirection, DividerOrientation, DividerVariant, MaterialDivider,
-};
+pub use divider::{DividerContext, DividerOrientation, DividerVariant, MaterialDivider};
 #[cfg(feature = "inputs")]
 pub use search::{
     SEARCH_BAR_HEIGHT, SEARCH_SUGGESTION_HEIGHT, SearchField, SearchFieldStyle, SearchSuggestion,

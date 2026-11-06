@@ -165,7 +165,6 @@ pub(crate) struct Roving {
     orientation: Orientation,
     select_on_focus: Option<Select>,
     reveal: Option<ScrollHandle>,
-    rtl: bool,
     exit_start: Option<Exit>,
 }
 
@@ -173,13 +172,6 @@ pub(crate) struct Roving {
 pub(crate) type Exit = Rc<dyn Fn(&mut Window, &mut App)>;
 
 impl Roving {
-    /// Resolve left and right arrows for this direction. Key handling runs
-    /// after the draw, outside any scope, so the caller passes what it rendered in.
-    pub(crate) fn rtl(mut self, rtl: bool) -> Self {
-        self.rtl = rtl;
-        self
-    }
-
     /// One focus handle per item; every item can take focus until
     /// [`Roving::skip`] says otherwise.
     pub(crate) fn new(focus: impl Into<Rc<[FocusHandle]>>, orientation: Orientation) -> Self {
@@ -191,7 +183,6 @@ impl Roving {
             orientation,
             select_on_focus: None,
             reveal: None,
-            rtl: false,
             exit_start: None,
         }
     }
@@ -282,11 +273,6 @@ impl Roving {
         let previous = self.clone();
         let right = self.clone();
         let left = self.clone();
-        let (toward_right, toward_left) = if self.rtl {
-            (Direction::Previous, Direction::Next)
-        } else {
-            (Direction::Next, Direction::Previous)
-        };
         let first = self.clone();
         let context = self.orientation.context();
         let last = self;
@@ -299,9 +285,11 @@ impl Roving {
                 previous.navigate(Direction::Previous, window, cx)
             })
             .on_action(move |_: &FocusRightItem, window, cx| {
-                right.navigate(toward_right, window, cx)
+                right.navigate(Direction::Next, window, cx)
             })
-            .on_action(move |_: &FocusLeftItem, window, cx| left.navigate(toward_left, window, cx))
+            .on_action(move |_: &FocusLeftItem, window, cx| {
+                left.navigate(Direction::Previous, window, cx)
+            })
             .on_action(move |_: &FocusFirstItem, window, cx| {
                 first.navigate(Direction::First, window, cx)
             })

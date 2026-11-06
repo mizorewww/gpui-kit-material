@@ -7,8 +7,7 @@
 //! `PaneMotion.kt`, `PaneExpansionState.kt` and
 //! `ThreePaneScaffoldNavigator.kt` at
 //! `19991f2c0858aadfcb442ce02b2c8e4743c96898`. Levitated panes and hinges are
-//! not ported, as in m3e. Lengths are dp; geometry is in reading order, which
-//! the layout mirrors under a right-to-left direction.
+//! not ported, as in m3e. Lengths are dp; geometry runs left to right.
 //!
 //! Copyright 2023 The Android Open Source Project. Licensed under the Apache
 //! License, Version 2.0: see `LICENSE-androidx` in this directory.

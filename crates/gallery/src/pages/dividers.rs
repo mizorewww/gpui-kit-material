@@ -23,23 +23,16 @@ impl GalleryPage for Page {
         match row {
             0 => board("horizontal-dividers")
                 .caption("Horizontal")
-                .row_labels([
-                    "Full width",
-                    "Inset",
-                    "Middle inset",
-                    "Inset · RTL",
-                    "With subhead",
-                ])
+                .row_labels(["Full width", "Inset", "Middle inset", "With subhead"])
                 .cells(
                     [
-                        (DividerVariant::FullWidth, DividerDirection::Ltr),
-                        (DividerVariant::Inset, DividerDirection::Ltr),
-                        (DividerVariant::MiddleInset, DividerDirection::Ltr),
-                        (DividerVariant::Inset, DividerDirection::Rtl),
+                        DividerVariant::FullWidth,
+                        DividerVariant::Inset,
+                        DividerVariant::MiddleInset,
                     ]
                     .into_iter()
                     .enumerate()
-                    .map(|(index, (variant, direction))| {
+                    .map(|(index, variant)| {
                         div()
                             .w(rem(320.))
                             .h(rem(24.))
@@ -49,8 +42,7 @@ impl GalleryPage for Page {
                             .bg(color(ColorRole::SURFACE_CONTAINER_HIGH))
                             .child(
                                 MaterialDivider::new(("horizontal-divider", index))
-                                    .variant(variant)
-                                    .direction(direction),
+                                    .variant(variant),
                             )
                             .into_any_element()
                     })

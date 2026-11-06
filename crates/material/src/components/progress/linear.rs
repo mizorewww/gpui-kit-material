@@ -265,10 +265,8 @@ pub(super) fn track_pieces(width: f32, active: &[(f32, f32)]) -> Vec<(f32, f32)>
 fn paint_bar(bounds: Bounds<Pixels>, active: Active, paint: BarPaint, window: &mut Window) {
     let width = f32::from(bounds.size.width);
     let x0 = f32::from(bounds.origin.x);
-    // Painted, so it does not mirror with layout: the bar fills from the start.
-    let rtl = crate::scope::is_rtl(window);
-    let at = |x: f32| if rtl { x0 + width - x } else { x0 + x };
-    let span = |a: f32, b: f32| if rtl { (at(b), at(a)) } else { (at(a), at(b)) };
+    let at = |x: f32| x0 + x;
+    let span = |a: f32, b: f32| (at(a), at(b));
     let cy = f32::from(bounds.center().y);
     let t = paint.thickness;
     let intervals: Vec<(f32, f32)> = match active {

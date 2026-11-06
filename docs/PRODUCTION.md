@@ -69,8 +69,6 @@ is **unverified**, never assumed.
   specification.
 - Text scale: layout holds at 100, 125, 150 and 200%, with no clipped or
   overlapping content.
-- RTL: mirrored layout, icons and keyboard direction, with a test. Directional
-  icons flip and others do not.
 - Contrast: correct in every reference theme at standard, medium and high
   contrast, light and dark.
 

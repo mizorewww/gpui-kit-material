@@ -405,9 +405,7 @@ impl Element for ButtonRipple {
         // Reference ripple z-index:0 covers the static label/icon as well as
         // the background; the separate focus outline is painted after us.
         self.child.paint(window, cx);
-        let rtl = window.layout_direction().is_rtl();
         let border = self.border.to_pixels(window.rem_size());
-        let border = if rtl { border.flip_x() } else { border };
         // CSS absolute inset:0 uses the padding box, while wave coordinates and
         // diameter come from the outer DOM bounds. Preserve its border-width
         // offset, including the inherited (not border-subtracted) corner radius.
@@ -419,7 +417,6 @@ impl Element for ButtonRipple {
             ),
         );
         let radius = self.radius.to_pixels(window.rem_size());
-        let radius = if rtl { radius.flip_x() } else { radius };
         for wave in &self.waves {
             if wave.opacity > 0.
                 && let Some(path) = super::ripple_clip::paint_path(

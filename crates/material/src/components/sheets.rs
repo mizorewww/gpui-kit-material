@@ -85,8 +85,6 @@ fn arrow_back() -> Icon {
         })
         .as_str(),
     ))
-    // Built from its path, it no longer knows it points along the reading order.
-    .directional(true)
 }
 
 /// The edge a side sheet docks to.
@@ -1313,10 +1311,6 @@ fn standing_sheet_shadow() -> Vec<BoxShadow> {
 mod tests {
     use super::*;
 
-    #[test]
-    fn the_back_arrow_mirrors_with_the_reading_direction() {
-        assert!(arrow_back().is_directional());
-    }
     use core::prelude::v1::test;
     use gpui::{Context, TestAppContext, VisualTestContext};
 

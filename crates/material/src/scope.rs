@@ -1,9 +1,7 @@
-//! Scoped theme and layout direction: a subtree painting with its own scheme,
-//! laying out in its own direction, or both.
+//! Scoped theme: a subtree painting with its own scheme.
 //!
-//! The application paints one scheme and has one direction ([`crate::theme`],
-//! [`set_app_direction`]), a window can override the direction
-//! ([`set_window_direction`]), and a [`Scope`] overrides either for a subtree.
+//! The application paints one scheme ([`crate::theme`]), and a [`Scope`]
+//! overrides it for a subtree.
 //!
 //! GPUI draws in three phases, so a scope is an element that re-enters itself
 //! around each of them: request_layout (which renders every `RenderOnce`
@@ -21,7 +19,7 @@
 //! # Limits
 //!
 //! A scope reaches what draws through it. These do not, and use the
-//! application's scheme and direction:
+//! application's scheme:
 //!
 //! - Kit overlays opened on its `Root` (Kit's dialog, sheet and notification
 //!   layers) and Kit's own tooltips, which draw outside the subtree. Material's
@@ -47,44 +45,23 @@ use gpui_kit::component::Theme as ComponentTheme;
 use std::cell::RefCell;
 use std::rc::Rc;
 
-pub use gpui::LayoutDirection;
-
-/// Whether `window` is laying out right to left here. Components read this
-/// while rendering, for the few things layout mirroring cannot reach: painted
-/// paths, pointer math and arrow keys.
-pub fn is_rtl(window: &Window) -> bool {
-    window.layout_direction().is_rtl()
-}
-
-/// Set the application's direction. Windows that have not chosen their own
-/// follow it and redraw; new windows start in it.
-pub fn set_app_direction(direction: LayoutDirection, cx: &mut App) {
-    cx.set_layout_direction(direction);
-}
-
-/// Set one window's direction, overriding the application's.
-pub fn set_window_direction(direction: LayoutDirection, window: &mut Window) {
-    window.set_layout_direction(direction);
-}
-
-/// An arrow key's logical effect here: `1` toward the end of the reading
-/// direction, `-1` toward its start. Other keys answer `None`.
-pub fn horizontal_arrow(key: &str, rtl: bool) -> Option<i32> {
-    let forward = match key {
-        "right" => 1,
-        "left" => -1,
-        _ => return None,
-    };
-    Some(if rtl { -forward } else { forward })
+/// A horizontal arrow key's effect: `1` for right (forward), `-1` for left
+/// (back). Other keys answer `None`.
+pub fn horizontal_arrow(key: &str) -> Option<i32> {
+    match key {
+        "right" => Some(1),
+        "left" => Some(-1),
+        _ => None,
+    }
 }
 
 type BuildChild = Box<dyn FnOnce(&mut Window, &mut App) -> AnyElement>;
 
-/// A subtree's overrides. Set a scheme, a direction or both.
+/// A subtree's scheme override.
 ///
 /// # Example
 ///
-/// A dark, right-to-left card inside a light, left-to-right window:
+/// A dark card inside a light window:
 ///
 /// ```
 /// use gpui_kit::{div, prelude::*};
@@ -93,14 +70,12 @@ type BuildChild = Box<dyn FnOnce(&mut Window, &mut App) -> AnyElement>;
 ///
 /// let card = Scope::new("dark-card")
 ///     .scheme(ThemeId::Baseline.scheme(ThemeMode::Dark, Contrast::Standard))
-///     .direction(LayoutDirection::Rtl)
-///     .child(div().bg(color(ColorRole::SURFACE)).child("مرحبا"));
+///     .child(div().bg(color(ColorRole::SURFACE)).child("Hello"));
 /// ```
 #[derive(gpui::IntoElement)]
 pub struct Scope {
     id: ElementId,
     scheme: Option<Scheme>,
-    direction: Option<LayoutDirection>,
     child: Option<AnyElement>,
     build: Option<BuildChild>,
 }
@@ -110,7 +85,6 @@ impl Scope {
         Self {
             id: id.into(),
             scheme: None,
-            direction: None,
             child: None,
             build: None,
         }
@@ -118,11 +92,6 @@ impl Scope {
     /// Paint the subtree with `scheme`, transitioning when it changes.
     pub fn scheme(mut self, scheme: Scheme) -> Self {
         self.scheme = Some(scheme);
-        self
-    }
-    /// Lay out and paint the subtree in `direction`.
-    pub fn direction(mut self, direction: LayoutDirection) -> Self {
-        self.direction = Some(direction);
         self
     }
     /// The subtree, already built. See the module's limits.
@@ -163,7 +132,7 @@ impl Scope {
         });
         // Cached views inside the scope do not know it changed, so a change
         // redraws them, once per step of a transition.
-        let key = (scheme.as_ref().map(|kit| kit.scheme), self.direction);
+        let key = scheme.as_ref().map(|kit| kit.scheme);
         let drawn = window.use_keyed_state((self.id.clone(), "scope-key"), cx, |_, _| key);
         if *drawn.read(cx) != key {
             drawn.update(cx, |drawn, _| *drawn = key);
@@ -173,7 +142,6 @@ impl Scope {
             frame: Rc::new(Frame {
                 outer: CURRENT.with(|current| current.borrow().clone()),
                 scheme,
-                direction: self.direction,
             }),
         }
     }
@@ -258,7 +226,6 @@ struct Frame {
     /// The enclosing scope, for draws deferred out of both.
     outer: Option<Rc<Frame>>,
     scheme: Option<Kit>,
-    direction: Option<LayoutDirection>,
 }
 
 impl Frame {
@@ -275,9 +242,8 @@ impl Frame {
             }
             theme::replace_scoped_scheme(Some(kit.scheme))
         });
-        let direction = self.direction.unwrap_or_else(|| window.layout_direction());
         let outer = CURRENT.with(|current| current.replace(Some(self.clone())));
-        let result = window.with_layout_direction(direction, |window| f(window, cx));
+        let result = f(window, cx);
         CURRENT.with(|current| current.replace(outer));
         if let (Some(kit), Some(previous)) = (&self.scheme, previous) {
             theme::replace_scoped_scheme(previous);
@@ -342,12 +308,8 @@ impl ResolvedScope {
             }
             theme::replace_scoped_scheme(Some(kit.scheme))
         });
-        let direction = self
-            .frame
-            .direction
-            .unwrap_or_else(|| window.layout_direction());
         let outer = CURRENT.with(|current| current.replace(Some(self.frame.clone())));
-        let result = window.with_layout_direction(direction, |window| f(window, cx));
+        let result = f(window, cx);
         CURRENT.with(|current| current.replace(outer));
         if let (Some(kit), Some(previous)) = (&self.frame.scheme, previous) {
             theme::replace_scoped_scheme(previous);

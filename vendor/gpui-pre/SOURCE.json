@@ -179,7 +179,6 @@
     "src/app/bench_context.rs",
     "src/elements/animation.rs",
     "src/elements/text.rs",
-    "src/geometry.rs",
     "src/platform.rs",
     "src/platform/test/window.rs",
     "src/profiler.rs",
@@ -189,7 +188,6 @@
     "src/styled.rs",
     "src/svg_renderer.rs",
     "src/tab_stop.rs",
-    "src/taffy.rs",
     "src/text_system.rs",
     "src/text_system/line_layout.rs",
     "src/text_system/line_wrapper.rs",
@@ -204,8 +202,8 @@
     },
     "src/app.rs": {
       "upstream_sha256": "7f5e2461c2506d63f2616bcdef083b3ca6c513feda9c6d761f345abdb3487814",
-      "local_sha256": "356b80ec5fe49494d27117df88edeb99ff3bf172cd0fcde1ac078e62649cfb5d",
-      "reason": "CpuFrameScope around the initial open_window draw and test-app draws (cpu-frame-scope-patch.md). Application layout direction (layout-direction-patch.md). App::swap_global_quietly (quiet-global-swap-patch.md)."
+      "local_sha256": "ca565104298d5c698eba2129d2dd1c6b644a6db6aaee6029392c7815a525f085",
+      "reason": "CpuFrameScope around the initial open_window draw and test-app draws (cpu-frame-scope-patch.md). App::swap_global_quietly (quiet-global-swap-patch.md)."
     },
     "src/app/bench_context.rs": {
       "upstream_sha256": "37ae667cdbc822ee22c100c418810c6ee9bd08ddcd40b826130bb22a9e8fe775",
@@ -224,13 +222,8 @@
     },
     "src/elements/text.rs": {
       "upstream_sha256": "a65ff874faaeaa9323d953f70d1236d98c808d69ddb111dce00bcd0df892ca5b",
-      "local_sha256": "54a751fa6022113e021f64b3924ff0d0a371245f21994ebd37664f2920ec41dd",
-      "reason": "Logical text alignment (layout-direction-patch.md). Text element shapes with its style letter spacing (letter-spacing-patch.md)."
-    },
-    "src/geometry.rs": {
-      "upstream_sha256": "c28a238493c9fa423d860ca46b2e4741925a9d81f55671eeda1389408f2b9dd5",
-      "local_sha256": "8f7c297cc42d68ff6ae58565098c3c55b8b792b0188adac321f579f2eaadd9c6",
-      "reason": "LayoutDirection and Corners/Edges::flip_x (layout-direction-patch.md)."
+      "local_sha256": "d0cea349ce42ce4c2059dd4e2f4eb3843bfce45f3ae3148792a625972c307e81",
+      "reason": "Text element shapes with its style letter spacing (letter-spacing-patch.md)."
     },
     "src/platform.rs": {
       "upstream_sha256": "fcd613681b31b52318f6349e5f63fcf0c08748705b8d71673891df0c303e8756",
@@ -259,8 +252,8 @@
     },
     "src/style.rs": {
       "upstream_sha256": "27753a378e4b3a30f535f796a592d1f2191c0f77580c99436ed1bfcd7b6a8da9",
-      "local_sha256": "6fee156ecdb8ce175acb3a5233d1b0c0b7586d69e233921d4819fbd6a32fb63f",
-      "reason": "Replace unpublished util_macros #[perf] with #[test] (test-harness-patch.md). Mirrored corner radii and border widths when painting; TextAlign::in_direction (layout-direction-patch.md). TextStyle::letter_spacing (letter-spacing-patch.md)."
+      "local_sha256": "e7aa460770230757cc5d00fa9b4b36d7b5c536bf085d7ceb13bccde4a2fa8abe",
+      "reason": "Replace unpublished util_macros #[perf] with #[test] (test-harness-patch.md). TextStyle::letter_spacing (letter-spacing-patch.md)."
     },
     "src/styled.rs": {
       "upstream_sha256": "94ecc23fb711e38ba674772cec54beee820d5cdafdc14de3bcfe101bf7ab984a",
@@ -276,11 +269,6 @@
       "upstream_sha256": "0c14aec0196ad632601015e166dfcd3df72228292646120bbc3857c3631cd680",
       "local_sha256": "1675934f90bd8dec84cb920dec09587c3681a5bc843fb8a0bebd9e8203eda120",
       "reason": "Material performance patch: TabStopMap records only its insertion history while painting and builds the tab order and focus lookup lazily on the first query (Tab navigation, a11y dump); query results unchanged. Replaying a reused view's or composited layer's tab stops no longer updates a SumTree per insertion."
-    },
-    "src/taffy.rs": {
-      "upstream_sha256": "48a3e432b8a28aaacca2ade807e3f69a80dec8eed9bc1e0e36be04edcfeb4f24",
-      "local_sha256": "bc6cccb85b110112e253a860df46d2e924dfa76a198635320c6efd774de9a627",
-      "reason": "Mirrors children of right-to-left nodes in layout_bounds (layout-direction-patch.md)."
     },
     "src/text_system.rs": {
       "upstream_sha256": "25f479208bf39e0840f9f7f67d33f6370b991459c8b900f2c4faeece08ebffb0",
@@ -299,8 +287,8 @@
     },
     "src/window.rs": {
       "upstream_sha256": "260fb355763edb86f395458e167c9d258352af4f2cb03d4d6eb51d59a36e1f4c",
-      "local_sha256": "7ae7da42f58ac06b255c750d8b57e4a6ac51bd3c5f081215260560d4527ee5aa",
-      "reason": "CPU frame scope (cpu-frame-scope-patch.md); WindowSubmissionStats, vsync, throttle retry (frame-submission-patch.md); present outcome (presentation-timing-patch.md). Layout direction on the window, recorded per layout node (layout-direction-patch.md)."
+      "local_sha256": "132012b0612b76de6f51786b4ce06a323ca7b03b7f8c400fc3b9c00a1b6723db",
+      "reason": "CPU frame scope (cpu-frame-scope-patch.md); WindowSubmissionStats, vsync, throttle retry (frame-submission-patch.md); present outcome (presentation-timing-patch.md)."
     }
   },
   "added_files": {
@@ -335,7 +323,7 @@
       "reason": "Not retained; Cargo.toml is the normalized manifest Cargo builds (test-harness-patch.md)."
     }
   },
-  "unchanged_file_count": 142,
+  "unchanged_file_count": 144,
   "provenance_files": [
     "SOURCE.json",
     "animation-visibility-patch.md",
@@ -344,7 +332,6 @@
     "focused-input-bounds-patch.md",
     "frame-submission-patch.md",
     "hanging-space-patch.md",
-    "layout-direction-patch.md",
     "letter-spacing-patch.md",
     "presentation-timing-patch.md",
     "quiet-global-swap-patch.md",

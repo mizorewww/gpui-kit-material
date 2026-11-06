@@ -266,7 +266,7 @@ impl Form {
         matches!(self, Form::Label | Form::Icon(_))
     }
 
-    pub(crate) fn geometry(self, size: ButtonSize, direction: ButtonDirection) -> FormGeometry {
+    pub(crate) fn geometry(self, size: ButtonSize) -> FormGeometry {
         let g = size.geometry();
         let label = FormGeometry {
             height: g.height,
@@ -323,16 +323,12 @@ impl Form {
                 let (start, inner) = segment_metrics(size).leading_padding;
                 FormGeometry {
                     min_width: 0.,
-                    padding: if direction == ButtonDirection::Rtl {
-                        (inner, start)
-                    } else {
-                        (start, inner)
-                    },
+                    padding: (start, inner),
                     outline: 1.,
                     ..label
                 }
             }
-            Form::FabMenuToggle { size: fab, .. } => Form::Fab(fab).geometry(size, direction),
+            Form::FabMenuToggle { size: fab, .. } => Form::Fab(fab).geometry(size),
             Form::FabMenuItem { expansion } => {
                 let (height, padding, gap) = FAB_MENU_ITEM;
                 let t = expansion.clamp(0., 1.);
@@ -357,11 +353,7 @@ impl Form {
                     min_width: 0.,
                     // The closed chevron sits slightly toward the leading
                     // segment; `MaterialButton` centers it while open.
-                    padding: if direction == ButtonDirection::Rtl {
-                        (outer, inner)
-                    } else {
-                        (inner, outer)
-                    },
+                    padding: (inner, outer),
                     outline: 1.,
                     gap: 0.,
                     icon: metrics.trailing_icon,
@@ -403,8 +395,7 @@ mod tests {
             icon_button_width(ButtonSize::ExtraLarge, IconButtonWidth::Wide),
             184.
         );
-        let g =
-            Form::Icon(IconButtonWidth::Wide).geometry(ButtonSize::Medium, ButtonDirection::Ltr);
+        let g = Form::Icon(IconButtonWidth::Wide).geometry(ButtonSize::Medium);
         assert_eq!(
             (g.height, g.width, g.padding, g.icon),
             (56., Some(72.), (0., 0.), 24.)
@@ -420,7 +411,7 @@ mod tests {
                 size: FabSize::Medium,
                 expansion,
             }
-            .geometry(ButtonSize::Small, ButtonDirection::Ltr)
+            .geometry(ButtonSize::Small)
         };
         let collapsed = geometry(0.);
         assert_eq!(
@@ -485,8 +476,8 @@ mod tests {
     #[core::prelude::v1::test]
     fn split_segments_share_the_button_height() {
         for size in ButtonSize::ALL {
-            let leading = Form::Segment(Segment::Leading).geometry(size, ButtonDirection::Ltr);
-            let trailing = Form::Segment(Segment::Trailing).geometry(size, ButtonDirection::Ltr);
+            let leading = Form::Segment(Segment::Leading).geometry(size);
+            let trailing = Form::Segment(Segment::Trailing).geometry(size);
             assert_eq!(leading.height, trailing.height);
             assert_eq!(leading.padding, segment_metrics(size).leading_padding);
             assert_eq!((leading.outline, trailing.outline), (1., 1.));
