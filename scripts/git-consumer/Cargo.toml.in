@@ -5,7 +5,7 @@ edition = "2024"
 publish = false
 
 [dependencies]
-gpui-kit = { git = "https://github.com/longbridge/gpui-kit", rev = "b2aaa3e5f9a387dea74981586bfca33e7e08420d" }
+gpui-kit = { git = "https://github.com/longbridge/gpui-kit", rev = "b881cadb7cf7c43b579f60bdac496460ab2f6276" }
 gpui-kit-material = { git = "@REPO@", rev = "@REV@" }
 
 [patch.crates-io]

@@ -1,7 +1,7 @@
 # Workspace compatibility patches
 
 This directory contains `crates/base` from Longbridge GPUI Kit Git revision
-`b2aaa3e5f9a387dea74981586bfca33e7e08420d`, licensed under Apache-2.0.
+`b881cadb7cf7c43b579f60bdac496460ab2f6276`, licensed under Apache-2.0.
 The upstream package declares version `0.9.0`, but this checkout is **not** the
 published crates.io `0.9.0` source. `SOURCE.json` records every upstream file's
 SHA-256, the normalized manifests, and the original and patched SHA-256 of
@@ -18,7 +18,8 @@ development examples retain references to sibling story-web fonts and repository
 fixtures not included in this Base-only snapshot. They are not claimed to run
 standalone; the upstream package also excludes these examples from publication.
 
-The local compatibility surface is restricted to:
+The local compatibility surface is restricted to the still-open upstream PRs below
+(block surfaces in `src/text/`, #3830, are described in `block-surface-patch.md`):
 
 - `src/motion.rs`: CSS reversing-adjusted start values, reversal duration and
   negative-delay scaling, plus explicit per-transition reduced-motion policy.
@@ -27,7 +28,9 @@ The local compatibility surface is restricted to:
   `TransitionPlayback<T>` is a caller-owned handle that keeps one transition's
   clock and interruption/reversal history across unmounts (for virtualized
   rows) using the same sampler as `transition_with_status`; it retains no
-  view, window or scheduled callback.
+  view, window or scheduled callback. Offered upstream as #3820
+  (`material/motion-css-reversal`) with the stacked branches
+  `material/motion-reduced-motion` and `material/motion-transition-playback`.
 - `src/lib.rs`: public exports `ReducedMotion` and `TransitionPlayback`.
 - `src/toolbar.rs`: `Toolbar::axis(Axis)`. Upstream handles only Left/Right
   and always reports a horizontal orientation, so a vertical toolbar needed
@@ -35,35 +38,33 @@ The local compatibility surface is restricted to:
   "horizontal". A vertical axis moves focus with Up/Down (Left/Right no
   longer move it) and reports `Orientation::Vertical`; the default stays
   horizontal and unchanged. Test: `a_vertical_toolbar_roves_with_up_and_down`.
+  Offered upstream as #3821 (`material/toolbar-vertical-axis`).
 
-- `src/slider.rs`: the bullets below, offered upstream as the branches
-  `material/slider-accessibility-steps` (stacked on `material/slider-step-from-min`),
-  `material/slider-min-above-default-max`, `material/slider-thumb-disabled` and
-  `material/slider-track-focus`. Right-to-left pointer math and a range's
-  `Role::Group` node are not patched here: Material does both
+- `src/slider.rs`: the bullets below, offered upstream as #3822
+  (`material/slider-step-from-min`) and the stacked branch
+  `material/slider-accessibility-steps`. Upstream has since merged `min` above the
+  default `max` in a builder (#3823), `Slider::track_focus` (#3824) and a disabled
+  `SliderThumb`'s accessibility flag (#3825); those are upstream code here, not
+  patches. Right-to-left pointer math and a range's `Role::Group` node are not
+  patched here: Material does both
   (`crates/material/src/components/slider/mirrored.rs` and `range_group.rs`).
-- `src/slider.rs`: three narrow corrections. Dragging snapped with
+- `src/slider.rs`: steps from `min`. Dragging snapped with
   `(value / step).round() * step`, so steps were counted from 0 rather than
   `min` (a 3..100 slider with step 5 landed on 10, not 8 or 13); values now
   snap to `min + k * step` inside the range.
   The accessibility Increment/Decrement actions set a single value, which
   collapsed a range; they now move only the range's end (never past its
-  start). `Slider::track_focus(&FocusHandle)` makes the `Role::Slider` node
-  itself focusable (observed by `test_support`), so keyboard focus and
-  assistive technology land on the slider instead of an unnamed wrapper.
-  Tests: `dragging_snaps_from_min`,
+  start). Tests: `dragging_snaps_from_min`,
   `accessibility_steps_move_only_the_stepped_thumb`.
-- `src/slider.rs`, four more. A drag kept the pointer's percentage, so a step-25 slider
+- `src/slider.rs`, two more. A drag kept the pointer's percentage, so a step-25 slider
   dropped at 30% had value 25 with its handle at 30%; the handle now stands at the value.
   Increment and Decrement went through `set_value`, which emits nothing, so a value owned by
   events missed a screen reader's edit; `SliderState::step_thumb` now emits `Change` when the
   thumb moved, and steps either thumb of a range for a caller whose thumbs are nodes of their
-  own. `SliderState::new().min(150.).max(200.)` panicked in `min`, whose `clamp` saw the
-  default max of 100; it no longer clamps by a pair that can be inverted. `SliderThumb`
-  reports its `disabled` flag on its accessibility node. Tests, in `crates/material/tests/slider_state.rs`
+  own. Tests, in `crates/material/tests/slider_state.rs`
   since this crate's own do not run in the workspace:
   `a_dropped_handle_stands_at_its_value`, `an_accessibility_step_reports_a_change`,
-  `each_range_thumb_steps_by_itself`, `min_can_be_set_above_the_default_max_before_max`.
+  `each_range_thumb_steps_by_itself`.
 - `src/slider.rs`, steps. A step of 0, a negative step or a non-finite one divided by
   zero in `snap_to_step`, and the NaN clamped to `max`, so a drag threw the handle to the
   end; such a step now leaves the value continuous. Increment and Decrement moved by
@@ -86,15 +87,11 @@ The local compatibility surface is restricted to:
   `a_range_thumb_snaps_to_the_grid_and_stops_at_the_other`; and in Base,
   `stepping_leaves_an_invalid_value_or_range_alone`.
 
-- `src/dialog.rs`: `Dialog::accessibility_label`. The dialog host is the
-  `Role::Dialog` node but upstream gives it no name and no way to set one,
-  so modal dialogs were announced as an unnamed "dialog". The label (a
-  caller's headline, typically) is set on the host; without it nothing
-  changes. Test: `a_dialog_takes_an_accessible_name`.
-
-- `src/time_field.rs`: `TimeField::separator`. The field writes `:` between its
-  segments, a string its caller cannot change, and some locales write `7.05`. The
-  default stays `:`. Test: `the_time_separator_comes_from_the_labels` in Material.
+Merged upstream and no longer patched here: `Dialog::accessibility_label` (#3826),
+`TimeField::separator` (#3829), and in `src/input/base/` telling the platform when the
+caret moves (#3827), notifying an input moved by its parent only while it is focused
+(#3828) and publishing the input's layout at the end of prepaint (#3831). Those files
+equal upstream.
 
 These patches require source unification for both the Kit Git dependency and
 any registry Base dependency in the consuming workspace. Cargo patches are not

@@ -96,9 +96,9 @@ tree-sitter-zig = ["component", "gpui-component/tree-sitter-zig"]
 gpui_macros = { package = "gpui-pre-macros", version = "=0.3.11" }
 gpui = { package = "gpui-pre", version = "=0.3.11" }
 gpui-fast = { package = "gpui-fast", version = "0.1.13", features = ["windows-manifest-provided-by-host"], optional = true }
-gpui-base = { version = "0.9.0", git = "https://github.com/longbridge/gpui-kit", rev = "b2aaa3e5f9a387dea74981586bfca33e7e08420d" }
-gpui-component = { version = "0.9.0", git = "https://github.com/longbridge/gpui-kit", rev = "b2aaa3e5f9a387dea74981586bfca33e7e08420d", optional = true }
-gpui-kit-assets = { version = "0.9.0", git = "https://github.com/longbridge/gpui-kit", rev = "b2aaa3e5f9a387dea74981586bfca33e7e08420d", optional = true }
+gpui-base = { version = "0.9.0", git = "https://github.com/longbridge/gpui-kit", rev = "b881cadb7cf7c43b579f60bdac496460ab2f6276" }
+gpui-component = { version = "0.9.0", git = "https://github.com/longbridge/gpui-kit", rev = "b881cadb7cf7c43b579f60bdac496460ab2f6276", optional = true }
+gpui-kit-assets = { version = "0.9.0", git = "https://github.com/longbridge/gpui-kit", rev = "b881cadb7cf7c43b579f60bdac496460ab2f6276", optional = true }
 
 [target.'cfg(not(any(target_os = "ios", target_os = "android", target_family = "wasm")))'.dependencies]
 gpui_platform = { package = "gpui-pre-platform", version = "=0.3.11", features = ["font-kit", "x11", "wayland", "runtime_shaders"] }

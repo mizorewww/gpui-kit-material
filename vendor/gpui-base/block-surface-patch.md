@@ -1,10 +1,13 @@
 # Block surfaces in `TextView`
 
-Source: the vendored `gpui-base` (`SOURCE.json`).
+Source: the vendored `gpui-base` (`SOURCE.json`), upstream `b881cadb` plus the open PR #3830
+(`material/text-block-surfaces`, through e58511d0).
 Files: `src/text/` (`markdown_ext.rs`, `format/markdown.rs`, `node.rs`, `document.rs`,
-`state.rs`, `range_highlight.rs`, `stream_fade.rs`, `mod.rs`).
-Tests: `crates/material/tests/block_surface.rs`, which CI runs. `src/text/block_surface_tests.rs`
-and one test in `node.rs` reach private state; CI does not run this crate's own tests.
+`state.rs`, `range_highlight.rs`, `stream_fade.rs`, `mod.rs`), and the added test files
+`src/text/block_surface_tests.rs` and `tests/block_surface.rs`.
+Tests: `crates/material/tests/block_surface.rs`, a copy of `tests/block_surface.rs` through
+the Kit facade, which CI runs. `src/text/block_surface_tests.rs` and one test in `node.rs`
+reach private state; CI does not run this crate's own tests.
 
 Block quotes were the only block with a style, and a style per view. An application
 showing a note as one document, for selection and find across it, could not give one
@@ -15,7 +18,9 @@ breaks that selection and find.
 a `Div` with its background, shape, padding, text style and any leading children, read
 from the theme as it renders. At the top level of a Markdown document, the blocks
 between `<!-- surface:name -->` and `<!-- /surface -->` become a `BlockNode::Surface`,
-appended to that `Div`.
+appended to that `Div`. Unless the container sets its own width (or minimum width), it
+takes the row's width and a zero minimum, as a blockquote does, so a list or table in a
+flex container wraps to the view instead of measuring at its unwrapped width.
 
 A surface is presentation. Every walker passes through it as through a list, so
 `rendered_text` is the same as without the fences and no range moves. A source copy

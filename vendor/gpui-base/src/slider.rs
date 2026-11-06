@@ -1071,6 +1071,48 @@ mod tests {
         }
     }
 
+    #[gpui::test]
+    fn a_slider_takes_focus_on_its_own_node(cx: &mut gpui::TestAppContext) {
+        struct Focusable {
+            state: Entity<SliderState>,
+            focus: FocusHandle,
+        }
+
+        impl Render for Focusable {
+            fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+                Slider::new(&self.state).track_focus(&self.focus)
+            }
+        }
+
+        let (view, cx) = cx.add_window_view(|_, cx| Focusable {
+            state: cx.new(|_| SliderState::new()),
+            focus: cx.focus_handle(),
+        });
+        cx.update(|window, cx| {
+            let focus = view.read(cx).focus.clone();
+            focus.focus(window, cx);
+            window.draw(cx).clear(cx);
+            let slider = crate::test_support::snapshots(window)
+                .into_iter()
+                .find(|node| node.role() == Some(Role::Slider))
+                .expect("a slider node");
+            assert_eq!(slider.focused(), Some(true));
+        });
+    }
+
+    #[test]
+    fn min_can_be_set_above_the_default_max_before_max() {
+        let state = SliderState::new().min(150.).max(200.).default_value(175.);
+        assert_eq!(state.value(), SliderValue::Single(175.));
+        assert_eq!(state.percentage(), 0.0..0.5);
+
+        let state = SliderState::new()
+            .default_value((160., 180.))
+            .min(150.)
+            .max(200.);
+        assert_eq!(state.percentage(), 0.2..0.6);
+    }
+
     #[test]
     fn dragging_snaps_from_min() {
         // Steps count from `min`: 3 + 5k, not multiples of 5.
@@ -1336,48 +1378,6 @@ mod tests {
         });
         cx.update(|window, cx| window.draw(cx).clear(cx));
         assert_eq!(reported.get(), Some(1.), "a hundredth of 0..100");
-    }
-
-    #[test]
-    fn min_can_be_set_above_the_default_max_before_max() {
-        let state = SliderState::new().min(150.).max(200.).default_value(175.);
-        assert_eq!(state.value(), SliderValue::Single(175.));
-        assert_eq!(state.percentage(), 0.0..0.5);
-
-        let state = SliderState::new()
-            .default_value((160., 180.))
-            .min(150.)
-            .max(200.);
-        assert_eq!(state.percentage(), 0.2..0.6);
-    }
-
-    #[gpui::test]
-    fn a_slider_takes_focus_on_its_own_node(cx: &mut gpui::TestAppContext) {
-        struct Focusable {
-            state: Entity<SliderState>,
-            focus: FocusHandle,
-        }
-
-        impl Render for Focusable {
-            fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
-                Slider::new(&self.state).track_focus(&self.focus)
-            }
-        }
-
-        let (view, cx) = cx.add_window_view(|_, cx| Focusable {
-            state: cx.new(|_| SliderState::new()),
-            focus: cx.focus_handle(),
-        });
-        cx.update(|window, cx| {
-            let focus = view.read(cx).focus.clone();
-            focus.focus(window, cx);
-            window.draw(cx).clear(cx);
-            let slider = crate::test_support::snapshots(window)
-                .into_iter()
-                .find(|node| node.role() == Some(Role::Slider))
-                .expect("a slider node");
-            assert_eq!(slider.focused(), Some(true));
-        });
     }
 
     #[test]

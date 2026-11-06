@@ -1978,6 +1978,12 @@ impl<M: InputModeKind> TextElement<M> {
         window: &mut Window,
         cx: &mut App,
     ) {
+        // The gutter is not text: show the arrow there, as code editors do,
+        // rather than the text cursor of the editor around it.
+        window.set_cursor_style(
+            gpui::CursorStyle::Arrow,
+            &fold_icon_layout.line_number_hitbox,
+        );
         let is_hovered = fold_icon_layout.line_number_hitbox.is_hovered(window);
         if !fold_icon_layout.icons.is_empty() {
             // Mouse moves do not repaint the editor, so repaint when the pointer
@@ -4918,33 +4924,6 @@ mod tests {
         assert_ne!(dirty_after_painting_at(40., &mut cx), 0, "moved, focused");
     }
 
-    #[gpui::test]
-    fn a_focused_input_reports_a_moved_caret_to_the_platform(cx: &mut TestAppContext) {
-        let (editor, window) = decoration_editor(cx, "alpha beta", false);
-        let mut cx = VisualTestContext::from_window(window.into(), cx);
-        cx.update(|window, cx| {
-            // `invalidate_character_coordinates` asks for the caret on the
-            // next frame, which is what tells the platform where it is.
-            let frame = |window: &mut Window, cx: &mut App| {
-                window.draw(cx).clear(cx);
-                window.simulate_next_frame(cx)
-            };
-            frame(window, cx);
-            assert_eq!(frame(window, cx), 0, "not focused");
-            editor.update(cx, |state, cx| state.focus(window, cx));
-            assert_eq!(frame(window, cx), 1, "focused");
-            assert_eq!(frame(window, cx), 0, "the caret stands still");
-            editor.update(cx, |state, cx| state.set_selected_range(5..5, cx));
-            assert_eq!(frame(window, cx), 1, "the caret moved");
-            assert_eq!(frame(window, cx), 0, "the caret stands still");
-
-            cx.focus_handle().focus(window, cx);
-            assert_eq!(frame(window, cx), 0, "not focused");
-            editor.update(cx, |state, cx| state.focus(window, cx));
-            assert_eq!(frame(window, cx), 1, "focused again");
-        });
-    }
-
     /// A wheel over a list builds the view holding it again, and draws the
     /// page around that view from the last frame. The page was checked before
     /// the view in it painted, so an input in that view writing its layout
@@ -5011,6 +4990,33 @@ mod tests {
             cx.update(|window, cx| window.draw(cx).clear(cx));
             assert_eq!(renders.get(), page_renders, "wheel {wheel}");
         }
+    }
+
+    #[gpui::test]
+    fn a_focused_input_reports_a_moved_caret_to_the_platform(cx: &mut TestAppContext) {
+        let (editor, window) = decoration_editor(cx, "alpha beta", false);
+        let mut cx = VisualTestContext::from_window(window.into(), cx);
+        cx.update(|window, cx| {
+            // `invalidate_character_coordinates` asks for the caret on the
+            // next frame, which is what tells the platform where it is.
+            let frame = |window: &mut Window, cx: &mut App| {
+                window.draw(cx).clear(cx);
+                window.simulate_next_frame(cx)
+            };
+            frame(window, cx);
+            assert_eq!(frame(window, cx), 0, "not focused");
+            editor.update(cx, |state, cx| state.focus(window, cx));
+            assert_eq!(frame(window, cx), 1, "focused");
+            assert_eq!(frame(window, cx), 0, "the caret stands still");
+            editor.update(cx, |state, cx| state.set_selected_range(5..5, cx));
+            assert_eq!(frame(window, cx), 1, "the caret moved");
+            assert_eq!(frame(window, cx), 0, "the caret stands still");
+
+            cx.focus_handle().focus(window, cx);
+            assert_eq!(frame(window, cx), 0, "not focused");
+            editor.update(cx, |state, cx| state.focus(window, cx));
+            assert_eq!(frame(window, cx), 1, "focused again");
+        });
     }
 
     #[gpui::test]
