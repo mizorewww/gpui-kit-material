@@ -5,8 +5,8 @@
       "sha256": "ae0f55ada1eb17b1c490fe58ae65af7e4f41535318d778e7ae547484a0da1893"
     },
     "src/text/block_surface_tests.rs": {
-      "reason": "Tests of the block surface patch (block-surface-patch.md); not an upstream file.",
-      "sha256": "f324704f404cc4f0b263796d309e2f2ff37e22b57e7d0fd28f7f61b7465ae25b"
+      "reason": "Tests of the block surface patch (block-surface-patch.md), as on upstream branch material/text-block-surfaces; not an upstream file.",
+      "sha256": "9cc3d2a95ae9b6812bd9db7545f2548c242b6f526b49b34232dda1fdb24ea55d"
     }
   },
   "development_examples_limit": "Upstream development examples are preserved, including references to sibling story-web font and repository example fixtures. Those external fixtures are not included in this Base-only vendor snapshot; standalone example execution is not asserted.",
@@ -36,13 +36,13 @@
       "upstream_sha256": "f56cc07dda43678903e2907b8c8c6028ae5fa80f0a637b8f065054a4c55b391d"
     },
     "src/input/base/element.rs": {
-      "local_sha256": "c37b4e9a1df5830011aadda75686898b289e171a57e9e961c6016abca6d6fdbd",
-      "reason": "Tell the platform when the caret moves, and again when the input regains focus with the caret unchanged, so a browser IME panel opens at it (ime-anchor-patch.md; upstream branch material/input-ime-anchor). An input moved by its parent is notified only while focused, comparing places inside its bounds within 0.01 px (input-move-patch.md; upstream branch material/input-move-notify). Code and tests equal those branches.",
+      "local_sha256": "e2142c08204604ea71bf25577e528e71aeb6b80dd872e6d919bc1fdbec52d036",
+      "reason": "Tell the platform when the caret moves, and again when the input regains focus with the caret unchanged, so a browser IME panel opens at it (ime-anchor-patch.md; upstream branch material/input-ime-anchor). An input moved by its parent is notified only while focused, comparing places inside its bounds within 0.01 px (input-move-patch.md; upstream branch material/input-move-notify). The layout, bounds and scroll state are published at the end of prepaint instead of paint, so painting an input writes nothing a view drawn around it read (input-paint-patch.md; upstream branch material/input-paint-no-write). Code and tests equal those branches.",
       "upstream_sha256": "1604d1b71271998bf335a1c3b244356bbf12860ea4de567d3bd0f8f4b4912fc8"
     },
     "src/input/base/state.rs": {
-      "local_sha256": "ca6e11cf4bb14b97ea1f6ee7b54bf485fcfd20c857e8c6d0ca063110f8113f29",
-      "reason": "The IME anchor field (ime-anchor-patch.md); equals upstream branch material/input-ime-anchor.",
+      "local_sha256": "493beaba58efb0cfd90dfc9bc1405f8f0001e336130f1fcaff505a3bb7d83d5b",
+      "reason": "The IME anchor field (ime-anchor-patch.md; upstream branch material/input-ime-anchor), and doc comments that the layout is published at the end of prepaint (input-paint-patch.md; upstream branch material/input-paint-no-write).",
       "upstream_sha256": "9a4352317273c35e7736cc0dcff409d261118f78970ecc64c0fc768f0685e9e9"
     },
     "src/lib.rs": {
@@ -51,13 +51,13 @@
       "upstream_sha256": "a6201039dbd23080496361e55480a3d1755da7eeee7501f6845d0e58a57c4ef8"
     },
     "src/motion.rs": {
-      "local_sha256": "d55dad6487967b7196bbf2217b9e31a5afbdfa4f6e1f6f2cb8eeb151dc1fbc10",
-      "reason": "CSS reversal, negative-delay scaling, per-transition reduced motion, and TransitionPlayback (motion-patch.md).",
+      "local_sha256": "5f0ae5e41d7fe022e988f669f3f7716555bcf1f152a56227d6f70e6e765120a5",
+      "reason": "CSS reversal, negative-delay scaling, per-transition reduced motion, and TransitionPlayback (motion-patch.md). Equals the stacked upstream branches material/motion-css-reversal, material/motion-reduced-motion and material/motion-transition-playback.",
       "upstream_sha256": "cfbcc4cbe63aeb5bb6ffc27af0505b59c5fec3054310beaf29e947e14cf6424e"
     },
     "src/slider.rs": {
-      "local_sha256": "23548bf3b1bbf31948e1dcab993620d6329eccdec8ced2040ae86d030049027f",
-      "reason": "Step snapping counted from min, a dropped handle standing at its snapped value, AT Increment/Decrement that move one thumb onto the step grid and emit Change, no snapping for a step that is not positive and finite, SliderState::accessibility_step (a hundredth of the range for a continuous slider), a min above the default max in a builder, a thumb's disabled flag, and Slider::track_focus for a focusable slider node (motion-patch.md). step_thumb leaves a NaN value, a min above max or a reversed range unchanged, as the keyboard does (motion-patch.md). Upstream branches material/slider-accessibility-steps (on material/slider-step-from-min), material/slider-min-above-default-max, material/slider-thumb-disabled and material/slider-track-focus.",
+      "local_sha256": "9331981b26d12d7ccfc0db98397533903f4da79fb665d40062aa9527bd92ec92",
+      "reason": "Step snapping counted from min, a dropped handle standing at its snapped value, AT Increment/Decrement that move one thumb onto the step grid and emit Change, no snapping for a step that is not positive and finite, SliderState::accessibility_step (a hundredth of the range for a continuous slider), a min above the default max in a builder, a thumb's disabled flag, and Slider::track_focus for a focusable slider node (motion-patch.md). step_thumb leaves a NaN value, a min above max or a reversed range unchanged, as the keyboard does (motion-patch.md). Equals those upstream branches merged, code and tests: material/slider-accessibility-steps (on material/slider-step-from-min, with the step_thumb guard), material/slider-min-above-default-max, material/slider-thumb-disabled and material/slider-track-focus.",
       "upstream_sha256": "71b801a92588d12f7931a5a9e1745fb62f4283ae87d651d4004ae9b41ad72da3"
     },
     "src/text/document.rs": {
@@ -101,13 +101,13 @@
       "upstream_sha256": "8070e549356951d29604a5e436afdf7606bfb6c0cd3fe284384acaf6195260b1"
     },
     "src/time_field.rs": {
-      "local_sha256": "c25c9a63303979086d8762d6ea997e9206bd701fae4dec5b1e5c25d12819f14a",
-      "reason": "TimeField::separator: the text between segments, `:` by default, for a caller showing a time in its own locale (motion-patch.md).",
+      "local_sha256": "47f85cfd522f4eb1067f400dbbb2a843788a8f176c9d9fe1906fac5995c0ca34",
+      "reason": "TimeField::separator: the text between segments, `:` by default, for a caller showing a time in its own locale (motion-patch.md). Equals upstream branch material/time-field-separator, with its separator test.",
       "upstream_sha256": "6500dace005377ac8202604c4ff844e327de67bc8dee1cf978308a9d2aa107d4"
     },
     "src/toolbar.rs": {
-      "local_sha256": "2eb0d4560dac01d2c278354bc3c2f6d745dcf8f2f09d3c9b948c4e90bcf17716",
-      "reason": "Settable axis: Up/Down roving and a vertical accessibility orientation for vertical toolbars (motion-patch.md).",
+      "local_sha256": "6a7abcdda373a2f328c311e8232d9ebd215944a1a02bd2bd36a874455633c9af",
+      "reason": "Settable axis: Up/Down roving and a vertical accessibility orientation for vertical toolbars (motion-patch.md). Equals upstream branch material/toolbar-vertical-axis.",
       "upstream_sha256": "4c992d9765bf6638952ff9c897d7706c6fad5f54eaa8dc428fd568f8fe6323fe"
     }
   },
@@ -132,7 +132,7 @@
     }
   },
   "package_version": "0.9.0",
-  "patch_application": "Moved from Git bb85882 to b2aaa3e by a three-way merge (upstream bb85882 / upstream b2aaa3e / local patched files) without conflicts. The original five patch files were three-way merged (upstream Git / published registry 0.8.1 base / local patched registry files) without conflicts. The TransitionPlayback addition and the IME anchor (ime-anchor-patch.md) were made directly on this checkout afterwards; src/input/base/element.rs and state.rs were then replaced by the upstream PR branches material/input-ime-anchor and material/input-move-notify (both on b2aaa3e, combined without conflicts in code). src/text_selection.rs carries no patch any more and matches upstream.",
+  "patch_application": "Moved from Git bb85882 to b2aaa3e by a three-way merge (upstream bb85882 / upstream b2aaa3e / local patched files) without conflicts. The original five patch files were three-way merged (upstream Git / published registry 0.8.1 base / local patched registry files) without conflicts. The TransitionPlayback addition and the IME anchor (ime-anchor-patch.md) were made directly on this checkout afterwards; src/input/base/element.rs and state.rs were then replaced by the upstream PR branches material/input-ime-anchor and material/input-move-notify (both on b2aaa3e, combined without conflicts in code), and material/input-paint-no-write (on 2c150ee5) was applied on top, moving the move-notify comparison with the block it moves. src/text_selection.rs carries no patch any more and matches upstream.",
   "patch_base": {
     "package": "gpui-base",
     "registry_source_revision": "99576db58ec8103417c41a092e891b4022d24e7e",
@@ -144,7 +144,8 @@
     "ime-anchor-patch.md",
     "motion-patch.md",
     "input-move-patch.md",
-    "block-surface-patch.md"
+    "block-surface-patch.md",
+    "input-paint-patch.md"
   ],
   "repository": "https://github.com/longbridge/gpui-kit",
   "revision": "b2aaa3e5f9a387dea74981586bfca33e7e08420d",

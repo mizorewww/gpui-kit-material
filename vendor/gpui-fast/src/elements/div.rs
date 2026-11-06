@@ -2513,34 +2513,6 @@ impl Interactivity {
             || window.is_inspector_picking(cx)
     }
 
-    /// How far the content of a box at `bounds` scrolls on each axis.
-    fn scroll_max(&self, bounds: Bounds<Pixels>, style: &Style, window: &Window) -> Point<Pixels> {
-        fn round_to_two_decimals(pixels: Pixels) -> Pixels {
-            const ROUNDING_FACTOR: f32 = 100.0;
-            (pixels * ROUNDING_FACTOR).round() / ROUNDING_FACTOR
-        }
-        let rem_size = window.rem_size();
-        // Taffy lays the box out with the padding snapped to the device pixel
-        // grid (`to_taffy`); recomputed unsnapped, e.g. py_1 at a fractional
-        // rem size, it exceeds `bounds` and leaves the box scrollable by the
-        // sub-pixel difference.
-        let padding = style
-            .padding
-            .to_pixels(bounds.size.into(), rem_size)
-            .map(|edge| window.pixel_snap(*edge));
-        let padding_size = size(padding.left + padding.right, padding.top + padding.bottom);
-        // The floating point values produced by Taffy and ours often vary
-        // slightly after ~5 decimal places. This can lead to cases where after
-        // subtracting these, the container becomes scrollable for less than
-        // 0.00000x pixels. As we generally don't benefit from a precision that
-        // high for the maximum scroll, we round the scroll max to 2 decimal
-        // places here.
-        let padded_content_size = self.content_size + padding_size;
-        Point::from(padded_content_size - bounds.size)
-            .map(round_to_two_decimals)
-            .max(&Default::default())
-    }
-
     fn clamp_scroll_position(
         &self,
         bounds: Bounds<Pixels>,
@@ -2548,6 +2520,11 @@ impl Interactivity {
         window: &mut Window,
         _cx: &mut App,
     ) -> Point<Pixels> {
+        fn round_to_two_decimals(pixels: Pixels) -> Pixels {
+            const ROUNDING_FACTOR: f32 = 100.0;
+            (pixels * ROUNDING_FACTOR).round() / ROUNDING_FACTOR
+        }
+
         if let Some(scroll_offset) = self.scroll_offset.as_ref() {
             let mut scroll_to_bottom = false;
             let mut tracked_scroll_handle = self
@@ -2559,7 +2536,26 @@ impl Interactivity {
                 scroll_to_bottom = mem::take(&mut scroll_handle_state.scroll_to_bottom);
             }
 
-            let scroll_max = self.scroll_max(bounds, style, window);
+            let rem_size = window.rem_size();
+            // Taffy lays the box out with the padding snapped to the device pixel
+            // grid (`to_taffy`); recomputed unsnapped, e.g. py_1 at a fractional
+            // rem size, it exceeds `bounds` and leaves the box scrollable by the
+            // sub-pixel difference.
+            let padding = style
+                .padding
+                .to_pixels(bounds.size.into(), rem_size)
+                .map(|edge| window.pixel_snap(*edge));
+            let padding_size = size(padding.left + padding.right, padding.top + padding.bottom);
+            // The floating point values produced by Taffy and ours often vary
+            // slightly after ~5 decimal places. This can lead to cases where after
+            // subtracting these, the container becomes scrollable for less than
+            // 0.00000x pixels. As we generally don't benefit from a precision that
+            // high for the maximum scroll, we round the scroll max to 2 decimal
+            // places here.
+            let padded_content_size = self.content_size + padding_size;
+            let scroll_max = Point::from(padded_content_size - bounds.size)
+                .map(round_to_two_decimals)
+                .max(&Default::default());
             // Clamp scroll offset in case scroll max is smaller now (e.g., if children
             // were removed or the bounds became larger).
             let mut scroll_offset = scroll_offset.borrow_mut();
@@ -3240,28 +3236,25 @@ impl Interactivity {
                     .pending_mouse_down
                     .get_or_insert_with(Default::default)
                     .clone();
-                let hover_listener: Rc<dyn Fn(&bool, &mut Window, &mut App)> =
-                    Rc::new(hover_listener);
-                let hover_listener_mode = self.hover_listener_mode;
-                let tracked = crate::fast::layers::hover_freeze::HoveredListener {
-                    was_hovered: was_hovered.clone(),
-                    has_mouse_down: has_mouse_down.clone(),
-                    listener: hover_listener.clone(),
-                    hitbox: hitbox.clone(),
-                    mode: hover_listener_mode,
-                };
-                // A listener hearing it is hovered is painted with this hitbox now.
-                if *was_hovered.borrow() {
-                    crate::fast::layers::hover_freeze::note_hovered(window, &tracked);
-                }
+                let hover_listener = crate::fast::layers::hover_freeze::track_listener(
+                    window,
+                    &was_hovered,
+                    &has_mouse_down,
+                    hover_listener,
+                    hitbox,
+                    self.hover_listener_mode,
+                );
+                let hover_listener_state = was_hovered.clone();
                 let update_hover = move |is_hovered: bool, window: &mut Window, cx: &mut App| {
-                    tracked.update(is_hovered, window, cx);
+                    let mut was_hovered = hover_listener_state.borrow_mut();
+                    if is_hovered != *was_hovered {
+                        *was_hovered = is_hovered;
+                        drop(was_hovered);
+                        hover_listener(&is_hovered, window, cx);
+                    }
                 };
+                let hover_listener_mode = self.hover_listener_mode;
 
-                // While a wheel holds hover still, a listener hears nothing: a row
-                // scrolled under the pointer does not start hovering, and one
-                // hovering does not stop, either of which could start a transition
-                // that keeps a list off its layer. See `hover_freeze`.
                 if has_mouse_down.borrow().is_none()
                     && !crate::fast::layers::hover_freeze::holds_listeners(window)
                 {
@@ -3449,13 +3442,8 @@ impl Interactivity {
             let allow_concurrent_scroll = style.allow_concurrent_scroll;
             let restrict_scroll_to_axis = style.restrict_scroll_to_axis;
             let line_height = window.line_height();
-            // Material patch: a wheel that cannot move the content (already at
-            // the end it points to, e.g. a vertical wheel mapped onto a
-            // horizontal-only box) changes nothing: it must not notify the
-            // view or mark the box scrolled, which repainted every scroll
-            // layer holding the box on each wheel event. The offset is still
-            // stored unclamped otherwise, and prepaint clamps it as upstream.
-            let scroll_max = self.scroll_max(hitbox.bounds, style, window);
+            let fast_scroll_max =
+                crate::fast::layers::wheel::scroll_max(self, hitbox.bounds, style, window);
             let hitbox = hitbox.clone();
             let current_view = window.current_view();
             let subtrees = crate::fast::retained::enclosing_retained_subtrees(window);
@@ -3500,12 +3488,11 @@ impl Interactivity {
                             delta_x = Pixels::ZERO;
                         }
                     }
-                    let moves = |old: Pixels, delta: Pixels, max: Pixels| {
-                        !delta.is_zero() && (old + delta).clamp(-max, px(0.)) != old
-                    };
-                    if !moves(old_scroll_offset.x, delta_x, scroll_max.x)
-                        && !moves(old_scroll_offset.y, delta_y, scroll_max.y)
-                    {
+                    if !crate::fast::layers::wheel::moves(
+                        old_scroll_offset,
+                        point(delta_x, delta_y),
+                        fast_scroll_max,
+                    ) {
                         return;
                     }
                     scroll_offset.y += delta_y;

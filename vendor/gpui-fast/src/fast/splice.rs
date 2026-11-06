@@ -220,8 +220,6 @@ pub(crate) struct Splice {
     /// layout the same for it to be drawn around the gap. See
     /// [`Window::splice_layout_holds`].
     held: Vec<(LayoutId, taffy::Layout)>,
-    /// Where the write generation stood when what the view read itself was checked.
-    checked_at: u64,
 }
 
 impl Splice {
@@ -306,8 +304,6 @@ impl Window {
     /// nodes, if it can be: nothing it read itself changed, it is hovered as
     /// it was, and the nested views ask for the layout they had.
     pub(crate) fn splice_layout(&mut self, id: &GlobalElementId, cx: &mut App) -> Option<Splice> {
-        // What the view read itself is checked just below, as of now.
-        let checked_at = cx.entities.write_generation();
         if self.refreshing
             || cx.has_active_drag()
             || crate::fast::a11y::stale(&self.a11y)
@@ -476,7 +472,6 @@ impl Window {
             gaps: built,
             layout,
             held,
-            checked_at,
         })
     }
 
@@ -625,7 +620,6 @@ impl Window {
             previous,
             mut gaps,
             layout,
-            checked_at,
             ..
         } = splice;
         let writes_now = cx.entities.write_generation();
@@ -742,8 +736,9 @@ impl Window {
         let mut layout_keys = kept_layout_keys;
         // What the view read itself was checked before it was spliced, so it
         // is up to date with every write so far.
-        let previous_dependencies = &self.rendered_frame.retained.records[previous].dependencies;
-        let mut dependencies = previous_dependencies.written_up_to(writes_now);
+        let mut dependencies = self.rendered_frame.retained.records[previous]
+            .dependencies
+            .written_up_to(writes_now);
         for gap in &gaps {
             let gap_id = &self.rendered_frame.retained.records[gap.record].id;
             if let Some(&gap_index) = target.by_id.get(gap_id) {
@@ -752,18 +747,18 @@ impl Window {
                 dependencies = dependencies.union(&gap_record.dependencies);
             }
         }
+        // The union only grows: a view that is spliced frame after frame would
+        // keep every entity the views in it ever read, and replay them all on
+        // every frame. Those that were released cannot change, so they go.
+        let previous_dependencies = &self.rendered_frame.retained.records[previous].dependencies;
         if !dependencies.shares_entities_with(previous_dependencies) {
-            dependencies = dependencies.without_dropped_entities(cx);
+            dependencies = dependencies.without_released_entities(cx);
         }
         let record = &mut target.records[index];
         record.prepaint_range = start..end;
         record.nested = nested;
         record.layout_keys = layout_keys.into();
         record.dependencies = dependencies;
-        // Each frame it is spliced is checked in turn, so only writes since this one matter,
-        // and the stretches `splice_paint` adds do not pile up. From the check, not from now:
-        // what a gap wrote while it was built, the view has not seen.
-        record.own_dependencies = record.own_dependencies.written_up_to(checked_at);
 
         ViewPrepaint::Spliced(SplicedPrepaint {
             previous,
@@ -886,7 +881,6 @@ impl Window {
             .push(OpenPaint { nested: Vec::new() });
         let hovers_start = self.retained_state.hover_dependencies.len();
         let start = self.paint_index();
-        let writes_before = cx.entities.write_generation();
         let mut segments: Vec<(PaintIndex, PaintIndex)> = Vec::with_capacity(gaps.len() + 1);
         let mut cursor = paint_range.start.clone();
         for gap in gaps.iter_mut() {
@@ -942,20 +936,10 @@ impl Window {
         hovers.extend_from_slice(&own_hovers);
         hovers.extend_from_slice(&copied_hovers);
         hovers.extend_from_slice(gap_hovers);
-        // What the gaps wrote as they painted is part of drawing this view, as it
-        // is of a view painted whole. Taken for a change to what it read, a nested
-        // input storing its layout would build this view on every later frame.
-        let writes_after = cx.entities.write_generation();
         let record = &mut self.next_frame.retained.records[*index];
         record.paint_range = start..end;
         record.paint = PaintStatus::Painted { source: None };
         record.hover_dependencies = hovers.into();
-        record.dependencies = record
-            .dependencies
-            .with_own_writes(writes_before, writes_after);
-        record.own_dependencies = record
-            .own_dependencies
-            .with_own_writes(writes_before, writes_after);
         self.retained_state.open_paints.pop();
         self.retained_state.subtree_stack.pop();
 

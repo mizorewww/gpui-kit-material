@@ -25,7 +25,7 @@ use crate::{StyledExt as _, TestSupportExt as _};
 /// - Left and Right move focus to the previous or next focusable descendant,
 ///   wrapping around at either end (the same default as Base UI's `loopFocus`).
 ///   A vertical toolbar ([`Toolbar::axis`]) uses Up and Down instead and
-///   reports a vertical orientation (local patch, `motion-patch.md`).
+///   reports a vertical orientation.
 /// - When `disabled`, the arrow keys do nothing. Hosted controls must be
 ///   disabled by their owner; the flag only suppresses the toolbar's own
 ///   navigation.

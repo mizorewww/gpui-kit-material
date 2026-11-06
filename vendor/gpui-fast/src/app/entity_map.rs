@@ -59,7 +59,7 @@ pub(crate) struct EntityMap {
     entities: SecondaryMap<EntityId, Box<dyn Any>>,
     accessed_entities: RefCell<AccessedEntities>,
     pub(crate) access_log: crate::fast::dependencies::EntityAccessLog,
-    ref_counts: Arc<RwLock<EntityRefCounts>>,
+    pub(crate) ref_counts: Arc<RwLock<EntityRefCounts>>,
 }
 
 /// The entities accessed during the current draw. An access is recorded only
@@ -86,7 +86,7 @@ impl AccessedEntities {
 
 #[doc(hidden)]
 pub(crate) struct EntityRefCounts {
-    counts: SlotMap<EntityId, AtomicUsize>,
+    pub(crate) counts: SlotMap<EntityId, AtomicUsize>,
     dropped_entity_ids: Vec<EntityId>,
     #[cfg(any(test, gpui_leak_detection))]
     leak_detector: LeakDetector,
@@ -208,11 +208,6 @@ impl EntityMap {
             Weak::ptr_eq(&entity.entity_map, &Arc::downgrade(&self.ref_counts)),
             "used a entity with the wrong context"
         );
-    }
-
-    /// Whether `entity_id` still exists: it may be leased, so its slot may be empty.
-    pub(crate) fn is_alive(&self, entity_id: EntityId) -> bool {
-        self.ref_counts.read().counts.contains_key(entity_id)
     }
 
     /// Records entities accessed by a reused draw. Entities released since it

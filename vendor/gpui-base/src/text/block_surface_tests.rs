@@ -1,6 +1,5 @@
 //! What of block surfaces only private state can tell. Their behavior is tested from
-//! outside in `crates/material/tests/block_surface.rs`, which CI runs; this crate's own
-//! tests are not part of CI.
+//! outside in `tests/block_surface.rs`.
 use std::sync::{
     Arc,
     atomic::{AtomicUsize, Ordering},
