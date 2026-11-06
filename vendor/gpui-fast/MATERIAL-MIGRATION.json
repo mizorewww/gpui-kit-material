@@ -207,12 +207,7 @@
       "source": "identical to the file in the published gpui-pre 0.3.11 archive (and vendor/gpui-pre); used by a src/platform.rs test"
     }
   },
-  "warning_patches": [
-    {
-      "path": "src/fast/layers/reuse.rs",
-      "scope": "Move the next/rendered frame borrows used only by debug-bounds replay inside the cfg(any(test, feature = \"test-support\")) block so builds without test-support have no unused-variable warnings. No behavior change."
-    }
-  ],
+  "warning_patches": [],
   "profiler_patches": [
     {
       "path": "src/profiler.rs",
@@ -242,7 +237,7 @@
       "src/app.rs": {
         "upstream_sha256": "4c2fc3737887421d536e7559a4c811c7877ee7c486ab7045bbbd62bc4f8e3692",
         "local_sha256": "b484f865ab7bb0509936e78a53540bbb5391c088c7aa6762d8e853410d82cae0",
-        "reason": "CpuFrameScope around initial and test-app draws (vendor/gpui-pre/cpu-frame-scope-patch.md). Material performance patch: record_entities_accessed updates only the entities that entered or left the tracked set instead of removing and re-inserting all of them each frame; the resulting maps are identical. Application layout direction (vendor/gpui-pre/layout-direction-patch.md). App::swap_global_quietly (vendor/gpui-pre/quiet-global-swap-patch.md)."
+        "reason": "CpuFrameScope around initial and test-app draws (vendor/gpui-pre/cpu-frame-scope-patch.md). GPUI-core engine patch, kept local: App::record_entities_accessed is GPUI core (the same function as gpui-pre 0.3.11's), and it now updates only the entities that entered or left the tracked set instead of removing and re-inserting all of them each frame; the resulting maps are identical. vendor/gpui-pre does not carry this change. Application layout direction (vendor/gpui-pre/layout-direction-patch.md). App::swap_global_quietly (vendor/gpui-pre/quiet-global-swap-patch.md)."
       },
       "src/app/bench_context.rs": {
         "upstream_sha256": "2fe59222d05a2dead8cf3e12ed00f61e90362f7a04cadc468e1ef9b08f7c8e47",
@@ -278,11 +273,6 @@
         "upstream_sha256": "a8273a396988f3c420a9008525b20dbb8056d4751b4df395200f35ae4a9913d8",
         "local_sha256": "00d479d55fa8e8b477a482695e96623b446a64fad4b855479bccea7f1dd90247",
         "reason": "Equals branch material/hover-freeze-listeners (be0482f, 471702c) on mizorewww/gpui-fast, ported to 0.1.13: the freeze holds hover listeners for any input modality, tracks the listeners that last heard true and tells those a frame without the freeze left off the pointer; a pending press keeps a listener hovered only while its element's hitbox is still drawn (upstream review of longbridge/gpui-fast#105)."
-      },
-      "src/fast/layers/reuse.rs": {
-        "upstream_sha256": "8259c4c5b53a8d9818786dbdedc377b8da4a8b1c84baafa65dd89cfb562b3f3f",
-        "local_sha256": "48ecbaa35f3707ab9dee2e3d4fb6bd1cc372a26e86a9a6875b51f8c20975f735",
-        "reason": "Debug-bounds borrows moved inside the test-support cfg to avoid unused-variable warnings (warning_patches)."
       },
       "src/fast/layers/wheel.rs": {
         "upstream_sha256": "56f648b1cf771d72d30efe51ba4d1222963359214efa5396e14d7e60852f2b2e",
@@ -441,6 +431,6 @@
         "reason": "Package-level lockfile not retained; the workspace Cargo.lock owns resolution."
       }
     },
-    "unchanged_file_count": 139
+    "unchanged_file_count": 140
   }
 }
