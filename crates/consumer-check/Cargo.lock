@@ -2208,7 +2208,7 @@ dependencies = [
 [[package]]
 name = "gpui-component"
 version = "0.9.0"
-source = "git+https://github.com/longbridge/gpui-kit?rev=b2aaa3e5f9a387dea74981586bfca33e7e08420d#b2aaa3e5f9a387dea74981586bfca33e7e08420d"
+source = "git+https://github.com/longbridge/gpui-kit?rev=b881cadb7cf7c43b579f60bdac496460ab2f6276#b881cadb7cf7c43b579f60bdac496460ab2f6276"
 dependencies = [
  "anyhow",
  "chrono",
@@ -2255,7 +2255,7 @@ dependencies = [
 [[package]]
 name = "gpui-component-macros"
 version = "0.9.0"
-source = "git+https://github.com/longbridge/gpui-kit?rev=b2aaa3e5f9a387dea74981586bfca33e7e08420d#b2aaa3e5f9a387dea74981586bfca33e7e08420d"
+source = "git+https://github.com/longbridge/gpui-kit?rev=b881cadb7cf7c43b579f60bdac496460ab2f6276#b881cadb7cf7c43b579f60bdac496460ab2f6276"
 dependencies = [
  "proc-macro-crate",
  "proc-macro2",
@@ -2575,7 +2575,7 @@ dependencies = [
 [[package]]
 name = "gpui-fps"
 version = "0.9.0"
-source = "git+https://github.com/longbridge/gpui-kit?rev=b2aaa3e5f9a387dea74981586bfca33e7e08420d#b2aaa3e5f9a387dea74981586bfca33e7e08420d"
+source = "git+https://github.com/longbridge/gpui-kit?rev=b881cadb7cf7c43b579f60bdac496460ab2f6276#b881cadb7cf7c43b579f60bdac496460ab2f6276"
 dependencies = [
  "core-graphics 0.24.0",
  "gpui-fast",
@@ -2609,7 +2609,7 @@ dependencies = [
 [[package]]
 name = "gpui-kit-assets"
 version = "0.9.0"
-source = "git+https://github.com/longbridge/gpui-kit?rev=b2aaa3e5f9a387dea74981586bfca33e7e08420d#b2aaa3e5f9a387dea74981586bfca33e7e08420d"
+source = "git+https://github.com/longbridge/gpui-kit?rev=b881cadb7cf7c43b579f60bdac496460ab2f6276#b881cadb7cf7c43b579f60bdac496460ab2f6276"
 dependencies = [
  "anyhow",
  "gpui-fast",
