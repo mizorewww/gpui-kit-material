@@ -2388,8 +2388,16 @@ fn a_spliced_view_forgets_the_entities_views_in_it_dropped() {
     });
     draw_shell(&mut cx, window);
     let tracked = cx
-        .update_window(window.into(), |_, _, cx| {
-            cx.entities.accessed_entities.borrow().len()
+        .update_window(window.into(), |_, window, _| {
+            // The most entities any record replays when it is reused.
+            window
+                .rendered_frame
+                .retained
+                .records
+                .iter()
+                .map(|record| record.dependencies.entities.len())
+                .max()
+                .unwrap_or(0)
         })
         .unwrap();
     for frame in 0..20 {
@@ -2397,8 +2405,16 @@ fn a_spliced_view_forgets_the_entities_views_in_it_dropped() {
         cx.update(|cx| cx.notify(page.entity_id()));
         draw_shell(&mut cx, window);
         let shown = cx
-            .update_window(window.into(), |_, _, cx| {
-                cx.entities.accessed_entities.borrow().len()
+            .update_window(window.into(), |_, window, _| {
+                // The most entities any record replays when it is reused.
+                window
+                    .rendered_frame
+                    .retained
+                    .records
+                    .iter()
+                    .map(|record| record.dependencies.entities.len())
+                    .max()
+                    .unwrap_or(0)
             })
             .unwrap();
         assert!(

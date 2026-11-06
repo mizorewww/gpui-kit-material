@@ -1,6 +1,6 @@
 # Letter spacing
 
-Source: the published Apache-2.0 `gpui-pre` 0.3.10 package (`SOURCE.json`), the
+Source: the published Apache-2.0 `gpui-pre` 0.3.11 package (`SOURCE.json`), the
 same in `vendor/gpui-fast`. Files: `src/style.rs`, `src/styled.rs`,
 `src/text_system.rs`, `src/text_system/line_layout.rs`,
 `src/text_system/line_wrapper.rs`, and the text element (`src/elements/text.rs`,

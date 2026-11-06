@@ -2,7 +2,7 @@
 
 **A consumer patches this crate** for the IME position below; see "Consumer patch set" in `docs/ARCHITECTURE.md`. Its manifest leaves the engine's `frame-observation` off. Only `crates/gallery-web` selects this crate's `frame-observation` feature.
 
-Complete published `gpui-pre-web` 0.3.10 crates.io archive (Apache-2.0,
+Complete published `gpui-pre-web` 0.3.11 crates.io archive (Apache-2.0,
 `LICENSE-APACHE` retained). `SOURCE.json` records the archive SHA-256, every
 original file hash, and the original and patched hash of each changed file.
 The archive ships no `.cargo_vcs_info.json`; no Git revision is claimed.

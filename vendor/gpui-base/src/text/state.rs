@@ -1141,6 +1141,7 @@ impl Render for TextViewState {
             markdown_extensions: self.markdown_extensions.clone(),
             stream_fade,
             range_highlights: self.range_highlights.clone(),
+            foregrounds: Default::default(),
             reveal,
             body_font_size,
         };

@@ -1,7 +1,7 @@
 # Source
 
-This directory vendors `gpui-pre-apple` 0.3.10 from crates.io:
-<https://crates.io/crates/gpui-pre-apple/0.3.10>.
+This directory vendors `gpui-pre-apple` 0.3.11 from crates.io:
+<https://crates.io/crates/gpui-pre-apple/0.3.11>.
 
 Published archive SHA-256:
 `e97cd068d8134b4e073321b946491760aa1e4511e486084a92e73b9174bff78a`.
@@ -27,7 +27,7 @@ Text patches (`src/text_system.rs`, `src/open_type.rs`, added
   an `sbix` table instead of matching the Apple Color Emoji PostScript names.
 
 Presentation patches (`src/metal_renderer.rs`), behind the crate's dev-only `frame-observation` feature; with it off, `draw` is upstream's. `draw_with_status` reports
-actual command-buffer submission (`draw` delegates to it). Its per-call autorelease pool drains temporary Metal
+actual command-buffer submission (`draw` delegates to it). It draws as upstream's `draw` does: into the drawable a `CAMetalDisplayLink` handed out, or the layer's `nextDrawable` while no link is attached. Its per-call autorelease pool drains temporary Metal
 references before returning to the presentation timer, including early returns;
 demand frames need not wait for the enclosing Cocoa event-loop pool.
 Synchronization, drawable timeout, buffering, and counting policy are unchanged.

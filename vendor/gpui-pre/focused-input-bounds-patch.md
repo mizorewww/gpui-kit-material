@@ -1,6 +1,6 @@
 # Focused input selection bounds
 
-Source: the published Apache-2.0 `gpui-pre` 0.3.10 package (`SOURCE.json`).
+Source: the published Apache-2.0 `gpui-pre` 0.3.11 package (`SOURCE.json`).
 Files: `src/window.rs`; `gpui-fast` carries the same method.
 
 `Window::focused_input_selection_bounds` returns the focused input handler's

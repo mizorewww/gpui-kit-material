@@ -1,6 +1,6 @@
 # Quiet global swap
 
-Source: the published Apache-2.0 `gpui-pre` 0.3.10 package (`SOURCE.json`), the
+Source: the published Apache-2.0 `gpui-pre` 0.3.11 package (`SOURCE.json`), the
 same in `vendor/gpui-fast`. File: `src/app.rs`.
 
 **A needed feature, not a bug fix.** It can be reverted alone: it depends on no

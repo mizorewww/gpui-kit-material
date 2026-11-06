@@ -2,7 +2,7 @@
 
 **Dev-only.** Everything here is behind the `frame-observation` Cargo feature, which is off for a consumer; see "Consumer patch set" in `docs/ARCHITECTURE.md`.
 
-Source: the published Apache-2.0 `gpui-pre` 0.3.10 package (`SOURCE.json`).
+Source: the published Apache-2.0 `gpui-pre` 0.3.11 package (`SOURCE.json`).
 Files: `src/profiler.rs`, `src/profiler/journal.rs`, `src/window.rs`, and
 `src/profiler/hang.rs` (test fixtures only: `successful_new_frame: None`).
 The CPU frame scope these fields extend is described in

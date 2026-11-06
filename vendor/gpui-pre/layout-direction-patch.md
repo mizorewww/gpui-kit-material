@@ -1,6 +1,6 @@
 # Layout direction
 
-Source: the published Apache-2.0 `gpui-pre` 0.3.10 package (`SOURCE.json`), the
+Source: the published Apache-2.0 `gpui-pre` 0.3.11 package (`SOURCE.json`), the
 same in `vendor/gpui-fast`. Files: `src/geometry.rs`, `src/taffy.rs`,
 `src/window.rs`, `src/app.rs`, `src/style.rs`, `src/elements/text.rs`, and in Fast
 `src/fast/layout.rs` and `src/fast/rounded_clip.rs`.

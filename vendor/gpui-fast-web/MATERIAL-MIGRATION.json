@@ -1,33 +1,33 @@
 {
   "source_package": "gpui-fast-web",
-  "version": "0.1.12",
+  "version": "0.1.13",
   "published_vcs": null,
   "published_checksums": null,
-  "archive_sha256": "ad903fddb78ae4c8f1c24b7fa07c79a0697da7614183d8c7dad67bd296802901",
+  "archive_sha256": "f5194d398f801160d6be5660055a14b175aed9b2dbca348d56065d742b11dbd9",
   "source_file_sha256": {
-    "Cargo.lock": "304fa06120cd487a62a22e76edffff0a74ac974a1b8ed26bfc43b33323b290ba",
-    "Cargo.toml": "6f317d525676d116acce313da939b2bd2c877c174476d04625c6ec65f92332b3",
-    "Cargo.toml.orig": "f59ac07ae7cb420fafc06ea28a43022629a40c53a0a854be035b52fca2ad3358",
+    "Cargo.lock": "cf6b381e6dc6b5cd5d37eeac1c34ade3badc969510ca9dc82ac28508b8c3d51d",
+    "Cargo.toml": "242f390546b4f32ea34d2ea90874628094942f1d8d407c8d2afad23b88b76139",
+    "Cargo.toml.orig": "06ba52f857e145739dc77d4d6b34c981d03bb83dfafef8d8f212de51c44c5506",
     "LICENSE": "5f78a733701db49b73da93addad8cb74f816f3789ef30c3c0e959e943ecd99b4",
-    "README.md": "0e89272d4cd1589baf04b4253d8176628ec13eed2a8f14d6fb502bb607eeaacd",
+    "README.md": "5a0a37655e96d9ed2337b595171a3806ed4a2996db108756e049b78d618c976c",
     "src/canvas_fallback.rs": "f23fef0d3b68fabe50dea4e32a63fa5b0bc0506f4e9e7e04ece8b563e05e20c4",
     "src/canvas_text.rs": "da73053a7f087e78aefb873f23502189224e8572fc0de49d52689f049f0cbfb3",
-    "src/dispatcher.rs": "2278e642e620a30605fe3ed8c391b0d94151ca79981fbd4c76a2bd61c06e8bb9",
+    "src/dispatcher.rs": "a39e66001519eecfca060b1ef721113cac34ad5c07bbecbe46cbb6da97998278",
     "src/display.rs": "4ca631603993dba5125088911193d380908b4f5ac7cc89b21ef4c9136b9ad433",
     "src/events.rs": "250ba40e44975b282cd74797e76c96de6ef5bdcc537a8009f7e876c8a47ff239",
     "src/glyph_cache.rs": "d9beafc7c2a8029171151249a4ecd13bf7419d1a22809abbf86d3e823b665793",
     "src/gpui_web.rs": "51360d028a5f0e495557732e7e257ccfd5de960a17a9a57487aeaa8562b10979",
-    "src/http_client.rs": "06cabc3449fac1a8878d31b9b8bf01d097cb52ec8993c794dc221f9b848226da",
+    "src/http_client.rs": "5d9e1594c1843b635acf9ae06f06fd4c17c1a08c6aea21193d6bc37cb1a28c2b",
     "src/ime_mirror.rs": "4061ebd319b5928c2a25f659c4f1db9adb193d5873bbbfeba36468ca2706895d",
     "src/keyboard.rs": "f13f68ea0aed387146d2ff95892bdd4f14b2e0a46231a2b06ea6c7e674e11a5d",
     "src/logging.rs": "2d464ead162a6eb83b8d22b435c83a557a8ad7c6776966ff92f3e2a82fdae1fb",
-    "src/platform.rs": "cd049a650e8e70ea673ea0f76d0312ee6c77bcaffb0c486c987d4463e224610d",
+    "src/platform.rs": "b273d4b58c61902deb41c9e4193450a95627d1746bdb28d4e2f78403ad4a5a02",
     "src/run_replacements.rs": "c00a0f957f156b3744a90d3687f773de0a0e259c6c8beb1c86bd3f17614c3f43",
     "src/text_system.rs": "50d2d9da4a628d4363264dee69ae7eb271655007ccd5ef1bfbdb88954315808f",
     "src/viewport.rs": "2f64241c990f6de9a874e7680baafa61feba6db96228c48fab26ac7faaf623f5",
     "src/window.rs": "eda543e585912fcb012e2a3559d8fb2e9ad7570ba58746747af380d044085cb8"
   },
-  "local_patch_base": "gpui-pre-web 0.3.10",
+  "local_patch_base": "gpui-pre-web 0.3.11",
   "migrated": [
     {
       "path": "src/window.rs",
@@ -45,25 +45,25 @@
   "local_changes": {
     "scope": "Every file that differs from the extracted published archive (Cargo's .cargo-ok extraction marker excluded); MATERIAL-MIGRATION.json itself is provenance.",
     "modified": {
-      "src/window.rs": {
-        "upstream_sha256": "eda543e585912fcb012e2a3559d8fb2e9ad7570ba58746747af380d044085cb8",
-        "local_sha256": "1c4bfbbf07461009f1f29aff563056467051a8e4df3d5c3fc88c5bf8a9667e72",
-        "reason": "IME caret position and, behind frame-observation, successful_frame_submissions, as vendor/gpui-pre-web (MATERIAL-PATCHES.md there)."
-      },
-      "src/ime_mirror.rs": {
-        "upstream_sha256": "4061ebd319b5928c2a25f659c4f1db9adb193d5873bbbfeba36468ca2706895d",
-        "local_sha256": "f571bc8dcc711bb863077fb01c5e8bd3d89a519658ed61ae5cfb2d6333b3934d",
-        "reason": "Moves the hidden input to the caret for update_ime_position, so a browser IME panel opens there, without its taking clicks there or insetting its text. A consumer needs it (identical in both web crates)."
-      },
       "Cargo.toml": {
-        "upstream_sha256": "6f317d525676d116acce313da939b2bd2c877c174476d04625c6ec65f92332b3",
-        "local_sha256": "ef4e34b5cb657db7d4e1fddb0f26d2297e9137624f2e7b5b8ba1912b1ea634e2",
+        "upstream_sha256": "242f390546b4f32ea34d2ea90874628094942f1d8d407c8d2afad23b88b76139",
+        "local_sha256": "0418e5f88904443779f0cf0c03dce718d2d80ad66f47782ee10e6ce16d190a21",
         "reason": "A frame-observation feature, off by default, forwarding to the engine's; only the Gallery turns it on (vendor/gpui-pre-web/MATERIAL-PATCHES.md)."
       },
       "src/events.rs": {
         "upstream_sha256": "250ba40e44975b282cd74797e76c96de6ef5bdcc537a8009f7e876c8a47ff239",
         "local_sha256": "5f2ed4dcf49569f795f1982fa4dbc1ac8c33f750acfd7a1fb47d71391bda65ad",
         "reason": "The IME owns a key while composing or reported as keyCode 229, before GPUI sees it, so the Enter committing a candidate is no PressEnter. An IME edit's prefix and suffix do not split a surrogate pair. A consumer needs both (identical in both web crates)."
+      },
+      "src/ime_mirror.rs": {
+        "upstream_sha256": "4061ebd319b5928c2a25f659c4f1db9adb193d5873bbbfeba36468ca2706895d",
+        "local_sha256": "f571bc8dcc711bb863077fb01c5e8bd3d89a519658ed61ae5cfb2d6333b3934d",
+        "reason": "Moves the hidden input to the caret for update_ime_position, so a browser IME panel opens there, without its taking clicks there or insetting its text. A consumer needs it (identical in both web crates)."
+      },
+      "src/window.rs": {
+        "upstream_sha256": "eda543e585912fcb012e2a3559d8fb2e9ad7570ba58746747af380d044085cb8",
+        "local_sha256": "1c4bfbbf07461009f1f29aff563056467051a8e4df3d5c3fc88c5bf8a9667e72",
+        "reason": "IME caret position and, behind frame-observation, successful_frame_submissions, as vendor/gpui-pre-web (MATERIAL-PATCHES.md there)."
       }
     },
     "added": {
@@ -74,10 +74,10 @@
     },
     "removed": {
       "Cargo.lock": {
-        "upstream_sha256": "304fa06120cd487a62a22e76edffff0a74ac974a1b8ed26bfc43b33323b290ba",
+        "upstream_sha256": "cf6b381e6dc6b5cd5d37eeac1c34ade3badc969510ca9dc82ac28508b8c3d51d",
         "reason": "Package-level lockfile not retained; the workspace Cargo.lock owns resolution."
       }
     },
-    "unchanged_file_count": 17
+    "unchanged_file_count": 16
   }
 }

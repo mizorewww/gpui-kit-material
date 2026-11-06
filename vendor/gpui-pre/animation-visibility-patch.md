@@ -1,6 +1,6 @@
 # Animation scheduling contract
 
-Source: the published Apache-2.0 `gpui-pre` 0.3.10 crates.io archive. That
+Source: the published Apache-2.0 `gpui-pre` 0.3.11 crates.io archive. That
 archive ships no `.cargo_vcs_info.json`, so no upstream Git revision is claimed;
 `SOURCE.json` records the archive and per-file hashes. Files:
 `src/elements/animation.rs`.

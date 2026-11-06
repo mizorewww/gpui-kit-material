@@ -1,10 +1,10 @@
 {
   "repository": "https://github.com/longbridge/gpui-kit",
-  "revision": "bb85882e1faab845d9e7be33b69a152879a90f69",
+  "revision": "b2aaa3e5f9a387dea74981586bfca33e7e08420d",
   "subdirectory": "crates/kit",
-  "source_workspace_manifest_sha256": "0c6dd98d2202a98e4654f42cdef42ec96c053b4e9a0ace80b01f226eacd6ad65",
+  "source_workspace_manifest_sha256": "81ede24a592ea451ba043fc484ffa6ed152b821fc6c1faf34b06726f58c401cc",
   "source_files_sha256": {
-    "Cargo.toml": "55054a47e1c27b83595863c6e52fdb541d60760e6e60577b43c81280bb3c0810",
+    "Cargo.toml": "1ba81933c192e35527aa0c7ee8a28fd1e194f9601fc8abcc34bfae97b95692db",
     "README.md": "7ab0635c9459323defd0319ef9c92da896616f75d009609ac7d335d992b303c0",
     "TESTING.md": "75a87dab89a1f141cf0c4953f185f9e41ae6076a12856a2c9d419d160049de2d",
     "src/lib.rs": "9f6a8305221bc87e1c345a60f9685dde6fad71aa0bc22615ea7dad4bb2f0f2fd",
@@ -15,13 +15,13 @@
     "tests/common/mod.rs": "e923b121ecd341aee01f3b38f47193a15d8e68564004df0f3d4fa208750be696",
     "tests/integration/assets.rs": "cb9a25654149319c118536fa7ca67e1dcd90227fdfeffddb54c3ad1c2499812b",
     "tests/integration/collection_steps.rs": "3a83acc3ef5b815a23692a4e21b4240f08214f6bad14d098b0807caee46bb55f",
-    "tests/integration/collections.rs": "b6af529cd9194737f04f6ddda7c863a6d285ab09c4ac2e089f40a42e1b85d9ab",
+    "tests/integration/collections.rs": "92f2f9c5d48962fa83ac44ea984a9a0ca81cbe777707091decab09ba09e12072",
     "tests/integration/components.rs": "cf62819d3977bb97b33f7279118141f59bbcf9490b24e596a4deebe3d8798cb0",
     "tests/integration/composition_helpers.rs": "cb111f284ba189768cb2c15fd53117420b04e4c3ae6b12825b64eff39e166d90",
     "tests/integration/control_steps.rs": "4ca12e74f6e3cb060c0ecc02496f363253a29ad90a34ac06dea52f3d255f3dec",
     "tests/integration/controls.rs": "953eb133d1fbd768333dca65701dbbbae28d99324949ebd3cdfc1ee357f7ce85",
     "tests/integration/date_picker.rs": "e394546ec04dbb208192d53e173759863207d7da8a06fc7dd35e5534dc74b00a",
-    "tests/integration/diff.rs": "3b079ac1c522f2b2773fcf60024e8e5143d048edec15e0e60a39a103c750e75d",
+    "tests/integration/diff.rs": "70cb363fbc289396e845796cc5e04a4743c53376bcd4e7464f517dc8bd89794b",
     "tests/integration/disclosure.rs": "6b947f77b255769f1d433e9ec3d295a344c79ab115c738e0041d795876a2de28",
     "tests/integration/dock.rs": "a386ef5423dbc7d50c8e2f63a0b7a65e8d81f10711073ff93b904dda071d8572",
     "tests/integration/environment.rs": "8da292f15c7b74f12d3eab004290ebe2ceccb3ae01960993dd4eb4c5cd04dd9d",
@@ -41,8 +41,8 @@
     "tests/integration/interactions.rs": "6c87d3e2d25d747d233c51bcaeda98872944a63b2a83c4fce53042222fc6ce32",
     "tests/integration/lifecycle.rs": "09802988acf07e484f4fd49aee50483085c41a77dd62d6b3fa38a6f3aeaaa1fc",
     "tests/integration/main.rs": "4ccee78f7ab765cedc777ff53357b91640a70a5723579e2e4bfd8cf6d6f2db87",
-    "tests/integration/menu.rs": "0de82c00fe4e5d7f8a27379c2a1194ed58f3c84dfe6418f64b5e80104c471d4d",
-    "tests/integration/overlays.rs": "e6652e397dc57738eae5fe1074124f78b9d0e308ea0cbd062e27cf5ba3bbc111",
+    "tests/integration/menu.rs": "47fbef30c014d94ca1170e04d5a47059a97225f8c171ea71951d02b66de6dbe6",
+    "tests/integration/overlays.rs": "78d5dfa5c4dcb4ba14251e53752ab1fdecef8374ac373deac348a02708774df5",
     "tests/integration/painted_text.rs": "d7111a6fb9e649b8050b7df7c32855596afd34e3f01322357171301339911f37",
     "tests/integration/query_helpers.rs": "a1667597bb2398e6e4da988eb9d9f8373399177c2742c8dffe3ef880c8359a83",
     "tests/integration/root.rs": "7f7c9fc43774222e06f8e792ca922aa36800faf0c6cc0bfe09d08e408fac9618",
@@ -61,5 +61,5 @@
     "LICENSE-APACHE": "d1b0449e5478c574ba4f686c2656df7fe77d66821a61f8b6ed3378a58ed9a811",
     "LICENSE-DOCS.md": "8a9ccf144b2d5bf5aae56abdc6e723e17e1ba4de1f5d515b3b644288fd4fc16f"
   },
-  "normalized_manifest_sha256": "66a230b7adc80fabac661413ebce72d6234e395e8cae110297b6189e9f8f936d"
+  "normalized_manifest_sha256": "b16808c199ed8aa30572e8389b1431bb1236d85aebb51debfdbf8cf42cf2dead"
 }
