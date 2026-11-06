@@ -493,7 +493,7 @@ pub struct InputBaseState<M: InputModeKind> {
     /// the previous frame's `last_layout`.
     pub(crate) prepaint_caret_geometry: Option<PrepaintCaretGeometry>,
     pub(super) last_cursor: Option<usize>,
-    /// Where the IME panel was last told the caret is.
+    /// Where the platform was last told the caret is, for its IME panel.
     pub(super) ime_anchor: Option<(Point<Pixels>, Option<Bounds<Pixels>>)>,
     /// The input container bounds
     pub(super) input_bounds: Bounds<Pixels>,
