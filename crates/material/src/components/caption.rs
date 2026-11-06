@@ -299,8 +299,9 @@ impl CaptionButtons {
         trailing_for(Self::width(window))
     }
 
-    /// [`Self::trailing`] for a forced caption style.
-    pub(super) fn trailing_for_style(caption: Caption, window: &Window) -> f32 {
+    /// [`Self::trailing`] for a forced caption style, such as the one given
+    /// to [`Self::caption`] to capture another platform's title bar.
+    pub fn trailing_for_style(caption: Caption, window: &Window) -> f32 {
         trailing_for(width_of(caption, buttons(caption, window).len()))
     }
 }
@@ -825,6 +826,27 @@ pub(crate) mod tests {
             cx.run_until_parked();
             assert_centered(cx, (32., 32.), 8., true);
         }
+    }
+
+    #[gpui::test]
+    fn a_forced_caption_style_measures_its_own_buttons(cx: &mut TestAppContext) {
+        let (_, cx) = cx.add_window_view(|_, _| BarHarness(Caption::System, px(48.)));
+        cx.update(|window, _| {
+            let count = buttons(Caption::Windows, window).len() as f32;
+            assert!(count > 0.);
+            assert_eq!(
+                CaptionButtons::trailing_for_style(Caption::System, window),
+                16.
+            );
+            assert_eq!(
+                CaptionButtons::trailing_for_style(Caption::Windows, window),
+                WINDOWS_BUTTON_WIDTH * count + 8.
+            );
+            assert_eq!(
+                CaptionButtons::trailing_for_style(Caption::Linux, window),
+                LINUX_BUTTON * count + LINUX_GAP * (count - 1.) + LINUX_END + 8.
+            );
+        });
     }
 
     #[gpui::test]
