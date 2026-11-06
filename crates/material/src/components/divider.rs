@@ -204,7 +204,6 @@ impl RenderOnce for MaterialDivider {
                     .text_size(scale.font_size)
                     .line_height(scale.line_height)
                     .font_weight(FontWeight(scale.font_weight as f32))
-                    .letter_spacing(scale.letter_spacing)
                     .text_color(color(ColorRole::ON_SURFACE_VARIANT)),
             )
             .into_any_element()

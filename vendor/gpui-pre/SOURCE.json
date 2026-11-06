@@ -178,14 +178,12 @@
     "src/app.rs",
     "src/app/bench_context.rs",
     "src/elements/animation.rs",
-    "src/elements/text.rs",
     "src/platform.rs",
     "src/platform/test/window.rs",
     "src/profiler.rs",
     "src/profiler/hang.rs",
     "src/profiler/journal.rs",
     "src/style.rs",
-    "src/styled.rs",
     "src/svg_renderer.rs",
     "src/tab_stop.rs",
     "src/text_system.rs",
@@ -220,11 +218,6 @@
       "local_sha256": "da466d2d926998f334aac8b4871d807a4eda8b972f8df8c9ea05abc0fe382a2d",
       "reason": "Executor-clock sampling, repeat_when_visible and RepeatAnimationPlayback (animation-visibility-patch.md)."
     },
-    "src/elements/text.rs": {
-      "upstream_sha256": "a65ff874faaeaa9323d953f70d1236d98c808d69ddb111dce00bcd0df892ca5b",
-      "local_sha256": "d0cea349ce42ce4c2059dd4e2f4eb3843bfce45f3ae3148792a625972c307e81",
-      "reason": "Text element shapes with its style letter spacing (letter-spacing-patch.md)."
-    },
     "src/platform.rs": {
       "upstream_sha256": "fcd613681b31b52318f6349e5f63fcf0c08748705b8d71673891df0c303e8756",
       "local_sha256": "08cd454d0935539e4fd6184edc02299d26767119a56b980aaa37329ca671506b",
@@ -252,13 +245,8 @@
     },
     "src/style.rs": {
       "upstream_sha256": "27753a378e4b3a30f535f796a592d1f2191c0f77580c99436ed1bfcd7b6a8da9",
-      "local_sha256": "e7aa460770230757cc5d00fa9b4b36d7b5c536bf085d7ceb13bccde4a2fa8abe",
-      "reason": "Replace unpublished util_macros #[perf] with #[test] (test-harness-patch.md). TextStyle::letter_spacing (letter-spacing-patch.md)."
-    },
-    "src/styled.rs": {
-      "upstream_sha256": "94ecc23fb711e38ba674772cec54beee820d5cdafdc14de3bcfe101bf7ab984a",
-      "local_sha256": "a4901dab7fc76992e7937169c96c2bf4f0d7db65a7aab9755303f7906584be23",
-      "reason": "Styled::letter_spacing (letter-spacing-patch.md)."
+      "local_sha256": "c409e07a80fbd7d815aa81c827b7e4a99a7dbc4205a2414d5689aa3c24087e6f",
+      "reason": "Replace unpublished util_macros #[perf] with #[test] (test-harness-patch.md)."
     },
     "src/svg_renderer.rs": {
       "upstream_sha256": "4f002bcfa1be479e77665c6144629ab95a932e55e52d29142e46f31949e958ca",
@@ -272,18 +260,18 @@
     },
     "src/text_system.rs": {
       "upstream_sha256": "25f479208bf39e0840f9f7f67d33f6370b991459c8b900f2c4faeece08ebffb0",
-      "local_sha256": "117e1dc5090887f444be1aeccf4693b368826c2fda167a46976df6099c292dbf",
-      "reason": "em_width/em_advance fallback for fonts without 'm' (em-fallback-patch.md). shape_text_spaced (letter-spacing-patch.md)."
+      "local_sha256": "3788a52fe3f1989d65a45ce521dc3a45e4e8f9721143f969fcfb3e91f4ebe7f6",
+      "reason": "em_width/em_advance fallback for fonts without 'm' (em-fallback-patch.md)."
     },
     "src/text_system/line_layout.rs": {
       "upstream_sha256": "76589c9dff94185fd52ead6966c1d2cb659a5a0ab943b6f79b5c2326a02b6d8e",
-      "local_sha256": "040438723f88f98837c779ee38ceaecb131f06475b07f426e739a167a8f02726",
-      "reason": "Spaced line layouts in the cache key and apply_letter_spacing (letter-spacing-patch.md). Hanging overflow space in compute_wrap_boundaries (hanging-space-patch.md)."
+      "local_sha256": "1c565a3059f315c175db2d82a1d336e42567ad3720195a4b9ec843030f2f9808",
+      "reason": "Hanging overflow space in compute_wrap_boundaries (hanging-space-patch.md)."
     },
     "src/text_system/line_wrapper.rs": {
       "upstream_sha256": "8912c5d16dc00bbcc1f19f56c2f2f4e3b826aa244b4f7c04c62a3934b22f7c4f",
-      "local_sha256": "d2e3017152c6fd425f4bafd2360507699cf5bc0480674e96ba5302b68cc87811",
-      "reason": "Hanging overflow space: a space that overflows a row after content no longer starts the next row; it hangs past the edge and the following word is the break (LineWrapper::wrap_line, the multi-line truncation that replicates it in Fast, LineLayout::compute_wrap_boundaries), with tests (hanging-space-patch.md). Letter spacing state (letter-spacing-patch.md)."
+      "local_sha256": "00aab5a2ae988ffa425bdcd4eda387689386565e5a1b92e7e13d245afa603a97",
+      "reason": "Hanging overflow space: a space that overflows a row after content no longer starts the next row; it hangs past the edge and the following word is the break (LineWrapper::wrap_line, the multi-line truncation that replicates it in Fast, LineLayout::compute_wrap_boundaries), with tests (hanging-space-patch.md)."
     },
     "src/window.rs": {
       "upstream_sha256": "260fb355763edb86f395458e167c9d258352af4f2cb03d4d6eb51d59a36e1f4c",
@@ -323,7 +311,7 @@
       "reason": "Not retained; Cargo.toml is the normalized manifest Cargo builds (test-harness-patch.md)."
     }
   },
-  "unchanged_file_count": 144,
+  "unchanged_file_count": 146,
   "provenance_files": [
     "SOURCE.json",
     "animation-visibility-patch.md",
@@ -332,7 +320,6 @@
     "focused-input-bounds-patch.md",
     "frame-submission-patch.md",
     "hanging-space-patch.md",
-    "letter-spacing-patch.md",
     "presentation-timing-patch.md",
     "quiet-global-swap-patch.md",
     "render-lease-patch.md",

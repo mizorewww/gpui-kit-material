@@ -31,9 +31,6 @@ pub struct LineWrapper {
     text_system: Arc<TextSystem>,
     pub(crate) font_id: FontId,
     pub(crate) font_size: Pixels,
-    /// Added to each character's width by truncation and wrapping. A new
-    /// wrapper, including the one behind a pooled handle, starts at zero.
-    pub letter_spacing: Pixels,
     char_widths: CharWidthCache,
     text_buffer: String,
 }
@@ -67,7 +64,6 @@ impl LineWrapper {
             text_system,
             font_id,
             font_size,
-            letter_spacing: px(0.),
             char_widths,
             text_buffer: String::new(),
         }
@@ -97,7 +93,6 @@ impl LineWrapper {
             text_system,
             font_id,
             font_size,
-            letter_spacing,
         } = self;
         text.clear();
         for fragment in fragments {
@@ -118,7 +113,6 @@ impl LineWrapper {
             .peekable();
         let mut width_for_char = move |character| {
             width_for_char(char_widths, character, text_system, *font_id, *font_size)
-                + *letter_spacing
         };
         let mut grapheme_index = 0;
         let mut width_before_grapheme = px(0.);
@@ -567,7 +561,7 @@ impl LineWrapper {
             &self.text_system,
             self.font_id,
             self.font_size,
-        ) + self.letter_spacing
+        )
     }
 }
 

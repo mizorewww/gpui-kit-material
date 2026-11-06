@@ -3,7 +3,8 @@
 //! Geometry and color come from the Figma Material 3 Design Kit's "Avatars"
 //! page (`Generic avatar` component set): a 40dp circle on
 //! primary-container with on-primary-container content. The monogram is
-//! title-medium (16/24, +0.1 tracking); the placeholder is the kit's person
+//! title-medium (16/24; the kit's +0.1 tracking is not painted, as GPUI has no
+//! letter spacing); the placeholder is the kit's person
 //! glyph (28×26 in 40dp) and the selected style a 24dp check. Other sizes
 //! scale every proportion with the diameter. Image avatars fill the circle
 //! (cover), over the container color while the image loads.
@@ -171,7 +172,6 @@ impl RenderOnce for Avatar {
                         .font_weight(FontWeight(type_scale.font_weight as f32))
                         .text_size(rem(16. * scale))
                         .line_height(rem(24. * scale))
-                        .letter_spacing(rem(MONOGRAM_TRACKING * scale))
                         .text_color(ink)
                         .child(monogram_initials(&text))
                         .into_any_element()
@@ -201,9 +201,6 @@ impl RenderOnce for Avatar {
             .child(content)
     }
 }
-
-/// The kit's monogram tracks at 0.1, tighter than the title it is otherwise set in.
-const MONOGRAM_TRACKING: f32 = 0.1;
 
 #[cfg(test)]
 mod tests {
@@ -241,11 +238,5 @@ mod tests {
         let on_surface = color(ColorRole::ON_SURFACE);
         assert_eq!(container, on_surface.opacity(0.10));
         assert_eq!(ink, on_surface.opacity(state::DISABLED_CONTENT));
-    }
-
-    /// The kit's `Avatars`, `Monogram`.
-    #[test]
-    fn a_monogram_tracks_at_the_kits_value() {
-        assert_eq!(MONOGRAM_TRACKING, 0.1);
     }
 }

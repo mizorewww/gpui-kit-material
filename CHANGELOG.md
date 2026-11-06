@@ -140,6 +140,10 @@ Distribution is by Git revision for now; see the [quick start](README.md#quick-s
   `DividerDirection` and `MaterialDivider::direction`, and the Gallery's RTL switch
   and `--rtl` capture option. `scope::horizontal_arrow` no longer takes a direction.
   Left-to-right layout is unchanged.
+- Painted letter spacing. GPUI has no letter spacing and the engine patch that added
+  it is gone. `TypeScale::letter_spacing` still records each role's tracking, but no
+  component paints it until GPUI supports it (zed-industries/zed#53475), so tracked
+  labels set slightly narrower than the kit's.
 
 ### Fixed
 

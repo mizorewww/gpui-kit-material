@@ -724,8 +724,7 @@ fn label_width(text: &SharedString, window: &Window) -> f32 {
         .text_system()
         .shape_line(text.clone(), size, &[run], None);
     // Back to design px at the base rem, so it composes with `rem()`.
-    let tracking = scale.letter_spacing.0 * text.chars().count() as f32;
-    (line.width.as_f32() / rem.as_f32() + tracking) * 14.
+    line.width.as_f32() / rem.as_f32() * 14.
 }
 
 /// The input a field last applied a type to, and that type.

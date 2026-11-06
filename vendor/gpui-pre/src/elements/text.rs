@@ -700,9 +700,7 @@ impl TextLayout {
                     return size;
                 }
 
-                let letter_spacing = text_style.letter_spacing.to_pixels(window.rem_size());
                 let mut line_wrapper = cx.text_system().line_wrapper(text_style.font(), font_size);
-                line_wrapper.letter_spacing = letter_spacing;
                 let (text, runs) = if let Some(truncate_width) = truncate_width {
                     if let Some(max_lines) = text_style.line_clamp
                         && let Some(wrap_width) = wrap_width
@@ -717,7 +715,7 @@ impl TextLayout {
                         )
                     } else if let Some(unclipped) = window
                         .text_system()
-                        .shape_text_spaced(text.clone(), font_size, &runs, None, None, letter_spacing)
+                        .shape_text(text.clone(), font_size, &runs, None, None)
                         .log_err()
                         && unclipped
                             .iter()
@@ -746,13 +744,12 @@ impl TextLayout {
 
                 let Some(lines) = window
                     .text_system()
-                    .shape_text_spaced(
+                    .shape_text(
                         text,
                         font_size,
                         &runs,
                         wrap_width,            // Wrap if we know the width.
                         text_style.line_clamp, // Limit the number of lines if line_clamp is set.
-                        letter_spacing,
                     )
                     .log_err()
                 else {

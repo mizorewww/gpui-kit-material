@@ -98,7 +98,6 @@ mod bench {
         /// The same surface without one.
         RippleNone,
         TextPlain,
-        TextTracked,
     }
 
     const CELLS: &[(&str, Component)] = &[
@@ -123,7 +122,6 @@ mod bench {
         ("ripple-idle", Component::RippleIdle),
         ("ripple-none", Component::RippleNone),
         ("text-plain", Component::TextPlain),
-        ("text-tracked", Component::TextTracked),
     ];
 
     struct Options {
@@ -416,10 +414,6 @@ mod bench {
                 .bg(color(ColorRole::PRIMARY_CONTAINER))
                 .into_any_element(),
             Component::TextPlain => div().child("Label text").into_any_element(),
-            Component::TextTracked => div()
-                .letter_spacing(px(0.5))
-                .child("Label text")
-                .into_any_element(),
         }
     }
 
