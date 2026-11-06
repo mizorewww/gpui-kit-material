@@ -2,7 +2,7 @@
 # Builds the README's quick start in a directory outside the repository, the way
 # a downstream application does: every Material and engine crate comes from the
 # Git repository at one revision, and nothing from a checkout. There is no
-# lockfile, so a resolve that drifts away from Kit bb85882 fails here first.
+# lockfile, so a resolve that drifts away from Kit b2aaa3e fails here first.
 #
 #   scripts/check-git-consumer.sh --rev <pushed commit> --dir <empty directory> \
 #       [--repo <url>] [--target <triple>] [--command check|build]
@@ -38,7 +38,7 @@ cargo generate-lockfile --manifest-path "$manifest"
 
 # Every crate from Kit's repository must be at the audited revision. A second
 # revision is what `branch = "main"` used to produce.
-kit=bb85882e1faab845d9e7be33b69a152879a90f69
+kit=b2aaa3e5f9a387dea74981586bfca33e7e08420d
 drifted=$(grep -F 'git+https://github.com/longbridge/gpui-kit' "$dir/Cargo.lock" | grep -vF "#$kit" || true)
 if [ -n "$drifted" ]; then
     echo "Kit crates resolved away from $kit:" >&2

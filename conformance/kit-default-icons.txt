@@ -1,4 +1,4 @@
-# Source: https://github.com/longbridge/gpui-kit/blob/bb85882e1faab845d9e7be33b69a152879a90f69/crates/assets/default-icons.txt
+# Source: https://github.com/longbridge/gpui-kit/blob/b2aaa3e5f9a387dea74981586bfca33e7e08420d/crates/assets/default-icons.txt
 # Original catalog follows verbatim; ignore comment lines when parsing.
 icons/a-large-small.svg
 icons/arrow-down.svg

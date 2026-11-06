@@ -1,6 +1,6 @@
 # em metrics for fonts without `m`
 
-Source: the published Apache-2.0 `gpui-pre` 0.3.10 package (`SOURCE.json`).
+Source: the published Apache-2.0 `gpui-pre` 0.3.11 package (`SOURCE.json`).
 File: `src/text_system.rs`. `gpui-fast` carries the same change.
 
 `TextSystem::em_width` and `em_advance` (used for `ch` and `em`) measure `m`

@@ -1,8 +1,8 @@
 {
   "added_files": {
     ".cargo_vcs_info.json": {
-      "reason": "Locally written marker naming the vendored Git revision bb85882 and crates/base; not an upstream file.",
-      "sha256": "1ef59237513d2538e17724e17d21e739823f9bc085031aea97a7f816c9b6e2a6"
+      "reason": "Locally written marker naming the vendored Git revision b2aaa3e and crates/base; not an upstream file.",
+      "sha256": "ae0f55ada1eb17b1c490fe58ae65af7e4f41535318d778e7ae547484a0da1893"
     },
     "src/text/block_surface_tests.rs": {
       "reason": "Tests of the block surface patch (block-surface-patch.md); not an upstream file.",
@@ -36,19 +36,19 @@
       "upstream_sha256": "f56cc07dda43678903e2907b8c8c6028ae5fa80f0a637b8f065054a4c55b391d"
     },
     "src/input/base/element.rs": {
-      "local_sha256": "e932cb10f87c8089a0145b145fcff5ddcc1fd899f113d228540e4ef6d1562be0",
+      "local_sha256": "0754c8080cf7bec60abea8d55b614ed352ee1c080041684e6992ef4619a9c05b",
       "reason": "Tell the platform when the caret moves, so a browser IME panel opens at it (ime-anchor-patch.md). An input moved by its parent is notified only while focused (input-move-patch.md).",
-      "upstream_sha256": "2d0697813d4e13f705d03c35c575e798754756c0528e013014e98aebfb67c5d5"
+      "upstream_sha256": "1604d1b71271998bf335a1c3b244356bbf12860ea4de567d3bd0f8f4b4912fc8"
     },
     "src/input/base/state.rs": {
-      "local_sha256": "9accae1333235bf245ba112ed3321004958eb7748155f552368cb21c545ff7fb",
+      "local_sha256": "020f48a6bd8fb2e0b7a1eae30902c2408e3d0df58286f40b251808bde51d89a0",
       "reason": "The IME anchor (ime-anchor-patch.md).",
-      "upstream_sha256": "39296e195f6dabbb581b8f72ee06809b13fae3b328c4a71b48768dbff5c81c53"
+      "upstream_sha256": "9a4352317273c35e7736cc0dcff409d261118f78970ecc64c0fc768f0685e9e9"
     },
     "src/lib.rs": {
-      "local_sha256": "1801bc21617235d0d0e5170df8a19fdca5b0ade3e2f7f2323dfca34201e91b8c",
+      "local_sha256": "ee7c091c8ae24a116ab1c6498af0fb34fdbd7f542f6065c64161eda408979556",
       "reason": "Public exports ReducedMotion and TransitionPlayback (motion) (motion-patch.md).",
-      "upstream_sha256": "7692fadcb738947c529f338208facea785a5172298064eef8fb34365e452e876"
+      "upstream_sha256": "a6201039dbd23080496361e55480a3d1755da7eeee7501f6845d0e58a57c4ef8"
     },
     "src/motion.rs": {
       "local_sha256": "d55dad6487967b7196bbf2217b9e31a5afbdfa4f6e1f6f2cb8eeb151dc1fbc10",
@@ -81,9 +81,9 @@
       "upstream_sha256": "c88ba532a1d529ad16e89788685c7752cd701771d08699d0395a8ab196ff2be6"
     },
     "src/text/node.rs": {
-      "local_sha256": "a3f48081c35659ee79f3fc7b77022373da8947a3efd32c41773d3ce59a40c0c1",
+      "local_sha256": "bb125082d4cc30c20f9000f6fb455c40f8f2cdc6a661dedb9624903b86784a6e",
       "reason": "BlockNode::Surface and MarkdownExtensions::block_surface: a run of top-level blocks drawn in a consumer's container (block-surface-patch.md).",
-      "upstream_sha256": "9c98338199b5269791f0aefcb24038f4f59c681adc1ca5e6a6dcd676057ba219"
+      "upstream_sha256": "b12a444e343b438e703ffbfd55365392b6381b685c73e64d7929df0214722fa1"
     },
     "src/text/range_highlight.rs": {
       "local_sha256": "8cc268301204cd388a797c9662531fcbcf7795de85e3131fd6ea9b603e855161",
@@ -91,9 +91,9 @@
       "upstream_sha256": "99ed9b73bcd26b30bda29135c2a2c0a2963aac82eff9ab720eb12563575078c0"
     },
     "src/text/state.rs": {
-      "local_sha256": "97fc34fc4df41deddb0740904defa2a296bb1df7207029cf5f0b5558b54daf87",
+      "local_sha256": "26be8886bf22bf2ead7ed9ae451ea8d37e6d355d05b1615dc12959d0ffdb8346",
       "reason": "BlockNode::Surface and MarkdownExtensions::block_surface: a run of top-level blocks drawn in a consumer's container (block-surface-patch.md).",
-      "upstream_sha256": "b22bf74f36e5fc0adcbb1200b4db64356272965e5fdecfdcd2b62d700de38bec"
+      "upstream_sha256": "77bf710cc6dfc3fd920a1c8821d933d66996708a326b63e94b7d8d6c6d8f4bd8"
     },
     "src/text/stream_fade.rs": {
       "local_sha256": "7a5bfd294a8244422be45cc36f3efa593f20e5d62c239d8cf0bb0c00d010ff3e",
@@ -119,20 +119,20 @@
   ],
   "normalized_manifests_sha256": {
     "Cargo.toml": {
-      "local_sha256": "5e7e4fbe949070998ab196093434292efeaec0a95d97007c37612880fb2dc8da",
-      "upstream_sha256": "02738156dcc3e7e3204895d131ef1b1f70c37901e84c1ef0b5961b72f8eddbcb"
+      "local_sha256": "86047357dcf5827b3333a819a52af45c9382b5f44873fcbc6dd5b99ff4de5ab7",
+      "upstream_sha256": "1a6020b4b28032f620ea5d8f10c03612f5aaaa8c66d5c19a8e081fd66081f855"
     },
     "examples/native/Cargo.toml": {
-      "local_sha256": "da50188239d8d66401ab08de619466e9cf325f209764394e9f218321d9b8928d",
-      "upstream_sha256": "63e0f84687f2b9daf51e1c4b417b80efcb2dfc384bf07b0df3ba275b487f856d"
+      "local_sha256": "cef8be1ecbca1701c7f1d5c9e97d41589d17162625dfcaa57df2f69b30d2c670",
+      "upstream_sha256": "6ffc2c586cbd47e38ba547cb183eea60c3971a57d1fcd61ea2c4973ed5beed3e"
     },
     "examples/wasm/Cargo.toml": {
-      "local_sha256": "e710c1d7a9ee0470b00bd0340bf25fef3d64f3a6154d8fd2a3b3dbb084762930",
-      "upstream_sha256": "50bec9a1923a184900e97d2311715df98396e45fad861a9b0d4aa0dd302665f3"
+      "local_sha256": "94adff1979d0fab7083bdf0a9d1c8c7c97089237d41c89d18bc506e2010e4aae",
+      "upstream_sha256": "f8a1b8abd4fdce69e31c8e9cd31e5c958bc34b7d1cb87638cc61f4c5f26e55b0"
     }
   },
-  "package_version": "0.8.1",
-  "patch_application": "The original five patch files were three-way merged (upstream Git / published registry 0.8.1 base / local patched registry files) without conflicts. The TransitionPlayback addition and the IME anchor (ime-anchor-patch.md) were made directly on this checkout afterwards. src/text_selection.rs carries no patch any more and matches upstream.",
+  "package_version": "0.9.0",
+  "patch_application": "Moved from Git bb85882 to b2aaa3e by a three-way merge (upstream bb85882 / upstream b2aaa3e / local patched files) without conflicts. The original five patch files were three-way merged (upstream Git / published registry 0.8.1 base / local patched registry files) without conflicts. The TransitionPlayback addition and the IME anchor (ime-anchor-patch.md) were made directly on this checkout afterwards. src/text_selection.rs carries no patch any more and matches upstream.",
   "patch_base": {
     "package": "gpui-base",
     "registry_source_revision": "99576db58ec8103417c41a092e891b4022d24e7e",
@@ -147,17 +147,17 @@
     "block-surface-patch.md"
   ],
   "repository": "https://github.com/longbridge/gpui-kit",
-  "revision": "bb85882e1faab845d9e7be33b69a152879a90f69",
-  "source_kind": "Git checkout, not the crates.io 0.8.1 archive",
+  "revision": "b2aaa3e5f9a387dea74981586bfca33e7e08420d",
+  "source_kind": "Git checkout, not the crates.io 0.9.0 archive",
   "upstream_files_sha256": {
-    "Cargo.toml": "02738156dcc3e7e3204895d131ef1b1f70c37901e84c1ef0b5961b72f8eddbcb",
+    "Cargo.toml": "1a6020b4b28032f620ea5d8f10c03612f5aaaa8c66d5c19a8e081fd66081f855",
     "LICENSE-APACHE": "d1b0449e5478c574ba4f686c2656df7fe77d66821a61f8b6ed3378a58ed9a811",
     "README.md": "8c1f0ce117fd98117f6733ab4f8a1c07b9f5723f8623b60b988754c00cb40d61",
     "benches/motion.rs": "8a1f6305dcc0bf4dc6ecfe070072a417e68d9987cafb73215add6e1329a6ca7f",
     "benches/text_view_scroll.rs": "48af8b27957c7c624055a167f921c4beaaca774db93e82726363e15d930ec8b5",
     "examples/README.md": "990865136cca660ae9083f1709a6321aa818b0b8ca32217ab294ba6d87f1e9ec",
     "examples/motion/mod.rs": "daff23092852548fd551b2c549ae978123c90ce6532e0f6f05a0cd207d250d7a",
-    "examples/native/Cargo.toml": "63e0f84687f2b9daf51e1c4b417b80efcb2dfc384bf07b0df3ba275b487f856d",
+    "examples/native/Cargo.toml": "6ffc2c586cbd47e38ba547cb183eea60c3971a57d1fcd61ea2c4973ed5beed3e",
     "examples/native/src/bin/components.rs": "9a73f38f0761e67e78a4727a2d0d7c42fc3ff116b065c149fd038fb14733249a",
     "examples/native/src/bin/motion.rs": "ebb91c7c898549c26d08fbadf65ba52e64da3ec3f7e0cbf089d51d275fe6935f",
     "examples/native/src/bin/scroll_bounce.rs": "a4bc8aaea246077dffbdbc020396d49d5ef3702158c03f43f4b8a0d1725820a5",
@@ -175,10 +175,11 @@
     "examples/showcase/components/dialog.rs": "272b999b0895de6888a0fb20bf0a697242f837809ba44b47a0274972abc4a19b",
     "examples/showcase/components/dock.rs": "63e75f3e97db0793dad4fa6723b6d2ff404c21d190b6b8e0a11808534826908d",
     "examples/showcase/components/editor.rs": "7466864c29bc1138615602533d107d7c180ddedc209d5ead1a3996773d6ef3d4",
+    "examples/showcase/components/grid_layout.rs": "b4b4117440d618d6cefb1792bbc79041213adf32dbdf681caa1c781a38530b6c",
     "examples/showcase/components/hover_card.rs": "d86413b6c0daeeb0dc5c0908bf0ad7dada343e3cb07c4ae7b1005a2afc0be920",
     "examples/showcase/components/input.rs": "66e347043aeb887b82850b5a861e161f08a3b03aad904c98b23a82e5281f0e23",
     "examples/showcase/components/link.rs": "38d8ada489ba91c1cdc2ff8efcf08c212eed94958373e33ed03e8dd6f5966ddb",
-    "examples/showcase/components/mod.rs": "bcefd62436607751246f9a534bbabca7438440eda7bfe3a4ec027b517ab7d833",
+    "examples/showcase/components/mod.rs": "45f1453a76e4f23880abeeabb7afb57364770bc9d5dbe4e6f1546ce65627e8c1",
     "examples/showcase/components/nav_stack.rs": "ba03149cf922476e03e317ab8de7c0632b3119b5fbd023ee25f408d6da7a5b99",
     "examples/showcase/components/number_input.rs": "93245b83487dd9c6663cdc71a24918e4e2081a7540db1ce79731aa805c9db3a6",
     "examples/showcase/components/otp_input.rs": "1aee23d54ee04bc7966806ddf4d828c833dfba6e020694c72da7957bdca7d352",
@@ -207,11 +208,11 @@
     "examples/showcase/components/tooltip.rs": "2aab5eb2c9d12403cbfed36339ae68b51ebf3637b95c3673716e02cfcaf3ff38",
     "examples/showcase/components/tree.rs": "efcb0dd0d7ad7fe1f058b21469bcf9a95379f22efe1587112e13423ddfbdf59a",
     "examples/showcase/components/virtual_list.rs": "5671a7f94a43addb3b53c77345c673cd674b9fac3a6e1af5aa36055c4e4a0007",
-    "examples/showcase/mod.rs": "9c06a9c1a6f79d6911846449ffae5c4151617263c2ef42c92976273a3bebdae7",
+    "examples/showcase/mod.rs": "981020304a424eaca15da6f2ae428858094b012189a981c64093b74f3a01ba9b",
     "examples/showcase/syntect_highlighter.rs": "e0377831a99f320aff83997aaa44b718fece3fe853f41f033fc3144cfdc2ef57",
-    "examples/wasm/Cargo.toml": "50bec9a1923a184900e97d2311715df98396e45fad861a9b0d4aa0dd302665f3",
+    "examples/wasm/Cargo.toml": "f8a1b8abd4fdce69e31c8e9cd31e5c958bc34b7d1cb87638cc61f4c5f26e55b0",
     "examples/wasm/Makefile": "7fa54dc3b0bd9dbc0028b1ec06b1d073b5c777985eef71e21eb4986f063e87f8",
-    "examples/wasm/scripts/build.sh": "a517efe2b3073b58842b37e67bdf0a0fbe0a6180a5e1dde837e99ab88708587e",
+    "examples/wasm/scripts/build.sh": "c36ac503cd5868dd10c6682c03ce7063d16c0d98b86866a125b01f386da0fdcc",
     "examples/wasm/src/lib.rs": "ed934f382576fe8abf8f692f987406212288259f0b7e431d4b9444c819bc6ddf",
     "examples/wasm/www/.gitignore": "7b0e1682fcbd0508560e58eae73f7a9bbef908f386a7dcc0569f85a3797f03d7",
     "examples/wasm/www/bun.lock": "1bc26f47fedb4705b212eb1d929184b35b39546705b08ca9bf13c52e97cb3749",
@@ -266,6 +267,10 @@
     "src/focus_trap.rs": "10fe3e8516e80bc2948c11ba76f60e9661802dbd0f9baba8dfe1e06635120f08",
     "src/geometry.rs": "ffe99efcf2dad27387e030ed2576a695031ea1dbecf30fb5f8f5ce315ae941e0",
     "src/global_state.rs": "0eeceaf87fd9c5831552ce35a68fdb480ddec56282056636cd575735c49558d7",
+    "src/grid_layout/grid_layout.rs": "fd3dac3cf49b4afe06b22bce62c6bf3c690a13fea3fe2d034e188682b30b272c",
+    "src/grid_layout/layout.rs": "004ce2434a8c58f5d05e0a6446af8475da8d4d82d96acc3c4a8e6fb0bd3bd7f6",
+    "src/grid_layout/mod.rs": "18f750c62eb6a060f042c091043df3b4685b81ff75589680b53cbd5873f27a9b",
+    "src/grid_layout/state.rs": "743f903138d58cce89f97939524625af2c49d78c9423c11eeadc4722fc901715",
     "src/history.rs": "7312a757d19fe5d4e62c4b8b9db65421603224526ab2edc1545ca2b17f166abc",
     "src/hover_card.rs": "0fa5143e3e9657b0d2fe427b830d9fc0422351b14a2fbe8207cfa83bc74a025a",
     "src/index_path.rs": "7e28ff5c5ae88fe94311c19732aaaf420723ad7ed299d70a8ec94231a47164fc",
@@ -273,18 +278,18 @@
     "src/input/base/blink_cursor.rs": "c42fe540ba6e1c3fb60a24f9dfd471c3efaec844a7af08405234d8f6603800a0",
     "src/input/base/change.rs": "7555a8bd9067a7f19248c2140c9836ea0f68ad80640210b95e886b01b91b9599",
     "src/input/base/cursor.rs": "05cca82894ddef125cfaaa24d92d72af62529a2255da26aaffc9b134bbc79413",
-    "src/input/base/element.rs": "2d0697813d4e13f705d03c35c575e798754756c0528e013014e98aebfb67c5d5",
+    "src/input/base/element.rs": "1604d1b71271998bf335a1c3b244356bbf12860ea4de567d3bd0f8f4b4912fc8",
     "src/input/base/inline_tokens.rs": "a515259884fd99cc07d9c6a5910504e390839331e69d6d49e8433dc08877d867",
     "src/input/base/kind.rs": "dd24ba5231bb84c64367075131b149962349f3f23881b07f83139d20dd1c8e71",
     "src/input/base/layout.rs": "08cedc8853fec2f61be0d0a3af980cb8bac8f35c1fc97838fc96c1bb09926db9",
     "src/input/base/mask_pattern.rs": "d53a4d3dc715a7e0a28ae0bd400a9f11ef612d3af9e722bc4e418e928e6c5ef4",
     "src/input/base/mod.rs": "c2de40bc03763b898b621ae8e8b9a8927a69b7b77f18b21b1f1d5b914eec19a7",
-    "src/input/base/mode.rs": "f4a77f5905caeb1e00596f63041cbcfef84ccfaf7ffa084dfd36a08bc1965f86",
+    "src/input/base/mode.rs": "e99fc26c210d38d64be6dbc8f596a7fd3f01b2a815e7f74fe769560107cd4807",
     "src/input/base/movement.rs": "9530d4fba9b29a11008bd70f1120a7ff9787435af05431811c8718e78c0eeca8",
     "src/input/base/native.rs": "8fcb188c4027f73756e69a7e885d18d150e8bbbe2d5d6cacf1bdf51cb87f904b",
     "src/input/base/rope_ext.rs": "07c2ca02bb8413411f9c67c6f03033fd80e259838842ba539f4f12a285ff6d8a",
     "src/input/base/selection.rs": "e27dcde643ed47e68e150f531ee37523f3b396a2056f94c7da60077f9fef40b1",
-    "src/input/base/state.rs": "39296e195f6dabbb581b8f72ee06809b13fae3b328c4a71b48768dbff5c81c53",
+    "src/input/base/state.rs": "9a4352317273c35e7736cc0dcff409d261118f78970ecc64c0fc768f0685e9e9",
     "src/input/base/tab_stops.rs": "a41467f4d5e37d435dc35b29964d85c1a8388bda4bca9126c01814a4c92d770b",
     "src/input/base/token_presentation.rs": "38258e52bad19102873d932768ba4b00abff93feeae5d3566b04093756fd577d",
     "src/input/base/touch.rs": "8787ade48d5e74e8ef8354f6a8f67811fa6864de918072ecb8fc7ff91250569e",
@@ -303,7 +308,7 @@
     "src/input/editor/display_map/text_wrapper/wrap_width.rs": "a134c0008913c16760e8ebab6583f231b582735c9b7e4816551b44cded548043",
     "src/input/editor/display_map/text_wrapper/wrap_width/tests.rs": "5cf6464752fb5647418e457cc9f5eda1d31b25831055855297b3c709680da365",
     "src/input/editor/display_map/wrap_map.rs": "947d9eb2cfa3388fd9becfb93eb51bd889301cab047534aae20c3e34ae04a869",
-    "src/input/editor/highlighting.rs": "a8ddf22a7e48437da874e5f4f665b0826660a39ea364a564bfdf77e90f218155",
+    "src/input/editor/highlighting.rs": "acfcf112bbbd45295bce5a932bc3faa0b3e989f675464b3c29c46e14d2b65c57",
     "src/input/editor/indent.rs": "8affffe1dac3b044c9ee2989983076a1a503a32daa23066843e0615051be6e04",
     "src/input/editor/language.rs": "4f95415cbc0f2a2fe9e5ac7a571f23daa0b08336f7bf355709d63607ad4d94c9",
     "src/input/editor/language_config.rs": "6fc15fe185b8a15d79e3dddf92f1bb3d9bd3fd482767a30c26ce0f5dd8c030f7",
@@ -318,10 +323,10 @@
     "src/input/editor/mod.rs": "b28501bf704dc8e4d2a1e9caef7d1e7daeb79e986d1832fbc2625a4d0524c28a",
     "src/input/editor/search.rs": "4e793f8ac73c2531eb0cb067d6d56cd8cc6c1c8b7f17a68ce4f4f2970bfaa92c",
     "src/input/input/mod.rs": "6795120ffbd098bcfe1bfad635615eb0133551af31ae22d429fe6a2945e4680b",
-    "src/input/mod.rs": "1c785e86623e9bf7dae49f0a6a2046e0498731f2723b2018bea8116e2e17f8cf",
+    "src/input/mod.rs": "63d3e6aea069fe81e9ad7eef6365bc433c526bba2c91ed787f8fb37ce9f8433b",
     "src/input/scrollbar_presentation.rs": "bfe3927d994fb204e9e4dd1a20049738c257027c2a33c255a7c2844125ca8332",
     "src/input/textarea/mod.rs": "55e95879a0bd3a6d4f717e35b5cc93151ee03757f007d5fd7e28638acb2f69d1",
-    "src/lib.rs": "7692fadcb738947c529f338208facea785a5172298064eef8fb34365e452e876",
+    "src/lib.rs": "a6201039dbd23080496361e55480a3d1755da7eeee7501f6845d0e58a57c4ef8",
     "src/link.rs": "34e994c670cf1312c777e114c0555b7b604923747fc3759a5138910f404ca886",
     "src/list_settings.rs": "50c6b4289a3de3877471ce8ebf9c6488f2ed5ddf7bd5a471e95fefe91c26cc4d",
     "src/macos_accessibility.rs": "089d673a24a155d7bac2cec3129b535a680cea4970c5cfb32da0e0b8b228b6af",
@@ -338,7 +343,7 @@
     "src/number_input.rs": "ef937e1764c170a12d19377907835087b16e83e2cad78b3967f6dc499d92dedd",
     "src/observe.rs": "00ce59655ceefe1e2df485f4bdae9e02c478aa4e083c9da0cba43b4f307e82b7",
     "src/otp_input.rs": "265578b529f210f06a045b14ffdcf99f050a0ed8fb738d5e6b59f4071cfe9de7",
-    "src/overscroll.rs": "4b68943417c727c7d22821f0f081f642ecaf3f973ffa7c82278698be8352de65",
+    "src/overscroll.rs": "a7e56fd5f0a0993c8ae87022694cfb04e0fa3333caff3ad1a77dcbf9a6e0409e",
     "src/pagination.rs": "23259096e34ee4becb61489e3ae62b65dd24dd1a3db2b69bd5cfe07a595cf23b",
     "src/plot/appear.rs": "f1d17352bf5ae10b9f7980e54a0b9e6471bdb2c312e48e4aafbe013488b1fa25",
     "src/plot/axis.rs": "218632b939f971712ba28560cce14328d77c105f58bbb3f7cabba172e30e7499",
@@ -379,8 +384,8 @@
     "src/resizable/panel.rs": "bd8438eadd5181ef5dfc98eda2518cb510d72c816c78f885586142692e5b5f1d",
     "src/resizable/resize_handle.rs": "ed277ce01b1c8113c95f938ed1760f59c0cf74ed4421d682f95b5c01a3e955b8",
     "src/root.rs": "9a32e3bb2668d0ee5a21f8ad22f306a4156446c5540150db625823fc90b95203",
-    "src/scroll_bounce.rs": "b51a5913cff99ff69863af988f9d6e2a52608084250e5ad370b943ce0f790518",
-    "src/scrollable_mask.rs": "aa6fa0a80e9ac3b435d1cd77220c3b26f232d57479d79c08225eff134d0631c5",
+    "src/scroll_bounce.rs": "502052e29fc2fc7c3f49a6a0cce329eba04fcad5652d582755b7d3594ace784b",
+    "src/scrollable_mask.rs": "db0aef51231c1fccdeb527c520020d23cd0c6104d3ab0a1bb711723ed3ef8b93",
     "src/scrollbar.rs": "8434eeca38a53483859096f94bed8225a96ffaaa62aa34d8e53294f8c995e99f",
     "src/select.rs": "0d23c688e9107a8875eb61c016f17dd14863c8d80e8f4e5a22fe609cdd769940",
     "src/selectable_text.rs": "5f8f33f03e5f31a563a05796d3bf82f4eef2ce3d5a0bd08f8afb08e763344e71",
@@ -391,21 +396,29 @@
     "src/switch.rs": "a97b54dce01d28f3201400e336ff26bae67d82160d92a2b13c1fa30f529b63d6",
     "src/table.rs": "b9101b8ff59b1514955e20ddb111fce7d8cb81cd27c170eb1fd77bcdb9512ad6",
     "src/tabs.rs": "301dce5f2715fbb9fe33dce6e7a6e2b2fe40d4fbab45ba9defe3a0c7e2bef141",
-    "src/test_support.rs": "670b1eb9f66d3f7e9b02a424d85239f42872c008293fc8aab257cb86b9e67d94",
-    "src/text/editor_host.rs": "358a6d45b287fdcea4a5f29dacc9a3738b20e62d2fc3ce7de5ddf358298e7b17",
+    "src/test_support.rs": "0bf987c336c802d50bbf2f5b2cd3605695651576f907af429a0967868b9fb436",
+    "src/text/document.rs": "fbac8a9bfcfbc884eadafa4e1a6c4b897593e0c48917179267d6deed9e1b81fb",
+    "src/text/editor_host.rs": "5fb189618273694bf1b6553d94a3adac83d45752b2426807c908ec73e043c8fe",
     "src/text/editor_seam.rs": "d10d86c056d6792f5d1fe904efc410c97830d77d3dfb555867a371182fa1e101",
     "src/text/format/html.rs": "c67898d5e370cf994d367354b1a542be71b2ef95c91e06db320e97f77c2ce046",
     "src/text/format/html5minify/mod.rs": "139ae3bdc3c5a1d35f2c7439183b1f2aafc5514ced0e1a2f89917098cdc2d714",
+    "src/text/format/markdown.rs": "08be31515e0b041fd39e10007c883105015fa498d23e3bb7023b561e84eddf7e",
     "src/text/format/mod.rs": "a9c352dd0d58f53f6dffe14568378bc481c8352985b2653b0ad7dcea67f72ba8",
-    "src/text/inline.rs": "ab846c327bed9dca4a165239faf6bc2a97afa43d6f458ee7a608497bdc78c7c6",
+    "src/text/inline.rs": "a130579965b510641771d1055cc1ac19e9689abaddad3250bad021497ba62561",
     "src/text/inline_element.rs": "ee002a6860ae76829568f994ea7ac92caba9ced2129c513a43da51c45ce96e37",
     "src/text/inline_flow.rs": "aefc083b5bc4214ab37e1bd19f53c6d3fe9c7b2a94f88dc900ab77e51d574c9c",
     "src/text/inline_object.rs": "4c4b7bf42048f8c2fa4c4deb328707445eaa8eb33d9414d2f8de156961657117",
     "src/text/inline_virtual_tests.rs": "e86c28cc7c0d918e10669c241129756cece9ea52ffd8f73b8e06125a259c4356",
+    "src/text/markdown_ext.rs": "44fa63ece976a0474f402a2a65d7d1f382f143c1a482dbb392b8f39f85e397b3",
+    "src/text/mod.rs": "c88ba532a1d529ad16e89788685c7752cd701771d08699d0395a8ab196ff2be6",
+    "src/text/node.rs": "b12a444e343b438e703ffbfd55365392b6381b685c73e64d7929df0214722fa1",
+    "src/text/range_highlight.rs": "99ed9b73bcd26b30bda29135c2a2c0a2963aac82eff9ab720eb12563575078c0",
     "src/text/selection.rs": "5a4923a2128cd6a3eea9f91b70dd9e7bd4369b020d1da4b209292c29e6ea870f",
     "src/text/selection_adapter.rs": "e59075ae32ed3c0e76bb045071ae77d8d403e30a98d3d8ea2853e16a88d908e1",
-    "src/text/style.rs": "3d754d79c126ad2e7bf0f3cd9295662fca95767f300124b7631c5d73bb12217b",
-    "src/text/text_view.rs": "094aa37246a2a26cab185122f0ea637ee05097177a07a287361ede92162354ef",
+    "src/text/state.rs": "77bf710cc6dfc3fd920a1c8821d933d66996708a326b63e94b7d8d6c6d8f4bd8",
+    "src/text/stream_fade.rs": "8070e549356951d29604a5e436afdf7606bfb6c0cd3fe284384acaf6195260b1",
+    "src/text/style.rs": "f87e3e483e2d4b1679c2f6aeb78727234d4c903e0cdad45cf0a7ed32b772b24e",
+    "src/text/text_view.rs": "d41d04ee9c38d9b43e8a5a24294c3e689c2492ee4d69b0368ef8b8f6bbeded6e",
     "src/text/utils.rs": "22a31ad1915b9a5b0ff7c7f79747fdfaab72537f087a498269a4e2b292e93480",
     "src/text_boundary.rs": "ca0ab74dc597c5ef6a8fa95259b75dcfc6320996be3cc9b35c79f0ca17862e6e",
     "src/text_selection.rs": "4d45f303915294b0e1984bc6a83a00f8752751c96bf78d6f24dcd057b17b742c",
@@ -422,6 +435,7 @@
     "src/undo_history.rs": "ed5b8f83b9de3d749855d2c9bb06097693c6d9664fb201d7a692801eca4fc1ce",
     "src/virtual_list.rs": "5082b8fc5c7e340e0eadbfa61079638524345558407f3f60e8b1b49d6f826d68",
     "tests/element_ext.rs": "1c0fbd0bb0b422b0537322163395eec312ccbe4e65e11874246dd1c4c5ca4c5f",
+    "tests/html_paragraph_ids.rs": "efbba433b72799f2b9e2e810865d6ea21c22b5f2d5b6aa0e1f85fe76e8c36638",
     "tests/text_host.rs": "7f5853edc1383ce5980b2d97af3df11fcf10eedeb60f3a56197ce2f6cb556776"
   },
   "verification": "upstream_files_sha256 are hashes of crates/base in the longbridge/gpui-kit checkout at revision; every vendor file outside local_patch_files, normalized_manifests, added_files and provenance_files matches them."

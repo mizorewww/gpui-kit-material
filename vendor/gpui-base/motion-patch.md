@@ -1,16 +1,16 @@
 # Workspace compatibility patches
 
 This directory contains `crates/base` from Longbridge GPUI Kit Git revision
-`bb85882e1faab845d9e7be33b69a152879a90f69`, licensed under Apache-2.0.
-The upstream package declares version `0.8.1`, but this checkout is **not** the
-published crates.io `0.8.1` source. `SOURCE.json` records every upstream file's
+`b2aaa3e5f9a387dea74981586bfca33e7e08420d`, licensed under Apache-2.0.
+The upstream package declares version `0.9.0`, but this checkout is **not** the
+published crates.io `0.9.0` source. `SOURCE.json` records every upstream file's
 SHA-256, the normalized manifests, and the original and patched SHA-256 of
 each local patch file. `.cargo_vcs_info.json` is a locally written
 marker identifying the Git checkout actually vendored here.
 
 The root and example manifests expand workspace-inherited values from that
 same upstream revision. They do not inherit dependencies or lint settings from
-the Material workspace. GPUI snapshot dependencies remain pinned to `=0.3.10`;
+the Material workspace. GPUI snapshot dependencies remain pinned to `=0.3.11`;
 optional GPUI Fast support and all upstream dependencies/features are retained.
 Dependency resolution belongs to the consuming workspace's `Cargo.lock`; there
 is no stale package-level lockfile from the older published archive. Upstream

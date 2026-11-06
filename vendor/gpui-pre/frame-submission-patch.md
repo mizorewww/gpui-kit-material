@@ -2,7 +2,7 @@
 
 **Dev-only.** Everything here is behind the `frame-observation` Cargo feature, which is off for a consumer; see "Consumer patch set" in `docs/ARCHITECTURE.md`.
 
-Source: the published Apache-2.0 `gpui-pre` 0.3.10 package (`SOURCE.json`).
+Source: the published Apache-2.0 `gpui-pre` 0.3.11 package (`SOURCE.json`).
 Files: `src/platform.rs`, `src/window.rs`, `src/platform/test/window.rs`.
 
 `PlatformWindow` gains three defaulted methods, so unpatched backends compile

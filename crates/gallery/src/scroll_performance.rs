@@ -59,6 +59,7 @@ impl JournalEvidence {
                             FrameSkipReason::NoRenderNeeded => "no_render_needed",
                             FrameSkipReason::InactiveFrameRateLimit => "inactive_frame_rate_limit",
                             FrameSkipReason::ThermalFrameRateLimit => "thermal_frame_rate_limit",
+                            FrameSkipReason::LowPowerFrameRateLimit => "low_power_frame_rate_limit",
                         }
                     })
                 }
@@ -999,6 +1000,11 @@ mod tests {
                         at: origin + AFTER,
                         reason: FrameSkipReason::ThermalFrameRateLimit,
                     })),
+                    Entry::Boundary(IntervalBoundary::FrameSkipped(FrameSkipped {
+                        window_id: id,
+                        at: origin + AFTER,
+                        reason: FrameSkipReason::LowPowerFrameRateLimit,
+                    })),
                     Entry::Discontinuity { lost: 3 },
                 ],
             },
@@ -1007,13 +1013,14 @@ mod tests {
         );
         let report = evidence.report();
         assert_eq!(report["lost"], 3);
-        assert_eq!(report["entries"].as_array().unwrap().len(), 3);
+        assert_eq!(report["entries"].as_array().unwrap().len(), 4);
         assert_eq!(report["entries"][0]["signal_at_ns"], BEFORE_NS as i64);
         assert_eq!(report["entries"][0]["source"], "local_schedule");
         assert_eq!(report["entries"][1]["at_ns"], AFTER_NS as i64);
         assert_eq!(report["entries"][1]["reason"], "thermal_frame_rate_limit");
-        assert_eq!(report["entries"][2]["lost"], 3);
-        assert_eq!(report["batches"][0]["entries"], 4);
+        assert_eq!(report["entries"][2]["reason"], "low_power_frame_rate_limit");
+        assert_eq!(report["entries"][3]["lost"], 3);
+        assert_eq!(report["batches"][0]["entries"], 5);
     }
 
     fn drive(count: u64) -> Drive {

@@ -1,7 +1,7 @@
 # Entity lease for rendering
 
-Source: the published Apache-2.0 `gpui-pre` 0.3.10 package (`SOURCE.json`) and
-`gpui-fast` 0.1.12 (`MATERIAL-MIGRATION.json`). Files: `src/app/entity_map.rs` here,
+Source: the published Apache-2.0 `gpui-pre` 0.3.11 package (`SOURCE.json`) and
+`gpui-fast` 0.1.13 (`MATERIAL-MIGRATION.json`). Files: `src/app/entity_map.rs` here,
 `src/fast/dependencies.rs` in `gpui-fast`.
 
 `Entity::update_for_render` leases an entity to build elements from it. It exposes

@@ -1,4 +1,4 @@
-//! Kit default icon paths at bb85882e1faab845d9e7be33b69a152879a90f69.
+//! Kit default icon paths at b2aaa3e5f9a387dea74981586bfca33e7e08420d.
 //!
 //! Source: `crates/assets/default-icons.txt`, which generates Component's
 //! compatibility IconName catalog. This is a semantic translation, not a claim
