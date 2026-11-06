@@ -492,6 +492,164 @@ fn a_slider_grows_from_the_right(cx: &mut TestAppContext) {
     assert!(after > value, "left increases in a right-to-left slider");
 }
 
+/// A right-to-left slider over a state, 320px wide.
+struct RtlSlider(Entity<SliderState>, crate::components::SliderAppearance);
+impl Render for RtlSlider {
+    fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        window.set_rem_size(px(14.));
+        Scope::new("rtl-slider")
+            .direction(LayoutDirection::Rtl)
+            .child(
+                div().w(px(320.)).child(
+                    div()
+                        .debug_selector(|| "slider".into())
+                        .child(MaterialSlider::new(&self.0, "Level").appearance(self.1)),
+                ),
+            )
+    }
+}
+
+/// The slider's state, and how many times it reported a release.
+fn rtl_slider(
+    cx: &mut TestAppContext,
+    state: SliderState,
+    appearance: crate::components::SliderAppearance,
+) -> (Entity<SliderState>, Rc<Cell<usize>>, &mut VisualTestContext) {
+    cx.update(|cx| {
+        gpui_kit::init(cx);
+        crate::init(cx);
+        cx.set_reduce_motion(true);
+    });
+    let (view, cx) = cx.add_window_view(|_, cx| RtlSlider(cx.new(|_| state), appearance));
+    draw(cx);
+    let state = view.read_with(cx, |view, _| view.0.clone());
+    let releases = Rc::new(Cell::new(0));
+    cx.update(|_, cx| {
+        let releases = releases.clone();
+        cx.subscribe(
+            &state,
+            move |_, event: &gpui_base::slider::SliderEvent, _| {
+                if matches!(event, gpui_base::slider::SliderEvent::Release(_)) {
+                    releases.set(releases.get() + 1);
+                }
+            },
+        )
+        .detach();
+    });
+    (state, releases, cx)
+}
+
+#[gpui::test]
+fn a_right_to_left_thumb_follows_a_drag(cx: &mut TestAppContext) {
+    thumb_follows_a_drag(cx, crate::components::SliderAppearance::Expressive);
+}
+
+#[gpui::test]
+fn a_right_to_left_classic_thumb_follows_a_drag(cx: &mut TestAppContext) {
+    thumb_follows_a_drag(cx, crate::components::SliderAppearance::Classic);
+}
+
+fn thumb_follows_a_drag(cx: &mut TestAppContext, appearance: crate::components::SliderAppearance) {
+    let (state, releases, cx) = rtl_slider(
+        cx,
+        SliderState::new().max(100.).default_value(50.),
+        appearance,
+    );
+    let value = |cx: &mut VisualTestContext| state.read_with(cx, |s, _| s.value().end());
+    let slider = cx.debug_bounds("slider").unwrap();
+    let thumb = cx.update(|window, _| {
+        gpui_base::test_support::find(window, &[], &ElementId::from(("slider-thumb", 0u32)))
+            .unwrap()
+            .bounds()
+    });
+    assert!(
+        (thumb.center().x - slider.center().x).abs() < px(4.),
+        "{thumb:?} in {slider:?}"
+    );
+    cx.simulate_mouse_down(thumb.center(), MouseButton::Left, Modifiers::default());
+    draw(cx);
+    assert_eq!(value(cx), 50., "a press on the thumb leaves it");
+    let left = point(slider.left() + px(30.), slider.center().y);
+    cx.simulate_mouse_move(left, MouseButton::Left, Modifiers::default());
+    draw(cx);
+    assert!(
+        value(cx) > 75.,
+        "dragged left, toward the end: {}",
+        value(cx)
+    );
+    let right = point(slider.right() - px(30.), slider.center().y);
+    cx.simulate_mouse_move(right, MouseButton::Left, Modifiers::default());
+    draw(cx);
+    let dropped = value(cx);
+    assert!(dropped < 25., "dragged right, toward the start: {dropped}");
+    cx.simulate_mouse_up(right, MouseButton::Left, Modifiers::default());
+    draw(cx);
+    assert_eq!(releases.get(), 1);
+    cx.simulate_mouse_move(left, None::<MouseButton>, Modifiers::default());
+    draw(cx);
+    assert_eq!(value(cx), dropped, "released, it no longer follows");
+}
+
+#[gpui::test]
+fn a_right_to_left_range_moves_the_nearer_thumb(cx: &mut TestAppContext) {
+    let (state, _, cx) = rtl_slider(
+        cx,
+        SliderState::new().max(100.).default_value((20., 60.)),
+        crate::components::SliderAppearance::Expressive,
+    );
+    let range = |cx: &mut VisualTestContext| {
+        let value = state.read_with(cx, |s, _| s.value());
+        (value.start(), value.end())
+    };
+    let slider = cx.debug_bounds("slider").unwrap();
+    // Near the right end is near the start of the range, so the start thumb.
+    let near_start = point(slider.right() - px(30.), slider.center().y);
+    cx.simulate_click(near_start, Modifiers::default());
+    draw(cx);
+    let (start, end) = range(cx);
+    assert!(
+        start < 15.,
+        "the start thumb moved toward the right: {start}"
+    );
+    assert_eq!(end, 60.);
+    let near_end = point(slider.left() + px(30.), slider.center().y);
+    cx.simulate_click(near_end, Modifiers::default());
+    draw(cx);
+    assert_eq!(range(cx).0, start);
+    assert!(
+        range(cx).1 > 85.,
+        "the end thumb moved left: {:?}",
+        range(cx)
+    );
+}
+
+#[gpui::test]
+fn a_right_to_left_slider_follows_a_finger(cx: &mut TestAppContext) {
+    let (state, releases, cx) = rtl_slider(
+        cx,
+        SliderState::new().max(100.).default_value(50.),
+        crate::components::SliderAppearance::Expressive,
+    );
+    let value = |cx: &mut VisualTestContext| state.read_with(cx, |s, _| s.value().end());
+    let slider = cx.debug_bounds("slider").unwrap();
+    let start_position = point(slider.right() - px(30.), slider.center().y);
+    let touch = |phase, position, cx: &mut VisualTestContext| {
+        cx.simulate_event(TouchDragEvent {
+            phase,
+            start_position,
+            position,
+        });
+        draw(cx);
+    };
+    touch(TouchPhase::Started, start_position, cx);
+    assert!(value(cx) < 25., "touched near the start: {}", value(cx));
+    let left = point(slider.left() + px(30.), slider.center().y);
+    touch(TouchPhase::Moved, left, cx);
+    assert!(value(cx) > 75., "moved toward the end: {}", value(cx));
+    touch(TouchPhase::Ended, left, cx);
+    assert_eq!(releases.get(), 1);
+}
+
 struct ScrolledRow {
     scroll: gpui::ScrollHandle,
     rtl: bool,

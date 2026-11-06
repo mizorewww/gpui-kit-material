@@ -183,9 +183,6 @@ pub struct SliderState {
     dragging: bool,
     /// The touch drag this slider claimed, while one is live.
     touch_drag: Option<TouchDrag>,
-    /// Whether it last rendered right to left, where a horizontal slider's
-    /// value grows toward the left. Pointer events run after the draw.
-    mirrored: bool,
 }
 
 /// A touch drag claimed by a slider.
@@ -209,7 +206,6 @@ impl SliderState {
             bounds: Bounds::default(),
             scale: SliderScale::default(),
             dragging: false,
-            mirrored: false,
             touch_drag: None,
         }
     }
@@ -383,11 +379,7 @@ impl SliderState {
         let step = self.step;
 
         let inner_pos = if axis.is_horizontal() {
-            if self.mirrored {
-                bounds.right() - position.x
-            } else {
-                position.x - bounds.left()
-            }
+            position.x - bounds.left()
         } else {
             bounds.bottom() - position.y
         };
@@ -440,11 +432,7 @@ impl SliderState {
     fn is_nearer_start(&self, axis: Axis, position: Point<Pixels>) -> bool {
         let size = self.bounds.size.along(axis);
         let along = if axis.is_horizontal() {
-            if self.mirrored {
-                self.bounds.right() - position.x
-            } else {
-                position.x - self.bounds.left()
-            }
+            position.x - self.bounds.left()
         } else {
             self.bounds.bottom() - position.y
         };
@@ -619,33 +607,23 @@ impl Styled for Slider {
 
 impl RenderOnce for Slider {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
-        let mirrored = window.layout_direction().is_rtl();
-        if self.state.read(cx).mirrored != mirrored {
-            self.state.update(cx, |state, _| state.mirrored = mirrored);
-        }
         let axis = self.axis;
         let entity_id = self.state.entity_id();
         let state = self.state.read(cx);
         let slider_state = self.state.clone();
-        // A range's thumbs are its sliders (`SliderThumb`), each with its own value and
-        // steps; the container only groups and names them, so assistive technology finds
-        // two sliders, not three.
-        let range = state.value().is_range();
 
         self.base
             .id(("slider", entity_id))
             .test_support()
             .when_some(self.focus, |this, focus| this.track_focus(&focus))
-            .role(if range { Role::Group } else { Role::Slider })
+            .role(Role::Slider)
             .when_some(self.accessibility_label, |this, label| {
                 this.aria_label(label)
             })
-            .when(!range, |this| {
-                this.aria_numeric_value(state.value().end() as f64)
-                    .aria_min_numeric_value(state.min_value() as f64)
-                    .aria_max_numeric_value(state.max_value() as f64)
-                    .aria_numeric_value_step(state.accessibility_step() as f64)
-            })
+            .aria_numeric_value(state.value().end() as f64)
+            .aria_min_numeric_value(state.min_value() as f64)
+            .aria_max_numeric_value(state.max_value() as f64)
+            .aria_numeric_value_step(state.accessibility_step() as f64)
             .aria_orientation(if axis.is_vertical() {
                 Orientation::Vertical
             } else {
@@ -654,23 +632,21 @@ impl RenderOnce for Slider {
             // A disabled slider takes no value, from the pointer or from
             // assistive technology.
             .when(!self.disabled, |this| {
-                this.when(!range, |this| {
-                    this.on_a11y_action(AccessibleAction::Increment, {
-                        let state = slider_state.clone();
-                        move |_, window, cx| {
-                            state.update(cx, |state, cx| {
-                                state.step_thumb(false, state.accessibility_step(), window, cx);
-                            });
-                        }
-                    })
-                    .on_a11y_action(AccessibleAction::Decrement, {
-                        let state = slider_state.clone();
-                        move |_, window, cx| {
-                            state.update(cx, |state, cx| {
-                                state.step_thumb(false, -state.accessibility_step(), window, cx);
-                            });
-                        }
-                    })
+                this.on_a11y_action(AccessibleAction::Increment, {
+                    let state = slider_state.clone();
+                    move |_, window, cx| {
+                        state.update(cx, |state, cx| {
+                            state.step_thumb(false, state.accessibility_step(), window, cx);
+                        });
+                    }
+                })
+                .on_a11y_action(AccessibleAction::Decrement, {
+                    let state = slider_state.clone();
+                    move |_, window, cx| {
+                        state.update(cx, |state, cx| {
+                            state.step_thumb(false, -state.accessibility_step(), window, cx);
+                        });
+                    }
                 })
                 .on_mouse_up(
                     MouseButton::Left,
@@ -818,11 +794,7 @@ impl RenderOnce for SliderTrack {
                             let is_start = if is_range {
                                 let size = state.bounds().size.along(axis);
                                 let position = if axis.is_horizontal() {
-                                    if state.mirrored {
-                                        state.bounds().right() - event.position.x
-                                    } else {
-                                        event.position.x - state.bounds().left()
-                                    }
+                                    event.position.x - state.bounds().left()
                                 } else {
                                     state.bounds().bottom() - event.position.y
                                 };
