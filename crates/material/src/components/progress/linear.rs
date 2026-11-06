@@ -2,6 +2,7 @@
 //! or indeterminate. Reference: <https://m3e.kyralabs.dev/components/progress/>
 //! and the Figma kit's linear progress sets.
 use super::paint::{dot, rounded_bar, stroke_polyline};
+use crate::motion::{RepeatAnimationPlayback, RepeatWhenVisibleExt as _};
 use crate::{color::ColorRole, theme::color};
 use gpui::{prelude::*, *};
 use gpui_base::{Easing, Progress};
@@ -409,14 +410,13 @@ impl RenderOnce for LinearProgress {
                 root.child(
                     div()
                         .size_full()
-                        .with_animation(id, Animation::new(WAVE_PERIOD).repeat(), move |slot, t| {
+                        .repeat_when_visible(id, WAVE_PERIOD, move |slot, t| {
                             slot.child(bar_canvas(
                                 Active::Measured(amount),
                                 BarPaint { phase: t, ..paint },
                             ))
                         })
-                        .when_some(playback, |a, p| a.with_repeat_playback(p))
-                        .repeat_when_visible(),
+                        .playback(playback),
                 )
             }
             None => {
@@ -433,9 +433,9 @@ impl RenderOnce for LinearProgress {
                 root.child(
                     div()
                         .size_full()
-                        .with_animation(
+                        .repeat_when_visible(
                             id,
-                            Animation::new(Duration::from_secs_f32(loop_ms / 1000.)).repeat(),
+                            Duration::from_secs_f32(loop_ms / 1000.),
                             move |slot, t| {
                                 #[cfg(test)]
                                 super::tests::record_repeat_phase(t);
@@ -449,8 +449,7 @@ impl RenderOnce for LinearProgress {
                                 ))
                             },
                         )
-                        .when_some(playback, |a, p| a.with_repeat_playback(p))
-                        .repeat_when_visible(),
+                        .playback(playback),
                 )
             }
         }

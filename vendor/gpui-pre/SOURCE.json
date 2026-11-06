@@ -177,7 +177,6 @@
     "Cargo.toml",
     "src/app.rs",
     "src/app/bench_context.rs",
-    "src/elements/animation.rs",
     "src/platform.rs",
     "src/platform/test/window.rs",
     "src/profiler.rs",
@@ -212,11 +211,6 @@
       "upstream_sha256": "2140fef3a74c237c296e1073daac9a41ff083955f96daad4fac1a283e4d7c580",
       "local_sha256": "9ac49d81381afa28cc5ecc543a059570b3dbf0e15684500e381c1b1e33274f55",
       "reason": "Entity::update_for_render (render-lease-patch.md)."
-    },
-    "src/elements/animation.rs": {
-      "upstream_sha256": "7b0dde3c811bf1062e532395f5c8f5b76acb10bfe95cf875ba0e5d6c5dc41c9f",
-      "local_sha256": "da466d2d926998f334aac8b4871d807a4eda8b972f8df8c9ea05abc0fe382a2d",
-      "reason": "Executor-clock sampling, repeat_when_visible and RepeatAnimationPlayback (animation-visibility-patch.md)."
     },
     "src/platform.rs": {
       "upstream_sha256": "fcd613681b31b52318f6349e5f63fcf0c08748705b8d71673891df0c303e8756",
@@ -311,10 +305,9 @@
       "reason": "Not retained; Cargo.toml is the normalized manifest Cargo builds (test-harness-patch.md)."
     }
   },
-  "unchanged_file_count": 146,
+  "unchanged_file_count": 147,
   "provenance_files": [
     "SOURCE.json",
-    "animation-visibility-patch.md",
     "cpu-frame-scope-patch.md",
     "em-fallback-patch.md",
     "focused-input-bounds-patch.md",

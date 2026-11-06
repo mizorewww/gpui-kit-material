@@ -76,6 +76,12 @@ Distribution is by Git revision for now; see the [quick start](README.md#quick-s
 
 ### Changed
 
+- **Breaking:** the indicators' `playback(...)` builders, `spinner_with_playback`,
+  `icon_spinner_with_playback` and the `*_progress_with_playback` shorthands take
+  `motion::RepeatAnimationPlayback` instead of GPUI's, which only the engine patch
+  had. `motion::RepeatWhenVisibleExt::repeat_when_visible` replaces GPUI's
+  `AnimationElement::repeat_when_visible` / `with_repeat_playback`; scheduling and
+  phase are unchanged.
 - Every built-in palette's `ERROR` and `ON_ERROR_CONTAINER` change: the palette's
   danger color is moved in tone, keeping its hue, until it reads at least 4.5:1 on
   every surface role and on `ERROR_CONTAINER`, as Material's standard contrast

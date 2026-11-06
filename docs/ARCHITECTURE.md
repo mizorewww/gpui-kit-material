@@ -156,7 +156,7 @@ Its engine has upstream's `FrameEvent`, `PlatformWindow` and frame path.
 | --- | --- |
 | `gpui-kit` | Normalized manifest that keeps WASM single-threaded by default. |
 | `gpui-base` | Slider, dialog and toolbar corrections, transition behavior, and the input reporting its caret. |
-| `gpui-pre`, `gpui-fast` | The lazy tab-stop index, repeat playback and visibility, the quiet global swap, the focused input's caret, and the other engine rules in the table below. An application with a scrolling form on a phone needs that caret to keep it above the keyboard, as the Gallery shell does; upstream has no other way to find it. |
+| `gpui-pre`, `gpui-fast` | The lazy tab-stop index, the quiet global swap, the focused input's caret, and the other engine rules in the table below. An application with a scrolling form on a phone needs that caret to keep it above the keyboard, as the Gallery shell does; upstream has no other way to find it. |
 | `gpui-pre-apple`, `gpui-fast-apple` | Non-Latin and app-private fallback fonts. |
 | `gpui-pre-web`, `gpui-fast-web` | The browser's IME panel opens at the caret; upstream's `update_ime_position` does nothing. Only matters on `wasm32`. |
 
@@ -177,7 +177,7 @@ does not compile here (`E0004`, `FrameEvent::Complete`) and is not used here.
 | --- | --- | --- |
 | `gpui-kit` | Git at audited `b881cadb`, unchanged source | Normalized manifest disables implicit WASM threading (`multithreaded-web` restores it). Hashes in `SOURCE.md`/`SOURCE.json`. |
 | `gpui-base` | Git `b881cadb` (`crates/base`) + patches (`SOURCE.json`, `motion-patch.md`, `block-surface-patch.md`) | Only open upstream PRs: CSS transition reversal, per-transition reduced motion, `TransitionPlayback` (#3820 and its stacked branches); vertical `Toolbar` axis (#3821); slider step snapping from min, a dropped handle at its value, assistive Increment/Decrement that move one thumb onto the step grid and report it (#3822 and its stacked branch); block surfaces in `TextView` (#3830). Merged upstream and no longer patched: slider min above the default max (#3823), `Slider::track_focus` (#3824), a disabled thumb's flag (#3825), `Dialog::accessibility_label` (#3826), the input's caret reported to the platform (#3827), an input a parent moves notified only while focused (#3828), `TimeField::separator` (#3829), the input's layout published at the end of prepaint (#3831). |
-| `gpui-pre` (GPUI `=0.3.11`) | crates.io + patches (`SOURCE.json`, `*-patch.md`) | Animation visibility and repeat playback; complete CPU frame scopes, presentation wait, GPU time and submission outcome in the profiler; submission statistics, vsync control and throttle retry; `em`/`ch` metrics for fonts without `m`; lazy tab-stop index (`tab-stop-index-patch.md`); `App::swap_global_quietly`, which a scope's theme and the text field's caret need (`quiet-global-swap-patch.md`); `Entity::update_for_render`, dev-only behind `frame-observation` (`render-lease-patch.md`); overflowing spaces hang instead of starting a wrapped row (`hanging-space-patch.md`); test-harness repairs; `Window::focused_input_selection_bounds` (`focused-input-bounds-patch.md`). |
+| `gpui-pre` (GPUI `=0.3.11`) | crates.io + patches (`SOURCE.json`, `*-patch.md`) | Complete CPU frame scopes, presentation wait, GPU time and submission outcome in the profiler; submission statistics, vsync control and throttle retry; `em`/`ch` metrics for fonts without `m`; lazy tab-stop index (`tab-stop-index-patch.md`); `App::swap_global_quietly`, which a scope's theme and the text field's caret need (`quiet-global-swap-patch.md`); `Entity::update_for_render`, dev-only behind `frame-observation` (`render-lease-patch.md`); overflowing spaces hang instead of starting a wrapped row (`hanging-space-patch.md`); test-harness repairs; `Window::focused_input_selection_bounds` (`focused-input-bounds-patch.md`). |
 | `gpui-pre-apple` | crates.io + patches (`SOURCE.json`, `VENDORED.md`) | Non-Latin and app-private fallback fonts; `draw_with_status` (upstream's draw, into a `CAMetalDisplayLink` drawable or `nextDrawable`) with a per-draw autorelease pool, drawable-wait and GPU timestamps. |
 | `gpui-pre-web` | crates.io + patches (`SOURCE.json`, `MATERIAL-PATCHES.md`) | Moves the hidden IME input to the caret, where a browser opens its candidate window and it takes no clicks; keeps a composition's keys from GPUI and a replaced emoji whole (consumers need these); successful submission count, behind the crate's own `frame-observation` feature. |
 | `gpui-fast`, `-apple`, `-web` | 0.1.13 + patches (`MATERIAL-MIGRATION.json`, per-file `local_changes`) | The GPUI, Apple and web patches above carried through Fast retained/scroll replay and composition; explicit single-threaded web defaults. Three of Fast's own for performance, each exactly its upstream PR branch: a wheel that cannot move its box does not notify or mark it scrolled (`material/wheel-at-limit`: `src/fast/layers/wheel.rs`, `src/elements/div.rs`, `crates/material/tests/wheel_guard.rs`); a wheel's hover freeze also holds hover listeners for any input modality while a frame is drawn (`material/hover-freeze-listeners`: `src/fast/layers/hover_freeze.rs`, `src/elements/div.rs`, `src/window.rs`); and a view spliced around nested views forgets the entities they dropped, which it otherwise replayed on every frame, forever (longbridge/gpui-fast#106: `src/fast/splice.rs`, `src/fast/dependencies.rs`). One GPUI-core patch stays local: `App::record_entities_accessed` touches only the entities that entered or left the tracked set (`src/app.rs`). |
@@ -202,7 +202,8 @@ does not compile here (`E0004`, `FrameEvent::Complete`) and is not used here.
 
 **Audit results for transition extras.** These stay, because removing them changes
 reference parity or the budget: reversal, per-transition reduced motion,
-`TransitionPlayback`, `RepeatAnimationPlayback` and `repeat_when_visible`. No Examples
+`TransitionPlayback`, and Material's `motion::RepeatAnimationPlayback` and
+`motion::RepeatWhenVisible`. No Examples
 page uses a playback handle. The Gallery's are in its buttons and loading pages.
 
 **Lazy tab stops.** `TabStopMap` records insertions during paint and builds the
@@ -253,6 +254,11 @@ virtualized rows, owners retain playback handles instead:
   determines which rows participated.
 - `CircularProgressPlayback` keeps only the indicator clock and reduced-motion
   stop state.
+- `motion::RepeatAnimationPlayback` keeps only a repeat's start time, for the
+  indeterminate linear and circular indicators, the loading indicator and the
+  spinners. `motion::RepeatWhenVisible` samples it (or its own clock) and asks for
+  the next frame in paint only when its bounds meet the content mask and the
+  viewport, on public GPUI API, so a clipped indicator leaves the window idle.
 
 Handles do not keep pointer/focus state or rendered subtrees; a new handle starts
 a new logical playback. Visible elements request frames for active transitions.

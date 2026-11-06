@@ -2,6 +2,7 @@
 //! flat and wavy, 4dp and 8dp, determinate and indeterminate) and the M3
 //! Expressive loading indicator's seven shapes, plus live indicators.
 use super::prelude::*;
+use gpui_kit_material::motion::RepeatAnimationPlayback;
 
 const LOADING_INDICATOR: usize = 4;
 const PULL_TO_REFRESH: usize = 5;

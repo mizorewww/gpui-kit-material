@@ -10,6 +10,7 @@ use super::{
     },
     paint::{dot, stroke_polyline},
 };
+use crate::motion::{RepeatAnimationPlayback, RepeatWhenVisibleExt as _};
 use gpui::{prelude::*, *};
 use gpui_base::Progress;
 use std::{f32::consts::TAU, time::Duration};
@@ -256,19 +257,10 @@ impl RenderOnce for CircularProgress {
                 root.child(
                     div()
                         .size_full()
-                        .with_animation(
-                            id,
-                            Animation::new(Duration::from_secs(1)).repeat(),
-                            move |slot, t| {
-                                slot.child(ring_canvas(
-                                    frame,
-                                    RingPaint { phase: t, ..paint },
-                                    true,
-                                ))
-                            },
-                        )
-                        .when_some(playback, |a, p| a.with_repeat_playback(p))
-                        .repeat_when_visible(),
+                        .repeat_when_visible(id, Duration::from_secs(1), move |slot, t| {
+                            slot.child(ring_canvas(frame, RingPaint { phase: t, ..paint }, true))
+                        })
+                        .playback(playback),
                 )
             }
             None => {
@@ -281,10 +273,9 @@ impl RenderOnce for CircularProgress {
                 root.child(
                     div()
                         .size_full()
-                        .with_animation(
+                        .repeat_when_visible(
                             id,
-                            Animation::new(Duration::from_secs_f32(INDETERMINATE_MS / 1000.))
-                                .repeat(),
+                            Duration::from_secs_f32(INDETERMINATE_MS / 1000.),
                             move |slot, t| {
                                 let elapsed = t * INDETERMINATE_MS;
                                 slot.child(ring_canvas(
@@ -298,8 +289,7 @@ impl RenderOnce for CircularProgress {
                                 ))
                             },
                         )
-                        .when_some(playback, |a, p| a.with_repeat_playback(p))
-                        .repeat_when_visible(),
+                        .playback(playback),
                 )
             }
         }

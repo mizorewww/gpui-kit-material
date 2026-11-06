@@ -19,6 +19,7 @@ pub use linear::{
 
 use crate::color::ColorRole;
 use crate::icons::{Icon, IconName};
+use crate::motion::{RepeatAnimationPlayback, RepeatWhenVisibleExt as _};
 use crate::theme::color;
 use gpui::{prelude::*, *};
 use gpui_base::Progress;
@@ -116,19 +117,16 @@ fn spin(
     root.child(
         div()
             .flex_shrink_0()
-            .with_animation(
+            .repeat_when_visible(
                 id,
-                Animation::new(Duration::from_millis(SPINNER_TURN_MS)).repeat(),
+                Duration::from_millis(SPINNER_TURN_MS),
                 move |slot, t| {
                     #[cfg(test)]
                     tests::record_repeat_phase(t);
                     slot.child(icon.clone().rotate(std::f32::consts::TAU * t))
                 },
             )
-            .when_some(playback, |animation, playback| {
-                animation.with_repeat_playback(playback)
-            })
-            .repeat_when_visible(),
+            .playback(playback),
     )
     .into_any_element()
 }
@@ -245,7 +243,7 @@ mod tests {
     struct RepeatHarness {
         kind: usize,
         mounted: bool,
-        playback: gpui::RepeatAnimationPlayback,
+        playback: crate::motion::RepeatAnimationPlayback,
     }
 
     impl Render for RepeatHarness {
@@ -337,7 +335,7 @@ mod tests {
             let (view, cx) = cx.add_window_view(|_, _| RepeatHarness {
                 kind,
                 mounted: false,
-                playback: gpui::RepeatAnimationPlayback::default(),
+                playback: crate::motion::RepeatAnimationPlayback::default(),
             });
             REPEAT_PHASES.with_borrow_mut(Vec::clear);
             // Neither unmounted nor initially reduced indicators start playback.
