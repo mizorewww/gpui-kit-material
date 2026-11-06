@@ -1,7 +1,9 @@
 # An input a parent moves is not notified
 
 Source: the vendored `gpui-base` (`SOURCE.json`).
-File: `src/input/base/element.rs`. Test: `crates/material/tests/input_move_guard.rs`.
+File: `src/input/base/element.rs`. Tests: `an_input_moved_by_its_parent_is_dirty_only_while_focused`
+(GPUI Fast only) and `crates/material/tests/input_move_guard.rs`. Upstream PR: the
+`material/input-move-notify` branch.
 
 The input's paint notified its view whenever its bounds or caret differed from the
 last paint, and those are window coordinates, so a list scrolling inputs notified
@@ -11,7 +13,8 @@ which paints their inputs at a new offset, which notifies them again: a loop tha
 holds itself for as long as the scroll lasts.
 
 The input now compares its size, its text's place inside its bounds and its caret's
-place inside its bounds. Its position alone still notifies while it is focused, since
+place inside its bounds, each within 0.01 px: those places are differences of window
+coordinates, and f32 rounding makes them differ slightly once the input has moved. Its position alone still notifies while it is focused, since
 only a focused input has a caret for an open menu to read. Nothing else needs
 the notification: `text_bounds` and `input_bounds` are read on demand.
 

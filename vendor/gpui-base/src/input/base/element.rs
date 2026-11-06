@@ -3746,6 +3746,9 @@ impl<M: InputModeKind> Element for TextElement<M> {
             if moved {
                 window.invalidate_character_coordinates();
             }
+        } else if self.state.read(cx).ime_anchor.is_some() {
+            // Focused again, it reports its caret again.
+            self.state.update(cx, |state, _| state.ime_anchor = None);
         }
 
         // Paint multi line text
@@ -4031,7 +4034,6 @@ impl<M: InputModeKind> Element for TextElement<M> {
             cx,
         );
 
-        let focused = self.state.read(cx).focus_handle.is_focused(window);
         self.state.update(cx, |state, cx| {
             // What the input draws depends on where it is only through what
             // reads its caret, as an open menu does, and only a focused input
@@ -4039,21 +4041,35 @@ impl<M: InputModeKind> Element for TextElement<M> {
             // each of them again on every frame.
             let origin = state.last_bounds.map(|last| last.origin);
             let moved = origin != Some(bounds.origin);
-            let caret_in = |caret: Option<Bounds<Pixels>>, origin: Point<Pixels>| {
-                caret.map(|caret| Bounds::new(caret.origin - origin, caret.size))
+            // Places inside the bounds, from window coordinates that carry
+            // float error once the input has moved.
+            let same_place = |a: Point<Pixels>, b: Point<Pixels>| {
+                (a.x - b.x).abs() < px(0.01) && (a.y - b.y).abs() < px(0.01)
             };
             let geometry_changed = (focused && moved)
                 || state.last_bounds.map(|last| last.size) != Some(bounds.size)
                 || state.input_bounds.size != input_bounds.size
                 || origin.is_none_or(|origin| {
-                    state.input_bounds.origin - origin != input_bounds.origin - bounds.origin
+                    !same_place(
+                        state.input_bounds.origin - origin,
+                        input_bounds.origin - bounds.origin,
+                    )
                 })
                 || state.scroll_size != prepaint.scroll_size
                 || state.last_layout.as_ref().is_none_or(|layout| {
-                    origin.is_none_or(|origin| {
-                        caret_in(layout.cursor_bounds, origin)
-                            != caret_in(prepaint.last_layout.cursor_bounds, bounds.origin)
-                    }) || layout.line_height != prepaint.last_layout.line_height
+                    let caret_moved = origin.is_none_or(|origin| {
+                        match (layout.cursor_bounds, prepaint.last_layout.cursor_bounds) {
+                            (Some(last), Some(caret)) => {
+                                last.size != caret.size
+                                    || !same_place(
+                                        last.origin - origin,
+                                        caret.origin - bounds.origin,
+                                    )
+                            }
+                            (last, caret) => last.is_some() != caret.is_some(),
+                        }
+                    });
+                    caret_moved || layout.line_height != prepaint.last_layout.line_height
                 });
             state.last_layout = Some(prepaint.last_layout.clone());
             state.last_bounds = Some(bounds);
@@ -4821,6 +4837,100 @@ mod tests {
             drop(menu_focus);
             assert!(weak_menu.upgrade().is_none());
             assert!(selection_paths(window, cx).is_empty());
+        });
+    }
+
+    /// Paints an input moved by its parent, then counts the views a draw with
+    /// nothing else to do builds: a notify during a draw only marks a view
+    /// dirty, for the next draw. Only GPUI Fast reuses a clean view.
+    #[cfg(feature = "gpui-fast")]
+    #[gpui::test]
+    fn an_input_moved_by_its_parent_is_dirty_only_while_focused(cx: &mut TestAppContext) {
+        use std::{cell::Cell, rc::Rc};
+
+        struct Moved {
+            input: Entity<crate::input::InputState>,
+            top: Rc<Cell<f32>>,
+            width: Rc<Cell<f32>>,
+        }
+
+        impl Render for Moved {
+            fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+                div().size_full().pt(px(self.top.get())).child(
+                    div()
+                        .w(px(self.width.get()))
+                        .child(crate::input::Input::new(&self.input)),
+                )
+            }
+        }
+
+        cx.update(crate::init);
+        let (top, width) = (Rc::new(Cell::new(0.)), Rc::new(Cell::new(200.)));
+        let mut input = None;
+        let window = cx.open_window(size(px(400.), px(300.)), |window, cx| {
+            let state = cx.new(|cx| crate::input::InputState::new(window, cx).default_value("a"));
+            input = Some(state.clone());
+            Moved {
+                input: state,
+                top: top.clone(),
+                width: width.clone(),
+            }
+        });
+        let input = input.unwrap();
+        let mut cx = VisualTestContext::from_window(window.into(), cx);
+        cx.update(|window, cx| window.draw(cx).clear(cx));
+        cx.run_until_parked();
+        let dirty_after_painting_at = |y: f32, cx: &mut VisualTestContext| {
+            top.set(y);
+            cx.update(|window, cx| {
+                window.refresh();
+                window.draw(cx).clear(cx);
+                let built = window.layout_stats().views_built;
+                window.draw(cx).clear(cx);
+                window.layout_stats().views_built - built
+            })
+        };
+
+        for y in [10., 20., 30., 10.] {
+            assert_eq!(
+                dirty_after_painting_at(y, &mut cx),
+                0,
+                "moved to {y}, not focused"
+            );
+        }
+
+        width.set(240.);
+        assert_ne!(dirty_after_painting_at(30., &mut cx), 0, "a new size");
+
+        cx.update(|window, cx| input.update(cx, |state, cx| state.focus(window, cx)));
+        dirty_after_painting_at(30., &mut cx);
+        assert_ne!(dirty_after_painting_at(40., &mut cx), 0, "moved, focused");
+    }
+
+    #[gpui::test]
+    fn a_focused_input_reports_a_moved_caret_to_the_platform(cx: &mut TestAppContext) {
+        let (editor, window) = decoration_editor(cx, "alpha beta", false);
+        let mut cx = VisualTestContext::from_window(window.into(), cx);
+        cx.update(|window, cx| {
+            // `invalidate_character_coordinates` asks for the caret on the
+            // next frame, which is what tells the platform where it is.
+            let frame = |window: &mut Window, cx: &mut App| {
+                window.draw(cx).clear(cx);
+                window.simulate_next_frame(cx)
+            };
+            frame(window, cx);
+            assert_eq!(frame(window, cx), 0, "not focused");
+            editor.update(cx, |state, cx| state.focus(window, cx));
+            assert_eq!(frame(window, cx), 1, "focused");
+            assert_eq!(frame(window, cx), 0, "the caret stands still");
+            editor.update(cx, |state, cx| state.set_selected_range(5..5, cx));
+            assert_eq!(frame(window, cx), 1, "the caret moved");
+            assert_eq!(frame(window, cx), 0, "the caret stands still");
+
+            cx.focus_handle().focus(window, cx);
+            assert_eq!(frame(window, cx), 0, "not focused");
+            editor.update(cx, |state, cx| state.focus(window, cx));
+            assert_eq!(frame(window, cx), 1, "focused again");
         });
     }
 

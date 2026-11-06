@@ -36,9 +36,12 @@ The local compatibility surface is restricted to:
   longer move it) and reports `Orientation::Vertical`; the default stays
   horizontal and unchanged. Test: `a_vertical_toolbar_roves_with_up_and_down`.
 
-- `src/slider.rs`, right to left: `SliderState` records whether it last rendered
-  under GPUI's right-to-left layout direction, and pointer math then measures a
-  horizontal slider from its right edge. Layout mirrors the thumb and indicator.
+- `src/slider.rs`: the bullets below, offered upstream as the branches
+  `material/slider-accessibility-steps` (stacked on `material/slider-step-from-min`),
+  `material/slider-min-above-default-max`, `material/slider-thumb-disabled` and
+  `material/slider-track-focus`. Right-to-left pointer math and a range's
+  `Role::Group` node are not patched here: Material does both
+  (`crates/material/src/components/slider/mirrored.rs` and `range_group.rs`).
 - `src/slider.rs`: three narrow corrections. Dragging snapped with
   `(value / step).round() * step`, so steps were counted from 0 rather than
   `min` (a 3..100 slider with step 5 landed on 10, not 8 or 13); values now
@@ -82,13 +85,6 @@ The local compatibility surface is restricted to:
   `stepping_leaves_an_invalid_value_or_range_alone`,
   `a_range_thumb_snaps_to_the_grid_and_stops_at_the_other`; and in Base,
   `stepping_leaves_an_invalid_value_or_range_alone`.
-- `src/slider.rs`, a range's node. A range slider's own node was a `Role::Slider` with
-  the end value and Increment/Decrement, beside its two `SliderThumb` sliders, so
-  assistive technology found three sliders for two thumbs. With a range value the node
-  is now a `Role::Group` that names the thumbs, with no value, bounds, step or step
-  actions; a single value keeps the slider node. Tests, in `crates/material`:
-  `sliders_report_a_usable_step_and_range_thumbs_their_bounds` and
-  `range_thumbs_report_their_step_and_a_disabled_slider`.
 
 - `src/dialog.rs`: `Dialog::accessibility_label`. The dialog host is the
   `Role::Dialog` node but upstream gives it no name and no way to set one,

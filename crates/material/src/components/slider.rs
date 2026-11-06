@@ -22,6 +22,10 @@ use gpui::{prelude::*, *};
 use gpui_base::slider::{
     Slider, SliderEvent, SliderIndicator, SliderState, SliderThumb, SliderTrack,
 };
+use mirrored::MirroredPointer;
+
+mod mirrored;
+mod range_group;
 
 /// The M3 Expressive slider sizes (track thickness 16/24/40/56/96dp).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
@@ -743,6 +747,11 @@ impl RenderOnce for MaterialSlider {
         } else {
             Orientation::Vertical
         };
+        // Base measures a pointer from the left: a right-to-left slider takes it here.
+        let pointer = (live && horizontal && mirrored_keys).then(|| MirroredPointer {
+            state: self.state.clone(),
+            drag: window.use_keyed_state((id.clone(), "mirrored-drag"), cx, |_, _| None),
+        });
 
         let thumbs = handles
             .iter()
@@ -798,6 +807,10 @@ impl RenderOnce for MaterialSlider {
                                         },
                                     )
                             })
+                    })
+                    .map(|thumb| match &pointer {
+                        Some(pointer) => pointer.thumb(thumb, start),
+                        None => thumb,
                     });
                 if classic {
                     let size = handle;
@@ -916,6 +929,7 @@ impl RenderOnce for MaterialSlider {
                 steps,
                 &paint,
                 thumbs,
+                pointer.as_ref(),
             )
         } else {
             let scale = f32::from(rem(1.).to_pixels(window.rem_size()));
@@ -957,6 +971,10 @@ impl RenderOnce for MaterialSlider {
             SliderTrack::new(&self.state)
                 .axis(self.axis)
                 .disabled(!live)
+                .map(|track| match &pointer {
+                    Some(pointer) => pointer.track(track, is_range),
+                    None => track,
+                })
                 .relative()
                 .size_full()
                 .child(
@@ -998,14 +1016,23 @@ impl RenderOnce for MaterialSlider {
                 .into_any_element()
         };
 
-        let slider = Slider::new(&self.state)
-            .axis(self.axis)
-            .accessibility_label(label)
-            // A specimen is not operated, whichever state it shows.
-            .disabled(!live)
-            .when(live && !is_range, |slider| slider.track_focus(&focus))
-            .size_full()
-            .child(track_view);
+        // A range's thumbs are its sliders; Base's root would be a third.
+        let slider = if is_range {
+            range_group::range_group(&self.state, label, orientation, !live, track_view)
+                .into_any_element()
+        } else {
+            Slider::new(&self.state)
+                .axis(self.axis)
+                .accessibility_label(label)
+                // A specimen is not operated, whichever state it shows.
+                .disabled(!live)
+                .when(live, |slider| slider.track_focus(&focus))
+                .size_full()
+                .child(track_view)
+                .into_any_element()
+        };
+        let mouse_drag = pointer.as_ref().and_then(|pointer| pointer.mouse_drag(cx));
+        let (pointer_up, pointer_up_out) = (pointer.clone(), pointer);
         let state_entity = self.state.clone();
         let (release, release_out) = (press.clone(), press.clone());
         // A release can go where no listener hears it: a move with no button
@@ -1047,10 +1074,16 @@ impl RenderOnce for MaterialSlider {
                 })
                 .on_mouse_up(MouseButton::Left, move |_, window, cx| {
                     release.update(cx, |pressed, _| *pressed = false);
+                    if let Some(pointer) = &pointer_up {
+                        pointer.release(cx);
+                    }
                     window.refresh();
                 })
                 .on_mouse_up_out(MouseButton::Left, move |_, window, cx| {
                     release_out.update(cx, |pressed, _| *pressed = false);
+                    if let Some(pointer) = &pointer_up_out {
+                        pointer.release(cx);
+                    }
                     window.refresh();
                 })
                 .on_key_down(move |event, window, cx| {
@@ -1099,6 +1132,7 @@ impl RenderOnce for MaterialSlider {
             })
             .child(slider)
             .children(lost_release)
+            .children(mouse_drag)
             .into_any_element()
     }
 }
@@ -1127,6 +1161,7 @@ fn classic_track(
     steps: Option<usize>,
     paint: &SliderPaint,
     thumbs: impl IntoIterator<Item = AnyElement>,
+    pointer: Option<&MirroredPointer>,
 ) -> AnyElement {
     let track = slider_geometry(SliderAppearance::Classic).0;
     let inset = rem((CLASSIC_TARGET - track) / 2.);
@@ -1200,6 +1235,10 @@ fn classic_track(
     SliderTrack::new(state)
         .axis(axis)
         .disabled(disabled)
+        .map(|track| match pointer {
+            Some(pointer) => pointer.track(track, handles.len() == 2),
+            None => track,
+        })
         .relative()
         .size_full()
         .child(bar)
