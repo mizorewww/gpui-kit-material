@@ -602,3 +602,24 @@ fn a_specimen_value_too_long_for_the_field_ends_in_an_ellipsis() {
         assert_eq!(style.min_size.width, Some(px(0.).into()));
     }
 }
+
+#[gpui::test]
+fn the_focused_field_reports_its_caret_and_an_unfocused_one_does_not(cx: &mut TestAppContext) {
+    let (_, cx) = setup(cx, TextFieldVariant::Filled, false);
+    draw(cx);
+    let caret = |cx: &mut VisualTestContext| {
+        cx.update(|window, _| super::super::focused_caret_bounds(window))
+    };
+    assert_eq!(caret(cx), None);
+    let field = cx.debug_bounds("field").unwrap();
+    cx.simulate_click(field.center(), Modifiers::default());
+    cx.simulate_input("Hello");
+    draw(cx);
+    let at = caret(cx).expect("the field is being edited");
+    assert!(field.contains(&at.center()), "{at:?} in {field:?}");
+    // The caret follows the text: after typing it is past the field's start.
+    assert!(at.left() > field.left() + px(16.), "{at:?}");
+    cx.update(|window, cx| window.blur(cx));
+    draw(cx);
+    assert_eq!(caret(cx), None, "focus left the field");
+}

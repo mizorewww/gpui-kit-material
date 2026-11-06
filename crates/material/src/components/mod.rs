@@ -119,6 +119,8 @@ mod focus;
 mod interaction;
 mod prepaint_bounds;
 pub use prepaint_bounds::{PrepaintBounds, prepaint_bounds};
+#[cfg(feature = "inputs")]
+mod caret_report;
 mod labeled;
 #[cfg(feature = "containment")]
 mod list;
@@ -139,6 +141,8 @@ mod ripple;
 #[cfg(all(test, feature = "full"))]
 mod ripple_tests;
 mod roving;
+#[cfg(feature = "inputs")]
+pub use caret_report::focused_caret_bounds;
 #[cfg(feature = "inputs")]
 mod search;
 #[cfg(feature = "dialogs")]
