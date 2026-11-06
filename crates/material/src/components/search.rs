@@ -232,15 +232,19 @@ impl RenderOnce for SearchField {
             BarInput::Static(..) => None,
         };
         let content: AnyElement = match self.input {
-            BarInput::Live(state) => Input::new(&state)
-                .appearance(false)
-                .disabled(disabled)
-                .with_size(Size::XSmall)
-                .p_0()
-                .h(rem(24.))
-                .text_size(TypeRole::BodyLarge.scale().font_size)
-                .line_height(TypeRole::BodyLarge.scale().line_height)
-                .into_any_element(),
+            BarInput::Live(state) => super::caret_report::CaretReport::around(
+                Input::new(&state)
+                    .appearance(false)
+                    .disabled(disabled)
+                    .with_size(Size::XSmall)
+                    .p_0()
+                    .h(rem(24.))
+                    .text_size(TypeRole::BodyLarge.scale().font_size)
+                    .line_height(TypeRole::BodyLarge.scale().line_height)
+                    .into_any_element(),
+                state,
+            )
+            .into_any_element(),
             BarInput::Static(text, placeholder) => div()
                 .overflow_hidden()
                 .whitespace_nowrap()

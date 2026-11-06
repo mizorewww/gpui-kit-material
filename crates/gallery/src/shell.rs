@@ -357,7 +357,7 @@ impl Gallery {
     /// edge, with room for the field around it.
     pub(super) fn reveal_caret(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         const MARGIN: f32 = 32.;
-        let Some(caret) = window.focused_input_selection_bounds(cx) else {
+        let Some(caret) = gpui_kit_material::components::focused_caret_bounds(window) else {
             return;
         };
         let visible = window.fully_visible_bounds();

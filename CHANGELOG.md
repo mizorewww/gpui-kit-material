@@ -9,6 +9,10 @@ Distribution is by Git revision for now; see the [quick start](README.md#quick-s
 
 ### Added
 
+- `components::focused_caret_bounds`: where the focused Material text field's or
+  search bar's caret was last drawn, for a page that keeps it above an on-screen
+  keyboard. It replaces the engine patch's `Window::focused_input_selection_bounds`,
+  which published GPUI does not have; inputs that are not Material's are not reported.
 - `Color::contrast`, the WCAG 2.x contrast ratio of two colors.
 - Cargo feature groups on `gpui-kit-material`, with `full` naming every group; see the
   [README](README.md#crates). `default` still enables everything.

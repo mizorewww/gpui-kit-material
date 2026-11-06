@@ -11,14 +11,5 @@ pub fn event_is_draw(event: FrameEvent) -> bool {
     }
 }
 
-/// The caret query a page uses to keep an input above an on-screen keyboard is
-/// part of the engine a consumer gets, not of frame observation.
-pub fn caret(
-    window: &mut gpui_kit::Window,
-    cx: &mut gpui_kit::App,
-) -> Option<gpui_kit::Bounds<gpui_kit::Pixels>> {
-    window.focused_input_selection_bounds(cx)
-}
-
 pub use gpui_fps as fps_hud;
 pub use gpui_kit_material::init as material_init;

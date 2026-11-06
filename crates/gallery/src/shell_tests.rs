@@ -1535,8 +1535,8 @@ fn the_caret_stays_above_an_on_screen_keyboard(cx: &mut TestAppContext) {
     click(&window, &mut cx, field);
     let caret = |window: &WindowHandle<Gallery>, cx: &mut VisualTestContext| {
         window
-            .update(cx, |_, window, cx| {
-                window.focused_input_selection_bounds(cx)
+            .update(cx, |_, window, _| {
+                gpui_kit_material::components::focused_caret_bounds(window)
             })
             .unwrap()
             .expect("the field is being edited")

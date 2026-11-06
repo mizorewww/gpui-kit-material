@@ -14,6 +14,7 @@
 //! retarget from wherever they are when focus changes again and honor reduced
 //! motion through [`crate::motion`].
 use super::InteractionPreview;
+use super::caret_report::CaretReport;
 use super::labeled::required_label;
 use super::text::type_style;
 use crate::{
@@ -1059,29 +1060,37 @@ impl RenderOnce for TextField {
             name
         });
         let editor: AnyElement = match &self.input {
-            FieldInput::Single(state) => Input::new(state)
-                .appearance(false)
-                .with_size(Size::XSmall)
-                .disabled(disabled)
-                .readonly(self.read_only)
-                .when_some(name.clone(), |this, label| this.aria_label(label))
-                .p_0()
-                .h(rem(24.))
-                .text_size(TypeRole::BodyLarge.scale().font_size)
-                .line_height(TypeRole::BodyLarge.scale().line_height)
-                .into_any_element(),
-            FieldInput::Multi(state) => Textarea::new(state)
-                .appearance(false)
-                .with_size(Size::XSmall)
-                .disabled(disabled)
-                .readonly(self.read_only)
-                .when_some(name.clone(), |this, label| this.aria_label(label))
-                .p_0()
-                // Kit insets multi-line text by the XSmall input padding.
-                .mx(px(-4.))
-                .text_size(TypeRole::BodyLarge.scale().font_size)
-                .line_height(TypeRole::BodyLarge.scale().line_height)
-                .into_any_element(),
+            FieldInput::Single(state) => CaretReport::around(
+                Input::new(state)
+                    .appearance(false)
+                    .with_size(Size::XSmall)
+                    .disabled(disabled)
+                    .readonly(self.read_only)
+                    .when_some(name.clone(), |this, label| this.aria_label(label))
+                    .p_0()
+                    .h(rem(24.))
+                    .text_size(TypeRole::BodyLarge.scale().font_size)
+                    .line_height(TypeRole::BodyLarge.scale().line_height)
+                    .into_any_element(),
+                state.clone(),
+            )
+            .into_any_element(),
+            FieldInput::Multi(state) => CaretReport::around(
+                Textarea::new(state)
+                    .appearance(false)
+                    .with_size(Size::XSmall)
+                    .disabled(disabled)
+                    .readonly(self.read_only)
+                    .when_some(name.clone(), |this, label| this.aria_label(label))
+                    .p_0()
+                    // Kit insets multi-line text by the XSmall input padding.
+                    .mx(px(-4.))
+                    .text_size(TypeRole::BodyLarge.scale().font_size)
+                    .line_height(TypeRole::BodyLarge.scale().line_height)
+                    .into_any_element(),
+                state.clone(),
+            )
+            .into_any_element(),
             FieldInput::Static(value) => static_value(
                 value,
                 self.input_type.is_some_and(TextFieldInputType::masked),
