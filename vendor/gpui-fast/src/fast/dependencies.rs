@@ -669,6 +669,12 @@ impl EntityAccessLog {
 }
 
 impl EntityMap {
+    /// Whether `entity_id` has not been released. A leased entity is alive,
+    /// though its slot is empty while it is leased.
+    pub(crate) fn is_alive(&self, entity_id: EntityId) -> bool {
+        self.ref_counts.read().counts.contains_key(entity_id)
+    }
+
     /// Marks where the access log stands as a boundary between stretches.
     pub(crate) fn mark_access_boundary(&mut self) {
         let log = &mut self.access_log;
@@ -1266,12 +1272,6 @@ impl RenderDependencies {
         }
     }
 
-    /// How many stretches of writes are taken for the subtree's own.
-    #[cfg(test)]
-    pub(crate) fn own_write_stretches(&self) -> usize {
-        self.writes.own.len()
-    }
-
     /// The same dependencies, known to be up to date with every write up to
     /// `writes`: a reused subtree's, checked when it was reused.
     pub(crate) fn written_up_to(&self, writes: u64) -> Self {
@@ -1285,28 +1285,27 @@ impl RenderDependencies {
         }
     }
 
-    /// These dependencies, without the entities that no longer exist, which
-    /// cannot change. A view spliced around nested views builds on what it read last
-    /// frame, so without this it keeps every entity they ever read, and replays
-    /// them on every frame it draws. Only worth calling when the list grew.
-    pub(crate) fn without_dropped_entities(mut self, cx: &App) -> Self {
-        let live = self
+    /// These dependencies without the entities that have been released,
+    /// which cannot change any more.
+    pub(crate) fn without_released_entities(mut self, cx: &App) -> Self {
+        if self
             .entities
             .iter()
-            .filter(|entity| cx.entities.is_alive(**entity))
-            .count();
-        if live != self.entities.len() {
-            self.entities = self
-                .entities
-                .iter()
-                .copied()
-                .filter(|entity| cx.entities.is_alive(*entity))
-                .collect();
+            .all(|entity| cx.entities.is_alive(*entity))
+        {
+            return self;
         }
+        self.entities = self
+            .entities
+            .iter()
+            .copied()
+            .filter(|entity| cx.entities.is_alive(*entity))
+            .collect();
         self
     }
 
-    /// Whether this holds the same list of entities as `other`, not an equal one.
+    /// Whether these dependencies hold the very list of entities `other`
+    /// holds, as a union with nothing new to add leaves it.
     pub(crate) fn shares_entities_with(&self, other: &Self) -> bool {
         Rc::ptr_eq(&self.entities, &other.entities)
     }

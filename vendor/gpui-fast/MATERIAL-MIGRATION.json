@@ -251,8 +251,8 @@
       },
       "src/app/entity_map.rs": {
         "upstream_sha256": "fd8413186c41a188997f34a3a74910289b2d3dd42a7eee4d7d1c7aa63724ba61",
-        "local_sha256": "d3259c687f2f404f9a6c7a2f66a5da82535d8be71ef9e760761269ddb29e8182",
-        "reason": "EntityMap::is_alive for the same."
+        "local_sha256": "eeb767b821328b054fd6ff50c260638f4dac8b73224a353bbccd13b1dfec3ab1",
+        "reason": "EntityMap's ref_counts and EntityRefCounts::counts made pub(crate), for EntityMap::is_alive in src/fast/dependencies.rs (upstream PR longbridge/gpui-fast#106)."
       },
       "src/elements/animation.rs": {
         "upstream_sha256": "7b0dde3c811bf1062e532395f5c8f5b76acb10bfe95cf875ba0e5d6c5dc41c9f",
@@ -271,8 +271,8 @@
       },
       "src/fast/dependencies.rs": {
         "upstream_sha256": "a421eab09d4f6f976b564f64e8c9d4393d5860d453f80ac43cfdd08b089282c1",
-        "local_sha256": "b23c0de076ec348b69d566387f798d5e90854be4884288142799c7cb77519d0b",
-        "reason": "Entity::update_for_render, the public form of dependencies::query, behind frame-observation (vendor/gpui-pre/render-lease-patch.md). A test's count of a record's stretches of own writes. RenderDependencies::without_dropped_entities for the same."
+        "local_sha256": "0e1284863e2620ee2f91201b7e07bc74fef0b113fe38205be22704b905ae060f",
+        "reason": "Entity::update_for_render, the public form of dependencies::query, behind frame-observation (vendor/gpui-pre/render-lease-patch.md). EntityMap::is_alive, RenderDependencies::without_released_entities and shares_entities_with, as in upstream PR longbridge/gpui-fast#106."
       },
       "src/fast/layers/hover_freeze.rs": {
         "upstream_sha256": "a8273a396988f3c420a9008525b20dbb8056d4751b4df395200f35ae4a9913d8",
@@ -296,8 +296,8 @@
       },
       "src/fast/splice.rs": {
         "upstream_sha256": "d796d7528b8a2dfcef69cbe358a6f17a84ca385d78e06aa9c7092b54efeb674a",
-        "local_sha256": "c7e5af8acbde71267d411f18b9a4e5737d642b3d8dcbcdff144741c52d12bae4",
-        "reason": "A view rebuilt alone keeps its direction (vendor/gpui-pre/layout-direction-patch.md). What a gap writes as it paints is the spliced view's own. Its own dependencies restart from the check each frame it is spliced, so those writes do not pile up. Limit: an entity keeps only its last write's stamp, so a write the view should see is hidden if a gap writes the same entity later in the frame; stamping each write would mean keeping every entity's history since the oldest live record, which an idle second window can hold back without bound (fast::tests::retained::a_later_paint_write_hides_an_earlier_write_of_the_same_entity). A spliced view forgets entities that no longer exist when its dependency list grew; without it a window's root keeps every entity a page ever read and replays them each frame (Material performance patch)."
+        "local_sha256": "bae7927e78f99d70536803ffcd7236cbcf36d5e46a5f767773a669e415da52ef",
+        "reason": "A view rebuilt alone keeps its direction (vendor/gpui-pre/layout-direction-patch.md). A spliced view forgets released entities when its dependency list grew; without it a window's root keeps every entity a page ever read and replays them each frame (Material performance patch; equals upstream PR longbridge/gpui-fast#106). Otherwise upstream 0.1.13: what a gap writes as it paints counts as a change to what the view around it read."
       },
       "src/fast/tests/dependencies.rs": {
         "upstream_sha256": "131164fada000e865db0a14855e4eab5446f89b45e70a1904414408cd0cdb6b0",
@@ -311,8 +311,8 @@
       },
       "src/fast/tests/retained.rs": {
         "upstream_sha256": "95fbb8389daf15e227312b07d2794ba109406071a780d3f4d9224e61f722173b",
-        "local_sha256": "0350ee6b52e655cde7e1147f2ef1c5348d76f6c03f94699557cd2dff7b6078b5",
-        "reason": "Tests of what a gap writes around a spliced view, and of the limit in src/fast/splice.rs. Test of the spliced view forgetting dropped entities, measured on the records' replayed dependencies: upstream 0.1.13 now leaves released entities out of the accessed set (EntityMap::extend_accessed), which hid the growth from the earlier measure."
+        "local_sha256": "8bc4d3b6b67464cebcc20a96feca3a93d9d7083f3d986a7bdfe3c44755479c6f",
+        "reason": "Test of a spliced view forgetting released entities, measured on the records' replayed dependencies, as in upstream PR longbridge/gpui-fast#106."
       },
       "src/fast/text.rs": {
         "upstream_sha256": "3505d68e4a644b286521770bd26009667d21a4fa2e33c9bf06e87215dd61f3ea",
