@@ -20,12 +20,6 @@ pub enum DividerVariant {
     Inset,
     MiddleInset,
 }
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub enum DividerDirection {
-    #[default]
-    Ltr,
-    Rtl,
-}
 /// Explicit equivalent of the reference's ancestor list/card margin rule.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum DividerContext {
@@ -68,7 +62,6 @@ pub struct MaterialDivider {
     id: ElementId,
     orientation: DividerOrientation,
     variant: DividerVariant,
-    direction: DividerDirection,
     context: DividerContext,
     thickness: Pixels,
     inset_start: Option<Length>,
@@ -83,7 +76,6 @@ impl MaterialDivider {
             id: id.into(),
             orientation: DividerOrientation::Horizontal,
             variant: DividerVariant::FullWidth,
-            direction: DividerDirection::Ltr,
             context: DividerContext::Plain,
             thickness: px(1.),
             inset_start: None,
@@ -99,11 +91,6 @@ impl MaterialDivider {
     }
     pub fn variant(mut self, variant: DividerVariant) -> Self {
         self.variant = variant;
-        self
-    }
-    /// Resolves logical horizontal insets; the parent owns its own flow direction.
-    pub fn direction(mut self, direction: DividerDirection) -> Self {
-        self.direction = direction;
         self
     }
     pub fn context(mut self, context: DividerContext) -> Self {
@@ -166,12 +153,7 @@ impl MaterialDivider {
                 .into(),
             );
             line = if horizontal {
-                let (left, right) = if self.direction == DividerDirection::Ltr {
-                    (start, end)
-                } else {
-                    (end, start)
-                };
-                line.w_auto().ml(left).mr(right)
+                line.w_auto().ml(start).mr(end)
             } else {
                 line.h_auto().mt(start).mb(end)
             };
@@ -195,11 +177,7 @@ impl Styled for MaterialDivider {
     }
 }
 impl RenderOnce for MaterialDivider {
-    fn render(mut self, window: &mut Window, _: &mut App) -> impl IntoElement {
-        // Layout already mirrors under an inherited right-to-left direction.
-        if crate::scope::is_rtl(window) {
-            self.direction = DividerDirection::Ltr;
-        }
+    fn render(mut self, _: &mut Window, _: &mut App) -> impl IntoElement {
         let subhead = self
             .subhead
             .take()

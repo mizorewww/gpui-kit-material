@@ -476,13 +476,7 @@ fn drag_handle(
 ) -> AnyElement {
     let width = f32::from(bounds.size.width);
     let origin = bounds.origin.x;
-    // The panes are laid out in reading order and the layout mirrors them, so a
-    // pointer and the arrows are the only things that have to be turned around.
-    let rtl = crate::scope::is_rtl(window);
-    let local = move |x: Pixels| {
-        let x = f32::from(x - origin).clamp(0., width.max(0.));
-        if rtl { width.max(0.) - x } else { x }
-    };
+    let local = move |x: Pixels| f32::from(x - origin).clamp(0., width.max(0.));
     let (dragged, focus) = {
         let state = state.read(cx);
         (state.dragging.is_some(), state.handle_focus.clone())
@@ -498,7 +492,7 @@ fn drag_handle(
         let anchors = anchors.clone();
         move |event: &KeyDownEvent, _: &mut Window, cx: &mut App| {
             let key = event.keystroke.key.as_str();
-            let position = match (key, crate::scope::horizontal_arrow(key, rtl)) {
+            let position = match (key, crate::scope::horizontal_arrow(key)) {
                 (_, Some(-1)) => previous_pane_anchor(&anchors, width, offset),
                 (_, Some(_)) | ("enter", _) => next_pane_anchor(&anchors, width, offset),
                 ("home", _) => Some(0.),
@@ -791,7 +785,6 @@ mod tests {
     struct Screen {
         navigator: Entity<PaneNavigator<u32>>,
         width: f32,
-        rtl: bool,
         handle: bool,
     }
 
@@ -807,14 +800,7 @@ mod tests {
             } else {
                 scaffold
             };
-            let mut scope = crate::scope::Scope::new("direction");
-            if self.rtl {
-                scope = scope.direction(LayoutDirection::Rtl);
-            }
-            div()
-                .w(px(self.width))
-                .h(px(800.))
-                .child(scope.child(scaffold))
+            div().w(px(self.width)).h(px(800.)).child(scaffold)
         }
     }
 
@@ -827,7 +813,6 @@ mod tests {
         let (view, cx) = cx.add_window_view(move |_, cx| Screen {
             navigator: cx.new(|_| PaneNavigator::list_detail()),
             width,
-            rtl: false,
             handle: false,
         });
         draw(cx);
@@ -923,64 +908,6 @@ mod tests {
         });
         assert!(cx.debug_bounds("pane-secondary").is_none());
         assert_eq!(cx.debug_bounds("pane-primary").unwrap().left(), px(0.));
-    }
-
-    #[gpui::test]
-    fn right_to_left_mirrors_the_panes(cx: &mut gpui::TestAppContext) {
-        let (view, cx) = open(cx, 1000., true);
-        cx.update(|_, cx| view.update(cx, |view, _| view.rtl = true));
-        draw(cx);
-        let list = cx.debug_bounds("pane-secondary").unwrap();
-        let detail = cx.debug_bounds("pane-primary").unwrap();
-        assert!(list.left() > detail.left(), "the list is on the right");
-        assert_eq!(list.right(), px(1000.));
-    }
-
-    #[gpui::test]
-    fn right_to_left_turns_the_handles_pointer_and_arrows_around(cx: &mut gpui::TestAppContext) {
-        let (view, cx) = open(cx, 1000., true);
-        cx.update(|_, cx| {
-            view.update(cx, |view, _| {
-                view.handle = true;
-                view.rtl = true;
-            })
-        });
-        draw(cx);
-        let handle = cx.debug_bounds("pane-drag-handle").unwrap().center();
-        assert_eq!(handle.x, px(1000. - 372.));
-        // Dragging toward the end of the reading direction, here leftward,
-        // widens the first pane; it settles on the nearest anchor.
-        cx.simulate_mouse_down(handle, MouseButton::Left, Modifiers::none());
-        draw(cx);
-        let target = point(px(480.), handle.y);
-        cx.simulate_mouse_move(target, MouseButton::Left, Modifiers::none());
-        draw(cx);
-        assert_eq!(
-            cx.debug_bounds("pane-drag-handle").unwrap().center().x,
-            px(480.),
-            "the handle stays under the pointer"
-        );
-        cx.simulate_mouse_up(target, MouseButton::Left, Modifiers::none());
-        draw(cx);
-        assert_eq!(
-            cx.debug_bounds("pane-drag-handle").unwrap().center().x,
-            px(500.)
-        );
-        // Focus by press, then: left moves on in reading order, to the 75% anchor.
-        let handle = cx.debug_bounds("pane-drag-handle").unwrap().center();
-        cx.simulate_click(handle, Modifiers::none());
-        draw(cx);
-        assert_eq!(
-            cx.debug_bounds("pane-drag-handle").unwrap().center().x,
-            px(240.)
-        );
-        cx.simulate_keystrokes("right");
-        draw(cx);
-        assert_eq!(
-            cx.debug_bounds("pane-drag-handle").unwrap().center().x,
-            px(500.),
-            "right goes back toward the start"
-        );
     }
 
     #[gpui::test]

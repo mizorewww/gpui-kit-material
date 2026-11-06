@@ -535,9 +535,6 @@ impl RenderOnce for MaterialTooltip {
         let placed = state.read(cx).placed.clone();
         let side = placed.get().unwrap_or(placement);
         let away = rem(TOOLTIP_TRAVEL * (1. - travel));
-        // `left` mirrors with the layout's direction; the sides do not.
-        let rtl = crate::scope::is_rtl(window);
-        let (leftward, rightward) = if rtl { (away, -away) } else { (-away, away) };
         let tip = div()
             .id("tooltip-motion")
             .when(cfg!(test), |tip| {
@@ -548,8 +545,8 @@ impl RenderOnce for MaterialTooltip {
             .map(|tip| match side {
                 Placement::Top => tip.top(-away),
                 Placement::Bottom => tip.top(away),
-                Placement::Left => tip.left(leftward),
-                Placement::Right => tip.left(rightward),
+                Placement::Left => tip.left(-away),
+                Placement::Right => tip.left(away),
             })
             .when_some(tip_focus, |tip, focus| {
                 let escape = tip_state.clone();
@@ -584,13 +581,6 @@ impl RenderOnce for MaterialTooltip {
                 .absolute()
                 .size_0()
             });
-        // Above or below its trigger a tooltip aligns along the reading direction,
-        // which the positioner does not know: its start is the left edge.
-        let align = match (placement, align) {
-            (Placement::Top | Placement::Bottom, Align::Start) if rtl => Align::End,
-            (Placement::Top | Placement::Bottom, Align::End) if rtl => Align::Start,
-            (_, align) => align,
-        };
         let positioner = gpui_base::Positioner::side(bounds)
             .placement(placement)
             .align(align)
@@ -831,38 +821,34 @@ mod tests {
         assert_eq!(after.top() - before.top(), px(100.), "it moved along");
     }
 
-    struct RtlHarness {
+    struct SideHarness {
         placement: Placement,
         align: Align,
         visible: bool,
     }
-    impl Render for RtlHarness {
+    impl Render for SideHarness {
         fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
             window.set_rem_size(px(14.));
-            crate::scope::Scope::new("rtl")
-                .direction(LayoutDirection::Rtl)
+            div()
+                .size_full()
+                .flex()
+                .items_center()
+                .justify_center()
                 .child(
-                    div()
-                        .size_full()
-                        .flex()
-                        .items_center()
-                        .justify_center()
-                        .child(
-                            MaterialTooltip::plain("tip", "Save a long description")
-                                .placement(self.placement)
-                                .align(self.align)
-                                .force_visible(self.visible)
-                                .trigger(div().debug_selector(|| "trigger".into()).size(px(40.))),
-                        ),
+                    MaterialTooltip::plain("tip", "Save a long description")
+                        .placement(self.placement)
+                        .align(self.align)
+                        .force_visible(self.visible)
+                        .trigger(div().debug_selector(|| "trigger".into()).size(px(40.))),
                 )
         }
     }
 
     #[gpui::test]
-    fn right_to_left_a_tooltip_travels_away_and_aligns_from_the_start(cx: &mut TestAppContext) {
+    fn a_tooltip_travels_away_and_aligns_from_the_start(cx: &mut TestAppContext) {
         cx.update(gpui_base::init);
         for side in [Placement::Right, Placement::Left] {
-            let (view, vcx) = cx.add_window_view(move |_, _| RtlHarness {
+            let (view, vcx) = cx.add_window_view(move |_, _| SideHarness {
                 placement: side,
                 align: Align::Center,
                 visible: false,
@@ -891,7 +877,7 @@ mod tests {
                 "{side:?}: it travels from farther away, not into the trigger: {gap:?}"
             );
         }
-        let (_, vcx) = cx.add_window_view(|_, _| RtlHarness {
+        let (_, vcx) = cx.add_window_view(|_, _| SideHarness {
             placement: Placement::Bottom,
             align: Align::Start,
             visible: true,
@@ -900,8 +886,8 @@ mod tests {
         draw(vcx);
         let trigger = vcx.debug_bounds("trigger").unwrap();
         let popup = vcx.debug_bounds("tooltip-popup").expect("shown");
-        assert_eq!(popup.right(), trigger.right(), "start is the right edge");
-        let (_, vcx) = vcx.cx.add_window_view(|_, _| RtlHarness {
+        assert_eq!(popup.left(), trigger.left(), "start is the left edge");
+        let (_, vcx) = vcx.cx.add_window_view(|_, _| SideHarness {
             placement: Placement::Right,
             align: Align::Start,
             visible: true,

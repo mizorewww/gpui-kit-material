@@ -678,8 +678,6 @@ fn schedule_snap(
 
 impl RenderOnce for MaterialCarousel {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
-        // Input runs after the draw, so it keeps this frame's direction.
-        let rtl = crate::scope::is_rtl(window);
         let id = self.id.clone();
         let state = window.use_keyed_state((id.clone(), "carousel"), cx, |_, _| {
             CarouselState::default()
@@ -944,12 +942,7 @@ impl RenderOnce for MaterialCarousel {
                 // they dominate, as a horizontal list has no other use.
                 let horizontal = delta.x.abs() > delta.y.abs();
                 let amount = if horizontal {
-                    // Items laid out from the right follow the fingers the other way.
-                    if rtl {
-                        f32::from(delta.x)
-                    } else {
-                        -f32::from(delta.x)
-                    }
+                    -f32::from(delta.x)
                 } else {
                     -f32::from(delta.y)
                 } / rem_size;
@@ -984,8 +977,8 @@ impl RenderOnce for MaterialCarousel {
                     .animation
                     .map_or(keys.read(cx).scroll, |a| a.to);
                 let to = match event.keystroke.key.as_str() {
-                    "right" => neighbor(current, step, max, !rtl),
-                    "left" => neighbor(current, step, max, rtl),
+                    "right" => neighbor(current, step, max, true),
+                    "left" => neighbor(current, step, max, false),
                     "home" => 0.,
                     "end" => max,
                     _ => return,
@@ -1041,7 +1034,6 @@ impl RenderOnce for MaterialCarousel {
                                         if let Some((x, from)) = state.drag {
                                             let delta = f32::from(event.position.x - x) / rem_size;
                                             state.swiped |= delta.abs() >= SWIPE_SLOP;
-                                            let delta = if rtl { -delta } else { delta };
                                             state.scroll = (from - delta).clamp(0., max);
                                         }
                                     });
@@ -1668,51 +1660,6 @@ mod tests {
         cx.simulate_mouse_move(to, Some(MouseButton::Left), Modifiers::none());
         redraw(cx);
         assert!(cx.debug_bounds("item-1").unwrap().left() < home.left());
-    }
-
-    struct RtlCarousel;
-    impl gpui::Render for RtlCarousel {
-        fn render(&mut self, window: &mut Window, _: &mut gpui::Context<Self>) -> impl IntoElement {
-            window.set_rem_size(px(BASE_PX));
-            crate::scope::Scope::new("rtl-carousel")
-                .direction(gpui::LayoutDirection::Rtl)
-                .child(
-                    MaterialCarousel::new("carousel", "Photos")
-                        .width(412.)
-                        .snap(false)
-                        .items((0..8).map(|i| {
-                            CarouselItem::new().content(
-                                div()
-                                    .debug_selector(move || format!("item-{i}"))
-                                    .size_full(),
-                            )
-                        })),
-                )
-        }
-    }
-
-    #[gpui::test]
-    fn a_horizontal_swipe_moves_items_with_the_fingers_right_to_left(
-        cx: &mut gpui::TestAppContext,
-    ) {
-        cx.update(|cx| {
-            gpui_base::init(cx);
-            cx.set_reduce_motion(true);
-        });
-        let (_, cx) = cx.add_window_view(|_, _| RtlCarousel);
-        redraw(cx);
-        let home = cx.debug_bounds("item-1").unwrap();
-        cx.simulate_event(gpui::ScrollEvent {
-            position: home.center(),
-            delta: gpui::ScrollDelta::Pixels(point(px(30.), px(0.))),
-            touch_phase: TouchPhase::Moved,
-            ..Default::default()
-        });
-        redraw(cx);
-        assert!(
-            cx.debug_bounds("item-1").unwrap().right() > home.right(),
-            "fingers moving right carry the items right"
-        );
     }
 
     struct Clickable(std::rc::Rc<std::cell::Cell<usize>>);

@@ -50,8 +50,6 @@ pub struct GalleryShared {
     /// follows the application.
     pub preview_theme: Option<ThemeId>,
     pub preview_mode: Option<ThemeMode>,
-    /// Lays the live preview out right to left.
-    pub preview_rtl: bool,
     pub contrast: Contrast,
     /// The text scale, as the option value ("1", "1.25", …).
     pub scale: SharedString,
@@ -70,7 +68,6 @@ impl Default for GalleryShared {
             seed: None,
             preview_theme: None,
             preview_mode: None,
-            preview_rtl: false,
             contrast: Contrast::Standard,
             scale: "1".into(),
             motion_scheme: motion::MotionScheme::Expressive,
@@ -197,9 +194,6 @@ impl GalleryShared {
         let mut scope = gpui_kit_material::scope::Scope::new("preview-scope");
         if let Some(scheme) = self.preview_scheme() {
             scope = scope.scheme(scheme);
-        }
-        if self.preview_rtl {
-            scope = scope.direction(gpui_kit_material::scope::LayoutDirection::Rtl);
         }
         scope
     }

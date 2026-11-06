@@ -789,17 +789,13 @@ impl RenderOnce for MaterialMenu {
             }
         };
         let on_collapse = self.on_collapse.clone();
-        let collapse = Rc::new(move |window: &mut Window, cx: &mut App| {
+        let collapse = move |window: &mut Window, cx: &mut App| {
             if let Some(collapse) = on_collapse.as_ref() {
                 collapse(window, cx);
             } else {
                 cx.propagate();
             }
-        });
-        let rtl = crate::scope::is_rtl(window);
-        let expand = Rc::new(expand);
-        let (expand_right, expand_left) = (expand.clone(), expand);
-        let (collapse_right, collapse_left) = (collapse.clone(), collapse);
+        };
         let activate = {
             let handles = handles.clone();
             let activators = activators.clone();
@@ -943,20 +939,8 @@ impl RenderOnce for MaterialMenu {
             .on_action(move |_: &SelectFirst, window, cx| nav_first(Direction::First, window, cx))
             .on_action(move |_: &SelectLast, window, cx| nav_last(Direction::Last, window, cx))
             .on_action(move |_: &Confirm, window, cx| activate(window, cx))
-            .on_action(move |_: &SelectRight, window, cx| {
-                if rtl {
-                    collapse_right(window, cx)
-                } else {
-                    expand_right(window, cx)
-                }
-            })
-            .on_action(move |_: &SelectLeft, window, cx| {
-                if rtl {
-                    expand_left(window, cx)
-                } else {
-                    collapse_left(window, cx)
-                }
-            })
+            .on_action(move |_: &SelectRight, window, cx| expand(window, cx))
+            .on_action(move |_: &SelectLeft, window, cx| collapse(window, cx))
             .on_action(move |_: &Cancel, window, cx| {
                 if let Some(dismiss) = on_dismiss.as_ref() {
                     dismiss(window, cx);
@@ -1386,20 +1370,6 @@ impl MenuPopup {
     pub fn anchor(mut self, anchor: Anchor) -> Self {
         self.anchor = anchor;
         self
-    }
-}
-
-/// The same anchor with its sides exchanged. Kit places popups physically, so
-/// right-to-left layout asks for the mirrored corner.
-pub(crate) fn mirrored_anchor(anchor: Anchor) -> Anchor {
-    match anchor {
-        Anchor::TopLeft => Anchor::TopRight,
-        Anchor::TopRight => Anchor::TopLeft,
-        Anchor::BottomLeft => Anchor::BottomRight,
-        Anchor::BottomRight => Anchor::BottomLeft,
-        Anchor::LeftCenter => Anchor::RightCenter,
-        Anchor::RightCenter => Anchor::LeftCenter,
-        other => other,
     }
 }
 
@@ -1834,11 +1804,7 @@ impl RenderOnce for MenuPopup {
         Popover::new(self.id.clone())
             .when(full_width, |popover| popover.w_full())
             .appearance(false)
-            .anchor(if crate::scope::is_rtl(window) {
-                mirrored_anchor(anchor)
-            } else {
-                anchor
-            })
+            .anchor(anchor)
             .offset(rem(POPUP_GAP).to_pixels(window.rem_size()))
             .track_focus(&focus)
             .open(visible)
@@ -1925,7 +1891,6 @@ impl RenderOnce for MaterialContextMenu {
         let state = window.use_keyed_state((self.id.clone(), "context-menu"), cx, |_, _| {
             ContextMenuState::default()
         });
-        let rtl = crate::scope::is_rtl(window);
         let press = canvas(
             |bounds, window, _| (bounds, window.insert_hitbox(bounds, HitboxBehavior::Normal)),
             {
@@ -1943,15 +1908,7 @@ impl RenderOnce for MaterialContextMenu {
                                 state.entering = !state.mounted;
                                 state.mounted = true;
                                 state.open = true;
-                                // Layout mirrors an absolute offset right to left.
-                                state.position = point(
-                                    if rtl {
-                                        bounds.size.width - from_left.x
-                                    } else {
-                                        from_left.x
-                                    },
-                                    from_left.y,
-                                );
+                                state.position = from_left;
                                 cx.notify();
                             });
                         }

@@ -390,23 +390,11 @@ impl RenderOnce for MaterialTabs {
             .map(|on_change| {
                 roving::select_value(self.items.iter().map(|item| item.value.clone()), on_change)
             });
-        let rtl = crate::scope::is_rtl(window);
         let roving = Roving::new(handles.clone(), Orientation::Row)
-            .rtl(rtl)
             .skip(skip)
             .selected(selected)
             .select_on_focus(select)
             .reveal(scrollable.then(|| scroll.clone()));
-        // A scrolling row starts at its first tab, which is at the far end of
-        // its range in right-to-left layout.
-        if scrollable && rtl {
-            let revealed =
-                window.use_keyed_state((self.id.clone(), "rtl-revealed"), cx, |_, _| false);
-            if !*revealed.read(cx) {
-                revealed.update(cx, |revealed, _| *revealed = true);
-                scroll.scroll_to_item(selected.unwrap_or(0));
-            }
-        }
         let entry = if specimen {
             None
         } else {
@@ -644,37 +632,21 @@ impl RenderOnce for MaterialTabs {
             let geometry_state = geometry_state.clone();
             // Once every tab has reported, as the lane finishes prepainting.
             super::prepaint_bounds(lane.children(sliding), move |_, window, cx| {
-                // Offsets from the first tab along the reading direction:
-                // the indicator's `left` mirrors with everything else.
+                // Offsets from the first tab.
                 let mut current = geometry.borrow_mut();
                 let bounds = &current.slots;
-                let (first, sign) = if crate::scope::is_rtl(window) {
-                    (bounds.first().map(|b| f32::from(b.right())), -1.)
-                } else {
-                    (bounds.first().map(|b| f32::from(b.left())), 1.)
-                };
-                let Some(first) = first else {
+                let Some(first) = bounds.first().map(|b| f32::from(b.left())) else {
                     return;
-                };
-                let along = |left: f32, width: f32| {
-                    if sign < 0. {
-                        first - (left + width)
-                    } else {
-                        left - first
-                    }
                 };
                 let tabs: Vec<(f32, f32)> = bounds
                     .iter()
                     .take(count)
-                    .map(|b| {
-                        let (left, width) = (f32::from(b.left()), f32::from(b.size.width));
-                        (along(left, width), width)
-                    })
+                    .map(|b| (f32::from(b.left()) - first, f32::from(b.size.width)))
                     .collect();
                 let contents: Vec<(f32, f32)> = current
                     .probed
                     .iter()
-                    .map(|(left, width)| (along(*left, *width), *width))
+                    .map(|(left, width)| (*left - first, *width))
                     .collect();
                 let first = current.tabs.is_empty();
                 let moved = !first

@@ -22,7 +22,7 @@ is still `unreviewed`).
 | Shape | Implemented | Corner scale, press morph, the Expressive shape library (35 shapes) and general morphing. Clipping content to a shape is missing. |
 | Typography | Implemented, with limits | 15 roles and emphasized styles, Roboto 400/500/600. Letter spacing paints on text elements through a fork patch (`vendor/gpui-pre/letter-spacing-patch.md`); Kit's editors shape their own lines and do not apply it, and ligatures stay on. |
 | Icons | Implemented | Material Symbols at the pinned revision; six approximate Kit translations await review. |
-| RTL | Implemented, with limits | Direction is inherited (application, window, `Scope`) and layout mirrors in the engine (`vendor/gpui-pre/layout-direction-patch.md`), with icons, painted bars, pointer math and arrow keys handled per component. Needs a review pass with a real RTL locale and committed captures. |
+| RTL | Not supported | Left-to-right layout only, as in Zed: GPUI has no layout direction, and this library does not patch one in. |
 
 ## Components
 

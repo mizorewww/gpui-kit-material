@@ -531,7 +531,6 @@ impl Gallery {
         let shared = props.shared.read(cx);
         let (theme_options, theme, app_option) = preview_theme_choice(shared);
         let dark = shared.preview_mode.unwrap_or(shared.painted_mode()) == ThemeMode::Dark;
-        let rtl = shared.preview_rtl;
         let update_shared = |f: fn(&mut GalleryShared, usize)| {
             let shared = props.shared.clone();
             move |value: usize, cx: &mut App| {
@@ -560,7 +559,6 @@ impl Gallery {
                 ThemeMode::Light
             });
         });
-        let select_rtl = update_shared(|shared, on| shared.preview_rtl = on == 1);
         div()
             .flex()
             .flex_wrap()
@@ -659,19 +657,6 @@ impl Gallery {
                             .on_change(move |value: &SharedString, _, cx| {
                                 select_mode(usize::from(value == "dark"), cx)
                             }),
-                    )
-                    .child(
-                        div()
-                            .debug_selector(|| "preview-rtl".into())
-                            .w(rem(120.))
-                            .child(
-                                MaterialSwitch::new("preview-rtl", "RTL")
-                                    .show_label(true)
-                                    .checked(rtl)
-                                    .on_change(move |on: &bool, _, cx| {
-                                        select_rtl(usize::from(*on), cx)
-                                    }),
-                            ),
                     ),
             )
     }

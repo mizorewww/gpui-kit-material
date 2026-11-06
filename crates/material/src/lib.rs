@@ -99,7 +99,7 @@ pub mod prelude {
     pub use crate::color::themes::{Contrast, ThemeId, ThemeMode};
     pub use crate::color::{Appearance, ColorRole, PaletteId, ThemePreferences};
     pub use crate::components::*;
-    pub use crate::scope::{LayoutDirection, Scope, is_rtl};
+    pub use crate::scope::Scope;
     #[cfg(feature = "shapes")]
     pub use crate::shapes::{MaterialShape, Morph, ShapeFrame, ShapeKind};
     pub use crate::theme::color;

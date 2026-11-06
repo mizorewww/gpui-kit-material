@@ -1048,8 +1048,6 @@ impl RenderOnce for TextField {
                 .text_color(rest.placeholder)
                 .child(text)
         };
-        // Kit's editors align physically; they do not mirror with layout.
-        let rtl = crate::scope::is_rtl(window);
         // A hero field shows its placeholder at rest, so it can stand in for a missing label.
         let name = self.label.clone().or_else(|| {
             let name = self.placeholder.clone().filter(|_| hero);
@@ -1067,7 +1065,6 @@ impl RenderOnce for TextField {
                 .with_size(Size::XSmall)
                 .disabled(disabled)
                 .readonly(self.read_only)
-                .when(rtl, |this| this.text_right())
                 .when_some(name.clone(), |this, label| this.aria_label(label))
                 .p_0()
                 .h(rem(24.))
@@ -1079,7 +1076,6 @@ impl RenderOnce for TextField {
                 .with_size(Size::XSmall)
                 .disabled(disabled)
                 .readonly(self.read_only)
-                .when(rtl, |this| this.text_right())
                 .when_some(name.clone(), |this, label| this.aria_label(label))
                 .p_0()
                 // Kit insets multi-line text by the XSmall input padding.

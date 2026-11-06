@@ -466,7 +466,6 @@ impl RenderOnce for MaterialRadioGroup {
             }) as roving::Select
         });
         let roving = Roving::new(focus.clone(), Orientation::Both)
-            .rtl(crate::scope::is_rtl(window))
             .skip(skip)
             .selected(selected)
             .select_on_focus(on_select);

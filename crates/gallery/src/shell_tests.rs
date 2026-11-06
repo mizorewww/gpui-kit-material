@@ -1442,7 +1442,6 @@ fn the_preview_controls_stay_in_the_card(cx: &mut TestAppContext) {
     cx.update(|_, cx| {
         shared.update(cx, |s, cx| {
             s.preview_mode = Some(ThemeMode::Dark);
-            s.preview_rtl = true;
             cx.notify();
         })
     });
@@ -1459,12 +1458,10 @@ fn the_preview_controls_stay_in_the_card(cx: &mut TestAppContext) {
         app_paint,
         "nothing leaks out of the preview's scope"
     );
-    // The RTL switch mirrors the preview's content inside its canvas.
     assert!(cx.debug_bounds("preview-canvas").is_some());
     cx.update(|_, cx| {
         shared.update(cx, |s, cx| {
             s.preview_mode = None;
-            s.preview_rtl = false;
             cx.notify();
         })
     });
@@ -1481,8 +1478,8 @@ fn the_preview_controls_stay_in_the_card(cx: &mut TestAppContext) {
     );
 }
 
-/// The preview's scope is its view's, so a preview in its own theme, mode or
-/// direction still keeps an animation frame to itself.
+/// The preview's scope is its view's, so a preview in its own theme or mode
+/// still keeps an animation frame to itself.
 // Fast retains views: upstream builds every view under a notified one again.
 #[cfg(feature = "gpui-fast")]
 #[gpui::test]
@@ -1496,16 +1493,10 @@ fn a_scoped_preview_keeps_a_frame_to_itself(cx: &mut TestAppContext) {
             (views.preview, g.lead.clone(), g.shared.clone())
         })
         .unwrap();
-    for (mode, rtl) in [
-        (None, false),
-        (None, true),
-        (Some(ThemeMode::Dark), false),
-        (Some(ThemeMode::Dark), true),
-    ] {
+    for mode in [None, Some(ThemeMode::Dark)] {
         cx.update(|_, cx| {
             shared.update(cx, |s, cx| {
                 s.preview_mode = mode;
-                s.preview_rtl = rtl;
                 cx.notify();
             })
         });
@@ -1528,7 +1519,7 @@ fn a_scoped_preview_keeps_a_frame_to_itself(cx: &mut TestAppContext) {
         assert_eq!(
             cx.read(|cx| lead.read(cx).renders.get()),
             rendered,
-            "mode {mode:?}, rtl {rtl}"
+            "mode {mode:?}"
         );
     }
 }
@@ -1550,12 +1541,11 @@ fn the_caret_stays_above_an_on_screen_keyboard(cx: &mut TestAppContext) {
             .unwrap()
             .expect("the field is being edited")
     };
-    assert!(caret(&window, &mut cx).bottom() < px(844.));
-    let visible = px(440.);
-    assert!(
-        caret(&window, &mut cx).bottom() > visible,
-        "the keyboard would cover the field"
-    );
+    let before = caret(&window, &mut cx);
+    assert!(before.bottom() < px(844.));
+    // A keyboard that covers the caret: the page keeps what is above it.
+    let visible = before.top();
+    assert!(visible > px(200.), "room above the field: {before:?}");
     cx.simulate_resize(size(px(390.), visible));
     settle(&window, &mut cx);
     assert!(caret(&window, &mut cx).bottom() <= visible);

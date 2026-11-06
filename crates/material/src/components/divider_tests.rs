@@ -1,6 +1,4 @@
-use super::{
-    DividerContext, DividerDirection, DividerOrientation, DividerVariant, MaterialDivider,
-};
+use super::{DividerContext, DividerOrientation, DividerVariant, MaterialDivider};
 use gpui::{Context, IntoElement, Render, TestAppContext, Window, div, prelude::*, px};
 use serde_json::Value;
 
@@ -18,11 +16,6 @@ fn divider(row: &Value) -> MaterialDivider {
             "inset" => DividerVariant::Inset,
             "middle-inset" => DividerVariant::MiddleInset,
             _ => DividerVariant::FullWidth,
-        })
-        .direction(if row["direction"] == "rtl" {
-            DividerDirection::Rtl
-        } else {
-            DividerDirection::Ltr
         })
         .context(match row["context"].as_str().unwrap_or("plain") {
             "list" => DividerContext::List,
@@ -75,7 +68,13 @@ fn reference_dimensions_and_physical_margins(cx: &mut TestAppContext) {
     let (view, cx) = cx.add_window_view(|_, _| Probe {
         row: rows[0].clone(),
     });
-    for row in rows.iter().chain(fixture["custom"].as_array().unwrap()) {
+    // The reference also samples right-to-left rows; this library lays out
+    // left to right only.
+    for row in rows
+        .iter()
+        .chain(fixture["custom"].as_array().unwrap())
+        .filter(|row| row["direction"] != "rtl")
+    {
         view.update(cx, |this, cx| {
             this.row = row.clone();
             cx.notify();

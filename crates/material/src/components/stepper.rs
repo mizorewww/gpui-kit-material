@@ -239,18 +239,14 @@ mod tests {
             .collect()
     }
 
-    struct Direction {
-        rtl: bool,
+    struct Steps {
         current: usize,
         steps: Vec<&'static str>,
     }
 
-    impl Render for Direction {
+    impl Render for Steps {
         fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
             window.set_rem_size(px(16.));
-            if self.rtl {
-                window.set_layout_direction(gpui::LayoutDirection::Rtl);
-            }
             div().debug_selector(|| "root".into()).w(px(600.)).child(
                 Stepper::new("steps", "Progress")
                     .steps(self.steps.iter().copied())
@@ -259,7 +255,7 @@ mod tests {
         }
     }
 
-    fn drawn(cx: &mut TestAppContext, view: Direction) -> &mut gpui::VisualTestContext {
+    fn drawn(cx: &mut TestAppContext, view: Steps) -> &mut gpui::VisualTestContext {
         cx.update(|cx| {
             gpui_kit::init(cx);
             crate::init(cx);
@@ -270,37 +266,10 @@ mod tests {
     }
 
     #[gpui::test]
-    fn steps_run_from_the_reading_start_right_to_left(cx: &mut TestAppContext) {
-        let cx = drawn(
-            cx,
-            Direction {
-                rtl: true,
-                current: 0,
-                steps: vec!["One", "Two", "Three"],
-            },
-        );
-        let (first, second, third) = (
-            cx.debug_bounds("stepper-step-0").unwrap(),
-            cx.debug_bounds("stepper-step-1").unwrap(),
-            cx.debug_bounds("stepper-step-2").unwrap(),
-        );
-        assert!(second.right() <= first.left(), "{first:?} {second:?}");
-        assert!(third.right() <= second.left(), "{second:?} {third:?}");
-        let root = cx.debug_bounds("root").unwrap();
-        assert_eq!(
-            first.right(),
-            root.right(),
-            "the first step at the start edge"
-        );
-        assert_eq!(third.left(), root.left(), "the last at the end edge");
-    }
-
-    #[gpui::test]
     fn the_last_step_ends_at_the_end_and_hairlines_take_what_is_left(cx: &mut TestAppContext) {
         let cx = drawn(
             cx,
-            Direction {
-                rtl: false,
+            Steps {
                 current: 1,
                 steps: vec!["One", "Two"],
             },
@@ -323,8 +292,7 @@ mod tests {
     fn no_steps_and_a_current_step_past_the_end_draw(cx: &mut TestAppContext) {
         let cx = drawn(
             cx,
-            Direction {
-                rtl: false,
+            Steps {
                 current: 9,
                 steps: Vec::new(),
             },
@@ -337,8 +305,7 @@ mod tests {
     fn a_lone_step_has_no_hairline(cx: &mut TestAppContext) {
         let cx = drawn(
             cx,
-            Direction {
-                rtl: false,
+            Steps {
                 current: 0,
                 steps: vec!["Only"],
             },

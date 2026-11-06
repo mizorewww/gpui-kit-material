@@ -214,13 +214,6 @@ impl Element for ButtonFocusRing {
             Radius::Rems(radius) => Corners::all(radius.to_pixels(window.rem_size())),
             Radius::Corners(corners) => corners,
         };
-        // A painted quad has physical corners, and style corners are in reading
-        // order: mirrored, this control's start corner is on the right.
-        let corners = if window.layout_direction().is_rtl() {
-            corners.flip_x()
-        } else {
-            corners
-        };
         #[cfg(test)]
         if let Some(observed) = &self.observed_corners {
             observed.set(Some(corners));
@@ -478,14 +471,12 @@ mod tests {
             )
             .forced(true);
             ring.observed_corners = Some(self.observed.clone());
-            crate::scope::Scope::new("rtl-ring")
-                .direction(gpui::LayoutDirection::Rtl)
-                .child(ring)
+            ring
         }
     }
 
     #[gpui::test]
-    fn the_rings_corners_mirror_with_the_control(cx: &mut TestAppContext) {
+    fn the_ring_keeps_each_corner_of_the_control(cx: &mut TestAppContext) {
         cx.update(gpui_base::init);
         let observed = Rc::new(Cell::new(None));
         let (_, cx) = cx.add_window_view({
@@ -499,12 +490,12 @@ mod tests {
         assert_eq!(
             observed.get(),
             Some(gpui::Corners {
-                top_left: px(2.),
-                top_right: px(1.),
-                bottom_right: px(4.),
-                bottom_left: px(3.),
+                top_left: px(1.),
+                top_right: px(2.),
+                bottom_right: px(3.),
+                bottom_left: px(4.),
             }),
-            "the start corner is on the right"
+            "each corner stays where the control has it"
         );
     }
 
