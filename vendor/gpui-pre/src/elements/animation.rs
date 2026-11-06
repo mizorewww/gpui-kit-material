@@ -95,9 +95,6 @@ pub trait AnimationExt {
             element: Some(self),
             animator: Box::new(move |this, _, value| animator(this, value)),
             animations: smallvec::smallvec![animation],
-            repeat_playback: None,
-            visible_repeat: false,
-            visible_frame: None,
         }
     }
 
@@ -116,9 +113,6 @@ pub trait AnimationExt {
             element: Some(self),
             animator: Box::new(animator),
             animations: animations.into(),
-            repeat_playback: None,
-            visible_repeat: false,
-            visible_frame: None,
         }
     }
 
@@ -163,26 +157,11 @@ pub trait AnimationExt {
 
 impl<E: IntoElement + 'static> AnimationExt for E {}
 
-/// A repeating animation's clock, owned independently of its mounted element.
-///
-/// Keep this handle in the owning view to preserve phase across virtualization.
-/// The clock starts on first layout and advances while unmounted. It retains no
-/// view, pending callback, layout, or paint data. Drop all clones to release it;
-/// use a new handle to start a new playback. Use one handle per logical playback
-/// with an unchanged duration and clock policy, within the same app.
-#[derive(Clone, Default)]
-pub struct RepeatAnimationPlayback {
-    start: Rc<Cell<Option<Instant>>>,
-}
-
 /// A GPUI element that applies an animation to another element
 pub struct AnimationElement<E> {
     id: ElementId,
     element: Option<E>,
     animations: SmallVec<[Animation; 1]>,
-    repeat_playback: Option<RepeatAnimationPlayback>,
-    visible_repeat: bool,
-    visible_frame: Option<VisibleAnimationFrame>,
     animator: Box<dyn Fn(E, usize, f32) -> E + 'static>,
 }
 
@@ -236,52 +215,6 @@ impl<E: ParentElement> ParentElement for AnimationElement<E> {
 }
 
 impl<E> AnimationElement<E> {
-    /// Preserve a repeat's clock across unmount/remount using caller-owned state.
-    ///
-    /// This does not change scheduling. Combine with [`Self::repeat_when_visible`]
-    /// for bounded decorative content. Synced repeats continue using the app
-    /// epoch. Reduced motion retains its normal static sampling behavior.
-    ///
-    /// # Panics
-    /// Panics unless this wraps exactly one repeating, nonzero-duration animation.
-    pub fn with_repeat_playback(mut self, playback: RepeatAnimationPlayback) -> Self {
-        assert!(
-            self.animations.len() == 1
-                && !self.animations[0].oneshot
-                && !self.animations[0].duration.is_zero(),
-            "with_repeat_playback requires one nonzero-duration repeating animation"
-        );
-        self.repeat_playback = Some(playback);
-        self
-    }
-
-    /// Only request recurring frames while this repeating element's layout bounds
-    /// overlap both its ancestor content mask and the window viewport.
-    ///
-    /// Opt in only for decorative content whose drawing stays within its bounds
-    /// and whose animation cannot move or grow from outside the visible region
-    /// into it. Overflow, shadows outside the bounds, and entrance animations
-    /// require the default scheduling. Opacity is deliberately not considered.
-    ///
-    /// Sampling still uses the original clock: scrolling away does not pause or
-    /// restart the animation. Scrolling back (or another external invalidation)
-    /// samples the current phase. One already queued callback/timer may fire
-    /// after leaving the visible region, but it will not keep scheduling itself.
-    ///
-    /// # Panics
-    /// Panics unless this wraps exactly one repeating, nonzero-duration animation.
-    /// Animation chains and oneshots retain the default scheduling policy.
-    pub fn repeat_when_visible(mut self) -> Self {
-        assert!(
-            self.animations.len() == 1
-                && !self.animations[0].oneshot
-                && !self.animations[0].duration.is_zero(),
-            "repeat_when_visible requires one nonzero-duration repeating animation"
-        );
-        self.visible_repeat = true;
-        self
-    }
-
     /// Returns a new [`AnimationElement<E>`] after applying the given function
     /// to the element being animated.
     pub fn map_element(mut self, f: impl FnOnce(E) -> E) -> AnimationElement<E> {
@@ -304,35 +237,6 @@ struct AnimationState {
     /// Whether a throttled re-render (see [`Animation::with_max_fps`]) is
     /// already scheduled, so overlapping renders don't stack extra timers.
     delayed_frame_pending: Rc<Cell<bool>>,
-}
-
-// This intent is transient; the persistent animation clock remains untouched.
-struct VisibleAnimationFrame {
-    view: crate::EntityId,
-    max_fps: Option<f32>,
-    delayed_frame_pending: Rc<Cell<bool>>,
-}
-
-impl VisibleAnimationFrame {
-    fn request(self, window: &mut Window, cx: &mut App) {
-        let view = self.view;
-        match self.max_fps {
-            Some(fps) if fps.is_finite() && fps > 0.0 => {
-                if !self.delayed_frame_pending.replace(true) {
-                    let pending = self.delayed_frame_pending;
-                    let interval = Duration::from_secs_f32(1.0 / fps);
-                    window
-                        .spawn(cx, async move |cx| {
-                            cx.background_executor().timer(interval).await;
-                            pending.set(false);
-                            cx.update(move |_, cx| cx.notify(view)).ok();
-                        })
-                        .detach();
-                }
-            }
-            _ => window.on_next_frame(move |_, cx| cx.notify(view)),
-        }
-    }
 }
 
 struct SpringElementState {
@@ -477,7 +381,7 @@ impl<E: IntoElement + 'static> Element for SpringAnimationElement<E> {
 
 impl<E: IntoElement + 'static> Element for AnimationElement<E> {
     type RequestLayoutState = AnyElement;
-    type PrepaintState = bool;
+    type PrepaintState = ();
 
     fn id(&self) -> Option<ElementId> {
         Some(self.id.clone())
@@ -495,18 +399,11 @@ impl<E: IntoElement + 'static> Element for AnimationElement<E> {
         cx: &mut App,
     ) -> (crate::LayoutId, Self::RequestLayoutState) {
         window.with_element_state(global_id.unwrap(), |state, window| {
-            let now = cx.background_executor().now();
             let mut state = state.unwrap_or_else(|| AnimationState {
-                start: now,
+                start: cx.background_executor().now(),
                 animation_ix: 0,
                 delayed_frame_pending: Rc::new(Cell::new(false)),
             });
-            if let Some(playback) = &self.repeat_playback {
-                state.start = playback.start.get().unwrap_or_else(|| {
-                    playback.start.set(Some(now));
-                    now
-                });
-            }
             let (animation_ix, delta, done) = if cx.reduce_motion() {
                 let animation_ix = self.animations.len() - 1;
                 let delta = if self.animations[animation_ix].oneshot {
@@ -520,11 +417,11 @@ impl<E: IntoElement + 'static> Element for AnimationElement<E> {
                 let duration = self.animations[animation_ix].duration;
 
                 let elapsed = if self.animations[animation_ix].synced && !duration.is_zero() {
-                    let elapsed = now - cx.synced_animation_epoch;
+                    let elapsed = cx.background_executor().now() - cx.synced_animation_epoch;
                     // Reduce modulo the duration before f32 conversion, which loses sub-second precision at scale.
                     Duration::from_nanos((elapsed.as_nanos() % duration.as_nanos()) as u64)
                 } else {
-                    now.duration_since(state.start)
+                    cx.background_executor().now() - state.start
                 };
                 let mut delta = elapsed.as_secs_f32() / duration.as_secs_f32();
 
@@ -534,7 +431,7 @@ impl<E: IntoElement + 'static> Element for AnimationElement<E> {
                         if animation_ix >= self.animations.len() - 1 {
                             done = true;
                         } else {
-                            state.start = now;
+                            state.start = cx.background_executor().now();
                             state.animation_ix += 1;
                         }
                         delta = 1.0;
@@ -551,13 +448,7 @@ impl<E: IntoElement + 'static> Element for AnimationElement<E> {
             let element = self.element.take().expect("should only be called once");
             let mut element = (self.animator)(element, animation_ix, delta).into_any_element();
 
-            if !done && self.visible_repeat {
-                self.visible_frame = Some(VisibleAnimationFrame {
-                    view: window.current_view(),
-                    max_fps: self.animations[animation_ix].max_fps,
-                    delayed_frame_pending: state.delayed_frame_pending.clone(),
-                });
-            } else if !done {
+            if !done {
                 match self.animations[animation_ix].max_fps {
                     Some(max_fps) if max_fps.is_finite() && max_fps > 0.0 => {
                         if !state.delayed_frame_pending.get() {
@@ -586,26 +477,12 @@ impl<E: IntoElement + 'static> Element for AnimationElement<E> {
         &mut self,
         _id: Option<&GlobalElementId>,
         _inspector_id: Option<&InspectorElementId>,
-        bounds: crate::Bounds<crate::Pixels>,
+        _bounds: crate::Bounds<crate::Pixels>,
         element: &mut Self::RequestLayoutState,
         window: &mut Window,
         cx: &mut App,
     ) -> Self::PrepaintState {
-        if self.visible_frame.is_none() {
-            element.prepaint(window, cx);
-            return false;
-        }
-        // Use prepaint coordinates (which already include the scroll offset).
-        // Intersect all three rectangles, not just two pairwise overlap tests.
-        let mask = window.content_mask().bounds;
-        let viewport = window.viewport_size();
-        let left = bounds.left().max(mask.left()).max(crate::px(0.0));
-        let top = bounds.top().max(mask.top()).max(crate::px(0.0));
-        let right = bounds.right().min(mask.right()).min(viewport.width);
-        let bottom = bounds.bottom().min(mask.bottom()).min(viewport.height);
-        let visible = right > left && bottom > top;
         element.prepaint(window, cx);
-        visible
     }
 
     fn paint(
@@ -614,18 +491,11 @@ impl<E: IntoElement + 'static> Element for AnimationElement<E> {
         _inspector_id: Option<&InspectorElementId>,
         _bounds: crate::Bounds<crate::Pixels>,
         element: &mut Self::RequestLayoutState,
-        visible: &mut Self::PrepaintState,
+        _: &mut Self::PrepaintState,
         window: &mut Window,
         cx: &mut App,
     ) {
         element.paint(window, cx);
-        // Commit only after successful prepaint: retryable list/autoscroll
-        // prepaints do not roll back queued callbacks or detached timers.
-        if *visible {
-            if let Some(frame) = self.visible_frame.take() {
-                frame.request(window, cx);
-            }
-        }
     }
 }
 
@@ -1154,392 +1024,5 @@ mod tests {
 
         assert_eq!(simulate_next_frame(&window, cx), 0);
         assert_eq!(*rendered_deltas.borrow(), vec![0.0]);
-    }
-    struct PlaybackTestView {
-        mounted: bool,
-        playback: RepeatAnimationPlayback,
-        deltas: Rc<RefCell<Vec<f32>>>,
-        max_fps: Option<f32>,
-    }
-
-    impl Render for PlaybackTestView {
-        fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
-            let mut root = div().size(px(100.));
-            if self.mounted {
-                let deltas = self.deltas.clone();
-                let mut animation = Animation::new(Duration::from_secs(1)).repeat();
-                animation.max_fps = self.max_fps;
-                root = root.child(
-                    div()
-                        .size(px(20.))
-                        .with_animation("persistent-repeat", animation, move |this, delta| {
-                            deltas.borrow_mut().push(delta);
-                            this
-                        })
-                        .with_repeat_playback(self.playback.clone())
-                        .repeat_when_visible(),
-                );
-            }
-            root
-        }
-    }
-
-    fn open_playback(
-        cx: &mut TestAppContext,
-        playback: RepeatAnimationPlayback,
-        mounted: bool,
-        max_fps: Option<f32>,
-    ) -> WindowHandle<PlaybackTestView> {
-        let window = cx.open_window(size(px(100.), px(100.)), move |_, _| PlaybackTestView {
-            mounted,
-            playback,
-            deltas: Rc::new(RefCell::new(Vec::new())),
-            max_fps,
-        });
-        cx.run_until_parked();
-        window
-    }
-
-    #[gpui::test]
-    fn repeat_playback_starts_on_first_mount_and_new_handle_restarts(cx: &mut TestAppContext) {
-        let playback = RepeatAnimationPlayback::default();
-        let window = open_playback(cx, playback.clone(), false, None);
-        cx.executor().advance_clock(Duration::from_secs(3));
-        assert!(playback.start.get().is_none());
-        assert_eq!(simulate_next_frame(&window, cx), 0);
-        window
-            .update(cx, |view, _, cx| {
-                view.mounted = true;
-                cx.notify();
-            })
-            .unwrap();
-        cx.run_until_parked();
-        window
-            .update(cx, |view, _, _| assert_eq!(*view.deltas.borrow(), vec![0.]))
-            .unwrap();
-        cx.executor().advance_clock(Duration::from_millis(250));
-        simulate_next_frame(&window, cx);
-        window
-            .update(cx, |view, _, cx| {
-                assert!((*view.deltas.borrow().last().unwrap() - 0.25).abs() < 0.01);
-                view.playback = RepeatAnimationPlayback::default();
-                cx.notify();
-            })
-            .unwrap();
-        cx.run_until_parked();
-        window
-            .update(cx, |view, _, _| {
-                assert_eq!(*view.deltas.borrow().last().unwrap(), 0.)
-            })
-            .unwrap();
-    }
-
-    #[gpui::test]
-    fn repeat_playback_survives_unmounted_frames_without_scheduling(cx: &mut TestAppContext) {
-        let window = open_playback(cx, RepeatAnimationPlayback::default(), true, None);
-        window
-            .update(cx, |view, _, cx| {
-                view.mounted = false;
-                cx.notify();
-            })
-            .unwrap();
-        cx.run_until_parked();
-        // Drain the callback already queued by the mounted frame.
-        simulate_next_frame(&window, cx);
-        assert_eq!(simulate_next_frame(&window, cx), 0);
-        window.update(cx, |_, _, cx| cx.notify()).unwrap();
-        cx.run_until_parked();
-        cx.executor().advance_clock(Duration::from_millis(2350));
-        assert_eq!(simulate_next_frame(&window, cx), 0);
-        window
-            .update(cx, |view, _, cx| {
-                assert_eq!(view.deltas.borrow().len(), 1);
-                view.mounted = true;
-                cx.notify();
-            })
-            .unwrap();
-        cx.run_until_parked();
-        window
-            .update(cx, |view, _, _| {
-                assert!((*view.deltas.borrow().last().unwrap() - 0.35).abs() < 0.01);
-            })
-            .unwrap();
-        assert!(simulate_next_frame(&window, cx) > 0);
-    }
-
-    #[gpui::test]
-    fn repeat_playback_remount_has_fresh_timer_and_owner(cx: &mut TestAppContext) {
-        let playback = RepeatAnimationPlayback::default();
-        let first = open_playback(cx, playback.clone(), true, Some(10.));
-        first
-            .update(cx, |view, _, cx| {
-                view.mounted = false;
-                cx.notify();
-            })
-            .unwrap();
-        cx.run_until_parked();
-        first.update(cx, |_, _, cx| cx.notify()).unwrap();
-        cx.run_until_parked();
-        cx.executor().advance_clock(Duration::from_millis(60));
-        // A different owning view, before the first owner's 100 ms timer fires.
-        let second = open_playback(cx, playback, true, Some(10.));
-        second
-            .update(cx, |view, _, _| {
-                assert!((*view.deltas.borrow().last().unwrap() - 0.06).abs() < 0.01);
-            })
-            .unwrap();
-        cx.executor().advance_clock(Duration::from_millis(45));
-        cx.run_until_parked();
-        first
-            .update(cx, |view, _, _| assert_eq!(view.deltas.borrow().len(), 1))
-            .unwrap();
-        second
-            .update(cx, |view, _, _| assert_eq!(view.deltas.borrow().len(), 1))
-            .unwrap();
-        // The second mount owns its own timer due at 160 ms; the old pending
-        // timer must neither block it nor notify this view at 100 ms.
-        cx.executor().advance_clock(Duration::from_millis(60));
-        cx.run_until_parked();
-        second
-            .update(cx, |view, _, _| {
-                assert_eq!(view.deltas.borrow().len(), 2);
-                assert!((*view.deltas.borrow().last().unwrap() - 0.165).abs() < 0.01);
-            })
-            .unwrap();
-        first
-            .update(cx, |view, _, _| assert_eq!(view.deltas.borrow().len(), 1))
-            .unwrap();
-    }
-
-    struct VisibleRepeatTestView {
-        scroll: crate::ScrollHandle,
-        deltas: Rc<RefCell<Vec<f32>>>,
-        opt_in: bool,
-        opacity: f32,
-        max_fps: Option<f32>,
-    }
-
-    impl Render for VisibleRepeatTestView {
-        fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
-            let deltas = self.deltas.clone();
-            let entrance_motion = !self.opt_in;
-            // Use the instance clock here: dedicated tests above cover synced
-            // repeats. Offscreen sampling must preserve both clock policies.
-            let mut animation = Animation::new(Duration::from_secs(1)).repeat();
-            if let Some(fps) = self.max_fps {
-                animation = animation.with_max_fps(fps);
-            }
-            let child = div()
-                .mt(px(150.))
-                .size(px(20.))
-                .opacity(self.opacity)
-                .with_animation("bounded-repeat", animation, move |this, delta| {
-                    deltas.borrow_mut().push(delta);
-                    if entrance_motion {
-                        this.relative().top(px(-200. * delta))
-                    } else {
-                        this
-                    }
-                });
-            let child = if self.opt_in {
-                child.repeat_when_visible()
-            } else {
-                child
-            };
-            div()
-                .id("viewport")
-                .size(px(100.))
-                .overflow_y_scroll()
-                .track_scroll(&self.scroll)
-                .child(div().h(px(400.)).w(px(100.)).child(child))
-        }
-    }
-
-    fn open_visible_repeat(
-        cx: &mut TestAppContext,
-        opt_in: bool,
-        max_fps: Option<f32>,
-    ) -> WindowHandle<VisibleRepeatTestView> {
-        let window = cx.open_window(size(px(100.), px(100.)), move |_, _| {
-            VisibleRepeatTestView {
-                scroll: crate::ScrollHandle::new(),
-                deltas: Rc::new(RefCell::new(Vec::new())),
-                opt_in,
-                opacity: 1.,
-                max_fps,
-            }
-        });
-        cx.run_until_parked();
-        window
-    }
-
-    #[gpui::test]
-    fn clipped_repeat_does_not_request_frames(cx: &mut TestAppContext) {
-        let window = open_visible_repeat(cx, true, None);
-        assert_eq!(simulate_next_frame(&window, cx), 0);
-        window
-            .update(cx, |view, _, _| assert_eq!(view.deltas.borrow().len(), 1))
-            .unwrap();
-    }
-
-    #[gpui::test]
-    fn scrolling_nonsynced_repeat_resumes_original_phase_even_at_zero_opacity(
-        cx: &mut TestAppContext,
-    ) {
-        let window = open_visible_repeat(cx, true, None);
-        cx.executor().advance_clock(Duration::from_millis(2350));
-        window
-            .update(cx, |view, _, cx| {
-                view.scroll.set_offset(crate::point(px(0.), px(-150.)));
-                view.opacity = 0.;
-                cx.notify();
-            })
-            .unwrap();
-        cx.run_until_parked();
-        window
-            .update(cx, |view, _, _| {
-                let delta = *view.deltas.borrow().last().unwrap();
-                assert!((delta - 0.35).abs() < 0.01, "phase restarted: {delta}");
-            })
-            .unwrap();
-        assert!(simulate_next_frame(&window, cx) > 0);
-        window
-            .update(cx, |view, _, cx| {
-                view.scroll.set_offset(crate::point(px(0.), px(0.)));
-                cx.notify();
-            })
-            .unwrap();
-        cx.run_until_parked();
-        // A callback queued while visible may still fire once.
-        simulate_next_frame(&window, cx);
-        assert_eq!(simulate_next_frame(&window, cx), 0);
-    }
-
-    #[gpui::test]
-    fn ordinary_offscreen_entrance_repeat_keeps_default_scheduling(cx: &mut TestAppContext) {
-        let window = open_visible_repeat(cx, false, None);
-        cx.executor().advance_clock(Duration::from_millis(750));
-        assert!(simulate_next_frame(&window, cx) > 0);
-        window
-            .update(cx, |view, _, _| {
-                // At phase .75 the ordinary animator moves its initial y=150 to 0.
-                // It must keep scheduling while outside in order to reach this state.
-                assert!((*view.deltas.borrow().last().unwrap() - 0.75).abs() < 0.01);
-            })
-            .unwrap();
-        assert!(simulate_next_frame(&window, cx) > 0);
-    }
-
-    #[gpui::test]
-    fn reduced_visible_repeat_remains_static(cx: &mut TestAppContext) {
-        cx.update(|cx| cx.set_reduce_motion(true));
-        let window = open_visible_repeat(cx, true, None);
-        window
-            .update(cx, |view, _, cx| {
-                view.scroll.set_offset(crate::point(px(0.), px(-150.)));
-                cx.notify();
-            })
-            .unwrap();
-        cx.run_until_parked();
-        assert_eq!(simulate_next_frame(&window, cx), 0);
-        window
-            .update(cx, |view, _, _| {
-                assert!(view.deltas.borrow().iter().all(|delta| *delta == 0.));
-            })
-            .unwrap();
-    }
-
-    #[gpui::test]
-    fn clipped_throttled_repeat_does_not_start_timer(cx: &mut TestAppContext) {
-        let window = open_visible_repeat(cx, true, Some(10.));
-        cx.executor().advance_clock(Duration::from_secs(1));
-        cx.run_until_parked();
-        window
-            .update(cx, |view, _, _| assert_eq!(view.deltas.borrow().len(), 1))
-            .unwrap();
-        assert_eq!(simulate_next_frame(&window, cx), 0);
-    }
-
-    #[gpui::test]
-    fn visible_throttled_repeat_deduplicates_and_stops_after_tail_timer(cx: &mut TestAppContext) {
-        let window = open_visible_repeat(cx, true, Some(10.));
-        window
-            .update(cx, |view, _, cx| {
-                view.scroll.set_offset(crate::point(px(0.), px(-150.)));
-                cx.notify();
-            })
-            .unwrap();
-        cx.run_until_parked();
-
-        // Three unrelated renders before the first 100 ms timer expires must
-        // not create timers due at 120, 140, and 160 ms.
-        for _ in 0..3 {
-            cx.executor().advance_clock(Duration::from_millis(20));
-            window.update(cx, |_, _, cx| cx.notify()).unwrap();
-            cx.run_until_parked();
-        }
-        let before_timer = window
-            .update(cx, |view, _, _| view.deltas.borrow().len())
-            .unwrap();
-        assert_eq!(simulate_next_frame(&window, cx), 0);
-        cx.executor().advance_clock(Duration::from_millis(45));
-        cx.run_until_parked();
-        let after_timer = window
-            .update(cx, |view, _, _| view.deltas.borrow().len())
-            .unwrap();
-        assert_eq!(after_timer, before_timer + 1);
-
-        // Separate deadlines make duplicate timers observable; merely counting
-        // renders at one shared deadline could hide coalesced notifications.
-        cx.executor().advance_clock(Duration::from_millis(60));
-        cx.run_until_parked();
-        window
-            .update(cx, |view, _, _| {
-                assert_eq!(view.deltas.borrow().len(), after_timer);
-            })
-            .unwrap();
-
-        window
-            .update(cx, |view, _, cx| {
-                view.scroll.set_offset(crate::point(px(0.), px(0.)));
-                cx.notify();
-            })
-            .unwrap();
-        cx.run_until_parked();
-        let after_scroll = window
-            .update(cx, |view, _, _| view.deltas.borrow().len())
-            .unwrap();
-        // The visible render at ~105 ms queued one timer at ~205 ms. It can
-        // notify once after clipping, but that draw must not renew the timer.
-        cx.executor().advance_clock(Duration::from_millis(45));
-        cx.run_until_parked();
-        window
-            .update(cx, |view, _, _| {
-                assert_eq!(view.deltas.borrow().len(), after_scroll + 1);
-            })
-            .unwrap();
-        cx.executor().advance_clock(Duration::from_secs(1));
-        cx.run_until_parked();
-        window
-            .update(cx, |view, _, _| {
-                assert_eq!(view.deltas.borrow().len(), after_scroll + 1);
-            })
-            .unwrap();
-        assert_eq!(simulate_next_frame(&window, cx), 0);
-    }
-
-    #[test]
-    #[should_panic(expected = "requires one nonzero-duration repeating animation")]
-    fn visible_repeat_rejects_animation_chains() {
-        div()
-            .with_animations(
-                "chain",
-                vec![
-                    Animation::new(Duration::from_secs(1)).repeat(),
-                    Animation::new(Duration::from_secs(1)).repeat(),
-                ],
-                |this, _, _| this,
-            )
-            .repeat_when_visible();
     }
 }

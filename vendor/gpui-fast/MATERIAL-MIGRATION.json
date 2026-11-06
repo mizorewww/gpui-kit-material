@@ -180,7 +180,7 @@
     "src/window/prompts.rs": "0d58ec14e8139af53b50f4ad67690f01959ed59ffafc4adb2cf522f3f6197164"
   },
   "patch_base": "gpui-pre 0.3.11 published archive plus this workspace compatibility patches",
-  "patch_contract": "Preserve full CPU scopes and repeat playback through Fast retained/scroll replay. Runtime validation is required.",
+  "patch_contract": "Preserve full CPU scopes through Fast retained/scroll replay. Runtime validation is required.",
   "additional_test_fixtures": {
     "tests/fonts/README.md": {
       "sha256": "675824dd97a1d09a1a105d186a7b96a05016009d5d14621d6f5298612b3fbc6d",
@@ -248,11 +248,6 @@
         "upstream_sha256": "fd8413186c41a188997f34a3a74910289b2d3dd42a7eee4d7d1c7aa63724ba61",
         "local_sha256": "eeb767b821328b054fd6ff50c260638f4dac8b73224a353bbccd13b1dfec3ab1",
         "reason": "EntityMap's ref_counts and EntityRefCounts::counts made pub(crate), for EntityMap::is_alive in src/fast/dependencies.rs (upstream PR longbridge/gpui-fast#106)."
-      },
-      "src/elements/animation.rs": {
-        "upstream_sha256": "7b0dde3c811bf1062e532395f5c8f5b76acb10bfe95cf875ba0e5d6c5dc41c9f",
-        "local_sha256": "da466d2d926998f334aac8b4871d807a4eda8b972f8df8c9ea05abc0fe382a2d",
-        "reason": "Executor-clock sampling, repeat_when_visible and RepeatAnimationPlayback (vendor/gpui-pre/animation-visibility-patch.md)."
       },
       "src/elements/div.rs": {
         "upstream_sha256": "ba8f3d0b8dc931ab446f13014edcd2320d956915459fa824739d69944b3f4a74",
@@ -396,6 +391,6 @@
         "reason": "Package-level lockfile not retained; the workspace Cargo.lock owns resolution."
       }
     },
-    "unchanged_file_count": 147
+    "unchanged_file_count": 148
   }
 }
