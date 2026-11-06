@@ -797,4 +797,20 @@ mod tests {
         assert_eq!(editor.time, hms(0, 0, 0));
         assert!(!editor.input_digit(1), "digits do not edit the period");
     }
+
+    #[gpui::test]
+    fn the_separator_is_a_colon_unless_set(cx: &mut gpui::TestAppContext) {
+        use gpui::AppContext as _;
+
+        let cx = cx.add_empty_window();
+        let state = cx.update(|window, cx| cx.new(|cx| TimeFieldState::new(window, cx)));
+        assert_eq!(TimeField::new("time", &state).separator.as_ref(), ":");
+        assert_eq!(
+            TimeField::new("time", &state)
+                .separator(".")
+                .separator
+                .as_ref(),
+            "."
+        );
+    }
 }
