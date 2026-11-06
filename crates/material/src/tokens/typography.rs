@@ -96,8 +96,10 @@ pub enum TypefaceRole {
 /// Reference typography metrics at 100% text scale.
 ///
 /// Sizes and tracking are in rems so they follow the application's text scale.
-/// `letter_spacing` paints through GPUI's text style, for text elements. Kit's
-/// editors shape their own lines and do not apply it.
+///
+/// `letter_spacing` (tracking) is recorded, not painted: GPUI's text style has
+/// no letter spacing, so no component applies it until GPUI supports it (see
+/// zed-industries/zed#53475).
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct TypeScale {
     pub typeface: TypefaceRole,

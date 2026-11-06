@@ -320,7 +320,6 @@ impl RenderOnce for Snackbar {
                 })
                 .px(rem(12.))
                 .text_size(label.font_size)
-                .letter_spacing(label.letter_spacing)
                 .line_height(label.line_height)
                 .font_weight(FontWeight(label.font_weight as f32))
                 .child(text)
@@ -364,7 +363,6 @@ impl RenderOnce for Snackbar {
             .bg(color(INVERSE_SURFACE))
             .text_color(color(INVERSE_ON_SURFACE))
             .text_size(body.font_size)
-            .letter_spacing(body.letter_spacing)
             .line_height(body.line_height)
             .shadow(elevation::level(SNACKBAR_ELEVATION))
             .when_some(self.selector, |surface, name| {

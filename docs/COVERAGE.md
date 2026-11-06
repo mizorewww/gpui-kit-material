@@ -139,7 +139,7 @@ M3 roles and type. Each is opt-in: the M3 defaults do not change.
 | Area | State | Source | Evidence | Missing |
 | --- | --- | --- | --- | --- |
 | Color | Implemented | Figma baseline, md3.io other themes, material-color-utilities (dynamic) | Fixtures, tests, upstream vectors | Image-derived seeds; multiple source colors; no committed seed captures |
-| Typography | Implemented, with limits | Figma | Fixtures, tests | Kit's editors do not apply letter spacing; ligatures stay on under it |
+| Typography | Implemented, with limits | Figma | Fixtures, tests | Tracking is recorded, not painted, until GPUI supports letter spacing (zed-industries/zed#53475) |
 | Shape | Implemented | Figma (corners), Compose `MaterialShapes` (library, morphing) | Fixtures, tests | Clipping content to a shape |
 | Elevation and state layers | Implemented | Figma | Fixtures, tests | none found |
 | Motion | Implemented | md3.io (Expressive), m3e (Standard) | Fixtures, tests | No per-component timed comparison outside buttons |

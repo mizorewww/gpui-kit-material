@@ -116,7 +116,6 @@ fn type_role_sized<E: Styled>(element: E, role: TypeRole) -> E {
     element
         .font_family(scale.font_family)
         .text_size(scale.font_size)
-        .letter_spacing(scale.letter_spacing)
         .line_height(scale.line_height)
 }
 
