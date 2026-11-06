@@ -269,7 +269,7 @@
     },
     "src/window.rs": {
       "upstream_sha256": "260fb355763edb86f395458e167c9d258352af4f2cb03d4d6eb51d59a36e1f4c",
-      "local_sha256": "132012b0612b76de6f51786b4ce06a323ca7b03b7f8c400fc3b9c00a1b6723db",
+      "local_sha256": "cb1c5d45509423ce053cbc472cfdf390edcb84234c9ec444c7ebbe8d521668b0",
       "reason": "CPU frame scope (cpu-frame-scope-patch.md); WindowSubmissionStats, vsync, throttle retry (frame-submission-patch.md); present outcome (presentation-timing-patch.md)."
     }
   },
@@ -310,7 +310,6 @@
     "SOURCE.json",
     "cpu-frame-scope-patch.md",
     "em-fallback-patch.md",
-    "focused-input-bounds-patch.md",
     "frame-submission-patch.md",
     "hanging-space-patch.md",
     "presentation-timing-patch.md",

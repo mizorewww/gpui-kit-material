@@ -351,8 +351,8 @@
       },
       "src/window.rs": {
         "upstream_sha256": "a6b900b49d9a5c8ae2ac32083251a7979b8730008f5e643155ddb56716c0b6c7",
-        "local_sha256": "6de10e675ffc6e682c3d84a7140676723ad033765bd291911baa8b800e008275",
-        "reason": "Same GPUI window patches as vendor/gpui-pre (CPU frame scope, submission stats/vsync/throttle retry, present outcome, focused_input_selection_bounds); FrameDirtyAccumulator made pub(crate) to match the public field holding it, used nowhere else. Draw ends with hover_freeze::release_unhovered."
+        "local_sha256": "663bdd8c634ee73a384853df3951c2c3dc464ae72d42f23aac0d8943f662fabd",
+        "reason": "Same GPUI window patches as vendor/gpui-pre (CPU frame scope, submission stats/vsync/throttle retry, present outcome); FrameDirtyAccumulator made pub(crate) to match the public field holding it, used nowhere else. Draw ends with hover_freeze::release_unhovered."
       }
     },
     "added": {
