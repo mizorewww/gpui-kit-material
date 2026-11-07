@@ -111,7 +111,7 @@ fn open(cx: &mut TestAppContext) -> (Entity<Harness>, &mut VisualTestContext) {
 }
 
 #[gpui::test]
-fn every_phase_and_kit_read_the_scoped_scheme_and_the_outside_does_not(cx: &mut TestAppContext) {
+fn every_phase_reads_the_scoped_scheme_and_kit_and_the_outside_do_not(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
     draw(cx);
     let want = Some(rgba(ink().get(ColorRole::SURFACE)));
@@ -121,8 +121,8 @@ fn every_phase_and_kit_read_the_scoped_scheme_and_the_outside_does_not(cx: &mut 
         assert_eq!(h.deferred.get(), want, "a deferred draw re-enters");
         assert_eq!(
             h.kit.get(),
-            want.map(Hsla::from),
-            "Kit's theme is projected while the scope paints"
+            Some(Hsla::from(rgba(paper().get(ColorRole::SURFACE)))),
+            "Kit's theme is the application's inside the scope too"
         );
         assert_eq!(
             h.outside.get(),
@@ -134,7 +134,7 @@ fn every_phase_and_kit_read_the_scoped_scheme_and_the_outside_does_not(cx: &mut 
         assert_eq!(
             cx.theme().background,
             Hsla::from(rgba(paper().get(ColorRole::SURFACE))),
-            "Kit's global is restored when the draw ends"
+            "Kit's global is untouched"
         );
         assert_eq!(theme::scheme(), paper());
     });
@@ -181,7 +181,7 @@ fn a_settled_scope_does_not_keep_the_window_drawing(cx: &mut TestAppContext) {
     for _ in 0..3 {
         dirty_draw(cx);
     }
-    assert_eq!(notified.get(), 0, "swapping Kit's globals notifies no view");
+    assert_eq!(notified.get(), 0, "a settled scope notifies no view");
 }
 
 #[gpui::test]
@@ -231,7 +231,7 @@ impl Render for DeferredKit {
 }
 
 #[gpui::test]
-fn deferred_content_laid_out_in_place_keeps_kit_in_the_scope(cx: &mut TestAppContext) {
+fn deferred_content_laid_out_in_place_stays_in_the_scope(cx: &mut TestAppContext) {
     cx.update(|cx| {
         gpui_kit::init(cx);
         theme::init_component_theme(paper(), 1., cx);
@@ -243,8 +243,9 @@ fn deferred_content_laid_out_in_place_keeps_kit_in_the_scope(cx: &mut TestAppCon
         move |_, _| DeferredKit(seen)
     });
     draw(cx);
+    let kit = Hsla::from(rgba(paper().get(ColorRole::SURFACE)));
     let want = rgba(ink().get(ColorRole::SURFACE));
-    assert_eq!(seen.get(), Some((Hsla::from(want), want)));
+    assert_eq!(seen.get(), Some((kit, want)), "Kit follows the application");
 }
 
 /// A view that paints its scope's color, notified on its own.

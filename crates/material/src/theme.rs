@@ -108,17 +108,6 @@ fn painted_role(role: ColorRole) -> Color {
         .unwrap_or_else(|| PAINT.with(|paint| paint.borrow().current.get(role)))
 }
 
-/// Write `scheme` into a Kit theme, for a scope's projection.
-pub(crate) fn project_scheme(theme: &mut ComponentTheme, scheme: Scheme) {
-    theme.mode = if scheme.is_dark() {
-        ComponentThemeMode::Dark
-    } else {
-        ComponentThemeMode::Light
-    };
-    let scale = f32::from(theme.font_size) / crate::tokens::typography::BASE_PX;
-    write_component_projection(theme, scheme, scale);
-}
-
 /// Convert a kit color to GPUI's.
 pub fn rgba(color: Color) -> Rgba {
     Rgba {

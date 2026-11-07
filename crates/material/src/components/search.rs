@@ -244,6 +244,12 @@ impl RenderOnce for SearchField {
                     .into_any_element(),
                 state,
             )
+            // Kit's theme paints these, except inside a scope, which leaves it alone.
+            .ink(
+                Hsla::from(color(ColorRole::PRIMARY)),
+                Hsla::from(alpha(color(ColorRole::PRIMARY), state::TEXT_SELECTION)),
+                cx,
+            )
             .into_any_element(),
             BarInput::Static(text, placeholder) => div()
                 .overflow_hidden()

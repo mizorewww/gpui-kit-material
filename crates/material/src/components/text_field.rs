@@ -29,7 +29,6 @@ use crate::{
 };
 use gpui::{prelude::*, *};
 use gpui_base::input::{InputBaseState, InputModeKind, InputState, TextareaState};
-use gpui_kit::component::Theme as ComponentTheme;
 use gpui_kit::component::{
     Sizable as _, Size,
     input::{Input, Textarea},
@@ -579,81 +578,6 @@ pub(crate) fn field_paint(variant: TextFieldVariant, s: FieldState) -> FieldPain
 
 /// Label geometry in design px: `(left, top, font size, line height)` for a
 /// float progress `t` (0 resting, 1 floating).
-/// Lays out an input with its caret in a color other than the theme's. Kit's `Input`
-/// projects the theme onto its state as it renders, which happens during this layout,
-/// so the caret holds until the next render and nothing is written around it.
-struct CaretColor {
-    child: AnyElement,
-    caret: Hsla,
-}
-
-impl CaretColor {
-    /// `child`, unwrapped when `caret` is what the theme paints already.
-    fn around(child: AnyElement, caret: Hsla, cx: &App) -> AnyElement {
-        if ComponentTheme::global(cx).caret == caret {
-            child
-        } else {
-            Self { child, caret }.into_any_element()
-        }
-    }
-}
-
-impl IntoElement for CaretColor {
-    type Element = Self;
-    fn into_element(self) -> Self {
-        self
-    }
-}
-
-impl Element for CaretColor {
-    type RequestLayoutState = ();
-    type PrepaintState = ();
-    fn id(&self) -> Option<ElementId> {
-        None
-    }
-    fn source_location(&self) -> Option<&'static std::panic::Location<'static>> {
-        None
-    }
-    fn request_layout(
-        &mut self,
-        _: Option<&GlobalElementId>,
-        _: Option<&InspectorElementId>,
-        window: &mut Window,
-        cx: &mut App,
-    ) -> (LayoutId, ()) {
-        let mut theme = ComponentTheme::global(cx).clone();
-        theme.colors.caret = self.caret;
-        // Back before anything else draws, so to the rest of the window nothing changed.
-        cx.swap_global_quietly(&mut theme);
-        let layout = self.child.request_layout(window, cx);
-        cx.swap_global_quietly(&mut theme);
-        (layout, ())
-    }
-    fn prepaint(
-        &mut self,
-        _: Option<&GlobalElementId>,
-        _: Option<&InspectorElementId>,
-        _: Bounds<Pixels>,
-        _: &mut (),
-        window: &mut Window,
-        cx: &mut App,
-    ) {
-        self.child.prepaint(window, cx);
-    }
-    fn paint(
-        &mut self,
-        _: Option<&GlobalElementId>,
-        _: Option<&InspectorElementId>,
-        _: Bounds<Pixels>,
-        _: &mut (),
-        _: &mut (),
-        window: &mut Window,
-        cx: &mut App,
-    ) {
-        self.child.paint(window, cx);
-    }
-}
-
 #[cfg(test)]
 pub(crate) fn label_geometry(
     variant: TextFieldVariant,
@@ -1059,6 +983,13 @@ impl RenderOnce for TextField {
             }
             name
         });
+        // Kit's input paints Kit's theme caret and selection; the field's caret
+        // follows its error state, and both follow a scope Kit's theme does not.
+        let caret = Hsla::from(active.caret);
+        let selection = Hsla::from(alpha(
+            color(ColorRole::PRIMARY),
+            crate::tokens::state::TEXT_SELECTION,
+        ));
         let editor: AnyElement = match &self.input {
             FieldInput::Single(state) => CaretReport::around(
                 Input::new(state)
@@ -1074,6 +1005,7 @@ impl RenderOnce for TextField {
                     .into_any_element(),
                 state.clone(),
             )
+            .ink(caret, selection, cx)
             .into_any_element(),
             FieldInput::Multi(state) => CaretReport::around(
                 Textarea::new(state)
@@ -1090,6 +1022,7 @@ impl RenderOnce for TextField {
                     .into_any_element(),
                 state.clone(),
             )
+            .ink(caret, selection, cx)
             .into_any_element(),
             FieldInput::Static(value) => static_value(
                 value,
@@ -1097,9 +1030,6 @@ impl RenderOnce for TextField {
             )
             .into_any_element(),
         };
-        // Kit's input paints the theme caret (primary through the theme bridge); the
-        // field's own caret follows its error state.
-        let editor = CaretColor::around(editor, Hsla::from(active.caret), cx);
         let placeholder = self.placeholder.clone().filter(|_| show_placeholder);
         let input_row = div()
             .debug_selector(|| "text-field-input".into())
