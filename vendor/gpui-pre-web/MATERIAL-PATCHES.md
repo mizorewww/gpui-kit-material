@@ -13,9 +13,12 @@ Submission counting (`src/window.rs`, `Cargo.toml`), behind the
 `WindowSubmissionStats` patch (`vendor/gpui-pre/frame-submission-patch.md`).
 Browser-controlled vsync stays `VsyncStatus::Unsupported`.
 
-IME position (`src/window.rs`, `src/ime_mirror.rs`): upstream's
+IME position (`src/window.rs`, `src/ime_mirror.rs`, `src/events.rs`): upstream's
 `update_ime_position` did nothing, so a browser's IME panel opened at the hidden
-input in the page's corner. It now moves that input to the caret. Over the canvas there, it
+input in the page's corner. It now moves that input to the caret, and so does a
+composition's start, which asks the focused input where its caret is
+(`PlatformInputHandler::ime_candidate_bounds`): an input need not report every caret
+move, which would draw a frame after each. Over the canvas there, the hidden input
 takes no clicks and has no padding or border.
 
 IME keys and edits (`src/events.rs`): upstream dispatched a key to GPUI before checking for a

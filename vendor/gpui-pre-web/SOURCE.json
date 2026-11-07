@@ -42,13 +42,13 @@
     },
     "src/events.rs": {
       "upstream_sha256": "250ba40e44975b282cd74797e76c96de6ef5bdcc537a8009f7e876c8a47ff239",
-      "local_sha256": "5f2ed4dcf49569f795f1982fa4dbc1ac8c33f750acfd7a1fb47d71391bda65ad",
-      "reason": "The IME owns a key while composing or reported as keyCode 229, before GPUI sees it, so the Enter committing a candidate is no PressEnter. An IME edit's prefix and suffix do not split a surrogate pair. A consumer needs both (identical in both web crates)."
+      "local_sha256": "0c73a383035a922a0665f3377a4698f593e63682342713f80eccbbdffe7365c3",
+      "reason": "The IME owns a key while composing or reported as keyCode 229, before GPUI sees it, so the Enter committing a candidate is no PressEnter. An IME edit's prefix and suffix do not split a surrogate pair. A composition's start asks the focused input for its caret and moves the hidden input there, where the browser opens its IME panel. A consumer needs these (identical in both web crates)."
     },
     "src/ime_mirror.rs": {
       "upstream_sha256": "4061ebd319b5928c2a25f659c4f1db9adb193d5873bbbfeba36468ca2706895d",
       "local_sha256": "f571bc8dcc711bb863077fb01c5e8bd3d89a519658ed61ae5cfb2d6333b3934d",
-      "reason": "Moves the hidden input to the caret for update_ime_position, so a browser IME panel opens there, without its taking clicks there or insetting its text. A consumer needs it (identical in both web crates)."
+      "reason": "Moves the hidden input to the caret, for compositionstart (events.rs) and update_ime_position, so a browser IME panel opens there, without its taking clicks there or insetting its text. A consumer needs it (identical in both web crates)."
     },
     "src/window.rs": {
       "upstream_sha256": "eda543e585912fcb012e2a3559d8fb2e9ad7570ba58746747af380d044085cb8",

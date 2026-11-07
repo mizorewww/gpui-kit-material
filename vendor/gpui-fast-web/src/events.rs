@@ -1114,6 +1114,15 @@ impl WebWindowInner {
         let this = Rc::clone(self);
         self.listen_input("compositionstart", move |_event: JsValue| {
             this.is_composing.set(true);
+            // The browser anchors its IME panel to the hidden input: move it to
+            // the caret now, which the focused input reports when asked.
+            if let Some(caret) = this
+                .with_input_handler(|handler| handler.ime_candidate_bounds())
+                .flatten()
+            {
+                this.ime_mirror
+                    .set_position(f32::from(caret.left()), f32::from(caret.bottom()));
+            }
         })
     }
 
