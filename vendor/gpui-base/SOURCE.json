@@ -1,16 +1,8 @@
 {
   "added_files": {
     ".cargo_vcs_info.json": {
-      "reason": "Locally written marker naming the vendored Git revision b881cadb and crates/base; not an upstream file.",
-      "sha256": "98986aa355abac92ae68fc44e1cfb7d91995daa23afe7dc7641a489f385a155e"
-    },
-    "src/text/block_surface_tests.rs": {
-      "reason": "Tests of the block surface patch (block-surface-patch.md), as on upstream branch material/text-block-surfaces; not an upstream file.",
-      "sha256": "9cc3d2a95ae9b6812bd9db7545f2548c242b6f526b49b34232dda1fdb24ea55d"
-    },
-    "tests/block_surface.rs": {
-      "reason": "Integration tests of the block surface patch (block-surface-patch.md), as on upstream branch material/text-block-surfaces (#3830) at e58511d0; not an upstream file. crates/material/tests/block_surface.rs runs a copy through the Kit facade.",
-      "sha256": "08ab87ce835b9c5ad1dbc3d023c20de359bb4c53b196442bebc0942617dc1ded"
+      "reason": "Locally written marker naming the vendored Git revision 46bf6d49 and crates/base; not an upstream file.",
+      "sha256": "becda0847e38c0f03ac6bb37d290807e1edbef2373d31b61a4c029c092973e8a"
     }
   },
   "development_examples_limit": "Upstream development examples are preserved, including references to sibling story-web font and repository example fixtures. Those external fixtures are not included in this Base-only vendor snapshot; standalone example execution is not asserted.",
@@ -18,77 +10,23 @@
   "local_patch_files": [
     "src/lib.rs",
     "src/motion.rs",
-    "src/slider.rs",
-    "src/text/document.rs",
-    "src/text/format/markdown.rs",
-    "src/text/markdown_ext.rs",
-    "src/text/mod.rs",
-    "src/text/node.rs",
-    "src/text/range_highlight.rs",
-    "src/text/state.rs",
-    "src/text/stream_fade.rs",
-    "src/toolbar.rs"
+    "src/slider.rs"
   ],
   "local_patch_sha256": {
     "src/lib.rs": {
       "local_sha256": "04b8aad215e6c115db560165dea02654d69241b0893be690230154f16e1b16de",
-      "reason": "Public exports ReducedMotion and TransitionPlayback (motion) (motion-patch.md). Upstream PR #3820 (material/motion-css-reversal) with the stacked branches material/motion-reduced-motion and material/motion-transition-playback.",
+      "reason": "Public exports ReducedMotion and TransitionPlayback (motion) (motion-patch.md). Equals fork branch material/motion-transition-playback (59bd3b1e, d59cae42) cherry-picked onto 46bf6d49.",
       "upstream_sha256": "0295fd414debfaa4130eb075298dfecc31c5d2b69f9b4c49fd31e7418dc847c0"
     },
     "src/motion.rs": {
       "local_sha256": "5f0ae5e41d7fe022e988f669f3f7716555bcf1f152a56227d6f70e6e765120a5",
-      "reason": "CSS reversal, negative-delay scaling, per-transition reduced motion, and TransitionPlayback (motion-patch.md). Equals the stacked upstream branches material/motion-css-reversal (#3820), material/motion-reduced-motion and material/motion-transition-playback.",
-      "upstream_sha256": "cfbcc4cbe63aeb5bb6ffc27af0505b59c5fec3054310beaf29e947e14cf6424e"
+      "reason": "Per-transition reduced motion and TransitionPlayback on top of the merged CSS reversal (#3820) (motion-patch.md). Equals fork branch material/motion-transition-playback (59bd3b1e, d59cae42) cherry-picked onto 46bf6d49.",
+      "upstream_sha256": "62396f2e3ac00539f48761869c11cdaa939c2c3911de91cb768a012c05957c04"
     },
     "src/slider.rs": {
       "local_sha256": "c243ec7cefdb1d5749a916a74f68d1083212102acc5d93dd668b783afb68110a",
-      "reason": "Step snapping counted from min, a dropped handle standing at its snapped value, AT Increment/Decrement that move one thumb onto the step grid and emit Change, no snapping for a step that is not positive and finite, and SliderState::accessibility_step (a hundredth of the range for a continuous slider); step_thumb leaves a NaN value, a min above max or a reversed range unchanged, as the keyboard does (motion-patch.md). Equals upstream PR #3822 (material/slider-step-from-min) with the stacked material/slider-accessibility-steps merged onto b881cadb, code and tests. min above the default max (#3823), Slider::track_focus (#3824) and a disabled SliderThumb (#3825) are upstream code.",
-      "upstream_sha256": "b05fae63cb9984b3f47c5fc8efe1b976d756f70bc50177899e326a4bcedfbc8d"
-    },
-    "src/text/document.rs": {
-      "local_sha256": "9a6bb5145daa9db2764b843b1d120c077bad3441ede58f45626a80dd93d36eec",
-      "reason": "BlockNode::Surface and MarkdownExtensions::block_surface: a run of top-level blocks drawn in a consumer's container, taking the row's width unless it sets its own (block-surface-patch.md). Equals upstream PR #3830 (material/text-block-surfaces) at e58511d0.",
-      "upstream_sha256": "fbac8a9bfcfbc884eadafa4e1a6c4b897593e0c48917179267d6deed9e1b81fb"
-    },
-    "src/text/format/markdown.rs": {
-      "local_sha256": "9998aac976c29f63746f444b89d3a3f2868788f63fb74564abf11aeccb6bae95",
-      "reason": "BlockNode::Surface and MarkdownExtensions::block_surface: a run of top-level blocks drawn in a consumer's container, taking the row's width unless it sets its own (block-surface-patch.md). Equals upstream PR #3830 (material/text-block-surfaces) at e58511d0.",
-      "upstream_sha256": "816473c47b4bdb71b01e11a3ea8b200ed6bd9cb23ddb47f3b6d3f7b72bb95c27"
-    },
-    "src/text/markdown_ext.rs": {
-      "local_sha256": "eb95c08802bebe05c0e6773f41eff5996d9cf710316e36d5627f9e4ac14b5ef8",
-      "reason": "BlockNode::Surface and MarkdownExtensions::block_surface: a run of top-level blocks drawn in a consumer's container, taking the row's width unless it sets its own (block-surface-patch.md). Equals upstream PR #3830 (material/text-block-surfaces) at e58511d0.",
-      "upstream_sha256": "44fa63ece976a0474f402a2a65d7d1f382f143c1a482dbb392b8f39f85e397b3"
-    },
-    "src/text/mod.rs": {
-      "local_sha256": "d945ddaf8663138092f2199ad5b57a52df11431aaa7b6fd5afa67f239f777009",
-      "reason": "BlockNode::Surface and MarkdownExtensions::block_surface: a run of top-level blocks drawn in a consumer's container, taking the row's width unless it sets its own (block-surface-patch.md). Equals upstream PR #3830 (material/text-block-surfaces) at e58511d0.",
-      "upstream_sha256": "c88ba532a1d529ad16e89788685c7752cd701771d08699d0395a8ab196ff2be6"
-    },
-    "src/text/node.rs": {
-      "local_sha256": "75208f8173c0c136e845f85f99ef2dcac45b837b68deccf2d647a41a0c257744",
-      "reason": "BlockNode::Surface and MarkdownExtensions::block_surface: a run of top-level blocks drawn in a consumer's container, taking the row's width unless it sets its own (block-surface-patch.md). Equals upstream PR #3830 (material/text-block-surfaces) at e58511d0.",
-      "upstream_sha256": "dc8e200676d82af57d7a01defbc8678189a41162fbd7adaab2e2f0b762f601da"
-    },
-    "src/text/range_highlight.rs": {
-      "local_sha256": "8cc268301204cd388a797c9662531fcbcf7795de85e3131fd6ea9b603e855161",
-      "reason": "BlockNode::Surface and MarkdownExtensions::block_surface: a run of top-level blocks drawn in a consumer's container, taking the row's width unless it sets its own (block-surface-patch.md). Equals upstream PR #3830 (material/text-block-surfaces) at e58511d0.",
-      "upstream_sha256": "99ed9b73bcd26b30bda29135c2a2c0a2963aac82eff9ab720eb12563575078c0"
-    },
-    "src/text/state.rs": {
-      "local_sha256": "ef7258916d036607bee3cafa286ae3d25b0c4dde70f98d8e94d270482c46a1c5",
-      "reason": "BlockNode::Surface and MarkdownExtensions::block_surface: a run of top-level blocks drawn in a consumer's container, taking the row's width unless it sets its own (block-surface-patch.md). Equals upstream PR #3830 (material/text-block-surfaces) at e58511d0.",
-      "upstream_sha256": "e26bd638714201746cce37cd29eac5aa911f5cffbf12e6a0913b48b8488aed74"
-    },
-    "src/text/stream_fade.rs": {
-      "local_sha256": "7a5bfd294a8244422be45cc36f3efa593f20e5d62c239d8cf0bb0c00d010ff3e",
-      "reason": "BlockNode::Surface and MarkdownExtensions::block_surface: a run of top-level blocks drawn in a consumer's container, taking the row's width unless it sets its own (block-surface-patch.md). Equals upstream PR #3830 (material/text-block-surfaces) at e58511d0.",
-      "upstream_sha256": "8070e549356951d29604a5e436afdf7606bfb6c0cd3fe284384acaf6195260b1"
-    },
-    "src/toolbar.rs": {
-      "local_sha256": "6a7abcdda373a2f328c311e8232d9ebd215944a1a02bd2bd36a874455633c9af",
-      "reason": "Settable axis: Up/Down roving and a vertical accessibility orientation for vertical toolbars (motion-patch.md). Equals upstream PR #3821 (material/toolbar-vertical-axis).",
-      "upstream_sha256": "4c992d9765bf6638952ff9c897d7706c6fad5f54eaa8dc428fd568f8fe6323fe"
+      "reason": "Assistive-technology Increment/Decrement that move one thumb onto the step grid counted from min and emit Change, SliderState::accessibility_step (a hundredth of the range for a continuous slider), and step_thumb leaving a NaN value, a min above max or a reversed range unchanged (motion-patch.md). Equals fork branch material/slider-accessibility-steps (43757c62, 56d21f7d) cherry-picked onto 46bf6d49; step snapping from min is upstream code (#3822).",
+      "upstream_sha256": "bcec9e49be5236da44a4b722e5239687d5e46f5dc97a1b1e46fa4a13d81d701f"
     }
   },
   "lockfile_policy": "No stale package-level lockfile. The consuming workspace Cargo.lock owns resolution.",
@@ -99,20 +37,20 @@
   ],
   "normalized_manifests_sha256": {
     "Cargo.toml": {
-      "local_sha256": "37e10629e82f1af0a5253c106f970810d005df34024990e96d51540b62cca381",
+      "local_sha256": "e38fc4e24faa2a98f699b253c61fdbcfd107720c856ae541127fa07f63934cde",
       "upstream_sha256": "1a6020b4b28032f620ea5d8f10c03612f5aaaa8c66d5c19a8e081fd66081f855"
     },
     "examples/native/Cargo.toml": {
-      "local_sha256": "718c83d28d5321e9195253bf1cd9b8a1c36e915a9dfcf36fcdf30b985923d938",
+      "local_sha256": "1765485e8d208d947bd30527bf257deee52f04f53e49a5a3c1e68357bc8607f1",
       "upstream_sha256": "6ffc2c586cbd47e38ba547cb183eea60c3971a57d1fcd61ea2c4973ed5beed3e"
     },
     "examples/wasm/Cargo.toml": {
-      "local_sha256": "3f2310c519819858efe3dcc75fccd1f23f7c45602c4201c8aaf46c36663906de",
+      "local_sha256": "f432e1f2cf3fb298de0f460c862747ada3e3c8fd72800d778ec0bd32ca5e2637",
       "upstream_sha256": "f8a1b8abd4fdce69e31c8e9cd31e5c958bc34b7d1cb87638cc61f4c5f26e55b0"
     }
   },
   "package_version": "0.9.0",
-  "patch_application": "Moved from Git b2aaa3e to b881cadb by a three-way merge per file (upstream b2aaa3e / upstream b881cadb / local patched files); the only conflicts were test placement in src/input/base/element.rs and src/slider.rs, resolved by taking upstream b881cadb order. Dropped because merged upstream: slider min above the default max (#3823), Slider::track_focus (#3824), a disabled SliderThumb (#3825), Dialog::accessibility_label (#3826), the input IME caret (#3827, was ime-anchor-patch.md), notifying an input moved by its parent (#3828, was input-move-patch.md), TimeField::separator (#3829) and publishing the input layout at the end of prepaint (#3831, was input-paint-patch.md); src/dialog.rs, src/time_field.rs, src/input/base/element.rs and src/input/base/state.rs equal upstream. src/text/node.rs and tests/block_surface.rs then took e58511d0 of material/text-block-surfaces. Every patched file equals b881cadb with the open PR branches material/motion-transition-playback, material/toolbar-vertical-axis, material/slider-accessibility-steps and material/text-block-surfaces merged onto it. Moved from Git bb85882 to b2aaa3e by a three-way merge (upstream bb85882 / upstream b2aaa3e / local patched files) without conflicts. The original five patch files were three-way merged (upstream Git / published registry 0.8.1 base / local patched registry files) without conflicts. The TransitionPlayback addition and the IME anchor (ime-anchor-patch.md) were made directly on this checkout afterwards; src/input/base/element.rs and state.rs were then replaced by the upstream PR branches material/input-ime-anchor and material/input-move-notify (both on b2aaa3e, combined without conflicts in code), and material/input-paint-no-write (on 2c150ee5) was applied on top, moving the move-notify comparison with the block it moves. src/text_selection.rs carries no patch any more and matches upstream.",
+  "patch_application": "Moved from Git b881cadb to 46bf6d49 by a three-way merge per file (upstream b881cadb / upstream 46bf6d49 / local patched files). Dropped because merged upstream: CSS transition reversal (#3820), slider step snapping from min (#3822), Toolbar::axis (#3821) and TextView block surfaces (#3830, was block-surface-patch.md); src/toolbar.rs, src/text/ and tests/block_surface.rs equal upstream, so the merged `> [!name]` block surface syntax replaces the patched comment fences and their copy rule. src/motion.rs and src/slider.rs conflicted only where review reworded the merged code; every conflict resolved to the local side, and the result equals 46bf6d49 with fork commits 59bd3b1e, d59cae42 (material/motion-transition-playback) and 43757c62, 56d21f7d (material/slider-accessibility-steps) cherry-picked onto it without conflicts; src/lib.rs merged cleanly to the same. Earlier: moved from Git b2aaa3e to b881cadb (dropping #3823-#3829 and #3831 as merged) and from bb85882 to b2aaa3e by the same method; the original five patch files were three-way merged from the published registry 0.8.1 base.",
   "patch_base": {
     "package": "gpui-base",
     "registry_source_revision": "99576db58ec8103417c41a092e891b4022d24e7e",
@@ -121,11 +59,10 @@
   "path_in_repository": "crates/base",
   "provenance_files": [
     "SOURCE.json",
-    "motion-patch.md",
-    "block-surface-patch.md"
+    "motion-patch.md"
   ],
   "repository": "https://github.com/longbridge/gpui-kit",
-  "revision": "b881cadb7cf7c43b579f60bdac496460ab2f6276",
+  "revision": "46bf6d498fa101a3b11cc64e6d8c20d28d17b720",
   "source_kind": "Git checkout, not the crates.io 0.9.0 archive",
   "upstream_files_sha256": {
     "Cargo.toml": "1a6020b4b28032f620ea5d8f10c03612f5aaaa8c66d5c19a8e081fd66081f855",
@@ -309,7 +246,7 @@
     "src/list_settings.rs": "50c6b4289a3de3877471ce8ebf9c6488f2ed5ddf7bd5a471e95fefe91c26cc4d",
     "src/macos_accessibility.rs": "089d673a24a155d7bac2cec3129b535a680cea4970c5cfb32da0e0b8b228b6af",
     "src/measure.rs": "ef0c897ee836610c618ce93ba6f288b8b53021c336c04161fc2cd81111ce7484",
-    "src/motion.rs": "cfbcc4cbe63aeb5bb6ffc27af0505b59c5fec3054310beaf29e947e14cf6424e",
+    "src/motion.rs": "62396f2e3ac00539f48761869c11cdaa939c2c3911de91cb768a012c05957c04",
     "src/motion/easing.rs": "a8374a23535422befae796b9b6b1290e7e533674f599b36d5f892304d4fd8bf2",
     "src/motion/keyframes.rs": "49c5162ce6dd28904cf7d339677f30bc91b73a640d2291227e425a32623c9cee",
     "src/motion/presence.rs": "29f42bfce53fd7c2034b92e6700b0f68f2aea9633e2421f64042deb5272ff039",
@@ -368,19 +305,20 @@
     "src/select.rs": "0d23c688e9107a8875eb61c016f17dd14863c8d80e8f4e5a22fe609cdd769940",
     "src/selectable_text.rs": "5f8f33f03e5f31a563a05796d3bf82f4eef2ce3d5a0bd08f8afb08e763344e71",
     "src/sheet.rs": "7a5f84d671a9aebb9a5f4afce688119ed05ea4b3648828ef79168aa806db6515",
-    "src/slider.rs": "b05fae63cb9984b3f47c5fc8efe1b976d756f70bc50177899e326a4bcedfbc8d",
+    "src/slider.rs": "bcec9e49be5236da44a4b722e5239687d5e46f5dc97a1b1e46fa4a13d81d701f",
     "src/state_style.rs": "f7e1f85c0215e3cd84df4b6fbce34938a33d275c9db392bdc9025670454760b1",
     "src/styled.rs": "7c1e88964cc3d76968609e6ac24db0c3698c87f9b138ef975d3776eac81dbd87",
     "src/switch.rs": "a97b54dce01d28f3201400e336ff26bae67d82160d92a2b13c1fa30f529b63d6",
     "src/table.rs": "b9101b8ff59b1514955e20ddb111fce7d8cb81cd27c170eb1fd77bcdb9512ad6",
     "src/tabs.rs": "301dce5f2715fbb9fe33dce6e7a6e2b2fe40d4fbab45ba9defe3a0c7e2bef141",
     "src/test_support.rs": "0bf987c336c802d50bbf2f5b2cd3605695651576f907af429a0967868b9fb436",
+    "src/text/block_surface_tests.rs": "6889d0c9f80ae81d54d4fe4d8b3bb0e488b910a5517baeed9cfc4bd0cba16057",
     "src/text/document.rs": "fbac8a9bfcfbc884eadafa4e1a6c4b897593e0c48917179267d6deed9e1b81fb",
     "src/text/editor_host.rs": "7709c03ca3b5e56a7ebb21743284a0ba6275a69bed6f7497045c55ef0385a6e8",
     "src/text/editor_seam.rs": "d10d86c056d6792f5d1fe904efc410c97830d77d3dfb555867a371182fa1e101",
     "src/text/format/html.rs": "7acba8fe9d29a339f9fe3c360e7cefb850f359f17f32bbc11562f4bbccbd74a1",
     "src/text/format/html5minify/mod.rs": "139ae3bdc3c5a1d35f2c7439183b1f2aafc5514ced0e1a2f89917098cdc2d714",
-    "src/text/format/markdown.rs": "816473c47b4bdb71b01e11a3ea8b200ed6bd9cb23ddb47f3b6d3f7b72bb95c27",
+    "src/text/format/markdown.rs": "4e8e8a324c5d9a5fbbb0e47942a18ba7e03f8f48c15383f20e38ba45a02f6458",
     "src/text/format/mod.rs": "a9c352dd0d58f53f6dffe14568378bc481c8352985b2653b0ad7dcea67f72ba8",
     "src/text/inline.rs": "7484607485d25d8b7ee10dcb2c8b2302b89c748786d0e8cc93a99b6a33a95cf3",
     "src/text/inline/selection_paint.rs": "84322d1a9ee1f28055745c0d32e4a4b0dad12ba3a282248f9da50b2bf7f9de30",
@@ -388,14 +326,14 @@
     "src/text/inline_flow.rs": "a7063f263d065110b6f2ee42203670b6c084e5887279a0ffb53b15d8e7ecf38d",
     "src/text/inline_object.rs": "4c4b7bf42048f8c2fa4c4deb328707445eaa8eb33d9414d2f8de156961657117",
     "src/text/inline_virtual_tests.rs": "e86c28cc7c0d918e10669c241129756cece9ea52ffd8f73b8e06125a259c4356",
-    "src/text/markdown_ext.rs": "44fa63ece976a0474f402a2a65d7d1f382f143c1a482dbb392b8f39f85e397b3",
-    "src/text/mod.rs": "c88ba532a1d529ad16e89788685c7752cd701771d08699d0395a8ab196ff2be6",
-    "src/text/node.rs": "dc8e200676d82af57d7a01defbc8678189a41162fbd7adaab2e2f0b762f601da",
-    "src/text/range_highlight.rs": "99ed9b73bcd26b30bda29135c2a2c0a2963aac82eff9ab720eb12563575078c0",
+    "src/text/markdown_ext.rs": "dbe9d4f29ad8e3f325842b5c6a60367b44d86d0c30b08ad3146fd5faf8dc70d0",
+    "src/text/mod.rs": "d945ddaf8663138092f2199ad5b57a52df11431aaa7b6fd5afa67f239f777009",
+    "src/text/node.rs": "a68d3cade6017ce1c6a45d2684d222d59966c9999285d66ac73f66f6a95650d3",
+    "src/text/range_highlight.rs": "8cc268301204cd388a797c9662531fcbcf7795de85e3131fd6ea9b603e855161",
     "src/text/selection.rs": "5a4923a2128cd6a3eea9f91b70dd9e7bd4369b020d1da4b209292c29e6ea870f",
     "src/text/selection_adapter.rs": "e59075ae32ed3c0e76bb045071ae77d8d403e30a98d3d8ea2853e16a88d908e1",
     "src/text/state.rs": "e26bd638714201746cce37cd29eac5aa911f5cffbf12e6a0913b48b8488aed74",
-    "src/text/stream_fade.rs": "8070e549356951d29604a5e436afdf7606bfb6c0cd3fe284384acaf6195260b1",
+    "src/text/stream_fade.rs": "7a5bfd294a8244422be45cc36f3efa593f20e5d62c239d8cf0bb0c00d010ff3e",
     "src/text/style.rs": "f87e3e483e2d4b1679c2f6aeb78727234d4c903e0cdad45cf0a7ed32b772b24e",
     "src/text/text_view.rs": "6f9273969920036196c8e1fbad16160f2fd8d5561fb15f10164161e3b360f408",
     "src/text/utils.rs": "22a31ad1915b9a5b0ff7c7f79747fdfaab72537f087a498269a4e2b292e93480",
@@ -407,12 +345,13 @@
     "src/toast.rs": "4963417c86f36174637edefc59902fd018f8fa9d1c724ba39b326dd51cfc33d9",
     "src/toggle.rs": "f534cdf953b1ed7d61e98f787e108d1698bfe482ad6ac28ebc314afea98ad802",
     "src/toggle_group.rs": "a3859562050fe83bf5ec86c1c8cfcf19fc6e9871a049679bab975fc28408832d",
-    "src/toolbar.rs": "4c992d9765bf6638952ff9c897d7706c6fad5f54eaa8dc428fd568f8fe6323fe",
+    "src/toolbar.rs": "6a7abcdda373a2f328c311e8232d9ebd215944a1a02bd2bd36a874455633c9af",
     "src/tooltip.rs": "a304c3e0ed0e56e4f5e1ac66e746b3d219f2b3a5872e50817d0a7a9e141bd7a9",
     "src/touch_selection.rs": "a4c0e56e99af0d268dd38e3d8f9d1cbc7fe4259fe9c52a6e4247e275ffe48141",
     "src/tree.rs": "6a8f108cafc850f2fc82f4259f617fb0724dd9f86e33ffc5e2b00bde722713fc",
     "src/undo_history.rs": "ed5b8f83b9de3d749855d2c9bb06097693c6d9664fb201d7a692801eca4fc1ce",
     "src/virtual_list.rs": "5082b8fc5c7e340e0eadbfa61079638524345558407f3f60e8b1b49d6f826d68",
+    "tests/block_surface.rs": "1240da9244a1c10f10e3eee38e22e1ed50602d79b366909551df675f7f6cdbc8",
     "tests/element_ext.rs": "1c0fbd0bb0b422b0537322163395eec312ccbe4e65e11874246dd1c4c5ca4c5f",
     "tests/html_paragraph_ids.rs": "efbba433b72799f2b9e2e810865d6ea21c22b5f2d5b6aa0e1f85fe76e8c36638",
     "tests/text_host.rs": "7f5853edc1383ce5980b2d97af3df11fcf10eedeb60f3a56197ce2f6cb556776"

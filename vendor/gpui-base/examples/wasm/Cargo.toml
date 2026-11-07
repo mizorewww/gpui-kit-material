@@ -1,4 +1,4 @@
-# Vendored from longbridge/gpui-kit b881cadb7cf7c43b579f60bdac496460ab2f6276.
+# Vendored from longbridge/gpui-kit 46bf6d498fa101a3b11cc64e6d8c20d28d17b720.
 # Workspace inheritance expanded from that revision; see SOURCE.json.
 [package]
 name = "gpui-base-examples-wasm"

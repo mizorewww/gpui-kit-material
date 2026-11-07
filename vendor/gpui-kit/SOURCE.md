@@ -2,7 +2,7 @@
 
 Source repository: <https://github.com/longbridge/gpui-kit>
 
-Pinned source revision: `b881cadb7cf7c43b579f60bdac496460ab2f6276`
+Pinned source revision: `46bf6d498fa101a3b11cc64e6d8c20d28d17b720`
 
 The complete `crates/kit` directory is copied without implementation changes.
 `Cargo.toml.orig` preserves the original manifest. `SOURCE.json` records SHA-256

@@ -93,7 +93,7 @@ engine patches below until they land upstream. All of them must use one revision
 
 ```toml
 [dependencies]
-gpui-kit = { git = "https://github.com/longbridge/gpui-kit", rev = "b881cadb7cf7c43b579f60bdac496460ab2f6276" }
+gpui-kit = { git = "https://github.com/longbridge/gpui-kit", rev = "46bf6d498fa101a3b11cc64e6d8c20d28d17b720" }
 gpui-kit-material = { git = "https://github.com/mizorewww/gpui-kit-material", rev = "3df2920f17cecb765c96f23073fff5e4a2773e86" }
 
 [patch.crates-io]

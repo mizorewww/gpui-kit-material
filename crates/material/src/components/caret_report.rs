@@ -71,7 +71,7 @@ impl<M: InputModeKind> CaretReport<M> {
 }
 
 /// The style Kit's `Input` gives its state as it renders (`Input::render` at Kit
-/// `b881cadb`), with Material's caret and selection. A Material field never folds,
+/// `46bf6d49`), with Material's caret and selection. A Material field never folds,
 /// so it has no fold icons.
 fn editor_style(caret: Hsla, selection: Hsla, cx: &App) -> InputEditorStyle {
     let theme = ComponentTheme::global(cx);
