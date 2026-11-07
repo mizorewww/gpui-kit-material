@@ -43,6 +43,8 @@ lto = "fat"
 codegen-units = 1
 
 [patch.crates-io]
+# Symbols depends on crates.io `gpui-kit`; it must be the same Kit as the Git one.
+gpui-kit = { path = "vendor/gpui-kit" }
 gpui-fast-macos = { path = "vendor/gpui-fast-macos" }
 gpui-pre-macos = { path = "vendor/gpui-pre-macos" }
 gpui-fast = { path = "vendor/gpui-fast" }

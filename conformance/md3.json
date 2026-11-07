@@ -1182,7 +1182,7 @@
       }
     }
   ],
-  "objective": "Reproduce every component of Google's Figma Material 3 Design Kit plus the union of https://md3.io/ and https://m3e.kyralabs.dev/ components, styles and animations on desktop and WASM galleries, with priority Figma kit > md3.io > m3e.kyralabs.dev per value; use https://gpui-kit.com/ for gallery organization. Exact visual and animation parity, independent subagent approval for every component, the performance targets in AGENTS.md, atomic commits and frequent GitHub progress pushes are required. Material icons must come from the gpui-material-symbols repository, pinned by Git revision for default builds; its sibling checkout may be used explicitly for development and improved as needed. Build on Longbridge gpui-kit and its gpui-component layer, reusing existing controls and infrastructure before implementing Material-specific differences.",
+  "objective": "Reproduce every component of Google's Figma Material 3 Design Kit plus the union of https://md3.io/ and https://m3e.kyralabs.dev/ components, styles and animations on desktop and WASM galleries, with priority Figma kit > md3.io > m3e.kyralabs.dev per value; use https://gpui-kit.com/ for gallery organization. Exact visual and animation parity, independent subagent approval for every component, the performance targets in AGENTS.md, atomic commits and frequent GitHub progress pushes are required. Material icons must come from the gpui-material-symbols repository, from its crates.io release (gpui-material-symbols 0.1) for default builds; its sibling checkout may be used explicitly for development and improved as needed. Build on Longbridge gpui-kit and its gpui-component layer, reusing existing controls and infrastructure before implementing Material-specific differences.",
   "reference_policy": {
     "priority": [
       "figma-m3-design-kit",
@@ -1499,7 +1499,8 @@
     "policy": "Use the sibling Symbols library and its Kit integration; keep the Material consumer in a separate package so the library never depends on Material.",
     "status": "integrated: canonical Symbols paths and Component Icon rendering; 103 Kit default translations, 3 explicit unsupported paths, 6 approximate translations; visual and performance acceptance pending",
     "commits": "atomic by concern in each affected repository",
-    "inspected_commit": "593aa15a46076f3e2870c23c0e4fd79f94f105bd"
+    "inspected_commit": "985f220282c8d79702267c26f778f2c17dab3b60",
+    "release": "gpui-material-symbols 0.1.0 (crates.io, tag v0.1.0)"
   },
   "implementation_foundation": {
     "repository": "https://github.com/longbridge/gpui-kit",
@@ -1508,7 +1509,7 @@
     "preferred_components": "gpui_kit::component (gpui-component)",
     "base": "use for source-verified presentation gaps, not as a blanket replacement for Component",
     "status": "Kit startup, Component theme bridge and Symbols integration implemented; individual control migration and runtime visual/performance acceptance pending",
-    "icons": "reuse ../gpui-material-symbols Kit integration with the same dependency source/revision",
+    "icons": "reuse the gpui-material-symbols Kit integration (crates.io 0.1), its crates.io gpui-kit patched to the one vendored Kit",
     "audit": "conformance/reuse-audit.json"
   }
 }

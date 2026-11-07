@@ -97,6 +97,7 @@ gpui-kit = { git = "https://github.com/longbridge/gpui-kit", rev = "46bf6d498fa1
 gpui-kit-material = { git = "https://github.com/mizorewww/gpui-kit-material", rev = "3df2920f17cecb765c96f23073fff5e4a2773e86" }
 
 [patch.crates-io]
+gpui-kit = { git = "https://github.com/mizorewww/gpui-kit-material", rev = "3df2920f17cecb765c96f23073fff5e4a2773e86" }
 gpui-base = { git = "https://github.com/mizorewww/gpui-kit-material", rev = "3df2920f17cecb765c96f23073fff5e4a2773e86" }
 gpui-pre = { git = "https://github.com/mizorewww/gpui-kit-material", rev = "3df2920f17cecb765c96f23073fff5e4a2773e86" }
 gpui-pre-apple = { git = "https://github.com/mizorewww/gpui-kit-material", rev = "3df2920f17cecb765c96f23073fff5e4a2773e86" }
@@ -237,8 +238,9 @@ alone (`scripts/check-features.sh`). Project rules for contributors and agents a
 
 MIT, except files ported from Apache-2.0 sources, which keep their notices.
 Palette sources and licenses: [crates/color/PALETTES.md](crates/color/PALETTES.md).
-Material Symbols assets are Apache-2.0, retained in the pinned
-[Symbols repository](https://github.com/mizorewww/gpui-material-symbols/tree/593aa15a46076f3e2870c23c0e4fd79f94f105bd).
+Material Symbols assets are Apache-2.0, retained in the
+[gpui-material-symbols](https://crates.io/crates/gpui-material-symbols) 0.1 crates
+([repository](https://github.com/mizorewww/gpui-material-symbols)).
 The gallery's fonts are SIL OFL 1.1, each beside its license in
 [crates/gallery/fonts](crates/gallery/fonts): Roboto
 and IBM Plex Sans, which it bundles, and Noto Sans Arabic, Noto Sans Hebrew, Noto Emoji

@@ -50,12 +50,15 @@ if [[ "$profile" == wasm-release ]]; then
 fi
 wasm-bindgen "$target_dir/wasm32-unknown-unknown/$profile/gpui_kit_material_gallery_web.wasm" "${bindgen_args[@]}"
 
-# The page downloads the icon fonts the Gallery draws; see `provide_symbol_asset`.
-symbols_manifest="$(cargo metadata --locked --format-version 1 --filter-platform wasm32-unknown-unknown | python3 -c '
-import json, sys
-print(next(p["manifest_path"] for p in json.load(sys.stdin)["packages"] if p["name"] == "gpui-material-symbols"))')"
-symbols_dir="$(dirname "$symbols_manifest")/assets"
-cp "$symbols_dir/MaterialSymbolsOutlined.ttf" "$symbols_dir/MaterialSymbolsRounded.ttf" "$out_dir/"
+# The page downloads the icon fonts the Gallery draws; see `provide_symbol_asset`. The
+# module embeds none of them: each font is in its own Symbols data crate, which Cargo
+# fetches (and `cargo metadata` lists) even with its feature off.
+cargo metadata --locked --format-version 1 --filter-platform wasm32-unknown-unknown | python3 -c '
+import json, os, shutil, sys
+packages = {p["name"]: p["manifest_path"] for p in json.load(sys.stdin)["packages"]}
+for style in ("Outlined", "Rounded"):
+    data_dir = os.path.dirname(packages["gpui-material-symbols-" + style.lower()])
+    shutil.copy(os.path.join(data_dir, "MaterialSymbols" + style + ".ttf"), sys.argv[1])' "$out_dir"
 
 # Binaryen is optional here, but a 2 MB smaller module is what keeps the page under
 # the host's 25 MiB per-file limit (scripts/deploy-site.sh enforces it).

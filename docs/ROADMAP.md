@@ -21,7 +21,7 @@ is still `unreviewed`).
 | Motion | Implemented | Expressive and Standard schemes, selectable per app. |
 | Shape | Implemented | Corner scale, press morph, the Expressive shape library (35 shapes) and general morphing. Clipping content to a shape is missing. |
 | Typography | Implemented, with limits | 15 roles and emphasized styles, Roboto 400/500/600. Tracking (letter spacing) is recorded in the type scale but not painted: GPUI's text style has no letter spacing (zed-industries/zed#53475). |
-| Icons | Implemented | Material Symbols at the pinned revision; six approximate Kit translations await review. |
+| Icons | Implemented | Material Symbols 0.1 from crates.io; six approximate Kit translations await review. |
 | RTL | Not supported | Left-to-right layout only, as in Zed: GPUI has no layout direction, and this library does not patch one in. |
 
 ## Components

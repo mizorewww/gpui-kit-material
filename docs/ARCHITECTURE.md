@@ -27,7 +27,7 @@ gpui-kit-material
   theme       painted Scheme for this frame; transitions; text scale; Kit bridge
   tokens      shape · typography · layout · elevation · state layers
   motion      Expressive/Standard schemes; enter / value / selection_value
-  icons       Material Symbols (pinned Git revision) via its Kit integration
+  icons       Material Symbols (crates.io 0.1) via its Kit integration
   components  Material adapters over Kit Component; Base for verified gaps
 ```
 
@@ -131,23 +131,30 @@ equivalent; six approximate translations await visual review. Raw SVG/data
 icons bypass the resolver. Cold-load and new-size/DPR raster costs must be
 measured before adding a cache beyond GPUI's.
 
-The desktop Gallery embeds Symbols. The browser Gallery downloads the two styles it
-draws (`www/main.js`) and hands them over with `provide_symbol_asset`, drawing a placeholder
-for each icon until its font arrives or fails. Consumers that serve Symbols at runtime can disable the `embedded-symbols` default feature. An
-adjacent `../gpui-material-symbols` checkout is never substituted implicitly.
+Symbols comes from crates.io (`gpui-material-symbols` 0.1), whose fonts and SVG pack
+are in one data crate each. `embedded-symbols` enables its `embed-assets` (all four);
+without it nothing is embedded. The desktop Gallery embeds Symbols. The browser Gallery
+embeds none: `scripts/build-gallery-web.sh` copies the Outlined and Rounded fonts out of
+their data crates, the page downloads them (`www/main.js`) and hands them over with
+`provide_symbol_asset`, drawing a placeholder for each icon until its font arrives or
+fails. Consumers that serve Symbols at runtime can disable the `embedded-symbols`
+default feature. An adjacent `../gpui-material-symbols` checkout is never substituted
+implicitly.
 
 ## Engine patches
 
 One GPUI and one Base implementation are shared across Material, Kit and
 Symbols. Git and registry packages with equal versions are still different
-identities, so the root `[patch]` tables redirect every source to `vendor/`.
+identities, so the root `[patch]` tables redirect every source to `vendor/`,
+including crates.io `gpui-kit`, which Symbols depends on, so that its `IconNamed`
+is Material's.
 **These patches apply only inside this workspace**; a downstream workspace needs
 the consumer patch set below until fixes land upstream. A patched Zed checkout
 overriding `gpui-pre` overrides it for this kit too.
 
 ### Consumer patch set
 
-A consumer patches `gpui-kit`, `gpui-base`, `gpui-pre`, `gpui-fast`,
+A consumer patches `gpui-kit` (from both crates.io, for Symbols, and Kit's Git), `gpui-base`, `gpui-pre`, `gpui-fast`,
 `gpui-pre-apple`, `gpui-fast-apple`, `gpui-pre-web` and `gpui-fast-web`, as the
 [quick start](../README.md#quick-start) shows, from this repository at the same revision
 as the dependency. CI builds that manifest from Git at the pushed commit
@@ -161,7 +168,7 @@ it; the others change behavior only.
 
 | Consumer crate | To build | Why a consumer needs it |
 | --- | --- | --- |
-| `gpui-kit` | no | Normalized manifest that keeps WASM single-threaded by default. |
+| `gpui-kit` | yes, from crates.io | Normalized manifest that keeps WASM single-threaded by default. Symbols depends on crates.io `gpui-kit` 0.9; without the crates.io patch a second Kit builds and Symbols' `IconNamed` is not Material's. |
 | `gpui-base` | yes | Two unmerged fork branches (table below): per-transition reduced motion and `TransitionPlayback`, which Material calls, and assistive-technology slider stepping. Until they merge and are released, a consumer cannot build without this patch. Everything else in it equals upstream, including the caret report on every move (#3827). |
 | `gpui-pre`, `gpui-fast` | no | Behavior only: the lazy tab-stop index, `em` metrics for fonts without `m`, hanging overflow spaces and, in Fast, `record_entities_accessed`, which are being offered upstream. Material calls no engine API that upstream lacks. |
 | `gpui-pre-apple`, `gpui-fast-apple` | no | Non-Latin and app-private fallback fonts. |

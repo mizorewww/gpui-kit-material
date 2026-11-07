@@ -291,7 +291,7 @@ def build_assets(output):
 
 
 def symbols_checkout():
-    """The pinned Symbols repository Cargo checked out for the browser gallery."""
+    """The Symbols crate Cargo fetched for the browser gallery (its licenses)."""
     metadata = subprocess.run(
         ["cargo", "metadata", "--locked", "--format-version", "1",
          "--filter-platform", "wasm32-unknown-unknown"],

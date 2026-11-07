@@ -27,6 +27,7 @@ gpui-kit = { git = "https://github.com/longbridge/gpui-kit", rev = "46bf6d498fa1
 [workspace]
 
 [patch.crates-io]
+gpui-kit = { path = "../../vendor/gpui-kit" }
 gpui-base = { path = "../../vendor/gpui-base" }
 gpui-pre = { path = "../../vendor/gpui-pre" }
 gpui-pre-apple = { path = "../../vendor/gpui-pre-apple" }
