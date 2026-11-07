@@ -87,8 +87,7 @@ initial theme projection and Root creation.
 `theme::init_component_theme` projects 25 generic Material roles (including the
 caret and text selection colors of Kit's inputs, Base's scrollbars, and `TextView`'s
 links and table heads), the body font and text scale into Component colors/tokens
-(and its Base projection) before Root's first render. A scope's projection writes the
-same list. Palette and scale events call
+(and its Base projection) before Root's first render. Palette and scale events call
 `theme::advance_component_theme` before drawing; one pending callback continues
 an active animation. **Render never updates Component Theme.** Full M3 roles,
 reference blending, motion, spacing and elevation remain Material-owned; unmanaged
@@ -96,13 +95,18 @@ fields keep Component's mode behavior.
 
 `scope::Scope` gives a subtree or a window's content its own scheme and direction.
 It is an element that re-enters around each drawing phase of its subtree, while
-`theme::color` answers from it and Kit's theme globals hold its projection.
-Material's overlays wrap what they defer in `current_scope`, which brings it back in.
-It swaps the globals quietly (`App::swap_global_quietly`): no observer is notified and
-GPUI Fast does not stamp them as changed, so nothing outside the scope rebuilds for
-them. The view holding the scope reads a marker global that drawing the scope stamps,
-so only that view rebuilds, and a view nested in it rebuilds through it, in the scope.
-Its limits are listed in `src/scope.rs`.
+`theme::color` answers from it. Material's overlays wrap what they defer in
+`current_scope`, which brings it back in. The view holding the scope reads a marker
+global that drawing the scope stamps, so only that view rebuilds, and a view nested in
+it rebuilds through it, in the scope. Its limits are listed in `src/scope.rs`.
+
+A scope does not touch Kit's theme globals (`cx.theme()` and Base's), so a Kit control
+drawn inside one follows the application's theme. Giving it the scope's would mean
+changing a global for part of a draw, and every public way to change a global notifies
+its observers and, under GPUI Fast, rebuilds every view that read it. The engine-only
+quiet swap that did this could not go upstream, and this regression is the accepted
+price of dropping it. Material's text inputs, which draw through Kit's `Input`, give it
+their scoped caret and selection colors themselves (`CaretReport::ink`).
 
 `theme::color` is context-free and thread-local, so helpers stay plain
 functions; GPUI paints on one UI thread.
@@ -158,10 +162,10 @@ it; the others change behavior only.
 | Consumer crate | To build | Why a consumer needs it |
 | --- | --- | --- |
 | `gpui-kit` | no | Normalized manifest that keeps WASM single-threaded by default. |
-| `gpui-base` | yes | Open upstream PRs (table below): transition reversal, per-transition reduced motion and `TransitionPlayback`, which Material calls; the vertical `Toolbar` axis, slider step snapping and block surfaces in `TextView`. |
-| `gpui-pre`, `gpui-fast` | yes | `App::swap_global_quietly`, which a `Scope`'s Kit theme and the text field's caret color use; it is the only engine API Material still needs. Behavior only: the lazy tab-stop index, `em` metrics for fonts without `m`, hanging overflow spaces and, in Fast, `record_entities_accessed`, which are being offered upstream. |
+| `gpui-base` | yes | Open upstream PRs (table below): transition reversal, per-transition reduced motion and `TransitionPlayback`, which Material calls; the vertical `Toolbar` axis, slider step snapping and block surfaces in `TextView`; without upstream's report of the caret on every move (#3827), which upstream is taking out. |
+| `gpui-pre`, `gpui-fast` | no | Behavior only: the lazy tab-stop index, `em` metrics for fonts without `m`, hanging overflow spaces and, in Fast, `record_entities_accessed`, which are being offered upstream. Material calls no engine API that upstream lacks. |
 | `gpui-pre-apple`, `gpui-fast-apple` | no | Non-Latin and app-private fallback fonts. |
-| `gpui-pre-web`, `gpui-fast-web` | no | The browser's IME panel opens at the caret; upstream's `update_ime_position` does nothing. Only matters on `wasm32`. |
+| `gpui-pre-web`, `gpui-fast-web` | no | The browser's IME panel opens at the caret: a composition's start asks the focused input where its caret is, and `update_ime_position`, which upstream ignores, moves it too. Only matters on `wasm32`. |
 
 Everything else in `vendor/` is a **dev-only overlay**, marked in the table below,
 for the Gallery's FPS display
@@ -179,10 +183,10 @@ does not compile here (`E0004`, `FrameEvent::Complete`) and is not used here.
 | Vendored | Source | Why |
 | --- | --- | --- |
 | `gpui-kit` | Git at audited `b881cadb`, unchanged source | Normalized manifest disables implicit WASM threading (`multithreaded-web` restores it). Hashes in `SOURCE.md`/`SOURCE.json`. |
-| `gpui-base` | Git `b881cadb` (`crates/base`) + patches (`SOURCE.json`, `motion-patch.md`, `block-surface-patch.md`) | Only open upstream PRs: CSS transition reversal, per-transition reduced motion, `TransitionPlayback` (#3820 and its stacked branches); vertical `Toolbar` axis (#3821); slider step snapping from min, a dropped handle at its value, assistive Increment/Decrement that move one thumb onto the step grid and report it (#3822 and its stacked branch); block surfaces in `TextView` (#3830). Merged upstream and no longer patched: slider min above the default max (#3823), `Slider::track_focus` (#3824), a disabled thumb's flag (#3825), `Dialog::accessibility_label` (#3826), the input's caret reported to the platform (#3827), an input a parent moves notified only while focused (#3828), `TimeField::separator` (#3829), the input's layout published at the end of prepaint (#3831). |
-| `gpui-pre` (GPUI `=0.3.11`) | crates.io + patches (`SOURCE.json`, `*-patch.md`) | Complete CPU frame scopes, presentation wait, GPU time and submission outcome in the profiler; submission statistics, vsync control and throttle retry; `em`/`ch` metrics for fonts without `m`; lazy tab-stop index (`tab-stop-index-patch.md`); `App::swap_global_quietly`, which a scope's theme and the text field's caret need (`quiet-global-swap-patch.md`); `Entity::update_for_render`, dev-only behind `frame-observation` (`render-lease-patch.md`); overflowing spaces hang instead of starting a wrapped row (`hanging-space-patch.md`); test-harness repairs. |
+| `gpui-base` | Git `b881cadb` (`crates/base`) + patches (`SOURCE.json`, `motion-patch.md`, `block-surface-patch.md`, `ime-anchor-revert-patch.md`) | Open upstream PRs: CSS transition reversal, per-transition reduced motion, `TransitionPlayback` (#3820 and its stacked branches); vertical `Toolbar` axis (#3821); slider step snapping from min, a dropped handle at its value, assistive Increment/Decrement that move one thumb onto the step grid and report it (#3822 and its stacked branch); block surfaces in `TextView` (#3830). Taken out as upstream is doing: the input's caret reported to the platform on every move (#3827), which scheduled a frame after each one; the web backends ask for the caret when a composition starts instead (`ime-anchor-revert-patch.md`). Merged upstream and no longer patched: slider min above the default max (#3823), `Slider::track_focus` (#3824), a disabled thumb's flag (#3825), `Dialog::accessibility_label` (#3826), an input a parent moves notified only while focused (#3828), `TimeField::separator` (#3829), the input's layout published at the end of prepaint (#3831). |
+| `gpui-pre` (GPUI `=0.3.11`) | crates.io + patches (`SOURCE.json`, `*-patch.md`) | Complete CPU frame scopes, presentation wait, GPU time and submission outcome in the profiler; submission statistics, vsync control and throttle retry; `em`/`ch` metrics for fonts without `m`; lazy tab-stop index (`tab-stop-index-patch.md`); `Entity::update_for_render`, dev-only behind `frame-observation` (`render-lease-patch.md`); overflowing spaces hang instead of starting a wrapped row (`hanging-space-patch.md`); test-harness repairs. |
 | `gpui-pre-apple` | crates.io + patches (`SOURCE.json`, `VENDORED.md`) | Non-Latin and app-private fallback fonts; `draw_with_status` (upstream's draw, into a `CAMetalDisplayLink` drawable or `nextDrawable`) with a per-draw autorelease pool, drawable-wait and GPU timestamps. |
-| `gpui-pre-web` | crates.io + patches (`SOURCE.json`, `MATERIAL-PATCHES.md`) | Moves the hidden IME input to the caret, where a browser opens its candidate window and it takes no clicks; keeps a composition's keys from GPUI and a replaced emoji whole (consumers need these); successful submission count, behind the crate's own `frame-observation` feature. |
+| `gpui-pre-web` | crates.io + patches (`SOURCE.json`, `MATERIAL-PATCHES.md`) | Moves the hidden IME input to the caret when a composition starts and on `update_ime_position`, where a browser opens its candidate window and it takes no clicks; keeps a composition's keys from GPUI and a replaced emoji whole (consumers need these); successful submission count, behind the crate's own `frame-observation` feature. |
 | `gpui-fast`, `-apple`, `-web` | 0.1.13 + patches (`MATERIAL-MIGRATION.json`, per-file `local_changes`) | The GPUI, Apple and web patches above carried through Fast retained/scroll replay and composition; explicit single-threaded web defaults. Three of Fast's own for performance, each exactly its upstream PR branch: a wheel that cannot move its box does not notify or mark it scrolled (`material/wheel-at-limit`: `src/fast/layers/wheel.rs`, `src/elements/div.rs`, `crates/material/tests/wheel_guard.rs`); a wheel's hover freeze also holds hover listeners for any input modality while a frame is drawn (`material/hover-freeze-listeners`: `src/fast/layers/hover_freeze.rs`, `src/elements/div.rs`, `src/window.rs`); and a view spliced around nested views forgets the entities they dropped, which it otherwise replayed on every frame, forever (longbridge/gpui-fast#106: `src/fast/splice.rs`, `src/fast/dependencies.rs`). One GPUI-core patch stays local: `App::record_entities_accessed` touches only the entities that entered or left the tracked set (`src/app.rs`). |
 | `gpui-pre-macos`, `gpui-fast-macos` (dev-only) | crates.io + patches (`SOURCE.json`, `MATERIAL-PATCHES.md`) | Vsync control, demand waker, periodic-source report and submission statistics (below). With vsync off, a window upstream paces with a `CAMetalDisplayLink` (macOS 14+) is paced by the `CVDisplayLink` path instead, so demand frames can run between ticks. |
 | `gpui-pre-linux`, `gpui-fast-linux`, `gpui-pre-wgpu`, `gpui-fast-wgpu`, `wgpu` (dev-only) | crates.io + patches (`SOURCE.json`, `MATERIAL-PATCHES.md`) | Submission statistics from the present status `wgpu` otherwise discards, and vsync control through `PresentMode` (below). |
