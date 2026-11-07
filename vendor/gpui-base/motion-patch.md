@@ -88,10 +88,10 @@ The local compatibility surface is restricted to the still-open upstream PRs bel
   `stepping_leaves_an_invalid_value_or_range_alone`.
 
 Merged upstream and no longer patched here: `Dialog::accessibility_label` (#3826),
-`TimeField::separator` (#3829), and in `src/input/base/` notifying an input moved by its
-parent only while it is focused (#3828) and publishing the input's layout at the end of
-prepaint (#3831). `src/input/base/` differs from upstream only by taking out the caret
-report to the platform (#3827), as upstream is doing (`ime-anchor-revert-patch.md`).
+`TimeField::separator` (#3829), and in `src/input/base/` telling the platform when the
+caret moves (#3827), notifying an input moved by its parent only while it is focused
+(#3828) and publishing the input's layout at the end of prepaint (#3831). Those files
+equal upstream.
 
 These patches require source unification for both the Kit Git dependency and
 any registry Base dependency in the consuming workspace. Cargo patches are not
