@@ -19,8 +19,9 @@ const STYLES: [(&str, &str); 3] = [
 /// The sample field's width, where the card has room.
 const SAMPLE_WIDTH: f32 = 360.;
 
-/// A document with a block surface: its fences hold ordinary blocks of the document.
-const RICH_TEXT: &str = "A reading view is one document, so a selection and a find go across all of it.\n\n<!-- surface:summary -->\n\nA block surface draws a run of blocks inside a container: background, shape, padding and a title of its own.\n\n- Selecting, finding and revealing work inside it and across its edges.\n- Copying leaves its fences and title behind.\n\n<!-- /surface -->\n\nThe text after it continues the same document. Drag from here up into the surface.";
+/// A document with a block surface: a blockquote opening with its `[!summary]`
+/// marker holds ordinary blocks of the document.
+const RICH_TEXT: &str = "A reading view is one document, so a selection and a find go across all of it.\n\n> [!summary]\n> A block surface draws a blockquote that opens with its marker inside a container: background, shape, padding and a title of its own.\n>\n> - Selecting, finding and revealing work inside it and across its edges.\n> - Copying leaves its title behind; other Markdown renderers show it as a blockquote.\n\nThe text after it continues the same document. Drag from here up into the surface.";
 
 /// The summary surface of `RICH_TEXT`, in the current theme's roles.
 fn rich_text_extensions() -> MarkdownExtensions {
