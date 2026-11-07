@@ -199,8 +199,8 @@
     },
     "src/app.rs": {
       "upstream_sha256": "7f5e2461c2506d63f2616bcdef083b3ca6c513feda9c6d761f345abdb3487814",
-      "local_sha256": "ca565104298d5c698eba2129d2dd1c6b644a6db6aaee6029392c7815a525f085",
-      "reason": "CpuFrameScope around the initial open_window draw and test-app draws (cpu-frame-scope-patch.md). App::swap_global_quietly (quiet-global-swap-patch.md)."
+      "local_sha256": "f6a3954379e7a77a2faffc52927b0a8d3999adc6f5054d40d53d7531982823c7",
+      "reason": "CpuFrameScope around the initial open_window draw and test-app draws (cpu-frame-scope-patch.md)."
     },
     "src/app/bench_context.rs": {
       "upstream_sha256": "37ae667cdbc822ee22c100c418810c6ee9bd08ddcd40b826130bb22a9e8fe775",
@@ -313,7 +313,6 @@
     "frame-submission-patch.md",
     "hanging-space-patch.md",
     "presentation-timing-patch.md",
-    "quiet-global-swap-patch.md",
     "render-lease-patch.md",
     "tab-stop-index-patch.md",
     "test-harness-patch.md"

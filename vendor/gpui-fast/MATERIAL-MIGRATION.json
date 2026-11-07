@@ -236,8 +236,8 @@
       },
       "src/app.rs": {
         "upstream_sha256": "4c2fc3737887421d536e7559a4c811c7877ee7c486ab7045bbbd62bc4f8e3692",
-        "local_sha256": "6a978bd4db2a2d8fba977228cc22929769ae3506df7831bb36ebae5fc69a02b3",
-        "reason": "CpuFrameScope around initial and test-app draws (vendor/gpui-pre/cpu-frame-scope-patch.md). GPUI-core engine patch, kept local: App::record_entities_accessed is GPUI core (the same function as gpui-pre 0.3.11's), and it now updates only the entities that entered or left the tracked set instead of removing and re-inserting all of them each frame; the resulting maps are identical. vendor/gpui-pre does not carry this change. App::swap_global_quietly (vendor/gpui-pre/quiet-global-swap-patch.md)."
+        "local_sha256": "b5f3185ad126cf4febfa5de48936c2a582c5e6b6890e35f276e17e8942aabc52",
+        "reason": "CpuFrameScope around initial and test-app draws (vendor/gpui-pre/cpu-frame-scope-patch.md). GPUI-core engine patch, kept local: App::record_entities_accessed is GPUI core (the same function as gpui-pre 0.3.11's), and it now updates only the entities that entered or left the tracked set instead of removing and re-inserting all of them each frame; the resulting maps are identical. vendor/gpui-pre does not carry this change."
       },
       "src/app/bench_context.rs": {
         "upstream_sha256": "2fe59222d05a2dead8cf3e12ed00f61e90362f7a04cadc468e1ef9b08f7c8e47",

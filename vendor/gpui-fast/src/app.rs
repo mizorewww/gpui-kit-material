@@ -2595,20 +2595,6 @@ impl App {
             .unwrap_or_else(|| panic!("no state of type {} exists", type_name::<G>()))
     }
 
-    /// Exchange the global of the given type with `value` for part of a draw, to
-    /// be exchanged back before the draw returns: nothing is notified, and it does
-    /// not count as a change to the global. Panics if it has not been assigned.
-    /// See `vendor/gpui-pre/quiet-global-swap-patch.md`.
-    #[track_caller]
-    pub fn swap_global_quietly<G: Global>(&mut self, value: &mut G) {
-        let global = self
-            .globals_by_type
-            .get_mut(&TypeId::of::<G>())
-            .and_then(|any_state| any_state.downcast_mut::<G>())
-            .unwrap_or_else(|| panic!("no state of type {} exists", type_name::<G>()));
-        std::mem::swap(global, value);
-    }
-
     /// Access the global of the given type mutably. A default value is assigned if a global of this type has not
     /// yet been assigned.
     pub fn default_global<G: Global + Default>(&mut self) -> &mut G {
