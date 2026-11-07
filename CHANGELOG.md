@@ -18,7 +18,8 @@ Distribution is by Git revision for now; see the [quick start](README.md#quick-s
   [README](README.md#crates). `default` still enables everything.
 - A `dynamic` feature on `gpui-kit-material-color`, on by default.
 - A published `[patch]` block for downstream workspaces, built from Git by CI.
-- `rust-version` 1.99.1, the toolchain this workspace is verified with.
+- `rust-version` 1.98, the oldest toolchain this workspace is verified with; Rust 1.97
+  lacks `Option::map_or_default`, which the published macOS backend uses.
 - `[package.metadata.docs.rs]`, `deny.toml`, and CI checks of what each package ships.
 - `MaterialMenu::max_height` and `ExposedDropdown::menu_max_height`: past it a menu
   scrolls, with the keyboard's item kept in view and the selected item shown on open.

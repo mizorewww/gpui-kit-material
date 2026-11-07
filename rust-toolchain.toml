@@ -1,7 +1,8 @@
 [toolchain]
-# Pinned to the stable release used to develop and verify this workspace.
+# Pinned to the stable release used to develop and verify this workspace;
+# rust-version (Cargo.toml) is the oldest that builds it.
 # CI installs exactly this toolchain; bump it deliberately in its own commit.
-channel = "1.99.1"
+channel = "1.98.1"
 profile = "minimal"
 components = ["clippy", "rustfmt"]
 targets = ["wasm32-unknown-unknown"]
