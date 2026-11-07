@@ -16,6 +16,8 @@
   "development_examples_limit": "Upstream development examples are preserved, including references to sibling story-web font and repository example fixtures. Those external fixtures are not included in this Base-only vendor snapshot; standalone example execution is not asserted.",
   "license": "Apache-2.0",
   "local_patch_files": [
+    "src/input/base/element.rs",
+    "src/input/base/state.rs",
     "src/lib.rs",
     "src/motion.rs",
     "src/slider.rs",
@@ -30,6 +32,16 @@
     "src/toolbar.rs"
   ],
   "local_patch_sha256": {
+    "src/input/base/element.rs": {
+      "local_sha256": "0900f5f98b859a11b7509c559e32169c6c792762fa0cf51ae0d811d060bba711",
+      "reason": "Upstream's report of the caret to the platform on every move (#3827) taken out, as upstream is doing: it scheduled a follow-up frame after each caret move (ime-anchor-revert-patch.md). Otherwise equals b881cadb.",
+      "upstream_sha256": "952852e19d8d48126ac6742ebbe29dd93310d7326faec8f1e58e79a56f78c4b1"
+    },
+    "src/input/base/state.rs": {
+      "local_sha256": "4b20821ab46d81c09a1fd493686832acd2c72eb196568b3bcb374060668f1c9c",
+      "reason": "Upstream's report of the caret to the platform on every move (#3827) taken out, as upstream is doing: it scheduled a follow-up frame after each caret move (ime-anchor-revert-patch.md). Otherwise equals b881cadb.",
+      "upstream_sha256": "493beaba58efb0cfd90dfc9bc1405f8f0001e336130f1fcaff505a3bb7d83d5b"
+    },
     "src/lib.rs": {
       "local_sha256": "04b8aad215e6c115db560165dea02654d69241b0893be690230154f16e1b16de",
       "reason": "Public exports ReducedMotion and TransitionPlayback (motion) (motion-patch.md). Upstream PR #3820 (material/motion-css-reversal) with the stacked branches material/motion-reduced-motion and material/motion-transition-playback.",
@@ -112,7 +124,7 @@
     }
   },
   "package_version": "0.9.0",
-  "patch_application": "Moved from Git b2aaa3e to b881cadb by a three-way merge per file (upstream b2aaa3e / upstream b881cadb / local patched files); the only conflicts were test placement in src/input/base/element.rs and src/slider.rs, resolved by taking upstream b881cadb order. Dropped because merged upstream: slider min above the default max (#3823), Slider::track_focus (#3824), a disabled SliderThumb (#3825), Dialog::accessibility_label (#3826), the input IME caret (#3827, was ime-anchor-patch.md), notifying an input moved by its parent (#3828, was input-move-patch.md), TimeField::separator (#3829) and publishing the input layout at the end of prepaint (#3831, was input-paint-patch.md); src/dialog.rs, src/time_field.rs, src/input/base/element.rs and src/input/base/state.rs equal upstream. src/text/node.rs and tests/block_surface.rs then took e58511d0 of material/text-block-surfaces. Every patched file equals b881cadb with the open PR branches material/motion-transition-playback, material/toolbar-vertical-axis, material/slider-accessibility-steps and material/text-block-surfaces merged onto it. Moved from Git bb85882 to b2aaa3e by a three-way merge (upstream bb85882 / upstream b2aaa3e / local patched files) without conflicts. The original five patch files were three-way merged (upstream Git / published registry 0.8.1 base / local patched registry files) without conflicts. The TransitionPlayback addition and the IME anchor (ime-anchor-patch.md) were made directly on this checkout afterwards; src/input/base/element.rs and state.rs were then replaced by the upstream PR branches material/input-ime-anchor and material/input-move-notify (both on b2aaa3e, combined without conflicts in code), and material/input-paint-no-write (on 2c150ee5) was applied on top, moving the move-notify comparison with the block it moves. src/text_selection.rs carries no patch any more and matches upstream.",
+  "patch_application": "Moved from Git b2aaa3e to b881cadb by a three-way merge per file (upstream b2aaa3e / upstream b881cadb / local patched files); the only conflicts were test placement in src/input/base/element.rs and src/slider.rs, resolved by taking upstream b881cadb order. Dropped because merged upstream: slider min above the default max (#3823), Slider::track_focus (#3824), a disabled SliderThumb (#3825), Dialog::accessibility_label (#3826), the input IME caret (#3827, was ime-anchor-patch.md), notifying an input moved by its parent (#3828, was input-move-patch.md), TimeField::separator (#3829) and publishing the input layout at the end of prepaint (#3831, was input-paint-patch.md); src/dialog.rs, src/time_field.rs, src/input/base/element.rs and src/input/base/state.rs equal upstream. src/text/node.rs and tests/block_surface.rs then took e58511d0 of material/text-block-surfaces. Every patched file equals b881cadb with the open PR branches material/motion-transition-playback, material/toolbar-vertical-axis, material/slider-accessibility-steps and material/text-block-surfaces merged onto it. Moved from Git bb85882 to b2aaa3e by a three-way merge (upstream bb85882 / upstream b2aaa3e / local patched files) without conflicts. The original five patch files were three-way merged (upstream Git / published registry 0.8.1 base / local patched registry files) without conflicts. The TransitionPlayback addition and the IME anchor (ime-anchor-patch.md) were made directly on this checkout afterwards; src/input/base/element.rs and state.rs were then replaced by the upstream PR branches material/input-ime-anchor and material/input-move-notify (both on b2aaa3e, combined without conflicts in code), and material/input-paint-no-write (on 2c150ee5) was applied on top, moving the move-notify comparison with the block it moves. src/text_selection.rs carries no patch any more and matches upstream. src/input/base/element.rs and state.rs then had upstream's IME caret report (#3827) removed by hand (ime-anchor-revert-patch.md).",
   "patch_base": {
     "package": "gpui-base",
     "registry_source_revision": "99576db58ec8103417c41a092e891b4022d24e7e",
@@ -122,7 +134,8 @@
   "provenance_files": [
     "SOURCE.json",
     "motion-patch.md",
-    "block-surface-patch.md"
+    "block-surface-patch.md",
+    "ime-anchor-revert-patch.md"
   ],
   "repository": "https://github.com/longbridge/gpui-kit",
   "revision": "b881cadb7cf7c43b579f60bdac496460ab2f6276",
