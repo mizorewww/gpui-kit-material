@@ -17,7 +17,7 @@ is still `unreviewed`).
 | --- | --- | --- |
 | Color roles and reference themes | Implemented | Full M3 role set; Figma baseline scheme, md3.io for the other 19 themes. |
 | Dynamic color | Implemented | HCT, tonal palettes and seed schemes with contrast levels, ported from material-color-utilities. Image-derived seeds and multiple source colors are missing. |
-| Scoped theme | Implemented, with limits | `scope::Scope` gives a subtree (or a window's content) its own animated scheme through render, paint, Material's deferred draws and Kit's theme. Kit's `Root` overlays, Kit tooltips, Kit's scrollbar styles and what Kit paints in its own deferred draws stay on the application theme (`crates/material/src/scope.rs`). |
+| Scoped theme | Implemented, with limits | `scope::Scope` gives a subtree (or a window's content) its own animated scheme through render, paint and Material's deferred draws. Kit controls, including Kit's `Root` overlays, tooltips and scrollbar styles, stay on the application theme: a scope does not touch Kit's theme globals (`crates/material/src/scope.rs`). |
 | Motion | Implemented | Expressive and Standard schemes, selectable per app. |
 | Shape | Implemented | Corner scale, press morph, the Expressive shape library (35 shapes) and general morphing. Clipping content to a shape is missing. |
 | Typography | Implemented, with limits | 15 roles and emphasized styles, Roboto 400/500/600. Tracking (letter spacing) is recorded in the type scale but not painted: GPUI's text style has no letter spacing (zed-industries/zed#53475). |

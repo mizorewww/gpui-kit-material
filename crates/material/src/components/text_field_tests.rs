@@ -623,3 +623,101 @@ fn the_focused_field_reports_its_caret_and_an_unfocused_one_does_not(cx: &mut Te
     draw(cx);
     assert_eq!(caret(cx), None, "focus left the field");
 }
+
+/// A field, in a scope of its own when given a scheme.
+struct InkHarness {
+    state: Entity<InputState>,
+    error: bool,
+    scheme: Option<crate::color::Scheme>,
+}
+
+impl Render for InkHarness {
+    fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        window.set_rem_size(px(14.));
+        let field = div()
+            .debug_selector(|| "field".into())
+            .w(px(210.))
+            .child(TextField::new("field", &self.state).error(self.error));
+        let mut scope = crate::scope::Scope::new("scope");
+        if let Some(scheme) = self.scheme {
+            scope = scope.scheme(scheme);
+        }
+        div().p(px(20.)).child(scope.child(field))
+    }
+}
+
+/// The caret's fill in the frame last painted: the only quad narrow and tall.
+fn caret_ink(cx: &mut VisualTestContext) -> Background {
+    cx.update(|window, _| {
+        let carets: Vec<_> = window
+            .painted_quads()
+            .into_iter()
+            .filter(|quad| quad.bounds.size.width.0 < 4. && quad.bounds.size.height.0 > 8.)
+            .collect();
+        assert_eq!(
+            carets.len(),
+            1,
+            "{:?}",
+            window
+                .painted_quads()
+                .iter()
+                .map(|q| q.bounds.size)
+                .collect::<Vec<_>>()
+        );
+        carets[0].background
+    })
+}
+
+fn paints(ink: Rgba, cx: &mut VisualTestContext) -> bool {
+    caret_ink(cx) == Background::from(Hsla::from(ink))
+}
+
+/// A focused field over the Paper scheme, Material's and Kit's.
+fn focused_ink_harness(
+    cx: &mut TestAppContext,
+    error: bool,
+    scheme: Option<crate::color::Scheme>,
+) -> &mut VisualTestContext {
+    cx.update(|cx| {
+        gpui_kit::init(cx);
+        crate::theme::init_component_theme(paper(), 1., cx);
+        cx.set_reduce_motion(true);
+    });
+    let (view, cx) = cx.add_window_view(|window, cx| InkHarness {
+        state: cx.new(|cx| InputState::new(window, cx)),
+        error,
+        scheme,
+    });
+    cx.update(|window, _| window.activate_window());
+    cx.run_until_parked();
+    draw(cx);
+    cx.update(|window, cx| {
+        let state = view.read(cx).state.clone();
+        state.update(cx, |state, cx| state.focus(window, cx));
+    });
+    draw(cx);
+    cx
+}
+
+fn paper() -> crate::color::Scheme {
+    crate::color::Scheme::from_palette(crate::color::PaletteId::Paper)
+}
+
+#[gpui::test]
+fn an_error_fields_caret_is_error(cx: &mut TestAppContext) {
+    let cx = focused_ink_harness(cx, true, None);
+    let error = crate::theme::rgba(paper().get(ColorRole::ERROR));
+    assert!(paints(error, cx), "the caret is error");
+}
+
+#[gpui::test]
+fn a_scoped_fields_caret_follows_the_scope_not_kits_theme(cx: &mut TestAppContext) {
+    let ink = crate::color::Scheme::from_palette(crate::color::PaletteId::Ink);
+    let cx = focused_ink_harness(cx, false, Some(ink));
+    let primary = |scheme: crate::color::Scheme| crate::theme::rgba(scheme.get(ColorRole::PRIMARY));
+    assert!(paints(primary(ink), cx), "the scope's primary");
+    assert!(
+        !paints(primary(paper()), cx),
+        "not the application's, which Kit's theme holds"
+    );
+}

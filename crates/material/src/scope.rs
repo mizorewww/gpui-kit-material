@@ -11,27 +11,25 @@
 //! defer in [`current_scope`], which brings it back in.
 //!
 //! Inside a scope [`crate::theme::color`], [`crate::theme::scheme`] and
-//! [`crate::theme::is_dark`] answer from its scheme, and Kit's theme globals
-//! (`cx.theme()` and the Base projection) hold its projection, so Kit controls
-//! follow. A change of scheme blends on the same effects spring as the
-//! application's, per scope, and reduced motion lands it at once.
+//! [`crate::theme::is_dark`] answer from its scheme. A change of scheme blends on
+//! the same effects spring as the application's, per scope, and reduced motion
+//! lands it at once.
 //!
 //! # Limits
 //!
-//! A scope reaches what draws through it. These do not, and use the
-//! application's scheme:
+//! A scope reaches what paints with Material's roles and draws through it. These
+//! use the application's scheme:
 //!
-//! - Kit overlays opened on its `Root` (Kit's dialog, sheet and notification
-//!   layers) and Kit's own tooltips, which draw outside the subtree. Material's
-//!   dialogs, sheets, menus and tooltips draw through the subtree and are
-//!   covered.
-//! - What Kit defers itself reads its colors while rendering, which is in the
-//!   scope, but anything it reads while painting is not.
+//! - Kit controls. A scope leaves Kit's theme globals (`cx.theme()` and Base's)
+//!   alone, so a Kit control inside one, Kit's `Root` overlays, its tooltips and
+//!   its scrollbar styles paint with the application's theme. Giving them the
+//!   scope's would change a global for part of a draw, and every way GPUI offers
+//!   to change one notifies its observers and, under GPUI Fast, rebuilds every
+//!   view that read it. Material's text inputs draw through Kit's input and give
+//!   it their scoped caret and selection colors themselves. Material's dialogs,
+//!   sheets, menus and tooltips draw through the subtree and are covered.
 //! - Drag previews, unless the preview is built with [`current_scope`]. A
 //!   [`ChipSet`](crate::components::ChipSet)'s are.
-//! - Kit's theme is projected again when the scheme or text size changes. Another
-//!   field changed on Kit's global reaches the subtree at its next scheme change.
-//! - Kit's scrollbar styles, which Kit builds privately from its global theme.
 //! - An element built before the scope is entered reads the outer scheme for
 //!   any color it computed while being built. Build through [`Scope::child_with`]
 //!   or [`ResolvedScope::build`]. Material components compute colors when they
@@ -40,8 +38,6 @@ use crate::color::Scheme;
 use crate::motion::{self, MotionToken};
 use crate::theme;
 use gpui::*;
-use gpui_base::Theme as BaseTheme;
-use gpui_kit::component::Theme as ComponentTheme;
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -112,27 +108,23 @@ impl Scope {
         let scheme = self.scheme.map(|target| {
             let _ = cx.try_global::<ScopeDrawn>();
             let paint = window.use_keyed_state((self.id.clone(), "scope-paint"), cx, |_, _| {
-                ScopePaint::new(target)
+                theme::Paint::at(target)
             });
             let now = cx.background_executor().now();
             let reduce_motion = cx.reduce_motion();
             let effects = motion::curve(MotionToken::SlowEffects);
             let (current, running) = paint.update(cx, |paint, _| {
-                let running = paint.paint.advance(target, now, reduce_motion, effects).1;
-                (paint.paint.current, running)
+                let running = paint.advance(target, now, reduce_motion, effects).1;
+                (paint.current, running)
             });
             if running {
                 window.request_animation_frame();
             }
-            let kit = paint.update(cx, |paint, cx| paint.projection(current, cx));
-            Kit {
-                scheme: current,
-                projection: kit,
-            }
+            current
         });
         // Cached views inside the scope do not know it changed, so a change
         // redraws them, once per step of a transition.
-        let key = scheme.as_ref().map(|kit| kit.scheme);
+        let key = scheme;
         let drawn = window.use_keyed_state((self.id.clone(), "scope-key"), cx, |_, _| key);
         if *drawn.read(cx) != key {
             drawn.update(cx, |drawn, _| *drawn = key);
@@ -147,65 +139,9 @@ impl Scope {
     }
 }
 
-/// A scope's scheme animation, with the Kit theme projected from it.
-struct ScopePaint {
-    paint: theme::Paint,
-    projection: Option<(Scheme, Pixels, Rc<RefCell<KitThemes>>)>,
-}
-
-impl ScopePaint {
-    fn new(initial: Scheme) -> Self {
-        Self {
-            paint: theme::Paint::at(initial),
-            projection: None,
-        }
-    }
-
-    /// Kit's themes for `scheme`. Rebuilt when the scheme changes, or when the
-    /// application's text scale does.
-    fn projection(&mut self, scheme: Scheme, cx: &App) -> Option<Rc<RefCell<KitThemes>>> {
-        let component = cx.try_global::<ComponentTheme>()?;
-        let font_size = component.font_size;
-        if let Some((built, size, themes)) = &self.projection
-            && *built == scheme
-            && *size == font_size
-        {
-            return Some(themes.clone());
-        }
-        let mut component = component.clone();
-        theme::project_scheme(&mut component, scheme);
-        let mut base = BaseTheme::global(cx);
-        base.appearance = if scheme.is_dark() {
-            gpui_base::ThemeAppearance::Dark
-        } else {
-            gpui_base::ThemeAppearance::Light
-        };
-        base.tokens = component.semantic_tokens();
-        let themes = Rc::new(RefCell::new(KitThemes { component, base }));
-        self.projection = Some((scheme, font_size, themes.clone()));
-        Some(themes)
-    }
-}
-
-struct KitThemes {
-    component: ComponentTheme,
-    base: BaseTheme,
-}
-
 thread_local! {
     /// The scope being drawn, for [`current_scope`] and nested scopes.
     static CURRENT: RefCell<Option<Rc<Frame>>> = const { RefCell::new(None) };
-}
-
-/// Exchange Kit's theme globals with a scope's, quietly: they differ only inside
-/// the scope, so nothing outside it should rebuild for them.
-fn swap_kit_themes(themes: &RefCell<KitThemes>, cx: &mut App) {
-    let mut themes = themes.borrow_mut();
-    let themes = &mut *themes;
-    cx.swap_global_quietly::<ComponentTheme>(&mut themes.component);
-    if cx.has_global::<BaseTheme>() {
-        cx.swap_global_quietly::<BaseTheme>(&mut themes.base);
-    }
 }
 
 /// Read by the view holding a scheme scope and stamped by drawing it. Under GPUI
@@ -216,16 +152,11 @@ fn swap_kit_themes(themes: &RefCell<KitThemes>, cx: &mut App) {
 struct ScopeDrawn;
 impl Global for ScopeDrawn {}
 
-struct Kit {
-    scheme: Scheme,
-    projection: Option<Rc<RefCell<KitThemes>>>,
-}
-
 /// What one scope changes while something draws inside it.
 struct Frame {
     /// The enclosing scope, for draws deferred out of both.
     outer: Option<Rc<Frame>>,
-    scheme: Option<Kit>,
+    scheme: Option<Scheme>,
 }
 
 impl Frame {
@@ -235,21 +166,15 @@ impl Frame {
         cx: &mut App,
         f: impl FnOnce(&mut Window, &mut App) -> R,
     ) -> R {
-        let previous = self.scheme.as_ref().map(|kit| {
+        let previous = self.scheme.map(|scheme| {
             cx.set_global(ScopeDrawn);
-            if let Some(projection) = &kit.projection {
-                swap_kit_themes(projection, cx);
-            }
-            theme::replace_scoped_scheme(Some(kit.scheme))
+            theme::replace_scoped_scheme(Some(scheme))
         });
         let outer = CURRENT.with(|current| current.replace(Some(self.clone())));
         let result = f(window, cx);
         CURRENT.with(|current| current.replace(outer));
-        if let (Some(kit), Some(previous)) = (&self.scheme, previous) {
+        if let Some(previous) = previous {
             theme::replace_scoped_scheme(previous);
-            if let Some(projection) = &kit.projection {
-                swap_kit_themes(projection, cx);
-            }
         }
         result
     }
@@ -274,7 +199,7 @@ impl Frame {
         f: &mut dyn FnMut(&mut Window, &mut App),
     ) {
         // `Deferred` lays out in place: the frame may already be on the stack,
-        // and swapping Kit's themes twice would put the outer one back.
+        // and entering it again would only repeat what is in force.
         if self.is_current() {
             return f(window, cx);
         }
@@ -302,20 +227,15 @@ impl ResolvedScope {
         cx: &mut C,
         f: impl FnOnce(&mut Window, &mut C) -> R,
     ) -> R {
-        let previous = self.frame.scheme.as_ref().map(|kit| {
-            if let Some(projection) = &kit.projection {
-                swap_kit_themes(projection, cx.borrow_mut());
-            }
-            theme::replace_scoped_scheme(Some(kit.scheme))
-        });
+        let previous = self
+            .frame
+            .scheme
+            .map(|scheme| theme::replace_scoped_scheme(Some(scheme)));
         let outer = CURRENT.with(|current| current.replace(Some(self.frame.clone())));
         let result = f(window, cx);
         CURRENT.with(|current| current.replace(outer));
-        if let (Some(kit), Some(previous)) = (&self.frame.scheme, previous) {
+        if let Some(previous) = previous {
             theme::replace_scoped_scheme(previous);
-            if let Some(projection) = &kit.projection {
-                swap_kit_themes(projection, cx.borrow_mut());
-            }
         }
         result
     }

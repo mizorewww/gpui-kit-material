@@ -144,7 +144,7 @@ M3 roles and type. Each is opt-in: the M3 defaults do not change.
 | Elevation and state layers | Implemented | Figma | Fixtures, tests | none found |
 | Motion | Implemented | md3.io (Expressive), m3e (Standard) | Fixtures, tests | No per-component timed comparison outside buttons |
 | Icons | Implemented | Material Symbols | Provenance in Symbols repository | Six approximate Kit translations unreviewed |
-| Scoped theme | Implemented, with limits | n/a | Tests in `src/scope/tests.rs` | Kit's `Root` overlays, Kit tooltips, Kit's scrollbar styles, drag previews outside `current_scope` and what Kit reads while painting its own deferred draws keep the application theme. Under GPUI Fast the view holding a scheme scope rebuilds on each draw that reaches it; nothing outside it does |
+| Scoped theme | Implemented, with limits | n/a | Tests in `src/scope/tests.rs` | Kit controls inside a scope, including Kit's `Root` overlays, tooltips and scrollbar styles, follow the application's theme: a scope does not touch Kit's theme globals (Material's text inputs give Kit's input their scoped caret and selection). Drag previews outside `current_scope` keep the application theme. Under GPUI Fast the view holding a scheme scope rebuilds on each draw that reaches it; nothing outside it does |
 
 ## Cross-cutting status
 
