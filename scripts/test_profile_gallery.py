@@ -25,5 +25,31 @@ class ProbeMovement(unittest.TestCase):
         self.assertNotIn("idle", warning)
 
 
+class GalleryTargets(unittest.TestCase):
+    MS = 1_000_000
+
+    def frame(self, start, ms, step, initial=False, presented=True):
+        return {"initial": initial, "step": step, "start_ns": start, "frame_ns": ms * self.MS,
+                "present_ns": 1 if presented else None}
+
+    def test_a_switch_frame_is_its_own_cost_not_steady_state(self):
+        data = {"marks_ns": [["switch:button", 100]], "page_switch_ns": [9 * self.MS], "frames": [
+            self.frame(-5, 4, "startup", initial=True, presented=False),
+            self.frame(10, 0.5, "startup"),
+            self.frame(120, 9, "switch:button"),
+            self.frame(140, 0.8, "switch:button"),
+        ]}
+        table = profile.gallery_targets(data)
+        self.assertEqual(table["metrics"]["steady_frame"]["max_ns"], 0.8 * self.MS)
+        self.assertEqual(table["targets"]["steady_cpu_max"]["verdict"], "PASS")
+        self.assertEqual(table["targets"]["page_switch"]["verdict"], "FAIL")
+        # The initial draw and the first submitted frame after it.
+        self.assertEqual(table["metrics"]["first_frame_ns"], 4.5 * self.MS)
+        self.assertEqual(table["targets"]["first_frame_vs_kit"]["verdict"], "UNVERIFIED")
+
+    def test_no_frames_judge_nothing(self):
+        self.assertEqual(profile.gallery_targets({"frames": []})["targets"], {})
+
+
 if __name__ == "__main__":
     unittest.main()

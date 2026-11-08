@@ -177,17 +177,17 @@ function watchContextLoss() {
   }, true);
 }
 
-// Keep the splash up until the engine has really submitted a frame.
+// Keep the splash up until the window exists, which GPUI draws as it opens it, and
+// one animation frame more, in which the browser shows that frame.
 function removeSplashAfterFirstFrame(module) {
   const started = performance.now();
   const poll = () => {
     if (splash.classList.contains("failed")) return;
-    const frames = module.gallery_successful_new_frames();
-    // A backend without a frame counter still reports its VSync state once the
-    // window exists, and that is the latest signal it can give.
-    if (frames > 0 || (frames === undefined && module.gallery_vsync_status() !== undefined)) {
-      splash.classList.add("done");
-      setTimeout(() => { splash.hidden = true; }, 200);
+    if (module.gallery_window_open()) {
+      requestAnimationFrame(() => {
+        splash.classList.add("done");
+        setTimeout(() => { splash.hidden = true; }, 200);
+      });
       return;
     }
     if (performance.now() - started > 15000) {
@@ -225,8 +225,6 @@ try {
     showIndeterminate("Starting…");
     watchContextLoss();
     module.run();
-    // What `?profile=probe` tells a moved canvas by.
-    window.__galleryNewFrames = () => module.gallery_successful_new_frames();
     removeSplashAfterFirstFrame(module);
     loadSymbolsInBackground(module);
   }

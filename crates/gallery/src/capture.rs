@@ -8,7 +8,7 @@ use gpui_kit_material::color::themes::ThemeMode;
 use gpui_kit_material::components::Caption;
 use std::{cell::Cell, path::PathBuf, process::Command, rc::Rc, time::Duration};
 
-pub const USAGE: &str = "gallery [--capture output.png --section <page id> --tab preview|specs\n  --scenario <name> --set <control>=<value> ...\n  --width 1280 --height 900 --scale 1 --dark --preview-dark --reduced-motion --settle-ms 800\n  --active --disabled --selected --loading --no-ripple --offset-y 0 --settings --fps --vsync on|off --caption windows|linux --drawer]\n\nPage ids, in navigation order:\n  overview button icon-button button-group split-button fab fab-menu\n  extended-fab checkbox switch radio-buttons chips slider text-field select\n  search date-picker time-picker navigation-rail navigation-bar drawer navigation-suite tabs menu\n  top-app-bar bottom-app-bar toolbar card list carousel divider dialog\n  bottom-sheet side-sheet canonical-layouts badge avatar progress loading-indicator stepper pull-to-refresh snackbar\n  tooltip\n  color typography shape motion elevation examples\n\nDesign-kit page ids open the first page showing that kit page on its Specs tab:\n  app-bars avatars badges buttons cards checkboxes date-time-pickers dialogs dividers\n  lists loading-progress navigation radio-button sheets sliders text-fields\n  toolbars tooltips\n\n--tab defaults to preview (specs for a kit page id). --scenario and --set\nconfigure the page's playground, e.g. --set variant=tonal --set disabled=true.";
+pub const USAGE: &str = "gallery [--capture output.png --section <page id> --tab preview|specs\n  --scenario <name> --set <control>=<value> ...\n  --width 1280 --height 900 --scale 1 --dark --preview-dark --reduced-motion --settle-ms 800\n  --active --disabled --selected --loading --no-ripple --offset-y 0 --settings --caption windows|linux --drawer]\n\nPage ids, in navigation order:\n  overview button icon-button button-group split-button fab fab-menu\n  extended-fab checkbox switch radio-buttons chips slider text-field select\n  search date-picker time-picker navigation-rail navigation-bar drawer navigation-suite tabs menu\n  top-app-bar bottom-app-bar toolbar card list carousel divider dialog\n  bottom-sheet side-sheet canonical-layouts badge avatar progress loading-indicator stepper pull-to-refresh snackbar\n  tooltip\n  color typography shape motion elevation examples\n\nDesign-kit page ids open the first page showing that kit page on its Specs tab:\n  app-bars avatars badges buttons cards checkboxes date-time-pickers dialogs dividers\n  lists loading-progress navigation radio-button sheets sliders text-fields\n  toolbars tooltips\n\n--tab defaults to preview (specs for a kit page id). --scenario and --set\nconfigure the page's playground, e.g. --set variant=tonal --set disabled=true.";
 
 #[derive(Clone)]
 pub struct CaptureOptions {
@@ -31,8 +31,6 @@ pub struct CaptureOptions {
     ripple: bool,
     offset_y: f32,
     settings: bool,
-    fps: bool,
-    vsync: Option<bool>,
     caption: Option<Caption>,
     drawer: bool,
     completed: Rc<Cell<bool>>,
@@ -65,8 +63,6 @@ impl CaptureOptions {
             ripple: true,
             offset_y: 0.,
             settings: false,
-            fps: false,
-            vsync: None,
             caption: None,
             drawer: false,
             completed: Rc::new(Cell::new(false)),
@@ -101,7 +97,6 @@ impl CaptureOptions {
                 "--scale" => options.scale = value()?.parse()?,
                 "--offset-y" => options.offset_y = value()?.parse()?,
                 "--settle-ms" => options.settle_ms = value()?.parse()?,
-                "--fps" => options.fps = true,
                 "--drawer" => options.drawer = true,
                 "--caption" => {
                     options.caption = Some(match value()?.as_str() {
@@ -111,13 +106,6 @@ impl CaptureOptions {
                     })
                 }
                 "--settings" => options.settings = true,
-                "--vsync" => {
-                    options.vsync = Some(match value()?.as_str() {
-                        "on" => true,
-                        "off" => false,
-                        _ => bail!("--vsync must be on or off"),
-                    })
-                }
                 "--dark" => options.dark = true,
                 "--preview-dark" => options.preview_dark = true,
                 "--reduced-motion" => options.reduced_motion = true,
@@ -197,11 +185,6 @@ impl CaptureOptions {
     }
 }
 
-pub(super) fn show_fps(cx: &App) -> bool {
-    cx.try_global::<CaptureOptions>()
-        .is_none_or(|options| options.fps)
-}
-
 pub(super) fn caption(cx: &App) -> Option<Caption> {
     cx.try_global::<CaptureOptions>()
         .and_then(|options| options.caption)
@@ -217,12 +200,6 @@ pub(super) fn install(view: &Entity<Gallery>, window: &mut Window, cx: &mut App)
         return;
     };
     cx.set_reduce_motion(options.reduced_motion);
-    if let Some(enabled) = options.vsync
-        && let Err(error) = window.set_vsync(enabled)
-    {
-        eprintln!("Capture vertical sync setting failed: {error:#}");
-        std::process::exit(1);
-    }
     view.update(cx, |gallery, cx| {
         gallery.apply_capture(
             options.section,
@@ -302,11 +279,7 @@ pub(super) fn install(view: &Entity<Gallery>, window: &mut Window, cx: &mut App)
                         "image_pixels":{"width":image.width(),"height":image.height()},
                         "device_scale_factor":window.scale_factor(), "text_scale":options.scale,
                         "theme":"baseline", "mode":if options.dark {"dark"} else {"light"},
-                        "fps_overlay":options.fps,
-                        "window_submissions":window.submission_stats().count,
                         "settings_open":options.settings,
-                        "requested_vsync":options.vsync,
-                        "vsync_status":format!("{:?}", window.vsync_status()),
                         "reduced_motion":cx.reduce_motion(),"settle_ms":options.settle_ms,
                         "logical_scroll_top":{"item_ix":scroll.logical_scroll_top().item_ix,"offset_in_item":f32::from(scroll.logical_scroll_top().offset_in_item)},
                         "state":{"active":options.active,"disabled":options.disabled,"selected":options.selected,"loading":options.loading,"ripple":options.ripple},
@@ -346,7 +319,7 @@ async fn drawn_frames(count: usize, cx: &mut gpui::AsyncWindowContext) {
 /// Advance using measured row heights. A ListState's unmeasured entries have
 /// zero summary height, so pixel scroll_by cannot skip arbitrary unseen rows.
 /// This capture-only walk paints each crossed row before consuming its height;
-/// performance::prepare rejects combining profiling with --capture.
+/// Captures are not profiled.
 fn scroll_measured_offset(
     list: &ListState,
     delta: Pixels,
@@ -523,7 +496,7 @@ mod tests {
             vec!["--capture", "out.png", "--scale", "NaN"],
             vec!["--capture", "out.png", "--width", "0"],
             vec!["--capture", "out.png", "--height"],
-            vec!["--capture", "out.png", "--vsync", "invalid"],
+            vec!["--capture", "out.png", "--fps"],
             vec!["--unknown"],
         ] {
             assert!(parse(&args).is_err(), "{args:?}");
@@ -552,14 +525,10 @@ mod tests {
             "--offset-y",
             "-300",
             "--settings",
-            "--fps",
-            "--vsync",
-            "off",
         ])
         .unwrap()
         .unwrap();
-        assert!(options.settings && options.fps);
-        assert_eq!(options.vsync, Some(false));
+        assert!(options.settings);
         assert_eq!(
             (
                 options.section,

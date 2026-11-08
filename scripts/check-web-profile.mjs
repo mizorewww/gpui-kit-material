@@ -22,7 +22,7 @@ const { installProfiler } = await import(
 for (const mode of ["scroll", "startup", "idle"]) {
   delete window.__galleryProfile;
   const profiler = installProfiler(new URLSearchParams(`profile=${mode}&seconds=1`));
-  profiler.start({ gallery_successful_new_frames: () => null, gallery_vsync_status: () => null });
+  profiler.start({ gallery_window_open: () => false });
   const published = window.__galleryProfile;
   assert.ok(published?.done, `${mode}: no report was published`);
   assert.equal(published.report.exit_code, 2, `${mode}: an invalid run is incomplete evidence`);

@@ -59,7 +59,7 @@ mod bench {
     /// What a list row holds.
     #[derive(Clone, Copy, PartialEq, Eq, Debug)]
     enum Content {
-        /// The Material row of `engine_bench`.
+        /// Material components: a list row of the library's controls.
         MaterialList,
         /// The same row, built from Kit's themed components.
         KitList,

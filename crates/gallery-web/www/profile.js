@@ -10,13 +10,12 @@
 // recording never allocates per frame.
 // The finished report is published as `window.__galleryProfile`.
 //
-// `?profile=idle` records an untouched window: every new frame after the
-// settle period counts against the "idle windows draw nothing" target.
+// `?profile=idle` records an untouched window. The engine reports no drawn-frame
+// count (that was a dropped dev-only engine patch), so whether an idle window draws
+// nothing is UNVERIFIED here: read it from a DevTools performance trace.
 // `targets` judges the AGENTS.md budgets for WASM (steady-state x2) from the
-// raw scopes; a target without data is UNVERIFIED, never PASS. New frames per
-// second and the first frame are reported beside them.
+// raw scopes; a target without data is UNVERIFIED, never PASS.
 
-const WINDOW_MS = 250;
 // AGENTS.md: WASM steady-state budgets are the native ones x2.
 const WASM_STEADY_P95_MS = 2;
 const WASM_STEADY_MAX_MS = 4;
@@ -48,11 +47,9 @@ export function installProfiler(params) {
   const frameCapacity = Math.ceil(seconds + 2) * 4000;
   const frameStart = new Float64Array(frameCapacity);
   const frameEnd = new Float64Array(frameCapacity);
-  const frameCount = new Float64Array(frameCapacity).fill(NaN);
   let frames = 0;
   let overflow = false;
   let recording = true;
-  let counters = null; // wasm exports, set once the module has loaded
   const errors = [...invalid];
 
   const nativeRaf = window.requestAnimationFrame.bind(window);
@@ -67,9 +64,6 @@ export function installProfiler(params) {
           if (frames < frameCapacity) {
             frameStart[frames] = start;
             frameEnd[frames] = end;
-            // Read after the scope ends: App is no longer borrowed.
-            const count = counters?.gallery_successful_new_frames();
-            frameCount[frames] = count ?? NaN;
             frames += 1;
           } else {
             overflow = true;
@@ -93,14 +87,12 @@ export function installProfiler(params) {
       state.initial = { start, end: performance.now() };
     },
     start(module) {
-      counters = module;
       if (errors.length) return finish();
       // Browser graphics initialize asynchronously: wait (bounded) for the
       // canvas and the Gallery window before starting the measured run.
       const waitStarted = performance.now();
       const ready = () => {
-        const vsync = module.gallery_vsync_status() ?? null;
-        if (vsync === null || !document.querySelector("canvas")) {
+        if (!module.gallery_window_open() || !document.querySelector("canvas")) {
           if (performance.now() - waitStarted > 20000) {
             errors.push("Gallery window or canvas did not appear within 20 s");
             return finish();
@@ -110,13 +102,13 @@ export function installProfiler(params) {
         state.window_ready_ms = performance.now();
         const startedAt = performance.now();
         const inputs = mode === "scroll" ? startScrollDriver(state, startedAt) : null;
-        setTimeout(() => finish(vsync, startedAt, inputs), seconds * 1000);
+        setTimeout(() => finish(startedAt, inputs), seconds * 1000);
       };
       ready();
     },
   };
 
-  function finish(vsyncInitial = null, startedAt = null, inputs = null) {
+  function finish(startedAt = null, inputs = null) {
     recording = false;
     inputs?.stop();
     const durations = [];
@@ -128,34 +120,20 @@ export function installProfiler(params) {
         start_ms: frameStart[i],
         end_ms: frameEnd[i],
         cpu_ms: ms,
-        successful_new_frames: Number.isNaN(frameCount[i]) ? null : frameCount[i],
         over_budget: ms > WASM_STEADY_MAX_MS,
       });
     }
     const scopes = state.initial
       ? [state.initial.end - state.initial.start, ...durations]
       : durations;
-    const windows = rateWindows(rows, startedAt);
-    const full = windows.filter((w) => !w.partial && w.fps !== null).map((w) => w.fps);
-    const minimumFps = full.length ? Math.min(...full) : null;
     if (overflow) errors.push("frame buffer full; later frames were not recorded");
-    if (counters?.gallery_successful_new_frames() == null) {
-      errors.push("successful new-frame counter unavailable");
-    }
-    if (minimumFps === null) errors.push("no complete >=250ms observation window");
+    if (startedAt === null) errors.push("the measured run did not start");
     if (mode === "scroll" && !(inputs?.summary().dispatched > 0)) {
       errors.push("no wheel input was dispatched");
     }
-    const vsyncFinal = counters?.gallery_vsync_status() ?? null;
     const settled = rows.filter((r) => startedAt !== null && r.start_ms >= startedAt + SETTLE_MS);
     const steady = settled.map((r) => r.cpu_ms);
     const steadySummary = summarize(steady);
-    const firstNew = rows.find((r) => r.successful_new_frames !== null && r.successful_new_frames > 0);
-    const idleNewFrames =
-      mode === "idle" && settled.length
-        ? (settled[settled.length - 1].successful_new_frames ?? NaN) -
-          (rows.filter((r) => r.start_ms < startedAt + SETTLE_MS).pop()?.successful_new_frames ?? 0)
-        : null;
     const judge = (target, limit, measured, compare = "<=", note = undefined) => ({
       target,
       limit,
@@ -173,7 +151,8 @@ export function installProfiler(params) {
         mode === "scroll" ? steadySummary.p95_ms : null),
       steady_cpu_max: judge("steady-state rAF CPU max (WASM budget x2)", WASM_STEADY_MAX_MS,
         mode === "scroll" ? steadySummary.max_ms : null),
-      idle_frames: judge("idle window draws nothing (new frames after settling)", 0, idleNewFrames),
+      idle_frames: judge("idle window draws nothing (new frames after settling)", 0, null, "<=",
+        "the engine reports no drawn-frame count; read idle frames from a DevTools performance trace"),
       page_switch: judge("page switch main-thread CPU, worst", 8,
         pageSwitches.length ? Math.max(...pageSwitches) : null, "<=",
         pageSwitches.length ? undefined : "hook window.__galleryPageSwitch(ms) not called by the shell"),
@@ -182,7 +161,7 @@ export function installProfiler(params) {
     };
     const targetFailure = Object.values(targets).some((t) => t.verdict === "FAIL");
     const report = {
-      schema: "gallery-web-frames-v2",
+      schema: "gallery-web-frames-v3",
       mode,
       budget_ms: WASM_STEADY_MAX_MS,
       scope:
@@ -197,17 +176,17 @@ export function installProfiler(params) {
       subsequent_frames_summary: summarize(durations),
       steady_frames_summary: steadySummary,
       steady_definition: `rAF scopes starting ${SETTLE_MS} ms after the measured run started`,
-      first_frame_ms: state.initial && firstNew ? state.initial.end - state.initial.start + firstNew.cpu_ms : null,
+      first_frame_ms: state.initial && rows.length ? state.initial.end - state.initial.start + rows[0].cpu_ms : null,
+      first_frame_definition: "run() plus the first rAF scope after it, which may not be the first drawn frame",
       page_switch_ms: pageSwitches,
       targets,
       gpu_time_ms: null,
       gpu_time_reason: "WebGPU timestamp queries are not wired into the web renderer",
-      vsync_initial: vsyncInitial,
-      vsync_final: vsyncFinal,
       vsync_note:
         "browser presentation is rAF/compositor paced; launch Chromium with --disable-gpu-vsync,--disable-frame-rate-limit for uncapped frames",
-      windows,
-      minimum_observed_window_fps: minimumFps,
+      raf_callbacks_per_s:
+        startedAt !== null && rows.length ? (rows.filter((r) => r.start_ms >= startedAt).length * 1000) / (state.seconds * 1000) : null,
+      raf_note: "rAF callbacks, not drawn frames: the engine no longer reports which callbacks drew",
       inputs: inputs?.summary() ?? null,
       coverage: {
         complete_gallery_traversal: false,
@@ -219,7 +198,7 @@ export function installProfiler(params) {
       acceptance_eligible: false,
       eligibility_reasons: [
         "Gallery traversal coverage is not verifiable from the browser driver",
-        "window FPS is an average per 250 ms window, not a per-frame minimum",
+        "drawn frames are not distinguishable from idle rAF callbacks",
       ],
       exit_code: targetFailure ? 1 : 2,
     };
@@ -297,26 +276,6 @@ function startScrollDriver(state, startedAt) {
   };
 }
 
-function rateWindows(rows, startedAt) {
-  const windows = [];
-  const observed = rows.filter((r) => r.successful_new_frames !== null && r.start_ms >= (startedAt ?? 0));
-  let anchor = 0;
-  for (let i = 1; i < observed.length; i += 1) {
-    const a = observed[anchor];
-    const b = observed[i];
-    const span = b.end_ms - a.end_ms;
-    if (span < WINDOW_MS && i + 1 !== observed.length) continue;
-    windows.push({
-      start_ms: a.end_ms,
-      end_ms: b.end_ms,
-      fps: span > 0 ? ((b.successful_new_frames - a.successful_new_frames) * 1000) / span : null,
-      partial: span < WINDOW_MS,
-    });
-    anchor = i;
-  }
-  return windows;
-}
-
 function summarize(values) {
   const sorted = [...values].sort((a, b) => a - b);
   const rank = (percent) =>
@@ -342,8 +301,9 @@ function summarize(values) {
 // scrolling are not included: compare with a DevTools trace (see
 // docs/DEVELOPMENT.md). Wheel input: fixed 8 px steps at `hz` over the element
 // under the viewport centre once the page has settled, reversing every `legPx`.
-// `moved` says whether they moved anything: the scroller's position on a DOM page, the
-// new frames of a canvas (`window.__galleryNewFrames`, as an idle window draws nothing).
+// `moved` says whether they moved anything: the scroller's position on a DOM page, or the
+// new frames of a canvas whose page offers `window.__galleryNewFrames` (the Gallery no
+// longer does, so its canvas reports `moved` null: unknown).
 function runFrameProbe({ seconds = 10, hz = 1000, legPx = 4000, settleMs = 750 } = {}) {
   return new Promise((resolve) => {
     const starts = [];

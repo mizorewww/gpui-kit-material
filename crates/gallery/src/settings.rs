@@ -17,7 +17,6 @@ pub(super) fn open(shared: Entity<GalleryShared>, window: &mut Window, cx: &mut 
     let content = cx.new(|cx| {
         cx.observe(&shared, |_, _, cx| cx.notify()).detach();
         Settings {
-            error: None,
             shared: Some(shared),
         }
     });
@@ -31,44 +30,13 @@ pub(super) fn open(shared: Entity<GalleryShared>, window: &mut Window, cx: &mut 
 }
 
 struct Settings {
-    error: Option<SharedString>,
     /// The theme mode's owner: the dark theme switch is here for a compact bar
     /// without room for its toggle.
     shared: Option<Entity<GalleryShared>>,
 }
 
-impl Settings {
-    fn change_vsync(&mut self, enabled: bool, window: &mut Window, cx: &mut Context<Self>) {
-        self.error = match window.set_vsync(enabled) {
-            Err(error) => Some(format!("Could not change vertical sync: {error}").into()),
-            Ok(()) => {
-                let expected = if enabled {
-                    VsyncStatus::Enabled
-                } else {
-                    VsyncStatus::Disabled
-                };
-                (window.vsync_status() != expected).then(|| {
-                    "The platform did not confirm the requested vertical sync setting.".into()
-                })
-            }
-        };
-        // No optimistic checked state: render reads the backend after every request.
-        cx.notify();
-    }
-}
-
 impl Render for Settings {
-    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let status = window.vsync_status();
-        let unsupported = status == VsyncStatus::Unsupported;
-        let explanation = match status {
-            VsyncStatus::Enabled => "On. Frame presentation is synchronized with the display.",
-            VsyncStatus::Disabled => "Off. Frame presentation synchronization is disabled.",
-            VsyncStatus::Unsupported if cfg!(target_family = "wasm") => {
-                "Controlled by the browser. This application cannot disable vertical sync."
-            }
-            VsyncStatus::Unsupported => "This platform does not expose vertical sync control.",
-        };
+    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         div()
             .id("gallery-settings-dialog")
             .debug_selector(|| "gallery-settings-dialog".into())
@@ -93,64 +61,28 @@ impl Render for Settings {
                         ),
                 )
             })
-            .child(
-                div()
-                    .debug_selector(|| "gallery-settings-vsync".into())
-                    .flex()
-                    .items_center()
-                    .justify_between()
-                    .child("Vertical sync")
-                    .child(
-                        MaterialSwitch::new("gallery-settings-vsync-switch", "Vertical sync")
-                            .checked(status == VsyncStatus::Enabled)
-                            .disabled(unsupported)
-                            .on_change(cx.listener(|this, enabled: &bool, window, cx| {
-                                this.change_vsync(*enabled, window, cx);
-                            })),
-                    ),
-            )
-            .child(
-                div()
-                    .debug_selector(|| "gallery-settings-vsync-status".into())
-                    .text_sm()
-                    .child(explanation),
-            )
-            .when_some(self.error.clone(), |content, error| {
-                content.child(
-                    div()
-                        .id("gallery-settings-error")
-                        .debug_selector(|| "gallery-settings-error".into())
-                        .role(accesskit::Role::Alert)
-                        .child(error),
-                )
-            })
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::Settings;
-    use gpui::{TestAppContext, VsyncStatus};
+    use gpui::{AppContext as _, TestAppContext};
 
     #[gpui::test]
-    fn unsupported_setting_reports_failure_without_a_fake_enabled_state(cx: &mut TestAppContext) {
+    fn the_dark_theme_switch_shows_with_the_shared_settings(cx: &mut TestAppContext) {
         cx.update(|cx| {
             gpui_kit::init(cx);
             gpui_kit_material::init(cx);
         });
-        let (settings, cx) = cx.add_window_view(|_, _| Settings {
-            error: None,
-            shared: None,
+        let shared = cx.new(|_| super::GalleryShared::default());
+        let (_, cx) = cx.add_window_view(|_, _| Settings {
+            shared: Some(shared),
         });
         cx.update(|window, cx| {
-            assert_eq!(window.vsync_status(), VsyncStatus::Unsupported);
-            settings.update(cx, |settings, cx| settings.change_vsync(true, window, cx));
-            assert!(settings.read(cx).error.is_some());
-            assert_eq!(window.vsync_status(), VsyncStatus::Unsupported);
             window.refresh();
             window.draw(cx).clear(cx);
         });
-        assert!(cx.debug_bounds("gallery-settings-error").is_some());
-        assert!(cx.debug_bounds("gallery-settings-vsync").is_some());
+        assert!(cx.debug_bounds("gallery-settings-dark").is_some());
     }
 }

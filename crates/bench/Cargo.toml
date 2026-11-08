@@ -1,6 +1,6 @@
 [package]
 name = "gpui-kit-material-bench"
-description = "Standalone frame benchmarks for gpui-kit-material: component_bench and engine_bench"
+description = "Standalone frame benchmark for gpui-kit-material: component_bench"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -14,7 +14,6 @@ publish = false
 default = ["gpui-fast", "embedded-symbols"]
 gpui-fast = ["gpui-kit/gpui-fast", "gpui-kit-material/gpui-fast"]
 embedded-symbols = ["gpui-kit-material/embedded-symbols"]
-frame-profiler = ["gpui-kit/profiler"]
 
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
 anyhow.workspace = true

@@ -1,8 +1,8 @@
 name: CI
 # Hosted runners check formatting, lints, tests, packaging and the WASM build only.
-# AGENTS.md's performance targets are measured with scripts/profile-gallery.py on
-# real hardware, because shared virtual runners give neither stable timing nor a
-# real display.
+# AGENTS.md's performance targets are measured on real hardware (docs/DEVELOPMENT.md,
+# Profiling), because shared virtual runners give neither stable timing nor a real
+# display.
 on:
   push:
     branches: [main]
@@ -55,42 +55,23 @@ jobs:
         run: |
           cargo clippy --locked -p gpui-kit-material --all-targets --no-default-features --features full,serde,embedded-symbols -- -D warnings
           cargo test --locked -p gpui-kit-material --no-default-features --features full,serde,embedded-symbols
-          cargo clippy --locked -p gpui-kit-material-gallery -p gpui-kit-material-bench --all-targets --no-default-features --features gpui-kit-material-gallery/embedded-symbols,gpui-kit-material-gallery/frame-profiler,gpui-kit-material-bench/embedded-symbols,gpui-kit-material-bench/frame-profiler -- -D warnings
+          cargo clippy --locked -p gpui-kit-material-gallery -p gpui-kit-material-bench --all-targets --no-default-features --features gpui-kit-material-gallery/embedded-symbols,gpui-kit-material-gallery/frame-profiler,gpui-kit-material-bench/embedded-symbols -- -D warnings
           cargo test --locked -p gpui-kit-material-gallery --no-default-features --features embedded-symbols
       - name: Check the Gallery's profiler and instruction counters
         run: |
-          cargo clippy --locked -p gpui-kit-material-gallery -p gpui-kit-material-bench --all-targets --features gpui-kit-material-gallery/frame-profiler,gpui-kit-material-gallery/instruction-bench,gpui-kit-material-bench/frame-profiler -- -D warnings
-          cargo test --locked -p gpui-kit-material-gallery --lib --features frame-profiler -- performance:: scroll_performance:: interactions::
+          cargo clippy --locked -p gpui-kit-material-gallery -p gpui-kit-material-bench --all-targets --features gpui-kit-material-gallery/frame-profiler,gpui-kit-material-gallery/instruction-bench -- -D warnings
+          cargo test --locked -p gpui-kit-material-gallery --lib --features frame-profiler -- interactions::
       # Each alone: in a command naming several packages, features unify across them, which
       # is how a bench that needed the Gallery's test-support kept passing the steps above.
       - name: Build each benchmark as its documentation does
         run: |
-          cargo check --locked --release -p gpui-kit-material-bench --bin engine_bench --no-default-features --features embedded-symbols,frame-profiler,gpui-fast
-          cargo check --locked --release -p gpui-kit-material-bench --bin engine_bench --features frame-profiler
           cargo check --locked --release -p gpui-kit-material-bench --bin component_bench
           cargo check --locked --release -p gpui-kit-material-gallery --bin gallery --features instruction-bench
       - name: The browser profiler's report
         run: node scripts/check-web-profile.mjs
       - name: The profiler's report rules
         run: python3 scripts/test_profile_gallery.py
-      - name: Linux present mode rules
-        if: runner.os == 'Linux'
-        run: |
-          cargo test --locked -p gpui-pre-wgpu --lib present_mode
-          cargo test --locked -p gpui-fast-wgpu --lib present_mode
-      - name: Frame submission rules
-        run: |
-          # Selecting a backend is what turns frame-observation on in the engine.
-          # The -macos crates are only in the dependency graph on macOS; naming
-          # them elsewhere panics Cargo's feature resolver.
-          if [ "$RUNNER_OS" = "macOS" ]; then
-            cargo test --locked -p gpui-pre -p gpui-pre-macos --lib frame_submission
-            cargo test --locked -p gpui-fast -p gpui-fast-macos --lib frame_submission
-          else
-            cargo test --locked -p gpui-pre --lib frame_submission
-            cargo test --locked -p gpui-fast --lib frame_submission
-          fi
-      - name: Engine rules with frame observation off, as a consumer builds them, and the lazy tab-stop index
+      - name: Engine rules as a consumer builds them, and the lazy tab-stop index
         working-directory: gpui-kit-material/crates/consumer-check
         run: |
           cargo test --locked -p consumer-check -p gpui-pre --lib profiler
@@ -98,7 +79,7 @@ jobs:
           cargo test --locked -p consumer-check -p gpui-pre --lib tab_stop
           cargo test --locked -p consumer-check -p gpui-fast --features gpui-fast --lib tab_stop
       # Builds the library beside upstream's gpui-fps against only the patches a
-      # consumer needs, so library code cannot start to depend on the dev overlay.
+      # consumer needs, so library code cannot start to depend on a workspace-only patch.
       - name: Consumer patch set
         run: |
           cargo check --locked --manifest-path crates/consumer-check/Cargo.toml

@@ -15,13 +15,8 @@ pub mod capture;
 mod instr_bench;
 #[cfg(all(not(target_family = "wasm"), feature = "frame-profiler"))]
 mod interactions;
-#[cfg(all(not(target_family = "wasm"), feature = "frame-profiler"))]
-mod performance;
-#[cfg(all(not(target_family = "wasm"), feature = "frame-profiler"))]
-mod scroll_performance;
 
 pub(crate) mod catalog;
-mod fps;
 mod overview;
 pub(crate) mod page;
 mod pages;
@@ -899,22 +894,20 @@ impl Render for Gallery {
 }
 
 /// The window content: the title bar (the top app bar's sections, search
-/// and mode toggle, the FPS counter and settings) over the cached Gallery,
-/// so a counter update renders only the bar and the counter, not the page.
+/// and mode toggle, and settings) over the Gallery, so a bar update renders
+/// only the bar, not the page.
 /// Gallery notifications and window refreshes (theme and scale steps)
 /// still render the Gallery again.
 struct GalleryWindow {
     gallery: Entity<Gallery>,
     top_bar: Entity<top_bar::TopBar>,
-    fps: Option<Entity<fps::FpsDisplay>>,
     /// A caption style forced by a capture, to compare another platform's.
     caption: Option<Caption>,
 }
 
 impl Render for GalleryWindow {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        // The compact bar has no room for a counter, and labels its settings
-        // with an icon only.
+        // The compact bar labels its settings with an icon only.
         let compact = shell::ShellLayout::of(window) == shell::ShellLayout::Compact;
         let shared = self.gallery.read(cx).shared.clone();
         // A phone's cutouts and home indicator: the content stays clear of them
@@ -973,9 +966,6 @@ impl Render for GalleryWindow {
                                 AnyView::from(self.top_bar.clone())
                                     .cached(StyleRefinement::default().flex_1().min_w_0().h_full()),
                             )
-                            .when_some(self.fps.clone().filter(|_| !compact), |bar, fps| {
-                                bar.child(fps)
-                            })
                             .child(settings),
                     ),
             )
@@ -1005,12 +995,6 @@ pub fn run(application: gpui::Application, initialize: impl FnOnce(&mut App) + '
     startup_mark("process_to_run");
     #[cfg(all(not(target_family = "wasm"), feature = "frame-profiler"))]
     let interactions = interactions::prepare();
-    #[cfg(all(not(target_family = "wasm"), feature = "frame-profiler"))]
-    let profiling = if interactions.is_some() {
-        None
-    } else {
-        performance::prepare()
-    };
     // One window is the whole application: closing it quits, on macOS too,
     // where GPUI's default keeps a windowless application running with no
     // menu to quit or reopen it from.
@@ -1068,13 +1052,6 @@ pub fn run(application: gpui::Application, initialize: impl FnOnce(&mut App) + '
             startup_mark("platform_window");
             let gallery = cx.new(|cx| Gallery::new(window, cx));
             startup_mark("gallery_new");
-            // FPS is part of ordinary UI and profiler runs. Only deterministic
-            // screenshot captures omit the changing counter and its timer.
-            #[cfg(not(target_family = "wasm"))]
-            let show_fps = capture::show_fps(cx);
-            #[cfg(target_family = "wasm")]
-            let show_fps = true;
-            let fps = show_fps.then(|| cx.new(|cx| fps::FpsDisplay::new(window, cx)));
             #[cfg(not(target_family = "wasm"))]
             capture::install(&gallery, window, cx);
             #[cfg(not(target_family = "wasm"))]
@@ -1087,13 +1064,12 @@ pub fn run(application: gpui::Application, initialize: impl FnOnce(&mut App) + '
             web_route::install(&gallery, cx);
             let shared = gallery.read(cx).shared.read(cx);
             let (initial_scheme, initial_scale) = (shared.target_scheme(), shared.text_scale());
-            startup_mark("top_bar_and_fps");
+            startup_mark("top_bar");
             theme::init_component_theme(initial_scheme, initial_scale, cx);
             startup_mark("theme");
             cx.new(|_| GalleryWindow {
                 gallery,
                 top_bar,
-                fps,
                 caption,
             })
         })
@@ -1117,26 +1093,13 @@ pub fn run(application: gpui::Application, initialize: impl FnOnce(&mut App) + '
                 })
                 .unwrap();
         }
-        #[cfg(all(not(target_family = "wasm"), feature = "frame-profiler"))]
-        if let Some(profiling) = profiling {
-            _window
-                .update(cx, |_, window, cx| {
-                    if std::env::var_os("MATERIAL_SCROLL_PROFILE").is_some() {
-                        let target = _content.read(cx).gallery.read(cx).list.clone().into();
-                        profiling.install_scroll(window, cx, target);
-                    } else {
-                        profiling.install(window, cx);
-                    }
-                })
-                .unwrap();
-        }
         cx.activate(true);
     });
 }
 
 #[cfg(test)]
 mod window_tests {
-    use super::{Gallery, GalleryWindow, fps, top_bar};
+    use super::{Gallery, GalleryWindow, top_bar};
     // GPUI's attribute expands to an unqualified #[test]. Keep that name
     // bound to Rust's test attribute rather than the parent's GPUI glob import.
     use core::prelude::v1::test;
@@ -1206,7 +1169,6 @@ mod window_tests {
             let mut parts = None;
             let window = cx.open_window(size(px(1600.), px(800.)), |window, cx| {
                 let gallery = cx.new(|cx| Gallery::new(window, cx));
-                let fps = cx.new(|cx| fps::FpsDisplay::new(window, cx));
                 let top_bar = cx.new(|cx| {
                     top_bar::TopBar::new(gallery.clone(), window, cx).caption(Some(caption))
                 });
@@ -1214,7 +1176,6 @@ mod window_tests {
                 GalleryWindow {
                     gallery,
                     top_bar,
-                    fps: Some(fps),
                     caption: Some(caption),
                 }
             });
@@ -1323,7 +1284,6 @@ mod window_tests {
             GalleryWindow {
                 gallery,
                 top_bar,
-                fps: None,
                 caption: None,
             }
         });
@@ -1679,7 +1639,6 @@ mod window_tests {
             GalleryWindow {
                 gallery,
                 top_bar,
-                fps: None,
                 caption: None,
             }
         });
@@ -1752,7 +1711,6 @@ mod window_tests {
             GalleryWindow {
                 gallery,
                 top_bar,
-                fps: None,
                 caption: None,
             }
         });
@@ -1816,7 +1774,6 @@ mod window_tests {
             GalleryWindow {
                 gallery,
                 top_bar,
-                fps: None,
                 caption: None,
             }
         });
@@ -1863,7 +1820,7 @@ mod window_tests {
     // Fast retains views: upstream builds every view under a notified one again.
     #[cfg(feature = "gpui-fast")]
     #[gpui::test]
-    fn fps_updates_render_only_the_title_bar(cx: &mut TestAppContext) {
+    fn a_title_bar_update_renders_only_the_title_bar(cx: &mut TestAppContext) {
         cx.update(|cx| {
             gpui_kit::init(cx);
             gpui_kit_material::init(cx);
@@ -1871,29 +1828,27 @@ mod window_tests {
         let mut parts = None;
         let window = cx.open_window(size(px(1280.), px(800.)), |window, cx| {
             let gallery = cx.new(|cx| Gallery::new(window, cx));
-            let fps = cx.new(|cx| fps::FpsDisplay::new(window, cx));
             let top_bar = cx.new(|cx| top_bar::TopBar::new(gallery.clone(), window, cx));
-            parts = Some((gallery.clone(), fps.clone()));
+            parts = Some((gallery.clone(), top_bar.clone()));
             GalleryWindow {
                 gallery,
                 top_bar,
-                fps: Some(fps),
                 caption: None,
             }
         });
-        let (gallery, fps) = parts.unwrap();
+        let (gallery, top_bar) = parts.unwrap();
         draw(window.into(), cx);
         // Settle first-frame work (playback and focus setup notify once).
         draw(window.into(), cx);
         draw(window.into(), cx);
         let rendered = cx.read(|cx| gallery.read(cx).renders.get());
         assert!(rendered > 0);
-        cx.update(|cx| fps.update(cx, |_, cx| cx.notify()));
+        cx.update(|cx| top_bar.update(cx, |_, cx| cx.notify()));
         draw(window.into(), cx);
         assert_eq!(
             cx.read(|cx| gallery.read(cx).renders.get()),
             rendered,
-            "a counter update must reuse the cached Gallery"
+            "a title bar update must reuse the Gallery"
         );
         cx.update(|cx| gallery.update(cx, |_, cx| cx.notify()));
         draw(window.into(), cx);
@@ -1914,7 +1869,6 @@ mod window_tests {
             GalleryWindow {
                 gallery,
                 top_bar,
-                fps: None,
                 caption: None,
             }
         });

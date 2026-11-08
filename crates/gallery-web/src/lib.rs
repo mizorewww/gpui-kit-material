@@ -3,9 +3,9 @@
 extern crate gpui_kit as gpui;
 
 #[cfg(target_family = "wasm")]
-mod frame_counters;
-#[cfg(target_family = "wasm")]
 mod motion_preference;
+#[cfg(target_family = "wasm")]
+mod windows;
 
 /// Supplies one symbol asset by its file name. The page downloads the styles the
 /// Gallery draws instead of embedding the 52 MB pack of every style in the module.
@@ -41,7 +41,7 @@ fn settle_symbol_asset(file_name: &str) -> Result<(), wasm_bindgen::JsError> {
     if let gpui_kit_material::icons::Asset::Font(style) = named_asset(file_name)? {
         gpui_kit_material::icons::set_style_pending(style, false);
     }
-    frame_counters::refresh_windows();
+    windows::refresh_windows();
     Ok(())
 }
 
@@ -73,6 +73,6 @@ pub fn run() {
     let application = gpui::Application::with_platform(platform).with_http_client(http_client);
     gpui_kit_material_gallery::run(application, |cx| {
         motion_preference::install(cx);
-        frame_counters::install(cx);
+        windows::install(cx);
     });
 }

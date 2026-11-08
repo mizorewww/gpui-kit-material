@@ -17,7 +17,7 @@ path = "src/main.rs"
 
 [features]
 default = ["gpui-fast", "embedded-symbols"]
-gpui-fast = ["gpui-kit/gpui-fast", "gpui-kit-material/gpui-fast", "dep:gpui-fast-web"]
+gpui-fast = ["gpui-kit/gpui-fast", "gpui-kit-material/gpui-fast"]
 # The browser downloads the two styles it draws; see crates/gallery-web.
 embedded-symbols = ["gpui-kit-material/embedded-symbols"]
 # scripts/profile-gallery.py's per-frame report: `performance.rs`, `interactions.rs`.
@@ -37,10 +37,5 @@ gpui-kit = { workspace = true, features = ["test-support"] }
 serde_json.workspace = true
 
 [target.'cfg(target_family = "wasm")'.dependencies]
-# The Gallery's frame counters read the engine's dev-only frame observation, which a
-# consumer's web backends leave off. Kit already links these crates, and its normalized
-# manifest keeps their threading off too.
-gpui-pre-web = { version = "=0.3.11", default-features = false, features = ["frame-observation"] }
-gpui-fast-web = { version = "0.1.13", default-features = false, features = ["frame-observation"], optional = true }
 wasm-bindgen = "=0.2.129"
 web-sys = { version = "=0.3.106", features = ["Window", "Location", "EventTarget"] }

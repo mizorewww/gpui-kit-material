@@ -2,13 +2,16 @@
 //! with `MATERIAL_PROFILE_OUTPUT=<frames.json>`): page switches between
 //! Button, Text field, Date picker and Examples, hover and press in the
 //! Button preview, and continuous wheel scrolling of Overview and a Specs
-//! tab. Every CPU frame scope is kept raw and labelled with the step that
-//! was active when it started; `page_switch_ns` holds the first drawing
-//! scope after each switch. Never enabled by the ordinary gallery and never
-//! decides acceptance (`scripts/profile-gallery.py --summarize` judges it).
+//! tab. It reads upstream's own profiler (`gpui-kit/profiler`): every frame's
+//! `FrameEvent::Draw` and the `FrameEvent::Present` that submitted it are kept
+//! raw and labelled with the step that was active when the draw started;
+//! `page_switch_ns` holds the first frame after each switch. A frame's time is
+//! its draw plus its submission: the platform callback around them (input
+//! dispatch, cleanup) and the GPU are not timed. Never enabled by the ordinary
+//! gallery (`scripts/profile-gallery.py` summarizes it).
 use super::{Gallery, Tab, catalog};
 use gpui::{
-    profiler::{self, CpuFrameSource, FrameEvent, FrameTimingCollector},
+    profiler::{self, FrameEvent, FrameTimingCollector},
     *,
 };
 use serde_json::{Value, json};
@@ -219,16 +222,8 @@ impl Session {
                 executor.timer(Duration::from_millis(wait)).await;
                 events.extend(self.collector.collect_unseen());
             }
-            let (gpu, _) = profiler::take_gpu_executions();
             profiler::set_trace_enabled(false);
-            let report = report(
-                events,
-                gpu,
-                window_id,
-                origin,
-                &marks.borrow(),
-                &moved.borrow(),
-            );
+            let report = report(events, window_id, origin, &marks.borrow(), &moved.borrow());
             if let Some(parent) = self.output.parent() {
                 let _ = std::fs::create_dir_all(parent);
             }
@@ -243,7 +238,6 @@ impl Session {
 
 fn report(
     events: Vec<FrameEvent>,
-    gpu: Vec<profiler::GpuExecution>,
     window_id: WindowId,
     origin: Instant,
     marks: &[(&'static str, Instant)],
@@ -263,76 +257,132 @@ fn report(
             .find(|(_, mark)| *mark <= at)
             .map_or("startup", |(label, _)| label)
     };
-    let mut draws = Vec::new();
-    let mut scopes = Vec::new();
-    for event in &events {
-        match event {
-            FrameEvent::Draw(draw) if draw.window_id == window_id => draws.push(*draw),
-            FrameEvent::Complete(scope) if scope.window_id == window_id => scopes.push(*scope),
-            _ => {}
-        }
-    }
-    let rows: Vec<Value> = scopes
+    let frames = frames(&events, window_id);
+    let rows: Vec<Value> = frames
         .iter()
-        .map(|scope| {
-            let phases = scope
-                .draw_start
-                .and_then(|start| draws.iter().find(|draw| draw.draw_start == start))
-                .map(|draw| {
-                    json!({"request_layout_ns": draw.phases.request_layout.as_nanos(),
-                        "prepaint_ns": draw.phases.prepaint.as_nanos(),
-                        "paint_ns": draw.phases.paint.as_nanos(),
-                        "draw_ns": (draw.draw_end - draw.draw_start).as_nanos()})
-                });
-            let gpu_ns: u128 = gpu
-                .iter()
-                .filter(|g| g.submitted_at >= scope.start && g.submitted_at <= scope.end)
-                .map(|g| ((g.gpu_end_s - g.gpu_start_s).max(0.) * 1e9) as u128)
-                .sum();
+        .enumerate()
+        .map(|(index, frame)| {
+            let draw = &frame.draw;
             json!({
-                "source": format!("{:?}", scope.source),
-                "step": step_at(scope.start),
-                "start_ns": ns(scope.start),
-                "cpu_elapsed_ns": scope.duration().as_nanos(),
-                "presentation_wait_ns": scope.presentation_wait.as_nanos(),
-                "draw_count": scope.draw_count,
-                "present_count": scope.present_count,
-                "gpu_time_ns": if scope.present_count > 0 { json!(gpu_ns) } else { Value::Null },
-                "phases": phases,
+                "initial": index == 0,
+                "step": step_at(draw.draw_start),
+                "start_ns": ns(draw.draw_start),
+                "frame_ns": frame.cpu().as_nanos(),
+                "draw_ns": draw.draw_duration().as_nanos(),
+                "present_ns": frame.present.map(|present| present.present_duration().as_nanos()),
+                "phases": {
+                    "request_layout_ns": draw.phases.request_layout.as_nanos(),
+                    "prepaint_ns": draw.phases.prepaint.as_nanos(),
+                    "paint_ns": draw.phases.paint.as_nanos(),
+                },
             })
         })
         .collect();
-    // The first drawing scope after each switch is that switch's cost.
+    // The first frame after each switch is that switch's cost.
     let mut switches = Vec::new();
     for (label, at) in marks {
         if !label.starts_with("switch:") {
             continue;
         }
-        if let Some(scope) = scopes
-            .iter()
-            .find(|scope| scope.start >= *at && scope.draw_count > 0)
-        {
-            switches.push(json!({"step": label, "cpu_elapsed_ns": scope.duration().as_nanos()}));
+        if let Some(frame) = frames.iter().find(|frame| frame.draw.draw_start >= *at) {
+            switches.push(json!({"step": label, "frame_ns": frame.cpu().as_nanos()}));
         }
     }
-    let initial = scopes
-        .iter()
-        .position(|scope| scope.source == CpuFrameSource::InitialDraw);
     json!({
-        "schema": "gallery-interactions-v1",
+        "schema": "gallery-interactions-v2",
         "metadata": {
             "release": !cfg!(debug_assertions),
             "backend": if gpui_kit::GPUI_FAST { "gpui-fast" } else { "gpui-pre" },
             "load_average_at_end": std::process::Command::new("sysctl").args(["-n", "vm.loadavg"]).output().ok().map(|o| String::from_utf8_lossy(&o.stdout).trim().to_owned()),
             "script": std::env::var("MATERIAL_PROFILE_SCRIPT").ok(), "interactions_script": SCRIPT.iter().map(|(label, _, wait)| json!([label, wait])).collect::<Vec<_>>(),
-            "cpu_elapsed_definition": "wall time of each complete main-thread CPU frame scope (render, layout, prepaint, paint, submission, cleanup)",
-            "steady_definition": "cpu_scopes holds the initial draw first, then every drawing scope that is not the first one after a page switch",
+            "frame_definition": "upstream profiler: Window::draw (render, layout, prepaint, paint) plus the platform submission of that draw, when there was one; the frame callback around them, drawable waits outside the submission and GPU time are not measured",
         },
         "marks_ns": marks.iter().map(|(label, at)| json!([label, ns(*at)])).collect::<Vec<_>>(),
         "scroll_moved_px": moved,
-        "page_switch_ns": switches.iter().map(|s| s["cpu_elapsed_ns"].clone()).collect::<Vec<_>>(),
+        "page_switch_ns": switches.iter().map(|s| s["frame_ns"].clone()).collect::<Vec<_>>(),
         "page_switches": switches,
-        "initial_scope_index": initial,
-        "all_scopes": rows,
+        "frames": rows,
     })
+}
+
+/// A drawn frame and the submission of what it drew, if it was submitted.
+struct Frame {
+    draw: profiler::FrameTiming,
+    present: Option<profiler::PresentTiming>,
+}
+
+impl Frame {
+    fn cpu(&self) -> Duration {
+        self.draw.draw_duration()
+            + self
+                .present
+                .map_or(Duration::ZERO, |present| present.present_duration())
+    }
+}
+
+/// `window`'s draws in order, each with the first submission that began after it
+/// ended and before the next draw.
+fn frames(events: &[FrameEvent], window: WindowId) -> Vec<Frame> {
+    let mut frames: Vec<Frame> = Vec::new();
+    for event in events {
+        match event {
+            FrameEvent::Draw(draw) if draw.window_id == window => frames.push(Frame {
+                draw: *draw,
+                present: None,
+            }),
+            FrameEvent::Present(present) if present.window_id == window => {
+                if let Some(frame) = frames.last_mut()
+                    && frame.present.is_none()
+                    && present.present_start >= frame.draw.draw_end
+                {
+                    frame.present = Some(*present);
+                }
+            }
+            _ => {}
+        }
+    }
+    frames
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use core::prelude::v1::test;
+    use gpui::profiler::{DrawPhases, FrameTiming, PresentTiming};
+
+    #[test]
+    fn a_frame_is_its_draw_and_the_submission_after_it() {
+        let window = WindowId::from(1);
+        let at = Instant::now();
+        let ms = |n: u64| at + Duration::from_millis(n);
+        let draw = |start, end| {
+            FrameEvent::Draw(FrameTiming {
+                window_id: window,
+                dirty_at: None,
+                invalidations: 1,
+                draw_start: ms(start),
+                draw_end: ms(end),
+                refresh_interval: None,
+                signal_at: None,
+                phases: DrawPhases::default(),
+            })
+        };
+        let present = |start, end| {
+            FrameEvent::Present(PresentTiming {
+                window_id: window,
+                present_start: ms(start),
+                present_end: ms(end),
+                animation_interval: None,
+            })
+        };
+        // A draw that was not submitted, then one that was, then a second
+        // submission of the same draw, which is not a frame's.
+        let frames = frames(
+            &[draw(0, 2), draw(10, 13), present(13, 14), present(20, 21)],
+            window,
+        );
+        assert_eq!(frames.len(), 2);
+        assert_eq!(frames[0].cpu(), Duration::from_millis(2));
+        assert_eq!(frames[1].cpu(), Duration::from_millis(4));
+    }
 }
