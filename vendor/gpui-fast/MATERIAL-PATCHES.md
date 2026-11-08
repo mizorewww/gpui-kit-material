@@ -17,7 +17,9 @@ deny-warnings builds cover the crate.
 
 Test harness: `src/style.rs` (`#[perf]` to `#[test]`), `src/svg_renderer.rs` and
 `tests/fonts/` (fonts the package omits), `examples/image/` (a fixture a
-`src/platform.rs` test reads).
+`src/platform.rs` test reads), and `src/profiler/hang.rs`'s
+`slow_views_are_journaled_with_their_own_time`, which takes the draw that contains the
+slow views rather than the last one: a later frame can replay them without the work.
 
 Behavior, not yet offered upstream: `src/text_system/line_layout.rs`,
 `src/text_system/line_wrapper.rs` hang a space that overflows after content

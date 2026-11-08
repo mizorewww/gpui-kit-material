@@ -1718,11 +1718,20 @@ mod tests {
             ForegroundEvent::View(timing) if timing.phase == ViewPhase::Paint
         )));
 
+        // Later frames can retain these views without rendering them. Associate
+        // their samples with the draw that actually performed the timed work.
         let draw = events
             .iter()
             .rev()
             .find_map(|event| match event {
-                ForegroundEvent::Draw(timing) => Some(*timing),
+                ForegroundEvent::Draw(timing)
+                    if timing.draw_start <= parent.start
+                        && timing.draw_end >= parent.end
+                        && timing.draw_start <= child.start
+                        && timing.draw_end >= child.end =>
+                {
+                    Some(*timing)
+                }
                 _ => None,
             })
             .expect("a draw");

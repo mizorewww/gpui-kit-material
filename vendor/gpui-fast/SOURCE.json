@@ -189,6 +189,10 @@
     "src/window.rs": "51bf1edd8da432889e86c82a08433610012e7008e4cd4a6d2ea44ccc2010d375"
   },
   "modified_files": {
+    "src/profiler/hang.rs": {
+      "upstream_sha256": "1d32f5e43c0b61ddbd8083662ad3a129f67f66c9c607dd555c98c9cefa041c7e",
+      "local_sha256": "3ae3884bb15e66c6af35fd6e431c1ce8932581f78ea7e11d82a4f00d47450b3e"
+    },
     "src/profiler/journal.rs": {
       "upstream_sha256": "66b07a3d29c2585d56886c5a6984022fed70cbc6e11f1ceb4ac331315042132a",
       "local_sha256": "86e16e613eb58265e1fec097d980c403f611b61b3f0d1aea97c758cbf1539248"
