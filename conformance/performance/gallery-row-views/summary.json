@@ -1,0 +1,244 @@
+{
+  "before": [
+    {
+      "what": "switch frame CPU (excl. drawable wait)",
+      "n": 41,
+      "p50_ms": 3.403,
+      "p95_ms": 18.276,
+      "max_ms": 29.05
+    },
+    {
+      "what": "hover/press frame CPU (excl. drawable wait)",
+      "n": 14,
+      "p50_ms": 2.127,
+      "p95_ms": 16.915,
+      "max_ms": 16.915
+    },
+    {
+      "what": "scroll frame CPU (excl. drawable wait)",
+      "n": 48,
+      "p50_ms": 2.057,
+      "p95_ms": 14.894,
+      "max_ms": 19.955
+    },
+    {
+      "what": "idle frame CPU (excl. drawable wait)",
+      "n": 6,
+      "p50_ms": 1.853,
+      "p95_ms": 11.567,
+      "max_ms": 11.567
+    },
+    {
+      "what": "switch draw only",
+      "n": 41,
+      "p50_ms": 3.068,
+      "p95_ms": 16.781,
+      "max_ms": 28.113
+    },
+    {
+      "what": "hover/press draw only",
+      "n": 14,
+      "p50_ms": 2.011,
+      "p95_ms": 15.184,
+      "max_ms": 15.184
+    },
+    {
+      "what": "scroll draw only",
+      "n": 48,
+      "p50_ms": 1.855,
+      "p95_ms": 13.668,
+      "max_ms": 19.504
+    },
+    {
+      "what": "idle draw only",
+      "n": 6,
+      "p50_ms": 1.743,
+      "p95_ms": 11.097,
+      "max_ms": 11.097
+    },
+    {
+      "what": "page switch (first scope)",
+      "n": 24,
+      "p50_ms": 5.457,
+      "p95_ms": 23.776,
+      "max_ms": 29.05
+    },
+    {
+      "what": "overview wheel scroll steady CPU, scroll-before-1.json",
+      "n": 1196,
+      "p50_ms": 0.459291,
+      "p95_ms": 0.660041,
+      "max_ms": 5.900251
+    },
+    {
+      "what": "overview wheel scroll steady CPU, scroll-before-2.json",
+      "n": 1196,
+      "p50_ms": 0.453416,
+      "p95_ms": 0.665166,
+      "max_ms": 5.979292
+    },
+    {
+      "what": "overview wheel scroll steady CPU, scroll-before-3.json",
+      "n": 4591,
+      "p50_ms": 0.512458,
+      "p95_ms": 0.771749,
+      "max_ms": 6.802208
+    },
+    {
+      "what": "overview wheel scroll steady CPU, scroll-before-4.json",
+      "n": 4518,
+      "p50_ms": 0.595833,
+      "p95_ms": 1.041583,
+      "max_ms": 6.693167
+    },
+    {
+      "what": "[hover script] frame CPU (excl. drawable wait)",
+      "n": 99,
+      "p50_ms": 3.058,
+      "p95_ms": 15.797,
+      "max_ms": 17.105
+    },
+    {
+      "what": "[switch script] frame CPU (excl. drawable wait)",
+      "n": 2247,
+      "p50_ms": 1.074,
+      "p95_ms": 7.192,
+      "max_ms": 32.236
+    },
+    {
+      "what": "[switch script] page switch (first scope)",
+      "n": 240,
+      "p50_ms": 4.982,
+      "p95_ms": 23.53,
+      "max_ms": 32.236
+    },
+    {
+      "what": "[scroll-specs script] frame CPU (excl. drawable wait)",
+      "n": 2888,
+      "p50_ms": 3.508,
+      "p95_ms": 4.716,
+      "max_ms": 18.086
+    }
+  ],
+  "after": [
+    {
+      "what": "switch frame CPU (excl. drawable wait)",
+      "n": 45,
+      "p50_ms": 3.649,
+      "p95_ms": 11.855,
+      "max_ms": 22.436
+    },
+    {
+      "what": "hover/press frame CPU (excl. drawable wait)",
+      "n": 14,
+      "p50_ms": 2.467,
+      "p95_ms": 21.398,
+      "max_ms": 21.398
+    },
+    {
+      "what": "scroll frame CPU (excl. drawable wait)",
+      "n": 54,
+      "p50_ms": 1.966,
+      "p95_ms": 5.631,
+      "max_ms": 6.378
+    },
+    {
+      "what": "idle frame CPU (excl. drawable wait)",
+      "n": 5,
+      "p50_ms": 1.523,
+      "p95_ms": 2.428,
+      "max_ms": 2.428
+    },
+    {
+      "what": "switch draw only",
+      "n": 45,
+      "p50_ms": 3.379,
+      "p95_ms": 8.506,
+      "max_ms": 21.721
+    },
+    {
+      "what": "hover/press draw only",
+      "n": 14,
+      "p50_ms": 2.292,
+      "p95_ms": 20.654,
+      "max_ms": 20.654
+    },
+    {
+      "what": "scroll draw only",
+      "n": 54,
+      "p50_ms": 1.817,
+      "p95_ms": 5.448,
+      "max_ms": 6.081
+    },
+    {
+      "what": "idle draw only",
+      "n": 5,
+      "p50_ms": 1.372,
+      "p95_ms": 2.273,
+      "max_ms": 2.273
+    },
+    {
+      "what": "page switch (first scope)",
+      "n": 24,
+      "p50_ms": 5.121,
+      "p95_ms": 22.436,
+      "max_ms": 22.436
+    },
+    {
+      "what": "overview wheel scroll steady CPU, scroll-after-1.json",
+      "n": 1198,
+      "p50_ms": 0.457583,
+      "p95_ms": 0.668292,
+      "max_ms": 6.089458
+    },
+    {
+      "what": "overview wheel scroll steady CPU, scroll-after-2.json",
+      "n": 4510,
+      "p50_ms": 0.565291,
+      "p95_ms": 1.014833,
+      "max_ms": 6.767167
+    },
+    {
+      "what": "overview wheel scroll steady CPU, scroll-after-3.json",
+      "n": 4787,
+      "p50_ms": 0.518916,
+      "p95_ms": 0.799084,
+      "max_ms": 6.595042
+    },
+    {
+      "what": "overview wheel scroll steady CPU, scroll-after-4.json",
+      "n": 4693,
+      "p50_ms": 0.519292,
+      "p95_ms": 0.771124,
+      "max_ms": 6.796584
+    },
+    {
+      "what": "[hover script] frame CPU (excl. drawable wait)",
+      "n": 99,
+      "p50_ms": 2.943,
+      "p95_ms": 15.048,
+      "max_ms": 15.971
+    },
+    {
+      "what": "[switch script] frame CPU (excl. drawable wait)",
+      "n": 2257,
+      "p50_ms": 1.221,
+      "p95_ms": 7.669,
+      "max_ms": 33.691
+    },
+    {
+      "what": "[switch script] page switch (first scope)",
+      "n": 240,
+      "p50_ms": 6.606,
+      "p95_ms": 24.003,
+      "max_ms": 33.691
+    },
+    {
+      "what": "[scroll-specs script] frame CPU (excl. drawable wait)",
+      "n": 2886,
+      "p50_ms": 2.879,
+      "p95_ms": 4.772,
+      "max_ms": 16.544
+    }
+  ]
+}

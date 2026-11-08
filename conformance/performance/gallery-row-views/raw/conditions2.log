@@ -1,0 +1,25 @@
+13:53:22 before hover 1 load { 2.24 2.55 2.60 }
+exit 0
+13:53:36 after hover 1 load { 2.77 2.66 2.63 }
+exit 0
+13:53:51 before switch 1 load { 2.61 2.62 2.62 }
+exit 0
+13:54:03 after switch 1 load { 2.37 2.58 2.60 }
+exit 0
+13:54:15 before scroll-specs 1 load { 2.54 2.60 2.61 }
+exit 0
+13:54:30 after scroll-specs 1 load { 2.65 2.62 2.62 }
+exit 0
+13:54:45 before hover 2 load { 2.36 2.56 2.59 }
+exit 0
+13:54:59 after hover 2 load { 2.37 2.55 2.59 }
+exit 0
+13:55:14 before switch 2 load { 2.07 2.47 2.56 }
+exit 0
+13:55:26 after switch 2 load { 2.04 2.46 2.55 }
+exit 0
+13:55:38 before scroll-specs 2 load { 1.88 2.41 2.53 }
+exit 0
+13:55:52 after scroll-specs 2 load { 2.06 2.42 2.54 }
+exit 0
+done

@@ -1233,21 +1233,28 @@ mod examples {
             let config = bounds(cx, "configuration-card");
             config.left() > canvas.right()
         };
-        let (preview, lead) = window
+        let (preview, panel, lead) = window
             .update(&mut cx, |g, _, _| {
                 let views = g.entries[g.current].views.clone().unwrap();
-                (views.preview, g.lead.clone())
+                (views.preview, views.panel, g.lead.clone())
             })
             .unwrap();
         assert!(side_by_side(&mut cx), "a phone leaves room for the panel");
         switch(&mut cx, Device::Desktop);
         assert!(!side_by_side(&mut cx), "a desktop needs the width");
         let rendered = cx.read(|cx| lead.read(cx).renders.get());
+        let panel_rendered = cx.read(|cx| panel.read(cx).renders.get());
         for _ in 0..3 {
             cx.update(|_, cx| cx.notify(preview.entity_id()));
             frames(&mut cx);
         }
         assert_eq!(cx.read(|cx| lead.read(cx).renders.get()), rendered);
+        // Building the preview draws the state the panel reads; it does not change it.
+        assert_eq!(
+            cx.read(|cx| panel.read(cx).renders.get()),
+            panel_rendered,
+            "a preview frame builds the panel again"
+        );
         switch(&mut cx, Device::Phone);
         assert!(side_by_side(&mut cx), "and the panel comes back");
     }

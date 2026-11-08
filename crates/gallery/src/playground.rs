@@ -1378,14 +1378,13 @@ impl Render for PreviewView {
         self.renders.set(self.renders.get() + 1);
         let scope = self.shared.read(cx).preview_scope().resolve(window, cx);
         let state = self.state.clone();
-        // A lease: what the Gallery reads of the state does not change by building
-        // the preview, and through `update` every animation frame of a preview
-        // would rebuild the Gallery around it.
-        let (preview, hint) = scope.build(window, cx, |window, cx| {
-            state.update_for_render(cx, |state, cx| {
-                (state.render_preview(window, cx), state.pane_hint())
-            })
+        // Rendered as the state's view: building the preview is drawing the state,
+        // not changing it. Through `update`, every animation frame of a preview would
+        // rebuild the Gallery and the panel around it.
+        let preview = scope.build(window, cx, |window, cx| {
+            render_part(&state, Part::Preview, window, cx)
         });
+        let hint = state.read(cx).pane_hint();
         if self.hint.replace(hint) != hint {
             let (lead, panel) = self.dependents.clone();
             cx.defer(move |cx| {
@@ -1408,6 +1407,8 @@ pub struct PanelView {
     state: Entity<PlaygroundState>,
     hint: Rc<Cell<PaneHint>>,
     _observe: Subscription,
+    #[cfg(test)]
+    pub(crate) renders: Cell<usize>,
 }
 
 impl PanelView {
@@ -1421,15 +1422,17 @@ impl PanelView {
             state,
             hint,
             _observe: observe,
+            #[cfg(test)]
+            renders: Cell::default(),
         }
     }
 }
 
 impl Render for PanelView {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let panel = self
-            .state
-            .update_for_render(cx, |state, cx| state.render_panel(window, cx));
+        #[cfg(test)]
+        self.renders.set(self.renders.get() + 1);
+        let panel = render_part(&self.state, Part::Panel, window, cx);
         // Stacked, the card is as tall as its controls and the page scrolls.
         if panes_stacked(window, self.hint.get()) {
             return panel;
@@ -1541,12 +1544,44 @@ impl Render for CodeView {
 /// The Code card's monospace face, bundled for the web build.
 pub const CODE_FONT: &str = "Roboto Mono";
 
-#[cfg(test)]
+/// What [`PlaygroundState`]'s view builds: the preview for [`PreviewView`] or
+/// the configuration for [`PanelView`].
+#[derive(Clone, Copy)]
+enum Part {
+    Preview,
+    Panel,
+}
+
+thread_local! {
+    /// The part the state rendered next builds: see [`render_part`].
+    static REQUESTED_PART: Cell<Option<Part>> = const { Cell::new(None) };
+}
+
+/// `part` of the playground, built as the engine renders a view, as a page's
+/// rows are (`page.rs`, "How a row is built"): what the preview and the panel
+/// keep in the state as they are built is part of drawing it, so neither
+/// rebuilds the other, nor the Gallery around them.
+fn render_part(
+    state: &Entity<PlaygroundState>,
+    part: Part,
+    window: &mut Window,
+    cx: &mut App,
+) -> AnyElement {
+    REQUESTED_PART.set(Some(part));
+    super::page::render_view(state, window, cx)
+}
+
 impl Render for PlaygroundState {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        div()
-            .child(self.render_preview(window, cx))
-            .child(self.render_panel(window, cx))
+        match REQUESTED_PART.take() {
+            Some(Part::Preview) => self.render_preview(window, cx),
+            Some(Part::Panel) => self.render_panel(window, cx),
+            // A window's root, in tests: both.
+            None => div()
+                .child(self.render_preview(window, cx))
+                .child(self.render_panel(window, cx))
+                .into_any_element(),
+        }
     }
 }
 

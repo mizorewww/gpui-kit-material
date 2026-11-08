@@ -1,0 +1,28 @@
+13:56:19 after switch 3 load { 2.21 2.42 2.53 }
+13:56:31 before switch 3 load { 2.25 2.43 2.53 }
+13:56:43 after switch 4 load { 2.07 2.38 2.51 }
+13:56:55 before switch 4 load { 2.11 2.38 2.51 }
+13:57:07 after switch 5 load { 2.17 2.38 2.51 }
+13:57:19 before switch 5 load { 2.13 2.36 2.50 }
+13:57:31 after switch 6 load { 1.95 2.31 2.48 }
+13:57:43 before switch 6 load { 1.80 2.27 2.46 }
+13:57:55 after scroll 3 load { 1.91 2.27 2.46 }
+13:58:05 before scroll 3 load { 1.85 2.25 2.45 }
+13:58:16 after scroll 4 load { 2.26 2.32 2.47 }
+13:58:26 before scroll 4 load { 2.29 2.33 2.47 }
+14:00:26 before switch 7 load { 3.03 2.55 2.54 } cua= 45.4
+14:00:38 after switch 7 load { 3.42 2.65 2.57 } cua= 47.5
+14:00:50 before switch 8 load { 3.34 2.67 2.58 } cua= 47.1
+14:01:02 after switch 8 load { 2.97 2.61 2.56 } cua= 45.1
+14:01:14 before switch 9 load { 2.76 2.58 2.55 } cua=  0.0
+14:01:26 after switch 9 load { 2.56 2.54 2.54 } cua=  0.0
+14:01:38 before switch 10 load { 4.38 2.92 2.67 } cua=  0.0
+14:01:50 after switch 10 load { 4.61 3.05 2.72 } cua=  0.0
+14:02:13 after hover 3 load { 3.65 2.94 2.69 }
+14:02:27 before hover 3 load { 3.22 2.87 2.67 }
+14:02:42 after scroll-specs 3 load { 2.71 2.78 2.64 }
+14:02:57 before scroll-specs 3 load { 2.49 2.73 2.62 }
+14:03:12 after hover 4 load { 2.09 2.62 2.59 }
+14:03:26 before hover 4 load { 3.12 2.81 2.65 }
+14:03:41 after scroll-specs 4 load { 2.87 2.77 2.64 }
+14:03:55 before scroll-specs 4 load { 2.67 2.73 2.63 }

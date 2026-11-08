@@ -1,0 +1,11 @@
+Both binaries: CARGO_BUILD_JOBS=3 nice -n 15 cargo build --locked --release -p gpui-kit-material-gallery
+  --bin gallery --no-default-features --features embedded-symbols,frame-profiler,gpui-fast
+before: f9ba78f (rows built through Entity::update_for_render)
+after:  f9ba78f + the row-view commit (rows and playground parts built through gpui::View::render)
+Machine: shared 16 GB Apple Silicon Mac, load average 1.8-4.6 during runs (other agents' sessions,
+a cua-driver process at ~45% CPU during part of the runs); window unfocused, GPUI_IGNORE_OCCLUSION=1.
+Runs were interleaved before/after. Runs fall into a fast and a slow mode independent of the
+binary (see summary-by-mode.txt): compare within a mode.
+Scripts: MATERIAL_PROFILE_SCRIPT=interactions|hover|switch|scroll-specs, MATERIAL_SCROLL_PROFILE=1
+MATERIAL_SCROLL_INPUT=wheel (Overview, 10 s). raw/*.cpu-scopes.json keep every CPU scope of the
+scroll runs without the raw engine event stream.

@@ -1,0 +1,21 @@
+13:50:46 before interactions 1 load { 2.34 2.83 2.69 }
+exit 0
+13:51:05 after interactions 1 load { 2.45 2.83 2.69 }
+exit 0
+13:51:25 before interactions 2 load { 2.54 2.82 2.69 }
+exit 0
+13:51:44 after interactions 2 load { 2.08 2.70 2.65 }
+exit 0
+13:52:02 before interactions 3 load { 1.84 2.62 2.62 }
+exit 0
+13:52:21 after interactions 3 load { 2.21 2.66 2.64 }
+exit 0
+13:52:40 before scroll 1 load { 1.98 2.58 2.61 }
+exit 1
+13:52:50 after scroll 1 load { 1.99 2.56 2.60 }
+exit 1
+13:53:00 before scroll 2 load { 1.83 2.51 2.58 }
+exit 1
+13:53:11 after scroll 2 load { 2.11 2.54 2.59 }
+exit 1
+done

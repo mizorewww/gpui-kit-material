@@ -688,23 +688,28 @@ mod tests {
         });
         let shared = cx.new(|_| GalleryShared::default());
         let page_shared = shared.clone();
-        let (page, cx) = cx.add_window_view(move |window, cx| {
+        let (root, cx) = cx.add_window_view(move |window, cx| {
             let list = ListState::new(0, ListAlignment::Top, px(100.));
-            cx.observe_in(&page_shared, window, |_: &mut Page, shared, window, cx| {
+            let page = cx.new(|cx| {
+                Page::new(
+                    PageCx {
+                        shared: page_shared.clone(),
+                        rows: super::super::super::page::PageRows::new(list),
+                    },
+                    window,
+                    cx,
+                )
+            });
+            cx.observe_in(&page_shared, window, |_: &mut Root, shared, window, cx| {
                 let shared = shared.read(cx);
                 let (scheme, scale) = (shared.target_scheme(), shared.text_scale());
                 theme::advance_component_theme(scheme, scale, window, cx);
             })
             .detach();
-            Page::new(
-                PageCx {
-                    shared: page_shared,
-                    rows: super::super::super::page::PageRows::new(list),
-                },
-                window,
-                cx,
-            )
+            cx.observe(&page, |_, _, cx| cx.notify()).detach();
+            Root(page)
         });
+        let page = cx.read(|cx| root.read(cx).0.clone());
         (page, shared, cx.clone())
     }
 
@@ -720,9 +725,12 @@ mod tests {
             .get(ColorRole::PRIMARY)
     }
 
-    impl Render for Page {
+    /// The window's root: the page's seed row.
+    struct Root(Entity<Page>);
+
+    impl Render for Root {
         fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-            self.render_seed(cx)
+            self.0.update(cx, |page, cx| page.render_seed(cx))
         }
     }
 

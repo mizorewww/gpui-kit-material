@@ -1,7 +1,7 @@
 //! The page registry: every design-kit page in Figma order, foundations
 //! first. This is the only file pages share; each page module owns its
 //! state and rows (see `super::page`).
-use super::page::{PageEntry, entry};
+use super::page::{PageEntry, entry, page_views};
 
 pub mod app_bars;
 pub mod avatars;
@@ -46,6 +46,40 @@ pub mod prelude {
     pub use gpui_kit_material::icons::IconName;
     pub use gpui_kit_material::prelude::*;
 }
+
+page_views!(
+    color::Page,
+    typography::Page,
+    shape::Page,
+    motion::Page,
+    elevation::Page,
+    examples::Page,
+    app_bars::Page,
+    avatars::Page,
+    badges::Page,
+    buttons::Page,
+    cards::Page,
+    carousel::Page,
+    checkboxes::Page,
+    chips::Page,
+    date_time_pickers::Page,
+    dialogs::Page,
+    dividers::Page,
+    lists::Page,
+    loading_progress::Page,
+    menu::Page,
+    navigation::Page,
+    radio_button::Page,
+    search::Page,
+    sheets::Page,
+    sliders::Page,
+    snackbar::Page,
+    switch::Page,
+    tabs::Page,
+    text_fields::Page,
+    toolbars::Page,
+    tooltips::Page,
+);
 
 pub static PAGES: &[PageEntry] = &[
     entry::<color::Page>(),

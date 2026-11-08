@@ -23,6 +23,19 @@
 //!
 //! Do not notify from `prepare` or `render_row`: the Gallery observes every
 //! page, so that would schedule another frame each frame.
+//!
+//! # How a row is built
+//!
+//! A row needs the page's `Context` for its listeners, and `render_row` may keep
+//! what it builds in the page (playback handles, lazily made entities). Building a
+//! row through [`Entity::update`] would count as writing the page while the window
+//! draws, and under GPUI Fast every other retained row that read the page would be
+//! built again on the next frame, each one writing it in turn. So a row is built
+//! the way the engine renders a view: the page is the [`Render`] view, rendered in
+//! place with [`gpui::View::render`] for the row [`render_row_view`] asks for. A
+//! view's own render is drawing it, not changing it; a notify while it renders
+//! still marks it changed, so what the page notifies about rebuilds every row that
+//! read it, and nothing else does. The page's `Render` is [`page_views!`]'s.
 use gpui::{prelude::*, *};
 use gpui_kit_material::color::Appearance;
 use gpui_kit_material::color::themes::{Contrast, ThemeId, ThemeMode};
@@ -315,8 +328,9 @@ pub struct CaptureState {
     pub ripple: bool,
 }
 
-/// One design-kit page.
-pub trait GalleryPage: Sized + 'static {
+/// One design-kit page. Its [`Render`] builds the row asked for: see
+/// [`page_views!`].
+pub trait GalleryPage: Render + Sized + 'static {
     const INFO: PageInfo;
     fn new(page: PageCx, window: &mut Window, cx: &mut Context<Self>) -> Self;
     /// Body rows after the header. May depend on the window (e.g. columns).
@@ -378,10 +392,7 @@ impl<P: GalleryPage> AnyPage for Entity<P> {
         self.read(cx).interactive(row)
     }
     fn render_row(&self, row: usize, window: &mut Window, cx: &mut App) -> AnyElement {
-        // A row builds from the page and writes nothing to it outside its listeners,
-        // which notify. Through `update`, each row built would invalidate every other
-        // retained row that read the page, and those rebuild in turn.
-        self.update_for_render(cx, |page, cx| page.render_row(row, window, cx))
+        render_row_view(self, row, window, cx)
     }
     fn prepare(&self, window: &mut Window, cx: &mut App) {
         if P::PREPARES {
@@ -411,6 +422,66 @@ impl<P: GalleryPage> AnyPage for Entity<P> {
     }
 }
 
+thread_local! {
+    /// The row the page rendered next builds: see [`render_row_view`].
+    static REQUESTED_ROW: Cell<Option<usize>> = const { Cell::new(None) };
+}
+
+/// Body row `row` of `page`, built as the engine renders a view (see the
+/// module's "How a row is built").
+pub(super) fn render_row_view<P: GalleryPage>(
+    page: &Entity<P>,
+    row: usize,
+    window: &mut Window,
+    cx: &mut App,
+) -> AnyElement {
+    REQUESTED_ROW.set(Some(row));
+    render_view(page, window, cx)
+}
+
+/// `entity` rendered in place, as the engine renders a view, for what its
+/// `Render` was asked to build. Upstream GPUI has no retained subtrees: an
+/// update is all a render is.
+pub(super) fn render_view<T: Render>(
+    entity: &Entity<T>,
+    window: &mut Window,
+    cx: &mut App,
+) -> AnyElement {
+    #[cfg(feature = "gpui-fast")]
+    return gpui::View::render(entity.clone(), window, cx).into_any_element();
+    #[cfg(not(feature = "gpui-fast"))]
+    entity.update(cx, |view, cx| view.render(window, cx).into_any_element())
+}
+
+/// What a page's [`Render`] builds: the row [`render_row_view`] asked for. A
+/// page rendered any other way (as a window's root) builds nothing.
+pub fn render_requested_row<P: GalleryPage>(
+    page: &mut P,
+    window: &mut Window,
+    cx: &mut Context<P>,
+) -> AnyElement {
+    match REQUESTED_ROW.take() {
+        Some(row) => page.render_row(row, window, cx),
+        None => div().into_any_element(),
+    }
+}
+
+/// Gives each page type its [`Render`], which builds the row asked for.
+macro_rules! page_views {
+    ($($page:ty),* $(,)?) => {$(
+        impl gpui::Render for $page {
+            fn render(
+                &mut self,
+                window: &mut gpui::Window,
+                cx: &mut gpui::Context<Self>,
+            ) -> impl gpui::IntoElement {
+                $crate::page::render_requested_row(self, window, cx)
+            }
+        }
+    )*};
+}
+pub(crate) use page_views;
+
 /// One registry entry: a page's static info and its constructor.
 pub struct PageEntry {
     pub info: &'static PageInfo,
@@ -426,6 +497,105 @@ pub const fn entry<P: GalleryPage>() -> PageEntry {
     PageEntry {
         info: &P::INFO,
         build: build::<P>,
+    }
+}
+
+/// The rule rows and playground parts are built by: building from an entity as
+/// its view draws it, which leaves what read the entity valid, unless the build
+/// notifies; an update would build the readers again.
+// Fast retains views: upstream builds every view again on each draw.
+#[cfg(all(test, feature = "gpui-fast"))]
+mod build_tests {
+    use super::*;
+    use core::prelude::v1::test;
+
+    struct Shared {
+        notify: bool,
+    }
+    impl Render for Shared {
+        fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+            if self.notify {
+                cx.notify();
+            }
+            div().child("built")
+        }
+    }
+    struct Builder {
+        shared: Entity<Shared>,
+        update: bool,
+    }
+    impl Render for Builder {
+        fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+            if self.update {
+                self.shared.update(cx, |shared, cx| {
+                    shared.render(window, cx).into_any_element()
+                })
+            } else {
+                render_view(&self.shared, window, cx)
+            }
+        }
+    }
+    struct Reader {
+        shared: Entity<Shared>,
+        renders: Rc<Cell<usize>>,
+    }
+    impl Render for Reader {
+        fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+            self.renders.set(self.renders.get() + 1);
+            div().child(if self.shared.read(cx).notify {
+                "a"
+            } else {
+                "b"
+            })
+        }
+    }
+    struct Root(Entity<Builder>, Entity<Reader>);
+    impl Render for Root {
+        fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+            div().child(self.0.clone()).child(self.1.clone())
+        }
+    }
+
+    /// How many times the reader renders over frames that build the builder again.
+    fn reader_renders(cx: &mut gpui::TestAppContext, update: bool, notify: bool) -> usize {
+        let renders = Rc::new(Cell::new(0));
+        let mut builder = None;
+        let window = cx.add_window({
+            let renders = renders.clone();
+            let builder = &mut builder;
+            move |_, cx| {
+                let shared = cx.new(|_| Shared { notify });
+                let built = cx.new(|_| Builder {
+                    shared: shared.clone(),
+                    update,
+                });
+                *builder = Some(built.clone());
+                Root(built, cx.new(|_| Reader { shared, renders }))
+            }
+        });
+        let builder = builder.unwrap();
+        let draw = |cx: &mut gpui::TestAppContext| {
+            cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear(cx))
+                .unwrap();
+        };
+        draw(cx);
+        let before = renders.get();
+        for _ in 0..3 {
+            cx.update(|cx| cx.notify(builder.entity_id()));
+            draw(cx);
+        }
+        renders.get() - before
+    }
+
+    #[gpui::test]
+    fn building_as_a_view_leaves_readers_valid_unless_it_notifies(cx: &mut gpui::TestAppContext) {
+        assert_eq!(
+            reader_renders(cx, false, false),
+            0,
+            "a view's build is drawing it"
+        );
+        assert!(reader_renders(cx, true, false) > 0, "an update is a write");
+        assert!(reader_renders(cx, false, true) > 0, "a notify is a change");
     }
 }
 

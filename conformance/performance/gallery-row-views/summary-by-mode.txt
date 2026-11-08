@@ -1,0 +1,12 @@
+hover         before fast runs-frames=   27 p50=  2.41 p95=  3.67 max=  5.12
+hover         before slow runs-frames=   72 p50=  3.76 p95= 15.89 max= 17.11
+hover         after  fast runs-frames=   23 p50=  2.47 p95=  3.42 max=  3.80
+hover         after  slow runs-frames=   76 p50=  3.12 p95= 15.16 max= 15.97
+scroll-specs  before fast runs-frames=  722 p50=  1.69 p95=  4.54 max=  8.00
+scroll-specs  before slow runs-frames= 2166 p50=  3.61 p95=  4.79 max= 18.09
+scroll-specs  after  fast runs-frames=  722 p50=  0.76 p95=  1.03 max=  3.76
+scroll-specs  after  slow runs-frames= 2164 p50=  3.63 p95=  4.87 max= 16.54
+switch        before fast runs-frames= 1347 p50=  0.69 p95=  4.00 max= 30.50  page-switch p95= 15.11 max= 30.50 n=144
+switch        before slow runs-frames=  900 p50=  2.95 p95= 19.52 max= 32.24  page-switch p95= 30.24 max= 32.24 n=96
+switch        after  fast runs-frames= 1130 p50=  0.68 p95=  3.87 max= 20.35  page-switch p95= 12.03 max= 20.35 n=120
+switch        after  slow runs-frames= 1127 p50=  2.91 p95= 18.26 max= 33.69  page-switch p95= 29.84 max= 33.69 n=120
