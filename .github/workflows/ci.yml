@@ -188,6 +188,32 @@ jobs:
             --dir "$RUNNER_TEMP/git-consumer" \
             ${TARGET:+--target "$TARGET"}
 
+  # The packaged library built as crates.io would receive it, with no [patch], against Kit's
+  # Git main standing in for its next release. It cannot pass until Kit has every Base API the
+  # library calls (docs/RELEASING.md), so it reports without failing CI.
+  release-readiness:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: gpui-kit-material
+      # rust-toolchain.toml pins the exact compiler, components and targets.
+      - name: Install the pinned toolchain
+        run: |
+          rustup toolchain install
+          rustc --version
+      - name: Linux libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libxkbcommon-dev libxkbcommon-x11-dev libwayland-dev libvulkan-dev libx11-xcb-dev libxcb1-dev libfontconfig-dev libfreetype-dev
+      - name: The package against Kit's main
+        run: |
+          kit=$(git ls-remote https://github.com/longbridge/gpui-kit refs/heads/main | cut -f1)
+          echo "Kit main: $kit"
+          scripts/check-registry-consumer.sh --dir "$RUNNER_TEMP/registry-consumer" --kit-git "$kit"
+
   # Packaging and dependency policy read manifests, not the platform, so one OS is enough.
   package:
     runs-on: ubuntu-latest
@@ -205,7 +231,7 @@ jobs:
         run: scripts/check-package.sh
       - name: The site Worker's rules
         run: node --test deploy/site/worker.test.js
-      # gpui-kit-material has Git dependencies and [patch] needs, so it cannot publish yet.
+      # gpui-kit-material waits for a Kit release (docs/RELEASING.md; the release-readiness job).
       - name: Publish dry run of the crate without Git dependencies
         run: cargo publish --locked --dry-run -p gpui-kit-material-color
       - uses: taiki-e/install-action@v2
