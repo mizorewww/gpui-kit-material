@@ -39,3 +39,13 @@ check gpui-kit-material LICENSE README.md \
     src/components/LICENSE-androidx src/shapes/LICENSE-androidx src/motion/LICENSE-material
 check gpui-kit-material-color LICENSE PALETTES.md \
     licenses/material-color-utilities.txt licenses/tokyo-night.txt licenses/catppuccin.txt licenses/nord.txt
+
+# crates.io refuses a package over 10 MB. Packaging names each Git dependency's
+# `version`, so this runs before Kit releases; scripts/check-registry-consumer.sh builds it.
+version=$(cargo pkgid -p gpui-kit-material | sed -E 's/.*[@#]//')
+cargo package --locked --allow-dirty --no-verify -p gpui-kit-material
+size=$(wc -c <"target/package/gpui-kit-material-$version.crate" | tr -d ' ')
+if [ "$size" -ge 10000000 ]; then
+    echo "gpui-kit-material is $size bytes packaged, over crates.io's 10 MB" >&2
+    exit 1
+fi

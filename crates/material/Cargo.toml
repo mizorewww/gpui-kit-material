@@ -9,7 +9,9 @@ rust-version.workspace = true
 license = "MIT AND Apache-2.0"
 repository.workspace = true
 authors.workspace = true
-readme = "../../README.md"
+readme = "README.md"
+# What crates.io gets: the library, its tests and fixtures, and the license texts it names.
+include = ["src/**/*", "tests/**/*", "LICENSE", "README.md"]
 keywords = ["material", "material-design", "gpui", "ui", "desktop"]
 categories = ["gui"]
 
