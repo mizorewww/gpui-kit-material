@@ -11,6 +11,7 @@ repository.workspace = true
 authors.workspace = true
 keywords = ["material", "color", "theme", "gpui"]
 categories = ["gui"]
+readme = "README.md"
 
 [package.metadata.docs.rs]
 all-features = true
