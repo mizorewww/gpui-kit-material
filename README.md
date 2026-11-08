@@ -110,20 +110,20 @@ use one revision:
 ```toml
 [dependencies]
 gpui-kit = { git = "https://github.com/longbridge/gpui-kit", rev = "8da4e005258ac0aac9a6a332cce746eeaafa08a8" }
-gpui-kit-material = { git = "https://github.com/mizorewww/gpui-kit-material", rev = "97cbe0bfd10f0b8eee2650967a160375240892e4" }
+gpui-kit-material = { git = "https://github.com/mizorewww/gpui-kit-material", rev = "75ccc77e01fe541a32848f42f003d7c82eb43b7a" }
 
 [patch.crates-io]
-gpui-kit = { git = "https://github.com/mizorewww/gpui-kit-material", rev = "97cbe0bfd10f0b8eee2650967a160375240892e4" }
+gpui-kit = { git = "https://github.com/mizorewww/gpui-kit-material", rev = "75ccc77e01fe541a32848f42f003d7c82eb43b7a" }
 gpui-base = { git = "https://github.com/longbridge/gpui-kit", rev = "8da4e005258ac0aac9a6a332cce746eeaafa08a8" }
-gpui-pre = { git = "https://github.com/mizorewww/gpui-kit-material", rev = "97cbe0bfd10f0b8eee2650967a160375240892e4" }
-gpui-pre-apple = { git = "https://github.com/mizorewww/gpui-kit-material", rev = "97cbe0bfd10f0b8eee2650967a160375240892e4" }
-gpui-pre-web = { git = "https://github.com/mizorewww/gpui-kit-material", rev = "97cbe0bfd10f0b8eee2650967a160375240892e4" }
-gpui-fast = { git = "https://github.com/mizorewww/gpui-kit-material", rev = "97cbe0bfd10f0b8eee2650967a160375240892e4" }
-gpui-fast-apple = { git = "https://github.com/mizorewww/gpui-kit-material", rev = "97cbe0bfd10f0b8eee2650967a160375240892e4" }
-gpui-fast-web = { git = "https://github.com/mizorewww/gpui-kit-material", rev = "97cbe0bfd10f0b8eee2650967a160375240892e4" }
+gpui-pre = { git = "https://github.com/mizorewww/gpui-kit-material", rev = "75ccc77e01fe541a32848f42f003d7c82eb43b7a" }
+gpui-pre-apple = { git = "https://github.com/mizorewww/gpui-kit-material", rev = "75ccc77e01fe541a32848f42f003d7c82eb43b7a" }
+gpui-pre-web = { git = "https://github.com/mizorewww/gpui-kit-material", rev = "75ccc77e01fe541a32848f42f003d7c82eb43b7a" }
+gpui-fast = { git = "https://github.com/mizorewww/gpui-kit-material", rev = "75ccc77e01fe541a32848f42f003d7c82eb43b7a" }
+gpui-fast-apple = { git = "https://github.com/mizorewww/gpui-kit-material", rev = "75ccc77e01fe541a32848f42f003d7c82eb43b7a" }
+gpui-fast-web = { git = "https://github.com/mizorewww/gpui-kit-material", rev = "75ccc77e01fe541a32848f42f003d7c82eb43b7a" }
 
 [patch."https://github.com/longbridge/gpui-kit"]
-gpui-kit = { git = "https://github.com/mizorewww/gpui-kit-material", rev = "97cbe0bfd10f0b8eee2650967a160375240892e4" }
+gpui-kit = { git = "https://github.com/mizorewww/gpui-kit-material", rev = "75ccc77e01fe541a32848f42f003d7c82eb43b7a" }
 ```
 
 > `[patch]` is read only from the top-level manifest, so it goes in your workspace root.
