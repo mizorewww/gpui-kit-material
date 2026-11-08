@@ -51,8 +51,8 @@ Icons come from
 
 | Crate | Published | Holds |
 | --- | --- | --- |
-| [`gpui-kit-material-color`](crates/color) | Dry run in CI | Color roles, palettes, reference themes and dynamic schemes, without GPUI. Features `serde`, `dynamic` (both default). |
-| [`gpui-kit-material`](crates/material) | Git revision | The library: theme, tokens, motion, icons and the components below. |
+| [`gpui-kit-material-color`](crates/color) | [crates.io](https://crates.io/crates/gpui-kit-material-color) 0.1 | Color roles, palettes, reference themes and dynamic schemes, without GPUI. Features `serde`, `dynamic` (both default). |
+| [`gpui-kit-material`](crates/material) | Git revision; crates.io after Kit's next release ([docs/RELEASING.md](docs/RELEASING.md)) | The library: theme, tokens, motion, icons and the components below. |
 | [`gpui-kit-material-gallery`](crates/gallery) | Never | The shared Gallery, its fonts and its dev-only profiler: a library and the `gallery` binary. |
 | [`gpui-kit-material-gallery-web`](crates/gallery-web) | Never | The Gallery's browser entry point. |
 | [`gpui-kit-material-bench`](crates/bench) | Never | `component_bench` and `engine_bench`. |
@@ -88,8 +88,24 @@ there.
 
 ## Quick start
 
-The library is distributed by Git revision, and a downstream workspace needs the
-engine patches below until they land upstream. All of them must use one revision:
+Minimum Rust: **1.98** (`rust-version`).
+
+**From crates.io** (not yet available). `gpui-kit-material` will be published once
+a `gpui-kit` release contains every Base API the library calls; the crates.io
+[README](crates/material/README.md) is what it will say. Then a dependency on both,
+at the Kit release the library names, is all a consumer needs, with no `[patch]`:
+
+```toml
+[dependencies]
+gpui-kit = "0.10"
+gpui-kit-material = "0.1"
+```
+
+[docs/RELEASING.md](docs/RELEASING.md) tracks what the release waits for.
+
+**From Git** (today). The library is distributed by Git revision, and a downstream
+workspace needs the engine patches below until they land upstream. All of them must
+use one revision:
 
 ```toml
 [dependencies]
@@ -227,6 +243,7 @@ alone (`scripts/check-features.sh`). Project rules for contributors and agents a
 | Document | Contents |
 | --- | --- |
 | [docs/PRODUCTION.md](docs/PRODUCTION.md) | What a component and a release must meet to be called stable |
+| [docs/RELEASING.md](docs/RELEASING.md) | Release order, what crates.io publication waits for, release-day steps |
 | [docs/COVERAGE.md](docs/COVERAGE.md) | Every reference component, its status and what is missing |
 | [docs/ROADMAP.md](docs/ROADMAP.md) | Status tables and remaining work |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Layers, Kit reuse, reference sources, theme bridge, engine patches |

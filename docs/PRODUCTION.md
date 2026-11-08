@@ -122,7 +122,7 @@ component invalidates the verdict for what it touches.
 
 ## Release criteria
 
-A crate release also requires:
+A crate release also requires (the steps are in [RELEASING.md](RELEASING.md)):
 
 - **CI** green on macOS, Linux and Windows, both GPUI backends, and the WASM
   gallery build.

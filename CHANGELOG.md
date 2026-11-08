@@ -5,7 +5,29 @@ commit messages.
 
 ## Unreleased
 
-Distribution is by Git revision for now; see the [quick start](README.md#quick-start).
+`gpui-kit-material-color` 0.1.0 is on crates.io (tag `color-v0.1.0`, 2026-11-08).
+`gpui-kit-material` is distributed by Git revision until its first crates.io release,
+0.1.0, which waits for a `gpui-kit` release ([docs/RELEASING.md](docs/RELEASING.md));
+see the [quick start](README.md#quick-start). The entries below are changes since
+earlier Git revisions.
+
+### gpui-kit-material 0.1.0, the first crates.io release
+
+- Material 3 / M3 Expressive over Longbridge GPUI Kit: Kit's `gpui-component` controls
+  and Base parts own behavior, this crate owns Material visuals and motion.
+- Theme runtime over `gpui-kit-material-color` 0.1: semantic `ColorRole`s, the 20 md3.io
+  reference themes, legacy palettes, dynamic seed schemes (`dynamic-color`), animated
+  theme transitions, a 100–200% text scale and a bridge into Kit's theme.
+- Tokens for shape, the 15 type roles and their emphasized styles, layout metrics,
+  elevation and state layers; Expressive and Standard motion schemes with
+  per-transition reduced motion.
+- Material Symbols through `gpui-material-symbols` 0.1, embedded by default.
+- Components in feature groups (`buttons`, `progress`, `loading`, `feedback`,
+  `selection`, `inputs`, `menus`, `pickers`, `dialogs`, `containment`, `navigation`,
+  `adaptive`, `window-chrome`, `shapes`), all on by default; the GPUI Fast backend by
+  default, upstream GPUI without it.
+- Pre-release: no component is stable yet ([docs/COVERAGE.md](docs/COVERAGE.md)).
+- `rust-version` 1.98. Builds on published crates only, with no `[patch]`.
 
 ### Added
 
