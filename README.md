@@ -55,7 +55,7 @@ Icons come from
 | [`gpui-kit-material`](crates/material) | Git revision; crates.io after Kit's next release ([docs/RELEASING.md](docs/RELEASING.md)) | The library: theme, tokens, motion, icons and the components below. |
 | [`gpui-kit-material-gallery`](crates/gallery) | Never | The shared Gallery, its fonts and its dev-only profiler: a library and the `gallery` binary. |
 | [`gpui-kit-material-gallery-web`](crates/gallery-web) | Never | The Gallery's browser entry point. |
-| [`gpui-kit-material-bench`](crates/bench) | Never | `component_bench` and `engine_bench`. |
+| [`gpui-kit-material-bench`](crates/bench) | Never | `component_bench`. |
 
 The library's `default` features enable every group, the Fast backend, embedded symbols
 and `serde`. To drop code, turn them off and name what you use; a group brings what it
@@ -129,7 +129,7 @@ gpui-base = { git = "https://github.com/mizorewww/gpui-kit-material", rev = "97c
 
 > `[patch]` is read only from the top-level manifest, so it goes in your workspace root.
 > [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#consumer-patch-set) says why each patch
-> exists. The rest of `vendor/` is dev-only frame observation for the Gallery. At every pushed
+> exists. The rest of `vendor/` is gpui-fast `main`'s backends for this workspace. At every pushed
 > commit, CI builds this block's template from Git at that commit
 > (`scripts/git-consumer/Cargo.toml.in`, `scripts/check-git-consumer.sh`), and checks that this
 > block differs from the template only in its revision (`scripts/check-package.sh`). The revision
@@ -201,10 +201,8 @@ cargo run -p gpui-kit-material-gallery      # desktop (GPUI Fast backend)
 python3 -m http.server 8080 --bind 127.0.0.1 --directory crates/gallery-web/www
 ```
 
-The title bar shows FPS of newly drawn frames; **Settings → Vertical sync**
-toggles Metal display sync on macOS, the surface's `PresentMode` on Linux and the
-DXGI sync interval on Windows. Headless capture, profiling and fixture
-tooling are described in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
+Headless capture, profiling and fixture tooling are described in
+[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
 
 ## References
 
@@ -224,8 +222,6 @@ tooling). Acceptance evidence is still open.
 | Idle window | draws nothing |
 
 The profiler's finer budgets in DEVELOPMENT.md are diagnostics, not release gates.
-
-GPU time is reported separately.
 
 ## Develop
 

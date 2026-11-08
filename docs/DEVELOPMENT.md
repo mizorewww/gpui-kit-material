@@ -121,34 +121,56 @@ evidence of success. Captures are for visual review, not timed animation.
 
 ## Profiling
 
-`scripts/profile-gallery.py` builds a release gallery and records full CPU
-frame scopes (including startup), build flags, source identity and raw timings:
+The engine is upstream's: Material adds no frame instrumentation to it. Frame timing
+comes from upstream's own `profiler` feature (the Gallery's `frame-profiler`), which
+records each frame's `Window::draw` (with its request-layout, prepaint and paint
+phases) and the platform submission of what it drew. Everything else is measured
+outside the engine:
+
+| What | How |
+| --- | --- |
+| Native frame time per interaction | `scripts/profile-gallery.py` (below): draw + submission per frame, from upstream's profiler |
+| Native main-thread work outside draw and submission (input dispatch, the frame callback, cleanup) | a sampling profiler on the release build: Instruments' Time Profiler, or `sample <pid>` |
+| Native GPU time | Instruments' Metal System Trace |
+| Instructions per frame, independent of load | `--features instruction-bench` (below) and `component_bench` |
+| Browser frame time | `www/profile.js` (each `requestAnimationFrame` callback) and Chrome DevTools performance traces |
+| md3.io | the same probe and DevTools traces ([below](#chrome-comparison-with-md3io)) |
+
+What can no longer be measured, since the dev-only engine patches that did it were
+dropped (gpui-fast does not take API additions):
+
+- the whole synchronous frame callback as one CPU scope, from the engine;
+- the drawable wait (`nextDrawable`) separately from submission, and Metal GPU
+  timestamps in the report;
+- successfully submitted new frames, so neither the title bar's FPS counter nor a
+  drawn-frame count: "idle windows draw nothing" is checked in a trace (Instruments,
+  DevTools), not by a counter;
+- frames with vertical sync off (the switch and `--vsync` are gone): every frame is
+  paced by the display, so a frame's time is what it costs, not a frame rate;
+- full-traversal scroll runs with per-frame position association (`--scroll`), and
+  the standalone `engine_bench`.
+
+### Interaction profiles
 
 ```sh
-python3 scripts/profile-gallery.py /tmp/material-fast --backend fast --seconds 5
-python3 scripts/profile-gallery.py /tmp/material-scroll --backend fast --seconds 10 \
-  --scroll --scroll-input wheel
+python3 scripts/profile-gallery.py /tmp/material-interactions --backend fast --script interactions
 ```
 
-`--scroll` (2–120 s) disables vertical sync and scrolls the whole Gallery
-top → bottom → top repeatedly, turning only at the real ends. A run lasts `--seconds`
-but continues until it has finished one lap, up to 120 s: Overview alone is 6 000 px,
-which takes 13 s where a display of 60 Hz paces input to two steps a frame. Input comes from
-a foreground timer (`--input-hz`, default 1000), never from frame callbacks,
-so the driver cannot pace frames. `--scroll-input wheel` sends 8 px wheel
-events through the normal input path; `programmatic` mutates the offset
-directly and bypasses wheel invalidation, so prefer `wheel` for gate evidence.
+builds a release Gallery with `frame-profiler`, runs one interaction script
+(`crates/gallery/src/interactions.rs`) and writes `frames.json` (every frame, labelled
+with the step that was active, raw), `targets.json` and the build's provenance.
+Scripts: `interactions` (page switches between Button, Text field, Date picker and
+Examples, hover and press in the Button preview, 8 px wheel scrolling of Overview and
+Button's Specs), and `hover`, `switch`, `scroll-specs` and `scroll-overview`, which
+repeat one of them. The binary runs the same scripts with
+`MATERIAL_PROFILE_SCRIPT=<script> MATERIAL_PROFILE_OUTPUT=<frames.json>`.
 
-Reports keep raw positions, laps and row coverage, successful new-frame
-counts, the lowest FPS over ≥ 250 ms windows, and draw-associated submission
-attempt gaps as a diagnostic. Runs whose rate sits near or below the display
-refresh while VSync reads disabled are marked (`observed_rate_near_or_below_refresh`).
-
-Drawable acquisition runs on the main thread, as upstream. Its wait is timed and
-reported separately as `presentation_wait_*`/`drawable_wait`. GPU time
-(Metal `GPUStartTime`/`GPUEndTime`, macOS only) is reported per frame under
-`gpu` and never counts toward the CPU budget; other backends report null with
-a reason.
+A frame's time is its draw plus its submission; the first frame after a page switch is
+that switch's cost and is kept out of the steady state. An unfocused window is
+throttled, so keep the Gallery's window in front while it runs, and compare runs taken
+under the same conditions: the report records the load average. macOS gives a covered
+window no frames, and a remote desktop's overlay covers every window: such a run
+submits nothing, and the runner reports it incomplete (exit 2). Run on a local display.
 
 ### Targets
 
@@ -161,20 +183,27 @@ with nearest-rank quantiles; an average never decides one:
 
 | Target | Limit | Source |
 | --- | --- | --- |
-| steady-state CPU p95 / max, excluding drawable wait | 1 ms / 2 ms (WASM 2 / 4 ms) | scroll frames after a 750 ms settle; `www/profile.js` for WASM |
+| steady-state frame p95 / max | 1 ms / 2 ms (WASM 2 / 4 ms) | interaction frames other than the first and those after a page switch; `www/profile.js` for WASM |
 | Material list against an equivalent Kit list | ≤ 2× the instructions per frame, worst of p50 and p95 | `component_bench --content material-list` and `kit-list`, same mode; UNVERIFIED without instruction counters, which read 0 outside native macOS |
-| idle window | 0 frames drawn or presented | `--bench` idle scenario, `?profile=idle` |
-| missed refreshes, vsync on | 0 at 120 Hz | intervals > 1.5 refreshes; UNVERIFIED on other displays |
-| first frame | ≤ 1.2 × Kit's stories baseline on this machine | thread CPU clock from `open_window` to after the first submission, against `--kit-first-frame-ms`; UNVERIFIED without that baseline |
-| page switch | 8 ms | native: the Gallery reports `page_switch_ns`. Web: not measured, so UNVERIFIED: `profile.js` offers the hook `window.__galleryPageSwitch(ms)`, and nothing calls it |
-| WASM against md3.io | main-thread frame time ≥ 5× lower | stays UNVERIFIED in the tool; [the comparison below](#chrome-comparison-with-md3io) is by hand |
+| first frame | ≤ 1.2 × Kit's stories baseline on this machine | the initial draw plus the first submitted frame, against `--kit-first-frame-ms`; UNVERIFIED without that baseline |
+| page switch | 8 ms | the first frame after each switch |
+| idle window | 0 frames drawn | not judged by the tool: a trace of an untouched window |
+| WASM against md3.io | main-thread frame time below md3.io's | stays UNVERIFIED in the tool; [the comparison below](#chrome-comparison-with-md3io) is by hand |
 
-GPU time (Metal timestamps), drawable wait, new frames per second and the forced
-redraw are reported under `metrics`, without a verdict.
+Re-judge saved evidence without running anything:
 
-Each report's `environment` records Low Power Mode, power source, display refresh and
-load, and the runner warns on stderr when Low Power Mode is on. Timings across different
-conditions do not compare; use instruction counts (below) to compare changes.
+```sh
+python3 scripts/profile-gallery.py --summarize /tmp/material-interactions/frames.json --kit-first-frame-ms 42
+cargo run --release -p gpui-kit-material-bench --bin component_bench -- \
+  --content material-list --mode scroll --frames 300 --out /tmp/material-list.json
+cargo run --release -p gpui-kit-material-bench --bin component_bench -- \
+  --content kit-list --mode scroll --frames 300 --out /tmp/kit-list.json
+python3 scripts/profile-gallery.py --summarize /tmp/material-list.json /tmp/kit-list.json
+```
+
+Runner exit status: `0` for a complete run with no failing budget, `1` when a budget
+failed, `2` for incomplete or unstable evidence. Evidence for a release commit goes
+under [conformance/performance/releases/](../conformance/performance/releases/README.md).
 
 ### Instruction counts
 
@@ -187,54 +216,18 @@ visits, with phase times and lines shaped. Every report also has `startup`, the
 instructions at each step from `main` to the first presented frame.
 
 A window that something covers gets no frames from macOS, and a benchmark then waits for
-ever. A remote desktop's overlay covers every window: set `GPUI_IGNORE_OCCLUSION=1` to draw
-regardless (Fast on macOS only, where any value turns it on, `0` and an empty one too). Counts stay comparable; a stalled main thread can still add
-frames, as a wheel's hover freeze expiring refreshes the window, so compare the frames' `row_builds` too.
-
-Re-judge saved evidence without running anything:
-
-```sh
-python3 scripts/profile-gallery.py --summarize /tmp/material-bench/*.json /tmp/material-scroll/frames.json \
-  --kit-first-frame-ms 42
-cargo run --release -p gpui-kit-material-bench --bin component_bench -- \
-  --content material-list --mode scroll --frames 300 --out /tmp/material-list.json
-cargo run --release -p gpui-kit-material-bench --bin component_bench -- \
-  --content kit-list --mode scroll --frames 300 --out /tmp/kit-list.json
-python3 scripts/profile-gallery.py --summarize /tmp/material-list.json /tmp/kit-list.json
-```
-
-The Gallery's own exit code fails on steady-state frames only. Evidence for a release
-commit goes under [conformance/performance/releases/](../conformance/performance/releases/README.md).
-
-### Engine benchmark
-
-`crates/bench/src/bin/engine_bench.rs` validates engine changes without
-the Gallery: a 4000-row `list` of Material components (`--content material`),
-plain quads and text (`simple`), or Gallery-like sections whose boards scroll
-horizontally inside their rows (`boards`). It drives one 8 px wheel event per
-frame (scroll), nothing (idle), or a root notify per frame (redraw), and
-writes raw per-frame CPU scopes, phases, drawable waits, submissions, GPU
-executions, engine counters and main-thread CPU time. `--bench` builds it and
-runs startup ×3, scroll with vsync off and on, idle and redraw:
-
-```sh
-python3 scripts/profile-gallery.py /tmp/material-bench --bench --seconds 5 [--bench-content boards]
-cargo run --release -p gpui-kit-material-bench --bin engine_bench --features frame-profiler -- \
-  --scenario scroll --vsync off --seconds 5 --content material --out /tmp/scroll.json
-```
-
-`--open-delay-ms N` opens a small plain window first and the measured window
-N ms later, so `sample <pid>` can attach in between (attaching during
-launch blocks the process on dyld notifications). Close other Gallery and
-build processes first: the reports record the load average, and a loaded
-machine inflates every timing and caps FPS.
+ever; a remote desktop's overlay covers every window, so run it on a local display.
+Counts stay comparable; a stalled main thread can still add frames, as a wheel's hover
+freeze expiring refreshes the window, so compare the frames' `row_builds` too.
 
 ### Chrome comparison with md3.io
 
-AGENTS.md asks for WASM main-thread frame time ≥ 5× lower than md3.io in
-Chrome for equivalent pages and interactions. Measure both sides the same way,
-release WASM, same Chrome build, flags, viewport (1280×800) and DPR, with the
-machine otherwise idle.
+AGENTS.md asks for main-thread frame time p95 and max below md3.io's best run in
+Chrome, natively and as WASM, for equivalent pages and interactions. Measure the
+browser sides the same way, release WASM, same Chrome build, flags, viewport
+(1280×800) and DPR, with the machine otherwise idle. Natively, the interaction
+profiles above give draw and submission per frame; a Time Profiler trace of the same
+interaction shows the main-thread work around them, which they leave out.
 
 1. Automated probe. `www/profile.js` contains `runFrameProbe`, a
    self-contained function that times each animation frame from its
@@ -242,13 +235,14 @@ machine otherwise idle.
    which runs after that frame's style, layout, paint and commit, while it
    sends 8 px wheel steps (and scrolls the nearest scroller) at 1000 Hz to what is under the
    viewport's centre once the page has settled. The report's `moved` says whether they moved
-   anything, from `scrolled_px` on a DOM page and `new_frames` on the Gallery's canvas; a
-   report with `moved` false measured an idle page:
+   anything, from `scrolled_px` on a DOM page; a report with `moved` false measured an
+   idle page:
 
    ```sh
    python3 scripts/profile-gallery.py /tmp/md3io --md3io https://md3.io/components/buttons --seconds 10
    # same probe on the Gallery, served as in "Browser gallery":
    #   http://127.0.0.1:8080/?profile=probe&seconds=10  -> window.__galleryProfile.report
+   # (the Gallery's canvas reports `moved` null: the engine no longer counts drawn frames)
    ```
 
    `probe.json` keeps the raw per-frame durations. The probe does not see
@@ -272,11 +266,6 @@ machine otherwise idle.
    resolution without cross-origin isolation) means the reference interaction
    does no main-thread work, not that the comparison passed.
 
-Runner exit status: `0` only for a complete run the gallery reports eligible
-with the steady-state CPU gate passing; `1` when a measured gate failed; `2`
-for incomplete, unstable or unverifiable evidence. Startup and browser runs
-cannot establish that gate, so they return `1` or `2`, never `0`.
-
 ### Browser (WASM)
 
 `--web` builds the release WASM Gallery, serves it with cross-origin isolation
@@ -286,38 +275,20 @@ headless Chromium through `agent-browser` with
 server:
 
 ```sh
-python3 scripts/profile-gallery.py /tmp/material-web --web --backend fast --seconds 15 --scroll
+python3 scripts/profile-gallery.py /tmp/material-web --web --backend fast --seconds 15 --web-mode scroll
 ```
 
 The same page works by hand: open `http://127.0.0.1:8080/?profile=scroll&seconds=15`
 (or `profile=startup`, `profile=idle`; optional `hz`, `legpx`) and read
 `window.__galleryProfile.report` when `done`. `www/profile.js` times every
-`requestAnimationFrame` callback (one whole GPUI frame) and the synchronous
-`run()` startup with `performance.now()` into preallocated buffers, and reads
-the engine's successful new-frame counter after each scope. The scroll driver
-dispatches 8 px DOM wheel events from a `MessageChannel` loop independent of
-animation frames. It cannot read the list position, so legs scroll a fixed
-distance and coverage stays unverified; GPU time is null (no WebGPU timestamp
+`requestAnimationFrame` callback (one whole GPUI frame when it draws) and the
+synchronous `run()` startup with `performance.now()` into preallocated buffers. The
+engine does not say which callbacks drew, so the report counts callbacks, not frames,
+and leaves the idle target UNVERIFIED: read drawn frames from a DevTools performance
+trace. The scroll driver dispatches 8 px DOM wheel events from a `MessageChannel` loop
+independent of animation frames. It cannot read the list position, so legs scroll a
+fixed distance and coverage stays unverified; GPU time is null (no WebGPU timestamp
 queries). Browser reports are never acceptance-eligible.
-
-The gallery FPS counter counts only successfully submitted new draws, sampled
-every 500 ms; skipped submissions, repeated presents and idle time do not count,
-and it is not display refresh or GPU completion. A backend without a success
-signal shows `FPS: unavailable`. Recorded runs live under
-`conformance/performance/`.
-
-To verify the counter on Linux or Windows, run the gallery on either backend:
-
-```sh
-cargo run -p gpui-kit-material-gallery
-cargo run -p gpui-kit-material-gallery --no-default-features --features embedded-symbols
-```
-
-The counter should show a number, not `FPS: unavailable`. It should read `FPS: 0.0`
-when idle and approach the display's refresh rate while you scroll continuously
-(never above it: the display still paces frame requests). Settings shows the real
-vertical sync state; X11 starts on, Wayland and Windows start off, and toggling it
-reconfigures presentation without changing that ceiling.
 
 ## Fonts and reference fixtures
 
@@ -349,4 +320,5 @@ into `conformance/reference/`. Figma kit token fixtures (`figma-*.json`) come fr
 cargo test -p gpui-pre-apple --test font_fallback
 cargo test -p gpui-pre --lib text_system
 cargo test -p gpui-kit-material -p gpui-fast --features gpui-kit-material/gpui-fast --lib
+cargo test -p gpui-fast-apple --test font_fallback
 ```

@@ -43,7 +43,7 @@ Every gpui-fast PR of ours is merged on gpui-fast `main`; the latest release is
 0.1.13, without them. `vendor/gpui-fast*` already track `main` (`bbdbc42d`, produced by
 `scripts/vendor-gpui-fast.py`, which runs upstream's release renaming), so these changes
 now come from upstream and are no longer local patches. Once gpui-fast releases them,
-replace the vendored copies with that release and drop what is left of the overlays below:
+replace the vendored copies with that release and drop what is left of the patches below:
 
 | gpui-fast PR (now upstream) | Where it lives upstream |
 | --- | --- |
@@ -58,12 +58,15 @@ replace the vendored copies with that release and drop what is left of the overl
 
 Not offered upstream, behavior only: hanging overflow spaces
 (`src/text_system/line_layout.rs`, `line_wrapper.rs`), a wrapping change kept for the
-Gallery; crates.io users get upstream wrapping. Dev-only, kept local for the Gallery
-and profiler: the `frame-observation` feature and everything behind it (CPU frame
-scopes, submission statistics, vsync control, presentation and GPU timing, the render
-lease `Entity::update_for_render`), the `-macos`, `-linux`, `-windows`, `-wgpu` and
-`wgpu` overlays, and the test-harness repairs and fixtures. The `gpui-pre*` patches
-mirror these for the upstream backend, which has no PR channel of its own.
+Gallery (waiting on zed-industries/zed#66644); crates.io users get upstream wrapping.
+`sbix` color fonts (`gpui-fast-apple/src/text_system.rs`) are being offered upstream.
+Kept local, no API: the test-harness repairs and fixtures, and `try_update` for the
+deprecated `fetch_update`. The `-macos`, `-linux`, `-windows` and `-wgpu` crates are
+unmodified copies of `main` and go with the release. Nothing vendored adds or changes
+engine API: the dev-only frame observation (CPU frame scopes, submission statistics,
+vsync control, presentation and GPU timing, the render lease) was dropped, since
+gpui-fast takes no API additions. The `gpui-pre*` patches mirror the remaining ones for
+the upstream backend, which has no PR channel of its own.
 
 ## Before the release
 

@@ -119,7 +119,7 @@ earlier Git revisions.
 - **Breaking:** the `frame-profiler` and `instruction-bench` features moved to
   `gpui-kit-material-gallery`. A consumer wanting Kit's profiler enables `gpui-kit/profiler`.
 - **Breaking:** the Gallery and benches moved out of `gpui-kit-material`'s examples:
-  `cargo run -p gpui-kit-material-gallery`, and `-p gpui-kit-material-bench --bin engine_bench`.
+  `cargo run -p gpui-kit-material-gallery`, and `-p gpui-kit-material-bench --bin component_bench`.
 - `gpui-kit-material`'s `serde` feature now controls the color crate's, which was always on.
 - `advance_component_theme` also projects Base's scrollbar colors and `TextView`'s
   link and table-head colors, so they follow the palette instead of Kit's default theme.
@@ -127,8 +127,10 @@ earlier Git revisions.
   color for blue, teal, pink and purple in every source palette.
 - Kit is pinned by revision (`bb85882`) instead of `branch = "main"`, so a consumer
   without this workspace's lockfile gets Component at the same revision as Base.
-- `Entity::update_for_render` is dev-only, behind `frame-observation`; a consumer's
-  engine keeps upstream's API here.
+- The vendored engines add no API: the dev-only frame observation (`frame-observation`,
+  `Entity::update_for_render`, submission statistics, vsync control) is gone, with the
+  Gallery's FPS counter and vsync switch, `engine_bench` and the old frame profiler. The
+  Gallery's profiler reads upstream's `profiler` feature.
 - `LineLayoutCache::layout_wrapped_line` is gone from both engines: `layout_wrapped_line_spaced`
   replaces it, and nothing outside the crate could reach it.
 - Performance tooling judges the targets in `AGENTS.md`: the 500 FPS, 0.3 ms redraw and

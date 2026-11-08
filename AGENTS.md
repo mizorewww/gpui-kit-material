@@ -75,6 +75,14 @@
   on an idle machine with raw per-frame timings, maxima, and hardware/build
   context; a profile taken during builds is not evidence. Averages alone never
   establish a target; incomplete timing stays unverified.
+  - Measure with upstream's own instrumentation and external tools, never an
+    engine patch: `scripts/profile-gallery.py` (upstream's `profiler`: each
+    frame's draw and submission), Instruments or `sample` for main-thread work
+    around them and GPU time, `instruction-bench`/`component_bench` for
+    load-independent counts, and `www/profile.js` plus Chrome DevTools traces
+    for WASM and md3.io. The engine no longer reports whole frame-callback
+    scopes, drawable waits, drawn-frame counts or frames with vsync off
+    (docs/DEVELOPMENT.md, Profiling): do not claim those measurements.
   - The profiler's finer budgets (steady CPU p95 1 ms, Material list against
     Kit list, first frame against Kit's stories, page switch 8 ms) are
     diagnostics for finding regressions, not release gates.

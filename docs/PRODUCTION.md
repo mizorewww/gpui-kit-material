@@ -96,7 +96,10 @@ comparable interaction, main-thread frame time p95 and max below md3.io's best r
 in Chrome on the same machine, natively and as WASM, and idle windows draw nothing.
 A component meets it when its Gallery page does
 in a release build, with raw per-frame timings and hardware context preserved.
-Averages never establish a target.
+Averages never establish a target. The measurements available are upstream's
+profiler (draw and submission per frame), sampling profiles, instruction counts and
+browser traces ([DEVELOPMENT.md](DEVELOPMENT.md#profiling)); idle drawing is shown
+by a trace, as the engine reports no drawn-frame count.
 
 ### Platforms
 

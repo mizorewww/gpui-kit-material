@@ -46,12 +46,13 @@ gpui-kit-material                the library; nothing below is in its package
 gpui-kit-material-gallery        publish = false: Gallery, fonts, frame-profiler, instruction-bench
         ▲            ▲
         │            gpui-kit-material-gallery-web   publish = false: browser entry, wasm-bindgen
-gpui-kit-material-bench          publish = false: component_bench, engine_bench (on the library only)
+gpui-kit-material-bench          publish = false: component_bench (on the library only)
 ```
 
 `crates/consumer-check` stands outside the workspace, as a downstream manifest does.
-Dev-only engine features are selected only by the Gallery and benches; the library has
-none ([Consumer patch set](#consumer-patch-set)). The Gallery's native build keeps
+Only the Gallery and benches select engine features beyond the backend, all of them
+upstream's: `profiler` (the Gallery's `frame-profiler`) and `test-support`; the library
+selects none ([Consumer patch set](#consumer-patch-set)). The Gallery's native build keeps
 `gpui-kit/test-support`, whose `render_to_image` draws `--capture`.
 
 The library's components are in Cargo feature groups, listed in the
@@ -174,30 +175,24 @@ it; the others change behavior only.
 | `gpui-pre-apple`, `gpui-fast-apple` | no | Non-Latin and app-private fallback fonts (upstream on gpui-fast `main`, a local patch in `gpui-pre-apple`); `sbix` color fonts drawn as color bitmaps (local in both). |
 | `gpui-pre-web`, `gpui-fast-web` | no | The browser's IME panel opens at the caret, and a key or edit the IME owns stays whole. Upstream on gpui-fast `main` (unreleased); a local patch in `gpui-pre-web`. Only matters on `wasm32`. |
 
-Everything else in `vendor/` is a **dev-only overlay**, marked in the table below,
-for the Gallery's FPS display
-and vsync switch, `crates/bench`'s `engine_bench` and `scripts/profile-gallery.py`: frame statistics,
-vsync control, CPU scopes, presentation timing and GPU time, and the render lease the
-Gallery's rows build through. `gpui-pre` and
-`gpui-fast` gate them behind the `frame-observation` Cargo feature, and only the
-overlay's backend manifests (`gpui-*-macos`, `-linux`, `-windows`) turn it on. The
-web crates are not overlays, so their manifests leave it off and offer a
-`frame-observation` feature of their own, which only `crates/gallery` selects
-for its browser frame counters. No library code may use them; `crates/consumer-check` fails to build if it does.
-Inside this workspace the feature is therefore always on, so upstream's `gpui-fps`
-does not compile here (`E0004`, `FrameEvent::Complete`) and is not used here.
+The rest of `vendor/` exists only so that this workspace builds the same engine: the
+gpui-fast backends at gpui-fast `main` (`gpui-fast-macos`, `-linux`, `-windows`,
+`-wgpu`), unmodified apart from test-harness repairs. No vendored crate adds or changes
+engine API: gpui-fast takes no API additions, so the dev-only frame observation the
+Gallery's FPS counter, vsync switch and old profiler used was dropped, and the
+upstream backend's platform crates (`gpui-pre-macos`, `-linux`, `-windows`, `-wgpu`,
+`wgpu`) come from crates.io. `crates/consumer-check` builds the library beside
+upstream's `gpui-fps`; so does this workspace.
 
 | Vendored | Source | Why |
 | --- | --- | --- |
 | `gpui-kit` | Git at Kit `main` `8dfdd49d`, unchanged source | Normalized manifest disables implicit WASM threading (`multithreaded-web` restores it). Hashes in `SOURCE.md`/`SOURCE.json`. |
 | `gpui-base` | Git `8dfdd49d` (Kit `main`, `crates/base`) + one patch (`SOURCE.json`, `motion-patch.md`) | `TransitionPlayback` (`src/motion.rs`, `src/lib.rs`), equal to the head of the open longbridge/gpui-kit#3841. Merged upstream and no longer patched: per-transition reduced motion (#3839), assistive Increment/Decrement with `SliderState::accessibility_step` (#3840), CSS transition reversal (#3820), vertical `Toolbar` axis (#3821), slider step snapping (#3822), block surfaces in `TextView` (#3830), slider min above the default max (#3823), `Slider::track_focus` (#3824), a disabled thumb's flag (#3825), `Dialog::accessibility_label` (#3826), an input a parent moves notified only while focused (#3828), `TimeField::separator` (#3829), the input's layout published at the end of prepaint (#3831). |
-| `gpui-pre` (GPUI `=0.3.11`) | crates.io + patches (`SOURCE.json`, `*-patch.md`) | Complete CPU frame scopes, presentation wait, GPU time and submission outcome in the profiler; submission statistics, vsync control and throttle retry; `em`/`ch` metrics for fonts without `m`; lazy tab-stop index (`tab-stop-index-patch.md`); `Entity::update_for_render`, dev-only behind `frame-observation` (`render-lease-patch.md`); overflowing spaces hang instead of starting a wrapped row (`hanging-space-patch.md`); test-harness repairs. |
-| `gpui-pre-apple` | crates.io + patches (`SOURCE.json`, `VENDORED.md`) | Non-Latin and app-private fallback fonts; `draw_with_status` (upstream's draw, into a `CAMetalDisplayLink` drawable or `nextDrawable`) with a per-draw autorelease pool, drawable-wait and GPU timestamps. |
-| `gpui-pre-web` | crates.io + patches (`SOURCE.json`, `MATERIAL-PATCHES.md`) | Moves the hidden IME input to the caret when a composition starts and on `update_ime_position`, where a browser opens its candidate window and it takes no clicks; keeps a composition's keys from GPUI and a replaced emoji whole (consumers need these); successful submission count, behind the crate's own `frame-observation` feature. |
-| `gpui-fast`, `-apple`, `-web` | gpui-fast `main` `bbdbc42d` + patches (`SOURCE.json`, `MATERIAL-PATCHES.md`) | gpui-fast's repository names its crates `gpui`, `gpui_web`, ...; only its release step gives them the `gpui-fast-*` names Kit depends on, so a Git `[patch]` cannot select them. `scripts/vendor-gpui-fast.py` runs that step at a commit (version kept at 0.1.13; `gpui-fast-macros` and `-platform` are unchanged since 0.1.13 and come from crates.io) and records each file that differs. Material's Fast PRs are all upstream: wheel at its limit (#104), hover freeze for listeners (#105), released entities in a spliced view (#106), web IME (#108, #109, #110), macOS fonts (#111, #112), lazy tab stops (#113), `record_entities_accessed` (#114), `em` metrics (#115). Local: the dev-only overlay below, test-harness repairs, hanging overflow spaces (`src/text_system/line_layout.rs`, `line_wrapper.rs`) and `sbix` color fonts (`gpui-fast-apple/src/text_system.rs`). |
-| `gpui-pre-macos`, `gpui-fast-macos` (dev-only) | crates.io (`gpui-pre-*`, `wgpu`) or gpui-fast `main` (`gpui-fast-*`) + patches (`SOURCE.json`, `MATERIAL-PATCHES.md`) | Vsync control, demand waker, periodic-source report and submission statistics (below). With vsync off, a window upstream paces with a `CAMetalDisplayLink` (macOS 14+) is paced by the `CVDisplayLink` path instead, so demand frames can run between ticks. |
-| `gpui-pre-linux`, `gpui-fast-linux`, `gpui-pre-wgpu`, `gpui-fast-wgpu`, `wgpu` (dev-only) | crates.io (`gpui-pre-*`, `wgpu`) or gpui-fast `main` (`gpui-fast-*`) + patches (`SOURCE.json`, `MATERIAL-PATCHES.md`) | Submission statistics from the present status `wgpu` otherwise discards, and vsync control through `PresentMode` (below). |
-| `gpui-pre-windows`, `gpui-fast-windows` (dev-only) | crates.io (`gpui-pre-*`, `wgpu`) or gpui-fast `main` (`gpui-fast-*`) + patches (`SOURCE.json`, `MATERIAL-PATCHES.md`) | Submission statistics counting only `S_OK` presents, and vsync control through the DXGI sync interval (below). |
+| `gpui-pre` (GPUI `=0.3.11`) | crates.io + patches (`SOURCE.json`, `*-patch.md`) | `em`/`ch` metrics for fonts without `m` (`em-fallback-patch.md`); lazy tab-stop index (`tab-stop-index-patch.md`); overflowing spaces hang instead of starting a wrapped row (`hanging-space-patch.md`); test-harness repairs; `try_update` for the deprecated `fetch_update` in the profiler. |
+| `gpui-pre-apple` | crates.io + patches (`SOURCE.json`, `VENDORED.md`) | Non-Latin and app-private fallback fonts; `sbix` color fonts. |
+| `gpui-pre-web` | crates.io + patches (`SOURCE.json`, `MATERIAL-PATCHES.md`) | Moves the hidden IME input to the caret when a composition starts and on `update_ime_position`, where a browser opens its candidate window and it takes no clicks; keeps a composition's keys from GPUI and a replaced emoji whole (consumers need these). |
+| `gpui-fast`, `-apple`, `-web` | gpui-fast `main` `bbdbc42d` + patches (`SOURCE.json`, `MATERIAL-PATCHES.md`) | gpui-fast's repository names its crates `gpui`, `gpui_web`, ...; only its release step gives them the `gpui-fast-*` names Kit depends on, so a Git `[patch]` cannot select them. `scripts/vendor-gpui-fast.py` runs that step at a commit (version kept at 0.1.13; `gpui-fast-macros` and `-platform` are unchanged since 0.1.13 and come from crates.io) and records each file that differs. Material's Fast PRs are all upstream: wheel at its limit (#104), hover freeze for listeners (#105), released entities in a spliced view (#106), web IME (#108, #109, #110), macOS fonts (#111, #112), lazy tab stops (#113), `record_entities_accessed` (#114), `em` metrics (#115). Local: test-harness repairs, `try_update` for the deprecated `fetch_update`, hanging overflow spaces (`src/text_system/line_layout.rs`, `line_wrapper.rs`) and `sbix` color fonts (`gpui-fast-apple/src/text_system.rs`). |
+| `gpui-fast-macos`, `-linux`, `-windows`, `-wgpu` | gpui-fast `main` `bbdbc42d`, unmodified (`-wgpu`: test-harness repairs) (`SOURCE.json`, `MATERIAL-PATCHES.md`) | Main's backends for main's `gpui-fast`; produced by `scripts/vendor-gpui-fast.py` with the crates above. |
 
 **Replaced by Material code.** No engine patch remains for these:
 
@@ -233,26 +228,17 @@ Kit, so upstream and Fast types cannot mix. Cargo still compiles upstream
 packages additively; they do not define the facade's public types. Disable
 default features to compare against upstream.
 
-## Frame observation
+## Rows built from an entity
 
-Dev-only: see [Consumer patch set](#consumer-patch-set).
-
-Submission statistics count attempts and, separately, successfully submitted
-**new** draw generations; FPS uses only the latter. Backends without a success
-signal report "unavailable"; nothing claims GPU completion. The gallery samples
-counters every 500 ms in its own view (included in profiles, disabled for static
-captures).
-
-`VsyncStatus` reports capability and actual state. The macOS backends forward
-it to Metal's display-sync property for existing and new surfaces; Linux to the
-surface's `wgpu::PresentMode` (X11 starts on `Fifo`, Wayland on `Mailbox`); Windows
-to the DXGI sync interval (upstream's 0, so it starts `Disabled`). Unsupported
-backends return an error rather than a pretend value. On Linux and Windows frame
-requests stay paced by the display (X11 refresh timer, Wayland frame callback,
-`DwmFlush`), so vsync off cannot exceed its refresh rate there until those backends
-gain a demand-driven frame source. With vsync off, real frame
-demand drives the coalescing main-thread source; the display link remains only
-as a safety throttle, so clean windows gain no render loop.
+A Gallery page's rows, and a playground's preview and configuration panel, need the
+entity's `Context` for their listeners and keep what they build in it. Under GPUI
+Fast, an `Entity::update` while the window draws counts as a write: every other
+retained subtree that read the entity (the other rows, the panel, the Gallery around
+a preview) would be built again on the next frame. So the entity is the view: it
+implements `Render` for the part asked for, and the caller renders it in place with
+upstream's `gpui::View::render`, whose update is drawing the view rather than writing
+it (`crates/gallery/src/page.rs`, "How a row is built"). A notify while it builds
+still marks it changed. Upstream GPUI has no retained subtrees and uses `update`.
 
 ## Virtualized animation state
 
