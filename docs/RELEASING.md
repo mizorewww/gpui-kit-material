@@ -26,12 +26,15 @@ Against crates.io `gpui-kit`/`gpui-base` 0.9.0, 18 errors:
 | `Toolbar::axis` | #3821, merged after 0.9.0 |
 | `TimeField::separator` | #3829, merged after 0.9.0 |
 | `Dialog::accessibility_label` | #3826, merged after 0.9.0 |
-| `TransitionPlayback` | gpui-kit#3841, open |
+| `TransitionState` (then named `TransitionPlayback`) | gpui-kit#3841, open |
 
-Against Kit `main` (`8dfdd49d`), unpatched, only `TransitionPlayback` is missing
-(4 errors). If #3841 is declined, Material keeps its own playback over Kit's public
+Against Kit `main` (`8dfdd49d`), unpatched, only that type was missing (4 errors,
+measured under its earlier name). The maintainer's review asked for the rename to
+`TransitionState` and a `sample` that takes the window and requests frames itself;
+#3841 and Material now use that API, so Plan B is likely unnecessary once #3841
+merges. If #3841 is declined, Material keeps its own playback over Kit's public
 `Easing`, `Interpolate` and `MotionValue`, as on branch
-`release/transition-playback-internal`.
+`release/transition-playback-internal` (which still has the earlier windowless API).
 
 Nothing else in `vendor/` is needed to build the library: the unpatched build above
 used crates.io `gpui-fast` 0.1.13. The engine patches change behavior only or are
