@@ -26,15 +26,13 @@ Against crates.io `gpui-kit`/`gpui-base` 0.9.0, 18 errors:
 | `Toolbar::axis` | #3821, merged after 0.9.0 |
 | `TimeField::separator` | #3829, merged after 0.9.0 |
 | `Dialog::accessibility_label` | #3826, merged after 0.9.0 |
-| `TransitionState` (then named `TransitionPlayback`) | gpui-kit#3841, open |
+| `TransitionState` | gpui-kit#3841, merged, unreleased |
 
-Against Kit `main` (`8dfdd49d`), unpatched, only that type was missing (4 errors,
-measured under its earlier name). The maintainer's review asked for the rename to
-`TransitionState` and a `sample` that takes the window and requests frames itself;
-#3841 and Material now use that API, so Plan B is likely unnecessary once #3841
-merges. If #3841 is declined, Material keeps its own playback over Kit's public
-`Easing`, `Interpolate` and `MotionValue`, as on branch
-`release/transition-playback-internal` (which still has the earlier windowless API).
+Against Kit `main` (`8da4e005`, which merges #3841), unpatched, the packaged library
+builds (`scripts/check-registry-consumer.sh --kit-git 8da4e005258ac0aac9a6a332cce746eeaafa08a8`,
+2026-11-08). Everything the library calls is in Kit `main`; the only remaining blocker
+is a Kit release. Plan B, Material's own playback on branch
+`release/transition-playback-internal`, is no longer needed.
 
 Nothing else in `vendor/` is needed to build the library: the unpatched build above
 used crates.io `gpui-fast` 0.1.13. The engine patches change behavior only or are
@@ -84,9 +82,9 @@ fail without failing CI until Kit releases.
 
 1. Kit has released. Set the root `Cargo.toml`'s `gpui-kit` to that release's registry
    version, without `git`/`rev`, and `gpui-base` to the same version. Drop the
-   `[patch."https://github.com/longbridge/gpui-kit"]` table and the vendored Base
-   patches now upstream; re-vendor what remains for the Gallery at the released
-   source (`SOURCE.json`).
+   `[patch."https://github.com/longbridge/gpui-kit"]` table and the `gpui-base` Git
+   patch; re-vendor `vendor/gpui-kit` for the Gallery at the released source
+   (`SOURCE.json`).
 2. Update `crates/material/README.md`'s and the root README's `gpui-kit = "…"` line.
 3. `scripts/check-registry-consumer.sh --dir "$(mktemp -d)"` passes, natively and
    with `--target wasm32-unknown-unknown`.

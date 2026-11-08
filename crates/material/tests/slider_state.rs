@@ -1,4 +1,4 @@
-//! `vendor/gpui-base/src/slider.rs`, whose crate is outside this workspace, so that its own
+//! Kit's `crates/base/src/slider.rs`, whose crate is outside this workspace, so that its own
 //! tests do not run here. What `MaterialSlider` relies on from its state.
 extern crate gpui_kit as gpui;
 

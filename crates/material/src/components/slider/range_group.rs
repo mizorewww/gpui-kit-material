@@ -1,7 +1,7 @@
 //! The node a range slider's thumbs are grouped under.
 //!
 //! Base's `Slider` root is always a `Role::Slider` with the end thumb's value and
-//! Increment/Decrement (`vendor/gpui-base/src/slider.rs`, `Slider::render`). A
+//! Increment/Decrement (Kit's `crates/base/src/slider.rs`, `Slider::render`). A
 //! range's thumbs are its sliders here, each with its own value, bounds and
 //! actions, so that root would make assistive technology find three sliders. A
 //! range is rendered under this group instead: it names the range, carries its

@@ -103,6 +103,9 @@ earlier Git revisions.
 
 ### Changed
 
+- Kit `main` `8da4e005` (gpui-kit#3841 merged). A Git consumer patches crates.io
+  `gpui-base` to Kit's Git at that revision instead of to this repository: Base is no
+  longer vendored or patched here.
 - **Breaking:** `ButtonTransitionPlayback::sync` and `ButtonProgressPlayback::sync` take
   `window: &mut Window` and `cx: &mut App`, and are called while drawing (as after layout,
   for buttons that are not mounted): a forwarded transition that runs requests the next

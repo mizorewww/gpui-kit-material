@@ -2,7 +2,7 @@
 //! input's view dirty: every row with one would be rendered again on every frame, and
 //! the list would never stay on its scroll layer. Only what reads the caret needs to
 //! know, as an open menu does, and only a focused input has one of those. A new size is
-//! a change for everyone. `vendor/gpui-base/src/input/base/element.rs`, the input's
+//! a change for everyone. Kit's `crates/base/src/input/base/element.rs`, the input's
 //! paint. Fast alone can reuse a view, so only it can tell.
 #![cfg(feature = "gpui-fast")]
 extern crate gpui_kit as gpui;

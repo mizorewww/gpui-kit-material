@@ -47,9 +47,9 @@
 +gpui_macros = { package = "gpui-pre-macros", version = "=0.3.11" }
 +gpui = { package = "gpui-pre", version = "=0.3.11" }
 +gpui-fast = { package = "gpui-fast", version = "0.1.13", features = ["windows-manifest-provided-by-host"], optional = true }
-+gpui-base = { version = "0.9.0", git = "https://github.com/longbridge/gpui-kit", rev = "8dfdd49de27c0726dd052fb2cfd2b0807d17980b" }
-+gpui-component = { version = "0.9.0", git = "https://github.com/longbridge/gpui-kit", rev = "8dfdd49de27c0726dd052fb2cfd2b0807d17980b", optional = true }
-+gpui-kit-assets = { version = "0.9.0", git = "https://github.com/longbridge/gpui-kit", rev = "8dfdd49de27c0726dd052fb2cfd2b0807d17980b", optional = true }
++gpui-base = { version = "0.9.0", git = "https://github.com/longbridge/gpui-kit", rev = "8da4e005258ac0aac9a6a332cce746eeaafa08a8" }
++gpui-component = { version = "0.9.0", git = "https://github.com/longbridge/gpui-kit", rev = "8da4e005258ac0aac9a6a332cce746eeaafa08a8", optional = true }
++gpui-kit-assets = { version = "0.9.0", git = "https://github.com/longbridge/gpui-kit", rev = "8da4e005258ac0aac9a6a332cce746eeaafa08a8", optional = true }
  
 -[target.'cfg(not(any(target_os = "ios", target_os = "android")))'.dependencies]
 -gpui_platform.workspace = true

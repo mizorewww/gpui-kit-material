@@ -1,7 +1,7 @@
 //! A block surface draws a blockquote that opens with a registered `[!name]`
 //! marker inside a container, and keeps its blocks part of the document: a
 //! selection, a find and a reveal go across and inside it. See
-//! `MarkdownExtensions::block_surface` (`vendor/gpui-base/src/text`).
+//! `MarkdownExtensions::block_surface` (Kit's `crates/base/src/text`).
 //!
 //! Places in the text are found the way a find shows them: a range highlight in its
 //! own color, read back from the quads of the frame. So a position is where the text

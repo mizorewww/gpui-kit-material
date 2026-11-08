@@ -1,6 +1,6 @@
 {
   "repository": "https://github.com/longbridge/gpui-kit",
-  "revision": "8dfdd49de27c0726dd052fb2cfd2b0807d17980b",
+  "revision": "8da4e005258ac0aac9a6a332cce746eeaafa08a8",
   "subdirectory": "crates/kit",
   "source_workspace_manifest_sha256": "81ede24a592ea451ba043fc484ffa6ed152b821fc6c1faf34b06726f58c401cc",
   "source_files_sha256": {
@@ -61,5 +61,5 @@
     "LICENSE-APACHE": "d1b0449e5478c574ba4f686c2656df7fe77d66821a61f8b6ed3378a58ed9a811",
     "LICENSE-DOCS.md": "8a9ccf144b2d5bf5aae56abdc6e723e17e1ba4de1f5d515b3b644288fd4fc16f"
   },
-  "normalized_manifest_sha256": "cba8fa364df195d9f8d1b079ffe5a0ab9e7ecc0e0f79ee6cebf5b44703bf94ac"
+  "normalized_manifest_sha256": "b237d72caff61d36246ce45342bdc135b704b47abae0cdcfa6e079b9e033bc85"
 }
