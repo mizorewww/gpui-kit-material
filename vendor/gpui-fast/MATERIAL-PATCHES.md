@@ -24,3 +24,7 @@ slow views rather than the last one: a later frame can replay them without the w
 Behavior, not yet offered upstream: `src/text_system/line_layout.rs`,
 `src/text_system/line_wrapper.rs` hang a space that overflows after content
 instead of starting the next wrapped row with it (`vendor/gpui-pre/hanging-space-patch.md`).
+`src/elements/list.rs`: after a width change, a `measure_all` list lays out only the
+items it shows in that frame, keeping the others' heights as estimates scaled by how
+those items reflowed, and measures the rest over later frames, 4 ms per frame
+(`vendor/gpui-pre/list-width-remeasure-patch.md`).

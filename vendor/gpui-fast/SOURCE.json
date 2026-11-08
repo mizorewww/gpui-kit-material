@@ -216,6 +216,10 @@
     "src/text_system/line_wrapper.rs": {
       "upstream_sha256": "8912c5d16dc00bbcc1f19f56c2f2f4e3b826aa244b4f7c04c62a3934b22f7c4f",
       "local_sha256": "fb5698fdef112a5daf981103ad2af0eb60ca854e134a03f297901cf28f6bc952"
+    },
+    "src/elements/list.rs": {
+      "upstream_sha256": "ab9329dbeb202377336fa9c6b64488317656685f068082ec3cc0f0df8d70c29a",
+      "local_sha256": "abbb1fcfd20bb305fb7845bcaf3c2d026e28defe5fc14845a9c10e673e15c0f8"
     }
   },
   "added_files": {
