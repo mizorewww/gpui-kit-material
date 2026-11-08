@@ -9,7 +9,7 @@ import subprocess
 import sys
 import tomllib
 
-REVISION = '46bf6d498fa101a3b11cc64e6d8c20d28d17b720'
+REVISION = '8dfdd49de27c0726dd052fb2cfd2b0807d17980b'
 REPOSITORY = 'https://github.com/longbridge/gpui-kit'
 source = Path(sys.argv[1]).resolve()
 destination = Path(__file__).resolve().parent

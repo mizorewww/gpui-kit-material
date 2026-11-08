@@ -138,6 +138,10 @@ impl Transition {
 
     /// Select reduced-motion behavior for this transition only.
     /// The application's preference and other motion channels are unchanged.
+    ///
+    /// [`transition`], [`transition_with_status`] and
+    /// [`TransitionPlayback::sample`] read it. [`Presence`] still finishes at
+    /// once under reduced motion.
     pub fn reduced_motion(mut self, behavior: ReducedMotion) -> Self {
         self.reduced_motion = behavior;
         self

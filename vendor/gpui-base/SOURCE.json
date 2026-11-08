@@ -1,32 +1,26 @@
 {
   "added_files": {
     ".cargo_vcs_info.json": {
-      "reason": "Locally written marker naming the vendored Git revision 46bf6d49 and crates/base; not an upstream file.",
-      "sha256": "becda0847e38c0f03ac6bb37d290807e1edbef2373d31b61a4c029c092973e8a"
+      "reason": "Locally written marker naming the vendored Git revision 8dfdd49d and crates/base; not an upstream file.",
+      "sha256": "4970907e0cb2f4d29df3d183de071d106c8868a9faa8889865ba902471e5385d"
     }
   },
   "development_examples_limit": "Upstream development examples are preserved, including references to sibling story-web font and repository example fixtures. Those external fixtures are not included in this Base-only vendor snapshot; standalone example execution is not asserted.",
   "license": "Apache-2.0",
   "local_patch_files": [
     "src/lib.rs",
-    "src/motion.rs",
-    "src/slider.rs"
+    "src/motion.rs"
   ],
   "local_patch_sha256": {
     "src/lib.rs": {
       "local_sha256": "04b8aad215e6c115db560165dea02654d69241b0893be690230154f16e1b16de",
-      "reason": "Public exports ReducedMotion and TransitionPlayback (motion) (motion-patch.md). Equals fork branch material/motion-transition-playback (59bd3b1e, d59cae42) cherry-picked onto 46bf6d49.",
-      "upstream_sha256": "0295fd414debfaa4130eb075298dfecc31c5d2b69f9b4c49fd31e7418dc847c0"
+      "reason": "Public export of TransitionPlayback. TransitionPlayback, a caller-owned handle that keeps one transition's clock and interruption history across unmounts (virtualized rows). Equals crates/base at longbridge/gpui-kit#3841 head e7de85eef5254781e6b4926cd0694f69c9fb802a (branch material/motion-transition-playback-v2 on mizorewww/gpui-kit, based on 8dfdd49de27c0726dd052fb2cfd2b0807d17980b); open upstream.",
+      "upstream_sha256": "1c48ee3191efaeb22b42db0fbe5b67a8be3af56ba67d631760ca234764a62b76"
     },
     "src/motion.rs": {
-      "local_sha256": "5f0ae5e41d7fe022e988f669f3f7716555bcf1f152a56227d6f70e6e765120a5",
-      "reason": "Per-transition reduced motion and TransitionPlayback on top of the merged CSS reversal (#3820) (motion-patch.md). Equals fork branch material/motion-transition-playback (59bd3b1e, d59cae42) cherry-picked onto 46bf6d49.",
-      "upstream_sha256": "62396f2e3ac00539f48761869c11cdaa939c2c3911de91cb768a012c05957c04"
-    },
-    "src/slider.rs": {
-      "local_sha256": "c243ec7cefdb1d5749a916a74f68d1083212102acc5d93dd668b783afb68110a",
-      "reason": "Assistive-technology Increment/Decrement that move one thumb onto the step grid counted from min and emit Change, SliderState::accessibility_step (a hundredth of the range for a continuous slider), and step_thumb leaving a NaN value, a min above max or a reversed range unchanged (motion-patch.md). Equals fork branch material/slider-accessibility-steps (43757c62, 56d21f7d) cherry-picked onto 46bf6d49; step snapping from min is upstream code (#3822).",
-      "upstream_sha256": "bcec9e49be5236da44a4b722e5239687d5e46f5dc97a1b1e46fa4a13d81d701f"
+      "local_sha256": "99d41ba38e2dd125b21ccc9a8eb407eb9da3e399cf87659cd89c43475b2ca29a",
+      "reason": "TransitionPlayback, a caller-owned handle that keeps one transition's clock and interruption history across unmounts (virtualized rows). Equals crates/base at longbridge/gpui-kit#3841 head e7de85eef5254781e6b4926cd0694f69c9fb802a (branch material/motion-transition-playback-v2 on mizorewww/gpui-kit, based on 8dfdd49de27c0726dd052fb2cfd2b0807d17980b); open upstream.",
+      "upstream_sha256": "73361c8873100c1f7e8d6443a244fe6d9b0841bfdff73dadcb869d1dcd1b695d"
     }
   },
   "lockfile_policy": "No stale package-level lockfile. The consuming workspace Cargo.lock owns resolution.",
@@ -37,20 +31,20 @@
   ],
   "normalized_manifests_sha256": {
     "Cargo.toml": {
-      "local_sha256": "e38fc4e24faa2a98f699b253c61fdbcfd107720c856ae541127fa07f63934cde",
+      "local_sha256": "2e61701afe01a04fe5fd804879a0d9df731bfbb31d66a161c9846a468caa8624",
       "upstream_sha256": "1a6020b4b28032f620ea5d8f10c03612f5aaaa8c66d5c19a8e081fd66081f855"
     },
     "examples/native/Cargo.toml": {
-      "local_sha256": "1765485e8d208d947bd30527bf257deee52f04f53e49a5a3c1e68357bc8607f1",
+      "local_sha256": "4d9cbbd7fd22a36bd29b6d6b494ab53db4800b2ca90da841b57d86499c6d3df8",
       "upstream_sha256": "6ffc2c586cbd47e38ba547cb183eea60c3971a57d1fcd61ea2c4973ed5beed3e"
     },
     "examples/wasm/Cargo.toml": {
-      "local_sha256": "f432e1f2cf3fb298de0f460c862747ada3e3c8fd72800d778ec0bd32ca5e2637",
+      "local_sha256": "5f324508a1c97d10cf4d09574178c3dc004f5dcc3e52f945bceaeda82f5ad7dc",
       "upstream_sha256": "f8a1b8abd4fdce69e31c8e9cd31e5c958bc34b7d1cb87638cc61f4c5f26e55b0"
     }
   },
   "package_version": "0.9.0",
-  "patch_application": "Moved from Git b881cadb to 46bf6d49 by a three-way merge per file (upstream b881cadb / upstream 46bf6d49 / local patched files). Dropped because merged upstream: CSS transition reversal (#3820), slider step snapping from min (#3822), Toolbar::axis (#3821) and TextView block surfaces (#3830, was block-surface-patch.md); src/toolbar.rs, src/text/ and tests/block_surface.rs equal upstream, so the merged `> [!name]` block surface syntax replaces the patched comment fences and their copy rule. src/motion.rs and src/slider.rs conflicted only where review reworded the merged code; every conflict resolved to the local side, and the result equals 46bf6d49 with fork commits 59bd3b1e, d59cae42 (material/motion-transition-playback) and 43757c62, 56d21f7d (material/slider-accessibility-steps) cherry-picked onto it without conflicts; src/lib.rs merged cleanly to the same. Earlier: moved from Git b2aaa3e to b881cadb (dropping #3823-#3829 and #3831 as merged) and from bb85882 to b2aaa3e by the same method; the original five patch files were three-way merged from the published registry 0.8.1 base.",
+  "patch_application": "Moved from Git 46bf6d49 to Kit main 8dfdd49de27c0726dd052fb2cfd2b0807d17980b, then crates/base/src/lib.rs and src/motion.rs taken from longbridge/gpui-kit#3841 head e7de85eef5254781e6b4926cd0694f69c9fb802a, whose base is 8dfdd49de27c0726dd052fb2cfd2b0807d17980b, so the vendored source equals that PR head. Dropped because merged upstream: per-transition reduced motion (#3839, a5bda4aa) and assistive-technology slider steps with SliderState::accessibility_step (#3840, c7cc85cd); the vendored src/slider.rs now equals upstream. Earlier: CSS transition reversal (#3820), Toolbar::axis (#3821), slider step snapping from min (#3822), TextView block surfaces (#3830).",
   "patch_base": {
     "package": "gpui-base",
     "registry_source_revision": "99576db58ec8103417c41a092e891b4022d24e7e",
@@ -62,7 +56,7 @@
     "motion-patch.md"
   ],
   "repository": "https://github.com/longbridge/gpui-kit",
-  "revision": "46bf6d498fa101a3b11cc64e6d8c20d28d17b720",
+  "revision": "8dfdd49de27c0726dd052fb2cfd2b0807d17980b",
   "source_kind": "Git checkout, not the crates.io 0.9.0 archive",
   "upstream_files_sha256": {
     "Cargo.toml": "1a6020b4b28032f620ea5d8f10c03612f5aaaa8c66d5c19a8e081fd66081f855",
@@ -241,12 +235,12 @@
     "src/input/mod.rs": "63d3e6aea069fe81e9ad7eef6365bc433c526bba2c91ed787f8fb37ce9f8433b",
     "src/input/scrollbar_presentation.rs": "bfe3927d994fb204e9e4dd1a20049738c257027c2a33c255a7c2844125ca8332",
     "src/input/textarea/mod.rs": "55e95879a0bd3a6d4f717e35b5cc93151ee03757f007d5fd7e28638acb2f69d1",
-    "src/lib.rs": "0295fd414debfaa4130eb075298dfecc31c5d2b69f9b4c49fd31e7418dc847c0",
+    "src/lib.rs": "1c48ee3191efaeb22b42db0fbe5b67a8be3af56ba67d631760ca234764a62b76",
     "src/link.rs": "34e994c670cf1312c777e114c0555b7b604923747fc3759a5138910f404ca886",
     "src/list_settings.rs": "50c6b4289a3de3877471ce8ebf9c6488f2ed5ddf7bd5a471e95fefe91c26cc4d",
     "src/macos_accessibility.rs": "089d673a24a155d7bac2cec3129b535a680cea4970c5cfb32da0e0b8b228b6af",
     "src/measure.rs": "ef0c897ee836610c618ce93ba6f288b8b53021c336c04161fc2cd81111ce7484",
-    "src/motion.rs": "62396f2e3ac00539f48761869c11cdaa939c2c3911de91cb768a012c05957c04",
+    "src/motion.rs": "73361c8873100c1f7e8d6443a244fe6d9b0841bfdff73dadcb869d1dcd1b695d",
     "src/motion/easing.rs": "a8374a23535422befae796b9b6b1290e7e533674f599b36d5f892304d4fd8bf2",
     "src/motion/keyframes.rs": "49c5162ce6dd28904cf7d339677f30bc91b73a640d2291227e425a32623c9cee",
     "src/motion/presence.rs": "29f42bfce53fd7c2034b92e6700b0f68f2aea9633e2421f64042deb5272ff039",
@@ -258,7 +252,7 @@
     "src/number_input.rs": "ef937e1764c170a12d19377907835087b16e83e2cad78b3967f6dc499d92dedd",
     "src/observe.rs": "00ce59655ceefe1e2df485f4bdae9e02c478aa4e083c9da0cba43b4f307e82b7",
     "src/otp_input.rs": "265578b529f210f06a045b14ffdcf99f050a0ed8fb738d5e6b59f4071cfe9de7",
-    "src/overscroll.rs": "a7e56fd5f0a0993c8ae87022694cfb04e0fa3333caff3ad1a77dcbf9a6e0409e",
+    "src/overscroll.rs": "515814d5b293f9fc723c8869d87840a9403848c2dc926e56b17d989075f154aa",
     "src/pagination.rs": "23259096e34ee4becb61489e3ae62b65dd24dd1a3db2b69bd5cfe07a595cf23b",
     "src/plot/appear.rs": "f1d17352bf5ae10b9f7980e54a0b9e6471bdb2c312e48e4aafbe013488b1fa25",
     "src/plot/axis.rs": "218632b939f971712ba28560cce14328d77c105f58bbb3f7cabba172e30e7499",
@@ -305,7 +299,7 @@
     "src/select.rs": "0d23c688e9107a8875eb61c016f17dd14863c8d80e8f4e5a22fe609cdd769940",
     "src/selectable_text.rs": "5f8f33f03e5f31a563a05796d3bf82f4eef2ce3d5a0bd08f8afb08e763344e71",
     "src/sheet.rs": "7a5f84d671a9aebb9a5f4afce688119ed05ea4b3648828ef79168aa806db6515",
-    "src/slider.rs": "bcec9e49be5236da44a4b722e5239687d5e46f5dc97a1b1e46fa4a13d81d701f",
+    "src/slider.rs": "c243ec7cefdb1d5749a916a74f68d1083212102acc5d93dd668b783afb68110a",
     "src/state_style.rs": "f7e1f85c0215e3cd84df4b6fbce34938a33d275c9db392bdc9025670454760b1",
     "src/styled.rs": "7c1e88964cc3d76968609e6ac24db0c3698c87f9b138ef975d3776eac81dbd87",
     "src/switch.rs": "a97b54dce01d28f3201400e336ff26bae67d82160d92a2b13c1fa30f529b63d6",
@@ -314,7 +308,7 @@
     "src/test_support.rs": "0bf987c336c802d50bbf2f5b2cd3605695651576f907af429a0967868b9fb436",
     "src/text/block_surface_tests.rs": "6889d0c9f80ae81d54d4fe4d8b3bb0e488b910a5517baeed9cfc4bd0cba16057",
     "src/text/document.rs": "fbac8a9bfcfbc884eadafa4e1a6c4b897593e0c48917179267d6deed9e1b81fb",
-    "src/text/editor_host.rs": "7709c03ca3b5e56a7ebb21743284a0ba6275a69bed6f7497045c55ef0385a6e8",
+    "src/text/editor_host.rs": "0354d34ca68b432a7a804f75554ca106a467359f3a4805b3fc5c0ef57f46320b",
     "src/text/editor_seam.rs": "d10d86c056d6792f5d1fe904efc410c97830d77d3dfb555867a371182fa1e101",
     "src/text/format/html.rs": "7acba8fe9d29a339f9fe3c360e7cefb850f359f17f32bbc11562f4bbccbd74a1",
     "src/text/format/html5minify/mod.rs": "139ae3bdc3c5a1d35f2c7439183b1f2aafc5514ced0e1a2f89917098cdc2d714",

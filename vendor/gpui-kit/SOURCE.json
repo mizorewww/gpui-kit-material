@@ -1,6 +1,6 @@
 {
   "repository": "https://github.com/longbridge/gpui-kit",
-  "revision": "46bf6d498fa101a3b11cc64e6d8c20d28d17b720",
+  "revision": "8dfdd49de27c0726dd052fb2cfd2b0807d17980b",
   "subdirectory": "crates/kit",
   "source_workspace_manifest_sha256": "81ede24a592ea451ba043fc484ffa6ed152b821fc6c1faf34b06726f58c401cc",
   "source_files_sha256": {
@@ -15,7 +15,7 @@
     "tests/common/mod.rs": "e923b121ecd341aee01f3b38f47193a15d8e68564004df0f3d4fa208750be696",
     "tests/integration/assets.rs": "cb9a25654149319c118536fa7ca67e1dcd90227fdfeffddb54c3ad1c2499812b",
     "tests/integration/collection_steps.rs": "3a83acc3ef5b815a23692a4e21b4240f08214f6bad14d098b0807caee46bb55f",
-    "tests/integration/collections.rs": "aaf1173f733c23df0aa77b984ef2ff67f3a2af5d01e4699aed2d909ca38ef0cc",
+    "tests/integration/collections.rs": "faf81fb696ca06d1c9a32fa5da86c53044f73e2bad93e4df1db73f09ed6c72f1",
     "tests/integration/components.rs": "cf62819d3977bb97b33f7279118141f59bbcf9490b24e596a4deebe3d8798cb0",
     "tests/integration/composition_helpers.rs": "cb111f284ba189768cb2c15fd53117420b04e4c3ae6b12825b64eff39e166d90",
     "tests/integration/control_steps.rs": "4ca12e74f6e3cb060c0ecc02496f363253a29ad90a34ac06dea52f3d255f3dec",
@@ -61,5 +61,5 @@
     "LICENSE-APACHE": "d1b0449e5478c574ba4f686c2656df7fe77d66821a61f8b6ed3378a58ed9a811",
     "LICENSE-DOCS.md": "8a9ccf144b2d5bf5aae56abdc6e723e17e1ba4de1f5d515b3b644288fd4fc16f"
   },
-  "normalized_manifest_sha256": "d591a7de0cf41009324e0e6b9c368ae9319569ade30358033e2940588caf3e92"
+  "normalized_manifest_sha256": "cba8fa364df195d9f8d1b079ffe5a0ab9e7ecc0e0f79ee6cebf5b44703bf94ac"
 }
