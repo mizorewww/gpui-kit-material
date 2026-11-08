@@ -40,11 +40,12 @@ dev-only (ARCHITECTURE.md, Consumer patch set).
 ## Engine patches after the release
 
 Every gpui-fast PR of ours is merged on gpui-fast `main`; the latest release is
-0.1.13, without them. Once gpui-fast releases them, re-vendor `vendor/gpui-fast*`
-at that release and drop these local changes (diffing each against the merged
-code, whose layout follows gpui-fast's CONTRIBUTING rather than our branches):
+0.1.13, without them. `vendor/gpui-fast*` already track `main` (`bbdbc42d`, produced by
+`scripts/vendor-gpui-fast.py`, which runs upstream's release renaming), so these changes
+now come from upstream and are no longer local patches. Once gpui-fast releases them,
+replace the vendored copies with that release and drop what is left of the overlays below:
 
-| gpui-fast PR | Vendored change |
+| gpui-fast PR (now upstream) | Where it lives upstream |
 | --- | --- |
 | #104 wheel at limit | `gpui-fast`: `src/fast/layers/wheel.rs`, wheel part of `src/elements/div.rs` |
 | #105 hover freeze holds listeners | `gpui-fast`: `src/fast/layers/hover_freeze.rs`, hover part of `div.rs`, `window.rs`'s `release_unhovered` |
