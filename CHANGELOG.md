@@ -191,6 +191,10 @@ earlier Git revisions.
 
 ### Fixed
 
+- A long Base `TextView`, or any `measure_all` list, resizes without laying out every item
+  in each frame the width changes (patched `gpui-pre` and `gpui-fast`): that frame lays
+  out the items shown, the rest keep estimated heights and are measured over the next
+  frames, 4 ms per frame. The scroll position stays on the item at the top.
 - A `notice_banner`'s icon stands beside its text's first line, centred on it at any text
   size, instead of beside the middle of a notice of several lines; icon and text still
   centre on the actions a caller appends. Debug selectors `{id}-icon` and `{id}-text`
