@@ -17,6 +17,8 @@
 //! input elsewhere reaches the windows below it, and its input is delivered
 //! to the window it covers.
 
+use super::whole_scene_layer;
+
 use std::{
     any::Any,
     cell::RefCell,
@@ -1061,6 +1063,10 @@ pub(crate) fn draw_composed(window: &X11Window, scene: ComposedScene<'_>) {
     // stacks the overlay window below the window (Hyprland renders a pinned
     // window above every other), menus and dialogs still show, only without
     // the shadows and backdrops blended over native content.
+    // With one full target and all other lists empty, the old combined output
+    // replays the full stream once, then finishes it. Overlay and occluder
+    // scenes still follow their own membership rules below.
+    let whole_scene = whole_scene_layer(scene.scene(), scene.layers());
     let mut window_scene = Scene::default();
     let mut overlay_scene = Scene::default();
     let mut overlay_input = Vec::new();
@@ -1078,22 +1084,25 @@ pub(crate) fn draw_composed(window: &X11Window, scene: ComposedScene<'_>) {
         let cuts_out = track_occluders && layer.surface != base_surface;
         let mut layer_scene = Scene::default();
         for range in &layer.ranges {
-            let replayed = window_scene
-                .replay_balanced(range.clone(), scene.scene())
-                .and_then(|()| {
-                    if in_overlay {
-                        overlay_scene.replay_balanced(range.clone(), scene.scene())
-                    } else {
-                        Ok(())
-                    }
-                })
-                .and_then(|()| {
-                    if cuts_out {
-                        layer_scene.replay_balanced(range.clone(), scene.scene())
-                    } else {
-                        Ok(())
-                    }
-                });
+            let replayed = if whole_scene.is_some() {
+                Ok(())
+            } else {
+                window_scene.replay_balanced(range.clone(), scene.scene())
+            }
+            .and_then(|()| {
+                if in_overlay {
+                    overlay_scene.replay_balanced(range.clone(), scene.scene())
+                } else {
+                    Ok(())
+                }
+            })
+            .and_then(|()| {
+                if cuts_out {
+                    layer_scene.replay_balanced(range.clone(), scene.scene())
+                } else {
+                    Ok(())
+                }
+            });
             if let Err(error) = replayed {
                 log::error!("replaying X11 composition scene: {error:#}");
                 return;
@@ -1104,7 +1113,13 @@ pub(crate) fn draw_composed(window: &X11Window, scene: ComposedScene<'_>) {
             occluders.insert(layer.surface, scene_occluders(&layer_scene, in_overlay));
         }
     }
-    window_scene.finish();
+    let window_scene = match whole_scene {
+        Some((_, whole_scene)) => whole_scene,
+        None => {
+            window_scene.finish();
+            &window_scene
+        }
+    };
     overlay_scene.finish();
 
     if occluders != composition.occluders {
@@ -1123,7 +1138,7 @@ pub(crate) fn draw_composed(window: &X11Window, scene: ComposedScene<'_>) {
             });
     }
     drop(composition);
-    window.draw_frame(&window_scene, overlay_presented);
+    window.draw_frame(window_scene, overlay_presented);
 }
 
 /// `PlatformWindow::enable_window_composition`: composition needs the SHAPE

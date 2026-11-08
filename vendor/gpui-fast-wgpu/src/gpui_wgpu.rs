@@ -7,6 +7,7 @@ mod wgpu_context;
 mod wgpu_renderer;
 
 pub use cosmic_text_system::*;
+pub use fast::dynamic_textures::WgpuDynamicTexture;
 pub use present_mode::*;
 pub use wgpu;
 pub use wgpu_atlas::*;

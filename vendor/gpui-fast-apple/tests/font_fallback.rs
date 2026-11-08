@@ -1,5 +1,5 @@
 #![cfg(target_os = "macos")]
-// Text patches kept in the Apple backends: fonts without an `m` glyph,
+// Apple text rules the Gallery relies on: fonts without an `m` glyph,
 // app-private fallback cascades and sbix color bitmaps.
 use gpui::{FontRun, PlatformTextSystem, font, px};
 

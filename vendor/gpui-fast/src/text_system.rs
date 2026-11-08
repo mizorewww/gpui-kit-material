@@ -427,32 +427,16 @@ impl TextSystem {
 
     /// Returns the width of an `em`.
     ///
-    /// Uses the width of `m`, shaping through platform fallback if this font
-    /// does not contain Latin letters. Existing Latin-font metrics are unchanged.
+    /// Uses the width of the `m` character in the given font and size.
     pub fn em_width(&self, font_id: FontId, font_size: Pixels) -> Result<Pixels> {
-        if self
-            .platform_text_system
-            .glyph_for_char(font_id, 'm')
-            .is_none()
-        {
-            return Ok(self.layout_width(font_id, font_size, 'm'));
-        }
-        Ok(self.typographic_bounds(font_id, font_size, 'm')?.size.width)
+        crate::fast::em_metrics::em_width(self, font_id, font_size)
     }
 
     /// Returns the advance width of an `em`.
     ///
-    /// Uses the advance of `m`, shaping through platform fallback if this font
-    /// does not contain Latin letters.
+    /// Uses the advance width of the `m` character in the given font and size.
     pub fn em_advance(&self, font_id: FontId, font_size: Pixels) -> Result<Pixels> {
-        if self
-            .platform_text_system
-            .glyph_for_char(font_id, 'm')
-            .is_none()
-        {
-            return Ok(self.layout_width(font_id, font_size, 'm'));
-        }
-        Ok(self.advance(font_id, font_size, 'm')?.width)
+        crate::fast::em_metrics::em_advance(self, font_id, font_size)
     }
 
     /// Returns the width of an `ch`.

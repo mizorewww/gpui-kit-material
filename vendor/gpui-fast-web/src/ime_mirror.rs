@@ -104,10 +104,6 @@ impl ImeMirror {
         style.set_property("width", "1px").ok();
         style.set_property("height", "1px").ok();
         style.set_property("opacity", "0").ok();
-        // It sits over the canvas at the caret: a click there is the canvas's.
-        style.set_property("pointer-events", "none").ok();
-        style.set_property("padding", "0").ok();
-        style.set_property("border", "0").ok();
         // Android Chrome zooms the visual viewport onto a focused text input
         // whose font is smaller than 16px; with page zoom disabled the user
         // can never zoom back out, so keep the hidden IME input at 16px.
@@ -180,15 +176,6 @@ impl ImeMirror {
             Some(hint) => element.set_attribute("enterkeyhint", hint).ok(),
             None => element.remove_attribute("enterkeyhint").ok(),
         };
-    }
-
-    /// Moves the element, which the browser anchors its IME panel to, to the caret
-    /// in canvas coordinates. A style write: unlike a value write it leaves the
-    /// IME's connection alone, and the element's fixed position scrolls nothing.
-    pub(crate) fn set_position(&self, x: f32, y: f32) {
-        let style = self.element.style();
-        style.set_property("left", &format!("{x}px")).ok();
-        style.set_property("top", &format!("{y}px")).ok();
     }
 
     pub(crate) fn event_target(&self) -> &web_sys::EventTarget {

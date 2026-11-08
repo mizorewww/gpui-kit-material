@@ -1,3 +1,4 @@
+// Modified by Longbridge for gpui-fast.
 use crate::display::WebDisplay;
 use crate::events::{
     ClickState, EventListenerHandle, TouchIds, WebEventListeners, is_mac_platform,
@@ -1044,9 +1045,7 @@ impl PlatformWindow for WebWindow {
     }
 
     fn update_ime_position(&self, bounds: Bounds<Pixels>) {
-        self.inner
-            .ime_mirror
-            .set_position(f32::from(bounds.left()), f32::from(bounds.bottom()));
+        crate::fast::ime_position::move_to_caret(&self.inner, bounds);
     }
 
     fn request_decorations(&self, _decorations: WindowDecorations) {}

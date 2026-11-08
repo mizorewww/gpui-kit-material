@@ -64,10 +64,10 @@ const kCGImageAlphaOnly: u32 = 7;
 pub struct AppleTextSystem(RwLock<AppleTextSystemState>);
 
 #[derive(Clone, PartialEq, Eq, Hash)]
-struct FontKey {
+pub(crate) struct FontKey {
     font_family: SharedString,
     font_features: FontFeatures,
-    font_fallbacks: Option<FontFallbacks>,
+    pub(crate) font_fallbacks: Option<FontFallbacks>,
 }
 
 struct AppleTextSystemState {
@@ -283,11 +283,10 @@ impl AppleTextSystemState {
             })
             .collect::<Result<Vec<_>>>()?;
         self.memory_source.add_fonts(fonts.into_iter())?;
-        // Previously selected fonts may carry a cascade built before a newly
-        // registered app-private fallback existed. Rebuild selections without
-        // removing font IDs still referenced by already-shaped frames.
-        self.font_selections.clear();
-        self.font_ids_by_font_key.clear();
+        crate::fast::font_fallbacks::forget_cascades(
+            &mut self.font_selections,
+            &mut self.font_ids_by_font_key,
+        );
         Ok(())
     }
 
@@ -307,23 +306,13 @@ impl AppleTextSystemState {
             .or_else(|_| self.system_source.select_family_by_name(name))?;
         for font in family.fonts() {
             let mut font = font.load()?;
-            let concrete_fallbacks = fallbacks
-                .into_iter()
-                .flat_map(|fallbacks| fallbacks.fallback_list())
-                .map(|name| {
-                    self.memory_source
-                        .select_best_match(
-                            &[font_kit::family_name::FamilyName::Title(name.clone())],
-                            &font.properties(),
-                        )
-                        .ok()
-                        .and_then(|handle| handle.load().ok())
-                })
-                .collect::<Vec<_>>();
 
-            apply_features_and_fallbacks(&mut font, features, fallbacks, &concrete_fallbacks)?;
-            // A valid non-Latin font need not contain 'm'. Text metrics callers
-            // use the platform fallback when their Latin measurement probe is absent.
+            let fast_app_fallbacks = crate::fast::font_fallbacks::AppFallbacks::new(
+                &self.memory_source,
+                fallbacks,
+                &font,
+            );
+            apply_features_and_fallbacks(&mut font, features, fallbacks, &fast_app_fallbacks)?;
 
             // We've seen a number of panics in production caused by calling font.properties()
             // which unwraps a downcast to CFNumber. This is an attempt to avoid the panic,

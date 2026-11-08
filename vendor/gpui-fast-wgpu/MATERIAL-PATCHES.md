@@ -2,9 +2,10 @@
 
 **Dev-only overlay.** This crate is vendored only for the gallery's and the profiler's frame observation, and its manifest turns on the engine's `frame-observation` feature. A consumer does not patch it; see "Consumer patch set" in `docs/ARCHITECTURE.md`.
 
-Complete published package, verified against its crates.io archive. `SOURCE.json`
-records the archive SHA-256, every original file hash, and the original and patched
-hash of each changed file.
+gpui-fast `main` at `bbdbc42d`, packaged by upstream's own release step, as
+`scripts/vendor-gpui-fast.py` reproduces it (version kept at 0.1.13). `SOURCE.json`
+records every upstream file hash and the original and patched hash of each changed
+file. The package-level `Cargo.lock` is not vendored.
 
 These patches give the Linux backends what `vendor/gpui-pre/frame-submission-patch.md`
 needs:

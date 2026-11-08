@@ -1,3 +1,4 @@
+// Modified by Longbridge for gpui-fast.
 use std::{collections::HashMap, rc::Rc};
 
 use gpui::{
@@ -11,10 +12,6 @@ use wasm_bindgen::prelude::*;
 
 use crate::ime_mirror::ImeMirror;
 use crate::window::WebWindowInner;
-
-#[path = "ime_edit.rs"]
-mod ime_edit;
-use ime_edit::{edit_prefix_and_suffix, key_belongs_to_ime};
 
 pub struct WebEventListeners {
     _handles: Vec<EventListenerHandle>,
@@ -483,7 +480,7 @@ impl WebWindowInner {
     }
 
     /// See [`ImeMirror::schedule_sync`].
-    fn schedule_ime_mirror_sync(self: &Rc<Self>) {
+    pub(crate) fn schedule_ime_mirror_sync(self: &Rc<Self>) {
         ImeMirror::schedule_sync(self);
     }
 
@@ -742,15 +739,7 @@ impl WebWindowInner {
                 return;
             }
 
-            // A key the IME owns, such as the Enter that commits a candidate,
-            // never reaches the app: a field would act on it mid-composition.
-            let composing = this.is_composing.get() || event.is_composing();
-            if key_belongs_to_ime(composing, event.key_code()) {
-                if composing {
-                    event.prevent_default();
-                } else {
-                    this.schedule_ime_mirror_sync();
-                }
+            if crate::fast::ime_keys::belongs_to_ime(&this, &event) {
                 return;
             }
 
@@ -868,12 +857,42 @@ impl WebWindowInner {
             let old_units: Vec<u16> = old_value.encode_utf16().collect();
             let new_units: Vec<u16> = new_value.encode_utf16().collect();
 
+            // A prefix/suffix diff is ambiguous when the inserted text
+            // shares characters with what follows it (inserting "pactor "
+            // before "pact" also reads as inserting "or pact" four units
+            // later). The edit's true position is not ambiguous: the browser
+            // leaves the caret at the end of an IME edit, so the suffix is
+            // anchored as "everything after the post-edit caret", and the
+            // prefix is capped to fit. Greedy matching is only a fallback
+            // for edits where the anchored suffix doesn't verify.
             let post_edit_caret = this
                 .ime_mirror
                 .selection_start()
                 .map(|caret| caret as usize);
+            let anchored_suffix_length = post_edit_caret
+                .map(|caret| new_units.len().saturating_sub(caret))
+                .filter(|&suffix_length| {
+                    suffix_length <= old_units.len()
+                        && old_units[old_units.len() - suffix_length..]
+                            == new_units[new_units.len() - suffix_length..]
+                });
+            let suffix_length = anchored_suffix_length.unwrap_or_else(|| {
+                old_units
+                    .iter()
+                    .rev()
+                    .zip(new_units.iter().rev())
+                    .take_while(|(old_unit, new_unit)| old_unit == new_unit)
+                    .count()
+            });
+            let prefix_length = old_units
+                .iter()
+                .zip(&new_units)
+                .take_while(|(old_unit, new_unit)| old_unit == new_unit)
+                .count()
+                .min(old_units.len() - suffix_length)
+                .min(new_units.len() - suffix_length);
             let (prefix_length, suffix_length) =
-                edit_prefix_and_suffix(&old_units, &new_units, post_edit_caret);
+                crate::fast::ime_edit::whole_code_points(&new_units, prefix_length, suffix_length);
 
             let inserted_text = String::from_utf16_lossy(
                 &new_units[prefix_length..new_units.len() - suffix_length],
@@ -1114,15 +1133,7 @@ impl WebWindowInner {
         let this = Rc::clone(self);
         self.listen_input("compositionstart", move |_event: JsValue| {
             this.is_composing.set(true);
-            // The browser anchors its IME panel to the hidden input: move it to
-            // the caret now, which the focused input reports when asked.
-            if let Some(caret) = this
-                .with_input_handler(|handler| handler.ime_candidate_bounds())
-                .flatten()
-            {
-                this.ime_mirror
-                    .set_position(f32::from(caret.left()), f32::from(caret.bottom()));
-            }
+            crate::fast::ime_position::follow_input(&this);
         })
     }
 
@@ -1132,6 +1143,7 @@ impl WebWindowInner {
             let event: web_sys::CompositionEvent = event.unchecked_into();
             let data = event.data().unwrap_or_default();
             this.is_composing.set(true);
+            crate::fast::ime_position::follow_input(&this);
             this.with_input_handler(|handler| {
                 handler.replace_and_mark_text_in_range(None, &data, None);
             });

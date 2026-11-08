@@ -36,6 +36,8 @@ use gpui::{
 };
 use gpui_wgpu::{WgpuRenderer, WgpuSurfaceConfig, wgpu};
 
+use super::whole_scene_layer;
+
 delegate_noop!(WaylandClientStatePtr: ignore wl_subcompositor::WlSubcompositor);
 delegate_noop!(WaylandClientStatePtr: ignore wl_subsurface::WlSubsurface);
 
@@ -608,6 +610,22 @@ impl WaylandComposition {
     }
 }
 
+// The base scene must survive auxiliary draws and release of the composition
+// borrow before the parent surface is drawn and committed.
+enum SurfaceScene<'a> {
+    Borrowed(&'a Scene),
+    Replayed(Scene),
+}
+
+impl SurfaceScene<'_> {
+    fn as_scene(&self) -> &Scene {
+        match self {
+            Self::Borrowed(scene) => scene,
+            Self::Replayed(scene) => scene,
+        }
+    }
+}
+
 /// `PlatformWindow::draw_composed`: draws each GPUI overlay on its
 /// subsurface, then the base content on the window surface, whose commit
 /// makes the synchronized overlays' frames appear with it.
@@ -653,15 +671,21 @@ pub(crate) fn draw_composed(window: &WaylandWindow, scene: ComposedScene<'_>) {
     }
     drop(state);
 
-    let mut base_scene = Scene::default();
+    let whole_scene = whole_scene_layer(scene.scene(), scene.layers());
+    let mut base_scene = SurfaceScene::Replayed(Scene::default());
     let mut surfaces_presented = true;
-    for layer in scene.layers() {
-        let surface_scene = match scene.layer_scene(layer) {
-            Ok(surface_scene) => surface_scene,
-            Err(error) => {
-                log::error!("replaying Wayland composition scene: {error:#}");
-                return;
+    for (layer_index, layer) in scene.layers().iter().enumerate() {
+        let surface_scene = match whole_scene {
+            Some((target_index, whole_scene)) if target_index == layer_index => {
+                SurfaceScene::Borrowed(whole_scene)
             }
+            _ => match scene.layer_scene(layer) {
+                Ok(surface_scene) => SurfaceScene::Replayed(surface_scene),
+                Err(error) => {
+                    log::error!("replaying Wayland composition scene: {error:#}");
+                    return;
+                }
+            },
         };
         if layer.surface == base_surface {
             base_scene = surface_scene;
@@ -693,7 +717,7 @@ pub(crate) fn draw_composed(window: &WaylandWindow, scene: ComposedScene<'_>) {
             }
             // Synchronized subsurfaces cache this commit until the window
             // surface commits the base frame below.
-            surface.renderer.draw(&surface_scene);
+            surface.renderer.draw(surface_scene.as_scene());
             surfaces_presented &= surface.renderer.take_present_succeeded();
         } else {
             log::error!(
@@ -704,7 +728,7 @@ pub(crate) fn draw_composed(window: &WaylandWindow, scene: ComposedScene<'_>) {
         }
     }
     drop(composition_ref);
-    window.draw_frame(&base_scene, surfaces_presented);
+    window.draw_frame(base_scene.as_scene(), surfaces_presented);
 }
 
 /// `PlatformWindow::enable_window_composition`: composition needs

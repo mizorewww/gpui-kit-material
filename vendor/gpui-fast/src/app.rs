@@ -1474,36 +1474,12 @@ impl App {
         invalidator: WindowInvalidator,
         entities: &FxHashSet<EntityId>,
     ) {
-        let mut tracked_entities =
-            std::mem::take(self.tracked_entities.entry(window_handle.id).or_default());
-        // Material performance patch: most entities stay tracked frame to
-        // frame, so only entities that left are removed and only those missing
-        // are inserted. A window's invalidator never changes, so the maps end
-        // as removing and inserting every entity would leave them.
-        for entity in tracked_entities.iter() {
-            if !entities.contains(entity) {
-                self.window_invalidators_by_entity
-                    .entry(*entity)
-                    .and_modify(|windows| {
-                        windows.remove(&window_handle.id);
-                    });
-            }
-        }
-        for entity in entities.iter() {
-            let windows = self
-                .window_invalidators_by_entity
-                .entry(*entity)
-                .or_default();
-            if !windows.contains_key(&window_handle.id) {
-                windows.insert(window_handle.id, invalidator.clone());
-            }
-            self.current_window_by_entity
-                .insert(*entity, window_handle.id);
-        }
-        tracked_entities.clear();
-        tracked_entities.extend(entities.iter().copied());
-        self.tracked_entities
-            .insert(window_handle.id, tracked_entities);
+        crate::fast::tracked_entities::record_entities_accessed(
+            self,
+            window_handle,
+            invalidator,
+            entities,
+        );
     }
 
     pub(crate) fn new_observer(&mut self, key: EntityId, value: Handler) -> Subscription {
