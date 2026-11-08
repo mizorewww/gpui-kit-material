@@ -37,7 +37,8 @@ dir=$(cd "$dir" && pwd)
 
 version=$(cargo pkgid -p gpui-kit-material | sed -E 's/.*[@#]//')
 cargo package --locked --allow-dirty --no-verify -p gpui-kit-material
-crate=target/package/gpui-kit-material-$version.crate
+target_dir=$(cargo metadata --format-version 1 --no-deps | sed -E 's/.*"target_directory":"([^"]*)".*/\1/')
+crate=$target_dir/package/gpui-kit-material-$version.crate
 
 # crates.io refuses packages over 10 MB.
 size=$(wc -c <"$crate" | tr -d ' ')
