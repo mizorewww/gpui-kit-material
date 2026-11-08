@@ -60,6 +60,9 @@ replace the vendored copies with that release and drop what is left of the patch
 Not offered upstream, behavior only: hanging overflow spaces
 (`src/text_system/line_layout.rs`, `line_wrapper.rs`), a wrapping change kept for the
 Gallery (waiting on zed-industries/zed#66644); crates.io users get upstream wrapping.
+A `measure_all` list's measurement after a width change (`src/elements/list.rs`,
+`vendor/gpui-pre/list-width-remeasure-patch.md`) is to be offered upstream; until then
+crates.io users lay out every item of such a list in each frame its width changes.
 `sbix` color fonts (`gpui-fast-apple/src/text_system.rs`) are being offered upstream.
 Kept local, no API: the test-harness repairs and fixtures, and `try_update` for the
 deprecated `fetch_update`. The `-macos`, `-linux`, `-windows` and `-wgpu` crates are

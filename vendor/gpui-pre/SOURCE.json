@@ -174,6 +174,7 @@
     "tests/action_macros.rs": "47b69024f403feb6cb63c9990a6993b8582856146f5a6ae16984714321956a84"
   },
   "local_patches": [
+    "src/elements/list.rs",
     "src/profiler.rs",
     "src/profiler/journal.rs",
     "src/style.rs",
@@ -228,6 +229,11 @@
       "upstream_sha256": "25f479208bf39e0840f9f7f67d33f6370b991459c8b900f2c4faeece08ebffb0",
       "local_sha256": "3788a52fe3f1989d65a45ce521dc3a45e4e8f9721143f969fcfb3e91f4ebe7f6",
       "reason": "em_width/em_advance fallback for fonts without 'm' (em-fallback-patch.md)."
+    },
+    "src/elements/list.rs": {
+      "upstream_sha256": "9a4580af24c5eada850d8e53ab63c43fbc2a71eca0b7bdbabc21f9fadab59b0f",
+      "local_sha256": "2141a4f617f6022a93f312eba970feb5d14fcb98fcf4eaed0a911c7bee8c6231",
+      "reason": "Material performance patch: after a width change, a measure_all list keeps each item's height as an estimate scaled by how the items it shows reflowed, lays out only those items in that frame, and measures the rest over later frames within 4 ms per frame (list-width-remeasure-patch.md)."
     }
   },
   "added_files": {
@@ -263,13 +269,14 @@
       "reason": "Not retained; Cargo.toml is the normalized manifest Cargo builds (test-harness-patch.md)."
     }
   },
-  "unchanged_file_count": 155,
+  "unchanged_file_count": 154,
   "provenance_files": [
     "SOURCE.json",
     "em-fallback-patch.md",
     "hanging-space-patch.md",
     "tab-stop-index-patch.md",
-    "test-harness-patch.md"
+    "test-harness-patch.md",
+    "list-width-remeasure-patch.md"
   ],
   "verification": "Archive downloaded from archive_url; its SHA-256 equals the crates.io index cksum. upstream_files are hashes of the extracted archive (excluding Cargo's .cargo-ok marker). Recompute: extract the .crate and compare with sha256 of each vendor file.",
   "validation": "source identity and per-file hashes verified; runtime acceptance is tracked separately"
