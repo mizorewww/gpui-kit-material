@@ -436,18 +436,23 @@ impl GalleryPage for Page {
     const PREPARES: bool = true;
     const OBSERVES_LAYOUT: bool = true;
 
-    fn prepare(&mut self, _: &mut Window, cx: &mut Context<Self>) {
+    fn prepare(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let inputs = (self.progress, self.loading, self.effects_disabled);
         for playback in &self.progress_playbacks {
             if self.progress_inputs != Some(inputs) {
-                playback.sync(inputs.0, inputs.1, inputs.2, cx);
+                playback.sync(inputs.0, inputs.1, inputs.2, window, cx);
             }
             playback.observe_reduced_motion(cx);
         }
         self.progress_inputs = Some(inputs);
     }
 
-    fn after_layout(&mut self, visible: &dyn Fn(usize) -> bool, cx: &mut Context<Self>) {
+    fn after_layout(
+        &mut self,
+        visible: &dyn Fn(usize) -> bool,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         #[cfg(test)]
         self.sync_rows.clear();
         let effect_row = row_of(Row::EffectSamples);
@@ -463,6 +468,7 @@ impl GalleryPage for Page {
                         ripple: self.ripple,
                         ..Default::default()
                     },
+                    window,
                     cx,
                 );
             }
@@ -483,6 +489,7 @@ impl GalleryPage for Page {
                         ripple: self.ripple,
                         ..Default::default()
                     },
+                    window,
                     cx,
                 );
             }
@@ -507,6 +514,7 @@ impl GalleryPage for Page {
                         ripple: self.ripple,
                         ..Default::default()
                     },
+                    window,
                     cx,
                 );
             }

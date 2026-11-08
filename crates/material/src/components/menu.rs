@@ -1206,8 +1206,8 @@ struct PopupState {
     trigger_bounds: Rc<std::cell::Cell<Option<Bounds<Pixels>>>>,
     /// Closing the sub-menu by keyboard returns focus to its owner item.
     restore: Rc<std::cell::Cell<bool>>,
-    reveal: motion::TokenTransitionPlayback<f32>,
-    fade: motion::TokenTransitionPlayback<f32>,
+    reveal: motion::TokenTransitionState<f32>,
+    fade: motion::TokenTransitionState<f32>,
 }
 
 /// Whether a popup still paints its surface: open, or closing until both

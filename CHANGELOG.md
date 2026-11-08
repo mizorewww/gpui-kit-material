@@ -103,6 +103,12 @@ earlier Git revisions.
 
 ### Changed
 
+- **Breaking:** `ButtonTransitionPlayback::sync` and `ButtonProgressPlayback::sync` take
+  `window: &mut Window` and `cx: &mut App`, and are called while drawing (as after layout,
+  for buttons that are not mounted): a forwarded transition that runs requests the next
+  frame, as Kit's `TransitionState::sample` does (gpui-kit#3841). `motion::TokenTransitionPlayback`
+  is renamed `motion::TokenTransitionState`; its `follow`, `sample` and `resample` take the
+  window and `&mut App`.
 - **Breaking:** the indicators' `playback(...)` builders, `spinner_with_playback`,
   `icon_spinner_with_playback` and the `*_progress_with_playback` shorthands take
   `motion::RepeatAnimationPlayback` instead of GPUI's, which only the engine patch

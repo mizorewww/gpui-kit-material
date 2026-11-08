@@ -170,7 +170,7 @@ it; the others change behavior only.
 | Consumer crate | To build | Why a consumer needs it |
 | --- | --- | --- |
 | `gpui-kit` | yes, from crates.io | Normalized manifest that keeps WASM single-threaded by default. Symbols depends on crates.io `gpui-kit` 0.9; without the crates.io patch a second Kit builds and Symbols' `IconNamed` is not Material's. |
-| `gpui-base` | yes | `TransitionPlayback`, which Material calls (longbridge/gpui-kit#3841, open). Until it merges and is released, a consumer cannot build without this patch. Everything else in it equals Kit `main`, including per-transition reduced motion (#3839) and assistive-technology slider steps (#3840). |
+| `gpui-base` | yes | `TransitionState`, which Material calls (longbridge/gpui-kit#3841, open). Until it merges and is released, a consumer cannot build without this patch. Everything else in it equals Kit `main`, including per-transition reduced motion (#3839) and assistive-technology slider steps (#3840). |
 | `gpui-pre`, `gpui-fast` | no | Behavior only. Fast is gpui-fast `main`, which has the lazy tab-stop index, `em` metrics for fonts without `m`, `record_entities_accessed` and the wheel and hover fixes (not yet released); both keep hanging overflow spaces, which upstream lacks. `gpui-pre` keeps the first two as local patches. Material calls no engine API that upstream lacks. |
 | `gpui-pre-apple`, `gpui-fast-apple` | no | Non-Latin and app-private fallback fonts (upstream on gpui-fast `main`, a local patch in `gpui-pre-apple`); `sbix` color fonts drawn as color bitmaps (local in both). |
 | `gpui-pre-web`, `gpui-fast-web` | no | The browser's IME panel opens at the caret, and a key or edit the IME owns stays whole. Upstream on gpui-fast `main` (unreleased); a local patch in `gpui-pre-web`. Only matters on `wasm32`. |
@@ -187,7 +187,7 @@ upstream's `gpui-fps`; so does this workspace.
 | Vendored | Source | Why |
 | --- | --- | --- |
 | `gpui-kit` | Git at Kit `main` `8dfdd49d`, unchanged source | Normalized manifest disables implicit WASM threading (`multithreaded-web` restores it). Hashes in `SOURCE.md`/`SOURCE.json`. |
-| `gpui-base` | Git `8dfdd49d` (Kit `main`, `crates/base`) + one patch (`SOURCE.json`, `motion-patch.md`) | `TransitionPlayback` (`src/motion.rs`, `src/lib.rs`), equal to the head of the open longbridge/gpui-kit#3841. Merged upstream and no longer patched: per-transition reduced motion (#3839), assistive Increment/Decrement with `SliderState::accessibility_step` (#3840), CSS transition reversal (#3820), vertical `Toolbar` axis (#3821), slider step snapping (#3822), block surfaces in `TextView` (#3830), slider min above the default max (#3823), `Slider::track_focus` (#3824), a disabled thumb's flag (#3825), `Dialog::accessibility_label` (#3826), an input a parent moves notified only while focused (#3828), `TimeField::separator` (#3829), the input's layout published at the end of prepaint (#3831). |
+| `gpui-base` | Git `8dfdd49d` (Kit `main`, `crates/base`) + one patch (`SOURCE.json`, `motion-patch.md`) | `TransitionState` (`src/motion.rs`, `src/lib.rs`), equal to `crates/base` at the head of the open longbridge/gpui-kit#3841 (`a4cf3898`, which merges Kit `main` `2fffa1ad`; its `crates/base` equals `8dfdd49d` elsewhere). Merged upstream and no longer patched: per-transition reduced motion (#3839), assistive Increment/Decrement with `SliderState::accessibility_step` (#3840), CSS transition reversal (#3820), vertical `Toolbar` axis (#3821), slider step snapping (#3822), block surfaces in `TextView` (#3830), slider min above the default max (#3823), `Slider::track_focus` (#3824), a disabled thumb's flag (#3825), `Dialog::accessibility_label` (#3826), an input a parent moves notified only while focused (#3828), `TimeField::separator` (#3829), the input's layout published at the end of prepaint (#3831). |
 | `gpui-pre` (GPUI `=0.3.11`) | crates.io + patches (`SOURCE.json`, `*-patch.md`) | `em`/`ch` metrics for fonts without `m` (`em-fallback-patch.md`); lazy tab-stop index (`tab-stop-index-patch.md`); overflowing spaces hang instead of starting a wrapped row (`hanging-space-patch.md`); test-harness repairs; `try_update` for the deprecated `fetch_update` in the profiler. |
 | `gpui-pre-apple` | crates.io + patches (`SOURCE.json`, `VENDORED.md`) | Non-Latin and app-private fallback fonts; `sbix` color fonts. |
 | `gpui-pre-web` | crates.io + patches (`SOURCE.json`, `MATERIAL-PATCHES.md`) | Moves the hidden IME input to the caret when a composition starts and on `update_ime_position`, where a browser opens its candidate window and it takes no clicks; keeps a composition's keys from GPUI and a replaced emoji whole (consumers need these). |
@@ -211,7 +211,7 @@ upstream's `gpui-fps`; so does this workspace.
 
 **Audit results for transition extras.** These stay, because removing them changes
 reference parity or the budget: reversal, per-transition reduced motion,
-`TransitionPlayback`, and Material's `motion::RepeatAnimationPlayback` and
+`TransitionState`, and Material's `motion::RepeatAnimationPlayback` and
 `motion::RepeatWhenVisible`. No Examples
 page uses a playback handle. The Gallery's are in its buttons and loading pages.
 
@@ -245,13 +245,16 @@ still marks it changed. Upstream GPUI has no retained subtrees and uses `update`
 Kit/Base keyed transitions live only while their element is mounted. For
 virtualized rows, owners retain playback handles instead:
 
-- Base `TransitionPlayback` keeps a transition sampler (with interruption and
-  reversal) across unmounts without scheduling frames.
+- Base `TransitionState` keeps a transition sampler (with interruption and
+  reversal) across unmounts. It holds no view or window; sampling it while
+  drawing requests the next frame while the transition runs.
 - `ButtonTransitionPlayback` keeps a button's color, shape, elevation and
   state-layer channels, combining that sampler with Material's motion curve. A
   completed offscreen transition settles before the next target's curve is
   chosen. Owners sync controlled inputs for unmounted buttons after layout
-  determines which rows participated.
+  determines which rows participated, in the same frame (a list prepaint), so a
+  forwarded transition requests one more frame and no more: the next sync with
+  the same inputs samples nothing.
 - `CircularProgressPlayback` keeps only the indicator clock and reduced-motion
   stop state.
 - `motion::RepeatAnimationPlayback` keeps only a repeat's start time, for the

@@ -431,6 +431,9 @@ type UnmountColors = (gpui::Rgba, gpui::Rgba, gpui::Rgba);
 
 struct ToggleUnmountHarness {
     playback: ButtonTransitionPlayback,
+    /// Controlled inputs to forward while drawing, as an owner does after
+    /// layout for a button that is not mounted.
+    forward: Option<super::ButtonTransitionInputs>,
     scheme: crate::motion::MotionScheme,
     selected: bool,
     mount_second: bool,
@@ -438,9 +441,12 @@ struct ToggleUnmountHarness {
     colors: [Rc<Cell<UnmountColors>>; 2],
 }
 impl Render for ToggleUnmountHarness {
-    fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         window.set_rem_size(px(14.));
         crate::motion::set_motion_scheme(self.scheme);
+        if let Some(inputs) = self.forward.take() {
+            self.playback.sync(inputs, window, cx);
+        }
         let mut root = div().flex().items_start();
         for (index, id) in ["always-mounted-toggle", "remounted-toggle"]
             .into_iter()
@@ -483,6 +489,7 @@ fn controlled_toggle_transition_survives_virtual_unmount(cx: &mut TestAppContext
     });
     let (view, cx) = cx.add_window_view(|_, _| ToggleUnmountHarness {
         playback: ButtonTransitionPlayback::default(),
+        forward: None,
         scheme: crate::motion::MotionScheme::Expressive,
         selected: false,
         mount_second: true,
@@ -582,6 +589,7 @@ fn controlled_toggle_offscreen_reversal_matches_mounted_control(cx: &mut TestApp
     });
     let (view, cx) = cx.add_window_view(|_, _| ToggleUnmountHarness {
         playback: ButtonTransitionPlayback::default(),
+        forward: None,
         scheme: crate::motion::MotionScheme::Expressive,
         selected: false,
         mount_second: true,
@@ -593,17 +601,14 @@ fn controlled_toggle_offscreen_reversal_matches_mounted_control(cx: &mut TestApp
     view.update(cx, |this, cx| {
         this.selected = true;
         this.mount_second = false;
-        this.playback.sync(
-            super::ButtonTransitionInputs {
-                variant: ButtonVariant::Filled,
-                size: ButtonSize::Large,
-                shape: ButtonShape::Round,
-                toggle: true,
-                selected: true,
-                ..Default::default()
-            },
-            cx,
-        );
+        this.forward = Some(super::ButtonTransitionInputs {
+            variant: ButtonVariant::Filled,
+            size: ButtonSize::Large,
+            shape: ButtonShape::Round,
+            toggle: true,
+            selected: true,
+            ..Default::default()
+        });
         cx.notify();
     });
     draw(cx);
@@ -612,17 +617,14 @@ fn controlled_toggle_offscreen_reversal_matches_mounted_control(cx: &mut TestApp
     assert_ne!(radius[0].get(), initial);
     view.update(cx, |this, cx| {
         this.selected = false;
-        this.playback.sync(
-            super::ButtonTransitionInputs {
-                variant: ButtonVariant::Filled,
-                size: ButtonSize::Large,
-                shape: ButtonShape::Round,
-                toggle: true,
-                selected: false,
-                ..Default::default()
-            },
-            cx,
-        );
+        this.forward = Some(super::ButtonTransitionInputs {
+            variant: ButtonVariant::Filled,
+            size: ButtonSize::Large,
+            shape: ButtonShape::Round,
+            toggle: true,
+            selected: false,
+            ..Default::default()
+        });
         cx.notify();
     });
     draw(cx);
@@ -662,6 +664,7 @@ fn offscreen_settled_toggle_uses_new_scheme_for_next_target(cx: &mut TestAppCont
     });
     let (view, cx) = cx.add_window_view(|_, _| ToggleUnmountHarness {
         playback: ButtonTransitionPlayback::default(),
+        forward: None,
         scheme: crate::motion::MotionScheme::Expressive,
         selected: false,
         mount_second: true,
@@ -717,21 +720,19 @@ fn visible_target_updates_sync_cache_before_offscreen_reversal(cx: &mut TestAppC
     });
     let (view, cx) = cx.add_window_view(|_, _| ToggleUnmountHarness {
         playback: ButtonTransitionPlayback::default(),
+        forward: None,
         scheme: crate::motion::MotionScheme::Expressive,
         selected: false,
         mount_second: true,
         radius: radius.clone(),
         colors: colors.clone(),
     });
-    view.update(cx, |this, cx| {
-        this.playback.sync(
-            super::ButtonTransitionInputs {
-                size: ButtonSize::Large,
-                toggle: true,
-                ..Default::default()
-            },
-            cx,
-        );
+    view.update(cx, |this, _| {
+        this.forward = Some(super::ButtonTransitionInputs {
+            size: ButtonSize::Large,
+            toggle: true,
+            ..Default::default()
+        });
     });
     draw(cx);
     let initial = radius[0].get();
@@ -746,17 +747,14 @@ fn visible_target_updates_sync_cache_before_offscreen_reversal(cx: &mut TestAppC
     view.update(cx, |this, cx| {
         this.selected = false;
         this.mount_second = false;
-        this.playback.sync(
-            super::ButtonTransitionInputs {
-                variant: ButtonVariant::Filled,
-                size: ButtonSize::Large,
-                shape: ButtonShape::Round,
-                toggle: true,
-                selected: false,
-                ..Default::default()
-            },
-            cx,
-        );
+        this.forward = Some(super::ButtonTransitionInputs {
+            variant: ButtonVariant::Filled,
+            size: ButtonSize::Large,
+            shape: ButtonShape::Round,
+            toggle: true,
+            selected: false,
+            ..Default::default()
+        });
         cx.notify();
     });
     draw(cx);

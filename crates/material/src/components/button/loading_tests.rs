@@ -263,9 +263,16 @@ struct PersistentProgressProbe {
     disabled: bool,
     playback: super::ButtonProgressPlayback,
     opacity: Rc<Cell<f32>>,
+    /// Runs at the start of the next render, as an owner forwards inputs to
+    /// an unmounted button while drawing.
+    hook: Option<ProgressHook>,
 }
+type ProgressHook = Box<dyn FnOnce(&super::ButtonProgressPlayback, &mut Window, &mut gpui::App)>;
 impl Render for PersistentProgressProbe {
-    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        if let Some(hook) = self.hook.take() {
+            hook(&self.playback, window, cx);
+        }
         let mut root = div().w(px(200.)).h(px(80.));
         if self.mounted {
             let mut button = MaterialButton::new("persistent-progress")
@@ -293,6 +300,7 @@ fn caller_progress_preserves_visible_opacity_and_distinguishes_real_hide(cx: &mu
         disabled: false,
         playback: playback.clone(),
         opacity: opacity.clone(),
+        hook: None,
     });
     cx.update(|window, cx| {
         window.refresh();
@@ -306,11 +314,21 @@ fn caller_progress_preserves_visible_opacity_and_distinguishes_real_hide(cx: &mu
         window.simulate_next_frame(cx);
         window.refresh();
         window.draw(cx).clear(cx);
-        playback.sync(true, false, true, cx);
+        assert_eq!(window.simulate_next_frame(cx), 0, "unmounted, nothing runs");
+        view.update(cx, |view, _| {
+            view.hook = Some(Box::new(|playback, window, cx| {
+                playback.sync(true, false, true, window, cx);
+            }));
+        });
+        window.refresh();
+        window.draw(cx).clear(cx);
+        window.simulate_next_frame(cx);
+        window.refresh();
+        window.draw(cx).clear(cx);
         assert_eq!(
             window.simulate_next_frame(cx),
             0,
-            "offscreen sync must not schedule"
+            "a forwarded transition asks for no frame once nothing samples it"
         );
     });
     cx.executor().advance_clock(Duration::from_millis(25));
@@ -334,10 +352,20 @@ fn caller_progress_preserves_visible_opacity_and_distinguishes_real_hide(cx: &mu
         view.update(cx, |view, _| view.mounted = false);
         window.refresh();
         window.draw(cx).clear(cx);
-        playback.sync(true, false, false, cx);
     });
-    let reversed = cx.update(|_, cx| playback.sample_inputs(true, false, false, cx).value);
-    assert!((reversed - expected).abs() < 0.00001);
+    let reversed = Rc::new(Cell::new(f32::NAN));
+    cx.update(|window, cx| {
+        let reversed = reversed.clone();
+        view.update(cx, |view, _| {
+            view.hook = Some(Box::new(move |playback, window, cx| {
+                playback.sync(true, false, false, window, cx);
+                reversed.set(playback.sample_inputs(true, false, false, window, cx).value);
+            }));
+        });
+        window.refresh();
+        window.draw(cx).clear(cx);
+    });
+    assert!((reversed.get() - expected).abs() < 0.00001);
     cx.executor().advance_clock(Duration::from_millis(10));
     cx.update(|window, cx| {
         view.update(cx, |view, _| {
@@ -352,11 +380,15 @@ fn caller_progress_preserves_visible_opacity_and_distinguishes_real_hide(cx: &mu
     let expected_reverse = expected + (1. - expected) * easing.sample(reverse_progress);
     assert!((opacity.get() - expected_reverse).abs() < 0.00001);
     cx.update(|window, cx| {
-        view.update(cx, |view, _| view.mounted = false);
+        view.update(cx, |view, _| {
+            view.mounted = false;
+            view.hook = Some(Box::new(|playback, window, cx| {
+                playback.sync(false, false, true, window, cx);
+                playback.sync(false, true, false, window, cx);
+            }));
+        });
         window.refresh();
         window.draw(cx).clear(cx);
-        playback.sync(false, false, true, cx);
-        playback.sync(false, true, false, cx);
         view.update(cx, |view, _| {
             view.mounted = true;
             view.progress = false;
@@ -377,22 +409,24 @@ fn caller_progress_preserves_visible_opacity_and_distinguishes_real_hide(cx: &mu
 fn caller_progress_retains_started_gate_and_offscreen_reduced_stop(cx: &mut TestAppContext) {
     use std::time::Duration;
     let playback = super::ButtonProgressPlayback::default();
-    cx.update(|cx| {
-        playback.sync(false, false, true, cx);
-        cx.set_reduce_motion(true);
-        playback.observe_reduced_motion(cx);
-        assert!(!playback.state.borrow().started);
-        cx.set_reduce_motion(false);
-    });
     let (view, cx) = cx.add_window_view(|_, _| PersistentProgressProbe {
-        mounted: true,
+        mounted: false,
         progress: false,
         loading: true,
         disabled: false,
         playback: playback.clone(),
         opacity: Rc::new(Cell::new(0.)),
+        hook: Some(Box::new(|playback, window, cx| {
+            playback.sync(false, false, true, window, cx);
+            cx.set_reduce_motion(true);
+            playback.observe_reduced_motion(cx);
+            assert!(!playback.state.borrow().started);
+            cx.set_reduce_motion(false);
+        })),
     });
+    assert!(!playback.state.borrow().started);
     cx.update(|window, cx| {
+        view.update(cx, |view, _| view.mounted = true);
         window.refresh();
         window.draw(cx).clear(cx);
     });

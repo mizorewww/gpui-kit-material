@@ -32,18 +32,19 @@ impl Default for ButtonTransitionInputs {
 }
 
 /// One logical button's visual transitions, independent of virtual mounting.
-/// Clones share only samples/curves. No focus, pointer, hover, ripple, window,
-/// or queued callback is retained. Forward offscreen controlled input changes
-/// through `sync`; call it after updating the Material motion scheme/theme.
+/// Clones share only samples/curves. No focus, pointer, hover, ripple, view or
+/// window is retained. Forward offscreen controlled input changes through
+/// `sync` while drawing, as after layout decides which rows are mounted; call it
+/// after updating the Material motion scheme/theme.
 #[derive(Clone, Default)]
 pub struct ButtonTransitionPlayback {
     last_sync: std::rc::Rc<std::cell::Cell<Option<SyncInputs>>>,
-    pub(super) background: motion::TokenTransitionPlayback<CssColor>,
-    pub(super) foreground: motion::TokenTransitionPlayback<CssColor>,
-    pub(super) border: motion::TokenTransitionPlayback<CssColor>,
-    pub(super) radius: motion::TokenTransitionPlayback<f32>,
-    pub(super) shadow: motion::TokenTransitionPlayback<shadow::ShadowPair>,
-    pub(super) opacity: gpui_base::TransitionPlayback<f32>,
+    pub(super) background: motion::TokenTransitionState<CssColor>,
+    pub(super) foreground: motion::TokenTransitionState<CssColor>,
+    pub(super) border: motion::TokenTransitionState<CssColor>,
+    pub(super) radius: motion::TokenTransitionState<f32>,
+    pub(super) shadow: motion::TokenTransitionState<shadow::ShadowPair>,
+    pub(super) opacity: gpui_base::TransitionState<f32>,
     opacity_target: std::rc::Rc<std::cell::Cell<f32>>,
 }
 #[derive(Clone, Copy, PartialEq)]
@@ -66,9 +67,10 @@ impl ButtonTransitionPlayback {
             effects: motion::curve(MotionToken::DefaultEffects),
         }
     }
-    /// Sample actual inputs without requesting frames. First sync adopts the
-    /// target, so initializing unused handles does not create an animation.
-    pub fn sync(&self, inputs: ButtonTransitionInputs, cx: &App) {
+    /// Sample actual inputs while drawing; a channel that starts running
+    /// requests the next frame. First sync adopts the target, so initializing
+    /// unused handles does not create an animation.
+    pub fn sync(&self, inputs: ButtonTransitionInputs, window: &mut Window, cx: &mut App) {
         let observed = Self::observed(inputs, cx);
         // Repeated owner renders must not reset the visible button's transient
         // targets to rest or allocate new color expressions every frame.
@@ -78,13 +80,17 @@ impl ButtonTransitionPlayback {
         let only_preferences = self.last_sync.get().is_some_and(|old| old.inputs == inputs);
         self.last_sync.set(Some(observed));
         if only_preferences {
-            self.background.resample(MotionToken::DefaultEffects, cx);
-            self.foreground.resample(MotionToken::DefaultEffects, cx);
-            self.border.resample(MotionToken::DefaultEffects, cx);
-            self.radius.resample(MotionToken::FastSpatial, cx);
-            self.shadow.resample(MotionToken::DefaultEffects, cx);
+            self.background
+                .resample(MotionToken::DefaultEffects, window, cx);
+            self.foreground
+                .resample(MotionToken::DefaultEffects, window, cx);
+            self.border
+                .resample(MotionToken::DefaultEffects, window, cx);
+            self.radius.resample(MotionToken::FastSpatial, window, cx);
+            self.shadow
+                .resample(MotionToken::DefaultEffects, window, cx);
             self.opacity
-                .sample(self.opacity_target.get(), opacity_policy(), cx);
+                .sample(self.opacity_target.get(), opacity_policy(), window, cx);
             return;
         }
         let (bg, fg, border) = toggle_color_targets(
@@ -93,15 +99,19 @@ impl ButtonTransitionPlayback {
             inputs.toggle,
             inputs.selected,
         );
-        self.background.sample(bg, MotionToken::DefaultEffects, cx);
-        self.foreground.sample(fg, MotionToken::DefaultEffects, cx);
-        self.border.sample(border, MotionToken::DefaultEffects, cx);
+        self.background
+            .sample(bg, MotionToken::DefaultEffects, window, cx);
+        self.foreground
+            .sample(fg, MotionToken::DefaultEffects, window, cx);
+        self.border
+            .sample(border, MotionToken::DefaultEffects, window, cx);
         let radius = if inputs.active {
             inputs.size.geometry().pressed
         } else {
             resting_radius(inputs.size, inputs.shape, inputs.toggle && inputs.selected)
         };
-        self.radius.sample(radius, MotionToken::FastSpatial, cx);
+        self.radius
+            .sample(radius, MotionToken::FastSpatial, window, cx);
         self.shadow.sample(
             shadow::ShadowPair::level(shadow_level(
                 inputs.variant,
@@ -111,6 +121,7 @@ impl ButtonTransitionPlayback {
                 inputs.active,
             )),
             MotionToken::DefaultEffects,
+            window,
             cx,
         );
         let opacity = state_opacity(
@@ -122,7 +133,7 @@ impl ButtonTransitionPlayback {
             false,
         );
         self.opacity_target.set(opacity);
-        self.opacity.sample(opacity, opacity_policy(), cx);
+        self.opacity.sample(opacity, opacity_policy(), window, cx);
     }
 }
 
@@ -174,23 +185,14 @@ pub(super) fn shadow_level(
         0
     }
 }
-fn schedule<T>(sample: gpui_base::MotionValue<T>, window: &mut Window) -> T {
-    if matches!(
-        sample.status,
-        gpui_base::MotionStatus::Running | gpui_base::MotionStatus::Delayed
-    ) {
-        window.request_animation_frame();
-    }
-    sample.value
-}
 pub(super) fn token_sample<T: gpui_base::Interpolate + PartialEq + 'static>(
-    playback: &motion::TokenTransitionPlayback<T>,
+    state: &motion::TokenTransitionState<T>,
     target: T,
     token: MotionToken,
     window: &mut Window,
     cx: &mut App,
 ) -> T {
-    schedule(playback.sample(target, token, cx), window)
+    state.follow(target, token, window, cx)
 }
 pub(super) fn opacity_sample(
     playback: &ButtonTransitionPlayback,
@@ -200,60 +202,85 @@ pub(super) fn opacity_sample(
     cx: &mut App,
 ) -> f32 {
     playback.opacity_target.set(target);
-    schedule(playback.opacity.sample(target, policy, cx), window)
+    playback.opacity.sample(target, policy, window, cx).value
 }
 
 #[cfg(test)]
 mod tests {
     use super::{ButtonTransitionInputs, ButtonTransitionPlayback, opacity_policy, shadow};
     use crate::motion::{self, MotionToken};
-    use gpui::TestAppContext;
+    use gpui::{App, Context, Empty, IntoElement, Render, TestAppContext, Window};
+
+    /// Runs its closure while drawing, where a sample may request a frame.
+    type Run = Box<dyn FnOnce(&mut Window, &mut App)>;
+    struct WhileDrawing(Option<Run>);
+    impl Render for WhileDrawing {
+        fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+            if let Some(run) = self.0.take() {
+                run(window, cx);
+            }
+            Empty
+        }
+    }
 
     #[gpui::test]
     fn preference_sync_keeps_last_visual_targets(cx: &mut TestAppContext) {
         cx.update(|cx| {
             gpui_base::init(cx);
             cx.set_reduce_motion(false);
-            motion::set_motion_scheme(motion::MotionScheme::Expressive);
-            let playback = ButtonTransitionPlayback::default();
-            let inputs = ButtonTransitionInputs::default();
-            playback.sync(inputs, cx);
-            // Simulate the last targets produced by live transient presentation,
-            // without putting pointer/focus flags into the persistent handle.
-            let pressed = inputs.size.geometry().pressed;
-            playback
-                .radius
-                .sample(pressed, MotionToken::FastSpatial, cx);
-            playback.shadow.sample(
-                shadow::ShadowPair::level(1),
-                MotionToken::DefaultEffects,
-                cx,
-            );
-            playback.opacity_target.set(crate::tokens::state::HOVER);
-            playback
-                .opacity
-                .sample(crate::tokens::state::HOVER, opacity_policy(), cx);
-            cx.set_reduce_motion(true);
-            motion::set_motion_scheme(motion::MotionScheme::Standard);
-            playback.sync(inputs, cx);
-            assert_eq!(
-                playback
-                    .radius
-                    .resample(MotionToken::FastSpatial, cx)
-                    .unwrap()
-                    .value,
-                pressed
-            );
-            assert_eq!(playback.opacity_target.get(), crate::tokens::state::HOVER);
-            // Same target remains a continuation, not a rest-target reversal.
-            assert_eq!(
-                playback
-                    .radius
-                    .resample(MotionToken::FastSpatial, cx)
-                    .unwrap()
-                    .status,
-                gpui_base::MotionStatus::Finished
-            );
         });
+        let (view, cx) = cx.add_window_view(|_, _| {
+            WhileDrawing(Some(Box::new(|window, cx| {
+                motion::set_motion_scheme(motion::MotionScheme::Expressive);
+                let playback = ButtonTransitionPlayback::default();
+                let inputs = ButtonTransitionInputs::default();
+                playback.sync(inputs, window, cx);
+                // Simulate the last targets produced by live transient presentation,
+                // without putting pointer/focus flags into the persistent handle.
+                let pressed = inputs.size.geometry().pressed;
+                playback
+                    .radius
+                    .sample(pressed, MotionToken::FastSpatial, window, cx);
+                playback.shadow.sample(
+                    shadow::ShadowPair::level(1),
+                    MotionToken::DefaultEffects,
+                    window,
+                    cx,
+                );
+                playback.opacity_target.set(crate::tokens::state::HOVER);
+                playback
+                    .opacity
+                    .sample(crate::tokens::state::HOVER, opacity_policy(), window, cx);
+                cx.set_reduce_motion(true);
+                motion::set_motion_scheme(motion::MotionScheme::Standard);
+                playback.sync(inputs, window, cx);
+                assert_eq!(
+                    playback
+                        .radius
+                        .resample(MotionToken::FastSpatial, window, cx)
+                        .unwrap()
+                        .value,
+                    pressed
+                );
+                assert_eq!(playback.opacity_target.get(), crate::tokens::state::HOVER);
+                // Same target remains a continuation, not a rest-target reversal.
+                assert_eq!(
+                    playback
+                        .radius
+                        .resample(MotionToken::FastSpatial, window, cx)
+                        .unwrap()
+                        .status,
+                    gpui_base::MotionStatus::Finished
+                );
+            })))
+        });
+        cx.update(|window, cx| {
+            window.refresh();
+            window.draw(cx).clear(cx);
+        });
+        assert!(
+            view.read_with(cx, |view, _| view.0.is_none()),
+            "ran while drawing"
+        );
     }
 }

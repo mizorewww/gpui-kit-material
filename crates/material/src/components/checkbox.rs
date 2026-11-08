@@ -274,10 +274,10 @@ thread_local! {
 /// and a checkbox that leaves one starts them over at their targets.
 #[derive(Clone, Default)]
 struct MarkChannels {
-    draw: motion::TokenTransitionPlayback<f32>,
-    fill: motion::TokenTransitionPlayback<f32>,
+    draw: motion::TokenTransitionState<f32>,
+    fill: motion::TokenTransitionState<f32>,
     /// The shape morphs on two channels: see `MarkShape::channel`.
-    morph: [motion::TokenTransitionPlayback<f32>; 2],
+    morph: [motion::TokenTransitionState<f32>; 2],
 }
 
 /// What a checkbox keeps between frames, in one entity.

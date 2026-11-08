@@ -13,13 +13,13 @@
   ],
   "local_patch_sha256": {
     "src/lib.rs": {
-      "local_sha256": "04b8aad215e6c115db560165dea02654d69241b0893be690230154f16e1b16de",
-      "reason": "Public export of TransitionPlayback. TransitionPlayback, a caller-owned handle that keeps one transition's clock and interruption history across unmounts (virtualized rows). Equals crates/base at longbridge/gpui-kit#3841 head e7de85eef5254781e6b4926cd0694f69c9fb802a (branch material/motion-transition-playback-v2 on mizorewww/gpui-kit, based on 8dfdd49de27c0726dd052fb2cfd2b0807d17980b); open upstream.",
+      "local_sha256": "db42d24cc20ac7f384d02163589a03320c651d54587d9b0eafcf30284bf0f4a6",
+      "reason": "Public export of TransitionState. TransitionState, caller-owned state that keeps one transition's clock and interruption history across unmounts (virtualized rows); sample takes the window and requests frames while Delayed/Running. Equals crates/base at longbridge/gpui-kit#3841 head a4cf38985e8b856905ba504f5b73968dc003dcea (branch material/motion-transition-playback-v2 on mizorewww/gpui-kit; upstream main 2fffa1ad merged in, which leaves crates/base equal to 8dfdd49de27c0726dd052fb2cfd2b0807d17980b outside this PR); open upstream.",
       "upstream_sha256": "1c48ee3191efaeb22b42db0fbe5b67a8be3af56ba67d631760ca234764a62b76"
     },
     "src/motion.rs": {
-      "local_sha256": "99d41ba38e2dd125b21ccc9a8eb407eb9da3e399cf87659cd89c43475b2ca29a",
-      "reason": "TransitionPlayback, a caller-owned handle that keeps one transition's clock and interruption history across unmounts (virtualized rows). Equals crates/base at longbridge/gpui-kit#3841 head e7de85eef5254781e6b4926cd0694f69c9fb802a (branch material/motion-transition-playback-v2 on mizorewww/gpui-kit, based on 8dfdd49de27c0726dd052fb2cfd2b0807d17980b); open upstream.",
+      "local_sha256": "c54fd0bc67eb706c4be7cea4abcddeeb9192d8a51007102c147b90f3d6da3cd7",
+      "reason": "TransitionState, caller-owned state that keeps one transition's clock and interruption history across unmounts (virtualized rows); sample takes the window and requests frames while Delayed/Running. Equals crates/base at longbridge/gpui-kit#3841 head a4cf38985e8b856905ba504f5b73968dc003dcea (branch material/motion-transition-playback-v2 on mizorewww/gpui-kit; upstream main 2fffa1ad merged in, which leaves crates/base equal to 8dfdd49de27c0726dd052fb2cfd2b0807d17980b outside this PR); open upstream.",
       "upstream_sha256": "73361c8873100c1f7e8d6443a244fe6d9b0841bfdff73dadcb869d1dcd1b695d"
     }
   },
@@ -44,7 +44,7 @@
     }
   },
   "package_version": "0.9.0",
-  "patch_application": "Moved from Git 46bf6d49 to Kit main 8dfdd49de27c0726dd052fb2cfd2b0807d17980b, then crates/base/src/lib.rs and src/motion.rs taken from longbridge/gpui-kit#3841 head e7de85eef5254781e6b4926cd0694f69c9fb802a, whose base is 8dfdd49de27c0726dd052fb2cfd2b0807d17980b, so the vendored source equals that PR head. Dropped because merged upstream: per-transition reduced motion (#3839, a5bda4aa) and assistive-technology slider steps with SliderState::accessibility_step (#3840, c7cc85cd); the vendored src/slider.rs now equals upstream. Earlier: CSS transition reversal (#3820), Toolbar::axis (#3821), slider step snapping from min (#3822), TextView block surfaces (#3830).",
+  "patch_application": "Moved from Git 46bf6d49 to Kit main 8dfdd49de27c0726dd052fb2cfd2b0807d17980b, then crates/base/src/lib.rs and src/motion.rs taken from longbridge/gpui-kit#3841 head a4cf38985e8b856905ba504f5b73968dc003dcea (TransitionPlayback renamed TransitionState, window-based sample, after review); that head merges upstream main 2fffa1ad, whose crates/base equals 8dfdd49de27c0726dd052fb2cfd2b0807d17980b, so the vendored source equals that PR head's crates/base. Dropped because merged upstream: per-transition reduced motion (#3839, a5bda4aa) and assistive-technology slider steps with SliderState::accessibility_step (#3840, c7cc85cd); the vendored src/slider.rs now equals upstream. Earlier: CSS transition reversal (#3820), Toolbar::axis (#3821), slider step snapping from min (#3822), TextView block surfaces (#3830).",
   "patch_base": {
     "package": "gpui-base",
     "registry_source_revision": "99576db58ec8103417c41a092e891b4022d24e7e",

@@ -20,15 +20,17 @@ from publication.
 
 The only local change is one open upstream PR, longbridge/gpui-kit#3841
 (branch `material/motion-transition-playback-v2` on mizorewww/gpui-kit, head
-`e7de85eef5254781e6b4926cd0694f69c9fb802a`, based on `8dfdd49d`). `src/lib.rs`
-and `src/motion.rs` equal that PR head:
+`a4cf38985e8b856905ba504f5b73968dc003dcea`). That head merges Kit `main`
+`2fffa1ad`, whose `crates/base` equals `8dfdd49d`. `src/lib.rs` and
+`src/motion.rs` equal that PR head:
 
-- `src/motion.rs`: `TransitionPlayback<T>`, a caller-owned handle that keeps
-  one transition's clock and interruption/reversal history across unmounts
-  (for virtualized rows), using the same sampler as `transition_with_status`
-  and honoring the transition's reduced-motion policy. It retains no view,
-  window or scheduled callback.
-- `src/lib.rs`: the public export of `TransitionPlayback`.
+- `src/motion.rs`: `TransitionState<T>`, caller-owned state that keeps one
+  transition's clock and interruption/reversal history across unmounts (for
+  virtualized rows), using the same sampler as `transition_with_status` and
+  honoring the transition's reduced-motion policy. It retains no view or
+  window; `sample(target, policy, window, cx)` requests the next animation
+  frame while the status is `Delayed` or `Running`.
+- `src/lib.rs`: the public export of `TransitionState`.
 
 Every other file equals Kit `8dfdd49d`. Merged upstream and no longer patched
 here: per-transition reduced motion (`Transition::reduced_motion`,

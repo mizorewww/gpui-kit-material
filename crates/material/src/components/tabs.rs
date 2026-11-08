@@ -303,7 +303,7 @@ struct TabGeometry {
     /// Each tab's bounds, written by this frame's probes.
     slots: Vec<Bounds<Pixels>>,
     /// Where the sliding indicator is.
-    indicator: motion::TokenTransitionPlayback<Bounds<Pixels>>,
+    indicator: motion::TokenTransitionState<Bounds<Pixels>>,
 }
 
 /// The indicator's target for a tab's span along the row.
@@ -665,6 +665,7 @@ impl RenderOnce for MaterialTabs {
                         current.indicator.sample(
                             indicator_target(*span, inset),
                             MotionToken::DefaultSpatial,
+                            window,
                             cx,
                         );
                     }

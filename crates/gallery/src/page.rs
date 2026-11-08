@@ -360,8 +360,15 @@ pub trait GalleryPage: Render + Sized + 'static {
     /// Whether [`Self::after_layout`] does anything, for the same reason.
     const OBSERVES_LAYOUT: bool = false;
     /// Runs after the list's prepaint with which body rows are on screen,
-    /// to forward controlled changes to playbacks of unmounted rows.
-    fn after_layout(&mut self, _visible: &dyn Fn(usize) -> bool, _cx: &mut Context<Self>) {}
+    /// to forward controlled changes to playbacks of unmounted rows. A
+    /// forwarded transition that runs requests the next frame.
+    fn after_layout(
+        &mut self,
+        _visible: &dyn Fn(usize) -> bool,
+        _window: &mut Window,
+        _cx: &mut Context<Self>,
+    ) {
+    }
     fn apply_capture(&mut self, _state: CaptureState, _cx: &mut Context<Self>) {}
 }
 
@@ -372,7 +379,7 @@ pub(super) trait AnyPage {
     fn interactive(&self, row: usize, cx: &App) -> bool;
     fn render_row(&self, row: usize, window: &mut Window, cx: &mut App) -> AnyElement;
     fn prepare(&self, window: &mut Window, cx: &mut App);
-    fn after_layout(&self, visible: &dyn Fn(usize) -> bool, cx: &mut App);
+    fn after_layout(&self, visible: &dyn Fn(usize) -> bool, window: &mut Window, cx: &mut App);
     fn observes_layout(&self) -> bool;
     fn apply_capture(&self, state: CaptureState, cx: &mut App);
     /// Re-render the Gallery when page `index` (in `PAGES`) changes while shown.
@@ -402,8 +409,8 @@ impl<P: GalleryPage> AnyPage for Entity<P> {
     fn observes_layout(&self) -> bool {
         P::OBSERVES_LAYOUT
     }
-    fn after_layout(&self, visible: &dyn Fn(usize) -> bool, cx: &mut App) {
-        self.update(cx, |page, cx| page.after_layout(visible, cx))
+    fn after_layout(&self, visible: &dyn Fn(usize) -> bool, window: &mut Window, cx: &mut App) {
+        self.update(cx, |page, cx| page.after_layout(visible, window, cx))
     }
     fn apply_capture(&self, state: CaptureState, cx: &mut App) {
         self.update(cx, |page, cx| page.apply_capture(state, cx))

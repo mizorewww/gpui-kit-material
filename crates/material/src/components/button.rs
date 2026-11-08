@@ -46,7 +46,8 @@ use gpui::{prelude::*, *};
 /// Persistent progress/loading presentation for one logical button.
 ///
 /// Keep this handle across virtual unmounts. Forward actual progress, loading,
-/// and disabled changes with [`Self::sync`] while unmounted; do not report a
+/// and disabled changes with [`Self::sync`] while unmounted (while drawing, as
+/// after layout decides which rows are mounted); do not report a
 /// virtual unmount as hiding progress. Clones share playback, not interaction
 /// state. A fresh handle starts a new lifecycle.
 #[derive(Clone, Default)]
@@ -60,17 +61,25 @@ struct ButtonProgressState {
     visible: bool,
     generation: u64,
     circular: super::progress::CircularProgressPlayback,
-    opacity: gpui_base::TransitionPlayback<f32>,
+    opacity: gpui_base::TransitionState<f32>,
 }
 
 impl ButtonProgressPlayback {
-    /// Record real input changes at their event time without requesting frames.
-    /// `disabled` is the caller's independent flag; loading also disables.
-    /// First showing progress starts its circular clock. Hiding preserves that
-    /// clock, but the next show adopts the new opacity rather than resuming an
-    /// old hidden transition, matching the ordinary button API.
-    pub fn sync(&self, progress: bool, loading: bool, disabled: bool, cx: &App) {
-        self.sample_inputs(progress, loading, disabled, cx);
+    /// Record real input changes while drawing; a running opacity transition
+    /// requests the next frame. `disabled` is the caller's independent flag;
+    /// loading also disables. First showing progress starts its circular clock.
+    /// Hiding preserves that clock, but the next show adopts the new opacity
+    /// rather than resuming an old hidden transition, matching the ordinary
+    /// button API.
+    pub fn sync(
+        &self,
+        progress: bool,
+        loading: bool,
+        disabled: bool,
+        window: &mut Window,
+        cx: &mut App,
+    ) {
+        self.sample_inputs(progress, loading, disabled, window, cx);
     }
 
     /// Forward a preference change after updating the app, including offscreen.
@@ -80,21 +89,23 @@ impl ButtonProgressPlayback {
         self.state.borrow().circular.observe_reduced_motion(cx);
     }
 
-    /// Advance lifecycle and opacity without requesting frames. A started
-    /// clock is sampled even while hidden or unmounted, keeping its phase and
-    /// reduced-motion stop; only a painted indicator requests frames.
+    /// Advance lifecycle and opacity. A started clock is sampled even while
+    /// hidden or unmounted, keeping its phase and reduced-motion stop; only a
+    /// painted indicator requests frames for it. Opacity requests the next frame
+    /// while it runs.
     fn sample_inputs(
         &self,
         progress: bool,
         loading: bool,
         disabled: bool,
-        cx: &App,
+        window: &mut Window,
+        cx: &mut App,
     ) -> gpui_base::MotionValue<f32> {
         let mut state = self.state.borrow_mut();
         let visible = progress || loading;
         if visible && !state.visible {
             state.generation += 1;
-            state.opacity = gpui_base::TransitionPlayback::default();
+            state.opacity = gpui_base::TransitionState::default();
         }
         state.started |= visible;
         state.visible = visible;
@@ -105,6 +116,7 @@ impl ButtonProgressPlayback {
             state.opacity.sample(
                 if disabled || loading { 0.7 } else { 1. },
                 playback::opacity_policy(),
+                window,
                 cx,
             )
         } else {
@@ -976,13 +988,8 @@ impl MaterialButton {
                 .read(cx)
                 .clone()
         });
-        let opacity = playback.sample_inputs(self.progress_visible(), loading, self.disabled, cx);
-        if matches!(
-            opacity.status,
-            gpui_base::MotionStatus::Running | gpui_base::MotionStatus::Delayed
-        ) {
-            window.request_animation_frame();
-        }
+        let opacity =
+            playback.sample_inputs(self.progress_visible(), loading, self.disabled, window, cx);
         (Some(playback), opacity.value)
     }
 

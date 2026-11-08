@@ -175,47 +175,52 @@ fn token_policy(resolved: MotionCurve, token: MotionToken) -> gpui_base::Transit
 }
 
 /// Caller-owned token channel. Keeps the active curve and Base reversal clock
-/// across virtual unmounts, without retaining a window or scheduling frames.
+/// across virtual unmounts, without retaining a view or window.
 #[derive(Clone)]
-pub struct TokenTransitionPlayback<T> {
-    playback: gpui_base::TransitionPlayback<T>,
+pub struct TokenTransitionState<T> {
+    state: gpui_base::TransitionState<T>,
     curve: std::rc::Rc<std::cell::Cell<Option<RunningCurve>>>,
     target: std::rc::Rc<std::cell::RefCell<Option<T>>>,
 }
-impl<T> Default for TokenTransitionPlayback<T> {
+impl<T> Default for TokenTransitionState<T> {
     fn default() -> Self {
         Self {
-            playback: Default::default(),
+            state: Default::default(),
             curve: Default::default(),
             target: Default::default(),
         }
     }
 }
-impl<T: gpui_base::Interpolate + PartialEq + 'static> TokenTransitionPlayback<T> {
+impl<T: gpui_base::Interpolate + PartialEq + 'static> TokenTransitionState<T> {
     /// Follow `target` while drawing, as [`token_transition`] does, for a control that
     /// keeps its channels together in one entity rather than one each: what a view records
     /// and replays each frame grows with the entities read while it draws.
-    pub fn follow(&self, target: T, token: MotionToken, window: &mut Window, cx: &App) -> T {
-        let sample = self.sample(target, token, cx);
-        if matches!(
-            sample.status,
-            gpui_base::MotionStatus::Running | gpui_base::MotionStatus::Delayed
-        ) {
-            window.request_animation_frame();
-        }
-        sample.value
+    pub fn follow(&self, target: T, token: MotionToken, window: &mut Window, cx: &mut App) -> T {
+        self.sample(target, token, window, cx).value
     }
 
     /// Resample an initialized channel's current visual target, preserving
     /// transient presentation while applying a motion preference change.
-    pub fn resample(&self, token: MotionToken, cx: &App) -> Option<gpui_base::MotionValue<T>> {
+    pub fn resample(
+        &self,
+        token: MotionToken,
+        window: &mut Window,
+        cx: &mut App,
+    ) -> Option<gpui_base::MotionValue<T>> {
         let target = self.target.borrow().clone()?;
-        Some(self.sample(target, token, cx))
+        Some(self.sample(target, token, window, cx))
     }
 
-    /// Forward actual target/preference changes while unmounted. A channel's
-    /// first sample adopts its target; a fresh handle resets its lifecycle.
-    pub fn sample(&self, target: T, token: MotionToken, cx: &App) -> gpui_base::MotionValue<T> {
+    /// Sample while drawing, including for an unmounted owner forwarding a
+    /// target change; requests the next frame while the channel runs. A
+    /// channel's first sample adopts its target; a fresh state resets it.
+    pub fn sample(
+        &self,
+        target: T,
+        token: MotionToken,
+        window: &mut Window,
+        cx: &mut App,
+    ) -> gpui_base::MotionValue<T> {
         let requested = effective_curve(token, cx);
         let mut active = self.curve.get().unwrap_or(RunningCurve {
             curve: requested,
@@ -227,15 +232,15 @@ impl<T: gpui_base::Interpolate + PartialEq + 'static> TokenTransitionPlayback<T>
             && let Some(previous) = self.target.borrow().clone()
         {
             let old = self
-                .playback
-                .sample(previous, token_policy(active.curve, token), cx);
+                .state
+                .sample(previous, token_policy(active.curve, token), window, cx);
             active.record(active.curve, old.status);
         }
         let resolved = active.resolve(requested);
         *self.target.borrow_mut() = Some(target.clone());
         let sample = self
-            .playback
-            .sample(target, token_policy(resolved, token), cx);
+            .state
+            .sample(target, token_policy(resolved, token), window, cx);
         active.record(resolved, sample.status);
         self.curve.set(Some(active));
         sample

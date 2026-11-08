@@ -1114,7 +1114,7 @@ pub(super) struct LayoutObserver {
 }
 
 impl LayoutObserver {
-    fn run(self, rendered: &[usize], cx: &mut App) {
+    fn run(self, rendered: &[usize], window: &mut Window, cx: &mut App) {
         // Run after list prepaint, when measurements are current. Fast can
         // carry visible rows without calling the builder; current intersection
         // protects those too. A preview's live demos are mounted in its card.
@@ -1135,7 +1135,7 @@ impl LayoutObserver {
                     })
             })
         };
-        self.page.after_layout(&visible, cx);
+        self.page.after_layout(&visible, window, cx);
     }
 }
 
@@ -1439,14 +1439,14 @@ impl Render for ContentView {
             })
             .child(
                 gpui::canvas(
-                    move |_, _, cx| {
+                    move |_, window, cx| {
                         #[cfg(all(not(target_family = "wasm"), feature = "instruction-bench"))]
                         super::instr_bench::note(super::instr_bench::Count::AfterLayout);
                         let observer = sync_view
                             .upgrade()
                             .and_then(|gallery| gallery.read(cx).layout_observer(cx));
                         if let Some(observer) = observer {
-                            observer.run(&rendered_rows.borrow(), cx);
+                            observer.run(&rendered_rows.borrow(), window, cx);
                         }
                     },
                     |_, _, _, _| {},

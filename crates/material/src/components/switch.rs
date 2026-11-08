@@ -269,9 +269,9 @@ const SWITCH_GROUP: &str = "material-switch";
 /// What a switch keeps between frames, in one entity; each channel keeps its own clock.
 struct SwitchState {
     focus: FocusHandle,
-    thumb: motion::TokenTransitionPlayback<f32>,
+    thumb: motion::TokenTransitionState<f32>,
     /// Not followed by a static specimen, which leaves it to start over.
-    size: std::cell::RefCell<Option<motion::TokenTransitionPlayback<f32>>>,
+    size: std::cell::RefCell<Option<motion::TokenTransitionState<f32>>>,
 }
 
 impl RenderOnce for MaterialSwitch {
