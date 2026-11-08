@@ -295,21 +295,30 @@ pub(crate) struct Gallery {
 
 impl Gallery {
     fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
-        let shared = cx.new(|_| GalleryShared::default());
-        let subscriptions =
-            vec![
-                cx.observe_in(&shared, window, |this: &mut Self, shared, window, cx| {
-                    let key = theme_key(shared.read(cx));
-                    if key != this.applied_theme {
-                        // The transition refreshes the window each step, which
-                        // renders the Gallery; a notify would invalidate it twice.
-                        this.applied_theme = key;
-                        this.prepare_theme(window, cx);
-                    } else {
-                        cx.notify();
-                    }
-                }),
-            ];
+        // The first frame already paints the system's light or dark (a browser's
+        // `prefers-color-scheme`), and later changes follow until the user picks.
+        let system_dark = theme::system_dark(cx);
+        let shared = cx.new(|_| {
+            let mut shared = GalleryShared::default();
+            shared.follow_system(system_dark);
+            shared
+        });
+        let subscriptions = vec![
+            cx.observe_in(&shared, window, |this: &mut Self, shared, window, cx| {
+                let key = theme_key(shared.read(cx));
+                if key != this.applied_theme {
+                    // The transition refreshes the window each step, which
+                    // renders the Gallery; a notify would invalidate it twice.
+                    this.applied_theme = key;
+                    this.prepare_theme(window, cx);
+                } else {
+                    cx.notify();
+                }
+            }),
+            cx.observe_window_appearance(window, |this: &mut Self, _, cx| {
+                this.follow_system(theme::system_dark(cx), cx);
+            }),
+        ];
         let applied_theme = theme_key(shared.read(cx));
         bind_focus_keys(cx);
         let gallery = cx.entity();
@@ -356,6 +365,16 @@ impl Gallery {
             #[cfg(test)]
             recounts: Default::default(),
         }
+    }
+
+    /// The system appearance changed: paint it unless the user picked a mode.
+    /// Only a change notifies, which starts the theme transition.
+    fn follow_system(&mut self, system_dark: bool, cx: &mut Context<Self>) {
+        self.shared.update(cx, |shared, cx| {
+            if shared.follow_system(system_dark) {
+                cx.notify();
+            }
+        });
     }
 
     // Run before Root prepares its styles, never while rendering the child view.
@@ -740,6 +759,12 @@ impl Gallery {
                 ThemeMode::Light
             };
             shared.scale = scale.to_string().into();
+            // A capture paints its mode whatever the system's appearance.
+            shared.appearance = if dark {
+                Appearance::Dark
+            } else {
+                Appearance::Light
+            };
         });
         // Capture applies the theme before the first frame (see `run`).
         self.applied_theme = theme_key(self.shared.read(cx));
@@ -1557,6 +1582,43 @@ mod window_tests {
         assert!(
             cx.read(|cx| gallery.read(cx).drawer_open),
             "the results show"
+        );
+    }
+
+    /// The Gallery opens in the system's appearance and follows its changes
+    /// through the theme transition, until the bar's toggle picks a mode.
+    #[gpui::test]
+    fn the_theme_follows_the_system_appearance_until_the_toggle(cx: &mut TestAppContext) {
+        use gpui_kit_material::prelude::{Appearance, ThemeMode};
+        let (gallery, top_bar, mut cx) = open_window(1280., cx);
+        let shared = cx.read(|cx| gallery.read(cx).shared.clone());
+        // The test platform's appearance is light.
+        cx.read(|cx| {
+            assert_eq!(shared.read(cx).appearance, Appearance::System);
+            assert_eq!(shared.read(cx).painted_mode(), ThemeMode::Light);
+        });
+        cx.update(|_, cx| gallery.update(cx, |gallery, cx| gallery.follow_system(true, cx)));
+        settle(&mut cx);
+        assert_eq!(cx.read(|cx| top_bar.read(cx).shown.mode), ThemeMode::Dark);
+        cx.read(|cx| {
+            let gallery = gallery.read(cx);
+            assert_eq!(
+                gallery.applied_theme.2,
+                ThemeMode::Dark,
+                "the theme was applied"
+            );
+        });
+        let toggle = cx.debug_bounds("mode-toggle").unwrap();
+        cx.simulate_click(toggle.center(), gpui::Modifiers::none());
+        settle(&mut cx);
+        assert_eq!(cx.read(|cx| shared.read(cx).appearance), Appearance::Light);
+        cx.update(|_, cx| gallery.update(cx, |gallery, cx| gallery.follow_system(true, cx)));
+        settle(&mut cx);
+        assert_eq!(cx.read(|cx| top_bar.read(cx).shown.mode), ThemeMode::Light);
+        assert_eq!(
+            cx.read(|cx| shared.read(cx).painted_mode()),
+            ThemeMode::Light,
+            "the user's pick outlasts a system change"
         );
     }
 

@@ -24,6 +24,7 @@
 //! Do not notify from `prepare` or `render_row`: the Gallery observes every
 //! page, so that would schedule another frame each frame.
 use gpui::{prelude::*, *};
+use gpui_kit_material::color::Appearance;
 use gpui_kit_material::color::themes::{Contrast, ThemeId, ThemeMode};
 use gpui_kit_material::motion;
 use gpui_kit_material::prelude::PaletteId;
@@ -43,6 +44,9 @@ pub struct GalleryShared {
     /// `None` paints `palette` instead of a reference theme.
     pub reference_theme: Option<ThemeId>,
     pub reference_mode: ThemeMode,
+    /// Whether the mode follows the system's light or dark appearance
+    /// ([`Appearance::System`], until the user picks one) or keeps the user's.
+    pub appearance: Appearance,
     /// A theme generated from a seed color, painted in `reference_mode` and
     /// `contrast` in place of the reference theme or palette.
     pub seed: Option<gpui_kit_material::color::dynamic::SeedScheme>,
@@ -65,6 +69,7 @@ impl Default for GalleryShared {
             palette: PaletteId::Paper,
             reference_theme: Some(ThemeId::Baseline),
             reference_mode: ThemeMode::Light,
+            appearance: Appearance::System,
             seed: None,
             preview_theme: None,
             preview_mode: None,
@@ -188,6 +193,29 @@ impl GalleryShared {
         if self.paints_palette() {
             self.palette = palette_for(self.palette, mode);
         }
+    }
+    /// The user picked light or dark: paint it, and stop following the system.
+    pub fn choose_dark(&mut self, dark: bool) {
+        self.appearance = if dark {
+            Appearance::Dark
+        } else {
+            Appearance::Light
+        };
+        self.set_dark(dark);
+    }
+    /// The system's appearance is (now) dark or light: paint it unless the user
+    /// chose a mode. Returns whether the painted mode changed.
+    pub fn follow_system(&mut self, system_dark: bool) -> bool {
+        let mode = if system_dark {
+            ThemeMode::Dark
+        } else {
+            ThemeMode::Light
+        };
+        if self.appearance != Appearance::System || self.painted_mode() == mode {
+            return false;
+        }
+        self.set_dark(system_dark);
+        true
     }
     /// The live preview's overrides, as a [`Scope`]. With none set it changes nothing.
     pub fn preview_scope(&self) -> gpui_kit_material::scope::Scope {
@@ -487,5 +515,35 @@ mod scheme_tests {
         shared.set_dark(false);
         assert_eq!(shared.painted_mode(), ThemeMode::Light);
         assert_eq!(shared.reference_theme, Some(ThemeId::Ocean));
+    }
+
+    /// The mode follows the system appearance, at start and as it changes,
+    /// until the user picks light or dark; their pick then stays.
+    #[test]
+    fn the_mode_follows_the_system_until_the_user_picks_one() {
+        let mut shared = GalleryShared::default();
+        assert_eq!(shared.appearance, Appearance::System);
+        assert!(shared.follow_system(true));
+        assert_eq!(shared.painted_mode(), ThemeMode::Dark);
+        assert!(
+            !shared.follow_system(true),
+            "an unchanged appearance changes nothing"
+        );
+        assert!(shared.follow_system(false));
+        assert_eq!(shared.painted_mode(), ThemeMode::Light);
+        // A painted palette follows within its family.
+        shared.reference_theme = None;
+        assert!(shared.follow_system(true));
+        assert_eq!(shared.palette, PaletteId::Ink);
+        // The user's pick holds against later system changes, either way.
+        shared.choose_dark(false);
+        assert_eq!(shared.appearance, Appearance::Light);
+        assert_eq!(shared.palette, PaletteId::Paper);
+        assert!(!shared.follow_system(true));
+        assert_eq!(shared.painted_mode(), ThemeMode::Light);
+        shared.choose_dark(true);
+        assert_eq!(shared.appearance, Appearance::Dark);
+        assert!(!shared.follow_system(false));
+        assert_eq!(shared.painted_mode(), ThemeMode::Dark);
     }
 }

@@ -73,10 +73,11 @@ pub(crate) fn compact_control(child: impl IntoElement, window: &Window) -> AnyEl
     RemScaled::new(rem, child.into_any_element()).into_any_element()
 }
 
-/// Switch the Gallery's theme mode, keeping the palette or theme it paints.
+/// The user switched the Gallery's theme mode: paint it, keeping the palette
+/// or theme it paints, and stop following the system appearance.
 pub(crate) fn set_dark(shared: &Entity<GalleryShared>, dark: bool, cx: &mut App) {
     shared.update(cx, |shared, cx| {
-        shared.set_dark(dark);
+        shared.choose_dark(dark);
         cx.notify();
     })
 }
