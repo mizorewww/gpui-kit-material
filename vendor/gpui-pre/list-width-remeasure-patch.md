@@ -24,8 +24,13 @@ A frame budget rather than one full measurement once the width has settled: ever
 frame stays bounded, the heights converge without a long frame after the resize,
 and a list is exact within frames of its last width change. The scroll position is
 relative to the item at its top, so measuring the items above it moves the
-scrollbar, not the content; `scroll_to` lands on its item at once, and
-`scroll_to_reveal_item` is exact once the items before it are measured.
+scrollbar, not the content; `scroll_to` lands on its item at once.
+`scroll_to_reveal_item` of an item below the viewport would otherwise place it from
+estimated heights and leave it there (a reveal that stops once the item is partly
+shown, as `TextView`'s, never corrects it): while a deferred measurement is under
+way it is kept until the next prepaint, which lays out the item and those before it,
+back from it, until they fill the viewport, and puts the item at the bottom edge
+from those exact heights.
 
 Unchanged: the first measurement, `reset`, `remeasure` and `remeasure_items` still
 measure every item in one frame (a full measurement due also ends a deferred
@@ -36,7 +41,15 @@ Tests: `test_width_change_measures_only_around_the_viewport_first`,
 `test_width_change_converges_to_exact_heights`,
 `test_width_change_keeps_the_scroll_anchor`,
 `test_scroll_to_item_after_width_change`,
-`test_remeasure_during_deferred_measurement_measures_all`, in both engines.
+`test_remeasure_during_deferred_measurement_measures_all`,
+`test_reveal_into_estimated_heights_after_width_change`,
+`test_width_change_twice_before_convergence`,
+`test_splice_during_deferred_measurement`,
+`test_width_change_on_bottom_aligned_list`,
+`test_width_change_to_one_pixel_and_back`,
+`test_width_change_to_zero_with_fixed_rows`,
+`test_deferred_measurement_ends_with_unready_items`,
+`test_wheel_during_deferred_measurement`, in both engines.
 
 Behavior only; no API is added. Consumers need this patch for long `TextView`s to
 resize smoothly: `docs/ARCHITECTURE.md`, Consumer patch set. Not yet offered

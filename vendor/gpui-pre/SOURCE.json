@@ -232,7 +232,7 @@
     },
     "src/elements/list.rs": {
       "upstream_sha256": "9a4580af24c5eada850d8e53ab63c43fbc2a71eca0b7bdbabc21f9fadab59b0f",
-      "local_sha256": "7a57f9a12e1e204f7e1922f536beac123c6c47b2373e44e1047f479694cab8f6",
+      "local_sha256": "2141a4f617f6022a93f312eba970feb5d14fcb98fcf4eaed0a911c7bee8c6231",
       "reason": "Material performance patch: after a width change, a measure_all list keeps each item's height as an estimate scaled by how the items it shows reflowed, lays out only those items in that frame, and measures the rest over later frames within 4 ms per frame (list-width-remeasure-patch.md)."
     }
   },

@@ -83,6 +83,10 @@ struct StateInner {
     /// at a time; `None` when no such pass is under way.
     deferred_measure: Option<usize>,
     deferred_measure_budget: Duration,
+    /// An item [`ListState::scroll_to_reveal_item`] is to reveal while a
+    /// deferred measurement leaves estimated heights before it: the next
+    /// prepaint measures back from it and places it exactly.
+    pending_reveal: Option<usize>,
 }
 
 #[derive(Clone, Copy)]
@@ -337,6 +341,7 @@ impl ListState {
             follow_state: FollowState::default(),
             deferred_measure: None,
             deferred_measure_budget: DEFERRED_MEASURE_BUDGET,
+            pending_reveal: None,
         })));
         state.splice(0..0, item_count);
         state
@@ -513,6 +518,8 @@ impl ListState {
         focus_handles: impl IntoIterator<Item = Option<FocusHandle>>,
     ) {
         let state = &mut *self.0.borrow_mut();
+        // The item to reveal may have moved or gone.
+        state.pending_reveal = None;
 
         let mut old_items = state.items.cursor::<Count>(());
         let mut new_items = old_items.slice(&Count(old_range.start), Bias::Right);
@@ -701,6 +708,11 @@ impl ListState {
         if ix <= scroll_top.item_ix {
             scroll_top.item_ix = ix;
             scroll_top.offset_in_item = px(0.);
+        } else if state.deferred_measure.is_some() {
+            // The heights before the item may be estimates a width change
+            // left: the next prepaint measures back from the item instead.
+            state.pending_reveal = Some(ix);
+            return;
         } else {
             let mut cursor = state.items.cursor::<ListItemSummary>(());
             cursor.seek(&Count(ix + 1), Bias::Right);
@@ -970,6 +982,8 @@ impl StateInner {
     }
 
     fn set_scroll_anchor(&mut self, position: Option<ListOffset>) {
+        // Any other scroll supersedes a reveal still to be placed.
+        self.pending_reveal = None;
         let Some(position) = position else {
             self.scroll_anchor = None;
             return;
@@ -1188,18 +1202,8 @@ impl StateInner {
         }
         drop(cursor);
 
-        if !measured.is_empty() {
-            let mut old_items = self.items.cursor::<Count>(());
-            let mut new_items = SumTree::default();
-            for (ix, item) in measured.iter() {
-                new_items.append(old_items.slice(&Count(*ix), Bias::Right), ());
-                new_items.push(item.clone(), ());
-                old_items.seek_forward(&Count(ix + 1), Bias::Right);
-            }
-            new_items.append(old_items.suffix(), ());
-            drop(old_items);
-            self.items = new_items;
-        }
+        let any_measured = !measured.is_empty();
+        self.replace_items(measured);
 
         self.deferred_measure = resume;
         if resume.is_none() && self.items.summary().unrendered_count > 0 {
@@ -1207,7 +1211,101 @@ impl StateInner {
             // retries them.
             self.measuring_behavior = ListMeasuringBehavior::Measure(false);
         }
-        !measured.is_empty()
+        any_measured
+    }
+
+    /// Replaces the items at the given indices, which ascend, with the items
+    /// given for them.
+    fn replace_items(&mut self, replacements: Vec<(usize, ListItem)>) {
+        if replacements.is_empty() {
+            return;
+        }
+        let mut old_items = self.items.cursor::<Count>(());
+        let mut new_items = SumTree::default();
+        for (ix, item) in replacements {
+            new_items.append(old_items.slice(&Count(ix), Bias::Right), ());
+            new_items.push(item, ());
+            old_items.seek_forward(&Count(ix + 1), Bias::Right);
+        }
+        new_items.append(old_items.suffix(), ());
+        drop(old_items);
+        self.items = new_items;
+    }
+
+    /// Places the item [`ListState::scroll_to_reveal_item`] left to reveal
+    /// at the bottom of the viewport, as that method does, from heights
+    /// measured now: the item and those before it are laid out, back from it,
+    /// until they fill the viewport, rather than trusting the estimates a
+    /// width change left.
+    fn resolve_pending_reveal(
+        &mut self,
+        bounds: Bounds<Pixels>,
+        padding: &Edges<Pixels>,
+        render_item: &mut RenderItemFn,
+        window: &mut Window,
+        cx: &mut App,
+    ) {
+        let Some(ix) = self.pending_reveal.take() else {
+            return;
+        };
+        let count = self.items.summary().count;
+        if ix >= count {
+            return;
+        }
+        let scroll_top = self.logical_scroll_top();
+        if ix <= scroll_top.item_ix {
+            self.set_scroll_anchor(Some(ListOffset {
+                item_ix: ix,
+                offset_in_item: px(0.),
+            }));
+            return;
+        }
+
+        let available_item_space = size(
+            AvailableSpace::Definite(bounds.size.width),
+            AvailableSpace::MinContent,
+        );
+        // How much of the items up to and including `ix` the viewport shows.
+        let mut remaining = bounds.size.height - padding.top - padding.bottom;
+        let mut measured = Vec::new();
+        let mut start = ListOffset::default();
+        let mut cursor = self.items.cursor::<Count>(());
+        cursor.seek(&Count(ix), Bias::Right);
+        while let Some(item) = cursor.item() {
+            let item_ix = cursor.start().0;
+            let height = match item.size() {
+                Some(size) => size.height,
+                None => {
+                    let mut element = render_item(item_ix, window, cx);
+                    let size = element.layout_as_root(available_item_space, window, cx);
+                    measured.push((
+                        item_ix,
+                        item.with_measurement(size, self.is_item_ready(item_ix, cx)),
+                    ));
+                    size.height
+                }
+            };
+            if height >= remaining {
+                start = ListOffset {
+                    item_ix,
+                    offset_in_item: height - remaining.max(px(0.)),
+                };
+                break;
+            }
+            remaining -= height;
+            if item_ix == 0 {
+                // The viewport reaches above the first item.
+                break;
+            }
+            cursor.prev();
+        }
+        drop(cursor);
+        measured.reverse();
+        self.replace_items(measured);
+
+        if start.item_ix >= scroll_top.item_ix {
+            self.set_scroll_anchor(Some(start));
+        }
     }
 
     fn layout_items(
@@ -1764,6 +1862,7 @@ impl Element for List {
             .to_pixels(bounds.size.into(), window.rem_size());
         let measured_deferred = !width_changed
             && state.measure_deferred_items(bounds.size.width, &mut self.render_item, window, cx);
+        state.resolve_pending_reveal(bounds, &padding, &mut self.render_item, window, cx);
         let mut autoscroll = true;
         let layout = loop {
             match state.prepaint_items(
@@ -4002,6 +4101,365 @@ mod test {
         assert_eq!(unmeasured(&state), 0);
         assert!(state.0.borrow().deferred_measure.is_none());
         assert_eq!(total_height(&state), exact_height(0..100, 140.));
+    }
+
+    fn review_frames_requested(cx: &mut VisualTestContext) -> usize {
+        cx.update(|window, _| window.next_frame_callbacks.borrow_mut().drain(..).count())
+    }
+
+    fn review_deferred(state: &ListState) -> Option<usize> {
+        state.0.borrow().deferred_measure
+    }
+
+    /// Draws until no frame is requested, returning how many frames ran; fails
+    /// if it does not settle within `limit` frames.
+    fn review_settle(
+        state: &ListState,
+        width: f32,
+        layout_width: &Rc<Cell<f32>>,
+        rendered: &Rc<RefCell<Vec<usize>>>,
+        painted: &Rc<RefCell<Vec<(usize, Pixels, Pixels)>>>,
+        cx: &mut VisualTestContext,
+        limit: usize,
+        mut each: impl FnMut(&ListState, &Rc<RefCell<Vec<(usize, Pixels, Pixels)>>>),
+    ) -> usize {
+        let mut frames = 0;
+        loop {
+            painted.borrow_mut().clear();
+            draw_reflowing(state, width, layout_width, rendered, painted, cx);
+            frames += 1;
+            each(state, painted);
+            if review_frames_requested(cx) == 0 {
+                return frames;
+            }
+            assert!(frames <= limit, "still requesting frames after {frames}");
+        }
+    }
+
+    #[gpui::test]
+    fn test_width_change_twice_before_convergence(cx: &mut TestAppContext) {
+        let cx = cx.add_empty_window();
+        let (state, width, rendered) = reflowing_list(300, 50.);
+        let painted = Rc::new(RefCell::new(Vec::new()));
+        draw_reflowing(&state, 100., &width, &rendered, &painted, cx);
+        state.0.borrow_mut().deferred_measure_budget = std::time::Duration::ZERO;
+        let h100 = reflowing_height(151, 100.);
+        state.scroll_to(list_offset(151, h100 / 2.));
+        draw_reflowing(&state, 100., &width, &rendered, &painted, cx);
+        review_frames_requested(cx);
+
+        draw_reflowing(&state, 160., &width, &rendered, &painted, cx);
+        assert!(review_frames_requested(cx) > 0, "a pass requests frames");
+        for _ in 0..3 {
+            draw_reflowing(&state, 160., &width, &rendered, &painted, cx);
+        }
+        assert!(review_deferred(&state).is_some());
+
+        // Second width change before the pass converged.
+        painted.borrow_mut().clear();
+        draw_reflowing(&state, 220., &width, &rendered, &painted, cx);
+        let h220 = reflowing_height(151, 220.);
+        let first = painted.borrow().first().copied().unwrap();
+        assert_eq!(first.0, 151);
+        assert!(
+            (f32::from(first.1) + h220 / 2.).abs() <= 1.,
+            "anchor fraction kept across two resizes: {first:?}, h220 {h220}"
+        );
+        let frames = review_settle(
+            &state,
+            220.,
+            &width,
+            &rendered,
+            &painted,
+            cx,
+            400,
+            |_, painted| {
+                assert_eq!(painted.borrow().first().map(|p| p.0), Some(151));
+            },
+        );
+        assert!(frames > 1);
+        assert_eq!(unmeasured(&state), 0);
+        assert!(review_deferred(&state).is_none());
+        assert_eq!(total_height(&state), exact_height(0..300, 220.));
+        assert_eq!(
+            state.max_offset_for_scrollbar().y,
+            px(exact_height(0..300, 220.) - 200.)
+        );
+    }
+
+    #[gpui::test]
+    fn test_splice_during_deferred_measurement(cx: &mut TestAppContext) {
+        let cx = cx.add_empty_window();
+        let (state, width, rendered) = reflowing_list(300, 50.);
+        let painted = Rc::new(RefCell::new(Vec::new()));
+        draw_reflowing(&state, 100., &width, &rendered, &painted, cx);
+        state.0.borrow_mut().deferred_measure_budget = std::time::Duration::ZERO;
+        state.scroll_to(list_offset(100, 0.));
+        draw_reflowing(&state, 100., &width, &rendered, &painted, cx);
+        draw_reflowing(&state, 170., &width, &rendered, &painted, cx);
+        for _ in 0..10 {
+            draw_reflowing(&state, 170., &width, &rendered, &painted, cx);
+        }
+        let next = review_deferred(&state).unwrap();
+        assert!(next > 2);
+
+        // Replace an item before `next` (same index), append past it, and
+        // drop the last few: indices of the others are unchanged.
+        state.splice(1..2, 1);
+        state.splice(300..300, 5);
+        state.splice(295..305, 3);
+        assert_eq!(state.item_count(), 298);
+        review_settle(
+            &state,
+            170.,
+            &width,
+            &rendered,
+            &painted,
+            cx,
+            400,
+            |_, _| {},
+        );
+        // One frame more for a full measurement of what the pass skipped.
+        draw_reflowing(&state, 170., &width, &rendered, &painted, cx);
+        assert_eq!(unmeasured(&state), 0);
+        assert_eq!(total_height(&state), exact_height(0..298, 170.));
+        assert_eq!(state.logical_scroll_top(), list_offset(100, 0.));
+
+        // Splicing the anchor out, and shrinking below `next`, mid-pass.
+        draw_reflowing(&state, 120., &width, &rendered, &painted, cx);
+        for _ in 0..50 {
+            draw_reflowing(&state, 120., &width, &rendered, &painted, cx);
+        }
+        assert!(review_deferred(&state).unwrap() > 30);
+        state.splice(20..298, 0);
+        review_settle(
+            &state,
+            120.,
+            &width,
+            &rendered,
+            &painted,
+            cx,
+            400,
+            |_, _| {},
+        );
+        draw_reflowing(&state, 120., &width, &rendered, &painted, cx);
+        assert_eq!(unmeasured(&state), 0);
+        assert_eq!(total_height(&state), exact_height(0..20, 120.));
+    }
+
+    #[gpui::test]
+    fn test_reveal_into_estimated_heights_after_width_change(cx: &mut TestAppContext) {
+        let cx = cx.add_empty_window();
+        let (state, width, rendered) = reflowing_list(300, 0.);
+        let painted = Rc::new(RefCell::new(Vec::new()));
+        draw_reflowing(&state, 100., &width, &rendered, &painted, cx);
+        state.0.borrow_mut().deferred_measure_budget = std::time::Duration::ZERO;
+        draw_reflowing(&state, 45., &width, &rendered, &painted, cx);
+        assert!(review_deferred(&state).is_some());
+
+        state.scroll_to_reveal_item(170);
+        painted.borrow_mut().clear();
+        draw_reflowing(&state, 45., &width, &rendered, &painted, cx);
+        let shown = painted.borrow().iter().find(|p| p.0 == 170).copied();
+        let (_, top, bottom) = shown.expect("item 170 painted after reveal");
+        // At the bottom edge, as a reveal of an item below places it.
+        assert_eq!(bottom, px(200.));
+        assert!(
+            top >= px(0.),
+            "item 170 not fully visible: {top:?}..{bottom:?}"
+        );
+
+        // Measuring the items above it moves nothing.
+        review_settle(&state, 45., &width, &rendered, &painted, cx, 400, |_, _| {});
+        painted.borrow_mut().clear();
+        draw_reflowing(&state, 45., &width, &rendered, &painted, cx);
+        let after = painted.borrow().iter().find(|p| p.0 == 170).copied();
+        assert_eq!(after, shown);
+        assert_eq!(
+            state.scroll_px_offset_for_scrollbar().y,
+            -px(exact_height(0..171, 45.) - 200.)
+        );
+    }
+
+    #[gpui::test]
+    fn test_width_change_on_bottom_aligned_list(cx: &mut TestAppContext) {
+        let cx = cx.add_empty_window();
+        let state = ListState::new(200, crate::ListAlignment::Bottom, px(50.)).measure_all();
+        let width = Rc::new(Cell::new(100.));
+        let rendered = Rc::new(RefCell::new(Vec::new()));
+        let painted = Rc::new(RefCell::new(Vec::new()));
+        draw_reflowing(&state, 100., &width, &rendered, &painted, cx);
+        state.0.borrow_mut().deferred_measure_budget = std::time::Duration::ZERO;
+        painted.borrow_mut().clear();
+        draw_reflowing(&state, 100., &width, &rendered, &painted, cx);
+        assert_eq!(
+            painted.borrow().last().map(|p| (p.0, p.2)),
+            Some((199, px(200.)))
+        );
+
+        painted.borrow_mut().clear();
+        draw_reflowing(&state, 60., &width, &rendered, &painted, cx);
+        assert_eq!(
+            painted.borrow().last().map(|p| (p.0, p.2)),
+            Some((199, px(200.)))
+        );
+        review_settle(
+            &state,
+            60.,
+            &width,
+            &rendered,
+            &painted,
+            cx,
+            400,
+            |_, painted| {
+                assert_eq!(
+                    painted.borrow().last().map(|p| (p.0, p.2)),
+                    Some((199, px(200.)))
+                );
+            },
+        );
+        assert_eq!(unmeasured(&state), 0);
+        assert_eq!(total_height(&state), exact_height(0..200, 60.));
+        assert_eq!(
+            state.scroll_px_offset_for_scrollbar().y,
+            -px(exact_height(0..200, 60.) - 200.)
+        );
+
+        // Bottom-aligned, scrolled up: the anchor item stays at the top.
+        state.scroll_to(list_offset(120, 0.));
+        draw_reflowing(&state, 60., &width, &rendered, &painted, cx);
+        draw_reflowing(&state, 90., &width, &rendered, &painted, cx);
+        review_settle(
+            &state,
+            90.,
+            &width,
+            &rendered,
+            &painted,
+            cx,
+            400,
+            |_, painted| {
+                assert_eq!(
+                    painted.borrow().first().map(|p| (p.0, p.1)),
+                    Some((120, px(0.)))
+                );
+            },
+        );
+        assert_eq!(total_height(&state), exact_height(0..200, 90.));
+    }
+
+    #[gpui::test]
+    fn test_width_change_to_one_pixel_and_back(cx: &mut TestAppContext) {
+        let cx = cx.add_empty_window();
+        let (state, width, rendered) = reflowing_list(100, 0.);
+        let painted = Rc::new(RefCell::new(Vec::new()));
+        draw_reflowing(&state, 100., &width, &rendered, &painted, cx);
+        draw_reflowing(&state, 1., &width, &rendered, &painted, cx);
+        review_settle(&state, 1., &width, &rendered, &painted, cx, 400, |_, _| {});
+        assert_eq!(total_height(&state), exact_height(0..100, 1.));
+        draw_reflowing(&state, 100., &width, &rendered, &painted, cx);
+        review_settle(
+            &state,
+            100.,
+            &width,
+            &rendered,
+            &painted,
+            cx,
+            400,
+            |_, _| {},
+        );
+        assert_eq!(total_height(&state), exact_height(0..100, 100.));
+    }
+
+    #[gpui::test]
+    fn test_width_change_to_zero_with_fixed_rows(cx: &mut TestAppContext) {
+        let cx = cx.add_empty_window();
+        let state = ListState::new(500, crate::ListAlignment::Top, px(0.)).measure_all();
+        let draw = |w: f32, cx: &mut VisualTestContext| {
+            cx.draw(point(px(0.), px(0.)), size(px(w), px(200.)), |_, cx| {
+                cx.new(|_| TestView {
+                    state: state.clone(),
+                    render_item: Rc::new(|_| div().h(px(20.)).w_full().into_any()),
+                })
+                .into_any_element()
+            });
+        };
+        draw(100., cx);
+        draw(0., cx);
+        let mut frames = 0;
+        while review_frames_requested(cx) > 0 {
+            draw(0., cx);
+            frames += 1;
+            assert!(frames < 1000);
+        }
+        assert_eq!(unmeasured(&state), 0);
+        assert_eq!(total_height(&state), 500. * 20.);
+        draw(100., cx);
+        while review_frames_requested(cx) > 0 {
+            draw(100., cx);
+            frames += 1;
+            assert!(frames < 2000);
+        }
+        assert_eq!(total_height(&state), 500. * 20.);
+    }
+
+    #[gpui::test]
+    fn test_deferred_measurement_ends_with_unready_items(cx: &mut TestAppContext) {
+        let cx = cx.add_empty_window();
+        let (state, width, rendered) = reflowing_list(80, 0.);
+        let painted = Rc::new(RefCell::new(Vec::new()));
+        draw_reflowing(&state, 100., &width, &rendered, &painted, cx);
+        state.0.borrow_mut().deferred_measure_budget = std::time::Duration::ZERO;
+        state.set_item_measurement_readiness(|ix, _| ix != 40);
+        draw_reflowing(&state, 150., &width, &rendered, &painted, cx);
+        review_settle(
+            &state,
+            150.,
+            &width,
+            &rendered,
+            &painted,
+            cx,
+            400,
+            |_, _| {},
+        );
+        assert_eq!(unmeasured(&state), 1);
+        assert!(review_deferred(&state).is_none());
+        // Further frames do not request more.
+        draw_reflowing(&state, 150., &width, &rendered, &painted, cx);
+        assert_eq!(review_frames_requested(cx), 0);
+    }
+
+    #[gpui::test]
+    fn test_wheel_during_deferred_measurement(cx: &mut TestAppContext) {
+        let cx = cx.add_empty_window();
+        let (state, width, rendered) = reflowing_list(300, 50.);
+        let painted = Rc::new(RefCell::new(Vec::new()));
+        draw_reflowing(&state, 100., &width, &rendered, &painted, cx);
+        state.0.borrow_mut().deferred_measure_budget = std::time::Duration::ZERO;
+        state.scroll_to(list_offset(150, 0.));
+        draw_reflowing(&state, 100., &width, &rendered, &painted, cx);
+        draw_reflowing(&state, 130., &width, &rendered, &painted, cx);
+        for _ in 0..5 {
+            cx.simulate_event(ScrollEvent {
+                position: point(px(1.), px(1.)),
+                delta: ScrollDelta::Pixels(point(px(0.), px(-37.))),
+                ..Default::default()
+            });
+            draw_reflowing(&state, 130., &width, &rendered, &painted, cx);
+        }
+        let top = state.logical_scroll_top();
+        assert!(top.item_ix >= 150);
+        review_settle(
+            &state,
+            130.,
+            &width,
+            &rendered,
+            &painted,
+            cx,
+            400,
+            |_, _| {},
+        );
+        assert_eq!(state.logical_scroll_top(), top);
+        assert_eq!(total_height(&state), exact_height(0..300, 130.));
     }
 
     fn draw_list(

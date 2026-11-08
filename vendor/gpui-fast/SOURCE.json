@@ -219,7 +219,7 @@
     },
     "src/elements/list.rs": {
       "upstream_sha256": "ab9329dbeb202377336fa9c6b64488317656685f068082ec3cc0f0df8d70c29a",
-      "local_sha256": "abbb1fcfd20bb305fb7845bcaf3c2d026e28defe5fc14845a9c10e673e15c0f8"
+      "local_sha256": "873b3fd5c182f8fdef12c1bb3ae1df8ff3e0bcf55c79bad4839fc492b89f0a55"
     }
   },
   "added_files": {
