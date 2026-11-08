@@ -25,19 +25,3 @@ Text patches (`src/text_system.rs`, `src/open_type.rs`, added
   IDs still used by shaped frames.
 - Color-bitmap glyph support is detected once per font ID from the presence of
   an `sbix` table instead of matching the Apple Color Emoji PostScript names.
-
-Presentation patches (`src/metal_renderer.rs`), behind the crate's dev-only `frame-observation` feature; with it off, `draw` is upstream's. `draw_with_status` reports
-actual command-buffer submission (`draw` delegates to it). It draws as upstream's `draw` does: into the drawable a `CAMetalDisplayLink` handed out, or the layer's `nextDrawable` while no link is attached. Its per-call autorelease pool drains temporary Metal
-references before returning to the presentation timer, including early returns;
-demand frames need not wait for the enclosing Cocoa event-loop pool.
-Synchronization, drawable timeout, buffering, and counting policy are unchanged.
-
-Profiler patch: while profiler tracing is enabled, `draw_with_status` times
-`CAMetalLayer nextDrawable` and reports it through
-`gpui::profiler::record_presentation_wait`, so frame evidence can separate
-blocked drawable waits from CPU work. Presentation policy is unchanged.
-
-GPU timing patch: while profiler tracing is enabled, `attach_gpu_timing` adds a
-command-buffer completion handler that reports `GPUStartTime`, `GPUEndTime`,
-status and the CPU commit time through `gpui::profiler::record_gpu_execution`.
-Rendering and presentation are unchanged.

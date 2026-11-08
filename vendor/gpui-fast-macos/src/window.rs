@@ -662,10 +662,6 @@ pub(crate) struct MacWindowState {
     cursor_style: CursorStyle,
     cursor_visible: Arc<AtomicBool>,
     frame_source: FrameSource,
-    pub(crate) successful_frame_submissions: u64,
-    /// The Metal link's frames while presentation synchronization is off
-    /// (`pace_for_synchronization`).
-    parked_metal_frames: Option<Rc<MetalFrames>>,
     pub(crate) renderer: renderer::Renderer,
     request_frame_callback: Option<Box<dyn FnMut(RequestFrameOptions)>>,
     pub(crate) event_callback: Option<Box<dyn FnMut(PlatformInput) -> gpui::DispatchEventResult>>,
@@ -707,9 +703,6 @@ pub(crate) struct MacWindowState {
     select_next_tab_callback: Option<Box<dyn FnMut()>>,
     select_previous_tab_callback: Option<Box<dyn FnMut()>>,
     toggle_tab_bar_callback: Option<Box<dyn FnMut()>>,
-    /// Whether this window asked for or was given window tabbing. See
-    /// `tab_bar_visible`.
-    tabbing_in_use: bool,
     activated_least_once: bool,
     closed: Arc<AtomicBool>,
     accesskit_adapter: Option<accesskit_macos::SubclassingAdapter>,
@@ -839,7 +832,11 @@ impl MacWindowState {
     /// weakly to deliver frames.
     fn start_display_link(&mut self, window_state: &Rc<Mutex<MacWindowState>>) {
         self.stop_display_link();
-        if !visible_for_frames(self.native_window()) {
+        if !self
+            .native_window()
+            .occlusionState()
+            .contains(NSWindowOcclusionState::Visible)
+        {
             return;
         }
         match &mut self.frame_source {
@@ -873,35 +870,6 @@ impl MacWindowState {
                     .log_err();
             }
         }
-    }
-
-    /// Material patch (frame observation): a `CAMetalDisplayLink` draws only
-    /// into the drawables it hands out, at the display's pace, so a window
-    /// without presentation synchronization is paced by the `CVDisplayLink`
-    /// path upstream keeps for macOS before 14, whose demand waker can request
-    /// frames between ticks. Turning synchronization back on restores the
-    /// Metal link.
-    fn pace_for_synchronization(
-        &mut self,
-        synchronized: bool,
-        window_state: &Rc<Mutex<MacWindowState>>,
-    ) {
-        let switch = match &self.frame_source {
-            FrameSource::Metal(_) => !synchronized,
-            FrameSource::DisplayLink(_) => synchronized && self.parked_metal_frames.is_some(),
-        };
-        if !switch {
-            return;
-        }
-        self.stop_display_link();
-        let next = match self.parked_metal_frames.take() {
-            Some(metal_frames) => FrameSource::Metal(metal_frames),
-            None => FrameSource::DisplayLink(None),
-        };
-        if let FrameSource::Metal(metal_frames) = mem::replace(&mut self.frame_source, next) {
-            self.parked_metal_frames = Some(metal_frames);
-        }
-        self.start_display_link(window_state);
     }
 
     fn stop_display_link(&mut self) {
@@ -1163,8 +1131,6 @@ impl MacWindow {
                     Some(metal_frames) => FrameSource::Metal(metal_frames.clone()),
                     None => FrameSource::DisplayLink(None),
                 },
-                successful_frame_submissions: 0,
-                parked_metal_frames: None,
                 renderer,
                 request_frame_callback: None,
                 event_callback: None,
@@ -1203,7 +1169,6 @@ impl MacWindow {
                 select_next_tab_callback: None,
                 select_previous_tab_callback: None,
                 toggle_tab_bar_callback: None,
-                tabbing_in_use: allows_automatic_window_tabbing,
                 activated_least_once: false,
                 closed: Arc::new(AtomicBool::new(false)),
                 accesskit_adapter: None,
@@ -1525,11 +1490,7 @@ impl PlatformWindow for MacWindow {
     }
 
     fn merge_all_windows(&self) {
-        let native_window = {
-            let mut lock = self.0.lock();
-            lock.tabbing_in_use = true;
-            lock.native_window
-        };
+        let native_window = self.0.lock().native_window;
         extern "C" fn merge_windows_async(context: *mut std::ffi::c_void) {
             unsafe {
                 let native_window = context as *mut AnyObject;
@@ -1569,11 +1530,7 @@ impl PlatformWindow for MacWindow {
     }
 
     fn set_tabbing_identifier(&self, tabbing_identifier: Option<String>) {
-        let native_window = {
-            let mut lock = self.0.lock();
-            lock.tabbing_in_use |= tabbing_identifier.is_some();
-            lock.native_window
-        };
+        let native_window = self.0.lock().native_window;
         unsafe {
             let allows_automatic_window_tabbing = tabbing_identifier.is_some();
             if allows_automatic_window_tabbing {
@@ -2091,66 +2048,6 @@ impl PlatformWindow for MacWindow {
         }
     }
 
-    fn vsync_status(&self) -> gpui::VsyncStatus {
-        crate::fast::composition::vsync_status(&self.0.as_ref().lock())
-    }
-
-    fn set_vsync(&mut self, enabled: bool) -> Result<()> {
-        let mut state = self.0.as_ref().lock();
-        crate::fast::composition::set_vsync(&state, enabled)?;
-        state.pace_for_synchronization(enabled, &self.0);
-        Ok(())
-    }
-
-    fn successful_frame_submissions(&self) -> Option<u64> {
-        Some(self.0.lock().successful_frame_submissions)
-    }
-
-    fn has_periodic_frame_source(&self) -> bool {
-        match &self.0.lock().frame_source {
-            FrameSource::DisplayLink(source) => {
-                source.as_ref().is_some_and(WindowFrameSource::is_running)
-            }
-            // The link pauses when GPUI goes idle; GPUI's retry resumes it,
-            // and it serves the retry at the next display tick, not at once.
-            FrameSource::Metal(_) => false,
-        }
-    }
-
-    fn frame_waker(&self) -> Option<Rc<dyn Fn()>> {
-        let metal_frames = self.2.as_ref().map(Rc::downgrade);
-        let weak = Rc::downgrade(&self.0);
-        Some(Rc::new(move || {
-            // Upstream's Metal waker, which takes no lock. An attached link
-            // paces the window, so nothing else is needed.
-            if let Some(metal_frames) = metal_frames.as_ref().and_then(Weak::upgrade) {
-                metal_frames.wake();
-                if metal_frames.is_attached() {
-                    return;
-                }
-            }
-            let Some(state) = weak.upgrade() else {
-                return;
-            };
-            let state = state.lock();
-            // Native display callbacks remain the synchronized/hidden path.
-            // Demand adds requests only when presentation sync is disabled.
-            if crate::fast::composition::vsync_status(&state) != gpui::VsyncStatus::Disabled
-                || !visible_for_frames(state.native_window())
-            {
-                return;
-            }
-            // An unregistered source has no periodic throttle recovery.
-            // Do not start an immediate retry chain during stop/restart (or
-            // after display-link creation fails). Registration resumes ticks.
-            if let FrameSource::DisplayLink(Some(source)) = &state.frame_source
-                && source.is_running()
-            {
-                source.wake();
-            }
-        }))
-    }
-
     fn on_request_frame(&self, callback: Box<dyn FnMut(RequestFrameOptions)>) {
         self.0.as_ref().lock().request_frame_callback = Some(callback);
     }
@@ -2224,26 +2121,7 @@ impl PlatformWindow for MacWindow {
 
     fn tab_bar_visible(&self) -> bool {
         unsafe {
-            // Material performance patch: `tabGroup` builds AppKit's window
-            // stack controller, about 40% of opening a window. A window that
-            // never used tabbing and has no tabbed siblings shows no tab bar,
-            // so it is not built just to ask.
-            let (native_window, tabbing_in_use) = {
-                let lock = self.0.lock();
-                (lock.native_window, lock.tabbing_in_use)
-            };
-            if !tabbing_in_use {
-                let windows: *mut AnyObject = msg_send![native_window, tabbedWindows];
-                let count: NSUInteger = if windows.is_null() {
-                    0
-                } else {
-                    msg_send![windows, count]
-                };
-                if count <= 1 {
-                    return false;
-                }
-            }
-            let tab_group: *mut AnyObject = msg_send![native_window, tabGroup];
+            let tab_group: *mut AnyObject = msg_send![self.0.lock().native_window, tabGroup];
             if tab_group.is_null() {
                 false
             } else {
@@ -2275,9 +2153,7 @@ impl PlatformWindow for MacWindow {
 
     fn draw(&self, scene: &gpui::Scene) {
         let mut this = self.0.lock();
-        if this.renderer.draw_with_status(scene) {
-            this.successful_frame_submissions = this.successful_frame_submissions.saturating_add(1);
-        }
+        this.renderer.draw(scene);
     }
 
     fn draw_composed(&self, scene: gpui::ComposedScene<'_>) {
@@ -2305,6 +2181,15 @@ impl PlatformWindow for MacWindow {
         if let Some(metal_frames) = &self.2 {
             metal_frames.wake();
         }
+    }
+
+    fn frame_waker(&self) -> Option<Rc<dyn Fn()>> {
+        let metal_frames = Rc::downgrade(self.2.as_ref()?);
+        Some(Rc::new(move || {
+            if let Some(metal_frames) = metal_frames.upgrade() {
+                metal_frames.wake();
+            }
+        }))
     }
 
     fn sprite_atlas(&self) -> Arc<dyn PlatformAtlas> {
@@ -3153,19 +3038,11 @@ pub(crate) extern "C" fn handle_view_event(this: &AnyObject, _: Sel, native_even
     }
 }
 
-/// Whether the window should draw as a visible one. A remote desktop's overlay covers every
-/// window for as long as it is connected, so `GPUI_IGNORE_OCCLUSION` lets an instruction
-/// benchmark, which needs frames and not their pixels, run behind one.
-fn visible_for_frames(window: &NSWindow) -> bool {
-    static IGNORE: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
-    window
-        .occlusionState()
-        .contains(NSWindowOcclusionState::Visible)
-        || *IGNORE.get_or_init(|| std::env::var_os("GPUI_IGNORE_OCCLUSION").is_some())
-}
-
 fn visibility(state: &MacWindowState) -> WindowVisibility {
-    let is_visible = visible_for_frames(state.native_window());
+    let is_visible = state
+        .native_window()
+        .occlusionState()
+        .contains(NSWindowOcclusionState::Visible);
     if is_visible {
         WindowVisibility::Visible
     } else {
@@ -3208,7 +3085,11 @@ fn report_visibility(window_state: &Rc<Mutex<MacWindowState>>) {
 extern "C" fn window_did_change_occlusion_state(this: &AnyObject, _: Sel, _: *mut AnyObject) {
     let window_state = unsafe { get_window_state(this) };
     let mut lock = window_state.lock();
-    if visible_for_frames(lock.native_window()) {
+    if lock
+        .native_window()
+        .occlusionState()
+        .contains(NSWindowOcclusionState::Visible)
+    {
         lock.move_traffic_light();
         lock.start_display_link(&window_state);
     } else {
@@ -4203,7 +4084,6 @@ extern "C" fn merge_all_windows(this: &AnyObject, _: Sel, _: *mut AnyObject) {
 
         let window_state = get_window_state(this);
         let mut lock = window_state.as_ref().lock();
-        lock.tabbing_in_use = true;
         if let Some(mut callback) = lock.merge_all_windows_callback.take() {
             drop(lock);
             callback();
@@ -4239,7 +4119,6 @@ extern "C" fn toggle_tab_bar(this: &AnyObject, _sel: Sel, _id: *mut AnyObject) {
 
         let window_state = get_window_state(this);
         let mut lock = window_state.as_ref().lock();
-        lock.tabbing_in_use = true;
         lock.move_traffic_light();
 
         if let Some(mut callback) = lock.toggle_tab_bar_callback.take() {

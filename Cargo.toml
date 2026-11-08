@@ -1,7 +1,7 @@
 [workspace]
 resolver = "3"
 members = ["crates/color", "crates/material", "crates/gallery", "crates/gallery-web", "crates/bench"]
-exclude = ["vendor/gpui-kit", "vendor/gpui-base", "vendor/gpui-pre", "vendor/gpui-pre-web", "vendor/gpui-pre-apple", "vendor/gpui-fast", "vendor/gpui-fast-web", "vendor/gpui-fast-apple", "vendor/gpui-fast-macos", "vendor/gpui-pre-macos", "vendor/gpui-fast-linux", "vendor/gpui-fast-wgpu", "vendor/gpui-fast-windows", "vendor/gpui-pre-linux", "vendor/gpui-pre-wgpu", "vendor/gpui-pre-windows", "vendor/wgpu"]
+exclude = ["vendor/gpui-kit", "vendor/gpui-base", "vendor/gpui-pre", "vendor/gpui-pre-web", "vendor/gpui-pre-apple", "vendor/gpui-fast", "vendor/gpui-fast-web", "vendor/gpui-fast-apple", "vendor/gpui-fast-macos", "vendor/gpui-fast-linux", "vendor/gpui-fast-wgpu", "vendor/gpui-fast-windows"]
 
 [workspace.package]
 version = "0.1.0"
@@ -47,7 +47,6 @@ codegen-units = 1
 # Symbols depends on crates.io `gpui-kit`; it must be the same Kit as the Git one.
 gpui-kit = { path = "vendor/gpui-kit" }
 gpui-fast-macos = { path = "vendor/gpui-fast-macos" }
-gpui-pre-macos = { path = "vendor/gpui-pre-macos" }
 gpui-fast = { path = "vendor/gpui-fast" }
 gpui-fast-web = { path = "vendor/gpui-fast-web" }
 gpui-fast-apple = { path = "vendor/gpui-fast-apple" }
@@ -58,10 +57,6 @@ gpui-pre-apple = { path = "vendor/gpui-pre-apple" }
 gpui-fast-linux = { path = "vendor/gpui-fast-linux" }
 gpui-fast-wgpu = { path = "vendor/gpui-fast-wgpu" }
 gpui-fast-windows = { path = "vendor/gpui-fast-windows" }
-gpui-pre-linux = { path = "vendor/gpui-pre-linux" }
-gpui-pre-wgpu = { path = "vendor/gpui-pre-wgpu" }
-gpui-pre-windows = { path = "vendor/gpui-pre-windows" }
-wgpu = { path = "vendor/wgpu" }
 
 [patch."https://github.com/longbridge/gpui-kit"]
 gpui-kit = { path = "vendor/gpui-kit" }

@@ -29,20 +29,15 @@
   },
   "local_patches": [
     "Cargo.toml",
-    "src/metal_renderer.rs",
     "src/open_type.rs",
-    "src/text_system.rs"
+    "src/text_system.rs",
+    "tests/font_fallback.rs"
   ],
   "modified_files": {
     "Cargo.toml": {
       "upstream_sha256": "c010c4a633651462bac663daf6e7870e51ed4002b8adfe23c80c629a3b4da736",
-      "local_sha256": "f7a84e5e56c9e713c14d44bc8d7ab9ea4bf13cc7cf9dd61a8213dc6536a455d4",
-      "reason": "The font_fallback [[test]] and the dev-only frame-observation feature (VENDORED.md)."
-    },
-    "src/metal_renderer.rs": {
-      "upstream_sha256": "a1b4fa7dcdfe636b0cd311bf7e0d20b3e05399756be8021fb0a2872dda042c99",
-      "local_sha256": "8da9aba1b60e42f5f64afca580dacd6990f85ef5534214026999b580167dcdcc",
-      "reason": "Behind frame-observation only: draw_with_status, upstream's draw (a display link's drawable, or nextDrawable when detached) with a per-draw autorelease pool, the nextDrawable presentation wait and attach_gpu_timing (VENDORED.md). With the feature off, draw is upstream's."
+      "local_sha256": "ae947e7adbec4cbdf0bf457fd3d2efae636544a734617bec22bd4aceeb729789",
+      "reason": "The font_fallback [[test]] (VENDORED.md)."
     },
     "src/open_type.rs": {
       "upstream_sha256": "bc827c157fdce50125b158adb595b665d82f38b62fc6b3a9693c65abae640453",
@@ -58,7 +53,8 @@
   "added_files": {
     "tests/font_fallback.rs": {
       "sha256": "18c0585e87a0458666c4f8ca57a141b1d567800eedb8f5d3296156a3283c1111",
-      "reason": "Added: tests of the kept font patches (VENDORED.md)."
+      "reason": "Added: tests of the kept font patches (VENDORED.md).",
+      "local_sha256": "18c0585e87a0458666c4f8ca57a141b1d567800eedb8f5d3296156a3283c1111"
     }
   },
   "removed_files": {
@@ -67,7 +63,7 @@
       "reason": "Package-level lockfile not retained; the workspace Cargo.lock owns resolution."
     }
   },
-  "unchanged_file_count": 15,
+  "unchanged_file_count": 16,
   "provenance_files": [
     "SOURCE.json",
     "VENDORED.md"

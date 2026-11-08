@@ -1,14 +1,12 @@
 // Modified by Longbridge for gpui-fast.
 mod cosmic_text_system;
 mod fast;
-mod present_mode;
 mod wgpu_atlas;
 mod wgpu_context;
 mod wgpu_renderer;
 
 pub use cosmic_text_system::*;
 pub use fast::dynamic_textures::WgpuDynamicTexture;
-pub use present_mode::*;
 pub use wgpu;
 pub use wgpu_atlas::*;
 pub use wgpu_context::*;

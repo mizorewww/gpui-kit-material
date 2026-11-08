@@ -577,7 +577,7 @@ impl X11Composition {
         window: &X11Window,
         scene: &Scene,
         input: Vec<Bounds<DevicePixels>>,
-    ) -> anyhow::Result<bool> {
+    ) -> anyhow::Result<()> {
         let Overlay::Supported {
             root,
             colormap,
@@ -585,22 +585,22 @@ impl X11Composition {
             spare_renderer,
         } = &mut self.overlay
         else {
-            return Ok(true);
+            return Ok(());
         };
         if scene.is_empty() && input.is_empty() {
             if let Some(overlay) = overlay.take() {
                 *spare_renderer = Some(overlay.destroy(&self.xcb));
                 xcb_flush(&self.xcb);
             }
-            return Ok(true);
+            return Ok(());
         }
 
         let state = window.0.state.borrow();
         let Some(window_renderer) = state.renderer.as_ref() else {
-            return Ok(false);
+            return Ok(());
         };
         if window_renderer.device_lost() {
-            return Ok(false);
+            return Ok(());
         }
         let size = window_renderer.viewport_size();
         if overlay
@@ -661,9 +661,8 @@ impl X11Composition {
         overlay.map(&self.xcb)?;
         overlay.raise_above(&self.xcb, self.x_window);
         overlay.renderer.draw(scene);
-        let presented = overlay.renderer.take_present_succeeded();
         xcb_flush(&self.xcb);
-        Ok(presented)
+        Ok(())
     }
 
     /// Destroys the overlay window rather than unmapping it, keeping its
@@ -1126,19 +1125,13 @@ pub(crate) fn draw_composed(window: &X11Window, scene: ComposedScene<'_>) {
         composition.occluders = occluders;
         composition.apply_order().log_err();
     }
-    let mut overlay_presented = true;
     if overlay_surfaces.is_empty() {
         composition.hide_overlay();
-    } else {
-        overlay_presented = composition
-            .draw_overlay(window, &overlay_scene, overlay_input)
-            .unwrap_or_else(|error| {
-                log::error!("drawing the X11 composition overlay window: {error:#}");
-                false
-            });
+    } else if let Err(error) = composition.draw_overlay(window, &overlay_scene, overlay_input) {
+        log::error!("drawing the X11 composition overlay window: {error:#}");
     }
     drop(composition);
-    window.draw_frame(window_scene, overlay_presented);
+    window.draw(window_scene);
 }
 
 /// `PlatformWindow::enable_window_composition`: composition needs the SHAPE

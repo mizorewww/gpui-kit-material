@@ -146,9 +146,6 @@ impl BenchReport {
         // `.ok()` on `record`: this operation is infallible (the histograms auto-resize).
         for event in events {
             match event {
-                // Outer CPU samples are consumed separately from these legacy phase metrics.
-                #[cfg(feature = "frame-observation")]
-                FrameEvent::Complete(_) => {}
                 FrameEvent::Draw(timing) => {
                     snapshot
                         .draw

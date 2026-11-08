@@ -174,13 +174,7 @@
     "tests/action_macros.rs": "47b69024f403feb6cb63c9990a6993b8582856146f5a6ae16984714321956a84"
   },
   "local_patches": [
-    "Cargo.toml",
-    "src/app.rs",
-    "src/app/bench_context.rs",
-    "src/platform.rs",
-    "src/platform/test/window.rs",
     "src/profiler.rs",
-    "src/profiler/hang.rs",
     "src/profiler/journal.rs",
     "src/style.rs",
     "src/svg_renderer.rs",
@@ -188,54 +182,22 @@
     "src/text_system.rs",
     "src/text_system/line_layout.rs",
     "src/text_system/line_wrapper.rs",
-    "src/window.rs",
-    "src/app/entity_map.rs"
+    "tests/fonts/README.md",
+    "tests/fonts/ibm-plex-sans/IBMPlexSans-Regular.ttf",
+    "tests/fonts/ibm-plex-sans/license.txt",
+    "tests/fonts/lilex/Lilex-Regular.ttf",
+    "tests/fonts/lilex/OFL.txt"
   ],
   "modified_files": {
-    "Cargo.toml": {
-      "upstream_sha256": "5619c6610080e859128ecd4307710b9c666aba5b8aacfd19397f6ad6354d9423",
-      "local_sha256": "1ab18386069286ba4e50d5ebfddb93e69163f689bd625dc81f8ba7ec309fc0cf",
-      "reason": "The dev-only frame-observation feature, which gates frame statistics, vsync control, CPU scopes, presentation timing and GPU time (frame-submission-patch.md)."
-    },
-    "src/app.rs": {
-      "upstream_sha256": "7f5e2461c2506d63f2616bcdef083b3ca6c513feda9c6d761f345abdb3487814",
-      "local_sha256": "f6a3954379e7a77a2faffc52927b0a8d3999adc6f5054d40d53d7531982823c7",
-      "reason": "CpuFrameScope around the initial open_window draw and test-app draws (cpu-frame-scope-patch.md)."
-    },
-    "src/app/bench_context.rs": {
-      "upstream_sha256": "37ae667cdbc822ee22c100c418810c6ee9bd08ddcd40b826130bb22a9e8fe775",
-      "local_sha256": "03244f80a970021bf014900ef452adcf402d646f89542f2faad8bb66cea72aee",
-      "reason": "Ignore FrameEvent::Complete in legacy phase metrics (cpu-frame-scope-patch.md)."
-    },
-    "src/app/entity_map.rs": {
-      "upstream_sha256": "2140fef3a74c237c296e1073daac9a41ff083955f96daad4fac1a283e4d7c580",
-      "local_sha256": "9ac49d81381afa28cc5ecc543a059570b3dbf0e15684500e381c1b1e33274f55",
-      "reason": "Entity::update_for_render (render-lease-patch.md)."
-    },
-    "src/platform.rs": {
-      "upstream_sha256": "fcd613681b31b52318f6349e5f63fcf0c08748705b8d71673891df0c303e8756",
-      "local_sha256": "08cd454d0935539e4fd6184edc02299d26767119a56b980aaa37329ca671506b",
-      "reason": "VsyncStatus, vsync_status/set_vsync, has_periodic_frame_source, successful_frame_submissions; declares frame_submission (frame-submission-patch.md)."
-    },
-    "src/platform/test/window.rs": {
-      "upstream_sha256": "0a9e1c0a0ce8885e64439bfda766a5c39fed5f2fffae3781e56104031ee4012e",
-      "local_sha256": "83271403bdcf2b87519713295de57dd044b85da939f14910e10d578595feea53",
-      "reason": "periodic_frame_source switch for the throttle-retry test (frame-submission-patch.md)."
+    "src/profiler/journal.rs": {
+      "upstream_sha256": "66b07a3d29c2585d56886c5a6984022fed70cbc6e11f1ceb4ac331315042132a",
+      "local_sha256": "86e16e613eb58265e1fec097d980c403f611b61b3f0d1aea97c758cbf1539248",
+      "reason": "`try_update` in place of the deprecated `fetch_update` on the runnable counter (identical semantics)."
     },
     "src/profiler.rs": {
       "upstream_sha256": "46450da2077a4dce7a624c3a6047a1151b35dc04cb8ba896f0623e9501d30c97",
-      "local_sha256": "f3fee4c20037058868f419f9dfd5008330a40253e7eb3df8e233988ab4694d4c",
-      "reason": "CpuFrameScope/CpuFrameTiming/FrameEvent::Complete (cpu-frame-scope-patch.md); presentation wait, GpuExecution store, successful_new_frame, raw Present recording and try_update (presentation-timing-patch.md)."
-    },
-    "src/profiler/hang.rs": {
-      "upstream_sha256": "1d32f5e43c0b61ddbd8083662ad3a129f67f66c9c607dd555c98c9cefa041c7e",
-      "local_sha256": "4ed52322278ea6619b268517d2c3ed157c380c50753b43e376d7a22ee05d2e4f",
-      "reason": "Test fixtures set PresentTiming.successful_new_frame behind frame-observation (presentation-timing-patch.md)."
-    },
-    "src/profiler/journal.rs": {
-      "upstream_sha256": "66b07a3d29c2585d56886c5a6984022fed70cbc6e11f1ceb4ac331315042132a",
-      "local_sha256": "96705bc7268a5f88ad380a267103d52281321c2655211561b3abaf205562c9a8",
-      "reason": "try_update instead of deprecated fetch_update; test fixtures set successful_new_frame (presentation-timing-patch.md)."
+      "local_sha256": "3e4e9c4da891ab8a061df439394a5f8d9c2bdc8cb72134d86239dbfcdd6577f4",
+      "reason": "`try_update` in place of the deprecated `fetch_update` on the trace state (identical semantics), so deny-warnings builds cover this backend."
     },
     "src/style.rs": {
       "upstream_sha256": "27753a378e4b3a30f535f796a592d1f2191c0f77580c99436ed1bfcd7b6a8da9",
@@ -252,11 +214,6 @@
       "local_sha256": "1675934f90bd8dec84cb920dec09587c3681a5bc843fb8a0bebd9e8203eda120",
       "reason": "Material performance patch: TabStopMap records only its insertion history while painting and builds the tab order and focus lookup lazily on the first query (Tab navigation, a11y dump); query results unchanged. Replaying a reused view's or composited layer's tab stops no longer updates a SumTree per insertion."
     },
-    "src/text_system.rs": {
-      "upstream_sha256": "25f479208bf39e0840f9f7f67d33f6370b991459c8b900f2c4faeece08ebffb0",
-      "local_sha256": "3788a52fe3f1989d65a45ce521dc3a45e4e8f9721143f969fcfb3e91f4ebe7f6",
-      "reason": "em_width/em_advance fallback for fonts without 'm' (em-fallback-patch.md)."
-    },
     "src/text_system/line_layout.rs": {
       "upstream_sha256": "76589c9dff94185fd52ead6966c1d2cb659a5a0ab943b6f79b5c2326a02b6d8e",
       "local_sha256": "1c565a3059f315c175db2d82a1d336e42567ad3720195a4b9ec843030f2f9808",
@@ -267,36 +224,37 @@
       "local_sha256": "00aab5a2ae988ffa425bdcd4eda387689386565e5a1b92e7e13d245afa603a97",
       "reason": "Hanging overflow space: a space that overflows a row after content no longer starts the next row; it hangs past the edge and the following word is the break (LineWrapper::wrap_line, the multi-line truncation that replicates it in Fast, LineLayout::compute_wrap_boundaries), with tests (hanging-space-patch.md)."
     },
-    "src/window.rs": {
-      "upstream_sha256": "260fb355763edb86f395458e167c9d258352af4f2cb03d4d6eb51d59a36e1f4c",
-      "local_sha256": "cb1c5d45509423ce053cbc472cfdf390edcb84234c9ec444c7ebbe8d521668b0",
-      "reason": "CPU frame scope (cpu-frame-scope-patch.md); WindowSubmissionStats, vsync, throttle retry (frame-submission-patch.md); present outcome (presentation-timing-patch.md)."
+    "src/text_system.rs": {
+      "upstream_sha256": "25f479208bf39e0840f9f7f67d33f6370b991459c8b900f2c4faeece08ebffb0",
+      "local_sha256": "3788a52fe3f1989d65a45ce521dc3a45e4e8f9721143f969fcfb3e91f4ebe7f6",
+      "reason": "em_width/em_advance fallback for fonts without 'm' (em-fallback-patch.md)."
     }
   },
   "added_files": {
-    "src/platform/frame_submission.rs": {
-      "sha256": "e5d9be99b8866fb9a498b4e622b8f75798f249760342cb36aaac655b52594458",
-      "reason": "Added: FrameSubmissionCounter and dxgi_present_succeeded, backend accounting tested on every host (vendor/gpui-pre/frame-submission-patch.md)."
-    },
     "tests/fonts/README.md": {
       "sha256": "675824dd97a1d09a1a105d186a7b96a05016009d5d14621d6f5298612b3fbc6d",
-      "reason": "Added: provenance and hashes of the restored test fonts (test-harness-patch.md)."
+      "reason": "Added: provenance and hashes of the restored test fonts (test-harness-patch.md).",
+      "local_sha256": "675824dd97a1d09a1a105d186a7b96a05016009d5d14621d6f5298612b3fbc6d"
     },
     "tests/fonts/ibm-plex-sans/IBMPlexSans-Regular.ttf": {
       "sha256": "975dcda37d80f038dcd143c22e33ca2d97a0cc5a929aace1c749153b0fe1afa5",
-      "reason": "Added: SVG test font from Zed 08cbb88 assets (tests/fonts/README.md)."
+      "reason": "Added: SVG test font from Zed 08cbb88 assets (tests/fonts/README.md).",
+      "local_sha256": "975dcda37d80f038dcd143c22e33ca2d97a0cc5a929aace1c749153b0fe1afa5"
     },
     "tests/fonts/ibm-plex-sans/license.txt": {
       "sha256": "91c25c350d3cac39da2736d74f7ba37ef648f5237a4e330a240615bc8d8c4360",
-      "reason": "Added: SIL OFL license for IBM Plex Sans (tests/fonts/README.md)."
+      "reason": "Added: SIL OFL license for IBM Plex Sans (tests/fonts/README.md).",
+      "local_sha256": "91c25c350d3cac39da2736d74f7ba37ef648f5237a4e330a240615bc8d8c4360"
     },
     "tests/fonts/lilex/Lilex-Regular.ttf": {
       "sha256": "8a467ad5a1941dc7c9cebaee34e3ed9364a73b48393034e363e4b528bd711d04",
-      "reason": "Added: SVG test font from Zed 08cbb88 assets (tests/fonts/README.md)."
+      "reason": "Added: SVG test font from Zed 08cbb88 assets (tests/fonts/README.md).",
+      "local_sha256": "8a467ad5a1941dc7c9cebaee34e3ed9364a73b48393034e363e4b528bd711d04"
     },
     "tests/fonts/lilex/OFL.txt": {
       "sha256": "a356708a399e3f54b937ec7d9b722c26dabba21365b60f95c56eb7ebca0dee40",
-      "reason": "Added: SIL OFL license for Lilex (tests/fonts/README.md)."
+      "reason": "Added: SIL OFL license for Lilex (tests/fonts/README.md).",
+      "local_sha256": "a356708a399e3f54b937ec7d9b722c26dabba21365b60f95c56eb7ebca0dee40"
     }
   },
   "removed_files": {
@@ -305,15 +263,11 @@
       "reason": "Not retained; Cargo.toml is the normalized manifest Cargo builds (test-harness-patch.md)."
     }
   },
-  "unchanged_file_count": 147,
+  "unchanged_file_count": 155,
   "provenance_files": [
     "SOURCE.json",
-    "cpu-frame-scope-patch.md",
     "em-fallback-patch.md",
-    "frame-submission-patch.md",
     "hanging-space-patch.md",
-    "presentation-timing-patch.md",
-    "render-lease-patch.md",
     "tab-stop-index-patch.md",
     "test-harness-patch.md"
   ],

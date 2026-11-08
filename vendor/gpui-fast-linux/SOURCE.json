@@ -46,28 +46,7 @@
     "src/linux/xdg_desktop_portal.rs": "2e3a8eb44718dbd31b21fc368ad2f5c2105b340ef04f7e002ee0029adb9f3cc1",
     "src/linux.rs": "f39b0492c216cb2d10511865f09854c5cf5c1dcc2fedc0c407a7cb0bbd618956"
   },
-  "modified_files": {
-    "Cargo.toml": {
-      "upstream_sha256": "d0d0dbbabf6c86abee0008cc321131f01ec183da4dbf6d69be98964d1d765d3b",
-      "local_sha256": "64a15c6bd47ecf5901476dd649c862d2ead0c7b4e86bd26a8ddae1b16d5426ca"
-    },
-    "src/fast/composition/wayland.rs": {
-      "upstream_sha256": "938306315fbb6618fcc1445cbbeb972c457a1b76657e606d569618f7046f3458",
-      "local_sha256": "645063afe2cc6f5d61bf02e5efdf4765ae40364b21439e5544f809130c6adc84"
-    },
-    "src/fast/composition/x11.rs": {
-      "upstream_sha256": "583fcb9d610ae746fcb0ca41ff081f3690e8abe4a2d5bd6b6baff9e9b4d3d50b",
-      "local_sha256": "e03d9ec2a44106b8614566eb95d86e0b6d3eaad69507767f94a3d94563cefede"
-    },
-    "src/linux/wayland/window.rs": {
-      "upstream_sha256": "aad2c83879b7747f2c4eb06d1db1dc32f7314f5c88b938d81f23e9fc4f9af200",
-      "local_sha256": "814f632a18e551374ed70aa97505730e0dc051c97937ec943d7dbaf6f5b3f7c4"
-    },
-    "src/linux/x11/window.rs": {
-      "upstream_sha256": "f1c8389e6eb18f176ade2363ac31fac0392d0ae928e5959d679249a7ee3f5a01",
-      "local_sha256": "bf876f14980ce9bfe647bc5c9b8233933d1ada3efede36a18b2a263fd8ec8ceb"
-    }
-  },
+  "modified_files": {},
   "added_files": {},
   "removed_files": {},
   "not_vendored": [

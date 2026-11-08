@@ -55,9 +55,6 @@ pub(crate) struct DirectXRenderer {
     /// In that case we want to discard the first frame that we draw as we got reset in the middle of a frame
     /// meaning we lost all the allocated gpu textures and scene resources.
     pub(crate) skip_draws: bool,
-    /// `SyncInterval` of every `Present`: 0 does not synchronize with the display,
-    /// 1 does. Frame requests stay paced separately by the VSync thread.
-    pub(crate) present_sync_interval: u32,
     pub(crate) fast_frame: crate::fast::frame::FrameState,
     pub(crate) fast_composition: crate::fast::composition::DirectXComposition,
     pub(crate) fast_recovery: crate::fast::device_recovery::RecoveryState,
@@ -201,7 +198,6 @@ impl DirectXRenderer {
             width: 1,
             height: 1,
             skip_draws: false,
-            present_sync_interval: 0,
             fast_frame: crate::fast::frame::FrameState::default(),
             fast_composition: crate::fast::composition::DirectXComposition::default(),
             fast_recovery: crate::fast::device_recovery::RecoveryState::default(),
@@ -254,18 +250,17 @@ impl DirectXRenderer {
     }
 
     #[inline]
-    pub(crate) fn present(&mut self) -> Result<bool> {
+    pub(crate) fn present(&mut self) -> Result<()> {
         let result = unsafe {
             self.resources
                 .as_ref()
                 .expect("resources missing")
                 .swap_chain
-                .Present(self.present_sync_interval, DXGI_PRESENT(0))
+                .Present(0, DXGI_PRESENT(0))
         };
         #[cfg(test)]
         crate::fast::native_tests::present(self.hwnd, self.direct_composition.is_some(), result.0);
-        result.ok().context("Presenting swap chain failed")?;
-        Ok(gpui::dxgi_present_succeeded(result.0))
+        result.ok().context("Presenting swap chain failed")
     }
 
     pub(crate) fn handle_device_lost(&mut self, directx_devices: &DirectXDevices) -> Result<()> {
@@ -345,18 +340,15 @@ impl DirectXRenderer {
         Ok(())
     }
 
-    /// Returns whether a frame reached the screen's presentation queue: a success
-    /// code such as `DXGI_STATUS_OCCLUDED` and a skipped draw are not failures but
-    /// present nothing.
     pub(crate) fn draw(
         &mut self,
         scene: &Scene,
         background_appearance: WindowBackgroundAppearance,
-    ) -> Result<bool> {
+    ) -> Result<()> {
         if self.skip_draws || !crate::fast::device_recovery::can_draw(self) {
             // skip drawing this frame, we just recovered from a device lost event
             // and so likely do not have the textures anymore that are required for drawing
-            return Ok(false);
+            return Ok(());
         }
         self.render(scene, background_appearance)?;
         self.present()

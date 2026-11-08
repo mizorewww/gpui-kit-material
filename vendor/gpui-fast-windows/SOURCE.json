@@ -53,24 +53,7 @@
     "src/window.rs": "6833b5e4fc9d0d4ab7d1ebd3909210e68da9890d81755aeade417cb3c085cbf4",
     "src/wrapper.rs": "a17bfb94697904d650a0db4007880262256d06bf96cb00af387e73fde7536c8b"
   },
-  "modified_files": {
-    "Cargo.toml": {
-      "upstream_sha256": "f4df14b5219d5c007a129294a4ef55767f46dc736c35f3e3c095aabcfd0a9927",
-      "local_sha256": "260b0c6a84ec776d16ac731813775d5607f2df79947faeff9d7c54f528ac2bd7"
-    },
-    "src/directx_renderer.rs": {
-      "upstream_sha256": "f9f66191572babcb3a29accefc132843c0367955f327bee2e6f0ba1026dfb8b2",
-      "local_sha256": "b6f2bdc616f6a09cc7dfaedbd217005bd72d80e0066fc94ba2d6b7a140db5557"
-    },
-    "src/fast/composition.rs": {
-      "upstream_sha256": "b8b1ba1747798a93994086d8298263cec0d789e8396bf757480cc9b3b575cebb",
-      "local_sha256": "91708c8d933ef391bbf03c82f46653acdb23ca03678b5a58cb2193915d8d0fe7"
-    },
-    "src/window.rs": {
-      "upstream_sha256": "6833b5e4fc9d0d4ab7d1ebd3909210e68da9890d81755aeade417cb3c085cbf4",
-      "local_sha256": "af6790cbe3563d6465b5a5e9d51122fc6df961a76a41cd267d6935d743fa7ef6"
-    }
-  },
+  "modified_files": {},
   "added_files": {},
   "removed_files": {},
   "not_vendored": [

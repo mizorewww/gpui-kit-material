@@ -600,7 +600,6 @@ impl MetalRenderer {
         // nothing to do
     }
 
-    #[cfg(not(feature = "frame-observation"))]
     pub fn draw(&mut self, scene: &Scene) {
         let layer = match &self.layer {
             Some(l) => l.clone(),
@@ -654,87 +653,6 @@ impl MetalRenderer {
             command_buffer.presentDrawable(ProtocolObject::from_ref(&*drawable));
             command_buffer.commit();
         }
-    }
-
-    #[cfg(feature = "frame-observation")]
-    pub fn draw(&mut self, scene: &Scene) {
-        self.draw_with_status(scene);
-    }
-
-    #[cfg(feature = "frame-observation")]
-    /// Submit a drawable and report whether a real command buffer/presentation
-    /// was issued. This is not GPU completion or display presentation timing.
-    pub fn draw_with_status(&mut self, scene: &Scene) -> bool {
-        // Dispatch-source demand frames can run without returning to the
-        // enclosing Cocoa event-loop pool. Release per-draw autoreleased Metal
-        // objects here, before returning to the measured presentation caller.
-        // Only a bool escapes; drawable/encoder borrows remain inside the pool.
-        objc2::rc::autoreleasepool(|_| {
-            let layer = match &self.layer {
-                Some(l) => l.clone(),
-                None => {
-                    log::error!(
-                        "draw() called on headless renderer - use render_scene_to_image() instead"
-                    );
-                    return false;
-                }
-            };
-            let drawable = match &mut self.display_link_mode {
-                DisplayLinkMode::Attached { drawable } => {
-                    let Some(drawable) = drawable.take() else {
-                        log::error!("skipped a frame drawn outside its display link's update");
-                        return false;
-                    };
-                    drawable
-                }
-                DisplayLinkMode::Detached => {
-                    // Material patch: nextDrawable can block until the compositor
-                    // releases a drawable. Report that wait separately from CPU work.
-                    // A display link's drawable is handed out ready, with no wait.
-                    let wait_started =
-                        gpui::profiler::trace_enabled().then(std::time::Instant::now);
-                    let next_drawable = layer.nextDrawable();
-                    if let Some(wait_started) = wait_started {
-                        gpui::profiler::record_presentation_wait(wait_started.elapsed());
-                    }
-                    let Some(drawable) = next_drawable else {
-                        log::error!(
-                            "failed to retrieve next drawable, drawable size: {:?}",
-                            layer.drawableSize()
-                        );
-                        return false;
-                    };
-                    drawable
-                }
-            };
-            // A display link's drawable was sized when the link handed it out,
-            // which can be before a resize the layer has since taken.
-            let texture = drawable.texture();
-            let viewport_size: Size<DevicePixels> = size(
-                (texture.width() as i32).into(),
-                (texture.height() as i32).into(),
-            );
-
-            let command_buffer = match self.render_frame(scene, &drawable.texture(), viewport_size)
-            {
-                Ok(command_buffer) => command_buffer,
-                Err(error) => {
-                    log::error!("failed to render: {error:#}");
-                    return false;
-                }
-            };
-
-            attach_gpu_timing(&command_buffer, "frame");
-            if self.presents_with_transaction {
-                command_buffer.commit();
-                command_buffer.waitUntilScheduled();
-                drawable.present();
-            } else {
-                command_buffer.presentDrawable(ProtocolObject::from_ref(&*drawable));
-                command_buffer.commit();
-            }
-            true
-        })
     }
 
     pub(crate) fn render_frame(
@@ -1794,10 +1712,7 @@ pub(crate) struct InstanceBindings {
     pub(crate) surfaces: InstanceBinding,
 }
 
-pub(crate) fn write_instances(
-    scene: &Scene,
-    writer: &mut InstanceBufferWriter,
-) -> Result<InstanceBindings> {
+pub(crate) fn write_instances(scene: &Scene, writer: &mut InstanceBufferWriter) -> Result<InstanceBindings> {
     Ok(InstanceBindings {
         quads: writer.write(&scene.quads)?,
         shadows: writer.write(&scene.shadows)?,
@@ -2037,39 +1952,6 @@ impl gpui::PlatformHeadlessRenderer for MetalHeadlessRenderer {
 
     fn sprite_atlas(&self) -> Arc<dyn gpui::PlatformAtlas> {
         self.renderer.sprite_atlas().clone()
-    }
-}
-
-#[cfg(feature = "frame-observation")]
-/// Material patch: while profiler tracing is enabled, report the driver's
-/// GPUStartTime/GPUEndTime for a command buffer committed after this call.
-pub(crate) fn attach_gpu_timing(
-    command_buffer: &ProtocolObject<dyn MTLCommandBuffer>,
-    kind: &'static str,
-) {
-    if !gpui::profiler::trace_enabled() {
-        return;
-    }
-    let submitted_at = std::time::Instant::now();
-    let block = RcBlock::new(
-        move |command_buffer: ptr::NonNull<ProtocolObject<dyn MTLCommandBuffer>>| {
-            // SAFETY: Metal hands its completion handlers the command buffer that
-            // completed; these read-only properties are valid once it completes.
-            let command_buffer = unsafe { command_buffer.as_ref() };
-            gpui::profiler::record_gpu_execution(gpui::profiler::GpuExecution {
-                submitted_at,
-                gpu_start_s: unsafe { objc2::msg_send![command_buffer, GPUStartTime] },
-                gpu_end_s: unsafe { objc2::msg_send![command_buffer, GPUEndTime] },
-                kind,
-                completed: command_buffer.status()
-                    == objc2_metal::MTLCommandBufferStatus::Completed,
-            });
-        },
-    );
-    // SAFETY: Metal copies the live block and invokes it once after the buffer completes;
-    // it captures only plain values.
-    unsafe {
-        command_buffer.addCompletedHandler(RcBlock::as_ptr(&block));
     }
 }
 

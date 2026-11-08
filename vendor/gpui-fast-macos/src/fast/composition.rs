@@ -535,14 +535,9 @@ pub(crate) fn draw_composed(window_state: &Rc<Mutex<MacWindowState>>, scene: Com
     let mut lock = window_state.lock();
     let state = &mut *lock;
     let Some(base_surface) = state.fast_composition.base_surface else {
-        if state.renderer.draw_with_status(scene.scene()) {
-            state.successful_frame_submissions =
-                state.successful_frame_submissions.saturating_add(1);
-        }
+        state.renderer.draw(scene.scene());
         return;
     };
-    let mut complete = true;
-    let mut submitted_any = false;
     let whole_scene = whole_scene_layer(scene.scene(), scene.layers());
     for (layer_index, layer) in scene.layers().iter().enumerate() {
         let replayed_scene;
@@ -560,28 +555,20 @@ pub(crate) fn draw_composed(window_state: &Rc<Mutex<MacWindowState>>, scene: Com
             }
         };
         if layer.surface == base_surface {
-            let submitted = state.renderer.draw_with_status(surface_scene);
-            complete &= submitted;
-            submitted_any |= submitted;
+            state.renderer.draw(surface_scene);
         } else if let Some(surface) = state.fast_composition.gpui_surfaces.get_mut(&layer.surface) {
             {
                 let mut regions = surface.input_regions.borrow_mut();
                 regions.clear();
                 regions.extend(scene.layer_hitboxes(layer).iter().cloned());
             }
-            let submitted = surface.renderer.draw_with_status(surface_scene);
-            complete &= submitted;
-            submitted_any |= submitted;
+            surface.renderer.draw(surface_scene);
         } else {
-            complete = false;
             log::error!(
                 "missing AppKit GPUI composition surface {:?}",
                 layer.surface
             );
         }
-    }
-    if complete && submitted_any {
-        state.successful_frame_submissions = state.successful_frame_submissions.saturating_add(1);
     }
 }
 
@@ -853,17 +840,6 @@ unsafe fn create_gpui_surface(
     }
 
     let scale_factor = state.scale_factor();
-    if let (Some(base), Some(layer)) = (state.renderer.layer(), renderer.layer()) {
-        layer.setDisplaySyncEnabled(base.displaySyncEnabled());
-        if layer.displaySyncEnabled() != base.displaySyncEnabled() {
-            // The view already owns raw Arc/Rc ivars; release it through its
-            // dealloc implementation before returning an initialization error.
-            unsafe {
-                let _: () = msg_send![view, release];
-            }
-            anyhow::bail!("new Metal surface could not inherit presentation synchronization");
-        }
-    }
     renderer.update_drawable_size(state.content_size().to_device_pixels(scale_factor));
     set_contents_scale(&renderer, scale_factor);
     unsafe {
@@ -885,65 +861,6 @@ unsafe fn create_gpui_surface(
         renderer,
         input_regions,
     })
-}
-
-/// Read every currently composed Metal layer, rather than a remembered UI flag.
-pub(crate) fn vsync_status(state: &MacWindowState) -> gpui::VsyncStatus {
-    let Some(base) = state.renderer.layer() else {
-        return gpui::VsyncStatus::Unsupported;
-    };
-    let enabled = base.displaySyncEnabled();
-    if state
-        .fast_composition
-        .gpui_surfaces
-        .values()
-        .any(|surface| {
-            surface
-                .renderer
-                .layer()
-                .is_none_or(|layer| layer.displaySyncEnabled() != enabled)
-        })
-    {
-        return gpui::VsyncStatus::Unsupported;
-    }
-    if enabled {
-        gpui::VsyncStatus::Enabled
-    } else {
-        gpui::VsyncStatus::Disabled
-    }
-}
-
-/// Set all existing surfaces together. Future surfaces inherit the actual base
-/// setting at creation; CVDisplayLink request pacing is deliberately unchanged.
-pub(crate) fn set_vsync(state: &MacWindowState, enabled: bool) -> Result<()> {
-    let previous = match vsync_status(state) {
-        gpui::VsyncStatus::Enabled => true,
-        gpui::VsyncStatus::Disabled => false,
-        gpui::VsyncStatus::Unsupported => {
-            anyhow::bail!("window Metal layers do not expose one synchronization setting")
-        }
-    };
-    let set_all = |value| {
-        if let Some(layer) = state.renderer.layer() {
-            layer.setDisplaySyncEnabled(value);
-        }
-        for surface in state.fast_composition.gpui_surfaces.values() {
-            if let Some(layer) = surface.renderer.layer() {
-                layer.setDisplaySyncEnabled(value);
-            }
-        }
-    };
-    set_all(enabled);
-    let expected = if enabled {
-        gpui::VsyncStatus::Enabled
-    } else {
-        gpui::VsyncStatus::Disabled
-    };
-    if vsync_status(state) != expected {
-        set_all(previous);
-        anyhow::bail!("Metal did not apply the requested presentation synchronization setting");
-    }
-    Ok(())
 }
 
 /// Sets whether the window's renderer and every surface's present their

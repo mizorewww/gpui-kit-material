@@ -24,24 +24,7 @@
     "src/window.rs": "e951058f8ede01679000f1b59c14cb0a32d7eaa8d11ad975a002f49f2c177acc",
     "src/window_appearance.rs": "c1ea31769bfd6b324339525b8ffec3be0f59a24495a7e491c1df66bd43db5b75"
   },
-  "modified_files": {
-    "Cargo.toml": {
-      "upstream_sha256": "a7fd58efdff6211848d2f6fe9f2fa36c52f83129625746c1778db6c2e529239c",
-      "local_sha256": "04a126ec9a84bc1f1f77b306c0ab4e6eae6f88cb12001b0cd1c61c031ed2d3f9"
-    },
-    "src/display_link.rs": {
-      "upstream_sha256": "b74ca5ae9b60a0a585d1105a24ce2c238efc41ca14310a7509b51e93bcc57a5b",
-      "local_sha256": "d8a179dabf95da770bca0ee287992da933a879c35494ac931104b9d68d87d68a"
-    },
-    "src/fast/composition.rs": {
-      "upstream_sha256": "da91fbdbcbc512dff84236b9cb422a86e0f78781f942a40d568f778e28d645df",
-      "local_sha256": "bd3661e1d85cf0bc0858e09b7cdca0f3b2c01fc37e9a782f9029d18d68434cdb"
-    },
-    "src/window.rs": {
-      "upstream_sha256": "e951058f8ede01679000f1b59c14cb0a32d7eaa8d11ad975a002f49f2c177acc",
-      "local_sha256": "6c610dbdcf9264a9ca5d6e81bea8714b8d4803d7d1a412dff1ad6e8e2f177967"
-    }
-  },
+  "modified_files": {},
   "added_files": {},
   "removed_files": {},
   "not_vendored": [

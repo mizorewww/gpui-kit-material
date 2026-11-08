@@ -1874,8 +1874,6 @@ mod tests {
             phases: Default::default(),
         };
         let presentation = PresentTiming {
-            #[cfg(feature = "frame-observation")]
-            successful_new_frame: None,
             window_id: frame.window_id,
             present_start: start + Duration::from_millis(5),
             present_end: start + Duration::from_millis(6),
@@ -3515,8 +3513,6 @@ mod tests {
 
     fn presentation_timing(window_id: WindowId, present_end: Instant) -> PresentTiming {
         PresentTiming {
-            #[cfg(feature = "frame-observation")]
-            successful_new_frame: None,
             window_id,
             present_start: present_end,
             present_end,

@@ -32,7 +32,6 @@ zed-version = "0.1.0"
 zed-rev = "f816e1f9263e3a8ef63c4baaa02e1441ce1c6038"
 
 [features]
-frame-observation = ["gpui/frame-observation"]
 bench-support = ["gpui/bench-support"]
 default = []
 font-kit = [

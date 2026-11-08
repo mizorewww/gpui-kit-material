@@ -52,18 +52,12 @@
       "upstream_sha256": "33464668a92ab46e6fe36db049854e3ab9d83ed0ce29be4cbb39240fb2751d18",
       "local_sha256": "662fe7abada7e93f053c999d375bc2c04e187e0c92a0814f28ad01ef91c359a1"
     },
-    "src/gpui_wgpu.rs": {
-      "upstream_sha256": "ad47a714ea2bec57132b9f30e736be85ccd18a3f7c7864ea1fd3e81049e113a0",
-      "local_sha256": "fa2b36a7df8988373ca6a43f04a09547d8717dff4944fbe69500ad9f526d9f02"
-    },
     "src/wgpu_renderer.rs": {
       "upstream_sha256": "b83c9d93a79930540f884282589f7cb0e61ff196cdbe2bc66ece41681c93d90b",
-      "local_sha256": "1c6aeba26a293b822653b1a256c6c2701188da7f3fea5a77e069bd32d6c2efa0"
+      "local_sha256": "516045d904b15dd808de163c861ce4b0ce37775da030c09fa804d377d34732af"
     }
   },
-  "added_files": {
-    "src/present_mode.rs": "fcc012981eb51d93dabfd20b8eeb40f5295d00b09b489222541b5699ca049ef0"
-  },
+  "added_files": {},
   "removed_files": {},
   "not_vendored": [
     ".cargo_vcs_info.json",

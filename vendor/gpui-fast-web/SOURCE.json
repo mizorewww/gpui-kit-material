@@ -31,16 +31,7 @@
     "src/viewport.rs": "2f64241c990f6de9a874e7680baafa61feba6db96228c48fab26ac7faaf623f5",
     "src/window.rs": "6c5e09637e35e959c4eabab0fba9ee1fc57b10246760461228d4b612ffefeccb"
   },
-  "modified_files": {
-    "Cargo.toml": {
-      "upstream_sha256": "242f390546b4f32ea34d2ea90874628094942f1d8d407c8d2afad23b88b76139",
-      "local_sha256": "0418e5f88904443779f0cf0c03dce718d2d80ad66f47782ee10e6ce16d190a21"
-    },
-    "src/window.rs": {
-      "upstream_sha256": "6c5e09637e35e959c4eabab0fba9ee1fc57b10246760461228d4b612ffefeccb",
-      "local_sha256": "6317c120292df5e97fdc3ee1f19c83f5da35f585edd62377a9147c2843d6d072"
-    }
-  },
+  "modified_files": {},
   "added_files": {},
   "removed_files": {},
   "not_vendored": [

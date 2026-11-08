@@ -98,14 +98,12 @@ struct PortalState {
 /// Forwarded to by `WindowsWindow::draw_composed`.
 pub(crate) fn draw_composed(window: &WindowsWindow, scene: ComposedScene<'_>) {
     let background_appearance = window.state.background_appearance.get();
-    let presented = draw(
+    draw(
         &mut window.state.renderer.borrow_mut(),
         scene,
         background_appearance,
     )
-    .log_err()
-    .unwrap_or(false);
-    window.state.record_frame_submission(presented);
+    .log_err();
 }
 
 /// Forwarded to by `WindowsWindow::enable_window_composition`.
@@ -237,18 +235,17 @@ fn ensure_enabled(renderer: &DirectXRenderer) -> Result<()> {
 
 /// Draws each GPUI surface's part of `scene` into its swap chain and
 /// presents them all. Until GPUI orders the surfaces, the whole scene is
-/// drawn as `DirectXRenderer::draw` draws it. Returns whether every surface
-/// presented.
+/// drawn as `DirectXRenderer::draw` draws it.
 fn draw(
     renderer: &mut DirectXRenderer,
     scene: ComposedScene<'_>,
     background_appearance: WindowBackgroundAppearance,
-) -> Result<bool> {
+) -> Result<()> {
     let Some(base_surface) = renderer.fast_composition.base else {
         return renderer.draw(scene.scene(), background_appearance);
     };
     if renderer.skip_draws || !crate::fast::device_recovery::can_draw(renderer) {
-        return Ok(false);
+        return Ok(());
     }
 
     let whole_scene = whole_scene_layer(scene.scene(), scene.layers());
@@ -274,19 +271,13 @@ fn draw(
         drawn?;
     }
 
-    let mut presented = renderer.present().context("presenting base swap chain")?;
+    renderer.present().context("presenting base swap chain")?;
     for resources in renderer.fast_composition.overlays.values() {
-        let result = unsafe {
-            resources
-                .swap_chain
-                .Present(renderer.present_sync_interval, DXGI_PRESENT(0))
-        };
-        result
+        unsafe { resources.swap_chain.Present(0, DXGI_PRESENT(0)) }
             .ok()
             .context("presenting GPUI composition swap chain")?;
-        presented &= gpui::dxgi_present_succeeded(result.0);
     }
-    Ok(presented)
+    Ok(())
 }
 
 /// Exchanges the window's render target view with `surface`'s.

@@ -14,8 +14,5 @@ application fonts in macOS fallback cascades, rebuilt when fonts are added (#112
   yet offered upstream.
 - `tests/font_fallback.rs` (added, `[[test]]` in `Cargo.toml`): application
   fallback, cascade rebuild and sbix glyphs with the Gallery's fonts.
-- Dev-only, behind `frame-observation` (`Cargo.toml`): `src/metal_renderer.rs`
-  `draw_with_status` with a per-draw autorelease pool, `nextDrawable` wait and GPU
-  timestamps; `src/fast/layers/raster.rs` GPU timestamps for raster tiles.
 - `src/fast/rounded_clip_shader.rs`: `allow(dead_code)` on `stage` under
   `runtime_shaders`, a warning fix.

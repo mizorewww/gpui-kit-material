@@ -1,7 +1,7 @@
 # Not a workspace member: this is what a downstream application's manifest looks
 # like. It proves the library builds against the patches a consumer needs, including
 # the web backends' IME position and the lazy tab-stop index (tested by CI's engine rules
-# step), without the dev-only frame observation, and that Kit's FPS HUD builds beside it.
+# step), and that Kit's FPS HUD builds beside it.
 # It reads them from this checkout; CI's git-consumer job builds the same set from Git.
 [package]
 name = "consumer-check"
@@ -19,8 +19,8 @@ gpui-kit = { git = "https://github.com/longbridge/gpui-kit", rev = "8dfdd49de27c
 gpui-fps = { git = "https://github.com/longbridge/gpui-kit", rev = "8dfdd49de27c0726dd052fb2cfd2b0807d17980b" }
 gpui-kit-material = { path = "../material", default-features = false, features = ["full", "serde", "embedded-symbols"] }
 
-# Lets `cargo test -p consumer-check -p gpui-pre --lib` run the engine tests with
-# frame observation off.
+# Lets `cargo test -p consumer-check -p gpui-pre --lib` run the engine tests as a
+# consumer's engine builds them.
 [dev-dependencies]
 gpui-kit = { git = "https://github.com/longbridge/gpui-kit", rev = "8dfdd49de27c0726dd052fb2cfd2b0807d17980b", features = ["test-support"] }
 

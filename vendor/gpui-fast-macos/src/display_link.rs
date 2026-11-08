@@ -382,20 +382,6 @@ impl WindowFrameSource {
         Ok(())
     }
 
-    /// Whether display-link registration is currently active.
-    pub fn is_running(&self) -> bool {
-        self.registration.is_some()
-    }
-
-    /// Enqueue one demand-driven request on the existing main-thread source.
-    /// Dispatch coalesces bursts; no timer or self-rescheduling loop is added.
-    pub fn wake(&self) {
-        if let Some(at) = PlatformFrameSignal::capture(Instant::now) {
-            self.signal.record(at, FrameRequestSource::LocalSchedule);
-        }
-        self.frame_requests.merge_data(1);
-    }
-
     pub fn take_signal(&self) -> Option<(Instant, FrameRequestSource)> {
         self.signal.take()
     }

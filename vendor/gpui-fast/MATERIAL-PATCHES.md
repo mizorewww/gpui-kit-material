@@ -11,19 +11,9 @@ hover freeze for listeners (#105), `record_entities_accessed` by what entered an
 left (#114), `em` metrics through fallback shaping (#115), lazy tab-stop index
 (#113, upstream's `src/fast/tab_stop.rs`; `src/tab_stop.rs` is unused upstream code).
 
-Dev-only, behind the `frame-observation` feature that only the dev overlay's
-backend manifests turn on (`vendor/gpui-pre/*-patch.md` describe the same patches):
-
-- `Cargo.toml`: the `frame-observation` feature.
-- `src/app.rs`, `src/app/bench_context.rs`: CPU frame scopes around initial and
-  test draws; legacy phase metrics ignore `FrameEvent::Complete`.
-- `src/profiler.rs`, `src/profiler/hang.rs`, `src/profiler/journal.rs`: presentation
-  wait, GPU time and submission outcome; `fetch_update` renamed `try_update`.
-- `src/platform.rs`, `src/platform/frame_submission.rs` (added),
-  `src/platform/test/window.rs`, `src/window.rs`: submission statistics, vsync control,
-  periodic frame source and throttle retry.
-- `src/fast/dependencies.rs`, `src/fast/tests/dependencies.rs`:
-  `Entity::update_for_render` (render lease).
+No API is added or changed. `src/profiler.rs` and `src/profiler/journal.rs` use
+`try_update` in place of the deprecated `fetch_update` (identical semantics), so
+deny-warnings builds cover the crate.
 
 Test harness: `src/style.rs` (`#[perf]` to `#[test]`), `src/svg_renderer.rs` and
 `tests/fonts/` (fonts the package omits), `examples/image/` (a fixture a

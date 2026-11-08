@@ -38,8 +38,6 @@ pub(crate) struct WebWindowCallbacks {
 
 pub(crate) struct WebWindowMutableState {
     pub(crate) renderer: WgpuRenderer,
-    #[cfg(feature = "frame-observation")]
-    successful_frame_submissions: u64,
     pub(crate) bounds: Bounds<Pixels>,
     pub(crate) scale_factor: f32,
     pub(crate) max_texture_dimension: u32,
@@ -191,8 +189,6 @@ impl WebWindow {
         };
 
         let mutable_state = WebWindowMutableState {
-            #[cfg(feature = "frame-observation")]
-            successful_frame_submissions: 0,
             renderer,
             bounds: initial_bounds,
             scale_factor: dpr,
@@ -996,11 +992,6 @@ impl PlatformWindow for WebWindow {
         self.inner.callbacks.borrow_mut().appearance_changed = Some(callback);
     }
 
-    #[cfg(feature = "frame-observation")]
-    fn successful_frame_submissions(&self) -> Option<u64> {
-        Some(self.inner.state.borrow().successful_frame_submissions)
-    }
-
     fn draw(&self, scene: &Scene) {
         if let Some((width, height)) = self.inner.pending_physical_size.take() {
             if self.inner.canvas.width() != width || self.inner.canvas.height() != height {
@@ -1016,15 +1007,6 @@ impl PlatformWindow for WebWindow {
             drop(state);
         }
 
-        #[cfg(feature = "frame-observation")]
-        {
-            let mut state = self.inner.state.borrow_mut();
-            if state.renderer.draw(scene) {
-                state.successful_frame_submissions =
-                    state.successful_frame_submissions.saturating_add(1);
-            }
-        }
-        #[cfg(not(feature = "frame-observation"))]
         self.inner.state.borrow_mut().renderer.draw(scene);
     }
 

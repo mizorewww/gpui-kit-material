@@ -51,7 +51,6 @@ zed-version = "0.2.2"
 zed-rev = "f816e1f9263e3a8ef63c4baaa02e1441ce1c6038"
 
 [features]
-frame-observation = []
 bench = ["bench-support"]
 bench-support = [
     "profiler",

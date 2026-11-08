@@ -28,18 +28,12 @@
     "src/window.rs": "eda543e585912fcb012e2a3559d8fb2e9ad7570ba58746747af380d044085cb8"
   },
   "local_patches": [
-    "Cargo.toml",
     "src/events.rs",
     "src/ime_edit.rs",
     "src/ime_mirror.rs",
     "src/window.rs"
   ],
   "modified_files": {
-    "Cargo.toml": {
-      "upstream_sha256": "d1e7f1428ca496dbb799797e66a67b49d88a75f6a31b83ccfdef6a4f0f215e4b",
-      "local_sha256": "f9960d7ea3c5366a169626513e70ea1baa0247650f5e71bd05231cf71bc46b00",
-      "reason": "A frame-observation feature, off by default, forwarding to the engine's; only the Gallery turns it on (MATERIAL-PATCHES.md)."
-    },
     "src/events.rs": {
       "upstream_sha256": "250ba40e44975b282cd74797e76c96de6ef5bdcc537a8009f7e876c8a47ff239",
       "local_sha256": "0c73a383035a922a0665f3377a4698f593e63682342713f80eccbbdffe7365c3",
@@ -52,8 +46,8 @@
     },
     "src/window.rs": {
       "upstream_sha256": "eda543e585912fcb012e2a3559d8fb2e9ad7570ba58746747af380d044085cb8",
-      "local_sha256": "1c4bfbbf07461009f1f29aff563056467051a8e4df3d5c3fc88c5bf8a9667e72",
-      "reason": "update_ime_position moves the IME mirror to the caret, always on; successful_frame_submissions for the WindowSubmissionStats patch, behind the crate's frame-observation feature (MATERIAL-PATCHES.md)."
+      "local_sha256": "7a98321b4c1e1b3c1156cd9346baaefb64a5788383c737a600540eb2b5428e4f",
+      "reason": "update_ime_position moves the IME mirror to the caret, where a browser opens its candidate window (MATERIAL-PATCHES.md)."
     }
   },
   "added_files": {
@@ -68,7 +62,7 @@
       "reason": "Package-level lockfile not retained; the workspace Cargo.lock owns resolution."
     }
   },
-  "unchanged_file_count": 15,
+  "unchanged_file_count": 16,
   "provenance_files": [
     "MATERIAL-PATCHES.md",
     "SOURCE.json"

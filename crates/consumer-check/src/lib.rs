@@ -2,8 +2,8 @@
 use gpui_kit::profiler::FrameEvent;
 
 /// The engine's profiler events stay upstream's: this match is exhaustive only
-/// while the dev-only `frame-observation` feature is off, which is also what
-/// lets `gpui-fps` (linked below) compile.
+/// while no patch adds an event, which is also what lets `gpui-fps` (linked
+/// below) compile.
 pub fn event_is_draw(event: FrameEvent) -> bool {
     match event {
         FrameEvent::Draw(_) => true,
