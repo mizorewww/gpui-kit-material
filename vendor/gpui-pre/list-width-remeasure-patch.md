@@ -56,5 +56,5 @@ Tests: `test_width_change_measures_only_around_the_viewport_first`,
 `test_wheel_during_deferred_measurement`, in both engines.
 
 Behavior only; no API is added. Consumers need this patch for long `TextView`s to
-resize smoothly: `docs/ARCHITECTURE.md`, Consumer patch set. Not yet offered
-upstream.
+resize smoothly: `docs/ARCHITECTURE.md`, Consumer patch set. Offered upstream as
+longbridge/gpui-fast#129.
