@@ -8,97 +8,82 @@ How the crates reach crates.io. What a release must meet is in
 1. `gpui-kit-material-color` 0.1.0: published, tag `color-v0.1.0`.
 2. `gpui-material-symbols` 0.1.0 and its four data crates: published from
    [gpui-material-symbols](https://github.com/mizorewww/gpui-material-symbols).
-3. A `gpui-kit` release containing every Base API the library calls (below).
+3. `gpui-kit` 0.9.1 (2026-11-09, tag `v0.9.1`), with every Base API the library calls:
+   released, with `gpui-fast` 0.1.14 and `gpui-pre` 0.3.12.
 4. `gpui-kit-material` 0.1.0, on that release and nothing patched.
 
-## What the library still needs from Kit
+## What the library needs from Kit
 
-`scripts/check-registry-consumer.sh` builds the packaged crate as crates.io would
-receive it. On 2026-11-08 it failed as follows.
+Nothing unreleased. The workspace depends on crates.io `gpui-kit` and `gpui-base` 0.9.1,
+with no Git source, and `scripts/check-registry-consumer.sh` builds the packaged crate as
+crates.io would receive it, with no `[patch]`, natively and for
+`wasm32-unknown-unknown` (2026-11-09). The browser build needs a nightly toolchain, as
+Kit's own WebAssembly guide says: published Kit enables its Web platforms' default
+`multithreaded` feature, whose `wasm_thread` uses `#![feature]`, so on stable 1.98 it
+fails in `wasm_thread`, not in this library. The workspace's `vendor/gpui-kit` manifest
+keeps the Gallery single-threaded on stable. The Base APIs 0.9.0 lacked (`ReducedMotion`,
+`Transition::reduced_motion`, `TransitionState`, `SliderState::accessibility_step` and
+`step_thumb`, `Slider::track_focus`, `Toolbar::axis`, `TimeField::separator`,
+`Dialog::accessibility_label`) are all in 0.9.1.
 
-Against crates.io `gpui-kit`/`gpui-base` 0.9.0, 18 errors:
+## What stays vendored, and why
 
-| Missing in 0.9.0 | Upstream |
-| --- | --- |
-| `ReducedMotion`, `Transition::reduced_motion` | gpui-kit#3839, merged, unreleased |
-| `SliderState::accessibility_step`, `step_thumb` | gpui-kit#3840, merged, unreleased |
-| `Slider::track_focus` | #3824, merged after 0.9.0 |
-| `Toolbar::axis` | #3821, merged after 0.9.0 |
-| `TimeField::separator` | #3829, merged after 0.9.0 |
-| `Dialog::accessibility_label` | #3826, merged after 0.9.0 |
-| `TransitionState` | gpui-kit#3841, merged, unreleased |
+None of it is needed to build the library; it is the Gallery's engine, and the optional
+patch set of the README's Git quick start ([ARCHITECTURE.md](ARCHITECTURE.md#consumer-patch-set)).
 
-Against Kit `main` (`8da4e005`, which merges #3841), unpatched, the packaged library
-builds (`scripts/check-registry-consumer.sh --kit-git 8da4e005258ac0aac9a6a332cce746eeaafa08a8`,
-2026-11-08). Everything the library calls is in Kit `main`; the only remaining blocker
-is a Kit release. Plan B, Material's own playback on branch
-`release/transition-playback-internal`, is no longer needed.
+| Vendored | On | Why it is still vendored |
+| --- | --- | --- |
+| `gpui-kit` | crates.io 0.9.1 source, unchanged | Its manifest keeps WASM single-threaded by default; published Kit enables the Web platforms' `multithreaded` default. |
+| `gpui-fast` | crates.io 0.1.14 | Hanging overflow spaces (`src/text_system/line_layout.rs`, `line_wrapper.rs`), waiting on zed-industries/zed#66644; a `measure_all` list's measurement after a width change (`src/elements/list.rs`, `vendor/gpui-pre/list-width-remeasure-patch.md`), to be offered upstream; test-harness repairs and `try_update` for the deprecated `fetch_update`. |
+| `gpui-fast-apple` | crates.io 0.1.14 | Its `font_fallback` regression test with the Gallery's fonts, and a warning fix; no runtime change. |
+| `gpui-pre` | crates.io 0.3.12 | The two `gpui-fast` behavior patches above, and the lazy tab-stop index and `em` metrics that gpui-fast has upstream, for the upstream backend, which has no PR channel of its own; test-harness repairs; `try_update`. |
+| `gpui-pre-apple`, `gpui-pre-web` | crates.io 0.3.12 | Fallback and `sbix` fonts, and the browser IME, for the upstream backend; gpui-fast 0.1.14 has them upstream. |
 
-Nothing else in `vendor/` is needed to build the library: the unpatched build above
-used crates.io `gpui-fast` 0.1.13. The engine patches change behavior only or are
-dev-only (ARCHITECTURE.md, Consumer patch set).
+Every Material gpui-fast PR (#104–#106, #108–#115, #119) is in gpui-fast 0.1.14, so
+`gpui-fast-macos`, `-linux`, `-windows`, `-wgpu` and `-web` are no longer vendored: they
+come from crates.io 0.1.14 (`-wgpu`'s test-harness repairs only mattered to its own tests,
+which this workspace does not run). `scripts/vendor-gpui-fast.py --published <version>`
+records the vendored gpui-fast crates against a release's archives; `--rev` still
+packages an unreleased commit with upstream's release step.
 
-## Engine patches after the release
+crates.io users get upstream wrapping, and lay out every item of a `measure_all` list in
+each frame its width changes, until those two patches are released upstream.
 
-Every gpui-fast PR of ours is merged on gpui-fast `main`; the latest release is
-0.1.13, without them. `vendor/gpui-fast*` already track `main` (`97439ecf`, produced by
-`scripts/vendor-gpui-fast.py`, which runs upstream's release renaming), so these changes
-now come from upstream and are no longer local patches. Once gpui-fast releases them,
-replace the vendored copies with that release and drop what is left of the patches below:
-
-| gpui-fast PR (now upstream) | Where it lives upstream |
-| --- | --- |
-| #104 wheel at limit | `gpui-fast`: `src/fast/layers/wheel.rs`, wheel part of `src/elements/div.rs` |
-| #105 hover freeze holds listeners | `gpui-fast`: `src/fast/layers/hover_freeze.rs`, hover part of `div.rs`, `window.rs`'s `release_unhovered` |
-| #106 splice forgets released entities | `gpui-fast`: `src/fast/splice.rs`, `EntityMap::is_alive` in `dependencies.rs` and `entity_map.rs` |
-| #108, #109, #110 web IME position, keys, surrogate pairs | `gpui-fast-web`: `src/ime_mirror.rs`, `src/events.rs`, `src/ime_edit.rs`, IME part of `src/window.rs` |
-| #111, #112 macOS fonts without `m`, app fonts in fallback cascades | `gpui-fast-apple`: `src/text_system.rs`, `src/open_type.rs`, `tests/font_fallback.rs` |
-| #119 `sbix` color fonts | `gpui-fast-apple`: `src/fast/color_bitmap_fonts.rs`, its part of `src/text_system.rs` |
-| #113 lazy tab stops | `gpui-fast`: `src/tab_stop.rs` |
-| #114 tracked entities | `gpui-fast`: `App::record_entities_accessed` in `src/app.rs` |
-| #115 em without `m` | `gpui-fast`: `src/text_system.rs` |
-
-Not offered upstream, behavior only: hanging overflow spaces
-(`src/text_system/line_layout.rs`, `line_wrapper.rs`), a wrapping change kept for the
-Gallery (waiting on zed-industries/zed#66644); crates.io users get upstream wrapping.
-A `measure_all` list's measurement after a width change (`src/elements/list.rs`,
-`vendor/gpui-pre/list-width-remeasure-patch.md`) is to be offered upstream; until then
-crates.io users lay out every item of such a list in each frame its width changes.
-Kept local, no API: the test-harness repairs and fixtures (`gpui-fast-apple`'s
-`tests/font_fallback.rs` among them), a warning fix, and `try_update` for the
-deprecated `fetch_update`. The `-web`, `-macos`, `-linux` and `-windows` crates are
-unmodified copies of `main` (`-wgpu` differs only in test-harness repairs) and go with
-the release. Nothing vendored adds or changes
-engine API: the dev-only frame observation (CPU frame scopes, submission statistics,
-vsync control, presentation and GPU timing, the render lease) was dropped, since
-gpui-fast takes no API additions. The `gpui-pre*` patches mirror the remaining ones for
-the upstream backend, which has no PR channel of its own.
-
-## Before the release
+## Before a release
 
 ```sh
-scripts/check-registry-consumer.sh --dir "$(mktemp -d)" --kit-git <Kit main commit>
+scripts/check-registry-consumer.sh --dir "$(mktemp -d)"
+RUSTUP_TOOLCHAIN=nightly-2026-10-31 \
+    scripts/check-registry-consumer.sh --dir "$(mktemp -d)" --target wasm32-unknown-unknown
 ```
 
-CI's `release-readiness` job runs this against Kit's `main` on every push. It may
-fail without failing CI until Kit releases.
+The browser check uses the nightly Kit 0.9.1's WebAssembly build names (`crates/story-web/rust-toolchain.toml`).
+
+CI's `release-readiness` job runs both on every push, and its `package` job runs
+`cargo publish --dry-run` of each library crate. To preview a Kit that is not released,
+`--kit-git <Kit commit>` takes `gpui-kit` and `gpui-base` from Kit's Git at that commit.
 
 ## Release day
 
-1. Kit has released. Set the root `Cargo.toml`'s `gpui-kit` to that release's registry
-   version, without `git`/`rev`, and `gpui-base` to the same version. Drop the
-   `[patch."https://github.com/longbridge/gpui-kit"]` table and the `gpui-base` Git
-   patch; re-vendor `vendor/gpui-kit` for the Gallery at the released source
-   (`SOURCE.json`).
+1. Kit has released what the library calls. Set the root `Cargo.toml`'s `gpui-kit` and
+   `gpui-base` to that release's registry version, without `git`/`rev`, and drop any Kit
+   Git `[patch]`. Re-vendor `vendor/gpui-kit` at the released source
+   (`vendor/gpui-kit/normalize-manifest.py`, `SOURCE.json`), and move the vendored engine
+   crates to the release Kit names (`scripts/vendor-gpui-fast.py --published`), dropping
+   every crate that no longer carries a local change.
 2. Update `crates/material/README.md`'s and the root README's `gpui-kit = "…"` line.
 3. `scripts/check-registry-consumer.sh --dir "$(mktemp -d)"` passes, natively and
-   with `--target wasm32-unknown-unknown`.
+   with `--target wasm32-unknown-unknown` (on Kit's nightly while published Kit builds
+   its Web platform multithreaded).
 4. `cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D warnings`,
    `cargo test --workspace`, `scripts/check-package.sh`, `scripts/check-features.sh`;
    CI green.
-5. In CHANGELOG.md, turn the 0.1.0 summary under Unreleased into
-   `## gpui-kit-material 0.1.0 (date)`. Update the README's crates table and quick start.
+5. In CHANGELOG.md, turn the summary under Unreleased into
+   `## gpui-kit-material <version> (date)`. Update the README's crates table and quick start.
 6. `cargo publish --dry-run -p gpui-kit-material`, then `cargo publish -p gpui-kit-material`.
-7. Tag the commit `material-v0.1.0` and push the tag.
+7. Tag the commit `material-v<version>` and push the tag.
+
+For 0.1.0, steps 1–6's dry run are done (2026-11-09, Kit 0.9.1); what remains is
+`cargo publish -p gpui-kit-material` and the `material-v0.1.0` tag.
 
 The Gallery, gallery-web, benches and consumer-check stay `publish = false`.

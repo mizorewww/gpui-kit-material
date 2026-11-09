@@ -5,13 +5,14 @@ commit messages.
 
 ## Unreleased
 
-`gpui-kit-material-color` 0.1.0 is on crates.io (tag `color-v0.1.0`, 2026-11-08).
-`gpui-kit-material` is distributed by Git revision until its first crates.io release,
-0.1.0, which waits for a `gpui-kit` release ([docs/RELEASING.md](docs/RELEASING.md));
-see the [quick start](README.md#quick-start). The entries below are changes since
-earlier Git revisions.
+Nothing yet.
 
-### gpui-kit-material 0.1.0, the first crates.io release
+## gpui-kit-material 0.1.0 (2026-11-09)
+
+The first crates.io release of `gpui-kit-material`, on `gpui-kit` 0.9.1
+(`gpui-material-symbols` 0.1, `gpui-kit-material-color` 0.1). `gpui-kit-material-color`
+0.1.0 was published on 2026-11-08 (tag `color-v0.1.0`). Earlier versions were
+distributed by Git revision; the entries below are changes since those revisions.
 
 - Material 3 / M3 Expressive over Longbridge GPUI Kit: Kit's `gpui-component` controls
   and Base parts own behavior, this crate owns Material visuals and motion.
@@ -27,7 +28,8 @@ earlier Git revisions.
   `adaptive`, `window-chrome`, `shapes`), all on by default; the GPUI Fast backend by
   default, upstream GPUI without it.
 - Pre-release: no component is stable yet ([docs/COVERAGE.md](docs/COVERAGE.md)).
-- `rust-version` 1.98. Builds on published crates only, with no `[patch]`.
+- `rust-version` 1.98. Builds on published crates only (`gpui-kit` 0.9.1, `gpui-fast`
+  0.1.14, `gpui-pre` 0.3.12), with no `[patch]`.
 
 ### Added
 
@@ -39,7 +41,8 @@ earlier Git revisions.
 - Cargo feature groups on `gpui-kit-material`, with `full` naming every group; see the
   [README](README.md#crates). `default` still enables everything.
 - A `dynamic` feature on `gpui-kit-material-color`, on by default.
-- A published `[patch]` block for downstream workspaces, built from Git by CI.
+- A published `[patch]` block for downstream workspaces that want the Gallery's engine
+  patches, built from Git by CI.
 - `rust-version` 1.98, the oldest toolchain this workspace is verified with; Rust 1.97
   lacks `Option::map_or_default`, which the published macOS backend uses.
 - `[package.metadata.docs.rs]`, `deny.toml`, and CI checks of what each package ships.
