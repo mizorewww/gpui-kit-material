@@ -95,6 +95,7 @@ pub struct ConnectedButtonGroup {
     options: Vec<OptionItem>,
     icons: BTreeMap<SharedString, Icon>,
     full_width: bool,
+    fit_content: bool,
     segmented: bool,
     label_text_size: Option<Rems>,
     height: Option<Rems>,
@@ -127,6 +128,7 @@ impl ConnectedButtonGroup {
             options: Vec::new(),
             icons: BTreeMap::new(),
             full_width: false,
+            fit_content: false,
             segmented: false,
             label_text_size: None,
             height: None,
@@ -261,11 +263,24 @@ impl ConnectedButtonGroup {
         self.full_width = true;
         self
     }
-    /// Connected segments that fill the parent, with persistent option icons.
+    /// Connected segments that fill the parent (as wide as their options with
+    /// [`Self::fit_content`]), with persistent option icons.
     /// Radio/tab semantics, focus navigation and pointer feedback are unchanged.
     pub fn segmented(mut self) -> Self {
         self.segmented = true;
         self.full_width = true;
+        self
+    }
+    /// Size the group to its options, as a toolbar's view switch is, instead of
+    /// filling the parent; [`Self::segmented`] keeps its icons and height.
+    /// Without it a segmented or [`Self::full_width`] group fills its parent.
+    ///
+    /// In a flex row the group is then as wide as its options. A flex column
+    /// stretches its children across by default, so a caller placing the group
+    /// in one aligns it (`items_start`, `items_center`) or gives it a parent
+    /// that does not stretch.
+    pub fn fit_content(mut self) -> Self {
+        self.fit_content = true;
         self
     }
     /// Override option text for a page-specific typography role.
@@ -723,7 +738,8 @@ impl RenderOnce for ConnectedButtonGroup {
         metrics.height = (metrics.height + self.density.offset()).max(0.);
         let vertical = self.vertical;
         metrics.vertical = vertical;
-        let equal = self.equal_widths && !vertical && !self.full_width;
+        let fill = self.full_width && !self.fit_content;
+        let equal = self.equal_widths && !vertical && !fill;
         // A slot measures no less than the widest width it is given, so what
         // makes an option's own width change has to start the measure over.
         let measured_for = equal.then(|| {
@@ -762,7 +778,6 @@ impl RenderOnce for ConnectedButtonGroup {
             Some(height) => height.to_pixels(window.rem_size()),
             None => rem(metrics.height).to_pixels(window.rem_size()),
         };
-        let fill = self.full_width;
         let icon_size = rem(metrics.icon);
         let variant = self.variant;
         let tone = self.tone;
@@ -1406,6 +1421,59 @@ mod tests {
         }
     }
 
+    /// A toolbar: a search box that takes the rest of the row, then a row of actions
+    /// with a view switch among them.
+    struct ToolbarHarness {
+        segmented: bool,
+        fit: bool,
+    }
+
+    impl Render for ToolbarHarness {
+        fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+            use gpui::InteractiveElement as _;
+            window.set_rem_size(px(14.));
+            let group = ConnectedButtonGroup::new("toolbar-choice", "View")
+                .options([("cards", "Cards"), ("list", "List")])
+                .icon("cards", IconName::Info)
+                .icon("list", IconName::Info)
+                .selected("cards");
+            let group = if self.segmented {
+                group.segmented()
+            } else {
+                group
+            };
+            let group = if self.fit { group.fit_content() } else { group };
+            div()
+                .flex()
+                .flex_wrap()
+                .items_center()
+                .w(px(800.))
+                .gap(px(12.))
+                .child(
+                    div()
+                        .flex_1()
+                        .flex_basis(px(280.))
+                        .h(px(40.))
+                        .debug_selector(|| "toolbar-search".into()),
+                )
+                .child(
+                    div()
+                        .flex()
+                        .flex_wrap()
+                        .items_center()
+                        .gap(px(12.))
+                        .child(div().w(px(120.)).h(px(40.)))
+                        .child(group)
+                        .child(
+                            div()
+                                .w(px(40.))
+                                .h(px(40.))
+                                .debug_selector(|| "toolbar-after".into()),
+                        ),
+                )
+        }
+    }
+
     struct SegmentedHarness {
         selected: usize,
         changes: usize,
@@ -1904,6 +1972,40 @@ mod tests {
             window.draw(cx).clear(cx);
             assert_eq!(window.simulate_next_frame(cx), 0);
         });
+    }
+
+    /// A segmented group fills its parent; with `fit_content` it is a toolbar's view
+    /// switch: as wide as its options, beside the search, still segmented.
+    #[gpui::test]
+    fn a_fit_content_segmented_group_sizes_to_its_options(cx: &mut TestAppContext) {
+        let mut layout = |segmented, fit| {
+            let (_, cx) = cx.add_window_view(|_, _| ToolbarHarness { segmented, fit });
+            draw_choice(cx);
+            let options = ["content-choice-option-0", "content-choice-option-1"]
+                .map(|name| cx.debug_bounds(name));
+            (
+                choice_bounds(cx, "full-choice-track"),
+                choice_bounds(cx, "toolbar-search"),
+                choice_bounds(cx, "toolbar-after"),
+                options,
+            )
+        };
+        let (track, ..) = layout(true, false);
+        assert!(track.size.width > px(300.), "segmented fills: {track:?}");
+        let (plain, ..) = layout(false, false);
+        let (track, search, after, options) = layout(true, true);
+        let [Some(first), Some(second)] = options else {
+            panic!("a fitted group lays out its options by content: {options:?}");
+        };
+        assert_eq!(
+            track.size.width, plain.size.width,
+            "as wide as a connected group"
+        );
+        assert!((track.size.width - (second.right() - first.left())).abs() < px(0.5));
+        assert_eq!(first.size.height, px(48.), "still a segmented option");
+        // One row: the search, the switch, then the action after it.
+        assert!((track.center().y - search.center().y).abs() < px(1.));
+        assert!((after.left() - track.right() - px(12.)).abs() < px(0.5));
     }
 
     fn assert_equal_options(cx: &mut VisualTestContext, count: usize, width: Pixels) {

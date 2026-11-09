@@ -228,8 +228,9 @@ impl ColorRole {
 /// the error text roles.
 const TEXT_CONTRAST: f32 = 4.5;
 
-/// Every surface a palette scheme's error text and icons are painted on.
-const ERROR_GROUNDS: [ColorRole; 11] = [
+/// Every surface a scheme's status text and icons (error, warning, success)
+/// are painted on, besides the status's own container.
+const STATUS_SURFACES: [ColorRole; 10] = [
     ColorRole::SURFACE_DIM,
     ColorRole::SURFACE,
     ColorRole::SURFACE_BRIGHT,
@@ -240,8 +241,31 @@ const ERROR_GROUNDS: [ColorRole; 11] = [
     ColorRole::SURFACE_CONTAINER_HIGHEST,
     ColorRole::SURFACE_VARIANT,
     ColorRole::INSET,
-    ColorRole::ERROR_CONTAINER,
 ];
+
+/// The container of a status color (success, warning, error) on `surface`.
+///
+/// Its tone is that of `surface` blended 12% toward the status color, a quiet
+/// step from the surface, so every contrast against the container is the
+/// blend's. Its hue is the status color's, as M3 takes a container from its
+/// color's own tonal palette; a plain blend mixes the hues instead, and a warm
+/// warning on a cool dark surface lands on grey while success and error drift
+/// toward blue and purple. Its chroma is the status color's up to
+/// [`STATUS_CONTAINER_CHROMA`].
+fn status_container(surface: Color, status: Color) -> Color {
+    let tone = crate::dynamic::utils::lstar_from_argb(surface.blend(status, 0.12).to_argb());
+    Color::argb(crate::dynamic::at_tone_within(
+        status.to_argb(),
+        STATUS_CONTAINER_CHROMA,
+        tone,
+    ))
+}
+
+/// The most chroma a status container takes: that of M3's secondary palette
+/// in the tonal-spot scheme (material-color-utilities' `SchemeTonalSpot`,
+/// chroma 16), the palette its quiet secondary containers come from. A status
+/// color's full chroma at a container tone would outshout the content on it.
+const STATUS_CONTAINER_CHROMA: f64 = 16.;
 
 /// `color` if it reaches [`TEXT_CONTRAST`] on every ground; otherwise the
 /// nearest tone of its hue that does, lighter or darker as asked, or white or
@@ -331,11 +355,11 @@ impl Scheme {
                 hex(p.text).blend(hex(p.accent), if dark { 0.30 } else { 0.40 })
             }
             ColorRole::SUCCESS => hex(p.success),
-            ColorRole::SUCCESS_BG => tint(p.success, 0.12),
+            ColorRole::SUCCESS_BG => status_container(hex(p.surface), hex(p.success)),
             ColorRole::WARNING => hex(p.warning),
-            ColorRole::WARNING_BG => tint(p.warning, 0.12),
+            ColorRole::WARNING_BG => status_container(hex(p.surface), hex(p.warning)),
             ColorRole::ERROR => hex(p.danger),
-            ColorRole::ERROR_CONTAINER => tint(p.danger, 0.12),
+            ColorRole::ERROR_CONTAINER => status_container(hex(p.surface), hex(p.danger)),
             ColorRole::SELECTION => hex(p.selection),
             // Selected text: the accent laid over whatever surface holds the
             // text, so it stays visible on tinted panels.
@@ -405,7 +429,19 @@ impl Scheme {
             | ColorRole::TINT_PURPLE
             | ColorRole::ON_TINT_PURPLE => hex(0),
         });
-        Self { colors, dark }.with_readable_error().with_tints()
+        Self { colors, dark }
+            .with_readable_error()
+            .with_readable_status(
+                ColorRole::WARNING,
+                ColorRole::ON_WARNING,
+                ColorRole::WARNING_BG,
+            )
+            .with_readable_status(
+                ColorRole::SUCCESS,
+                ColorRole::ON_SUCCESS,
+                ColorRole::SUCCESS_BG,
+            )
+            .with_tints()
     }
 
     /// Move the error roles to a tone that reads where they are painted,
@@ -428,12 +464,27 @@ impl Scheme {
     /// 5.75 to 6.81:1 and could only reach 7:1 by darkening error further;
     /// dark palettes already exceed 7:1.
     fn with_readable_error(self) -> Self {
-        let grounds = ERROR_GROUNDS.map(|role| self.get(role));
-        let error = readable(self.get(ColorRole::ERROR), &grounds, self.dark);
-        let on_error = readable(self.get(ColorRole::ON_ERROR), &[error], !self.dark);
-        self.with_role(ColorRole::ERROR, error)
-            .with_role(ColorRole::ON_ERROR_CONTAINER, error)
-            .with_role(ColorRole::ON_ERROR, on_error)
+        let scheme = self.with_readable_status(
+            ColorRole::ERROR,
+            ColorRole::ON_ERROR,
+            ColorRole::ERROR_CONTAINER,
+        );
+        scheme.with_role(ColorRole::ON_ERROR_CONTAINER, scheme.get(ColorRole::ERROR))
+    }
+
+    /// Move a status color to a tone of its hue that reads 4.5:1 on every surface
+    /// and on its own container, and its on-color to one that reads on it, as
+    /// [`Self::with_readable_error`] does for error. A status chip and a warning
+    /// notice paint the status as text on its container: a palette's warning or
+    /// success is designed for its own background, and some fell short on the
+    /// derived ones (Tokyo Day's warning read 3.58:1 on its container, Catppuccin
+    /// Latte's success 3.54:1). A status that already reads is kept.
+    fn with_readable_status(self, status: ColorRole, on: ColorRole, container: ColorRole) -> Self {
+        let mut grounds = STATUS_SURFACES.map(|role| self.get(role)).to_vec();
+        grounds.push(self.get(container));
+        let color = readable(self.get(status), &grounds, self.dark);
+        let on_color = readable(self.get(on), &[color], !self.dark);
+        self.with_role(status, color).with_role(on, on_color)
     }
 
     /// Derive every [`TintFamily`]'s roles from the scheme's surface, text and primary.
@@ -475,9 +526,9 @@ impl Scheme {
             .with_role(ColorRole::CARD_LINE, scheme.get(ColorRole::OUTLINE_VARIANT))
             .with_role(
                 ColorRole::SUCCESS_BG,
-                surface.blend(scheme.get(ColorRole::SUCCESS), 0.12),
+                status_container(surface, scheme.get(ColorRole::SUCCESS)),
             )
-            .with_role(ColorRole::WARNING_BG, surface.blend(warning, 0.12))
+            .with_role(ColorRole::WARNING_BG, status_container(surface, warning))
             .with_role(ColorRole::FIND_HIGHLIGHT, surface.blend(warning, 0.16))
             .with_role(ColorRole::FIND_CURRENT, surface.blend(warning, 0.32))
             .with_role(ColorRole::FIND_CURRENT_LINE, warning)
@@ -579,7 +630,10 @@ mod tests {
         for id in ALL {
             let scheme = Scheme::from_palette(id);
             let error = scheme.get(ColorRole::ERROR);
-            for ground in ERROR_GROUNDS {
+            for ground in STATUS_SURFACES
+                .into_iter()
+                .chain([ColorRole::ERROR_CONTAINER])
+            {
                 let ratio = contrast(error, scheme.get(ground));
                 assert!(ratio >= 4.5, "{} error on {ground:?}: {ratio}", id.name());
             }
@@ -589,6 +643,64 @@ mod tests {
             ] {
                 let ratio = contrast(scheme.get(content), scheme.get(container));
                 assert!(ratio >= 4.5, "{} {content:?}: {ratio}", id.name());
+            }
+        }
+    }
+
+    /// Warning and success read as text, 4.5:1, on their own containers and their
+    /// on-colors on them, in every palette, seed scheme and reference theme in
+    /// every mode and contrast; in palettes and seed schemes they also read on
+    /// every surface, as error does in [`Scheme::with_readable_error`].
+    ///
+    /// A reference theme's warning and success are md3.io's own values, which the
+    /// kit reproduces exactly (`themes::tests`), and at medium and high contrast
+    /// its light surfaces darken under them: md3.io's warning reads 3.3:1 on
+    /// surface-dim in a light high-contrast theme. Only the container, which the
+    /// kit derives, is held for those.
+    #[test]
+    fn warning_and_success_text_read_on_their_containers_and_surfaces() {
+        use crate::themes::{Contrast, ThemeMode};
+        let mut schemes: Vec<_> = every_kind_of_scheme()
+            .into_iter()
+            .filter(|(name, _)| !name.starts_with("baseline"))
+            .map(|(name, scheme)| (name, scheme, true))
+            .collect();
+        for theme in crate::themes::ALL {
+            for mode in [ThemeMode::Light, ThemeMode::Dark] {
+                for level in [Contrast::Standard, Contrast::Medium, Contrast::High] {
+                    schemes.push((
+                        format!("{} {mode:?} {level:?}", theme.name()),
+                        theme.scheme(mode, level),
+                        false,
+                    ));
+                }
+            }
+        }
+        for (name, scheme, on_surfaces) in schemes {
+            for (status, on, container) in [
+                (
+                    ColorRole::WARNING,
+                    ColorRole::ON_WARNING,
+                    ColorRole::WARNING_BG,
+                ),
+                (
+                    ColorRole::SUCCESS,
+                    ColorRole::ON_SUCCESS,
+                    ColorRole::SUCCESS_BG,
+                ),
+            ] {
+                let ink = scheme.get(status);
+                let surfaces = if on_surfaces {
+                    &STATUS_SURFACES[..]
+                } else {
+                    &[]
+                };
+                for &ground in surfaces.iter().chain([&container]) {
+                    let ratio = contrast(ink, scheme.get(ground));
+                    assert!(ratio >= 4.5, "{name} {status:?} on {ground:?}: {ratio}");
+                }
+                let ratio = contrast(scheme.get(on), ink);
+                assert!(ratio >= 4.5, "{name} {on:?} on {status:?}: {ratio}");
             }
         }
     }
@@ -605,6 +717,49 @@ mod tests {
             );
             let shift = crate::dynamic::utils::difference_degrees(hue(from), hue(to));
             assert!(shift < 4., "{}: {shift}", id.name());
+        }
+    }
+
+    /// A status container is a tint of its status, not of the surface under it:
+    /// Ink's warm warning on its cool surface once blended to a grey, and success
+    /// and error drifted toward blue and purple. It stays a quiet step from the
+    /// surface, and the status reads on it as it did on the blend.
+    #[cfg(feature = "dynamic")]
+    #[test]
+    fn status_containers_keep_their_status_hue_in_every_scheme() {
+        use crate::dynamic::Hct;
+        for (name, scheme) in every_kind_of_scheme() {
+            let palette = ALL.iter().any(|id| id.name() == name);
+            let mut pairs = vec![
+                (ColorRole::SUCCESS_BG, ColorRole::SUCCESS),
+                (ColorRole::WARNING_BG, ColorRole::WARNING),
+            ];
+            // Reference themes keep M3's own error container.
+            if palette {
+                pairs.push((ColorRole::ERROR_CONTAINER, ColorRole::ERROR));
+            }
+            let surface = scheme.get(ColorRole::SURFACE);
+            for (container, status) in pairs {
+                let (tint, ink) = (scheme.get(container), scheme.get(status));
+                let (tint_hct, ink_hct) = (
+                    Hct::from_argb(tint.to_argb()),
+                    Hct::from_argb(ink.to_argb()),
+                );
+                let shift =
+                    crate::dynamic::utils::difference_degrees(tint_hct.hue(), ink_hct.hue());
+                assert!(shift < 15., "{name} {container:?}: hue moved {shift}");
+                // Tinted (a light tone holds less chroma than the cap), never loud.
+                assert!(
+                    (6. ..=STATUS_CONTAINER_CHROMA + 1.).contains(&tint_hct.chroma()),
+                    "{name} {container:?}: chroma {}",
+                    tint_hct.chroma()
+                );
+                let ratio = contrast(tint, surface);
+                assert!(
+                    (1.02..1.4).contains(&ratio),
+                    "{name} {container:?}: {ratio} from the surface"
+                );
+            }
         }
     }
 

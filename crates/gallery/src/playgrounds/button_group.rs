@@ -1,8 +1,9 @@
 //! Button group playground: md3.io's Button group configuration (kind,
-//! variant, size, square shape, orientation, density, equal widths, items,
+//! variant, size, square shape, orientation, density, equal widths, width, items,
 //! content, labels, selection, required selection, disabled) on the real
 //! `ButtonGroup` (standard: toggle buttons that widen when pressed) and
-//! `ConnectedButtonGroup` (connected shapes). Clicking options selects them
+//! `ConnectedButtonGroup` (connected shapes, or segments that fill the preview
+//! or, as a toolbar's view switch, fit their options). Clicking options selects them
 //! under the chosen selection rule.
 use super::prelude::*;
 
@@ -87,7 +88,7 @@ pub static PLAYGROUND: Playground = Playground {
                 Control::Segmented {
                     id: "kind",
                     label: "Kind",
-                    options: &["standard", "connected"],
+                    options: &["standard", "connected", "segmented"],
                     default: 1,
                 },
                 Control::Select {
@@ -128,6 +129,14 @@ pub static PLAYGROUND: Playground = Playground {
                     id: "equal",
                     label: "Equal widths",
                     default: false,
+                },
+                // A connected group fits its options unless it fills; a segmented
+                // one fills unless it fits.
+                Control::Segmented {
+                    id: "width",
+                    label: "Width",
+                    options: &["content", "fill"],
+                    default: 0,
                 },
             ],
         },
@@ -251,6 +260,8 @@ fn preview(
     let variant = VARIANTS[config.choice("variant")];
     let tone = ButtonTone::ALL[config.choice("tone")];
     let id = ElementId::from(("playground-button-group", items_index));
+    let segmented = config.option("kind") == "segmented";
+    let fill = config.option("width") == "fill" && config.option("kind") != "standard";
     let report = {
         let demo = demo.clone();
         std::rc::Rc::new(move |value: &SharedString, cx: &mut App| {
@@ -322,6 +333,12 @@ fn preview(
             .equal_widths(equal)
             .disabled(disabled)
             .options(items.options.iter().map(|&(label, _)| (label, label)))
+            .map(|group| match (segmented, fill) {
+                (true, true) => group.segmented(),
+                (true, false) => group.segmented().fit_content(),
+                (false, true) => group.full_width(),
+                (false, false) => group,
+            })
             .labels(match (text, labels_selected) {
                 (false, _) => GroupLabels::Never,
                 (true, true) => GroupLabels::Selected,
@@ -353,10 +370,12 @@ fn preview(
         .flex()
         .flex_col()
         .items_center()
+        .when(fill, |preview| preview.w_full())
         .gap(rem(16.))
         .child(
             div()
                 .flex()
+                .when(fill, |frame| frame.w_full())
                 .debug_selector(|| "playground-button-group".into())
                 .child(group),
         )
@@ -396,6 +415,12 @@ fn code(config: &Config) -> String {
         (config.option("orientation") == "vertical").then(|| "vertical(true)".into()),
         (density != 0).then(|| format!("density(ButtonDensity::{})", DENSITY_NAMES[density])),
         config.bool("equal").then(|| "equal_widths(true)".into()),
+        match (config.option("kind"), config.option("width")) {
+            ("segmented", "fill") => Some("segmented()".into()),
+            ("segmented", _) => Some("segmented()\n.fit_content()".into()),
+            ("connected", "fill") => Some("full_width()".into()),
+            _ => None,
+        },
     ];
     let initial = |count: usize| {
         let values: Vec<String> = items.selected[..count.min(items.selected.len())]
@@ -611,6 +636,25 @@ mod tests {
         assert!(column.size.width < row.size.width);
     }
 
+    /// A segmented group fills the preview unless it fits its options, the
+    /// width a connected group has.
+    #[gpui::test]
+    fn segments_fill_or_fit_their_options(cx: &mut TestAppContext) {
+        let mut h = open(&PLAYGROUND, cx);
+        let connected = h.bounds("playground-button-group");
+        h.set("kind", Value::Choice(2));
+        let fitted = h.bounds("playground-button-group");
+        assert_eq!(fitted.size.width, connected.size.width);
+        h.set("width", Value::Choice(1));
+        let filled = h.bounds("playground-button-group");
+        assert!(filled.size.width > fitted.size.width * 1.5, "{filled:?}");
+        h.set("kind", Value::Choice(1));
+        assert_eq!(
+            h.bounds("playground-button-group").size.width,
+            filled.size.width
+        );
+    }
+
     #[test]
     fn the_code_follows_the_configuration() {
         let mut config = Config::defaults(&PLAYGROUND);
@@ -625,6 +669,25 @@ mod tests {
             "{code}"
         );
         assert!(!code.contains(".vertical("));
+        assert!(
+            !code.contains("width") && !code.contains("segmented"),
+            "{code}"
+        );
+        config.set("kind", Value::Choice(2));
+        assert!(
+            super::code(&config).contains(".segmented()\n    .fit_content()"),
+            "{}",
+            super::code(&config)
+        );
+        config.set("width", Value::Choice(1));
+        let code = super::code(&config);
+        assert!(
+            code.contains(".segmented()") && !code.contains("fit_content"),
+            "{code}"
+        );
+        config.set("kind", Value::Choice(1));
+        assert!(super::code(&config).contains(".full_width()"));
+        config.set("width", Value::Choice(0));
         config.set("orientation", Value::Choice(1));
         assert!(super::code(&config).contains(".vertical(true)"));
         config.set("kind", Value::Choice(0));

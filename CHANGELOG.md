@@ -101,6 +101,9 @@ earlier Git revisions.
   layers, ripple and focus ring, as a navigation drawer's active indicator. It changes the
   shape only; the resting `container` is still painted.
 
+- `ConnectedButtonGroup::fit_content`: a segmented or full-width group is as wide as its
+  options, like a toolbar's view switch, instead of filling its parent.
+
 ### Changed
 
 - Kit `main` `8da4e005` (gpui-kit#3841 merged). A Git consumer patches crates.io
@@ -191,6 +194,18 @@ earlier Git revisions.
 
 ### Fixed
 
+- An `ExposedDropdown` whose value is too long for the field, and ends in an ellipsis, shows
+  the whole value in a plain tooltip on the field (with the `feedback` feature), on hover
+  or keyboard focus, and not while its menu is open. A value that fits gets no tooltip.
+- A palette's warning and success read 4.5:1 as text on every surface and on their own
+  containers, and their on-colors on them, as error already did: where they fell short they
+  move in tone, keeping their hue (Tokyo Day's warning `#8c6c3e` is now `#74562a`; Paper,
+  Nord Snow, Catppuccin Latte and Nord also move). Reference themes keep md3.io's values.
+- Status containers (`WARNING_BG`, `SUCCESS_BG`, and a palette's `ERROR_CONTAINER`) take
+  their status color's hue, with chroma up to 16 (M3's tonal-spot secondary), at the tone the
+  12% blend toward it gave them. The blend mixed hues: on a dark palette's cool surface a
+  warning container was grey and success and error leaned blue and purple. Contrast against
+  the containers is unchanged. Reference themes keep M3's own error container.
 - A long Base `TextView`, or any `measure_all` list, resizes without laying out every item
   in each frame the width changes (patched `gpui-pre` and `gpui-fast`): that frame lays
   out the items shown, the rest keep estimated heights and are measured over the next

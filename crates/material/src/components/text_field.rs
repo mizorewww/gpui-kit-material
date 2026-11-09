@@ -33,6 +33,7 @@ use gpui_kit::component::{
     Sizable as _, Size,
     input::{Input, Textarea},
 };
+use std::{cell::Cell, rc::Rc};
 
 /// Container height of a single-line field.
 pub const TEXT_FIELD_HEIGHT: f32 = 56.;
@@ -259,6 +260,8 @@ pub struct TextField {
     input_type: Option<TextFieldInputType>,
     float_label: bool,
     preview: Option<InteractionPreview>,
+    /// Where a specimen reports whether its value is cut short by its ellipsis.
+    value_clipped: Option<Rc<Cell<bool>>>,
     style: StyleRefinement,
 }
 
@@ -277,6 +280,14 @@ impl TextField {
     /// that render many fields in forced states without an editor each.
     pub fn specimen(id: impl Into<ElementId>, value: impl Into<SharedString>) -> Self {
         Self::with_input(id, FieldInput::Static(value.into()))
+    }
+
+    /// Report into `clipped`, each time the field is drawn, whether a specimen's
+    /// value is too long for it and ends in an ellipsis; the window refreshes
+    /// when that changes. An exposed dropdown shows the whole value as a tooltip then.
+    pub(crate) fn report_value_clipped(mut self, clipped: Rc<Cell<bool>>) -> Self {
+        self.value_clipped = Some(clipped);
+        self
     }
 
     fn with_input(id: impl Into<ElementId>, input: FieldInput) -> Self {
@@ -298,6 +309,7 @@ impl TextField {
             disabled: false,
             read_only: false,
             required: false,
+            value_clipped: None,
             input_type: None,
             float_label: false,
             preview: None,
@@ -1024,11 +1036,16 @@ impl RenderOnce for TextField {
             )
             .ink(caret, selection, cx)
             .into_any_element(),
-            FieldInput::Static(value) => static_value(
-                value,
-                self.input_type.is_some_and(TextFieldInputType::masked),
-            )
-            .into_any_element(),
+            FieldInput::Static(value) => {
+                let masked = self.input_type.is_some_and(TextFieldInputType::masked);
+                let line = static_value(value, masked);
+                match self.value_clipped.clone().filter(|_| !masked) {
+                    Some(clipped) => {
+                        report_clipped(line, value.clone(), clipped).into_any_element()
+                    }
+                    None => line.into_any_element(),
+                }
+            }
         };
         let placeholder = self.placeholder.clone().filter(|_| show_placeholder);
         let input_row = div()
@@ -1245,12 +1262,42 @@ fn outline(
 
 /// A specimen's value on its one line, masked as bullets for a password type:
 /// too long for the field, it ends in an ellipsis rather than stopping
-/// mid-letter at the field's edge.
+/// mid-letter at the field's edge. Line breaks in it read as spaces.
 fn static_value(value: &SharedString, masked: bool) -> Div {
     div().flex_1().min_w_0().truncate().child(if masked {
         SharedString::from("\u{2022}".repeat(value.chars().count()))
     } else {
+        one_line(value)
+    })
+}
+
+/// `value` with each line break as a space: the line a single-line field shows,
+/// and the one text shaping can measure (it takes no line breaks).
+fn one_line(value: &SharedString) -> SharedString {
+    if value.contains(['\n', '\r']) {
+        value.replace("\r\n", " ").replace(['\n', '\r'], " ").into()
+    } else {
         value.clone()
+    }
+}
+
+/// `line`, reporting into `clipped` whether `value`, shaped in the text style
+/// it inherits, is wider than the room the line is given.
+fn report_clipped(line: Div, value: SharedString, clipped: Rc<Cell<bool>>) -> impl IntoElement {
+    let value = one_line(&value);
+    super::prepaint_bounds::prepaint_bounds(line, move |bounds, window, _| {
+        let style = window.text_style();
+        let size = style.font_size.to_pixels(window.rem_size());
+        let run = style.to_run(value.len());
+        let width = window
+            .text_system()
+            .shape_line(value, size, &[run], None)
+            .width;
+        let now = width > bounds.size.width + px(0.5);
+        if clipped.replace(now) != now {
+            // `refresh` is ignored while drawing; the next frame shows the change.
+            window.request_animation_frame();
+        }
     })
 }
 
