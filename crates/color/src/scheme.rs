@@ -243,6 +243,30 @@ const ERROR_GROUNDS: [ColorRole; 11] = [
     ColorRole::ERROR_CONTAINER,
 ];
 
+/// The container of a status color (success, warning, error) on `surface`.
+///
+/// Its tone is that of `surface` blended 12% toward the status color, a quiet
+/// step from the surface, so every contrast against the container is the
+/// blend's. Its hue is the status color's, as M3 takes a container from its
+/// color's own tonal palette; a plain blend mixes the hues instead, and a warm
+/// warning on a cool dark surface lands on grey while success and error drift
+/// toward blue and purple. Its chroma is the status color's up to
+/// [`STATUS_CONTAINER_CHROMA`].
+fn status_container(surface: Color, status: Color) -> Color {
+    let tone = crate::dynamic::utils::lstar_from_argb(surface.blend(status, 0.12).to_argb());
+    Color::argb(crate::dynamic::at_tone_within(
+        status.to_argb(),
+        STATUS_CONTAINER_CHROMA,
+        tone,
+    ))
+}
+
+/// The most chroma a status container takes: that of M3's secondary palette
+/// in the tonal-spot scheme (material-color-utilities' `SchemeTonalSpot`,
+/// chroma 16), the palette its quiet secondary containers come from. A status
+/// color's full chroma at a container tone would outshout the content on it.
+const STATUS_CONTAINER_CHROMA: f64 = 16.;
+
 /// `color` if it reaches [`TEXT_CONTRAST`] on every ground; otherwise the
 /// nearest tone of its hue that does, lighter or darker as asked, or white or
 /// black when no tone of the hue reaches it.
@@ -331,11 +355,11 @@ impl Scheme {
                 hex(p.text).blend(hex(p.accent), if dark { 0.30 } else { 0.40 })
             }
             ColorRole::SUCCESS => hex(p.success),
-            ColorRole::SUCCESS_BG => tint(p.success, 0.12),
+            ColorRole::SUCCESS_BG => status_container(hex(p.surface), hex(p.success)),
             ColorRole::WARNING => hex(p.warning),
-            ColorRole::WARNING_BG => tint(p.warning, 0.12),
+            ColorRole::WARNING_BG => status_container(hex(p.surface), hex(p.warning)),
             ColorRole::ERROR => hex(p.danger),
-            ColorRole::ERROR_CONTAINER => tint(p.danger, 0.12),
+            ColorRole::ERROR_CONTAINER => status_container(hex(p.surface), hex(p.danger)),
             ColorRole::SELECTION => hex(p.selection),
             // Selected text: the accent laid over whatever surface holds the
             // text, so it stays visible on tinted panels.
@@ -475,9 +499,9 @@ impl Scheme {
             .with_role(ColorRole::CARD_LINE, scheme.get(ColorRole::OUTLINE_VARIANT))
             .with_role(
                 ColorRole::SUCCESS_BG,
-                surface.blend(scheme.get(ColorRole::SUCCESS), 0.12),
+                status_container(surface, scheme.get(ColorRole::SUCCESS)),
             )
-            .with_role(ColorRole::WARNING_BG, surface.blend(warning, 0.12))
+            .with_role(ColorRole::WARNING_BG, status_container(surface, warning))
             .with_role(ColorRole::FIND_HIGHLIGHT, surface.blend(warning, 0.16))
             .with_role(ColorRole::FIND_CURRENT, surface.blend(warning, 0.32))
             .with_role(ColorRole::FIND_CURRENT_LINE, warning)
@@ -605,6 +629,49 @@ mod tests {
             );
             let shift = crate::dynamic::utils::difference_degrees(hue(from), hue(to));
             assert!(shift < 4., "{}: {shift}", id.name());
+        }
+    }
+
+    /// A status container is a tint of its status, not of the surface under it:
+    /// Ink's warm warning on its cool surface once blended to a grey, and success
+    /// and error drifted toward blue and purple. It stays a quiet step from the
+    /// surface, and the status reads on it as it did on the blend.
+    #[cfg(feature = "dynamic")]
+    #[test]
+    fn status_containers_keep_their_status_hue_in_every_scheme() {
+        use crate::dynamic::Hct;
+        for (name, scheme) in every_kind_of_scheme() {
+            let palette = ALL.iter().any(|id| id.name() == name);
+            let mut pairs = vec![
+                (ColorRole::SUCCESS_BG, ColorRole::SUCCESS),
+                (ColorRole::WARNING_BG, ColorRole::WARNING),
+            ];
+            // Reference themes keep M3's own error container.
+            if palette {
+                pairs.push((ColorRole::ERROR_CONTAINER, ColorRole::ERROR));
+            }
+            let surface = scheme.get(ColorRole::SURFACE);
+            for (container, status) in pairs {
+                let (tint, ink) = (scheme.get(container), scheme.get(status));
+                let (tint_hct, ink_hct) = (
+                    Hct::from_argb(tint.to_argb()),
+                    Hct::from_argb(ink.to_argb()),
+                );
+                let shift =
+                    crate::dynamic::utils::difference_degrees(tint_hct.hue(), ink_hct.hue());
+                assert!(shift < 15., "{name} {container:?}: hue moved {shift}");
+                // Tinted (a light tone holds less chroma than the cap), never loud.
+                assert!(
+                    (6. ..=STATUS_CONTAINER_CHROMA + 1.).contains(&tint_hct.chroma()),
+                    "{name} {container:?}: chroma {}",
+                    tint_hct.chroma()
+                );
+                let ratio = contrast(tint, surface);
+                assert!(
+                    (1.02..1.4).contains(&ratio),
+                    "{name} {container:?}: {ratio} from the surface"
+                );
+            }
         }
     }
 

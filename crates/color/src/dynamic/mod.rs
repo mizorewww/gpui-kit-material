@@ -60,3 +60,11 @@ pub(crate) fn at_tone(argb: u32, tone: f64) -> u32 {
     let hct = hct::Hct::from_argb(argb);
     hct::Hct::from_hct(hct.hue(), hct.chroma(), tone).argb()
 }
+
+/// `argb`'s hue at `tone` (L*), with its chroma up to `max_chroma` and reduced
+/// further where that tone cannot hold it. Not part of the upstream port: the
+/// scheme uses it for status containers.
+pub(crate) fn at_tone_within(argb: u32, max_chroma: f64, tone: f64) -> u32 {
+    let hct = hct::Hct::from_argb(argb);
+    hct::Hct::from_hct(hct.hue(), hct.chroma().min(max_chroma), tone).argb()
+}

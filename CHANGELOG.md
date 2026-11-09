@@ -191,6 +191,11 @@ earlier Git revisions.
 
 ### Fixed
 
+- Status containers (`WARNING_BG`, `SUCCESS_BG`, and a palette's `ERROR_CONTAINER`) take
+  their status color's hue, with chroma up to 16 (M3's tonal-spot secondary), at the tone the
+  12% blend toward it gave them. The blend mixed hues: on a dark palette's cool surface a
+  warning container was grey and success and error leaned blue and purple. Contrast against
+  the containers is unchanged. Reference themes keep M3's own error container.
 - A long Base `TextView`, or any `measure_all` list, resizes without laying out every item
   in each frame the width changes (patched `gpui-pre` and `gpui-fast`): that frame lays
   out the items shown, the rest keep estimated heights and are measured over the next
