@@ -169,13 +169,11 @@ jobs:
             --dir "$RUNNER_TEMP/git-consumer" \
             ${TARGET:+--target "$TARGET"}
 
-  # The packaged library built as crates.io would receive it, with no [patch], against Kit's
-  # Git main standing in for its next release. It cannot pass until Kit has every Base API the
-  # library calls (docs/RELEASING.md), so it reports without failing CI.
+  # The packaged library built as crates.io would receive it: a fresh resolve of registry
+  # crates only, with no [patch] and none of vendor/, natively and for the browser.
   release-readiness:
     runs-on: ubuntu-latest
     timeout-minutes: 60
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
         with:
@@ -189,11 +187,16 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y libxkbcommon-dev libxkbcommon-x11-dev libwayland-dev libvulkan-dev libx11-xcb-dev libxcb1-dev libfontconfig-dev libfreetype-dev
-      - name: The package against Kit's main
+      - name: The package against crates.io
+        run: scripts/check-registry-consumer.sh --dir "$RUNNER_TEMP/registry-consumer"
+      # Published Kit builds its Web platform multithreaded (`wasm_thread`), which needs the
+      # nightly Kit's own WebAssembly build pins (crates/story-web/rust-toolchain.toml).
+      - name: The same on the browser target, on Kit's nightly
+        env:
+          RUSTUP_TOOLCHAIN: nightly-2026-10-31
         run: |
-          kit=$(git ls-remote https://github.com/longbridge/gpui-kit refs/heads/main | cut -f1)
-          echo "Kit main: $kit"
-          scripts/check-registry-consumer.sh --dir "$RUNNER_TEMP/registry-consumer" --kit-git "$kit"
+          rustup toolchain install nightly-2026-10-31 --profile minimal --target wasm32-unknown-unknown
+          scripts/check-registry-consumer.sh --dir "$RUNNER_TEMP/registry-consumer-wasm" --target wasm32-unknown-unknown
 
   # Packaging and dependency policy read manifests, not the platform, so one OS is enough.
   package:
@@ -208,13 +211,19 @@ jobs:
         run: |
           rustup toolchain install
           rustc --version
+      # The library's publish dry run builds it.
+      - name: Linux libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libxkbcommon-dev libxkbcommon-x11-dev libwayland-dev libvulkan-dev libx11-xcb-dev libxcb1-dev libfontconfig-dev libfreetype-dev
       - name: What each package ships
         run: scripts/check-package.sh
       - name: The site Worker's rules
         run: node --test deploy/site/worker.test.js
-      # gpui-kit-material waits for a Kit release (docs/RELEASING.md; the release-readiness job).
-      - name: Publish dry run of the crate without Git dependencies
-        run: cargo publish --locked --dry-run -p gpui-kit-material-color
+      - name: Publish dry runs
+        run: |
+          cargo publish --locked --dry-run -p gpui-kit-material-color
+          cargo publish --locked --dry-run -p gpui-kit-material
       - uses: taiki-e/install-action@v2
         with:
           tool: cargo-deny@0.20.2
