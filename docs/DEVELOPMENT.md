@@ -111,7 +111,8 @@ design-kit page id (`buttons`, `text-fields`, …, which opens that page's
 Specs tab). `--tab preview|specs` picks the component card's tab;
 `--scenario <name>` and repeated `--set <control>=<value>` configure the
 page's playground (control ids are in `playgrounds/<component>.rs`); invalid
-names are errors. `--help` lists the ids, theme, text scale, state
+names are errors. `--palette <name>` paints a built-in palette (`Paper`, `Ink`,
+`Nord`, …) instead of the baseline theme, with `--dark` for a dark one. `--help` lists the ids, theme, text scale, state
 (`--active`, `--disabled`, `--no-ripple`, `--selected`, `--loading`) and
 scroll options. A JSON sidecar
 records revision, dirty state, requested and actual viewport, device scale,

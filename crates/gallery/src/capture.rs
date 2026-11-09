@@ -4,11 +4,12 @@ use super::playground::Value;
 use super::{Gallery, Tab, page::CaptureState};
 use anyhow::{Context as _, Result, bail, ensure};
 use gpui::{App, Entity, Global, ListOffset, ListState, Pixels, Window, px, size};
+use gpui_kit_material::color::palette::{ALL as PALETTES, PaletteId};
 use gpui_kit_material::color::themes::ThemeMode;
 use gpui_kit_material::components::Caption;
 use std::{cell::Cell, path::PathBuf, process::Command, rc::Rc, time::Duration};
 
-pub const USAGE: &str = "gallery [--capture output.png --section <page id> --tab preview|specs\n  --scenario <name> --set <control>=<value> ...\n  --width 1280 --height 900 --scale 1 --dark --preview-dark --reduced-motion --settle-ms 800\n  --active --disabled --selected --loading --no-ripple --offset-y 0 --settings --caption windows|linux --drawer]\n\nPage ids, in navigation order:\n  overview button icon-button button-group split-button fab fab-menu\n  extended-fab checkbox switch radio-buttons chips slider text-field select\n  search date-picker time-picker navigation-rail navigation-bar drawer navigation-suite tabs menu\n  top-app-bar bottom-app-bar toolbar card list carousel divider dialog\n  bottom-sheet side-sheet canonical-layouts badge avatar progress loading-indicator stepper pull-to-refresh snackbar\n  tooltip\n  color typography shape motion elevation examples\n\nDesign-kit page ids open the first page showing that kit page on its Specs tab:\n  app-bars avatars badges buttons cards checkboxes date-time-pickers dialogs dividers\n  lists loading-progress navigation radio-button sheets sliders text-fields\n  toolbars tooltips\n\n--tab defaults to preview (specs for a kit page id). --scenario and --set\nconfigure the page's playground, e.g. --set variant=tonal --set disabled=true.";
+pub const USAGE: &str = "gallery [--capture output.png --section <page id> --tab preview|specs\n  --scenario <name> --set <control>=<value> ...\n  --width 1280 --height 900 --scale 1 --dark --palette <name> --preview-dark --reduced-motion --settle-ms 800\n  --active --disabled --selected --loading --no-ripple --offset-y 0 --settings --caption windows|linux --drawer]\n\nPage ids, in navigation order:\n  overview button icon-button button-group split-button fab fab-menu\n  extended-fab checkbox switch radio-buttons chips slider text-field select\n  search date-picker time-picker navigation-rail navigation-bar drawer navigation-suite tabs menu\n  top-app-bar bottom-app-bar toolbar card list carousel divider dialog\n  bottom-sheet side-sheet canonical-layouts badge avatar progress loading-indicator stepper pull-to-refresh snackbar\n  tooltip\n  color typography shape motion elevation examples\n\nDesign-kit page ids open the first page showing that kit page on its Specs tab:\n  app-bars avatars badges buttons cards checkboxes date-time-pickers dialogs dividers\n  lists loading-progress navigation radio-button sheets sliders text-fields\n  toolbars tooltips\n\n--tab defaults to preview (specs for a kit page id). --scenario and --set\nconfigure the page's playground, e.g. --set variant=tonal --set disabled=true.\n--palette paints a built-in palette (Paper, Ink, Nord, ...) instead of the\nbaseline theme; a dark one needs --dark.";
 
 #[derive(Clone)]
 pub struct CaptureOptions {
@@ -21,6 +22,7 @@ pub struct CaptureOptions {
     height: f32,
     scale: f32,
     dark: bool,
+    palette: Option<PaletteId>,
     preview_dark: bool,
     reduced_motion: bool,
     settle_ms: u64,
@@ -53,6 +55,7 @@ impl CaptureOptions {
             height: 900.,
             scale: 1.,
             dark: false,
+            palette: None,
             preview_dark: false,
             reduced_motion: false,
             settle_ms: 800,
@@ -107,6 +110,14 @@ impl CaptureOptions {
                 }
                 "--settings" => options.settings = true,
                 "--dark" => options.dark = true,
+                "--palette" => {
+                    let name = value()?;
+                    let id = PALETTES
+                        .into_iter()
+                        .find(|id| id.name().eq_ignore_ascii_case(&name))
+                        .with_context(|| format!("Unknown palette: {name}"))?;
+                    options.palette = Some(id);
+                }
                 "--preview-dark" => options.preview_dark = true,
                 "--reduced-motion" => options.reduced_motion = true,
                 "--active" => options.active = true,
@@ -118,6 +129,19 @@ impl CaptureOptions {
             }
         }
         options.output = output.context("Capture options require --capture output.png")?;
+        if let Some(palette) = options.palette {
+            ensure!(
+                palette.is_dark() == options.dark,
+                "{} is a {} palette: {}",
+                palette.name(),
+                if palette.is_dark() { "dark" } else { "light" },
+                if palette.is_dark() {
+                    "add --dark"
+                } else {
+                    "drop --dark"
+                }
+            );
+        }
         options.tab = tab.unwrap_or(if legacy { Tab::Specs } else { Tab::Preview });
         let entry = &CATALOG[options.section];
         let playground = match entry.kind {
@@ -201,6 +225,12 @@ pub(super) fn install(view: &Entity<Gallery>, window: &mut Window, cx: &mut App)
     };
     cx.set_reduce_motion(options.reduced_motion);
     view.update(cx, |gallery, cx| {
+        if let Some(palette) = options.palette {
+            gallery.shared.update(cx, |shared, _| {
+                shared.palette = palette;
+                shared.reference_theme = None;
+            });
+        }
         gallery.apply_capture(
             options.section,
             options.tab,
@@ -278,7 +308,7 @@ pub(super) fn install(view: &Entity<Gallery>, window: &mut Window, cx: &mut App)
                         "actual_viewport":{"width":f32::from(viewport.width),"height":f32::from(viewport.height)},
                         "image_pixels":{"width":image.width(),"height":image.height()},
                         "device_scale_factor":window.scale_factor(), "text_scale":options.scale,
-                        "theme":"baseline", "mode":if options.dark {"dark"} else {"light"},
+                        "theme":options.palette.map_or("baseline", |palette| palette.name()), "mode":if options.dark {"dark"} else {"light"},
                         "settings_open":options.settings,
                         "reduced_motion":cx.reduce_motion(),"settle_ms":options.settle_ms,
                         "logical_scroll_top":{"item_ix":scroll.logical_scroll_top().item_ix,"offset_in_item":f32::from(scroll.logical_scroll_top().offset_in_item)},
@@ -373,7 +403,7 @@ fn scroll_measured_offset(
 #[cfg(test)]
 mod tests {
     use super::super::pages::PAGES;
-    use super::{CATALOG, CaptureOptions, Tab, Value, catalog};
+    use super::{CATALOG, CaptureOptions, PaletteId, Tab, Value, catalog};
     fn parse(args: &[&str]) -> anyhow::Result<Option<CaptureOptions>> {
         CaptureOptions::parse(args.iter().map(|s| s.to_string()))
     }
@@ -481,11 +511,25 @@ mod tests {
             vec!["--section", "button", "--scenario", "Nope"],
             vec!["--section", "color", "--set", "a=b"],
             vec!["--section", "button", "--tab", "code"],
+            vec!["--section", "button", "--palette", "Nope", "--dark"],
+            vec!["--section", "button", "--palette", "Ink"],
+            vec!["--section", "button", "--palette", "Paper", "--dark"],
         ] {
             let mut args = args;
             args.extend(["--capture", "out.png"]);
             assert!(parse(&args).is_err(), "{args:?}");
         }
+    }
+    #[test]
+    fn a_capture_paints_a_named_palette_in_its_own_mode() {
+        let options = parse(&["--capture", "out.png", "--palette", "ink", "--dark"])
+            .unwrap()
+            .unwrap();
+        assert_eq!(options.palette, Some(PaletteId::Ink));
+        let options = parse(&["--capture", "out.png", "--palette", "Nord Snow"])
+            .unwrap()
+            .unwrap();
+        assert_eq!(options.palette, Some(PaletteId::NordSnow));
     }
     #[test]
     fn invalid_capture_requests_fail_instead_of_silently_launching() {
