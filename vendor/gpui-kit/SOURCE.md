@@ -2,7 +2,8 @@
 
 Source repository: <https://github.com/longbridge/gpui-kit>
 
-Pinned source revision: `8da4e005258ac0aac9a6a332cce746eeaafa08a8`
+Source release: `gpui-kit` 0.9.1, tag `v0.9.1`,
+revision `39ab849a93b5f15507b969164d49891db8d5b470`
 
 The complete `crates/kit` directory is copied without implementation changes.
 `Cargo.toml.orig` preserves the original manifest. `SOURCE.json` records SHA-256
@@ -12,10 +13,9 @@ licenses, and the generated local manifest. `LICENSE-APACHE` and
 
 The local `Cargo.toml` expands the source workspace's edition, Clippy lints and
 dependency declarations. Source workspace siblings (`gpui-base`,
-`gpui-component`, `gpui-kit-assets`) use the original Git repository at the pinned
-revision rather than crates.io, so a consumer without this workspace's lockfile
-still gets Component at the revision the facade was copied from. Moving to another
-revision means refreshing the facade copy and this pin together.
+`gpui-component`, `gpui-kit-assets`) are the same 0.9.1 release on crates.io, as in
+the published `gpui-kit` 0.9.1. Moving to another release means refreshing the
+facade copy and this tag together.
 
 The behavioral manifest changes are limited to platform feature selection:
 
@@ -33,7 +33,7 @@ The behavioral manifest changes are limited to platform feature selection:
 
 `MANIFEST.diff` shows the complete difference from the original, including
 workspace normalization. Reproduce with Python 3.11 or newer and an unmodified
-checkout at the pinned revision:
+checkout at the release tag:
 
 ```sh
 python3.13 vendor/gpui-kit/normalize-manifest.py /path/to/gpui-kit-checkout

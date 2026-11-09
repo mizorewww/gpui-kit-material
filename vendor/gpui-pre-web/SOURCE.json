@@ -1,14 +1,14 @@
 {
   "package": "gpui-pre-web",
-  "version": "0.3.11",
+  "version": "0.3.12",
   "source": "crates.io published archive",
-  "archive_url": "https://static.crates.io/crates/gpui-pre-web/gpui-pre-web-0.3.11.crate",
+  "archive_url": "https://static.crates.io/crates/gpui-pre-web/gpui-pre-web-0.3.12.crate",
   "license": "Apache-2.0 (LICENSE-APACHE retained)",
-  "archive_sha256": "ad51fcf6e251d45b092fd4a98a26325eb9cf6ad4e6228b0c6bc50672db9e0563",
+  "archive_sha256": "a85e775c6874257c63f9cf51d99f0aba13b3bc615ed8d47e7d5338e3b5941f6a",
   "upstream_files": {
-    "Cargo.lock": "1555c9848a59bf24537cbbabd33be39e986744b5ed609b44d95cb62e25c4c8d9",
-    "Cargo.toml": "d1e7f1428ca496dbb799797e66a67b49d88a75f6a31b83ccfdef6a4f0f215e4b",
-    "Cargo.toml.orig": "f1362ddc1d2705e9de1608d886236ec5f141a0f7fe92702077f343add863ff17",
+    "Cargo.lock": "c32a66cede93feca1728ac3db75a41c2f8b082cc5ed104e6227ae70dd1d00d36",
+    "Cargo.toml": "4e99257925ea054ba428c1425620afeb4cc390ee7ce4893fccd29494a5d89b32",
+    "Cargo.toml.orig": "f74aa741d935ad10b1a9b559a4ade4b845d6e9014a6e4e5f4a4df2beb25eb859",
     "LICENSE-APACHE": "752daf2fb234ca4a1fa372c073fe127f44b7b90fd2529ae44273a64f9d53da7a",
     "src/canvas_fallback.rs": "f23fef0d3b68fabe50dea4e32a63fa5b0bc0506f4e9e7e04ece8b563e05e20c4",
     "src/canvas_text.rs": "da73053a7f087e78aefb873f23502189224e8572fc0de49d52689f049f0cbfb3",
@@ -58,7 +58,7 @@
   },
   "removed_files": {
     "Cargo.lock": {
-      "upstream_sha256": "1555c9848a59bf24537cbbabd33be39e986744b5ed609b44d95cb62e25c4c8d9",
+      "upstream_sha256": "c32a66cede93feca1728ac3db75a41c2f8b082cc5ed104e6227ae70dd1d00d36",
       "reason": "Package-level lockfile not retained; the workspace Cargo.lock owns resolution."
     }
   },

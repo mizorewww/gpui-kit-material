@@ -1,16 +1,16 @@
 {
   "package": "gpui-pre-apple",
-  "version": "0.3.11",
+  "version": "0.3.12",
   "source": "crates.io published archive",
-  "archive_url": "https://static.crates.io/crates/gpui-pre-apple/gpui-pre-apple-0.3.11.crate",
+  "archive_url": "https://static.crates.io/crates/gpui-pre-apple/gpui-pre-apple-0.3.12.crate",
   "license": "Apache-2.0 (LICENSE-APACHE retained)",
-  "archive_sha256": "8c0bea8ffa563d3a1ada533e148bb55be7fb873c178979e889a3d1204f8e1b91",
+  "archive_sha256": "a460605ec4e8cbcc9b213462a84b1d6cc3efe4ed8f0e18669659f07b2d5c6aec",
   "upstream_files": {
-    "Cargo.lock": "3ad6ef14ab1348b9d2febfd62e1ab4b0616ed763e6278579af2afd84026ccbe0",
-    "Cargo.toml": "c010c4a633651462bac663daf6e7870e51ed4002b8adfe23c80c629a3b4da736",
-    "Cargo.toml.orig": "de002b2b1b99898035cddc19a05f20d1c9d381125e59621140656f79508a8cb2",
+    "Cargo.lock": "59a3de6f66956beb9f7a6d36de485ba2212836ba927c995b0971f59768ed228f",
+    "Cargo.toml": "43f1e598242229d53189a8a27ac5aecf31b7113d870f382f12b13548ec03703e",
+    "Cargo.toml.orig": "2f2448865e91fd8006ea557ea101de01f5da5d8d52deff88fd5ce6abe61f3489",
     "LICENSE-APACHE": "752daf2fb234ca4a1fa372c073fe127f44b7b90fd2529ae44273a64f9d53da7a",
-    "build.rs": "3e9a1111e632562b1c98eda0d9ed76126cd0285fa8dad47342477df8e31b442c",
+    "build.rs": "64e593cc20e82ce21f644ec674ea3d37840d71a0ccbbce46f26829e971e60509",
     "src/dispatcher.rs": "21ec54613d48cd3c419f2f694f75460d1019491c2406a7ed4dfa3374c84824cf",
     "src/display_link.rs": "1a1776d9a8d5a0083ec07faced6ba16a9a0fa833c256ae2888d4cc784f7e356f",
     "src/gpui_apple.rs": "699d1bb1676ad55b8edca5020896b00c31c3de901a677227a102cdfcb5960563",
@@ -22,10 +22,10 @@
     "src/shaders.metal": "436647169d914d26092fcf3bfd4020a6638a97d1ea3b39466fd2d4641d1c219e",
     "src/text_system.rs": "5f59742a4396eeec97b06ed8515967713c67f37b74996c8631495015515c0732",
     "vendor/gpui/src/color.rs": "4292aa1a2bbc56b653aaef0702726325f8efb93f16226320519e257c3ba8a839",
-    "vendor/gpui/src/geometry.rs": "c28a238493c9fa423d860ca46b2e4741925a9d81f55671eeda1389408f2b9dd5",
-    "vendor/gpui/src/platform.rs": "fcd613681b31b52318f6349e5f63fcf0c08748705b8d71673891df0c303e8756",
+    "vendor/gpui/src/geometry.rs": "965ae8f6c1d4bd2e7dcb43e253a99dd4363252b1ef6dc19c3031ea50c5192408",
+    "vendor/gpui/src/platform.rs": "1a1002581b0afcc816cfa92473c928791faf49fb8a94ef359fc10b1a372065ba",
     "vendor/gpui/src/scene.rs": "b615c926356b9180c81706d84e1033501ff9f4cd70895374b0ce63fcf4bc153e",
-    "vendor/gpui/src/window.rs": "260fb355763edb86f395458e167c9d258352af4f2cb03d4d6eb51d59a36e1f4c"
+    "vendor/gpui/src/window.rs": "9f4891f1e9c323d8d14a0624ce86c436cb9e623a52e8300a9b67ec0119f4aaa5"
   },
   "local_patches": [
     "Cargo.toml",
@@ -35,8 +35,8 @@
   ],
   "modified_files": {
     "Cargo.toml": {
-      "upstream_sha256": "c010c4a633651462bac663daf6e7870e51ed4002b8adfe23c80c629a3b4da736",
-      "local_sha256": "ae947e7adbec4cbdf0bf457fd3d2efae636544a734617bec22bd4aceeb729789",
+      "upstream_sha256": "43f1e598242229d53189a8a27ac5aecf31b7113d870f382f12b13548ec03703e",
+      "local_sha256": "a89d46b6b5e96f259e308d88076561f84c3fda076daca6dce8aa14b77710e235",
       "reason": "The font_fallback [[test]] (VENDORED.md)."
     },
     "src/open_type.rs": {
@@ -59,7 +59,7 @@
   },
   "removed_files": {
     "Cargo.lock": {
-      "upstream_sha256": "3ad6ef14ab1348b9d2febfd62e1ab4b0616ed763e6278579af2afd84026ccbe0",
+      "upstream_sha256": "59a3de6f66956beb9f7a6d36de485ba2212836ba927c995b0971f59768ed228f",
       "reason": "Package-level lockfile not retained; the workspace Cargo.lock owns resolution."
     }
   },

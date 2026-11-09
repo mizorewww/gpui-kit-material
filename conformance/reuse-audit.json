@@ -89,7 +89,7 @@
     },
     {
       "id": "base-compatibility",
-      "disposition": "retain-pending-equivalence",
+      "disposition": "done",
       "priority": "P0",
       "local_paths": [
         "vendor/gpui-base/src/dialog.rs",
@@ -110,7 +110,8 @@
         "crates/base/src/toolbar.rs"
       ],
       "action": "Keep narrow transition, slider, dialog, toolbar and IME-anchor fixes while pinning the Git Base dependency. The busy, toggle-focus and caret patches are gone, replaced by Material code (docs/ARCHITECTURE.md).",
-      "conditions": "Same 0.8.1 version is not equivalence; upstream lacks reversal and per-transition reduced motion, the slider's snapping and assistive actions, Dialog::accessibility_label, a vertical Toolbar and the caret report behind a browser's IME panel."
+      "conditions": "Same 0.8.1 version is not equivalence; upstream lacks reversal and per-transition reduced motion, the slider's snapping and assistive actions, Dialog::accessibility_label, a vertical Toolbar and the caret report behind a browser's IME panel.",
+      "status": "vendor/gpui-base is gone; crates.io gpui-base 0.9.1 has every API the library calls (docs/RELEASING.md)."
     },
     {
       "id": "material-motion",
@@ -367,8 +368,8 @@
       "upstream_paths": [
         "Cargo.toml"
       ],
-      "action": "Keep gpui-fast main (scripts/vendor-gpui-fast.py) until it is released; local: hanging overflow spaces, test-harness repairs, try_update. See MATERIAL-PATCHES.md.",
-      "conditions": "Every Material PR is merged on gpui-fast main; the vendored copy adds no API. Remove when Kit depends on a release that includes main and the hanging-space change lands or is dropped."
+      "action": "Keep crates.io gpui-fast 0.1.14 (scripts/vendor-gpui-fast.py --published 0.1.14) with local hanging overflow spaces, the measure_all list's deferred measurement after a width change, test-harness repairs and try_update. See MATERIAL-PATCHES.md.",
+      "conditions": "Every Material PR is released in gpui-fast 0.1.14; the vendored copy adds no API and the library builds without it. Remove when the hanging-space and list-width changes land upstream or are dropped."
     },
     {
       "id": "vendor-gpui-fast-apple",
@@ -380,12 +381,12 @@
       "upstream_paths": [
         "Cargo.toml"
       ],
-      "action": "Keep gpui-fast main (scripts/vendor-gpui-fast.py) until it is released; local: the font_fallback test and a warning fix. See MATERIAL-PATCHES.md.",
-      "conditions": "sbix color fonts are upstream on gpui-fast main (#119); only the font_fallback test and a warning fix differ from it. Remove when Kit depends on a release that includes main."
+      "action": "Keep crates.io gpui-fast-apple 0.1.14 with the font_fallback test and a warning fix only. See MATERIAL-PATCHES.md.",
+      "conditions": "The font fixes and sbix color fonts are released in 0.1.14; no runtime change remains. Remove when the regression test moves or is dropped."
     },
     {
       "id": "vendor-gpui-fast-web",
-      "disposition": "retain-pending-equivalence",
+      "disposition": "done",
       "priority": "P0",
       "local_paths": [
         "vendor/gpui-fast-web"
@@ -394,11 +395,12 @@
         "Cargo.toml"
       ],
       "action": "An unmodified copy of gpui-fast main, which has the IME fixes a consumer needs (#108-#110); drop it with the release.",
-      "conditions": "Backing-store sizing at real device scale factors is validated by scripts/check-gallery-dpr.py; repeat that check after any web backend update."
+      "conditions": "Backing-store sizing at real device scale factors is validated by scripts/check-gallery-dpr.py; repeat that check after any web backend update.",
+      "status": "Removed on 2026-11-09: gpui-fast 0.1.14 includes gpui-fast main (97439ecf); the crate comes from crates.io unchanged."
     },
     {
       "id": "vendor-gpui-fast-macos",
-      "disposition": "retain-pending-equivalence",
+      "disposition": "done",
       "priority": "P0",
       "local_paths": [
         "vendor/gpui-fast-macos"
@@ -407,7 +409,8 @@
         "Cargo.toml"
       ],
       "action": "An unmodified copy of gpui-fast main's backend, for main's gpui-fast; drop it with the release.",
-      "conditions": "Main's backends differ from the published 0.1.13."
+      "conditions": "Main's backends differ from the published 0.1.13.",
+      "status": "Removed on 2026-11-09: gpui-fast 0.1.14 includes gpui-fast main (97439ecf); the crate comes from crates.io unchanged."
     },
     {
       "id": "icon-button",
@@ -862,11 +865,11 @@
         "Cargo.toml"
       ],
       "action": "Keep the facade source unchanged with a normalized manifest that disables implicit WASM threading; drop it when upstream defaults match.",
-      "conditions": "Single-threaded WASM builds without cross-origin isolation, and one Base and GPUI identity across Material, Kit and Symbols. Hashes are in vendor/gpui-kit/SOURCE.json."
+      "conditions": "Single-threaded WASM builds without cross-origin isolation, and one Base and GPUI identity across Material, Kit and Symbols. Hashes are in vendor/gpui-kit/SOURCE.json. Source is the released 0.9.1 (tag v0.9.1); published Kit 0.9.1 still enables the Web platforms' multithreaded default."
     },
     {
       "id": "vendor-gpui-linux-backends",
-      "disposition": "retain-pending-equivalence",
+      "disposition": "done",
       "priority": "P1",
       "local_paths": [
         "vendor/gpui-fast-linux",
@@ -876,11 +879,12 @@
         "Cargo.toml"
       ],
       "action": "Unmodified copies of gpui-fast main's backends (gpui-fast-wgpu with test-harness repairs); the upstream backend's Linux crates and wgpu come from crates.io.",
-      "conditions": "Main's backends differ from the published 0.1.13; drop them with the release."
+      "conditions": "Main's backends differ from the published 0.1.13; drop them with the release.",
+      "status": "Removed on 2026-11-09: gpui-fast 0.1.14 includes gpui-fast main (97439ecf); the crate comes from crates.io unchanged."
     },
     {
       "id": "vendor-gpui-windows-backends",
-      "disposition": "retain-pending-equivalence",
+      "disposition": "done",
       "priority": "P1",
       "local_paths": [
         "vendor/gpui-fast-windows"
@@ -889,7 +893,8 @@
         "Cargo.toml"
       ],
       "action": "An unmodified copy of gpui-fast main's backend; the upstream backend's Windows crate comes from crates.io.",
-      "conditions": "Main's backends differ from the published 0.1.13; drop it with the release."
+      "conditions": "Main's backends differ from the published 0.1.13; drop it with the release.",
+      "status": "Removed on 2026-11-09: gpui-fast 0.1.14 includes gpui-fast main (97439ecf); the crate comes from crates.io unchanged."
     }
   ],
   "runtime_migration_status": "pending",

@@ -1,10 +1,10 @@
 {
   "repository": "https://github.com/longbridge/gpui-kit",
-  "revision": "8da4e005258ac0aac9a6a332cce746eeaafa08a8",
+  "revision": "39ab849a93b5f15507b969164d49891db8d5b470",
   "subdirectory": "crates/kit",
-  "source_workspace_manifest_sha256": "81ede24a592ea451ba043fc484ffa6ed152b821fc6c1faf34b06726f58c401cc",
+  "source_workspace_manifest_sha256": "a25113b29fcf44c05ea6296def215b79744a603b7e23b1a9647702b70b72b4b3",
   "source_files_sha256": {
-    "Cargo.toml": "1ba81933c192e35527aa0c7ee8a28fd1e194f9601fc8abcc34bfae97b95692db",
+    "Cargo.toml": "961c60722c485c4061da0a1b6ddb4e8458654816ddfedfa196a0f35575d273bb",
     "README.md": "7ab0635c9459323defd0319ef9c92da896616f75d009609ac7d335d992b303c0",
     "TESTING.md": "75a87dab89a1f141cf0c4953f185f9e41ae6076a12856a2c9d419d160049de2d",
     "src/lib.rs": "9f6a8305221bc87e1c345a60f9685dde6fad71aa0bc22615ea7dad4bb2f0f2fd",
@@ -61,5 +61,5 @@
     "LICENSE-APACHE": "d1b0449e5478c574ba4f686c2656df7fe77d66821a61f8b6ed3378a58ed9a811",
     "LICENSE-DOCS.md": "8a9ccf144b2d5bf5aae56abdc6e723e17e1ba4de1f5d515b3b644288fd4fc16f"
   },
-  "normalized_manifest_sha256": "b237d72caff61d36246ce45342bdc135b704b47abae0cdcfa6e079b9e033bc85"
+  "normalized_manifest_sha256": "3765ecc907be301dda41b753099b247214549ed31e7b963a6f0d1f00d22f8f23"
 }

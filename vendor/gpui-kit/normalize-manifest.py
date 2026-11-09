@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Reproduce the local manifest from the pinned, unmodified Kit checkout."""
+"""Reproduce the local manifest from the released, unmodified Kit checkout (tag v0.9.1)."""
 import hashlib
 import difflib
 import json
@@ -9,7 +9,7 @@ import subprocess
 import sys
 import tomllib
 
-REVISION = '8da4e005258ac0aac9a6a332cce746eeaafa08a8'
+REVISION = '39ab849a93b5f15507b969164d49891db8d5b470'
 REPOSITORY = 'https://github.com/longbridge/gpui-kit'
 source = Path(sys.argv[1]).resolve()
 destination = Path(__file__).resolve().parent
@@ -37,9 +37,9 @@ def value(item):
 def dependency(name, local=None):
     declared = workspace['dependencies'][name]
     result = dict(declared) if isinstance(declared, dict) else {'version': declared}
+    # Workspace siblings are the same release on crates.io.
     if 'path' in result:
         del result['path']
-        result.update(git=REPOSITORY, rev=REVISION)
     local = dict(local or {})
     local.pop('workspace', None)
     if 'features' in local:

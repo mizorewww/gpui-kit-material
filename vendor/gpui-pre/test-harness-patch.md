@@ -1,6 +1,6 @@
 # Vendored test harness repairs
 
-Source: the published Apache-2.0 `gpui-pre` 0.3.11 package (`SOURCE.json`).
+Source: the published Apache-2.0 `gpui-pre` 0.3.12 package (`SOURCE.json`).
 Test-only; no runtime behavior changes.
 
 - `src/svg_renderer.rs`: the SVG tests `include_bytes!` fonts from

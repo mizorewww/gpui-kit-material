@@ -2,7 +2,7 @@
 
 **A consumer patches this crate** for the IME position below; see "Consumer patch set" in `docs/ARCHITECTURE.md`.
 
-Complete published `gpui-pre-web` 0.3.11 crates.io archive (Apache-2.0,
+Complete published `gpui-pre-web` 0.3.12 crates.io archive (Apache-2.0,
 `LICENSE-APACHE` retained). `SOURCE.json` records the archive SHA-256, every
 original file hash, and the original and patched hash of each changed file.
 The archive ships no `.cargo_vcs_info.json`; no Git revision is claimed.
@@ -23,4 +23,4 @@ surrogate pair, which turned a replaced emoji into U+FFFD. Both rules are in the
 which `crates/material/tests/ime_edit.rs` runs natively.
 
 The package-level `Cargo.lock` is not retained; the workspace lockfile owns
-resolution. `gpui-fast-web` on gpui-fast `main` has the same `window.rs`, `ime_mirror.rs` and `events.rs` changes. Canvas sizing is upstream's: `scripts/check-gallery-dpr.py` validates it.
+resolution. `gpui-fast-web` 0.1.14 has the same `window.rs`, `ime_mirror.rs` and `events.rs` changes upstream. Canvas sizing is upstream's: `scripts/check-gallery-dpr.py` validates it.

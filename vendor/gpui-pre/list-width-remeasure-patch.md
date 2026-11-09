@@ -1,6 +1,6 @@
 # Width change on a `measure_all` list
 
-Source: the published Apache-2.0 `gpui-pre` 0.3.11 package (`SOURCE.json`), the
+Source: the published Apache-2.0 `gpui-pre` 0.3.12 package (`SOURCE.json`), the
 same in `vendor/gpui-fast`. File: `src/elements/list.rs`.
 
 **Why.** On a width change, upstream's `List::prepaint` drops every item's height
@@ -31,6 +31,10 @@ shown, as `TextView`'s, never corrects it): while a deferred measurement is unde
 way it is kept until the next prepaint, which lays out the item and those before it,
 back from it, until they fill the viewport, and puts the item at the bottom edge
 from those exact heights.
+
+Since 0.3.12 (and gpui-fast 0.1.14) upstream lays items out inside the list's padding
+and border, and forgets heights when that inner width changes; the patch keys on the
+same inner width and measures deferred and revealed items at it.
 
 Unchanged: the first measurement, `reset`, `remeasure` and `remeasure_items` still
 measure every item in one frame (a full measurement due also ends a deferred
