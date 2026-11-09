@@ -41,7 +41,7 @@ dev-only (ARCHITECTURE.md, Consumer patch set).
 ## Engine patches after the release
 
 Every gpui-fast PR of ours is merged on gpui-fast `main`; the latest release is
-0.1.13, without them. `vendor/gpui-fast*` already track `main` (`bbdbc42d`, produced by
+0.1.13, without them. `vendor/gpui-fast*` already track `main` (`97439ecf`, produced by
 `scripts/vendor-gpui-fast.py`, which runs upstream's release renaming), so these changes
 now come from upstream and are no longer local patches. Once gpui-fast releases them,
 replace the vendored copies with that release and drop what is left of the patches below:
@@ -53,6 +53,7 @@ replace the vendored copies with that release and drop what is left of the patch
 | #106 splice forgets released entities | `gpui-fast`: `src/fast/splice.rs`, `EntityMap::is_alive` in `dependencies.rs` and `entity_map.rs` |
 | #108, #109, #110 web IME position, keys, surrogate pairs | `gpui-fast-web`: `src/ime_mirror.rs`, `src/events.rs`, `src/ime_edit.rs`, IME part of `src/window.rs` |
 | #111, #112 macOS fonts without `m`, app fonts in fallback cascades | `gpui-fast-apple`: `src/text_system.rs`, `src/open_type.rs`, `tests/font_fallback.rs` |
+| #119 `sbix` color fonts | `gpui-fast-apple`: `src/fast/color_bitmap_fonts.rs`, its part of `src/text_system.rs` |
 | #113 lazy tab stops | `gpui-fast`: `src/tab_stop.rs` |
 | #114 tracked entities | `gpui-fast`: `App::record_entities_accessed` in `src/app.rs` |
 | #115 em without `m` | `gpui-fast`: `src/text_system.rs` |
@@ -63,10 +64,11 @@ Gallery (waiting on zed-industries/zed#66644); crates.io users get upstream wrap
 A `measure_all` list's measurement after a width change (`src/elements/list.rs`,
 `vendor/gpui-pre/list-width-remeasure-patch.md`) is to be offered upstream; until then
 crates.io users lay out every item of such a list in each frame its width changes.
-`sbix` color fonts (`gpui-fast-apple/src/text_system.rs`) are being offered upstream.
-Kept local, no API: the test-harness repairs and fixtures, and `try_update` for the
-deprecated `fetch_update`. The `-macos`, `-linux`, `-windows` and `-wgpu` crates are
-unmodified copies of `main` and go with the release. Nothing vendored adds or changes
+Kept local, no API: the test-harness repairs and fixtures (`gpui-fast-apple`'s
+`tests/font_fallback.rs` among them), a warning fix, and `try_update` for the
+deprecated `fetch_update`. The `-web`, `-macos`, `-linux` and `-windows` crates are
+unmodified copies of `main` (`-wgpu` differs only in test-harness repairs) and go with
+the release. Nothing vendored adds or changes
 engine API: the dev-only frame observation (CPU frame scopes, submission statistics,
 vsync control, presentation and GPU timing, the render lease) was dropped, since
 gpui-fast takes no API additions. The `gpui-pre*` patches mirror the remaining ones for

@@ -380,8 +380,8 @@
       "upstream_paths": [
         "Cargo.toml"
       ],
-      "action": "Keep sbix color fonts and the font_fallback test until upstream takes them; see MATERIAL-PATCHES.md.",
-      "conditions": "The sbix change is being offered upstream; nothing else differs from gpui-fast main apart from a warning fix."
+      "action": "Keep gpui-fast main (scripts/vendor-gpui-fast.py) until it is released; local: the font_fallback test and a warning fix. See MATERIAL-PATCHES.md.",
+      "conditions": "sbix color fonts are upstream on gpui-fast main (#119); only the font_fallback test and a warning fix differ from it. Remove when Kit depends on a release that includes main."
     },
     {
       "id": "vendor-gpui-fast-web",
