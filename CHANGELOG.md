@@ -194,6 +194,10 @@ earlier Git revisions.
 
 ### Fixed
 
+- A palette's warning and success read 4.5:1 as text on every surface and on their own
+  containers, and their on-colors on them, as error already did: where they fell short they
+  move in tone, keeping their hue (Tokyo Day's warning `#8c6c3e` is now `#74562a`; Paper,
+  Nord Snow, Catppuccin Latte and Nord also move). Reference themes keep md3.io's values.
 - Status containers (`WARNING_BG`, `SUCCESS_BG`, and a palette's `ERROR_CONTAINER`) take
   their status color's hue, with chroma up to 16 (M3's tonal-spot secondary), at the tone the
   12% blend toward it gave them. The blend mixed hues: on a dark palette's cool surface a
