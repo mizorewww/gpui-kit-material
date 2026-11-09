@@ -9,6 +9,8 @@ use gpui_base::slider::SliderState;
 use serde_json::Value;
 
 const MARKER: &str = "material-a11y-names-verified";
+/// A dropdown value too long for its field, which shows it in a tooltip.
+const CLIPPED_VALUE: &str = "Qwen3-ASR 1.7B, downloaded and ready to transcribe";
 
 struct Screen(Entity<TimePickerState>);
 impl Render for Screen {
@@ -43,6 +45,12 @@ impl Render for Screen {
                     .required(true)
                     .options(["English", "Chinese"])
                     .selected(Some(1)),
+            )
+            .child(
+                ExposedDropdown::new("speech", "Speech model")
+                    .width(120.)
+                    .options([CLIPPED_VALUE])
+                    .selected(Some(0)),
             )
             .child(
                 ExposedDropdown::new("model", "Model")
@@ -257,6 +265,15 @@ fn overlays_rows_and_items_announce_names_and_states(cx: &mut TestAppContext) {
     // A dropdown with the caller's menu announces the value it shows.
     let model = labelled(&all, "comboBox", "Model", &tree);
     assert_eq!(model["value"], "Deep", "{model}");
+
+    // A clipped value's tooltip does not describe the field again: the field's
+    // accessible value is already the whole text.
+    let speech = labelled(&all, "comboBox", "Speech model", &tree);
+    assert_eq!(speech["value"], CLIPPED_VALUE, "{speech}");
+    assert!(
+        !all.iter().any(|node| node["description"] == CLIPPED_VALUE),
+        "{tree}"
+    );
 
     // A status fact says in words what its color says.
     labelled(&all, "label", "Checked: passed", &tree);

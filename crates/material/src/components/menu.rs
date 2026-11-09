@@ -2226,6 +2226,7 @@ impl RenderOnce for ExposedDropdown {
         let value = self.value_text();
         // Whether the field's value ended in an ellipsis when it was last drawn:
         // then its whole text is a tooltip on the field.
+        #[cfg(feature = "feedback")]
         let clipped = window
             .use_keyed_state((id.clone(), "dropdown-value-clipped"), cx, |_, _| {
                 Rc::new(std::cell::Cell::new(false))
@@ -2245,8 +2246,10 @@ impl RenderOnce for ExposedDropdown {
         )
         .size(rem(24.))
         .rotate(std::f32::consts::PI * turn);
-        let mut field = TextField::specimen((id.clone(), "field"), value.clone())
-            .report_value_clipped(clipped.clone())
+        let field = TextField::specimen((id.clone(), "field"), value.clone());
+        #[cfg(feature = "feedback")]
+        let field = field.report_value_clipped(clipped.clone());
+        let mut field = field
             .variant(self.variant)
             .shape(self.shape)
             .density(self.density)
@@ -2326,19 +2329,25 @@ impl RenderOnce for ExposedDropdown {
             max_height: menu.max_height.or(self.menu_max_height),
             ..menu
         };
-        // Only while the value is cut short: a tooltip that repeated what the field
-        // shows would only be noise, to the pointer and to assistive technology.
-        // Not over the open menu, which lists the values itself. The tooltip is
-        // the `feedback` feature's.
+        // Shown only while the value is cut short: a tooltip that repeated what the
+        // field shows would be noise. Not over the open menu, which lists the
+        // values itself. It never describes the field to assistive technology,
+        // whose accessible value is already the whole text. The trigger is always
+        // wrapped, so its element path, and the field's motion and ripple state
+        // under it, stay put when the value starts or stops fitting. The tooltip
+        // is the `feedback` feature's.
         #[cfg(feature = "feedback")]
-        let trigger = if clipped.get() {
-            super::MaterialTooltip::plain((id.clone(), "value-tip"), value)
-                .map(|tip| if open { tip.force_visible(false) } else { tip })
-                .trigger(trigger)
-                .into_any_element()
-        } else {
-            trigger.into_any_element()
-        };
+        let trigger = super::MaterialTooltip::plain((id.clone(), "value-tip"), value)
+            .describes_trigger(false)
+            .map(|tip| {
+                if open || !clipped.get() {
+                    tip.force_visible(false)
+                } else {
+                    tip
+                }
+            })
+            .trigger(trigger)
+            .into_any_element();
         #[cfg(not(feature = "feedback"))]
         let trigger = trigger.into_any_element();
         if self.disabled {

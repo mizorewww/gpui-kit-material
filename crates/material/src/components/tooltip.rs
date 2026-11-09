@@ -93,6 +93,8 @@ pub struct MaterialTooltip {
     align: Align,
     timing: TipTiming,
     forced: Option<bool>,
+    /// Whether the trigger is described by the tooltip's text for assistive technology.
+    describes: bool,
 }
 
 /// How a tooltip responds to input: which inputs show it and its delays
@@ -127,6 +129,7 @@ impl MaterialTooltip {
             align: Align::Center,
             timing: TipTiming::default(),
             forced: None,
+            describes: true,
         }
     }
     /// A rich tooltip with `supporting` text.
@@ -143,6 +146,7 @@ impl MaterialTooltip {
             align: Align::Center,
             timing: TipTiming::default(),
             forced: None,
+            describes: true,
         }
     }
     /// A rich tooltip's title-small subhead.
@@ -202,6 +206,14 @@ impl MaterialTooltip {
     /// captured demo.
     pub fn force_visible(mut self, visible: bool) -> Self {
         self.forced = Some(visible);
+        self
+    }
+
+    /// Whether the tooltip's text describes the trigger to assistive technology
+    /// (default true). Off for a trigger that already exposes that text, such as
+    /// an exposed dropdown whose clipped value is its accessible value.
+    pub(crate) fn describes_trigger(mut self, describes: bool) -> Self {
+        self.describes = describes;
         self
     }
 
@@ -403,6 +415,7 @@ impl RenderOnce for MaterialTooltip {
             return container(self.id, self.content).into_any_element();
         };
         let description = self.description();
+        let describes = self.describes;
         let interactive = self.interactive();
         let placement = self.placement;
         let align = self.align;
@@ -486,8 +499,9 @@ impl RenderOnce for MaterialTooltip {
             .track_focus(&focus)
             .tab_stop(false)
             // Only a node with a role reaches the accessibility tree.
-            .role(Role::Group)
-            .aria_description(description)
+            .when(describes, |wrapper| {
+                wrapper.role(Role::Group).aria_description(description)
+            })
             .on_key_down(move |event, window, cx| escape_tip(&escape_state, event, window, cx))
             .child(trigger)
             .child(hover_layer(
