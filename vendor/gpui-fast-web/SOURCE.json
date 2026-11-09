@@ -2,7 +2,7 @@
   "package": "gpui-fast-web",
   "version": "0.1.13",
   "repository": "https://github.com/longbridge/gpui-fast",
-  "revision": "bbdbc42dc00794faf69f40aeb8c9bfd63e74fc0b",
+  "revision": "97439ecf580765469aff56c534c5d1d6af336328",
   "source": "upstream main, packaged by its own release step (bun script/prepare-release.ts --tag v0.1.13; cargo package --workspace --no-verify) by scripts/vendor-gpui-fast.py",
   "upstream_files_sha256": {
     "Cargo.toml": "242f390546b4f32ea34d2ea90874628094942f1d8d407c8d2afad23b88b76139",

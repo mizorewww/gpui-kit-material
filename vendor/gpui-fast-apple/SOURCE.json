@@ -2,7 +2,7 @@
   "package": "gpui-fast-apple",
   "version": "0.1.13",
   "repository": "https://github.com/longbridge/gpui-fast",
-  "revision": "bbdbc42dc00794faf69f40aeb8c9bfd63e74fc0b",
+  "revision": "97439ecf580765469aff56c534c5d1d6af336328",
   "source": "upstream main, packaged by its own release step (bun script/prepare-release.ts --tag v0.1.13; cargo package --workspace --no-verify) by scripts/vendor-gpui-fast.py",
   "upstream_files_sha256": {
     "Cargo.toml": "47441995155975e95824aaefad6dcec160fb0c4b9ee52bd6924ca9a6eeb31fa6",
@@ -12,6 +12,7 @@
     "build.rs": "cc05fa1dd22c2115da3385c7ec9a0d06cdae73cf4eaad630b193ac06731c292a",
     "src/dispatcher.rs": "21ec54613d48cd3c419f2f694f75460d1019491c2406a7ed4dfa3374c84824cf",
     "src/display_link.rs": "1a1776d9a8d5a0083ec07faced6ba16a9a0fa833c256ae2888d4cc784f7e356f",
+    "src/fast/color_bitmap_fonts.rs": "1e670f525ba3a0ccd23940e01e1a0b88b37acdbc6404f75dcccf765a5f63c06a",
     "src/fast/composition.rs": "87976f984efe12f04788c459ba1081cb1020c5124dbdc83e69ea27a4040bfeb7",
     "src/fast/dynamic_textures.rs": "c45088caf11ab5c1d16f3f0ed2afbb83719d55122a536caf3841383ff7293541",
     "src/fast/font_fallbacks.rs": "0857cdd0c25fa1ed7cff52f423692cc905f31a288ed7905a1fdefb29e611f711",
@@ -20,7 +21,7 @@
     "src/fast/layers/raster.rs": "73624582017003289a7f20b0dc8d0f11ac3a1c748db3fb4fddc02c85a9a8ab48",
     "src/fast/layers/tests.rs": "19253d11c3ed809e96919d6af4e2bf6e1710ffae67ce641a9f8cccdf18f13249",
     "src/fast/layers/tile_cache.rs": "66f539be39587a9b7f61fe976945dde5d2b0958535c0e9b15ad90c5ae9b20c1c",
-    "src/fast/mod.rs": "d134555eeee2a1572ba02a0a28aa370cb4701d860b007c46deead188d2e1b246",
+    "src/fast/mod.rs": "746bd6fdfffcd94882c3b98697bf1582b745ee4272bb60b37174a196a7355343",
     "src/fast/paths.rs": "f9971cf7eb296c443e4e7e959719f276d2b0e9c688a8c7af607f69dfbbee9ac2",
     "src/fast/release_gpui/src/color.rs": "4292aa1a2bbc56b653aaef0702726325f8efb93f16226320519e257c3ba8a839",
     "src/fast/release_gpui/src/geometry.rs": "c28a238493c9fa423d860ca46b2e4741925a9d81f55671eeda1389408f2b9dd5",
@@ -40,10 +41,10 @@
     "src/fast/release_gpui/src/platform/visual_test.rs": "93d2a650c42546b469916ac8f5c6727da04522de58f5da1c44e6c3dd1506227f",
     "src/fast/release_gpui/src/platform.rs": "a06df279dbf86a25d6eaf50b94ad9f2bd9ef9a5ea02ad75d5e145fcfbb5a9d59",
     "src/fast/release_gpui/src/scene.rs": "a0c39f4a306c103c559b444ced54df6039362c8d0af2af0f8b380661e7971fbd",
-    "src/fast/release_gpui/src/window/a11y/debug.rs": "1990fae248c624dadbb83e907da9dd2e39603a118d35d39f9e497c0668ffab07",
-    "src/fast/release_gpui/src/window/a11y.rs": "765c268b7d11c30917fced0239a9541b78deac2bcce2388f2d2b8b01bd7f8ecc",
+    "src/fast/release_gpui/src/window/a11y/debug.rs": "9de446535b8d49f5f674690cfb0f80da751036e51231f351426ba53460598916",
+    "src/fast/release_gpui/src/window/a11y.rs": "2a049d83c2c71bab12c51e147c9552707b39360eec08cb24fc7a1daa7eb954e6",
     "src/fast/release_gpui/src/window/prompts.rs": "0d58ec14e8139af53b50f4ad67690f01959ed59ffafc4adb2cf522f3f6197164",
-    "src/fast/release_gpui/src/window.rs": "51bf1edd8da432889e86c82a08433610012e7008e4cd4a6d2ea44ccc2010d375",
+    "src/fast/release_gpui/src/window.rs": "44c4b224d8d8a1bd4da7163c2af5a9663b2ecc9caf47465593b80fea1ab1e388",
     "src/fast/rounded_clip.rs": "cd4550aa62fc91cd73794e074b6daf2931868215b2cf757a9f0f62809484c184",
     "src/fast/rounded_clip_shader.rs": "e48e86dee268738339c89589279be7fcf9a44d8ad62c43a56c6cf5d722e216b1",
     "src/fast/text_system.rs": "98fd94a56c558e95d777501066cc61fd8f8ab80e1bc1de752d43c0a3b7f2c493",
@@ -54,7 +55,7 @@
     "src/open_type.rs": "7eb18da02690f18b0f6e0001f9f5ee9a6cac0b26912912bb3f9724dc1963aa8e",
     "src/process_info.rs": "533288f7707bfeaeea53f753d25c7af676235ebff57910bb79331f68492be139",
     "src/shaders.metal": "5ceaf9120161fa6f1a1addb171945459b24214d87dfecf6ed70f939b6e869576",
-    "src/text_system.rs": "dbcaa48301dd7564d43c798285cec9b1589312b9d16700610b04438a5e6ea879"
+    "src/text_system.rs": "2145eac56f6f72dcb7a0716fcbdcac8a3520a7e10793528e733cb12043d0d04c"
   },
   "modified_files": {
     "Cargo.toml": {
@@ -64,10 +65,6 @@
     "src/fast/rounded_clip_shader.rs": {
       "upstream_sha256": "e48e86dee268738339c89589279be7fcf9a44d8ad62c43a56c6cf5d722e216b1",
       "local_sha256": "850baf0e853468a49ba0f269d350315d1b28c029dd5f397239e68f32fb59df33"
-    },
-    "src/text_system.rs": {
-      "upstream_sha256": "dbcaa48301dd7564d43c798285cec9b1589312b9d16700610b04438a5e6ea879",
-      "local_sha256": "871f21f0551a5a5f846c9acc9f056ccd7c2cf70c00e366ea337eb02624011a96"
     }
   },
   "added_files": {

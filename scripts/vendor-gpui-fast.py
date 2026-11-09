@@ -11,8 +11,9 @@ archives exactly, apart from their package-level Cargo.lock.
 
     scripts/vendor-gpui-fast.py --rev <commit> --work <empty scratch dir> [--write]
 
-Without --write it only reports the difference. Needs git, bun and cargo; it downloads
-the repository and the crates.io index, and compiles nothing.
+Without --write it only reports the difference. Needs Python 3.12+ (tarfile's
+extraction filter), git, bun and cargo; it downloads the repository and the crates.io
+index, and compiles nothing.
 """
 import argparse
 import hashlib

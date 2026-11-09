@@ -74,12 +74,12 @@ struct AppleTextSystemState {
     memory_source: MemSource,
     system_source: SystemSource,
     fonts: Vec<FontKitFont>,
-    bitmap_color_fonts: HashSet<FontId>,
     font_selections: HashMap<Font, FontId>,
     font_ids_by_postscript_name: HashMap<String, FontId>,
     font_ids_by_font_key: HashMap<FontKey, SmallVec<[FontId; 4]>>,
     postscript_names_by_font_id: HashMap<FontId, String>,
     sized_fonts: crate::fast::text_system::SizedFonts,
+    color_bitmap_fonts: crate::fast::color_bitmap_fonts::ColorBitmapFonts,
 }
 
 impl AppleTextSystem {
@@ -89,12 +89,12 @@ impl AppleTextSystem {
             memory_source: MemSource::empty(),
             system_source: SystemSource::new(),
             fonts: Vec::new(),
-            bitmap_color_fonts: HashSet::default(),
             font_selections: HashMap::default(),
             font_ids_by_postscript_name: HashMap::default(),
             font_ids_by_font_key: HashMap::default(),
             postscript_names_by_font_id: HashMap::default(),
             sized_fonts: crate::fast::text_system::SizedFonts::default(),
+            color_bitmap_fonts: crate::fast::color_bitmap_fonts::ColorBitmapFonts::default(),
         }))
     }
 }
@@ -373,10 +373,12 @@ impl AppleTextSystemState {
                 .insert(postscript_name.clone(), font_id);
             self.postscript_names_by_font_id
                 .insert(font_id, postscript_name);
-            if has_sbix_table(&font) {
-                self.bitmap_color_fonts.insert(font_id);
-            }
             self.fonts.push(font);
+            crate::fast::color_bitmap_fonts::ColorBitmapFonts::note(
+                &mut self.color_bitmap_fonts,
+                font_id,
+                &self.fonts[font_id.0],
+            );
         }
         Ok(font_ids)
     }
@@ -401,24 +403,31 @@ impl AppleTextSystemState {
                 .insert(postscript_name.clone(), font_id);
             self.postscript_names_by_font_id
                 .insert(font_id, postscript_name);
-            let font =
-                font_kit::font::Font::from_core_graphics_font(requested_font.copy_to_CGFont());
-            if has_sbix_table(&font) {
-                self.bitmap_color_fonts.insert(font_id);
-            }
-            self.fonts.push(font);
+            self.fonts
+                .push(font_kit::font::Font::from_core_graphics_font(
+                    requested_font.copy_to_CGFont(),
+                ));
+            crate::fast::color_bitmap_fonts::ColorBitmapFonts::note(
+                &mut self.color_bitmap_fonts,
+                font_id,
+                &self.fonts[font_id.0],
+            );
             font_id
         }
     }
 
     fn is_emoji(&self, font_id: FontId) -> bool {
-        self.bitmap_color_fonts.contains(&font_id)
-            || self
-                .postscript_names_by_font_id
-                .get(&font_id)
-                .is_some_and(|postscript_name| {
-                    postscript_name == "AppleColorEmoji" || postscript_name == ".AppleColorEmojiUI"
-                })
+        if crate::fast::color_bitmap_fonts::ColorBitmapFonts::contains(
+            &self.color_bitmap_fonts,
+            font_id,
+        ) {
+            return true;
+        }
+        self.postscript_names_by_font_id
+            .get(&font_id)
+            .is_some_and(|postscript_name| {
+                postscript_name == "AppleColorEmoji" || postscript_name == ".AppleColorEmojiUI"
+            })
     }
 
     fn raster_bounds(&self, params: &RenderGlyphParams) -> Result<Bounds<DevicePixels>> {
@@ -1062,16 +1071,4 @@ mod tests {
         assert_eq!(layout.len, 0);
         assert!(layout.runs.is_empty());
     }
-}
-
-// Inspect capability once when assigning a font ID; do not copy bitmap tables
-// per glyph, and do not infer arbitrary color-font support from a family name.
-fn has_sbix_table(font: &FontKitFont) -> bool {
-    font.native_font()
-        .get_available_font_tables()
-        .is_some_and(|tables| {
-            tables
-                .iter()
-                .any(|tag| *tag == u32::from_be_bytes(*b"sbix"))
-        })
 }

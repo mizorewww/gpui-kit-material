@@ -2,7 +2,7 @@
   "package": "gpui-fast-macos",
   "version": "0.1.13",
   "repository": "https://github.com/longbridge/gpui-fast",
-  "revision": "bbdbc42dc00794faf69f40aeb8c9bfd63e74fc0b",
+  "revision": "97439ecf580765469aff56c534c5d1d6af336328",
   "source": "upstream main, packaged by its own release step (bun script/prepare-release.ts --tag v0.1.13; cargo package --workspace --no-verify) by scripts/vendor-gpui-fast.py",
   "upstream_files_sha256": {
     "Cargo.toml": "a7fd58efdff6211848d2f6fe9f2fa36c52f83129625746c1778db6c2e529239c",

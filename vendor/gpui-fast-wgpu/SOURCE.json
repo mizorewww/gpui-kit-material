@@ -2,7 +2,7 @@
   "package": "gpui-fast-wgpu",
   "version": "0.1.13",
   "repository": "https://github.com/longbridge/gpui-fast",
-  "revision": "bbdbc42dc00794faf69f40aeb8c9bfd63e74fc0b",
+  "revision": "97439ecf580765469aff56c534c5d1d6af336328",
   "source": "upstream main, packaged by its own release step (bun script/prepare-release.ts --tag v0.1.13; cargo package --workspace --no-verify) by scripts/vendor-gpui-fast.py",
   "upstream_files_sha256": {
     "Cargo.toml": "ed81c1f4573d2db69c94ed415d8c398f7688a3262ca841ef89093136fece3fb6",
@@ -15,7 +15,8 @@
     "src/fast/composition.rs": "e7e1e95cb3eb30c556c4902b64e580a2d930aa1fc98bbb1042005de814da4ae5",
     "src/fast/dynamic_textures/tests.rs": "0a0b5e642e15528f1c093b12d4d71fc5f3f677a210b148ec2441f4a3d6eb12c6",
     "src/fast/dynamic_textures.rs": "6efe7de37e991f654424584c87ec0e1eeb1c48a31e5c4e46644bc8e78198e54d",
-    "src/fast/frame.rs": "426f9009da030a510cbceff74f07f49a927bbaf4852cadfe0c0092db8e7bacb1",
+    "src/fast/frame/tests.rs": "be18c3f2b7a77ce0f7c673fd86c5c10e69964dd8effca51b76389dd6a5a73256",
+    "src/fast/frame.rs": "71526d96bbf01868f504249a8627875990a3b24701309ee7d59520558126c69c",
     "src/fast/globals.rs": "823c5c491879bd4589a92d5a54775a87fb6fb4d29677b5021b348fe29f3781f6",
     "src/fast/layers/composite.rs": "1b74d15677712b8783b075593247da2f853c95178fb75388e7caf71f912693aa",
     "src/fast/layers/mod.rs": "9eeacc33e599a381961614cc236debcf47622f60e223a7e9a2bf073ebb7c5ab6",
