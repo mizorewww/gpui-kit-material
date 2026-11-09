@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Builds the README's quick start in a directory outside the repository, the way
-# a downstream application does: every Material and engine crate comes from the
-# Git repository at one revision, and nothing from a checkout. There is no
-# lockfile, so a resolve that drifts away from Kit 8da4e005 fails here first.
+# Builds the README's Git quick start in a directory outside the repository, the way
+# a downstream application does: Kit from crates.io, the library and its engine patches
+# from the Git repository at one revision, and nothing from a checkout. There is no
+# lockfile, so a resolve that drifts away from one Kit, Base and engine fails here first.
 #
 #   scripts/check-git-consumer.sh --rev <pushed commit> --dir <empty directory> \
 #       [--repo <url>] [--target <triple>] [--command check|build]
@@ -36,16 +36,14 @@ manifest=$dir/Cargo.toml
 
 cargo generate-lockfile --manifest-path "$manifest"
 
-# Every crate from Kit's repository must be at the audited revision. A second
-# revision is what `branch = "main"` used to produce.
-kit=8da4e005258ac0aac9a6a332cce746eeaafa08a8
-drifted=$(grep -F 'git+https://github.com/longbridge/gpui-kit' "$dir/Cargo.lock" | grep -vF "#$kit" || true)
-if [ -n "$drifted" ]; then
-    echo "Kit crates resolved away from $kit:" >&2
-    echo "$drifted" >&2
+# Kit is released: nothing may come from Kit's repository.
+from_kit_git=$(grep -F 'git+https://github.com/longbridge/gpui-kit' "$dir/Cargo.lock" || true)
+if [ -n "$from_kit_git" ]; then
+    echo "Kit crates resolved from Git:" >&2
+    echo "$from_kit_git" >&2
     exit 1
 fi
-# One Base and one Kit: both source identities must have collapsed into the patch.
+# One Kit, Base and engine: the registry's and the patch's must be one package.
 for package in gpui-base gpui-kit gpui-pre gpui-fast; do
     count=$(grep -cF "name = \"$package\"" "$dir/Cargo.lock" || true)
     if [ "$count" != 1 ]; then

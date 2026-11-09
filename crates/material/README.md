@@ -18,12 +18,17 @@ color from [gpui-kit-material-color](https://crates.io/crates/gpui-kit-material-
 
 ```toml
 [dependencies]
-gpui-kit = "0.10"
+gpui-kit = "0.9.1"
 gpui-kit-material = "0.1"
 ```
 
-Use the `gpui-kit` release this crate depends on, so that Kit, Base, GPUI and the
-Symbols crate resolve to one implementation. Minimum Rust: **1.98**.
+Use the `gpui-kit` release this crate depends on (0.9.1 or a later 0.9), so that Kit,
+Base, GPUI and the Symbols crate resolve to one implementation; no `[patch]` is
+needed. Minimum Rust: **1.98**.
+
+In the browser, published Kit 0.9.1 builds its Web platform multithreaded, which needs the
+nightly toolchain its [WebAssembly guide](https://github.com/longbridge/gpui-kit/blob/main/website/docs/webassembly.md)
+names (`wasm_thread` does not build on stable).
 
 ```rust,no_run
 use gpui_kit_material::{color::themes::{Contrast, ThemeId, ThemeMode}, icons::Assets, theme};

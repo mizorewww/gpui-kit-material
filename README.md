@@ -52,7 +52,7 @@ Icons come from
 | Crate | Published | Holds |
 | --- | --- | --- |
 | [`gpui-kit-material-color`](crates/color) | [crates.io](https://crates.io/crates/gpui-kit-material-color) 0.1 | Color roles, palettes, reference themes and dynamic schemes, without GPUI. Features `serde`, `dynamic` (both default). |
-| [`gpui-kit-material`](crates/material) | Git revision; crates.io after Kit's next release ([docs/RELEASING.md](docs/RELEASING.md)) | The library: theme, tokens, motion, icons and the components below. |
+| [`gpui-kit-material`](crates/material) | [crates.io](https://crates.io/crates/gpui-kit-material) 0.1, on `gpui-kit` 0.9.1 | The library: theme, tokens, motion, icons and the components below. |
 | [`gpui-kit-material-gallery`](crates/gallery) | Never | The shared Gallery, its fonts and its dev-only profiler: a library and the `gallery` binary. |
 | [`gpui-kit-material-gallery-web`](crates/gallery-web) | Never | The Gallery's browser entry point. |
 | [`gpui-kit-material-bench`](crates/bench) | Never | `component_bench`. |
@@ -62,7 +62,7 @@ and `serde`. To drop code, turn them off and name what you use; a group brings w
 needs. `full` is every group, without the backend, symbols or `serde`.
 
 ```toml
-gpui-kit-material = { git = "...", rev = "...", default-features = false, features = ["buttons", "selection", "gpui-fast", "embedded-symbols"] }
+gpui-kit-material = { version = "0.1", default-features = false, features = ["buttons", "selection", "gpui-fast", "embedded-symbols"] }
 ```
 
 | Feature | Components | Needs |
@@ -90,49 +90,45 @@ there.
 
 Minimum Rust: **1.98** (`rust-version`).
 
-**From crates.io** (not yet available). `gpui-kit-material` will be published once
-a `gpui-kit` release contains every Base API the library calls; the crates.io
-[README](crates/material/README.md) is what it will say. Then a dependency on both,
-at the Kit release the library names, is all a consumer needs, with no `[patch]`:
+**From crates.io.** A dependency on both, at the Kit release the library names, is all
+a consumer needs, with no `[patch]`:
 
 ```toml
 [dependencies]
-gpui-kit = "0.10"
+gpui-kit = "0.9.1"
 gpui-kit-material = "0.1"
 ```
 
-[docs/RELEASING.md](docs/RELEASING.md) tracks what the release waits for.
+The library's crate [README](crates/material/README.md) says the same.
 
-**From Git** (today). The library is distributed by Git revision, and a downstream
-workspace needs the engine patches below until they land upstream. All of them must
-use one revision:
+**From Git, with the Gallery's engine patches** (optional). This workspace builds the
+Gallery on a few engine patches that change behavior only: spaces that overflow a
+wrapped row hang instead of starting the next one, a long `measure_all` list such as a
+`TextView` resizes without laying out every item each frame, and, on the upstream GPUI
+backend, fallback fonts, `sbix` color fonts and the browser IME, which gpui-fast 0.1.14
+already has. A downstream workspace that wants the same takes the library and the
+patches from this repository at one revision:
 
 ```toml
 [dependencies]
-gpui-kit = { git = "https://github.com/longbridge/gpui-kit", rev = "8da4e005258ac0aac9a6a332cce746eeaafa08a8" }
-gpui-kit-material = { git = "https://github.com/mizorewww/gpui-kit-material", rev = "75ccc77e01fe541a32848f42f003d7c82eb43b7a" }
+gpui-kit = "0.9.1"
+gpui-kit-material = { git = "https://github.com/mizorewww/gpui-kit-material", rev = "98c72b8d183418631b3dcf91064fcece6a96350f" }
 
 [patch.crates-io]
-gpui-kit = { git = "https://github.com/mizorewww/gpui-kit-material", rev = "75ccc77e01fe541a32848f42f003d7c82eb43b7a" }
-gpui-base = { git = "https://github.com/longbridge/gpui-kit", rev = "8da4e005258ac0aac9a6a332cce746eeaafa08a8" }
-gpui-pre = { git = "https://github.com/mizorewww/gpui-kit-material", rev = "75ccc77e01fe541a32848f42f003d7c82eb43b7a" }
-gpui-pre-apple = { git = "https://github.com/mizorewww/gpui-kit-material", rev = "75ccc77e01fe541a32848f42f003d7c82eb43b7a" }
-gpui-pre-web = { git = "https://github.com/mizorewww/gpui-kit-material", rev = "75ccc77e01fe541a32848f42f003d7c82eb43b7a" }
-gpui-fast = { git = "https://github.com/mizorewww/gpui-kit-material", rev = "75ccc77e01fe541a32848f42f003d7c82eb43b7a" }
-gpui-fast-apple = { git = "https://github.com/mizorewww/gpui-kit-material", rev = "75ccc77e01fe541a32848f42f003d7c82eb43b7a" }
-gpui-fast-web = { git = "https://github.com/mizorewww/gpui-kit-material", rev = "75ccc77e01fe541a32848f42f003d7c82eb43b7a" }
-
-[patch."https://github.com/longbridge/gpui-kit"]
-gpui-kit = { git = "https://github.com/mizorewww/gpui-kit-material", rev = "75ccc77e01fe541a32848f42f003d7c82eb43b7a" }
+gpui-kit = { git = "https://github.com/mizorewww/gpui-kit-material", rev = "98c72b8d183418631b3dcf91064fcece6a96350f" }
+gpui-pre = { git = "https://github.com/mizorewww/gpui-kit-material", rev = "98c72b8d183418631b3dcf91064fcece6a96350f" }
+gpui-pre-apple = { git = "https://github.com/mizorewww/gpui-kit-material", rev = "98c72b8d183418631b3dcf91064fcece6a96350f" }
+gpui-pre-web = { git = "https://github.com/mizorewww/gpui-kit-material", rev = "98c72b8d183418631b3dcf91064fcece6a96350f" }
+gpui-fast = { git = "https://github.com/mizorewww/gpui-kit-material", rev = "98c72b8d183418631b3dcf91064fcece6a96350f" }
 ```
 
 > `[patch]` is read only from the top-level manifest, so it goes in your workspace root.
 > [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#consumer-patch-set) says why each patch
-> exists. The rest of `vendor/` is gpui-fast `main`'s backends for this workspace. At every pushed
-> commit, CI builds this block's template from Git at that commit
-> (`scripts/git-consumer/Cargo.toml.in`, `scripts/check-git-consumer.sh`), and checks that this
-> block differs from the template only in its revision (`scripts/check-package.sh`). The revision
-> shown here is the last release's: CI does not build that revision again.
+> exists. At every pushed commit, CI builds this block's template from Git at that commit
+> (`scripts/git-consumer/Cargo.toml.in`, `scripts/check-git-consumer.sh`), and checks that
+> this block differs from the template only in its revision (`scripts/check-package.sh`).
+> The revision shown is the one that moved these patches to Kit 0.9.1: CI does not build
+> that revision again.
 
 ```rust
 use gpui_kit_material::{color::themes::{Contrast, ThemeId, ThemeMode}, icons::Assets, theme};

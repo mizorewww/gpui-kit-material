@@ -145,53 +145,48 @@ implicitly.
 ## Engine patches
 
 One GPUI and one Base implementation are shared across Material, Kit and
-Symbols. Git and registry packages with equal versions are still different
-identities, so the root `[patch]` tables redirect every source to `vendor/`,
-including crates.io `gpui-kit`, which Symbols depends on, so that its `IconNamed`
-is Material's.
-**These patches apply only inside this workspace**; a downstream workspace needs
-the consumer patch set below until fixes land upstream. A patched Zed checkout
-overriding `gpui-pre` overrides it for this kit too.
+Symbols. The library depends on released crates only: `gpui-kit` and `gpui-base` 0.9.1,
+which name `gpui-fast` 0.1.14 and `gpui-pre` 0.3.12; Symbols depends on crates.io
+`gpui-kit` 0.9 too, so a consumer resolves one Kit and its `IconNamed` is Material's.
+The root `[patch.crates-io]` table redirects a few of those crates to `vendor/` for this
+workspace's Gallery. **These patches apply only inside this workspace**, and none is
+needed to build the library (`scripts/check-registry-consumer.sh` builds the package
+without them). A patched Zed checkout overriding `gpui-pre` overrides it for this kit
+too.
 
 ### Consumer patch set
 
-A consumer patches `gpui-kit` (from both crates.io, for Symbols, and Kit's Git), `gpui-base` (to Kit's Git), `gpui-pre`, `gpui-fast`,
-`gpui-pre-apple`, `gpui-fast-apple`, `gpui-pre-web` and `gpui-fast-web`, as the
-[quick start](../README.md#quick-start) shows, from this repository at the same revision
-as the dependency. CI builds that manifest from Git at the pushed commit
-(`scripts/check-git-consumer.sh`) on every target, and
-[crates/consumer-check/Cargo.toml](../crates/consumer-check/Cargo.toml), the same patches
-from this checkout, on every target and both backends, beside upstream's `gpui-fps`.
-Its engine has upstream's `FrameEvent`, `PlatformWindow` and frame path.
+A downstream workspace that wants the Gallery's engine behavior patches `gpui-kit`,
+`gpui-pre`, `gpui-pre-apple`, `gpui-pre-web` and `gpui-fast` from this repository at
+one revision, as the [quick start](../README.md#quick-start) shows. CI builds that
+manifest from Git at the pushed commit (`scripts/check-git-consumer.sh`) on every target,
+and [crates/consumer-check/Cargo.toml](../crates/consumer-check/Cargo.toml), the same
+patches from this checkout, on every target and both backends, beside upstream's
+`gpui-fps`. Every patch changes behavior only: Material calls no engine API that the
+releases lack.
 
-"To build" marks a patch whose API Material calls, so a consumer cannot build without
-it; the others change behavior only.
+| Consumer crate | Why a consumer may want it |
+| --- | --- |
+| `gpui-kit` | Kit 0.9.1's unchanged source with a normalized manifest that keeps WASM single-threaded by default (`multithreaded-web` restores upstream's workers); published Kit selects its Web platforms' default `multithreaded` feature. |
+| `gpui-pre`, `gpui-fast` | Spaces that overflow a wrapped row hang instead of starting the next one (upstream lacks this), and a `measure_all` list measures its off-screen items over later frames after a width change, so a long `TextView` resizes without laying out every block per frame. `gpui-pre` also keeps the lazy tab-stop index and `em` metrics for fonts without `m`, which gpui-fast 0.1.14 has upstream. |
+| `gpui-pre-apple` | Non-Latin and app-private fallback fonts, and `sbix` color fonts drawn as color bitmaps, on the upstream backend; gpui-fast 0.1.14 has them upstream. |
+| `gpui-pre-web` | The browser's IME panel opens at the caret, and a key or edit the IME owns stays whole, on the upstream backend; gpui-fast 0.1.14 has them upstream. Only matters on `wasm32`. |
 
-| Consumer crate | To build | Why a consumer needs it |
-| --- | --- | --- |
-| `gpui-kit` | yes, from crates.io | Normalized manifest that keeps WASM single-threaded by default. Symbols depends on crates.io `gpui-kit` 0.9; without the crates.io patch a second Kit builds and Symbols' `IconNamed` is not Material's. |
-| `gpui-base` | yes, from Kit's Git | Unmodified Kit `main` (`8da4e005`): crates.io 0.9.0 lacks `TransitionState` (#3841) and other APIs Material calls, all merged on Kit `main` and unreleased (RELEASING.md). Patched from Kit's own repository at the Kit revision, not from this one; nothing in it is Material's. |
-| `gpui-pre`, `gpui-fast` | no | Behavior only. Fast is gpui-fast `main`, which has the lazy tab-stop index, `em` metrics for fonts without `m`, `record_entities_accessed` and the wheel and hover fixes (not yet released); both keep hanging overflow spaces, which upstream lacks, and measure a `measure_all` list's off-screen items over later frames after a width change, so a long `TextView` resizes without laying out every block per frame. `gpui-pre` keeps the first two as local patches. Material calls no engine API that upstream lacks. |
-| `gpui-pre-apple`, `gpui-fast-apple` | no | Non-Latin and app-private fallback fonts and `sbix` color fonts drawn as color bitmaps: upstream on gpui-fast `main` (unreleased), local patches in `gpui-pre-apple`. |
-| `gpui-pre-web`, `gpui-fast-web` | no | The browser's IME panel opens at the caret, and a key or edit the IME owns stays whole. Upstream on gpui-fast `main` (unreleased); a local patch in `gpui-pre-web`. Only matters on `wasm32`. |
-
-The rest of `vendor/` exists only so that this workspace builds the same engine: the
-gpui-fast backends at gpui-fast `main` (`gpui-fast-macos`, `-linux`, `-windows`,
-`-wgpu`), unmodified apart from test-harness repairs. No vendored crate adds or changes
-engine API: gpui-fast takes no API additions, so the dev-only frame observation the
-Gallery's FPS counter, vsync switch and old profiler used was dropped, and the
-upstream backend's platform crates (`gpui-pre-macos`, `-linux`, `-windows`, `-wgpu`,
-`wgpu`) come from crates.io. `crates/consumer-check` builds the library beside
-upstream's `gpui-fps`; so does this workspace.
+The other gpui-fast crates (`-apple` apart, below, `-macos`, `-linux`, `-windows`,
+`-wgpu`, `-web`, `-platform`, `-macros`) and the upstream backend's platform crates come
+from crates.io unchanged. No vendored crate adds or changes engine API: gpui-fast takes
+no API additions, so the dev-only frame observation the Gallery's FPS counter, vsync
+switch and old profiler used was dropped. `crates/consumer-check` builds the library
+beside upstream's `gpui-fps`; so does this workspace.
 
 | Vendored | Source | Why |
 | --- | --- | --- |
-| `gpui-kit` | Git at Kit `main` `8da4e005`, unchanged source | Normalized manifest disables implicit WASM threading (`multithreaded-web` restores it). Hashes in `SOURCE.md`/`SOURCE.json`. |
-| `gpui-pre` (GPUI `=0.3.11`) | crates.io + patches (`SOURCE.json`, `*-patch.md`) | `em`/`ch` metrics for fonts without `m` (`em-fallback-patch.md`); lazy tab-stop index (`tab-stop-index-patch.md`); overflowing spaces hang instead of starting a wrapped row (`hanging-space-patch.md`); a width change lays out a `measure_all` list's shown items first and the rest over later frames (`list-width-remeasure-patch.md`); test-harness repairs; `try_update` for the deprecated `fetch_update` in the profiler. |
-| `gpui-pre-apple` | crates.io + patches (`SOURCE.json`, `VENDORED.md`) | Non-Latin and app-private fallback fonts; `sbix` color fonts. |
-| `gpui-pre-web` | crates.io + patches (`SOURCE.json`, `MATERIAL-PATCHES.md`) | Moves the hidden IME input to the caret when a composition starts and on `update_ime_position`, where a browser opens its candidate window and it takes no clicks; keeps a composition's keys from GPUI and a replaced emoji whole (consumers need these). |
-| `gpui-fast`, `-apple`, `-web` | gpui-fast `main` `97439ecf` + patches (`SOURCE.json`, `MATERIAL-PATCHES.md`) | gpui-fast's repository names its crates `gpui`, `gpui_web`, ...; only its release step gives them the `gpui-fast-*` names Kit depends on, so a Git `[patch]` cannot select them. `scripts/vendor-gpui-fast.py` runs that step at a commit (version kept at 0.1.13; `gpui-fast-macros` and `-platform` are unchanged since 0.1.13 and come from crates.io) and records each file that differs. Material's Fast PRs are all upstream: wheel at its limit (#104), hover freeze for listeners (#105), released entities in a spliced view (#106), web IME (#108, #109, #110), macOS fonts (#111, #112), lazy tab stops (#113), `record_entities_accessed` (#114), `em` metrics (#115), `sbix` color fonts (#119). Local: test-harness repairs, `try_update` for the deprecated `fetch_update`, hanging overflow spaces (`src/text_system/line_layout.rs`, `line_wrapper.rs`), a `measure_all` list's measurement after a width change (`src/elements/list.rs`); `gpui-fast-apple` keeps only its `font_fallback` test and a warning fix, and `gpui-fast-web` is unmodified. |
-| `gpui-fast-macos`, `-linux`, `-windows`, `-wgpu` | gpui-fast `main` `97439ecf`, unmodified (`-wgpu`: test-harness repairs) (`SOURCE.json`, `MATERIAL-PATCHES.md`) | Main's backends for main's `gpui-fast`; produced by `scripts/vendor-gpui-fast.py` with the crates above. |
+| `gpui-kit` | crates.io 0.9.1 (tag `v0.9.1`, `39ab849a`), unchanged source | Normalized manifest disables implicit WASM threading (`multithreaded-web` restores it). Hashes in `SOURCE.md`/`SOURCE.json`. |
+| `gpui-pre` (GPUI `=0.3.12`) | crates.io + patches (`SOURCE.json`, `*-patch.md`) | `em`/`ch` metrics for fonts without `m` (`em-fallback-patch.md`); lazy tab-stop index (`tab-stop-index-patch.md`); overflowing spaces hang instead of starting a wrapped row (`hanging-space-patch.md`); a width change lays out a `measure_all` list's shown items first and the rest over later frames (`list-width-remeasure-patch.md`); test-harness repairs; `try_update` for the deprecated `fetch_update` in the profiler. |
+| `gpui-pre-apple` | crates.io 0.3.12 + patches (`SOURCE.json`, `VENDORED.md`) | Non-Latin and app-private fallback fonts; `sbix` color fonts. |
+| `gpui-pre-web` | crates.io 0.3.12 + patches (`SOURCE.json`, `MATERIAL-PATCHES.md`) | Moves the hidden IME input to the caret when a composition starts and on `update_ime_position`, where a browser opens its candidate window and it takes no clicks; keeps a composition's keys from GPUI and a replaced emoji whole. |
+| `gpui-fast` | crates.io 0.1.14 + patches (`SOURCE.json`, `MATERIAL-PATCHES.md`), recorded by `scripts/vendor-gpui-fast.py --published 0.1.14` | Material's Fast PRs are all released in 0.1.14: wheel at its limit (#104), hover freeze for listeners (#105), released entities in a spliced view (#106), web IME (#108, #109, #110), macOS fonts (#111, #112), lazy tab stops (#113), `record_entities_accessed` (#114), `em` metrics (#115), `sbix` color fonts (#119). Local: hanging overflow spaces (`src/text_system/line_layout.rs`, `line_wrapper.rs`), a `measure_all` list's measurement after a width change (`src/elements/list.rs`), test-harness repairs, `try_update` for the deprecated `fetch_update`. |
+| `gpui-fast-apple` | crates.io 0.1.14 + a test (`SOURCE.json`, `MATERIAL-PATCHES.md`) | Workspace only, no runtime change: the `font_fallback` regression test with the Gallery's fonts, and a warning fix. Not in the consumer set. |
 
 **Replaced by Material code.** No engine patch remains for these:
 
