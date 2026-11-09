@@ -274,6 +274,11 @@ impl ConnectedButtonGroup {
     /// Size the group to its options, as a toolbar's view switch is, instead of
     /// filling the parent; [`Self::segmented`] keeps its icons and height.
     /// Without it a segmented or [`Self::full_width`] group fills its parent.
+    ///
+    /// In a flex row the group is then as wide as its options. A flex column
+    /// stretches its children across by default, so a caller placing the group
+    /// in one aligns it (`items_start`, `items_center`) or gives it a parent
+    /// that does not stretch.
     pub fn fit_content(mut self) -> Self {
         self.fit_content = true;
         self
