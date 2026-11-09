@@ -101,6 +101,9 @@ earlier Git revisions.
   layers, ripple and focus ring, as a navigation drawer's active indicator. It changes the
   shape only; the resting `container` is still painted.
 
+- `ConnectedButtonGroup::fit_content`: a segmented or full-width group is as wide as its
+  options, like a toolbar's view switch, instead of filling its parent.
+
 ### Changed
 
 - Kit `main` `8da4e005` (gpui-kit#3841 merged). A Git consumer patches crates.io
