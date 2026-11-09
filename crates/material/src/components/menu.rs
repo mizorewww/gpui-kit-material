@@ -2224,6 +2224,14 @@ impl RenderOnce for ExposedDropdown {
             });
         }
         let value = self.value_text();
+        // Whether the field's value ended in an ellipsis when it was last drawn:
+        // then its whole text is a tooltip on the field.
+        let clipped = window
+            .use_keyed_state((id.clone(), "dropdown-value-clipped"), cx, |_, _| {
+                Rc::new(std::cell::Cell::new(false))
+            })
+            .read(cx)
+            .clone();
         // The arrow turns over with the menu on the fast spatial token.
         let turn = motion::token_value(
             (id.clone(), "dropdown-arrow"),
@@ -2238,6 +2246,7 @@ impl RenderOnce for ExposedDropdown {
         .size(rem(24.))
         .rotate(std::f32::consts::PI * turn);
         let mut field = TextField::specimen((id.clone(), "field"), value.clone())
+            .report_value_clipped(clipped.clone())
             .variant(self.variant)
             .shape(self.shape)
             .density(self.density)
@@ -2284,7 +2293,7 @@ impl RenderOnce for ExposedDropdown {
             .when(self.full_width, |trigger| trigger.w_full())
             .role(Role::ComboBox)
             .aria_label(super::labeled::required_label(&self.label, self.required))
-            .aria_value(value)
+            .aria_value(value.clone())
             .aria_expanded(open)
             .key_context(DROPDOWN_CONTEXT)
             .when(!self.disabled, |this| this.track_focus(&focus))
@@ -2317,8 +2326,23 @@ impl RenderOnce for ExposedDropdown {
             max_height: menu.max_height.or(self.menu_max_height),
             ..menu
         };
+        // Only while the value is cut short: a tooltip that repeated what the field
+        // shows would only be noise, to the pointer and to assistive technology.
+        // Not over the open menu, which lists the values itself. The tooltip is
+        // the `feedback` feature's.
+        #[cfg(feature = "feedback")]
+        let trigger = if clipped.get() {
+            super::MaterialTooltip::plain((id.clone(), "value-tip"), value)
+                .map(|tip| if open { tip.force_visible(false) } else { tip })
+                .trigger(trigger)
+                .into_any_element()
+        } else {
+            trigger.into_any_element()
+        };
+        #[cfg(not(feature = "feedback"))]
+        let trigger = trigger.into_any_element();
         if self.disabled {
-            return trigger.into_any_element();
+            return trigger;
         }
         MenuPopup::new((id, "popup"), trigger, menu)
             .full_width(self.full_width)

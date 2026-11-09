@@ -194,6 +194,9 @@ earlier Git revisions.
 
 ### Fixed
 
+- An `ExposedDropdown` whose value is too long for the field, and ends in an ellipsis, shows
+  the whole value in a plain tooltip on the field (with the `feedback` feature), on hover
+  or keyboard focus, and not while its menu is open. A value that fits gets no tooltip.
 - A palette's warning and success read 4.5:1 as text on every surface and on their own
   containers, and their on-colors on them, as error already did: where they fell short they
   move in tone, keeping their hue (Tokyo Day's warning `#8c6c3e` is now `#74562a`; Paper,

@@ -1831,3 +1831,81 @@ fn a_trigger_below_the_window_keeps_its_submenu_inside_it(cx: &mut TestAppContex
         "sub-menu {submenu:?}"
     );
 }
+
+struct LongValueHarness {
+    value: &'static str,
+    open: bool,
+}
+
+impl Render for LongValueHarness {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        window.set_rem_size(px(14.));
+        div().p(px(20.)).w(px(600.)).h(px(400.)).child(
+            ExposedDropdown::new("dropdown", "Speech model")
+                .options([self.value])
+                .selected(Some(0))
+                .width(160.)
+                .open(self.open)
+                .on_open_change(cx.listener(|this, open: &bool, _, cx| {
+                    this.open = *open;
+                    cx.notify();
+                })),
+        )
+    }
+}
+
+/// The value tooltip shows after hovering the field, by the time the pointer has
+/// rested past any show delay.
+fn value_tip_after_hover(cx: &mut VisualTestContext) -> Option<Bounds<Pixels>> {
+    let trigger = cx.debug_bounds("dropdown-trigger").unwrap();
+    cx.simulate_mouse_move(trigger.center(), None, Modifiers::default());
+    draw(cx);
+    cx.executor()
+        .advance_clock(std::time::Duration::from_secs(2));
+    draw(cx);
+    draw(cx);
+    cx.debug_bounds("tooltip-popup")
+}
+
+/// A value too long for the field ends in an ellipsis and is shown whole in a
+/// tooltip on the field; one that fits gets none, and the open menu hides it.
+#[gpui::test]
+fn a_clipped_dropdown_value_is_shown_whole_in_a_tooltip(cx: &mut TestAppContext) {
+    cx.update(|cx| {
+        gpui_kit::init(cx);
+        crate::init(cx);
+        cx.set_reduce_motion(true);
+    });
+    let (_, short) = cx.add_window_view(|_, _| LongValueHarness {
+        value: "Whisper",
+        open: false,
+    });
+    draw(short);
+    draw(short);
+    let short_field = short.debug_bounds("dropdown-trigger").unwrap();
+    assert!(value_tip_after_hover(short).is_none(), "a value that fits");
+
+    let (view, long) = cx.add_window_view(|_, _| LongValueHarness {
+        value: "Qwen3-ASR 1.7B · downloaded and ready to transcribe",
+        open: false,
+    });
+    draw(long);
+    draw(long);
+    // The tooltip leaves the field's size alone.
+    let long_field = long.debug_bounds("dropdown-trigger").unwrap();
+    assert_eq!(long_field.size, short_field.size);
+    let tip = value_tip_after_hover(long).expect("the clipped value's tooltip");
+    assert!(tip.size.width > px(0.));
+    long.update(|_, cx| {
+        view.update(cx, |this, cx| {
+            this.open = true;
+            cx.notify();
+        })
+    });
+    settle(long);
+    draw(long);
+    assert!(
+        long.debug_bounds("tooltip-popup").is_none(),
+        "not over the open menu"
+    );
+}
