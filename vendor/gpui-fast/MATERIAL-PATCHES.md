@@ -23,11 +23,11 @@ Test harness: `src/style.rs` (`#[perf]` to `#[test]`), `src/svg_renderer.rs` and
 `slow_views_are_journaled_with_their_own_time`, which takes the draw that contains the
 slow views rather than the last one: a later frame can replay them without the work.
 
-Behavior, not yet offered upstream: `src/text_system/line_layout.rs`,
+Behavior, not yet released upstream: `src/text_system/line_layout.rs`,
 `src/text_system/line_wrapper.rs` hang a space that overflows after content
-instead of starting the next wrapped row with it (`vendor/gpui-pre/hanging-space-patch.md`).
+instead of starting the next wrapped row with it (`vendor/gpui-pre/hanging-space-patch.md`; zed-industries/zed#66644).
 `src/elements/list.rs`: after a width change (since 0.1.14, a change of the width
 inside the list's padding and border), a `measure_all` list lays out only the items it
 shows in that frame, keeping the others' heights as estimates scaled by how
 those items reflowed, and measures the rest over later frames, 4 ms per frame
-(`vendor/gpui-pre/list-width-remeasure-patch.md`).
+(`vendor/gpui-pre/list-width-remeasure-patch.md`; offered as longbridge/gpui-fast#129).
