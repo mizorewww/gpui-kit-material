@@ -1262,18 +1262,29 @@ fn outline(
 
 /// A specimen's value on its one line, masked as bullets for a password type:
 /// too long for the field, it ends in an ellipsis rather than stopping
-/// mid-letter at the field's edge.
+/// mid-letter at the field's edge. Line breaks in it read as spaces.
 fn static_value(value: &SharedString, masked: bool) -> Div {
     div().flex_1().min_w_0().truncate().child(if masked {
         SharedString::from("\u{2022}".repeat(value.chars().count()))
     } else {
-        value.clone()
+        one_line(value)
     })
+}
+
+/// `value` with each line break as a space: the line a single-line field shows,
+/// and the one text shaping can measure (it takes no line breaks).
+fn one_line(value: &SharedString) -> SharedString {
+    if value.contains(['\n', '\r']) {
+        value.replace("\r\n", " ").replace(['\n', '\r'], " ").into()
+    } else {
+        value.clone()
+    }
 }
 
 /// `line`, reporting into `clipped` whether `value`, shaped in the text style
 /// it inherits, is wider than the room the line is given.
 fn report_clipped(line: Div, value: SharedString, clipped: Rc<Cell<bool>>) -> impl IntoElement {
+    let value = one_line(&value);
     super::prepaint_bounds::prepaint_bounds(line, move |bounds, window, _| {
         let style = window.text_style();
         let size = style.font_size.to_pixels(window.rem_size());

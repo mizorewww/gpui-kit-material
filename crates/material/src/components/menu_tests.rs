@@ -1909,3 +1909,36 @@ fn a_clipped_dropdown_value_is_shown_whole_in_a_tooltip(cx: &mut TestAppContext)
         "not over the open menu"
     );
 }
+
+/// A value with line breaks is measured and shown as one line, as a single-line
+/// field is: shaping takes no line breaks, and a debug build once panicked on one.
+#[gpui::test]
+fn a_dropdown_value_with_line_breaks_stays_one_line(cx: &mut TestAppContext) {
+    cx.update(|cx| {
+        gpui_kit::init(cx);
+        crate::init(cx);
+        cx.set_reduce_motion(true);
+    });
+    let (_, plain) = cx.add_window_view(|_, _| LongValueHarness {
+        value: "Whisper",
+        open: false,
+    });
+    draw(plain);
+    draw(plain);
+    let one_line = plain.debug_bounds("dropdown-trigger").unwrap();
+    let (_, broken) = cx.add_window_view(|_, _| LongValueHarness {
+        value: "Qwen3-ASR 1.7B\nready to transcribe\r\nafter its download",
+        open: false,
+    });
+    draw(broken);
+    draw(broken);
+    assert_eq!(
+        broken.debug_bounds("dropdown-trigger").unwrap().size,
+        one_line.size,
+        "the field keeps one line"
+    );
+    assert!(
+        value_tip_after_hover(broken).is_some(),
+        "the clipped value's tooltip"
+    );
+}
