@@ -68,7 +68,9 @@ pub use search::{
 #[cfg(feature = "selection")]
 pub use slider::{MaterialSlider, SliderAppearance, SliderColor, SliderSize};
 #[cfg(feature = "feedback")]
-pub use snackbar::{SNACKBAR_CLOSE_ICON, Snackbar, SnackbarDuration, SnackbarPosition};
+pub use snackbar::{
+    SNACKBAR_CLOSE_ICON, SNACKBAR_PRIORITY, Snackbar, SnackbarDuration, SnackbarPosition,
+};
 #[cfg(feature = "selection")]
 pub use switch::{MaterialSwitch, SwitchIcons};
 #[cfg(feature = "window-chrome")]
@@ -215,8 +217,8 @@ pub use loading_indicator::{
 pub use menu::ExposedDropdown;
 #[cfg(feature = "menus")]
 pub use menu::{
-    MaterialContextMenu, MaterialMenu, MaterialMenuItem, MenuDensity, MenuGroup, MenuPopup,
-    MenuStyle,
+    ContextMenuHandle, MaterialContextMenu, MaterialMenu, MaterialMenuItem, MenuDensity, MenuGroup,
+    MenuPopup, MenuStyle,
 };
 #[cfg(feature = "navigation")]
 pub use navigation::{

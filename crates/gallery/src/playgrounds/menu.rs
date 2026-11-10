@@ -172,6 +172,10 @@ struct MenuState {
     align: usize,
     /// The last activated item, for the caption under the button.
     last: Option<&'static str>,
+    /// The context region's focus, from which Shift+F10 or the Menu key opens
+    /// its menu, and the handle its "more" button opens it with.
+    context_focus: FocusHandle,
+    context_menu: ContextMenuHandle,
 }
 
 #[cfg(test)]
@@ -198,12 +202,14 @@ fn preview(
     window: &mut Window,
     cx: &mut Context<PlaygroundState>,
 ) -> AnyElement {
-    let state = preview.local("menu-state", window, cx, |_, _| MenuState {
+    let state = preview.local("menu-state", window, cx, |_, cx| MenuState {
         open: false,
         submenu: false,
         styles: 0b001,
         align: 0,
         last: None,
+        context_focus: cx.focus_handle().tab_stop(true),
+        context_menu: ContextMenuHandle::default(),
     });
     let (open, submenu_open, styles, align, last) = {
         let s = state.read(cx);
@@ -380,7 +386,7 @@ fn preview(
         .items_center()
         .gap(rem(12.))
         .child(popup)
-        .child(context_region(style, density, width, state.clone()))
+        .child(context_region(style, density, width, state.clone(), cx))
         .child(
             accessible_text("menu-last", last.unwrap_or(""))
                 .map(|text| type_role(text, TypeRole::BodyMedium))
@@ -389,27 +395,40 @@ fn preview(
         .into_any_element()
 }
 
-/// A surface whose right press opens the same styles of menu at the pointer.
+/// A surface whose right press opens the same styles of menu at the pointer;
+/// with the surface focused, Shift+F10 or the Menu key opens it below the
+/// surface, and its "more" button opens it from code.
 fn context_region(
     style: MenuStyle,
     density: MenuDensity,
     width: f32,
     state: Entity<MenuState>,
+    cx: &App,
 ) -> impl IntoElement {
+    let (focus, handle) = {
+        let s = state.read(cx);
+        (s.context_focus.clone(), s.context_menu.clone())
+    };
+    let more = handle.clone();
     div()
+        .id("menu-context-region")
         .debug_selector(|| "menu-context-region".into())
         .relative()
         .flex()
         .items_center()
         .justify_center()
+        .gap(rem(4.))
         .w_full()
-        .max_w(rem(240.))
+        .max_w(rem(320.))
         .h(rem(64.))
+        .pl(rem(16.))
+        .pr(rem(4.))
         .rounded(rem(12.))
         .bg(color(ColorRole::SURFACE_CONTAINER))
-        .child(MaterialContextMenu::new(
-            "playground-context-menu",
-            move |_, _| {
+        .track_focus(&focus)
+        .focus_visible(|ring| ring.border_2().border_color(color(ColorRole::SECONDARY)))
+        .child(
+            MaterialContextMenu::new("playground-context-menu", move |_, _| {
                 let state = state.clone();
                 MaterialMenu::new("playground-context-items")
                     .style(style)
@@ -424,12 +443,28 @@ fn context_region(
                             })
                         })
                     }))
-            },
-        ))
+            })
+            .trigger(&focus)
+            .handle(&handle),
+        )
         .child(
-            accessible_text("menu-context-hint", "Right-click for a context menu")
-                .map(|text| type_role(text, TypeRole::BodyMedium))
-                .text_color(color(ColorRole::ON_SURFACE_VARIANT)),
+            accessible_text(
+                "menu-context-hint",
+                "Right-click, or Shift+F10 when focused",
+            )
+            .map(|text| type_role(text, TypeRole::BodyMedium))
+            .text_color(color(ColorRole::ON_SURFACE_VARIANT))
+            .flex_1()
+            .min_w_0(),
+        )
+        .child(
+            div().debug_selector(|| "menu-context-more".into()).child(
+                IconButton::new("menu-context-more", symbol("more_vert", 24.), "More")
+                    // A keyboard click's position is the button's bottom-start corner.
+                    .on_click(move |event, _, cx| {
+                        more.open_at(event.position(), cx);
+                    }),
+            ),
         )
 }
 
@@ -672,6 +707,26 @@ mod tests {
         harness.keys("left");
         assert!(!drawn().1, "Left closes the sub-menu");
         assert!(drawn().0, "the menu stays open");
+    }
+
+    #[gpui::test]
+    fn the_context_region_opens_from_its_more_button_and_the_keyboard(cx: &mut TestAppContext) {
+        let mut harness = Harness::open(cx, &PLAYGROUND);
+        harness.cx.update(|_, cx| cx.set_reduce_motion(true));
+        let labels = MENUS[0][0];
+        harness.click("menu-context-more");
+        harness.advance(1000);
+        harness.keys("down enter");
+        harness.advance(1000);
+        assert_eq!(drawn().4, Some(labels[0].0), "the more button opens it");
+        // A press focuses the region; Shift+F10 then opens its menu.
+        let region = harness.expect("menu-context-region");
+        harness.click_at(region.origin + point(px(12.), px(12.)));
+        harness.keys("shift-f10");
+        harness.advance(1000);
+        harness.keys("down down enter");
+        harness.advance(1000);
+        assert_eq!(drawn().4, Some(labels[1].0), "Shift+F10 opens it");
     }
 
     #[test]

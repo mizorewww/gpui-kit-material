@@ -7,6 +7,62 @@ commit messages.
 
 Nothing yet.
 
+## gpui-kit-material 0.1.1 and gpui-kit-material-color 0.1.1 (2026-11-10)
+
+`gpui-kit-material` 0.1.1 still builds on `gpui-kit-material-color` 0.1.0 and `gpui-kit`
+0.9.1. `gpui-kit-material-color` 0.1.1 carries the two status-color fixes listed under
+0.1.0 below (warning and success at 4.5:1, status containers in their status color's
+hue), which were made after color 0.1.0 was published and so were not on crates.io;
+a fresh resolve of `gpui-kit-material` picks it up.
+
+### Added
+
+- `CustomRadioGroup`: a single choice among caller-drawn options (swatches and the like),
+  Kit Base's `Radio` options in its `RadioGroup` with the library's roving focus, as
+  `MaterialRadioGroup` has.
+- `MaterialContextMenu` opens from the keyboard and from code. With
+  `MaterialContextMenu::trigger(&focus)`, Shift+F10 or the Menu key opens it while that
+  element or anything inside it has focus (the innermost such trigger's menu), below the
+  parent's start edge or above it when there is no room; focus moves into the menu and
+  returns on Escape or an activated item. A `ContextMenuHandle` given to
+  `MaterialContextMenu::handle` opens it below its parent (`open`), at a point such as a
+  "more" button's `ClickEvent::position` (`open_at`), or closes it. The keys need
+  `gpui_kit_material::init`, as a menu's arrows and Escape do; calling it again keeps
+  them working. The right press is unchanged.
+- `SNACKBAR_PRIORITY` (99, `gpui_base::POPUP_PRIORITY - 1`), the deferred layer a
+  `Snackbar` draws in: above GPUI Base's dialog host and Material's modal sheets (10 and
+  up) and window caption buttons (50), below menus and popovers (100) and tooltips (200).
+  Kit `Root` dialogs take 10 plus a counter that grows with each dialog a window opens, so
+  after about 90 of them one draws above a snackbar, as it then does above Kit's menus.
+
+### Fixed
+
+- A `Snackbar` shown while a modal or full-screen `MaterialDialog` (or a modal sheet) is
+  open appears above the dialog and its scrim, as M3's snackbars appear above other
+  content; it drew under them and could not be seen. It still lays out where it is placed
+  and stays clipped as its place is. Its surface takes the pointer: a press on it, its
+  action or its close button no longer reaches the scrim, so the dialog stays open, and
+  no longer reaches the page under it.
+- A press on a snackbar's action or close button ripples and acts as before, then gives
+  focus back to what had it (in a dialog it shows over, the dialog), instead of leaving it
+  on a button that goes with the snackbar. With nothing focused, the button keeps focus;
+  a handler that moves focus elsewhere keeps its move.
+- A snackbar with an action keeps its countdown paused while a Material dialog, modal
+  sheet or modal drawer is open in its window, and starts it again in full once they
+  close (or leave the tree), wherever the snackbar is drawn: the dialog's focus trap keeps
+  the keyboard from reaching the action meanwhile. Kit's `window.open_dialog` and plain
+  GPUI Base dialogs do not pause it. A snackbar without an action counts down as before.
+
+### Known limitations
+
+- A snackbar draws in a layer of its own, so Tab reaches its buttons after the page's
+  last stop (as a web snackbar appended to the document), not where it is laid out, and
+  never from inside an open dialog. Give its command another keyboard route as well, as
+  M3 asks of snackbar actions.
+- A parent's opacity does not reach a snackbar inside it: a page fading out does not
+  fade it (GPUI applies opacity only to what draws inside the element). Its own enter
+  and exit fades are unaffected.
+
 ## gpui-kit-material 0.1.0 (2026-11-09)
 
 The first crates.io release of `gpui-kit-material`, on `gpui-kit` 0.9.1

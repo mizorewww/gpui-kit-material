@@ -11,6 +11,7 @@ use crate::motion::{self, MotionToken};
 use crate::theme::color;
 use crate::tokens::{elevation, shape::*, state, typography::*};
 use gpui::{prelude::*, *};
+use std::cell::Cell;
 use std::rc::Rc;
 use std::time::Duration;
 
@@ -24,6 +25,31 @@ const CLOSE_BOX: f32 = 48.;
 const TRAVEL: f32 = 12.;
 /// A placed snackbar's distance from the edges of its ancestor.
 const EDGE: f32 = 16.;
+/// The deferred layer a snackbar draws in, just below menus and popovers
+/// (`gpui_base::POPUP_PRIORITY`, 100) and tooltips (200), which stay above it.
+///
+/// M3 snackbars appear above other content, a modal surface included. GPUI
+/// Base's dialog host is a deferred layer at 10 plus its `layer`: 10 for a
+/// `MaterialDialog`, and Material's modal sheets are at 10 too. Kit's
+/// `Root` dialogs (`window.open_dialog`) pass a per-window counter that
+/// grows with every dialog the window has opened, so after about 90 of them
+/// a Kit dialog draws above a snackbar; by then it draws above Kit's own
+/// menus too. Window caption buttons (50) are below it.
+///
+/// Raised content keeps its place's clip but not its ancestors' opacity: a
+/// parent fading in or out does not fade the snackbar (GPUI applies element
+/// opacity only to what draws inside it). The snackbar's own enter and exit
+/// fades are unaffected.
+///
+/// Tab reaches the snackbar's buttons after the page's last stop, as it
+/// reaches a web snackbar appended to the document. While a dialog is open
+/// its focus trap keeps Tab inside the dialog, so a snackbar with an action
+/// waits for every Material modal surface in its window (`MaterialDialog`,
+/// modal sheets and drawers) to close before its countdown runs. Dialogs
+/// that are not Material's, such as Kit's `window.open_dialog` or a plain
+/// GPUI Base `Dialog`, do not pause it. Give its command another keyboard
+/// route too, as M3 asks of snackbar actions.
+pub const SNACKBAR_PRIORITY: usize = gpui_base::POPUP_PRIORITY - 1;
 
 type SnackbarHandler = Rc<dyn Fn(&ClickEvent, &mut Window, &mut App)>;
 type DismissHandler = Rc<dyn Fn(&mut Window, &mut App)>;
@@ -63,8 +89,9 @@ pub enum SnackbarPosition {
     End,
 }
 
-/// The auto-dismiss countdown: what it was armed for, a generation that
-/// cancels stale timers, whether the pointer pauses it, and the latest handler.
+/// The auto-dismiss countdown: what it was armed for (open, duration,
+/// paused), a generation that cancels stale timers, whether the pointer
+/// pauses it, and the latest handler.
 #[derive(Default)]
 struct AutoDismiss {
     armed: Option<(bool, SnackbarDuration, bool)>,
@@ -84,6 +111,15 @@ struct AutoDismiss {
 /// [`Self::position`] along the bottom of its positioned ancestor.
 /// [`Self::duration`] asks for dismissal through [`Self::on_dismiss`], which
 /// also answers Escape; the pointer resting on it pauses the countdown.
+///
+/// It lays out where it is placed but draws and takes the pointer in a
+/// layer above the page and any open dialog, sheet or scrim
+/// ([`SNACKBAR_PRIORITY`], which also covers its tab order and opacity),
+/// still clipped as its place in the page is. A press on it reaches only it:
+/// its buttons ripple and act, and focus then goes back to what had it, so a
+/// dialog it shows over keeps focus and stays open. A snackbar with an action
+/// keeps its countdown paused while a Material dialog, modal sheet or modal
+/// drawer is open in its window.
 ///
 /// # Example
 ///
@@ -203,6 +239,7 @@ impl Snackbar {
 /// shared keyboard focus ring.
 fn inverse_button(
     id: ElementId,
+    focus: &FocusHandle,
     fg: Rgba,
     handler: SnackbarHandler,
     preview: Option<InteractionPreview>,
@@ -211,6 +248,7 @@ fn inverse_button(
     let (hover, press) = (state::hovered(clear, fg), state::pressed(clear, fg));
     let focused = state::layer(clear, fg, state::FOCUS);
     let button = RingedButton::new(id, RingPlacement::Outer(Corners::all(RADIUS_FULL)))
+        .track_focus(focus)
         .map(move |button| {
             button
                 .flex()
@@ -234,17 +272,19 @@ fn inverse_button(
 }
 
 /// Keep the countdown in line with the snackbar. Each show, duration change or
-/// hover end restarts it; anything else leaves a running timer alone.
+/// end of a pause restarts it; anything else leaves a running timer alone.
+/// `held` pauses it as the pointer resting on it does.
 fn sync_auto_dismiss(
     state: &Entity<AutoDismiss>,
     open: bool,
     duration: SnackbarDuration,
+    held: bool,
     on_dismiss: Option<DismissHandler>,
     window: &mut Window,
     cx: &mut App,
 ) {
-    let hovered = state.read(cx).hovered;
-    let key = (open, duration, hovered);
+    let paused = state.read(cx).hovered || held;
+    let key = (open, duration, paused);
     let restart = state.read(cx).armed != Some(key);
     let generation = state.update(cx, |state, _| {
         state.on_dismiss = on_dismiss;
@@ -254,7 +294,7 @@ fn sync_auto_dismiss(
         }
         state.generation
     });
-    if !restart || !open || hovered {
+    if !restart || !open || paused {
         return;
     }
     let Some(delay) = duration.timeout() else {
@@ -279,6 +319,19 @@ fn sync_auto_dismiss(
         .detach();
 }
 
+/// The focus handles of the action and close buttons.
+#[derive(Clone)]
+struct ButtonFocus {
+    action: FocusHandle,
+    close: FocusHandle,
+}
+
+impl ButtonFocus {
+    fn has_focus(&self, window: &Window) -> bool {
+        self.action.is_focused(window) || self.close.is_focused(window)
+    }
+}
+
 /// Whether a closing snackbar has finished leaving.
 fn hidden(open: bool, shown: f32) -> bool {
     !open && shown <= 0.
@@ -300,10 +353,14 @@ impl RenderOnce for Snackbar {
         let auto_dismiss =
             window.use_keyed_state(child("auto-dismiss"), cx, |_, _| AutoDismiss::default());
         if preview.is_none() {
+            // An action shown while a modal surface is open waits for it to
+            // close: a dialog's focus trap keeps the keyboard from reaching it.
+            let held = self.action.is_some() && super::focus::modal_open(window);
             sync_auto_dismiss(
                 &auto_dismiss,
                 self.open,
                 self.duration,
+                held,
                 self.on_dismiss.clone(),
                 window,
                 cx,
@@ -312,17 +369,30 @@ impl RenderOnce for Snackbar {
         if hidden(self.open, shown) {
             return div().id(id).hidden().into_any_element();
         }
+        let button_focus = window
+            .use_keyed_state(child("buttons"), cx, |_, cx| ButtonFocus {
+                action: cx.focus_handle(),
+                close: cx.focus_handle(),
+            })
+            .read(cx)
+            .clone();
         let label = TypeRole::LabelLarge.scale();
         let action = self.action.map(|(text, handler)| {
-            inverse_button(child("action"), color(INVERSE_PRIMARY), handler, preview)
-                .when(cfg!(test), |b| {
-                    b.debug_selector(|| "snackbar-action".into())
-                })
-                .px(rem(12.))
-                .text_size(label.font_size)
-                .line_height(label.line_height)
-                .font_weight(FontWeight(label.font_weight as f32))
-                .child(text)
+            inverse_button(
+                child("action"),
+                &button_focus.action,
+                color(INVERSE_PRIMARY),
+                handler,
+                preview,
+            )
+            .when(cfg!(test), |b| {
+                b.debug_selector(|| "snackbar-action".into())
+            })
+            .px(rem(12.))
+            .text_size(label.font_size)
+            .line_height(label.line_height)
+            .font_weight(FontWeight(label.font_weight as f32))
+            .child(text)
         });
         let close = self.close.map(|(text, handler)| {
             div()
@@ -332,11 +402,17 @@ impl RenderOnce for Snackbar {
                 .flex_shrink_0()
                 .size(rem(CLOSE_BOX))
                 .child(
-                    inverse_button(child("close"), color(INVERSE_ON_SURFACE), handler, preview)
-                        .when(cfg!(test), |b| b.debug_selector(|| "snackbar-close".into()))
-                        .accessibility_label(text)
-                        .w(rem(BUTTON_HEIGHT))
-                        .child(IconName::Close.icon().size(SNACKBAR_CLOSE_ICON)),
+                    inverse_button(
+                        child("close"),
+                        &button_focus.close,
+                        color(INVERSE_ON_SURFACE),
+                        handler,
+                        preview,
+                    )
+                    .when(cfg!(test), |b| b.debug_selector(|| "snackbar-close".into()))
+                    .accessibility_label(text)
+                    .w(rem(BUTTON_HEIGHT))
+                    .child(IconName::Close.icon().size(SNACKBAR_CLOSE_ICON)),
                 )
         });
         let has_close = close.is_some();
@@ -365,6 +441,29 @@ impl RenderOnce for Snackbar {
             .text_size(body.font_size)
             .line_height(body.line_height)
             .shadow(elevation::level(SNACKBAR_ELEVATION))
+            // An opaque surface: a press on it is not one on what it covers,
+            // such as a dialog's scrim.
+            .occlude()
+            // A transient surface keeps focus where it is, in a dialog it
+            // shows over above all. The press runs as usual (its ripple and
+            // pressed state), and once it has been handled, focus that moved
+            // onto one of the buttons goes back to what had it. With nothing
+            // focused, a button keeps focus as usual; a handler that moves
+            // focus elsewhere keeps its move.
+            .capture_any_mouse_down({
+                let buttons = button_focus.clone();
+                move |_, window, cx| {
+                    let Some(previous) = window.focused(cx) else {
+                        return;
+                    };
+                    let buttons = buttons.clone();
+                    window.defer(cx, move |window, cx| {
+                        if buttons.has_focus(window) && !previous.is_focused(window) {
+                            previous.focus(window, cx);
+                        }
+                    });
+                }
+            })
             .when_some(self.selector, |surface, name| {
                 surface.debug_selector(move || name.to_string())
             })
@@ -422,7 +521,7 @@ impl RenderOnce for Snackbar {
         } else {
             surface.into_any_element()
         };
-        match self.position {
+        let placed = match self.position {
             None => surface,
             Some(position) => div()
                 .absolute()
@@ -437,7 +536,157 @@ impl RenderOnce for Snackbar {
                 })
                 .child(surface)
                 .into_any_element(),
+        };
+        // A static specimen stays in the page's own layer.
+        if preview.is_some() {
+            placed
+        } else {
+            Raised::new(crate::scope::current_scope(placed)).into_any_element()
         }
+    }
+}
+
+/// Lays `child` out in place and draws it in the [`SNACKBAR_PRIORITY`] layer,
+/// clipped as it would be in place. GPUI's `deferred` drops its ancestors'
+/// clip, which would let a snackbar scrolled out of a list draw, and take
+/// presses, over the page around it.
+struct Raised {
+    child: Option<AnyElement>,
+    mask: Rc<Cell<Option<ContentMask<Pixels>>>>,
+}
+
+impl Raised {
+    fn new(child: AnyElement) -> Self {
+        let mask = Rc::new(Cell::new(None));
+        let child = Clipped {
+            child,
+            mask: mask.clone(),
+        };
+        Self {
+            child: Some(child.into_any_element()),
+            mask,
+        }
+    }
+}
+
+impl IntoElement for Raised {
+    type Element = Self;
+    fn into_element(self) -> Self {
+        self
+    }
+}
+
+impl Element for Raised {
+    type RequestLayoutState = ();
+    type PrepaintState = ();
+
+    fn id(&self) -> Option<ElementId> {
+        None
+    }
+
+    fn source_location(&self) -> Option<&'static core::panic::Location<'static>> {
+        None
+    }
+
+    fn request_layout(
+        &mut self,
+        _: Option<&GlobalElementId>,
+        _: Option<&InspectorElementId>,
+        window: &mut Window,
+        cx: &mut App,
+    ) -> (LayoutId, ()) {
+        let child = self.child.as_mut().expect("laid out once");
+        (child.request_layout(window, cx), ())
+    }
+
+    fn prepaint(
+        &mut self,
+        _: Option<&GlobalElementId>,
+        _: Option<&InspectorElementId>,
+        _: Bounds<Pixels>,
+        _: &mut (),
+        window: &mut Window,
+        _: &mut App,
+    ) {
+        self.mask.set(Some(window.content_mask()));
+        let child = self.child.take().expect("prepainted once");
+        let offset = window.element_offset();
+        window.defer_draw(child, offset, SNACKBAR_PRIORITY, None);
+    }
+
+    fn paint(
+        &mut self,
+        _: Option<&GlobalElementId>,
+        _: Option<&InspectorElementId>,
+        _: Bounds<Pixels>,
+        _: &mut (),
+        _: &mut (),
+        _: &mut Window,
+        _: &mut App,
+    ) {
+    }
+}
+
+/// The raised child, under the clip its place in the page had.
+struct Clipped {
+    child: AnyElement,
+    mask: Rc<Cell<Option<ContentMask<Pixels>>>>,
+}
+
+impl IntoElement for Clipped {
+    type Element = Self;
+    fn into_element(self) -> Self {
+        self
+    }
+}
+
+impl Element for Clipped {
+    type RequestLayoutState = ();
+    type PrepaintState = ();
+
+    fn id(&self) -> Option<ElementId> {
+        None
+    }
+
+    fn source_location(&self) -> Option<&'static core::panic::Location<'static>> {
+        None
+    }
+
+    fn request_layout(
+        &mut self,
+        _: Option<&GlobalElementId>,
+        _: Option<&InspectorElementId>,
+        window: &mut Window,
+        cx: &mut App,
+    ) -> (LayoutId, ()) {
+        (self.child.request_layout(window, cx), ())
+    }
+
+    fn prepaint(
+        &mut self,
+        _: Option<&GlobalElementId>,
+        _: Option<&InspectorElementId>,
+        _: Bounds<Pixels>,
+        _: &mut (),
+        window: &mut Window,
+        cx: &mut App,
+    ) {
+        let child = &mut self.child;
+        window.with_content_mask(self.mask.get(), |window| child.prepaint(window, cx));
+    }
+
+    fn paint(
+        &mut self,
+        _: Option<&GlobalElementId>,
+        _: Option<&InspectorElementId>,
+        _: Bounds<Pixels>,
+        _: &mut (),
+        _: &mut (),
+        window: &mut Window,
+        cx: &mut App,
+    ) {
+        let child = &mut self.child;
+        window.with_content_mask(self.mask.get(), |window| child.paint(window, cx));
     }
 }
 
@@ -602,6 +851,510 @@ mod tests {
         let (_, cx) = open(cx, false);
         assert!(cx.debug_bounds("snackbar-action").is_none());
         assert!(cx.debug_bounds("snackbar-close").is_none());
+    }
+
+    /// A page whose snackbar shows while a modal dialog is open over it.
+    #[cfg(feature = "dialogs")]
+    struct OverDialog {
+        full_screen: bool,
+        actions: usize,
+        dismissals: usize,
+    }
+
+    #[cfg(feature = "dialogs")]
+    impl Render for OverDialog {
+        fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+            window.set_rem_size(px(16.));
+            let dialog = crate::components::MaterialDialog::new("dialog")
+                .headline("Screenshot")
+                .supporting_text("Copy it to the clipboard")
+                .modal(true)
+                .on_dismiss({
+                    let this = cx.entity().downgrade();
+                    move |_, cx| {
+                        let _ = this.update(cx, |this, _| this.dismissals += 1);
+                    }
+                });
+            let dialog = if self.full_screen {
+                dialog.full_screen("Close", None)
+            } else {
+                dialog
+            };
+            div().relative().size_full().child(dialog).child(
+                Snackbar::new("copied", "Image copied")
+                    .debug_name("over-dialog")
+                    .action("Undo", cx.listener(|this, _, _, _| this.actions += 1))
+                    .position(SnackbarPosition::Center),
+            )
+        }
+    }
+
+    /// The snackbar's action takes a press over the dialog's scrim (or its
+    /// full-screen surface), which neither dismisses the dialog nor takes its
+    /// focus.
+    #[cfg(feature = "dialogs")]
+    fn shows_over(full_screen: bool, cx: &mut TestAppContext) {
+        cx.update(|cx| {
+            gpui_base::init(cx);
+            cx.set_reduce_motion(true);
+        });
+        let (view, cx) = cx.add_window_view(move |_, _| OverDialog {
+            full_screen,
+            actions: 0,
+            dismissals: 0,
+        });
+        for _ in 0..3 {
+            redraw(cx);
+            cx.run_until_parked();
+        }
+        let focused = cx.update(|window, cx| window.focused(cx));
+        assert!(focused.is_some(), "the dialog took focus");
+        let surface = cx.debug_bounds("over-dialog").expect("snackbar");
+        let action = cx.debug_bounds("snackbar-action").expect("action");
+        // Its padding, then its action.
+        let padding = point(surface.left() + px(4.), surface.center().y);
+        cx.simulate_click(padding, Modifiers::default());
+        cx.simulate_click(action.center(), Modifiers::default());
+        redraw(cx);
+        cx.run_until_parked();
+        view.read_with(cx, |v, _| {
+            assert_eq!(v.actions, 1, "the action is above the dialog layer");
+            assert_eq!(
+                v.dismissals, 0,
+                "a press on the snackbar is not the scrim's"
+            );
+        });
+        cx.update(|window, cx| {
+            assert_eq!(window.focused(cx), focused, "the dialog keeps focus");
+        });
+        // Escape still reaches the dialog.
+        let escape = cx.update(|_, cx| {
+            gpui::Keystroke::parse_with_os("escape", cx.platform_info().os).unwrap()
+        });
+        cx.simulate_event(gpui::KeyDownEvent {
+            keystroke: escape,
+            is_held: false,
+            prefer_character_input: false,
+        });
+        cx.run_until_parked();
+        view.read_with(cx, |v, _| assert_eq!(v.dismissals, 1));
+    }
+
+    #[cfg(feature = "dialogs")]
+    #[gpui::test]
+    fn a_snackbar_shows_over_a_modal_dialog(cx: &mut TestAppContext) {
+        shows_over(false, cx);
+    }
+
+    #[cfg(feature = "dialogs")]
+    #[gpui::test]
+    fn a_snackbar_shows_over_a_full_screen_dialog(cx: &mut TestAppContext) {
+        shows_over(true, cx);
+    }
+
+    /// A focused field beside a snackbar.
+    struct Focused {
+        field: FocusHandle,
+        actions: usize,
+    }
+
+    impl Render for Focused {
+        fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+            window.set_rem_size(px(14.));
+            div()
+                .size_full()
+                .child(div().id("field").track_focus(&self.field).size(px(40.)))
+                .child(
+                    div().w(px(344.)).child(
+                        Snackbar::new("saved", "Saved")
+                            .action("Undo", cx.listener(|this, _, _, _| this.actions += 1)),
+                    ),
+                )
+        }
+    }
+
+    #[gpui::test]
+    fn a_press_ripples_and_leaves_focus_where_it_was(cx: &mut TestAppContext) {
+        cx.update(|cx| {
+            gpui_base::init(cx);
+            cx.set_reduce_motion(true);
+        });
+        let (view, cx) = cx.add_window_view(|_, cx| Focused {
+            field: cx.focus_handle(),
+            actions: 0,
+        });
+        cx.run_until_parked();
+        let field = view.read_with(cx, |v, _| v.field.clone());
+        cx.update(|window, cx| field.focus(window, cx));
+        redraw(cx);
+        let at = cx.debug_bounds("snackbar-action").expect("action").center();
+        let before = crate::components::interaction::waves_painted();
+        cx.simulate_mouse_move(at, None, Modifiers::default());
+        cx.simulate_mouse_down(at, gpui::MouseButton::Left, Modifiers::default());
+        redraw(cx);
+        cx.executor()
+            .advance_clock(std::time::Duration::from_millis(100));
+        redraw(cx);
+        assert!(
+            crate::components::interaction::waves_painted() > before,
+            "the action ripples while held"
+        );
+        cx.update(|window, _| assert!(field.is_focused(window), "the field keeps focus"));
+        cx.simulate_mouse_up(at, gpui::MouseButton::Left, Modifiers::default());
+        redraw(cx);
+        view.read_with(cx, |v, _| assert_eq!(v.actions, 1));
+        cx.update(|window, _| assert!(field.is_focused(window), "and after the click"));
+    }
+
+    /// A snackbar with a countdown shown while a dialog may be open.
+    #[cfg(feature = "dialogs")]
+    struct Held {
+        dialog: bool,
+        action: bool,
+        dismissals: usize,
+    }
+
+    #[cfg(feature = "dialogs")]
+    impl Render for Held {
+        fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+            window.set_rem_size(px(16.));
+            // At the bottom, away from the pointer, which would pause it.
+            let snackbar = Snackbar::new("copied", "Image copied")
+                .position(SnackbarPosition::Center)
+                .duration(SnackbarDuration::Short)
+                .on_dismiss({
+                    let this = cx.entity().downgrade();
+                    move |_, cx| {
+                        let _ = this.update(cx, |this, _| this.dismissals += 1);
+                    }
+                });
+            let snackbar = if self.action {
+                snackbar.action("Undo", |_, _, _| {})
+            } else {
+                snackbar
+            };
+            div()
+                .relative()
+                .size_full()
+                .child(
+                    crate::components::MaterialDialog::new("dialog")
+                        .headline("Screenshot")
+                        .modal(self.dialog),
+                )
+                .child(snackbar)
+        }
+    }
+
+    #[cfg(feature = "dialogs")]
+    fn held(cx: &mut TestAppContext, action: bool) -> (Entity<Held>, &mut gpui::VisualTestContext) {
+        cx.update(|cx| {
+            gpui_base::init(cx);
+            cx.set_reduce_motion(true);
+        });
+        let (view, cx) = cx.add_window_view(move |_, _| Held {
+            dialog: true,
+            action,
+            dismissals: 0,
+        });
+        redraw(cx);
+        cx.run_until_parked();
+        (view, cx)
+    }
+
+    #[cfg(feature = "dialogs")]
+    fn wait(cx: &mut gpui::VisualTestContext, seconds: u64) {
+        cx.executor()
+            .advance_clock(std::time::Duration::from_secs(seconds));
+        cx.run_until_parked();
+        redraw(cx);
+    }
+
+    #[cfg(feature = "dialogs")]
+    #[gpui::test]
+    fn an_action_waits_for_an_open_dialog_to_close(cx: &mut TestAppContext) {
+        let (view, cx) = held(cx, true);
+        wait(cx, 6);
+        view.read_with(cx, |v, _| {
+            assert_eq!(v.dismissals, 0, "held while the dialog is open")
+        });
+        view.update(cx, |v, cx| {
+            v.dialog = false;
+            cx.notify();
+        });
+        redraw(cx);
+        wait(cx, 1);
+        wait(cx, 1);
+        view.read_with(cx, |v, _| {
+            assert_eq!(v.dismissals, 0, "a full countdown restarts")
+        });
+        wait(cx, 4);
+        view.read_with(cx, |v, _| assert_eq!(v.dismissals, 1));
+    }
+
+    #[cfg(feature = "dialogs")]
+    #[gpui::test]
+    fn a_message_alone_counts_down_over_a_dialog(cx: &mut TestAppContext) {
+        let (view, cx) = held(cx, false);
+        wait(cx, 6);
+        view.read_with(cx, |v, _| assert_eq!(v.dismissals, 1));
+    }
+
+    /// A snackbar in a view of its own, drawn before a dialog in another.
+    #[cfg(feature = "dialogs")]
+    struct Bar {
+        dismissals: std::rc::Rc<std::cell::Cell<usize>>,
+    }
+
+    #[cfg(feature = "dialogs")]
+    impl Render for Bar {
+        fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+            let dismissals = self.dismissals.clone();
+            div().size_full().child(
+                Snackbar::new("copied", "Image copied")
+                    .position(SnackbarPosition::Center)
+                    .duration(SnackbarDuration::Short)
+                    .action("Undo", |_, _, _| {})
+                    .on_dismiss(move |_, _| dismissals.set(dismissals.get() + 1)),
+            )
+        }
+    }
+
+    #[cfg(feature = "dialogs")]
+    struct BarFirst {
+        dialog: bool,
+        /// Whether the dialog is in the tree at all.
+        mounted: bool,
+        bar: Entity<Bar>,
+    }
+
+    #[cfg(feature = "dialogs")]
+    impl Render for BarFirst {
+        fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+            window.set_rem_size(px(16.));
+            div()
+                .relative()
+                .size_full()
+                .child(div().absolute().inset_0().child(self.bar.clone()))
+                .when(self.mounted, |page| {
+                    page.child(
+                        crate::components::MaterialDialog::new("dialog")
+                            .headline("Screenshot")
+                            .modal(self.dialog),
+                    )
+                })
+        }
+    }
+
+    /// A platform frame: draws what changed, nothing forced.
+    #[cfg(feature = "dialogs")]
+    fn frame(cx: &mut gpui::VisualTestContext) {
+        cx.run_until_parked();
+        cx.update(|window, cx| {
+            window.draw(cx).clear(cx);
+        });
+        cx.run_until_parked();
+    }
+
+    #[cfg(feature = "dialogs")]
+    fn tick(cx: &mut gpui::VisualTestContext, seconds: u64) {
+        for _ in 0..seconds * 4 {
+            cx.executor()
+                .advance_clock(std::time::Duration::from_millis(250));
+            frame(cx);
+        }
+    }
+
+    #[cfg(feature = "dialogs")]
+    #[gpui::test]
+    fn a_snackbar_drawn_before_the_dialog_resumes_when_it_closes(cx: &mut TestAppContext) {
+        cx.update(|cx| {
+            gpui_base::init(cx);
+            cx.set_reduce_motion(true);
+        });
+        let dismissals = std::rc::Rc::new(std::cell::Cell::new(0));
+        let (view, cx) = cx.add_window_view({
+            let dismissals = dismissals.clone();
+            move |_, cx| BarFirst {
+                dialog: true,
+                mounted: true,
+                bar: cx.new(|_| Bar { dismissals }),
+            }
+        });
+        frame(cx);
+        tick(cx, 6);
+        assert_eq!(dismissals.get(), 0, "held while the dialog is open");
+        view.update(cx, |v, cx| {
+            v.dialog = false;
+            cx.notify();
+        });
+        tick(cx, 8);
+        assert_eq!(
+            dismissals.get(),
+            1,
+            "the countdown ran once the dialog closed"
+        );
+    }
+
+    #[cfg(feature = "dialogs")]
+    #[gpui::test]
+    fn an_open_dialog_leaving_the_tree_releases_the_snackbar(cx: &mut TestAppContext) {
+        cx.update(|cx| {
+            gpui_base::init(cx);
+            cx.set_reduce_motion(true);
+        });
+        let dismissals = std::rc::Rc::new(std::cell::Cell::new(0));
+        let (view, cx) = cx.add_window_view({
+            let dismissals = dismissals.clone();
+            move |_, cx| BarFirst {
+                dialog: true,
+                mounted: true,
+                bar: cx.new(|_| Bar { dismissals }),
+            }
+        });
+        frame(cx);
+        tick(cx, 6);
+        assert_eq!(dismissals.get(), 0);
+        view.update(cx, |v, cx| {
+            v.mounted = false;
+            cx.notify();
+        });
+        tick(cx, 8);
+        assert_eq!(
+            dismissals.get(),
+            1,
+            "removed while open, it no longer holds"
+        );
+    }
+
+    #[cfg(feature = "dialogs")]
+    #[gpui::test]
+    fn a_dialog_in_another_window_does_not_hold_a_snackbar(cx: &mut TestAppContext) {
+        cx.update(|cx| {
+            gpui_base::init(cx);
+            cx.set_reduce_motion(true);
+        });
+        let (_, other) = cx.add_window_view(|_, _| Held {
+            dialog: true,
+            action: false,
+            dismissals: 0,
+        });
+        frame(other);
+        let dismissals = std::rc::Rc::new(std::cell::Cell::new(0));
+        let (_, cx) = cx.add_window_view({
+            let dismissals = dismissals.clone();
+            move |_, cx| BarFirst {
+                dialog: false,
+                mounted: true,
+                bar: cx.new(|_| Bar { dismissals }),
+            }
+        });
+        frame(cx);
+        tick(cx, 6);
+        assert_eq!(dismissals.get(), 1, "only its own window's modals hold it");
+    }
+
+    /// Stops before and after a snackbar in the page.
+    struct Order {
+        before: FocusHandle,
+        after: FocusHandle,
+    }
+
+    impl Render for Order {
+        fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+            window.set_rem_size(px(14.));
+            div()
+                .size_full()
+                .child(div().id("before").track_focus(&self.before).size(px(40.)))
+                .child(
+                    div()
+                        .w(px(344.))
+                        .child(Snackbar::new("saved", "Saved").action("Undo", |_, _, _| {})),
+                )
+                .child(div().id("after").track_focus(&self.after).size(px(40.)))
+        }
+    }
+
+    /// The documented order: a raised snackbar's buttons follow the page's
+    /// last stop, as a web snackbar appended to the body does.
+    #[gpui::test]
+    fn tab_reaches_the_action_after_the_pages_last_stop(cx: &mut TestAppContext) {
+        cx.update(|cx| {
+            gpui_base::init(cx);
+            cx.set_reduce_motion(true);
+        });
+        let (view, cx) = cx.add_window_view(|_, cx| Order {
+            before: cx.focus_handle().tab_stop(true),
+            after: cx.focus_handle().tab_stop(true),
+        });
+        cx.run_until_parked();
+        let (before, after) = view.read_with(cx, |v, _| (v.before.clone(), v.after.clone()));
+        cx.update(|window, cx| before.focus(window, cx));
+        redraw(cx);
+        cx.update(|window, cx| window.focus_next(cx));
+        redraw(cx);
+        cx.update(|window, _| assert!(after.is_focused(window), "the page's stops first"));
+        cx.update(|window, cx| window.focus_next(cx));
+        redraw(cx);
+        cx.update(|window, cx| {
+            assert!(
+                !after.is_focused(window) && !before.is_focused(window),
+                "then the snackbar's action"
+            );
+            assert!(window.focused(cx).is_some());
+        });
+    }
+
+    /// A snackbar in a region that clips it, beside a button.
+    struct Clipping {
+        actions: usize,
+        page: usize,
+    }
+
+    impl Render for Clipping {
+        fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+            window.set_rem_size(px(14.));
+            div()
+                .size_full()
+                .child(
+                    div()
+                        .id("page")
+                        .absolute()
+                        .inset_0()
+                        .on_click(cx.listener(|this, _, _, _| this.page += 1)),
+                )
+                .child(
+                    // Shows the snackbar's message, not its action.
+                    div().w(px(120.)).overflow_hidden().child(
+                        div().w(px(344.)).child(
+                            Snackbar::new("clipped", "Saved")
+                                .action("Undo", cx.listener(|this, _, _, _| this.actions += 1)),
+                        ),
+                    ),
+                )
+        }
+    }
+
+    #[gpui::test]
+    fn a_raised_snackbar_keeps_its_clip(cx: &mut TestAppContext) {
+        cx.update(|cx| cx.set_reduce_motion(true));
+        let (view, cx) = cx.add_window_view(|_, _| Clipping {
+            actions: 0,
+            page: 0,
+        });
+        cx.run_until_parked();
+        let action = cx.debug_bounds("snackbar-action").expect("action");
+        assert!(
+            action.left() > px(120.),
+            "laid out past the clip: {action:?}"
+        );
+        cx.simulate_click(action.center(), Modifiers::default());
+        view.read_with(cx, |v, _| {
+            assert_eq!(
+                (v.actions, v.page),
+                (0, 1),
+                "the clipped action takes no press"
+            );
+        });
     }
 
     #[test]
