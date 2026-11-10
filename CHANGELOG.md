@@ -20,6 +20,14 @@ a fresh resolve of `gpui-kit-material` picks it up.
 - `CustomRadioGroup`: a single choice among caller-drawn options (swatches and the like),
   Kit Base's `Radio` options in its `RadioGroup` with the library's roving focus, as
   `MaterialRadioGroup` has.
+- `MaterialContextMenu` opens from the keyboard and from code. With
+  `MaterialContextMenu::trigger(&focus)`, Shift+F10 or the Menu key opens it while that
+  element or anything inside it has focus (the innermost such trigger's menu), below the
+  parent's start edge or above it when there is no room; focus moves into the menu and
+  returns on Escape or an activated item. A `ContextMenuHandle` given to
+  `MaterialContextMenu::handle` opens it below its parent (`open`), at a point such as a
+  "more" button's `ClickEvent::position` (`open_at`), or closes it. The keys need
+  `gpui_kit_material::init`, as a menu's arrows and Escape do. The right press is unchanged.
 - `SNACKBAR_PRIORITY`, the deferred layer a `Snackbar` draws in: above GPUI Base's dialog
   host and Material's modal sheets (10 and up), below caption buttons (50), menus and
   popovers (100) and tooltips (200).

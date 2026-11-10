@@ -75,6 +75,11 @@ pub(crate) fn init(cx: &mut App) {
             Some(DROPDOWN_CONTEXT),
         ),
     ]);
+    let keys = cx.intercept_keystrokes(open_context_menu_from_keyboard);
+    cx.set_global(ContextMenuKeys {
+        _keys: keys,
+        menus: Vec::new(),
+    });
 }
 
 /// The menu families of the design kit.
@@ -1828,37 +1833,60 @@ impl RenderOnce for MenuPopup {
     }
 }
 
-/// A menu that opens at the pointer on a right press inside its parent.
+/// A menu that opens at the pointer on a right press inside its parent, from
+/// the keyboard, or from code.
 ///
 /// Add it as the first child of the element it serves, which must be
-/// `relative`: it takes no room, and it builds nothing until the press, so a
+/// `relative`: it takes no room, and it builds nothing until it opens, so a
 /// long list pays only for a hitbox and a listener per row. The menu behaves as
 /// a [`MenuPopup`] does: it reveals on the same motion, keeps inside the window,
 /// takes focus and returns it, and closes on an activated item, Escape or a press
 /// outside. A right press elsewhere in the parent moves it there. Of nested
 /// context menus, the innermost under the pointer opens.
 ///
+/// From the keyboard, Shift+F10 or the Menu key opens it, as on Windows, Linux
+/// desktops and the web, while focus is on [`Self::trigger`] or inside it (on
+/// macOS, which has no context-menu key, Shift+F10 alone). It opens below the
+/// parent's start edge, or above when there is no room, and the arrow keys
+/// move into its items. Of nested context menus, the one whose trigger holds
+/// focus most closely opens. Initialize the library ([`crate::init`]) for these
+/// keys, as for a menu's arrows and Escape.
+///
+/// From code, a [`ContextMenuHandle`] given to [`Self::handle`] opens it below
+/// the parent or at a point, for a "more" button or a command.
+///
 /// A control that blocks the mouse, such as a button in the row, keeps its own
-/// right press, as it does for Kit's `context_menu`. Give the same commands a
-/// way in from the keyboard, usually a [`MenuPopup`] behind a "more" button.
+/// right press, as it does for Kit's `context_menu`.
 ///
 /// ```
-/// use gpui_kit::{div, prelude::*};
+/// use gpui_kit::{App, FocusHandle, div, prelude::*};
 /// use gpui_kit_material::prelude::*;
 ///
+/// # fn row(cx: &mut App) {
 /// # let row_content = div();
+/// let focus: FocusHandle = cx.focus_handle(); // the row's, kept by its view
+/// let menu = ContextMenuHandle::default(); // kept by the view too
 /// let row = div()
 ///     .relative()
-///     .child(MaterialContextMenu::new("row-menu", |_, _| {
-///         MaterialMenu::new("row-menu-items").item(MaterialMenuItem::new("Rename"))
-///     }))
+///     .track_focus(&focus)
+///     .child(
+///         MaterialContextMenu::new("row-menu", |_, _| {
+///             MaterialMenu::new("row-menu-items").item(MaterialMenuItem::new("Rename"))
+///         })
+///         .trigger(&focus)
+///         .handle(&menu),
+///     )
 ///     .child(row_content);
+/// // Later, from a "more" button or a command: `menu.open(cx)`.
 /// # let _ = row;
+/// # }
 /// ```
 #[derive(gpui::IntoElement)]
 pub struct MaterialContextMenu {
     id: ElementId,
     menu: MenuBuilder,
+    trigger: Option<FocusHandle>,
+    handle: Option<ContextMenuHandle>,
 }
 
 impl MaterialContextMenu {
@@ -1870,20 +1898,168 @@ impl MaterialContextMenu {
         Self {
             id: id.into(),
             menu: Box::new(menu),
+            trigger: None,
+            handle: None,
         }
+    }
+
+    /// The focus handle of the element the menu serves, usually its parent:
+    /// Shift+F10 or the Menu key opens the menu while this element, or
+    /// anything inside it, has focus.
+    pub fn trigger(mut self, focus: &FocusHandle) -> Self {
+        self.trigger = Some(focus.clone());
+        self
+    }
+
+    /// Open and close the menu from code through `handle`.
+    pub fn handle(mut self, handle: &ContextMenuHandle) -> Self {
+        self.handle = Some(handle.clone());
+        self
+    }
+}
+
+/// Opens and closes a [`MaterialContextMenu`] from code, such as a "more"
+/// button or a command. Clones share the menu; it reaches the menu once that
+/// has rendered with [`MaterialContextMenu::handle`].
+#[derive(Clone, Default)]
+pub struct ContextMenuHandle(Rc<std::cell::RefCell<Option<WeakEntity<ContextMenuState>>>>);
+
+impl ContextMenuHandle {
+    fn state(&self) -> Option<Entity<ContextMenuState>> {
+        self.0.borrow().as_ref().and_then(WeakEntity::upgrade)
+    }
+
+    /// Open below the start edge of the menu's parent, as the keyboard does.
+    /// Returns whether the menu has rendered and so could open.
+    pub fn open(&self, cx: &mut App) -> bool {
+        self.state().is_some_and(|state| {
+            let anchor = state.read(cx).keyboard_anchor();
+            show_context_menu(&state, anchor, cx);
+            true
+        })
+    }
+
+    /// Open at `position`, in window coordinates, such as a "more" button's
+    /// `ClickEvent::position`: the pointer for a press, the button's
+    /// bottom-start corner for a key.
+    pub fn open_at(&self, position: Point<Pixels>, cx: &mut App) -> bool {
+        self.state().is_some_and(|state| {
+            let origin = state.read(cx).bounds.origin;
+            show_context_menu(&state, position - origin, cx);
+            true
+        })
+    }
+
+    /// Close the menu if it is open; focus returns as on Escape.
+    pub fn close(&self, cx: &mut App) {
+        if let Some(state) = self.state() {
+            state.update(cx, |state, cx| {
+                if state.open {
+                    state.open = false;
+                    cx.notify();
+                }
+            });
+        }
+    }
+
+    /// Whether the menu is open (or opening).
+    pub fn is_open(&self, cx: &App) -> bool {
+        self.state().is_some_and(|state| state.read(cx).open)
     }
 }
 
 #[derive(Default)]
-struct ContextMenuState {
+pub(crate) struct ContextMenuState {
     /// Whether the popup is in the tree: from the press until it has closed.
     mounted: bool,
     /// The popup enters the tree closed for one frame, so that it has a closed
     /// state to reveal from and a trigger position to open at.
     entering: bool,
     open: bool,
-    /// The pointer's offset from the parent's start edge.
+    /// Where the menu opens, from the parent's start edge.
     position: Point<Pixels>,
+    /// The parent's bounds when it was last drawn, in window coordinates.
+    bounds: Bounds<Pixels>,
+    /// What holds focus for the keyboard to open it.
+    trigger: Option<WeakFocusHandle>,
+    /// Whether the keyboard's list has it.
+    registered: bool,
+}
+
+impl ContextMenuState {
+    /// Below the parent's start edge.
+    fn keyboard_anchor(&self) -> Point<Pixels> {
+        point(px(0.), self.bounds.size.height)
+    }
+}
+
+/// Open (or move) the menu at `position` from its parent's start edge.
+fn show_context_menu(state: &Entity<ContextMenuState>, position: Point<Pixels>, cx: &mut App) {
+    state.update(cx, |state, cx| {
+        state.entering = !state.mounted;
+        state.mounted = true;
+        state.open = true;
+        state.position = position;
+        cx.notify();
+    });
+}
+
+/// The context menus whose triggers the keyboard can open them from.
+struct ContextMenuKeys {
+    _keys: Subscription,
+    menus: Vec<WeakEntity<ContextMenuState>>,
+}
+
+impl Global for ContextMenuKeys {}
+
+/// Whether `keystroke` asks for a context menu: Shift+F10, or the Menu key
+/// (`menu` from Windows and X11/Wayland, `contextmenu` from the web).
+fn opens_context_menu(keystroke: &Keystroke) -> bool {
+    let m = &keystroke.modifiers;
+    let others = m.control || m.alt || m.platform || m.function;
+    match keystroke.key.as_str() {
+        "f10" => m.shift && !others,
+        "menu" | "contextmenu" => !m.shift && !others,
+        _ => false,
+    }
+}
+
+fn open_context_menu_from_keyboard(event: &KeystrokeEvent, window: &mut Window, cx: &mut App) {
+    if !opens_context_menu(&event.keystroke) {
+        return;
+    }
+    let menus = {
+        let keys = cx.global_mut::<ContextMenuKeys>();
+        keys.menus.retain(|menu| menu.upgrade().is_some());
+        keys.menus.clone()
+    };
+    // The menu whose trigger holds focus most closely: no other holding it
+    // lies inside its trigger.
+    let mut chosen: Option<(Entity<ContextMenuState>, FocusHandle)> = None;
+    for state in menus.iter().filter_map(WeakEntity::upgrade) {
+        let Some(trigger) = state
+            .read(cx)
+            .trigger
+            .as_ref()
+            .and_then(WeakFocusHandle::upgrade)
+        else {
+            continue;
+        };
+        if !trigger.contains_focused(window, cx) {
+            continue;
+        }
+        let closer = chosen
+            .as_ref()
+            .is_none_or(|(_, current)| current.contains(&trigger, window));
+        if closer {
+            chosen = Some((state, trigger));
+        }
+    }
+    if let Some((state, _)) = chosen {
+        cx.stop_propagation();
+        let anchor = state.read(cx).keyboard_anchor();
+        show_context_menu(&state, anchor, cx);
+    }
 }
 
 impl RenderOnce for MaterialContextMenu {
@@ -1891,8 +2067,32 @@ impl RenderOnce for MaterialContextMenu {
         let state = window.use_keyed_state((self.id.clone(), "context-menu"), cx, |_, _| {
             ContextMenuState::default()
         });
+        if let Some(handle) = &self.handle {
+            *handle.0.borrow_mut() = Some(state.downgrade());
+        }
+        if let Some(trigger) = &self.trigger {
+            // Once per menu, for the keyboard to find it; dropped menus are
+            // pruned when a key asks for one.
+            let register = !state.read(cx).registered && cx.has_global::<ContextMenuKeys>();
+            state.update(cx, |state, _| {
+                state.trigger = Some(trigger.downgrade());
+                state.registered |= register;
+            });
+            if register {
+                let weak = state.downgrade();
+                cx.global_mut::<ContextMenuKeys>().menus.push(weak);
+            }
+        } else if state.read(cx).trigger.is_some() {
+            state.update(cx, |state, _| state.trigger = None);
+        }
         let press = canvas(
-            |bounds, window, _| (bounds, window.insert_hitbox(bounds, HitboxBehavior::Normal)),
+            {
+                let state = state.clone();
+                move |bounds, window, cx| {
+                    state.update(cx, |state, _| state.bounds = bounds);
+                    (bounds, window.insert_hitbox(bounds, HitboxBehavior::Normal))
+                }
+            },
             {
                 let state = state.clone();
                 move |_, (bounds, hitbox): (Bounds<Pixels>, Hitbox), window, _| {
@@ -1903,14 +2103,7 @@ impl RenderOnce for MaterialContextMenu {
                         {
                             // Bubbling reaches the innermost context menu first.
                             cx.stop_propagation();
-                            let from_left = event.position - bounds.origin;
-                            state.update(cx, |state, cx| {
-                                state.entering = !state.mounted;
-                                state.mounted = true;
-                                state.open = true;
-                                state.position = from_left;
-                                cx.notify();
-                            });
+                            show_context_menu(&state, event.position - bounds.origin, cx);
                         }
                     });
                 }

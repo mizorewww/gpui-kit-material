@@ -217,8 +217,8 @@ pub use loading_indicator::{
 pub use menu::ExposedDropdown;
 #[cfg(feature = "menus")]
 pub use menu::{
-    MaterialContextMenu, MaterialMenu, MaterialMenuItem, MenuDensity, MenuGroup, MenuPopup,
-    MenuStyle,
+    ContextMenuHandle, MaterialContextMenu, MaterialMenu, MaterialMenuItem, MenuDensity, MenuGroup,
+    MenuPopup, MenuStyle,
 };
 #[cfg(feature = "navigation")]
 pub use navigation::{

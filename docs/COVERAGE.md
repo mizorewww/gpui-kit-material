@@ -46,7 +46,7 @@ M3 roles and type. Each is opt-in: the M3 defaults do not change.
 | `MaterialDialog::container` | Another role for a dialog's container |
 | `NoticeKind::Warning`, `status_fact_chip` | Status surfaces on the kit's own warning and success roles |
 | `TintFamily`, `ListLeading::Tinted` | Seven harmonized hue families in 14 `ColorRole`s. M3's custom colors are the model; the design colors are the kit's |
-| `MaterialContextMenu` | A menu opened at the pointer. The menu is M3's; the right press is not in a reference |
+| `MaterialContextMenu` | A menu opened at the pointer, by Shift+F10 or the Menu key from its trigger, or from code. The menu is M3's; the right press and keys are platform conventions, not in a reference |
 
 ## Legend
 

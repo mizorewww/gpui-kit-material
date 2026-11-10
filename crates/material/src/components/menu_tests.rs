@@ -233,6 +233,202 @@ fn the_innermost_context_menu_under_the_pointer_opens(cx: &mut TestAppContext) {
     assert!(cx.debug_bounds("outer-item").is_none());
 }
 
+/// A focusable row whose context menu the keyboard and code can open, with a
+/// focusable control inside it and a nested region with its own menu.
+struct KeyboardHarness {
+    picked: Rc<Cell<usize>>,
+    outside: FocusHandle,
+    row: FocusHandle,
+    control: FocusHandle,
+    inner: FocusHandle,
+    handle: ContextMenuHandle,
+}
+
+impl Render for KeyboardHarness {
+    fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        window.set_rem_size(px(14.));
+        let picked = self.picked.clone();
+        let menu = move |id: &'static str, label: &'static str| {
+            let picked = picked.clone();
+            MaterialContextMenu::new(id, move |_, _| {
+                let picked = picked.clone();
+                MaterialMenu::new((id, 0usize)).item(
+                    MaterialMenuItem::new(label)
+                        .leading(div().debug_selector(move || label.into()).size_full())
+                        .on_click(move |_, _, _| picked.set(picked.get() + 1)),
+                )
+            })
+        };
+        // Clear of the window's edge, which a popup keeps a margin from.
+        div()
+            .size_full()
+            .p(px(40.))
+            .child(
+                div()
+                    .debug_selector(|| "outside".into())
+                    .track_focus(&self.outside)
+                    .size(px(40.)),
+            )
+            .child(
+                div()
+                    .debug_selector(|| "row".into())
+                    .relative()
+                    .track_focus(&self.row)
+                    .w(px(400.))
+                    .h(px(120.))
+                    .child(
+                        menu("outer", "outer-item")
+                            .trigger(&self.row)
+                            .handle(&self.handle),
+                    )
+                    .child(div().track_focus(&self.control).size(px(20.)))
+                    .child(
+                        div()
+                            .debug_selector(|| "inner".into())
+                            .relative()
+                            .track_focus(&self.inner)
+                            .size(px(60.))
+                            .child(menu("inner", "inner-item").trigger(&self.inner)),
+                    ),
+            )
+    }
+}
+
+fn keyboard_menu(cx: &mut TestAppContext) -> (Entity<KeyboardHarness>, &mut VisualTestContext) {
+    cx.update(|cx| {
+        gpui_kit::init(cx);
+        crate::init(cx);
+        cx.set_reduce_motion(true);
+    });
+    let (view, cx) = cx.add_window_view(move |_, cx| KeyboardHarness {
+        picked: Rc::default(),
+        outside: cx.focus_handle(),
+        row: cx.focus_handle(),
+        control: cx.focus_handle(),
+        inner: cx.focus_handle(),
+        handle: ContextMenuHandle::default(),
+    });
+    settle(cx);
+    (view, cx)
+}
+
+fn focus_on(cx: &mut VisualTestContext, focus: &FocusHandle) {
+    cx.update(|window, cx| focus.focus(window, cx));
+    settle(cx);
+}
+
+fn keys(cx: &mut VisualTestContext, keys: &str) {
+    cx.simulate_keystrokes(keys);
+    settle(cx);
+}
+
+#[gpui::test]
+fn shift_f10_opens_the_context_menu_below_its_focused_trigger(cx: &mut TestAppContext) {
+    let (view, cx) = keyboard_menu(cx);
+    let (row, picked) = view.update(cx, |v, _| (v.row.clone(), v.picked.clone()));
+    focus_on(cx, &row);
+    keys(cx, "shift-f10");
+    let menu = cx.debug_bounds("material-menu").expect("the menu opened");
+    let bounds = cx.debug_bounds("row").unwrap();
+    assert_eq!(menu.origin.x, bounds.origin.x, "at the trigger's start");
+    assert!(menu.origin.y >= bounds.bottom() && menu.origin.y - bounds.bottom() <= px(4.));
+    assert!(cx.debug_bounds("outer-item").is_some());
+    cx.update(|window, _| assert!(!row.is_focused(window), "focus moved into the menu"));
+    // The arrows reach its items: Enter activates the first.
+    keys(cx, "down");
+    keys(cx, "enter");
+    assert_eq!(picked.get(), 1);
+    assert!(cx.debug_bounds("material-menu").is_none());
+    cx.update(|window, _| assert!(row.is_focused(window), "focus came back"));
+}
+
+#[gpui::test]
+fn escape_closes_a_keyboard_context_menu_and_returns_focus(cx: &mut TestAppContext) {
+    let (view, cx) = keyboard_menu(cx);
+    let row = view.update(cx, |v, _| v.row.clone());
+    focus_on(cx, &row);
+    keys(cx, "menu");
+    assert!(
+        cx.debug_bounds("outer-item").is_some(),
+        "the Menu key opens it"
+    );
+    keys(cx, "escape");
+    assert!(cx.debug_bounds("material-menu").is_none());
+    cx.update(|window, _| assert!(row.is_focused(window), "focus came back"));
+}
+
+#[gpui::test]
+fn a_focused_descendant_opens_its_closest_triggers_menu(cx: &mut TestAppContext) {
+    let (view, cx) = keyboard_menu(cx);
+    let (control, inner) = view.update(cx, |v, _| (v.control.clone(), v.inner.clone()));
+    focus_on(cx, &control);
+    keys(cx, "shift-f10");
+    assert!(cx.debug_bounds("outer-item").is_some(), "inside the row");
+    keys(cx, "escape");
+    focus_on(cx, &inner);
+    keys(cx, "shift-f10");
+    assert!(
+        cx.debug_bounds("inner-item").is_some(),
+        "the nested trigger's"
+    );
+    assert!(cx.debug_bounds("outer-item").is_none());
+}
+
+#[gpui::test]
+fn other_keys_and_focus_elsewhere_leave_the_menu_closed(cx: &mut TestAppContext) {
+    let (view, cx) = keyboard_menu(cx);
+    let (outside, row) = view.update(cx, |v, _| (v.outside.clone(), v.row.clone()));
+    focus_on(cx, &outside);
+    keys(cx, "shift-f10");
+    assert!(
+        cx.debug_bounds("material-menu").is_none(),
+        "focus is not in the row"
+    );
+    focus_on(cx, &row);
+    for key in ["f10", "ctrl-shift-f10", "shift-menu"] {
+        keys(cx, key);
+        assert!(cx.debug_bounds("material-menu").is_none(), "{key}");
+    }
+}
+
+#[gpui::test]
+fn a_handle_opens_and_closes_the_context_menu_from_code(cx: &mut TestAppContext) {
+    let (view, cx) = keyboard_menu(cx);
+    let (handle, row) = view.update(cx, |v, _| (v.handle.clone(), v.row.clone()));
+    focus_on(cx, &row);
+    let bounds = cx.debug_bounds("row").unwrap();
+    assert!(cx.update(|_, cx| handle.open(cx)));
+    settle(cx);
+    let menu = cx.debug_bounds("material-menu").expect("open() opens it");
+    assert_eq!(menu.origin.x, bounds.origin.x);
+    assert!(cx.update(|_, cx| handle.is_open(cx)));
+    cx.update(|_, cx| handle.close(cx));
+    settle(cx);
+    assert!(cx.debug_bounds("material-menu").is_none());
+    assert!(!cx.update(|_, cx| handle.is_open(cx)));
+    cx.update(|window, _| assert!(row.is_focused(window), "focus came back"));
+
+    let at = bounds.origin + point(px(150.), px(40.));
+    assert!(cx.update(|_, cx| handle.open_at(at, cx)));
+    settle(cx);
+    let menu = cx
+        .debug_bounds("material-menu")
+        .expect("open_at() opens it");
+    assert_eq!(menu.origin.x, at.x, "at the point");
+    assert!(!cx.update(|_, cx| ContextMenuHandle::default().open(cx)));
+}
+
+#[test]
+fn shift_f10_and_the_menu_key_ask_for_a_context_menu() {
+    let key = |text: &'static str| Keystroke::parse(text).unwrap();
+    assert!(opens_context_menu(&key("shift-f10")));
+    assert!(opens_context_menu(&key("menu")));
+    assert!(opens_context_menu(&key("contextmenu")));
+    assert!(!opens_context_menu(&key("f10")));
+    assert!(!opens_context_menu(&key("cmd-shift-f10")));
+    assert!(!opens_context_menu(&key("alt-menu")));
+}
+
 #[test]
 fn a_closing_popup_paints_until_both_channels_settle() {
     assert!(popup_visible(true, 0., 0.));
