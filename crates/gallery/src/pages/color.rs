@@ -340,11 +340,16 @@ impl Page {
         }
     }
 
-    /// Picking another theme or palette anywhere in the Gallery ends the seed.
+    /// Picking another theme or palette anywhere in the Gallery ends the seed,
+    /// and so does a pick elsewhere that clears it (the home's swatches).
     fn shared_changed(&mut self, cx: &mut Context<Self>) {
         let shared = self.page.shared.read(cx);
         let reference = (shared.reference_theme, shared.palette);
-        if !self.active {
+        if self.active && shared.seed.is_none() {
+            self.active = false;
+            self.reference = reference;
+            cx.notify();
+        } else if !self.active {
             self.reference = reference;
         } else if reference != self.reference {
             self.clear_seed(cx);
@@ -826,6 +831,18 @@ mod tests {
             page.update(cx, |page, cx| page.clear_seed(cx));
         });
         assert_eq!(theme::scheme(), forest);
+
+        // Clearing the seed elsewhere while keeping the theme (the home's
+        // swatch for the theme already painted) ends it here too.
+        cx.update(|_, cx| {
+            page.update(cx, |page, cx| page.apply_seed(cx));
+            shared.update(cx, |shared, cx| {
+                shared.seed = None;
+                cx.notify();
+            });
+        });
+        cx.run_until_parked();
+        cx.update(|_, cx| assert!(!page.read(cx).active));
     }
 
     #[gpui::test]
