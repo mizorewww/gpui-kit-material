@@ -163,20 +163,21 @@ one revision:
 ```toml
 [dependencies]
 gpui-kit = "0.9.1"
-gpui-kit-material = { git = "https://github.com/mizorewww/gpui-kit-material", rev = "98c72b8d183418631b3dcf91064fcece6a96350f" }
+gpui-kit-material = { git = "https://github.com/mizorewww/gpui-kit-material", rev = "bb725687a758cdaffd5018f4b7519243db7fbd3d" }
 
 [patch.crates-io]
-gpui-kit = { git = "https://github.com/mizorewww/gpui-kit-material", rev = "98c72b8d183418631b3dcf91064fcece6a96350f" }
-gpui-pre = { git = "https://github.com/mizorewww/gpui-kit-material", rev = "98c72b8d183418631b3dcf91064fcece6a96350f" }
-gpui-pre-apple = { git = "https://github.com/mizorewww/gpui-kit-material", rev = "98c72b8d183418631b3dcf91064fcece6a96350f" }
-gpui-pre-web = { git = "https://github.com/mizorewww/gpui-kit-material", rev = "98c72b8d183418631b3dcf91064fcece6a96350f" }
-gpui-fast = { git = "https://github.com/mizorewww/gpui-kit-material", rev = "98c72b8d183418631b3dcf91064fcece6a96350f" }
+gpui-kit = { git = "https://github.com/mizorewww/gpui-kit-material", rev = "bb725687a758cdaffd5018f4b7519243db7fbd3d" }
+gpui-pre = { git = "https://github.com/mizorewww/gpui-kit-material", rev = "bb725687a758cdaffd5018f4b7519243db7fbd3d" }
+gpui-pre-apple = { git = "https://github.com/mizorewww/gpui-kit-material", rev = "bb725687a758cdaffd5018f4b7519243db7fbd3d" }
+gpui-pre-web = { git = "https://github.com/mizorewww/gpui-kit-material", rev = "bb725687a758cdaffd5018f4b7519243db7fbd3d" }
+gpui-fast = { git = "https://github.com/mizorewww/gpui-kit-material", rev = "bb725687a758cdaffd5018f4b7519243db7fbd3d" }
 ```
 
 `[patch]` is read only from the top-level manifest, so it goes in your workspace root.
-The revision shown is the one that moved these patches to Kit 0.9.1: CI does not build
-that revision again, and `scripts/check-package.sh` checks that this block differs from
-the template CI builds (`scripts/git-consumer/Cargo.toml.in`) only in its revision.
+The revision shown is `gpui-kit-material` 0.1.1's source; the engine patches in it are
+unchanged since they moved to Kit 0.9.1 (`98c72b8`). CI does not build that revision
+again, and `scripts/check-package.sh` checks that this block differs from the template CI
+builds (`scripts/git-consumer/Cargo.toml.in`) only in its revision.
 
 CI builds that
 manifest from Git at the pushed commit (`scripts/check-git-consumer.sh`) on every target,
