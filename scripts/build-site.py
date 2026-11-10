@@ -31,6 +31,9 @@ WASM = "gpui_kit_material_gallery_web_bg.wasm"
 # The icon styles the Gallery draws; crates/gallery-web/www/main.js lists the same.
 SYMBOLS = ("MaterialSymbolsOutlined.ttf", "MaterialSymbolsRounded.ttf")
 
+# Images the pages show, published at their repository path.
+IMAGES = "docs/screenshots"
+
 # Source path -> (published URL, navigation label). Optional docs are skipped
 # until they exist; any other repository path links to GitHub.
 PAGES = {
@@ -121,6 +124,8 @@ a { color: var(--primary); }
 .side .toc { margin: 12px 0 0; padding-top: 12px; border-top: 1px solid var(--outline-variant); }
 .side .toc a { padding: 4px 16px; font-weight: 400; }
 main { min-width: 0; }
+main img { max-width: 100%; height: auto; }
+main img[src^="/docs/"] { border-radius: 12px; }
 h1 { margin: 0 0 16px; font-size: 2.25rem; line-height: 2.75rem; font-weight: 400; }
 h2 { margin: 40px 0 12px; font-size: 1.75rem; line-height: 2.25rem; font-weight: 400; }
 h3 { margin: 28px 0 8px; font-size: 1.375rem; line-height: 1.75rem; font-weight: 500; }
@@ -213,6 +218,8 @@ class SiteLinks(Treeprocessor):
         fragment = f"#{parts.fragment}" if parts.fragment else ""
         if path in self.published:
             return self.published[path] + fragment
+        if path.startswith(IMAGES + "/"):
+            return f"/{path}"
         kind = "tree" if (ROOT / path).is_dir() else "blob"
         return f"{REPOSITORY}/{kind}/main/{path}{fragment}"
 
@@ -478,6 +485,8 @@ def main():
                     ignore=shutil.ignore_patterns(".lock", ".rustc_info.json", "*.lock"))
     build_gallery(output)
     build_docs(output, build_assets(output), commit)
+    if (ROOT / IMAGES).is_dir():
+        shutil.copytree(ROOT / IMAGES, output / IMAGES)
     (output / "_headers").write_text(HEADERS)
     check_links(output)
     files = [path for path in output.rglob("*") if path.is_file()]
