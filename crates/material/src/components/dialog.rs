@@ -504,6 +504,9 @@ pub(crate) struct ModalFocus {
     pub focus: FocusHandle,
     previous: Option<FocusHandle>,
     shown: bool,
+    /// Held from opening to closing (or leaving the tree), for content that
+    /// waits for modal surfaces, such as a snackbar's countdown.
+    _hold: Option<super::focus::ModalHold>,
 }
 
 /// The focus handle of the modal surface keyed by `id`, after applying the
@@ -521,6 +524,7 @@ pub(crate) fn modal_focus(
         focus: cx.focus_handle(),
         previous: None,
         shown: false,
+        _hold: None,
     });
     let shown = state.read(cx).shown;
     if open && !shown {
@@ -528,6 +532,7 @@ pub(crate) fn modal_focus(
         state.update(cx, |state, _| {
             state.shown = true;
             state.previous = previous;
+            state._hold = Some(super::focus::ModalHold::new());
         });
         if take_focus {
             let target = state.read(cx).focus.clone();
@@ -537,6 +542,7 @@ pub(crate) fn modal_focus(
     } else if !open && shown {
         let previous = state.update(cx, |state, _| {
             state.shown = false;
+            state._hold = None;
             state.previous.take()
         });
         if let Some(previous) = previous {

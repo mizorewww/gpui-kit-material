@@ -559,3 +559,34 @@ mod tests {
         assert_eq!(reveal_delta(300., 900., 80., 400.), -220.);
     }
 }
+
+thread_local! {
+    /// How many Material modal surfaces (dialogs, modal sheets and drawers)
+    /// are open on this thread, for content that waits for them to close.
+    static MODALS_OPEN: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
+/// Held while a Material modal surface is open; dropping it, as closing or
+/// leaving the tree does, releases it.
+#[cfg_attr(not(feature = "dialogs"), allow(dead_code))]
+pub(crate) struct ModalHold(());
+
+#[cfg_attr(not(feature = "dialogs"), allow(dead_code))]
+impl ModalHold {
+    pub(crate) fn new() -> Self {
+        MODALS_OPEN.with(|open| open.set(open.get() + 1));
+        Self(())
+    }
+}
+
+impl Drop for ModalHold {
+    fn drop(&mut self) {
+        MODALS_OPEN.with(|open| open.set(open.get().saturating_sub(1)));
+    }
+}
+
+/// Whether a Material modal surface is open.
+#[cfg_attr(not(feature = "feedback"), allow(dead_code))]
+pub(crate) fn modal_open() -> bool {
+    MODALS_OPEN.with(|open| open.get() > 0)
+}
