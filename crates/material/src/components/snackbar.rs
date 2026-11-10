@@ -11,6 +11,7 @@ use crate::motion::{self, MotionToken};
 use crate::theme::color;
 use crate::tokens::{elevation, shape::*, state, typography::*};
 use gpui::{prelude::*, *};
+use std::cell::Cell;
 use std::rc::Rc;
 use std::time::Duration;
 
@@ -24,6 +25,13 @@ const CLOSE_BOX: f32 = 48.;
 const TRAVEL: f32 = 12.;
 /// A placed snackbar's distance from the edges of its ancestor.
 const EDGE: f32 = 16.;
+/// The deferred layer a snackbar draws in. M3 snackbars appear above other
+/// content, a modal surface included: GPUI Base's dialog host is a deferred
+/// layer at 10 plus its stack depth and Material's modal sheets are at 10, so
+/// a snackbar shown while one is open goes above it. Caption buttons (50),
+/// menus and popovers (`gpui_base::POPUP_PRIORITY`, 100) and tooltips (200)
+/// stay above it.
+pub const SNACKBAR_PRIORITY: usize = 40;
 
 type SnackbarHandler = Rc<dyn Fn(&ClickEvent, &mut Window, &mut App)>;
 type DismissHandler = Rc<dyn Fn(&mut Window, &mut App)>;
@@ -84,6 +92,12 @@ struct AutoDismiss {
 /// [`Self::position`] along the bottom of its positioned ancestor.
 /// [`Self::duration`] asks for dismissal through [`Self::on_dismiss`], which
 /// also answers Escape; the pointer resting on it pauses the countdown.
+///
+/// It lays out where it is placed but draws and takes the pointer in a
+/// layer above the page and any open dialog, sheet or scrim
+/// ([`SNACKBAR_PRIORITY`]), still clipped as its place in the page is. A
+/// press on it reaches only it, and does not take focus from what has it, so
+/// a dialog it shows over keeps focus and stays open.
 ///
 /// # Example
 ///
@@ -365,6 +379,17 @@ impl RenderOnce for Snackbar {
             .text_size(body.font_size)
             .line_height(body.line_height)
             .shadow(elevation::level(SNACKBAR_ELEVATION))
+            // An opaque surface: a press on it is not one on what it covers,
+            // such as a dialog's scrim.
+            .occlude()
+            // A transient surface keeps focus where it is, in a dialog it
+            // shows over above all: a press only activates its buttons.
+            // With nothing focused, a button takes focus as usual.
+            .capture_any_mouse_down(|_, window, cx| {
+                if window.focused(cx).is_some() {
+                    window.prevent_default();
+                }
+            })
             .when_some(self.selector, |surface, name| {
                 surface.debug_selector(move || name.to_string())
             })
@@ -422,7 +447,7 @@ impl RenderOnce for Snackbar {
         } else {
             surface.into_any_element()
         };
-        match self.position {
+        let placed = match self.position {
             None => surface,
             Some(position) => div()
                 .absolute()
@@ -437,7 +462,157 @@ impl RenderOnce for Snackbar {
                 })
                 .child(surface)
                 .into_any_element(),
+        };
+        // A static specimen stays in the page's own layer.
+        if preview.is_some() {
+            placed
+        } else {
+            Raised::new(crate::scope::current_scope(placed)).into_any_element()
         }
+    }
+}
+
+/// Lays `child` out in place and draws it in the [`SNACKBAR_PRIORITY`] layer,
+/// clipped as it would be in place. GPUI's `deferred` drops its ancestors'
+/// clip, which would let a snackbar scrolled out of a list draw, and take
+/// presses, over the page around it.
+struct Raised {
+    child: Option<AnyElement>,
+    mask: Rc<Cell<Option<ContentMask<Pixels>>>>,
+}
+
+impl Raised {
+    fn new(child: AnyElement) -> Self {
+        let mask = Rc::new(Cell::new(None));
+        let child = Clipped {
+            child,
+            mask: mask.clone(),
+        };
+        Self {
+            child: Some(child.into_any_element()),
+            mask,
+        }
+    }
+}
+
+impl IntoElement for Raised {
+    type Element = Self;
+    fn into_element(self) -> Self {
+        self
+    }
+}
+
+impl Element for Raised {
+    type RequestLayoutState = ();
+    type PrepaintState = ();
+
+    fn id(&self) -> Option<ElementId> {
+        None
+    }
+
+    fn source_location(&self) -> Option<&'static core::panic::Location<'static>> {
+        None
+    }
+
+    fn request_layout(
+        &mut self,
+        _: Option<&GlobalElementId>,
+        _: Option<&InspectorElementId>,
+        window: &mut Window,
+        cx: &mut App,
+    ) -> (LayoutId, ()) {
+        let child = self.child.as_mut().expect("laid out once");
+        (child.request_layout(window, cx), ())
+    }
+
+    fn prepaint(
+        &mut self,
+        _: Option<&GlobalElementId>,
+        _: Option<&InspectorElementId>,
+        _: Bounds<Pixels>,
+        _: &mut (),
+        window: &mut Window,
+        _: &mut App,
+    ) {
+        self.mask.set(Some(window.content_mask()));
+        let child = self.child.take().expect("prepainted once");
+        let offset = window.element_offset();
+        window.defer_draw(child, offset, SNACKBAR_PRIORITY, None);
+    }
+
+    fn paint(
+        &mut self,
+        _: Option<&GlobalElementId>,
+        _: Option<&InspectorElementId>,
+        _: Bounds<Pixels>,
+        _: &mut (),
+        _: &mut (),
+        _: &mut Window,
+        _: &mut App,
+    ) {
+    }
+}
+
+/// The raised child, under the clip its place in the page had.
+struct Clipped {
+    child: AnyElement,
+    mask: Rc<Cell<Option<ContentMask<Pixels>>>>,
+}
+
+impl IntoElement for Clipped {
+    type Element = Self;
+    fn into_element(self) -> Self {
+        self
+    }
+}
+
+impl Element for Clipped {
+    type RequestLayoutState = ();
+    type PrepaintState = ();
+
+    fn id(&self) -> Option<ElementId> {
+        None
+    }
+
+    fn source_location(&self) -> Option<&'static core::panic::Location<'static>> {
+        None
+    }
+
+    fn request_layout(
+        &mut self,
+        _: Option<&GlobalElementId>,
+        _: Option<&InspectorElementId>,
+        window: &mut Window,
+        cx: &mut App,
+    ) -> (LayoutId, ()) {
+        (self.child.request_layout(window, cx), ())
+    }
+
+    fn prepaint(
+        &mut self,
+        _: Option<&GlobalElementId>,
+        _: Option<&InspectorElementId>,
+        _: Bounds<Pixels>,
+        _: &mut (),
+        window: &mut Window,
+        cx: &mut App,
+    ) {
+        let child = &mut self.child;
+        window.with_content_mask(self.mask.get(), |window| child.prepaint(window, cx));
+    }
+
+    fn paint(
+        &mut self,
+        _: Option<&GlobalElementId>,
+        _: Option<&InspectorElementId>,
+        _: Bounds<Pixels>,
+        _: &mut (),
+        _: &mut (),
+        window: &mut Window,
+        cx: &mut App,
+    ) {
+        let child = &mut self.child;
+        window.with_content_mask(self.mask.get(), |window| child.paint(window, cx));
     }
 }
 
@@ -602,6 +777,158 @@ mod tests {
         let (_, cx) = open(cx, false);
         assert!(cx.debug_bounds("snackbar-action").is_none());
         assert!(cx.debug_bounds("snackbar-close").is_none());
+    }
+
+    /// A page whose snackbar shows while a modal dialog is open over it.
+    #[cfg(feature = "dialogs")]
+    struct OverDialog {
+        full_screen: bool,
+        actions: usize,
+        dismissals: usize,
+    }
+
+    #[cfg(feature = "dialogs")]
+    impl Render for OverDialog {
+        fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+            window.set_rem_size(px(16.));
+            let dialog = crate::components::MaterialDialog::new("dialog")
+                .headline("Screenshot")
+                .supporting_text("Copy it to the clipboard")
+                .modal(true)
+                .on_dismiss({
+                    let this = cx.entity().downgrade();
+                    move |_, cx| {
+                        let _ = this.update(cx, |this, _| this.dismissals += 1);
+                    }
+                });
+            let dialog = if self.full_screen {
+                dialog.full_screen("Close", None)
+            } else {
+                dialog
+            };
+            div().relative().size_full().child(dialog).child(
+                Snackbar::new("copied", "Image copied")
+                    .debug_name("over-dialog")
+                    .action("Undo", cx.listener(|this, _, _, _| this.actions += 1))
+                    .position(SnackbarPosition::Center),
+            )
+        }
+    }
+
+    /// The snackbar's action takes a press over the dialog's scrim (or its
+    /// full-screen surface), which neither dismisses the dialog nor takes its
+    /// focus.
+    #[cfg(feature = "dialogs")]
+    fn shows_over(full_screen: bool, cx: &mut TestAppContext) {
+        cx.update(|cx| {
+            gpui_base::init(cx);
+            cx.set_reduce_motion(true);
+        });
+        let (view, cx) = cx.add_window_view(move |_, _| OverDialog {
+            full_screen,
+            actions: 0,
+            dismissals: 0,
+        });
+        for _ in 0..3 {
+            redraw(cx);
+            cx.run_until_parked();
+        }
+        let focused = cx.update(|window, cx| window.focused(cx));
+        assert!(focused.is_some(), "the dialog took focus");
+        let surface = cx.debug_bounds("over-dialog").expect("snackbar");
+        let action = cx.debug_bounds("snackbar-action").expect("action");
+        // Its padding, then its action.
+        let padding = point(surface.left() + px(4.), surface.center().y);
+        cx.simulate_click(padding, Modifiers::default());
+        cx.simulate_click(action.center(), Modifiers::default());
+        redraw(cx);
+        cx.run_until_parked();
+        view.read_with(cx, |v, _| {
+            assert_eq!(v.actions, 1, "the action is above the dialog layer");
+            assert_eq!(
+                v.dismissals, 0,
+                "a press on the snackbar is not the scrim's"
+            );
+        });
+        cx.update(|window, cx| {
+            assert_eq!(window.focused(cx), focused, "the dialog keeps focus");
+        });
+        // Escape still reaches the dialog.
+        let escape = cx.update(|_, cx| {
+            gpui::Keystroke::parse_with_os("escape", cx.platform_info().os).unwrap()
+        });
+        cx.simulate_event(gpui::KeyDownEvent {
+            keystroke: escape,
+            is_held: false,
+            prefer_character_input: false,
+        });
+        cx.run_until_parked();
+        view.read_with(cx, |v, _| assert_eq!(v.dismissals, 1));
+    }
+
+    #[cfg(feature = "dialogs")]
+    #[gpui::test]
+    fn a_snackbar_shows_over_a_modal_dialog(cx: &mut TestAppContext) {
+        shows_over(false, cx);
+    }
+
+    #[cfg(feature = "dialogs")]
+    #[gpui::test]
+    fn a_snackbar_shows_over_a_full_screen_dialog(cx: &mut TestAppContext) {
+        shows_over(true, cx);
+    }
+
+    /// A snackbar in a region that clips it, beside a button.
+    struct Clipping {
+        actions: usize,
+        page: usize,
+    }
+
+    impl Render for Clipping {
+        fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+            window.set_rem_size(px(14.));
+            div()
+                .size_full()
+                .child(
+                    div()
+                        .id("page")
+                        .absolute()
+                        .inset_0()
+                        .on_click(cx.listener(|this, _, _, _| this.page += 1)),
+                )
+                .child(
+                    // Shows the snackbar's message, not its action.
+                    div().w(px(120.)).overflow_hidden().child(
+                        div().w(px(344.)).child(
+                            Snackbar::new("clipped", "Saved")
+                                .action("Undo", cx.listener(|this, _, _, _| this.actions += 1)),
+                        ),
+                    ),
+                )
+        }
+    }
+
+    #[gpui::test]
+    fn a_raised_snackbar_keeps_its_clip(cx: &mut TestAppContext) {
+        cx.update(|cx| cx.set_reduce_motion(true));
+        let (view, cx) = cx.add_window_view(|_, _| Clipping {
+            actions: 0,
+            page: 0,
+        });
+        cx.run_until_parked();
+        let action = cx.debug_bounds("snackbar-action").expect("action");
+        assert!(
+            action.left() > px(120.),
+            "laid out past the clip: {action:?}"
+        );
+        cx.simulate_click(action.center(), Modifiers::default());
+        view.read_with(cx, |v, _| {
+            assert_eq!(
+                (v.actions, v.page),
+                (0, 1),
+                "the clipped action takes no press"
+            );
+        });
     }
 
     #[test]

@@ -68,7 +68,9 @@ pub use search::{
 #[cfg(feature = "selection")]
 pub use slider::{MaterialSlider, SliderAppearance, SliderColor, SliderSize};
 #[cfg(feature = "feedback")]
-pub use snackbar::{SNACKBAR_CLOSE_ICON, Snackbar, SnackbarDuration, SnackbarPosition};
+pub use snackbar::{
+    SNACKBAR_CLOSE_ICON, SNACKBAR_PRIORITY, Snackbar, SnackbarDuration, SnackbarPosition,
+};
 #[cfg(feature = "selection")]
 pub use switch::{MaterialSwitch, SwitchIcons};
 #[cfg(feature = "window-chrome")]

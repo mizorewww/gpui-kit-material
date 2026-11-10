@@ -5,7 +5,23 @@ commit messages.
 
 ## Unreleased
 
-Nothing yet.
+### Added
+
+- `SNACKBAR_PRIORITY`, the deferred layer a `Snackbar` draws in: above GPUI Base's dialog
+  host and Material's modal sheets (10 and up), below caption buttons (50), menus and
+  popovers (100) and tooltips (200).
+
+### Fixed
+
+- A `Snackbar` shown while a modal or full-screen `MaterialDialog` (or a modal sheet) is
+  open appears above the dialog and its scrim, as M3's snackbars appear above other
+  content; it drew under them and could not be seen. It still lays out where it is placed
+  and stays clipped as its place is. Its surface takes the pointer: a press on it, its
+  action or its close button no longer reaches the scrim, so the dialog stays open, and
+  no longer reaches the page under it.
+- A press on a snackbar leaves keyboard focus where it is (in a dialog it shows over, in
+  the dialog), instead of moving it to a button that leaves with the snackbar. With
+  nothing focused, its buttons take focus as before.
 
 ## gpui-kit-material 0.1.0 (2026-11-09)
 
