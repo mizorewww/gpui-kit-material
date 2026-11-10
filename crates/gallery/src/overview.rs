@@ -28,6 +28,15 @@ pub(crate) fn columns(width: f32) -> usize {
     (((width + CARD_GAP) / (CARD_MIN_WIDTH + CARD_GAP)).floor() as usize).max(1)
 }
 
+/// "7 components", beside a group's heading.
+fn group_count(count: usize) -> SharedString {
+    if count == 1 {
+        "1 component".into()
+    } else {
+        format!("{count} components").into()
+    }
+}
+
 fn icon(name: &str) -> Icon {
     symbol(name, 24.)
 }
@@ -616,17 +625,32 @@ impl Gallery {
                     (chunk.len()..columns).map(|_| div().flex_1().min_w_0().into_any_element()),
                 )
         });
+        let count = entries.len();
         gpui_base::v_flex()
             .gap(rem(16.))
             .pb(rem(40.))
             .child(
-                accessible_text(
-                    ("overview-group", group as usize),
-                    group.title().to_uppercase(),
-                )
-                .role(Role::Heading)
-                .map(|text| type_role(text, TypeRole::LabelLarge))
-                .text_color(color(ColorRole::ON_SURFACE_VARIANT)),
+                div()
+                    .flex()
+                    .flex_wrap()
+                    .items_baseline()
+                    .gap_x(rem(12.))
+                    .child(
+                        accessible_text(("overview-group", group as usize), group.title())
+                            .role(Role::Heading)
+                            .min_w_0()
+                            .whitespace_normal()
+                            .map(|text| type_role(text, TypeRole::TitleLarge))
+                            .text_color(color(ColorRole::ON_SURFACE)),
+                    )
+                    .child(
+                        accessible_text(
+                            ("overview-group-count", group as usize),
+                            group_count(count),
+                        )
+                        .map(|text| type_role(text, TypeRole::LabelLarge))
+                        .text_color(color(ColorRole::ON_SURFACE_VARIANT)),
+                    ),
             )
             .child(gpui_base::v_flex().gap(rem(CARD_GAP)).children(rows))
             .into_any_element()

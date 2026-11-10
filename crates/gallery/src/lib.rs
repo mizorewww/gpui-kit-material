@@ -17,6 +17,7 @@ mod instr_bench;
 mod interactions;
 
 pub(crate) mod catalog;
+mod home;
 mod overview;
 pub(crate) mod page;
 mod pages;

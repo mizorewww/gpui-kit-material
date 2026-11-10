@@ -124,6 +124,8 @@ fn navigation_switches_the_page_and_builds_only_pages_shown(cx: &mut TestAppCont
 
     // An overview card navigates too.
     go(&window, &mut cx, "overview");
+    let browse = bounds(&mut cx, "home-browse");
+    click(&window, &mut cx, browse.center());
     let card = bounds(&mut cx, "overview-icon-button");
     click(&window, &mut cx, card.center());
     window

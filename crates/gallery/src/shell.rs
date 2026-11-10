@@ -167,6 +167,11 @@ impl ShellLayout {
     }
 }
 
+/// The width of the page content between the gutters, in design px.
+pub(crate) fn page_content_width(window: &Window) -> f32 {
+    ShellLayout::of(window).content_width(shell_width(window))
+}
+
 /// The width inside a spec card, in design px.
 pub(super) fn spec_content_width(window: &Window) -> f32 {
     let layout = ShellLayout::of(window);
@@ -1478,6 +1483,9 @@ struct LeadProps {
 /// invalidation owner.
 pub(crate) struct LeadView {
     gallery: WeakEntity<Gallery>,
+    /// The Overview's home, built when first shown: its own view, so what
+    /// happens in it renders only it.
+    pub(super) home: Option<Entity<super::home::HomeView>>,
     _observe: Subscription,
     #[cfg(test)]
     pub(super) renders: std::cell::Cell<usize>,
@@ -1488,6 +1496,7 @@ impl LeadView {
         let observe = cx.observe(&gallery, |_, _, cx| cx.notify());
         Self {
             gallery: gallery.downgrade(),
+            home: None,
             _observe: observe,
             #[cfg(test)]
             renders: Default::default(),
@@ -1520,6 +1529,13 @@ impl Render for LeadView {
             scope.child(canvas).into_any_element()
         });
         let props = gallery.read(cx).lead_props(self.gallery.clone());
+        if matches!(CATALOG[props.current].kind, Kind::Overview) {
+            let home = self.home.get_or_insert_with(|| {
+                let (gallery, shared) = (props.gallery.clone(), props.shared.clone());
+                cx.new(|cx| super::home::HomeView::new(gallery, shared, cx))
+            });
+            return home.clone().into_any_element();
+        }
         let body = match CATALOG[props.current].kind {
             Kind::Overview | Kind::Document => None,
             Kind::Component { .. } => Some(match props.tab {

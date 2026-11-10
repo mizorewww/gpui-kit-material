@@ -35,11 +35,159 @@ fn bounds(cx: &mut VisualTestContext, selector: &'static str) -> Bounds<Pixels> 
 }
 
 #[gpui::test]
+fn the_home_repaints_the_gallery_and_opens_pages(cx: &mut TestAppContext) {
+    use gpui_kit_material::prelude::ThemeId;
+    let (window, mut cx) = open(cx);
+    settle(&window, &mut cx);
+    let (shared, lead) = window
+        .update(&mut cx, |g, _, _| (g.shared.clone(), g.lead.clone()))
+        .unwrap();
+    // A hero shape morphs to the next one when pressed, without leaving the page.
+    let shapes = |cx: &mut VisualTestContext| {
+        cx.update(|_, cx| lead.read(cx).home.clone().unwrap().read(cx).shapes)
+    };
+    let before = shapes(&mut cx);
+    let shape = bounds(&mut cx, "home-shape-0");
+    cx.simulate_click(shape.center(), Modifiers::none());
+    settle(&window, &mut cx);
+    assert_eq!(shapes(&mut cx)[0], before[0] + 1);
+    assert_eq!(shapes(&mut cx)[1..], before[1..]);
+    window
+        .update(&mut cx, |g, _, _| assert_eq!(g.current, 0))
+        .unwrap();
+    // A swatch, scrolled into view under the hero, paints its theme across
+    // the Gallery.
+    let scroll = |window: &WindowHandle<Gallery>, cx: &mut VisualTestContext, offset: f32| {
+        window
+            .update(cx, |g, _, cx| {
+                g.list.scroll_to(gpui::ListOffset {
+                    item_ix: 0,
+                    offset_in_item: px(offset),
+                });
+                cx.notify();
+            })
+            .unwrap();
+        settle(window, cx);
+    };
+    scroll(&window, &mut cx, 400.);
+    let ocean = bounds(&mut cx, "home-swatch-3");
+    cx.simulate_click(ocean.center(), Modifiers::none());
+    settle(&window, &mut cx);
+    cx.update(|_, cx| assert_eq!(shared.read(cx).reference_theme, Some(ThemeId::Ocean)));
+    scroll(&window, &mut cx, 0.);
+    // The hero's actions open the Styles and Examples pages.
+    let styles = bounds(&mut cx, "home-styles");
+    cx.simulate_click(styles.center(), Modifiers::none());
+    settle(&window, &mut cx);
+    window
+        .update(&mut cx, |g, _, _| {
+            assert_eq!(g.current, catalog::position("color").unwrap())
+        })
+        .unwrap();
+    window
+        .update(&mut cx, |g, _, cx| g.navigate(0, cx))
+        .unwrap();
+    settle(&window, &mut cx);
+    let examples = bounds(&mut cx, "home-examples");
+    cx.simulate_click(examples.center(), Modifiers::none());
+    settle(&window, &mut cx);
+    window
+        .update(&mut cx, |g, _, _| {
+            assert_eq!(g.current, catalog::position("examples").unwrap())
+        })
+        .unwrap();
+}
+
+/// The home's parts that must stay inside the window.
+const HOME_PARTS: [&str; 13] = [
+    "home-hero",
+    "home-browse",
+    "home-styles",
+    "home-examples",
+    "home-shape-3",
+    "home-tile-theme",
+    "home-swatch-7",
+    "home-tile-live",
+    "home-chip-2",
+    "home-toggle-2",
+    "home-tile-install",
+    "home-install-copy",
+    "home-library",
+];
+
+/// The home reflows at every width and text scale: nothing reaches past the
+/// window's edge.
+#[gpui::test]
+fn the_home_fits_every_width(cx: &mut TestAppContext) {
+    let (window, mut cx) = open(cx);
+    let sizes = [
+        (1600., 1.),
+        (1280., 1.),
+        (1000., 1.),
+        (840., 1.),
+        (600., 1.),
+        (412., 1.),
+        (360., 1.),
+        (412., 1.5),
+        (360., 2.),
+        (320., 2.),
+    ];
+    for (width, scale) in sizes {
+        window
+            .update(&mut cx, |_, window, _| {
+                window.set_rem_size(px(gpui_kit_material::tokens::typography::BASE_PX * scale))
+            })
+            .unwrap();
+        cx.simulate_resize(size(px(width), px(900.)));
+        // Each part is checked where it is drawn, the page scrolled to it.
+        let mut offset = 0.;
+        let mut checked = std::collections::HashSet::new();
+        while checked.len() < HOME_PARTS.len() && offset < 6000. {
+            window
+                .update(&mut cx, |g, _, cx| {
+                    g.list.scroll_to(gpui::ListOffset {
+                        item_ix: 0,
+                        offset_in_item: px(offset),
+                    });
+                    cx.notify();
+                })
+                .unwrap();
+            // A fit measures on one frame and draws to fit on the next.
+            settle(&window, &mut cx);
+            settle(&window, &mut cx);
+            for selector in HOME_PARTS {
+                let Some(element) = cx.debug_bounds(selector) else {
+                    continue;
+                };
+                if element.bottom() < px(0.) || element.top() > px(900.) {
+                    continue;
+                }
+                checked.insert(selector);
+                assert!(
+                    element.left() >= px(-0.5) && element.right() <= px(width) + px(0.5),
+                    "{selector} at {width}px and {scale}x: {element:?}"
+                );
+            }
+            offset += 300.;
+        }
+        assert_eq!(
+            checked.len(),
+            HOME_PARTS.len(),
+            "at {width}px and {scale}x only {checked:?} were drawn"
+        );
+    }
+}
+
+#[gpui::test]
 fn overview_cards_show_thumbnails_reflow_and_navigate(cx: &mut TestAppContext) {
     let (window, mut cx) = open(cx);
     settle(&window, &mut cx);
     let rows = window.update(&mut cx, |g, _, _| g.rows.clone()).unwrap();
     assert!(rows[1..].iter().all(|row| matches!(row, Row::Group(_))));
+    // The home's first action scrolls to the first group's cards.
+    let browse = bounds(&mut cx, "home-browse");
+    cx.simulate_click(browse.center(), Modifiers::none());
+    settle(&window, &mut cx);
     // Two cards share the first row at 1280px, each within the content.
     let button = bounds(&mut cx, "overview-button");
     let icon = bounds(&mut cx, "overview-icon-button");
