@@ -181,6 +181,51 @@ fn browsing_takes_focus_to_the_first_card(cx: &mut TestAppContext) {
         .unwrap();
 }
 
+#[gpui::test]
+fn the_theme_swatches_are_one_radio_group(cx: &mut TestAppContext) {
+    use gpui_kit_material::prelude::ThemeId;
+    let (window, mut cx) = open(cx);
+    settle(&window, &mut cx);
+    let shared = window.update(&mut cx, |g, _, _| g.shared.clone()).unwrap();
+    scroll_home(&window, &mut cx, 400.);
+    let ocean = bounds(&mut cx, "home-swatch-3");
+    cx.simulate_click(ocean.center(), Modifiers::none());
+    settle(&window, &mut cx);
+    let theme = |cx: &mut VisualTestContext| cx.update(|_, cx| shared.read(cx).reference_theme);
+    assert_eq!(theme(&mut cx), Some(ThemeId::Ocean));
+    // Arrow keys move along the swatches and pick each, wrapping round.
+    cx.simulate_keystrokes("right");
+    settle(&window, &mut cx);
+    assert_eq!(theme(&mut cx), Some(ThemeId::Forest));
+    cx.simulate_keystrokes("left left");
+    settle(&window, &mut cx);
+    assert_eq!(theme(&mut cx), Some(ThemeId::Expressive));
+    cx.simulate_keystrokes("end");
+    settle(&window, &mut cx);
+    assert_eq!(theme(&mut cx), Some(ThemeId::Monochrome));
+    cx.simulate_keystrokes("right");
+    settle(&window, &mut cx);
+    assert_eq!(theme(&mut cx), Some(ThemeId::Baseline));
+    // The eight are one tab stop: Tab leaves for the mode buttons.
+    let focused = |window: &WindowHandle<Gallery>, cx: &mut VisualTestContext| {
+        window
+            .update(cx, |_, window, cx| window.focused(cx))
+            .unwrap()
+    };
+    let swatch = focused(&window, &mut cx);
+    cx.simulate_keystrokes("tab");
+    settle(&window, &mut cx);
+    assert_ne!(focused(&window, &mut cx), swatch);
+    cx.simulate_keystrokes("shift-tab");
+    settle(&window, &mut cx);
+    assert_eq!(
+        focused(&window, &mut cx),
+        swatch,
+        "Shift+Tab comes back to the choice"
+    );
+    assert_eq!(theme(&mut cx), Some(ThemeId::Baseline), "Tab picks nothing");
+}
+
 /// The home's parts that must stay inside the window.
 const HOME_PARTS: [&str; 13] = [
     "home-hero",

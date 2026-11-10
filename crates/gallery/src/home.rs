@@ -431,73 +431,84 @@ impl HomeView {
         let shared = self.shared.read(cx);
         let mode = shared.painted_mode();
         let current = shared.reference_theme.filter(|_| shared.seed.is_none());
-        let swatches = div().flex().flex_wrap().gap(rem(8.)).children(
-            SWATCH_THEMES
-                .into_iter()
-                .enumerate()
-                .map(|(index, (theme, name))| {
-                    let selected = current == Some(theme);
-                    let scope = gpui_kit_material::scope::Scope::new(("home-swatch-scope", index))
-                        .scheme(swatch_scheme(index, mode))
-                        .child(
-                            div()
-                                .relative()
-                                .size(rem(SWATCH))
-                                .flex()
-                                .items_center()
-                                .justify_center()
+        let selected = SWATCH_THEMES
+            .iter()
+            .position(|(theme, _)| current == Some(*theme));
+        // One choice of eight: a radio group, one tab stop whose arrow keys
+        // move between the swatches and pick them.
+        let swatches = CustomRadioGroup::new("home-swatches", "Theme")
+            .flex()
+            .flex_wrap()
+            .gap(rem(8.))
+            .options(
+                SWATCH_THEMES
+                    .into_iter()
+                    .enumerate()
+                    .map(|(index, (_, name))| {
+                        let selected = selected == Some(index);
+                        let scope =
+                            gpui_kit_material::scope::Scope::new(("home-swatch-scope", index))
+                                .scheme(swatch_scheme(index, mode))
                                 .child(
-                                    // The chosen theme's swatch morphs to a
-                                    // cookie and takes a check.
-                                    MaterialShape::new(
-                                        ("home-swatch", index),
-                                        if selected {
-                                            ShapeKind::Cookie9Sided
-                                        } else {
-                                            ShapeKind::Circle
-                                        },
-                                    )
-                                    .color(ColorRole::PRIMARY)
-                                    .size(SWATCH)
-                                    .animated(true),
-                                )
-                                .when(selected, |swatch| {
-                                    swatch.child(
-                                        div()
-                                            .absolute()
-                                            .inset_0()
-                                            .flex()
-                                            .items_center()
-                                            .justify_center()
-                                            .child(
-                                                symbol("check", 20.)
-                                                    .color(color(ColorRole::ON_PRIMARY)),
-                                            ),
-                                    )
-                                }),
-                        );
-                    let ring = color(ColorRole::SECONDARY);
-                    gpui_base::Button::new(("home-swatch-button", index))
-                        .accessibility_label(name)
-                        .selected(selected)
-                        .debug_selector(move || format!("home-swatch-{index}"))
-                        .rounded_full()
-                        .cursor_pointer()
-                        // A constant ring that only focus colors, so focus
-                        // moves nothing.
-                        .border_2()
-                        .border_color(gpui::transparent_black())
-                        .focus_visible(move |style| style.border_color(ring))
-                        .child(scope)
-                        .on_click(cx.listener(move |this, _, _, cx| {
-                            this.shared.update(cx, |shared, cx| {
-                                shared.seed = None;
-                                shared.reference_theme = Some(theme);
-                                cx.notify();
-                            });
-                        }))
-                }),
-        );
+                                    div()
+                                        .relative()
+                                        .size(rem(SWATCH))
+                                        .flex()
+                                        .items_center()
+                                        .justify_center()
+                                        .child(
+                                            // The chosen theme's swatch morphs
+                                            // to a cookie and takes a check.
+                                            MaterialShape::new(
+                                                ("home-swatch", index),
+                                                if selected {
+                                                    ShapeKind::Cookie9Sided
+                                                } else {
+                                                    ShapeKind::Circle
+                                                },
+                                            )
+                                            .color(ColorRole::PRIMARY)
+                                            .size(SWATCH)
+                                            .animated(true),
+                                        )
+                                        .when(selected, |swatch| {
+                                            swatch.child(
+                                                div()
+                                                    .absolute()
+                                                    .inset_0()
+                                                    .flex()
+                                                    .items_center()
+                                                    .justify_center()
+                                                    .child(
+                                                        symbol("check", 20.)
+                                                            .color(color(ColorRole::ON_PRIMARY)),
+                                                    ),
+                                            )
+                                        }),
+                                );
+                        let ring = color(ColorRole::SECONDARY);
+                        gpui_base::Radio::new(("home-swatch-button", index))
+                            .accessibility_label(name)
+                            .debug_selector(move || format!("home-swatch-{index}"))
+                            .rounded_full()
+                            .cursor_pointer()
+                            // A constant ring that only focus colors, so focus
+                            // moves nothing.
+                            .border_2()
+                            .border_color(gpui::transparent_black())
+                            .focus_visible(move |style| style.border_color(ring))
+                            .child(scope)
+                    }),
+            )
+            .selected(selected)
+            .on_change(cx.listener(|this, index: &usize, _, cx| {
+                let theme = SWATCH_THEMES[*index].0;
+                this.shared.update(cx, |shared, cx| {
+                    shared.seed = None;
+                    shared.reference_theme = Some(theme);
+                    cx.notify();
+                });
+            }));
         let shared = self.shared.clone();
         Self::tile(
             "theme",
