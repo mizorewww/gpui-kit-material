@@ -8,13 +8,13 @@ cd "$(dirname "$0")/.."
 cmp LICENSE crates/material/LICENSE
 cmp LICENSE crates/color/LICENSE
 
-# The README's patch block is the manifest check-git-consumer.sh builds, at one revision.
+# ARCHITECTURE.md's consumer patch block is the manifest check-git-consumer.sh builds, at one revision.
 repo=https://github.com/mizorewww/gpui-kit-material
-published=$(grep -F "git = \"$repo\", rev = " README.md)
+published=$(grep -F "git = \"$repo\", rev = " docs/ARCHITECTURE.md)
 diff <(sed -E 's/rev = "[^"]*"/rev = "@REV@"/' <<<"$published") \
     <(grep -F '@REPO@' scripts/git-consumer/Cargo.toml.in | sed "s|@REPO@|$repo|")
 if [ "$(grep -oE 'rev = "[^"]*"' <<<"$published" | sort -u | wc -l | tr -d ' ')" != 1 ]; then
-    echo "The README's patch block mixes revisions" >&2
+    echo "The consumer patch block mixes revisions" >&2
     exit 1
 fi
 

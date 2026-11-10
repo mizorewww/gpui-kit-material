@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Builds the README's Git quick start in a directory outside the repository, the way
+# Builds ARCHITECTURE.md's consumer patch set in a directory outside the repository, the way
 # a downstream application does: Kit from crates.io, the library and its engine patches
 # from the Git repository at one revision, and nothing from a checkout. There is no
 # lockfile, so a resolve that drifts away from one Kit, Base and engine fails here first.

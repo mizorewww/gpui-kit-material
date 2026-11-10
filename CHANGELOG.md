@@ -39,7 +39,7 @@ distributed by Git revision; the entries below are changes since those revisions
   which published GPUI does not have; inputs that are not Material's are not reported.
 - `Color::contrast`, the WCAG 2.x contrast ratio of two colors.
 - Cargo feature groups on `gpui-kit-material`, with `full` naming every group; see the
-  [README](README.md#crates). `default` still enables everything.
+  [crate README](crates/material/README.md#features). `default` still enables everything.
 - A `dynamic` feature on `gpui-kit-material-color`, on by default.
 - A published `[patch]` block for downstream workspaces that want the Gallery's engine
   patches, built from Git by CI.

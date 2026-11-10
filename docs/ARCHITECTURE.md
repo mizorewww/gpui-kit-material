@@ -56,7 +56,7 @@ selects none ([Consumer patch set](#consumer-patch-set)). The Gallery's native b
 `gpui-kit/test-support`, whose `render_to_image` draws `--capture`.
 
 The library's components are in Cargo feature groups, listed in the
-[README](../README.md#crates). A component using one in another group means its group
+[crate README](../crates/material/README.md#features). A component using one in another group means its group
 declares that group in `Cargo.toml`, and `scripts/check-features.sh`, which checks each
 group alone in CI, fails when it does not. `components/interaction` (focus ring, ripple),
 `focus`, `ripple`, `roving`, `preview`, `labeled` and `text` are shared by the groups and
@@ -158,7 +158,27 @@ too.
 
 A downstream workspace that wants the Gallery's engine behavior patches `gpui-kit`,
 `gpui-pre`, `gpui-pre-apple`, `gpui-pre-web` and `gpui-fast` from this repository at
-one revision, as the [quick start](../README.md#quick-start) shows. CI builds that
+one revision:
+
+```toml
+[dependencies]
+gpui-kit = "0.9.1"
+gpui-kit-material = { git = "https://github.com/mizorewww/gpui-kit-material", rev = "98c72b8d183418631b3dcf91064fcece6a96350f" }
+
+[patch.crates-io]
+gpui-kit = { git = "https://github.com/mizorewww/gpui-kit-material", rev = "98c72b8d183418631b3dcf91064fcece6a96350f" }
+gpui-pre = { git = "https://github.com/mizorewww/gpui-kit-material", rev = "98c72b8d183418631b3dcf91064fcece6a96350f" }
+gpui-pre-apple = { git = "https://github.com/mizorewww/gpui-kit-material", rev = "98c72b8d183418631b3dcf91064fcece6a96350f" }
+gpui-pre-web = { git = "https://github.com/mizorewww/gpui-kit-material", rev = "98c72b8d183418631b3dcf91064fcece6a96350f" }
+gpui-fast = { git = "https://github.com/mizorewww/gpui-kit-material", rev = "98c72b8d183418631b3dcf91064fcece6a96350f" }
+```
+
+`[patch]` is read only from the top-level manifest, so it goes in your workspace root.
+The revision shown is the one that moved these patches to Kit 0.9.1: CI does not build
+that revision again, and `scripts/check-package.sh` checks that this block differs from
+the template CI builds (`scripts/git-consumer/Cargo.toml.in`) only in its revision.
+
+CI builds that
 manifest from Git at the pushed commit (`scripts/check-git-consumer.sh`) on every target,
 and [crates/consumer-check/Cargo.toml](../crates/consumer-check/Cargo.toml), the same
 patches from this checkout, on every target and both backends, beside upstream's

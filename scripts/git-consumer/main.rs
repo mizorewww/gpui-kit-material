@@ -1,4 +1,4 @@
-//! The README's quick start, as a downstream application compiles it.
+//! ARCHITECTURE.md's consumer patch set, as a downstream application compiles it.
 use gpui_kit_material::{
     color::themes::{Contrast, ThemeId, ThemeMode},
     icons::Assets,

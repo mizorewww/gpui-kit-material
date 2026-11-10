@@ -1,97 +1,43 @@
 # gpui-kit-material
 
-Material 3 / **M3 Expressive** tokens, motion and components for
-[Longbridge GPUI Kit](https://github.com/longbridge/gpui-kit).
+[![crates.io](https://img.shields.io/crates/v/gpui-kit-material.svg)](https://crates.io/crates/gpui-kit-material)
+[![docs.rs](https://img.shields.io/docsrs/gpui-kit-material)](https://docs.rs/gpui-kit-material)
+[![CI](https://github.com/mizorewww/gpui-kit-material/actions/workflows/ci.yml/badge.svg)](https://github.com/mizorewww/gpui-kit-material/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-Components are Material adapters over Kit's `gpui-component` controls
-(`gpui_kit::component`) and Base parts: Kit owns behavior (input, focus,
-accessibility, overlays, windows), this crate owns Material visuals and motion.
-Icons come from
-[gpui-material-symbols](https://github.com/mizorewww/gpui-material-symbols).
+Material 3 and **M3 Expressive** components for Rust desktop and web apps built on
+[GPUI](https://www.gpui.rs/) and [Longbridge GPUI Kit](https://github.com/longbridge/gpui-kit).
 
-> **Status: pre-release (0.1).** Almost every component is implemented and
-> tested, but none is stable: no component has passed independent conformance
-> review, and none meets the [production standard](docs/PRODUCTION.md) yet.
-> [docs/COVERAGE.md](docs/COVERAGE.md) lists the state and gaps per component,
-> [docs/ROADMAP.md](docs/ROADMAP.md) what remains, and
-> [conformance/md3.json](conformance/md3.json) the review record.
+Buttons, chips, text fields, menus, dialogs, navigation, pickers and more, with
+Material's color system, type scale, shapes and Expressive motion. One codebase runs
+natively on macOS, Linux and Windows, and in the browser through WebAssembly.
 
-| Crate | Purpose |
-| --- | --- |
-| [`gpui-kit-material-color`](crates/color) | Color roles, palettes, reference themes, scheme derivation. No GPUI dependency. |
-| [`gpui-kit-material`](crates/material) | Theme runtime, tokens, motion, icons and components. |
-| [`gpui-kit-material-gallery-web`](crates/gallery-web) | WASM entry point for the shared gallery. |
+**[Try the live Gallery →](https://material.mizore.blog/gallery/)**
 
-## What's included
+![The Gallery's component overview, dark theme](docs/screenshots/gallery.png)
 
-- **Color and theme**: semantic `ColorRole`s, all 20 md3.io reference themes
-  (light/dark × standard/medium/high contrast, 52 reference roles each, with the kit's
-  10 application roles and 14 tint-family roles: 76 in all), 10 legacy
-  palettes, animated theme transitions and a 100–200% text scale. Dynamic
-  seed/HCT schemes are ported from material-color-utilities; image-derived seeds
-  are not supported.
-- **Tokens**: shape, the 15 type roles and their emphasized styles, layout
-  metrics, elevation, state layers.
-- **Motion**: Expressive (default) and Standard schemes, spatial/effects
-  curves, entrances, retargetable values, per-transition reduced motion.
-- **Components**:
+## Features
 
-| Group | Components |
-| --- | --- |
-| Actions | `MaterialButton` (5 variants, 5 sizes, round/square, toggle, loading), `IconButton`, `ButtonGroup`, `ConnectedButtonGroup`, `SplitButton`, `Fab`, `ExtendedFab`, `FabMenu` |
-| Selection | `MaterialCheckbox`, `MaterialSwitch`, `MaterialRadio`/`MaterialRadioGroup`, `AssistChip`/`FilterChip`/`InputChip`/`SuggestionChip`, `ChipSet`, `MaterialSlider` |
-| Text input | `TextField`, `ExposedDropdown` (select), `SearchField`/`SearchView`, `DatePicker`, `TimePicker` |
-| Navigation | `NavigationRail`, `NavigationBar`, `NavigationDrawer`, `NavigationSuite`, `MaterialTabs`, `MaterialMenu`, `MaterialContextMenu`, `TopAppBar`, `BottomAppBar`, `Toolbar` (docked and floating) |
-| Containment | `MaterialCard`, `ListItem`, `MaterialCarousel`, `MaterialDivider`, `MaterialDialog`, `MaterialBottomSheet`, `MaterialSideSheet` |
-| Communication | `Badge`, `Avatar`, `LinearProgress`/`CircularProgress`, `Stepper`, `LoadingIndicator`, `Snackbar`, `MaterialTooltip`, `PullToRefresh` |
-| Layout | `PaneScaffold`, `FeedLayout` |
-| Application | `TitleBar`, `CaptionButtons`, tiles, choice tiles, status chips and notices (from course2md, not M3 components) |
+- **50+ components** across actions, selection, text input, navigation, containment
+  and communication: buttons and FABs, checkboxes, switches, chips, sliders, text
+  fields, date and time pickers, menus, tabs, navigation rail, bar and drawer, app bars,
+  cards, lists, carousels, dialogs, sheets, snackbars, progress and loading indicators.
+- **Material color**: semantic color roles, the 20 md3.io reference themes in light and
+  dark at three contrast levels, and dynamic schemes from a seed color
+  (ported from material-color-utilities).
+- **Expressive motion**: spring-based Expressive and Standard motion schemes, animated
+  theme changes, and reduced motion per transition.
+- **Tokens**: the 15 type roles, shape scale and shape morphing, elevation, state
+  layers and layout metrics, with text scaling from 100% to 200%.
+- **Material Symbols**: the full Google icon catalog through
+  [gpui-material-symbols](https://github.com/mizorewww/gpui-material-symbols).
+- **Built on Kit**: components are Material styling over Kit's controls, so input,
+  focus, keyboard navigation, accessibility and overlays work the way Kit's do.
+- **Pay for what you use**: every component group is a Cargo feature.
 
-## Crates
+## Installation
 
-| Crate | Published | Holds |
-| --- | --- | --- |
-| [`gpui-kit-material-color`](crates/color) | [crates.io](https://crates.io/crates/gpui-kit-material-color) 0.1 | Color roles, palettes, reference themes and dynamic schemes, without GPUI. Features `serde`, `dynamic` (both default). |
-| [`gpui-kit-material`](crates/material) | [crates.io](https://crates.io/crates/gpui-kit-material) 0.1, on `gpui-kit` 0.9.1 | The library: theme, tokens, motion, icons and the components below. |
-| [`gpui-kit-material-gallery`](crates/gallery) | Never | The shared Gallery, its fonts and its dev-only profiler: a library and the `gallery` binary. |
-| [`gpui-kit-material-gallery-web`](crates/gallery-web) | Never | The Gallery's browser entry point. |
-| [`gpui-kit-material-bench`](crates/bench) | Never | `component_bench`. |
-
-The library's `default` features enable every group, the Fast backend, embedded symbols
-and `serde`. To drop code, turn them off and name what you use; a group brings what it
-needs. `full` is every group, without the backend, symbols or `serde`.
-
-```toml
-gpui-kit-material = { version = "0.1", default-features = false, features = ["buttons", "selection", "gpui-fast", "embedded-symbols"] }
-```
-
-| Feature | Components | Needs |
-| --- | --- | --- |
-| `buttons` | `MaterialButton`, `IconButton`, `ButtonGroup`, `ConnectedButtonGroup`, `SplitButton`, `Fab`, `ExtendedFab`, `FabMenu` | `menus`, `progress` |
-| `progress` | `LinearProgress`, `CircularProgress`, `Stepper` | |
-| `loading` | `LoadingIndicator`, `PullToRefresh` | `progress`, `shapes` |
-| `feedback` | `Badge`, `Snackbar`, `MaterialTooltip`, `MaterialCard`, `drop_target`, status chips, notices | |
-| `selection` | `MaterialCheckbox`, `MaterialRadio`, `MaterialSwitch`, chips, `ChipSet`, `MaterialSlider`, tiles, choice tiles | |
-| `inputs` | `TextField`, `SearchField`, `SearchView` | |
-| `menus` | `MaterialMenu`, `MenuPopup`, `MaterialContextMenu`, and `ExposedDropdown` when `inputs` is on too | |
-| `pickers` | `DatePicker`, `TimePicker` | `buttons`, `inputs`, `chrono` |
-| `dialogs` | `MaterialDialog`, `MaterialBottomSheet`, `MaterialSideSheet` | |
-| `containment` | `Avatar`, `MaterialCarousel`, `MaterialDivider`, `ListItem` | `selection` |
-| `navigation` | `NavigationBar`, `NavigationRail`, `NavigationDrawer`, `NavigationSuite`, `MaterialTabs`, `TopAppBar`, `BottomAppBar`, `Toolbar` | `adaptive`, `dialogs`, `feedback` |
-| `adaptive` | Window size classes, `PaneScaffold`, `FeedLayout` | |
-| `window-chrome` | `TitleBar`, `CaptionButtons` | |
-| `shapes` | `shapes`: `MaterialShape`, `Morph` | |
-| `dynamic-color` | `color::dynamic`: HCT and seed schemes | |
-
-The theme, tokens, motion, icons, scopes, focus ring, ripple and text helpers are always
-there.
-
-## Quick start
-
-Minimum Rust: **1.98** (`rust-version`).
-
-**From crates.io.** A dependency on both, at the Kit release the library names, is all
-a consumer needs, with no `[patch]`:
+Minimum Rust: **1.98**.
 
 ```toml
 [dependencies]
@@ -99,36 +45,24 @@ gpui-kit = "0.9.1"
 gpui-kit-material = "0.1"
 ```
 
-The library's crate [README](crates/material/README.md) says the same.
+Use the `gpui-kit` version the library depends on, so that Kit, GPUI and the icons
+resolve to one implementation. No `[patch]` is needed.
 
-**From Git, with the Gallery's engine patches** (optional). This workspace builds the
-Gallery on a few engine patches that change behavior only: spaces that overflow a
-wrapped row hang instead of starting the next one, a long `measure_all` list such as a
-`TextView` resizes without laying out every item each frame, and, on the upstream GPUI
-backend, fallback fonts, `sbix` color fonts and the browser IME, which gpui-fast 0.1.14
-already has. A downstream workspace that wants the same takes the library and the
-patches from this repository at one revision:
+To compile only the parts you use, turn off the defaults and name the component groups:
 
 ```toml
-[dependencies]
-gpui-kit = "0.9.1"
-gpui-kit-material = { git = "https://github.com/mizorewww/gpui-kit-material", rev = "98c72b8d183418631b3dcf91064fcece6a96350f" }
-
-[patch.crates-io]
-gpui-kit = { git = "https://github.com/mizorewww/gpui-kit-material", rev = "98c72b8d183418631b3dcf91064fcece6a96350f" }
-gpui-pre = { git = "https://github.com/mizorewww/gpui-kit-material", rev = "98c72b8d183418631b3dcf91064fcece6a96350f" }
-gpui-pre-apple = { git = "https://github.com/mizorewww/gpui-kit-material", rev = "98c72b8d183418631b3dcf91064fcece6a96350f" }
-gpui-pre-web = { git = "https://github.com/mizorewww/gpui-kit-material", rev = "98c72b8d183418631b3dcf91064fcece6a96350f" }
-gpui-fast = { git = "https://github.com/mizorewww/gpui-kit-material", rev = "98c72b8d183418631b3dcf91064fcece6a96350f" }
+gpui-kit-material = { version = "0.1", default-features = false, features = ["buttons", "selection", "gpui-fast", "embedded-symbols"] }
 ```
 
-> `[patch]` is read only from the top-level manifest, so it goes in your workspace root.
-> [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#consumer-patch-set) says why each patch
-> exists. At every pushed commit, CI builds this block's template from Git at that commit
-> (`scripts/git-consumer/Cargo.toml.in`, `scripts/check-git-consumer.sh`), and checks that
-> this block differs from the template only in its revision (`scripts/check-package.sh`).
-> The revision shown is the one that moved these patches to Kit 0.9.1: CI does not build
-> that revision again.
+The [crate README](crates/material/README.md#features) lists every feature.
+
+**WebAssembly:** published Kit 0.9.1 builds its web platform with threads, which needs
+the nightly toolchain named in Kit's
+[WebAssembly guide](https://github.com/longbridge/gpui-kit/blob/main/website/docs/webassembly.md).
+
+## Usage
+
+Initialize Kit and Material, then set a theme:
 
 ```rust
 use gpui_kit_material::{color::themes::{Contrast, ThemeId, ThemeMode}, icons::Assets, theme};
@@ -138,22 +72,35 @@ gpui_kit::application()
     .run(|cx| {
         gpui_kit::init(cx);
         gpui_kit_material::init(cx);
-        // Project the initial scheme into Kit's theme before the first Root render.
         let scheme = ThemeId::Baseline.scheme(ThemeMode::Light, Contrast::Standard);
         theme::init_component_theme(scheme, 1.0, cx);
-        // Open windows with gpui_kit::open_window; Kit supplies the Root.
+        // Open windows with gpui_kit::open_window.
     });
 ```
 
-Paint with semantic roles, never stored colors:
+Paint with color roles, so your UI follows theme and dark mode changes:
 
 ```rust
 div().bg(color(ColorRole::SURFACE_CONTAINER)).text_color(color(ColorRole::ON_SURFACE))
 ```
 
-Switch theme from an input event (it animates on the slow effects spring; keep
-calling `advance_component_theme` from a next-frame callback while it returns
-`true`, never from `render`), or switch the motion scheme:
+Components are controlled: your view owns the state, and the component reports changes.
+
+```rust
+use gpui_kit_material::icons::IconName;
+
+let view = cx.entity();
+material_button("save", ButtonVariant::Tonal)
+    .icon(IconName::Check)
+    .toggle(true)
+    .selected(self.saved)
+    .on_change(move |selected, _click, _window, cx| {
+        view.update(cx, |this, cx| { this.saved = selected; cx.notify(); });
+    })
+    .child("Saved")
+```
+
+Switch themes with an animated transition, or change the motion scheme:
 
 ```rust
 let ocean = ThemeId::Ocean.scheme(ThemeMode::Dark, Contrast::High);
@@ -161,97 +108,50 @@ let running = theme::advance_component_theme(ocean, 1.0, window, cx);
 gpui_kit_material::motion::set_motion_scheme(gpui_kit_material::motion::MotionScheme::Standard);
 ```
 
-A controlled toggle button (the caller owns `selected`; the button never
-stores it):
+`advance_component_theme` returns `true` while the transition runs. Call it again
+from a next-frame callback, not from `render`.
 
-```rust
-use gpui_kit_material::icons::IconName;
+More: the [API documentation](https://docs.rs/gpui-kit-material) and the
+[Gallery](https://material.mizore.blog/gallery/), whose
+[source](crates/gallery) uses every component.
 
-let view = cx.entity();
-material_button("save", ButtonVariant::Tonal)
-    .button_size(ButtonSize::Medium)
-    .icon(IconName::Check)
-    .toggle(true)
-    .selected(self.saved)
-    .on_change(move |selected, _click, _window, cx| {
-        view.update(cx, |this, cx| { this.saved = selected; cx.notify(); });
-    })
-    .child(label)
-```
+## Crates
 
-Labels and accessible names always come from the caller. See the rustdoc
-(`cargo doc --open -p gpui-kit-material`) for each component's contract.
-
-## Gallery
-
-One gallery module runs on desktop and in the browser. It follows md3.io's
-component pages: navigation by component group, a live preview of the real
-component with theme and light/dark switches, and a configuration panel for
-every variant, size, state and content option. A **Specs** tab shows the Figma
-kit's boards. Style pages cover color, typography, shape, motion and elevation.
-
-```sh
-cargo run -p gpui-kit-material-gallery      # desktop (GPUI Fast backend)
-./scripts/build-gallery-web.sh --release    # browser, then:
-python3 -m http.server 8080 --bind 127.0.0.1 --directory crates/gallery-web/www
-```
-
-Headless capture, profiling and fixture tooling are described in
-[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
-
-## References
-
-Where references disagree, priority is **Figma Material 3 Design Kit > md3.io >
-m3e.kyralabs.dev**, per token family and per value; each value records its
-source. See [Reference sources](docs/ARCHITECTURE.md#reference-sources).
-
-## Performance targets
-
-Measured on release builds from raw per-frame timings ([AGENTS.md](AGENTS.md)
-has the full rules, [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md#targets) the
-tooling). Acceptance evidence is still open.
-
-| Target | Limit |
+| Crate | |
 | --- | --- |
-| Each comparable interaction (scrolling, hover, animations, typing, page switch, first load), native and WASM | main-thread frame time p95 and max below md3.io's best run in Chrome on the same machine |
-| Idle window | draws nothing |
+| [`gpui-kit-material`](https://crates.io/crates/gpui-kit-material) | Theme, tokens, motion, icons and components. |
+| [`gpui-kit-material-color`](https://crates.io/crates/gpui-kit-material-color) | Color roles, themes and dynamic color, with no GPUI dependency. |
+| [`gpui-material-symbols`](https://crates.io/crates/gpui-material-symbols) | Material Symbols for GPUI Kit. |
 
-The profiler's finer budgets in DEVELOPMENT.md are diagnostics, not release gates.
+## Project status
 
-## Develop
+**Pre-release (0.1).** Almost every component is implemented and tested, but the API
+may still change and no component is marked stable yet.
+[Coverage](docs/COVERAGE.md) lists each component's state and gaps, and the
+[roadmap](docs/ROADMAP.md) what comes next. See the [changelog](CHANGELOG.md) for releases.
 
-```sh
-cargo fmt --all --check
-cargo clippy --workspace --all-targets -- -D warnings
-cargo test --workspace
-```
+## Support
 
-CI runs these on macOS, Linux and Windows, plus both GPUI backends, the WASM gallery build, and
-`cargo check` of the defaults, no features, `full` with and without Fast, and each feature group
-alone (`scripts/check-features.sh`). Project rules for contributors and agents are in
-[AGENTS.md](AGENTS.md).
+Report bugs and ask questions in [GitHub issues](https://github.com/mizorewww/gpui-kit-material/issues).
 
-| Document | Contents |
-| --- | --- |
-| [docs/PRODUCTION.md](docs/PRODUCTION.md) | What a component and a release must meet to be called stable |
-| [docs/RELEASING.md](docs/RELEASING.md) | Release order, what crates.io publication waits for, release-day steps |
-| [docs/COVERAGE.md](docs/COVERAGE.md) | Every reference component, its status and what is missing |
-| [docs/ROADMAP.md](docs/ROADMAP.md) | Status tables and remaining work |
-| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Layers, Kit reuse, reference sources, theme bridge, engine patches |
-| [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) | Gallery capture, profiling, WASM, fixtures |
-| [docs/EXTRACTION.md](docs/EXTRACTION.md) | Mapping from course2md, where the kit originated |
-| [scripts/README.md](scripts/README.md) | Reference capture, Figma extraction and font scripts |
+## Contributing
+
+Pull requests are welcome. [CONTRIBUTING.md](CONTRIBUTING.md) explains how to build and
+run the Gallery, run the checks, and where the design and performance rules live.
+
+## Acknowledgments
+
+- [Longbridge GPUI Kit](https://github.com/longbridge/gpui-kit) and
+  [GPUI](https://github.com/zed-industries/zed/tree/main/crates/gpui), which this library builds on.
+- Google's [Material 3](https://m3.material.io/) design and its Figma Design Kit,
+  [md3.io](https://md3.io/) and [m3e.kyralabs.dev](https://m3e.kyralabs.dev/), the
+  references for every token and component.
+- [material-color-utilities](https://github.com/material-foundation/material-color-utilities)
+  for dynamic color.
 
 ## License
 
-MIT, except files ported from Apache-2.0 sources, which keep their notices.
-Palette sources and licenses: [crates/color/PALETTES.md](crates/color/PALETTES.md).
-Material Symbols assets are Apache-2.0, retained in the
-[gpui-material-symbols](https://crates.io/crates/gpui-material-symbols) 0.1 crates
-([repository](https://github.com/mizorewww/gpui-material-symbols)).
-The gallery's fonts are SIL OFL 1.1, each beside its license in
-[crates/gallery/fonts](crates/gallery/fonts): Roboto
-and IBM Plex Sans, which it bundles, and Noto Sans Arabic, Noto Sans Hebrew, Noto Emoji
-and Noto Color Emoji, kept for conformance captures only and not bundled. None of them
-is part of the library's package. The published site lists every license at
-[/licenses/](https://material.mizore.blog/licenses/).
+MIT, except files ported from Apache-2.0 sources, which keep their notices. Material
+Symbols are Apache-2.0. The Gallery's fonts are SIL OFL 1.1. See
+[crates/color/PALETTES.md](crates/color/PALETTES.md) for palette sources and the
+site's [license list](https://material.mizore.blog/licenses/) for every license.

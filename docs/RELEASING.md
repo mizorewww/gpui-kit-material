@@ -29,7 +29,7 @@ keeps the Gallery single-threaded on stable. The Base APIs 0.9.0 lacked (`Reduce
 ## What stays vendored, and why
 
 None of it is needed to build the library; it is the Gallery's engine, and the optional
-patch set of the README's Git quick start ([ARCHITECTURE.md](ARCHITECTURE.md#consumer-patch-set)).
+consumer patch set ([ARCHITECTURE.md](ARCHITECTURE.md#consumer-patch-set)).
 
 | Vendored | On | Why it is still vendored |
 | --- | --- | --- |
@@ -79,7 +79,7 @@ CI's `release-readiness` job runs both on every push, and its `package` job runs
    `cargo test --workspace`, `scripts/check-package.sh`, `scripts/check-features.sh`;
    CI green.
 5. In CHANGELOG.md, turn the summary under Unreleased into
-   `## gpui-kit-material <version> (date)`. Update the README's crates table and quick start.
+   `## gpui-kit-material <version> (date)`. Update the README's installation section and the consumer patch set's revision in ARCHITECTURE.md.
 6. `cargo publish --dry-run -p gpui-kit-material`, then `cargo publish -p gpui-kit-material`.
 7. Tag the commit `material-v<version>` and push the tag.
 

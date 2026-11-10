@@ -1,5 +1,5 @@
 # Not a workspace member: this is what a downstream application's manifest looks
-# like with the README's Git patch set: Kit from crates.io, the engine patches the Gallery
+# like with ARCHITECTURE.md's consumer patch set: Kit from crates.io, the engine patches the Gallery
 # builds on (tested by CI's engine rules step) from this checkout, and Kit's FPS HUD beside
 # the library. The library needs none of these patches to build; scripts/check-registry-
 # consumer.sh builds it without them. CI's git-consumer job builds the same set from Git.

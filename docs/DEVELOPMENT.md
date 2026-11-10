@@ -22,7 +22,7 @@ scripts/check-features.sh --target wasm32-unknown-unknown
 ```
 
 CI's `features` job runs both. Adding a component to a group, or making one use another
-group, is where this fails; the groups are in the [README](../README.md#crates).
+group, is where this fails; the groups are in the [crate README](../crates/material/README.md#features).
 
 ## Browser gallery
 

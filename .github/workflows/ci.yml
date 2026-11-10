@@ -129,7 +129,7 @@ jobs:
 
   # consumer-check reads the library and its patches from this checkout, so it says
   # nothing about what a downstream application gets from Git. This job builds the
-  # README's quick start from the pushed commit, with a fresh resolve and no lockfile.
+  # consumer patch set in ARCHITECTURE.md from the pushed commit, with a fresh resolve and no lockfile.
   git-consumer:
     strategy:
       fail-fast: false

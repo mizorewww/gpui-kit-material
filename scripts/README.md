@@ -25,7 +25,7 @@ script's docstring (`--help`) and [docs/DEVELOPMENT.md](../docs/DEVELOPMENT.md).
 | `site_stamp.py` | Records what the module and site were built from, and judges it for `deploy-site.sh` |
 | `deploy-site.sh` | Publishes `target/site` to material.mizore.blog with the Cloudflare CLI, if built from the current commit (`--check` publishes nothing) |
 | `check-features.sh` | `cargo check` of the library's default, empty, `full` and single-group feature selections, and the color crate's |
-| `check-git-consumer.sh` | Builds the README's quick start in a directory outside the repository, from Git at a pushed commit (`git-consumer/`) |
+| `check-git-consumer.sh` | Builds ARCHITECTURE.md's consumer patch set in a directory outside the repository, from Git at a pushed commit (`git-consumer/`) |
 | `check-package.sh` | Checks that each package ships its license texts and notices, and not the Gallery's fonts |
 | `check-web-profile.mjs` | Runs `www/profile.js` under Node as far as its report, which CI has no browser to reach |
 | `profile-gallery.py` | Builds a release Gallery and records an interaction profile (upstream's profiler: draw and submission per frame) with provenance, a browser profile (`--web`) or an md3.io probe (`--md3io`), and judges the diagnostic budgets |
