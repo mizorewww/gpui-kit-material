@@ -1,10 +1,12 @@
 //! Snackbar: the kit's configurations with and without the close
-//! affordance, the action and close states, the live snackbar, and inline
-//! messages.
+//! affordance, the action and close states, the live snackbar (also shown
+//! from a dialog, above it), and inline messages.
 use super::prelude::*;
 
 pub struct Page {
     page: PageCx,
+    /// The live demo's dialog, whose action shows the snackbar over it.
+    dialog: bool,
 }
 
 /// The kit's configurations: message, action, longer action.
@@ -63,7 +65,10 @@ impl GalleryPage for Page {
     };
 
     fn new(page: PageCx, _: &mut Window, _: &mut Context<Self>) -> Self {
-        Self { page }
+        Self {
+            page,
+            dialog: false,
+        }
     }
 
     fn row_count(&self, _: &Window) -> usize {
@@ -74,7 +79,17 @@ impl GalleryPage for Page {
         row == 2
     }
 
-    fn render_row(&mut self, row: usize, _: &mut Window, _: &mut Context<Self>) -> AnyElement {
+    fn apply_capture(&mut self, state: CaptureState, cx: &mut Context<Self>) {
+        // `--active` opens the dialog and shows the snackbar above it.
+        self.dialog = state.active;
+        self.page.shared.update(cx, |shared, cx| {
+            shared.snackbar = state.active;
+            cx.notify();
+        });
+        cx.notify();
+    }
+
+    fn render_row(&mut self, row: usize, _: &mut Window, cx: &mut Context<Self>) -> AnyElement {
         match row {
             0 => board("snackbars")
                 .caption("Snackbar")
@@ -109,21 +124,64 @@ impl GalleryPage for Page {
                 }))
                 .into_any_element(),
             2 => {
-                let shared = self.page.shared.clone();
+                let show = |shared: Entity<GalleryShared>| {
+                    move |_: &ClickEvent, _: &mut Window, cx: &mut App| {
+                        shared.update(cx, |shared, cx| {
+                            shared.snackbar = true;
+                            cx.notify();
+                        })
+                    }
+                };
+                let close = cx.listener(|this, _, _, cx| {
+                    this.dialog = false;
+                    cx.notify();
+                });
+                let entity = cx.entity().downgrade();
                 spec::demo(
                     "snackbar-demo",
                     "Live snackbar",
-                    spec::demo_row().child(
-                        material_button("show-snackbar", ButtonVariant::Tonal)
-                            .child("Show snackbar")
-                            .on_click(move |_, _, cx| {
-                                shared.update(cx, |shared, cx| {
-                                    shared.snackbar = true;
+                    spec::demo_row()
+                        .child(
+                            material_button("show-snackbar", ButtonVariant::Tonal)
+                                .child("Show snackbar")
+                                .on_click(show(self.page.shared.clone()))
+                                .reveal("reveal-show-snackbar", self.page.rows.list()),
+                        )
+                        .child(
+                            material_button("snackbar-open-dialog", ButtonVariant::Outlined)
+                                .child("Show from a dialog")
+                                .on_click(cx.listener(|this, _, _, cx| {
+                                    this.dialog = true;
                                     cx.notify();
-                                })
-                            })
-                            .reveal("reveal-show-snackbar", self.page.rows.list()),
-                    ),
+                                }))
+                                .reveal("reveal-snackbar-open-dialog", self.page.rows.list()),
+                        )
+                        // A snackbar shown from a dialog appears above it and
+                        // its scrim; the dialog stays open and keeps focus.
+                        .child(
+                            MaterialDialog::new("snackbar-dialog")
+                                .headline("Share link")
+                                .supporting_text(
+                                    "Copying the link shows a snackbar above this dialog.",
+                                )
+                                .action(
+                                    material_button("snackbar-dialog-done", ButtonVariant::Text)
+                                        .child("Done")
+                                        .on_click(close),
+                                )
+                                .action(
+                                    material_button("snackbar-dialog-copy", ButtonVariant::Text)
+                                        .child("Copy link")
+                                        .on_click(show(self.page.shared.clone())),
+                                )
+                                .modal(self.dialog)
+                                .on_dismiss(move |_, cx| {
+                                    let _ = entity.update(cx, |this, cx| {
+                                        this.dialog = false;
+                                        cx.notify();
+                                    });
+                                }),
+                        ),
                 )
                 .into_any_element()
             }
