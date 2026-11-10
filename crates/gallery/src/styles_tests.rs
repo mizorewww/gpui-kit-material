@@ -143,6 +143,44 @@ fn the_copy_button_says_copied_for_a_moment(cx: &mut TestAppContext) {
     assert!(!copied(&mut cx), "the button offers to copy again");
 }
 
+#[gpui::test]
+fn browsing_takes_focus_to_the_first_card(cx: &mut TestAppContext) {
+    let (window, mut cx) = open(cx);
+    settle(&window, &mut cx);
+    let browse = bounds(&mut cx, "home-browse");
+    cx.simulate_click(browse.center(), Modifiers::none());
+    settle(&window, &mut cx);
+    // The Gallery moves focus on the frame after the one that drew the row.
+    cx.update(|window, cx| window.simulate_next_frame(cx));
+    settle(&window, &mut cx);
+    let first = super::shell::overview_groups().next().unwrap();
+    let card = catalog::CATALOG
+        .iter()
+        .position(|entry| entry.group == first && super::shell::overview_entry(entry))
+        .unwrap();
+    window
+        .update(&mut cx, |g, window, cx| {
+            assert!(
+                g.row_focus[1].contains_focused(window, cx) && !g.row_focus[1].is_focused(window),
+                "focus is in the first group"
+            );
+        })
+        .unwrap();
+    // The focused control is the first card: Enter opens its page.
+    // GPUI's keyboard click is a press and a release.
+    let enter = gpui::Keystroke::parse("enter").unwrap();
+    cx.simulate_event(gpui::KeyDownEvent {
+        keystroke: enter.clone(),
+        is_held: false,
+        prefer_character_input: false,
+    });
+    cx.simulate_event(gpui::KeyUpEvent { keystroke: enter });
+    settle(&window, &mut cx);
+    window
+        .update(&mut cx, |g, _, _| assert_eq!(g.current, card))
+        .unwrap();
+}
+
 /// The home's parts that must stay inside the window.
 const HOME_PARTS: [&str; 13] = [
     "home-hero",

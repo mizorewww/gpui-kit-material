@@ -201,13 +201,16 @@ impl HomeView {
             .update(cx, |gallery, cx| gallery.navigate(index, cx));
     }
 
-    /// Scroll the overview to its first component group.
+    /// Scroll the overview to its first component group, and take keyboard
+    /// focus there: the Gallery focuses the group's first card once its row
+    /// is drawn, as Tab does into a row that was off-screen.
     fn browse(&self, cx: &mut App) {
         let _ = self.gallery.update(cx, |gallery, cx| {
             gallery.list.scroll_to(ListOffset {
                 item_ix: 1,
                 offset_in_item: px(0.),
             });
+            gallery.pending_focus = Some((1, false));
             cx.notify();
         });
     }
