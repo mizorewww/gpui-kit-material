@@ -14,7 +14,7 @@ natively on macOS, Linux and Windows, and in the browser through WebAssembly.
 
 **[Try the live Gallery →](https://material.mizore.blog/gallery/)**
 
-![The Gallery's component overview, dark theme](docs/screenshots/gallery.png)
+![The Gallery's home in the dark theme: the hero with morphing shapes, theme swatches, live controls and the install line](docs/screenshots/gallery.png)
 
 ## Features
 
