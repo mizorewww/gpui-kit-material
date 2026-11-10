@@ -76,6 +76,9 @@ const INSTALL: &str = "cargo add gpui-kit-material";
 /// [`INSTALL`] as shown: word joiners keep a narrow tile from breaking the
 /// crate's name at its hyphens.
 const INSTALL_SHOWN: &str = "cargo add gpui\u{2060}-\u{2060}kit\u{2060}-\u{2060}material";
+/// How long the copy button says "Copied" before it offers to copy again:
+/// Kit's `Clipboard` feedback time (`gpui-component/src/clipboard.rs`).
+pub(super) const COPIED_FOR: std::time::Duration = std::time::Duration::from_secs(2);
 
 /// A swatch's scheme: `theme`'s standard contrast in `mode`. Reference
 /// schemes are fixed data, so each is built once and never invalidated.
@@ -153,8 +156,10 @@ pub(crate) struct HomeView {
     chips: [bool; 3],
     toggles: [bool; 3],
     volume: Entity<SliderState>,
-    /// Whether the install line was copied.
-    copied: bool,
+    /// Whether the install line was copied in the last [`COPIED_FOR`].
+    pub(super) copied: bool,
+    /// Ends [`Self::copied`]; a new copy replaces, and so restarts, it.
+    copied_reset: Option<Task<()>>,
     _observe: Subscription,
 }
 
@@ -182,6 +187,7 @@ impl HomeView {
                     .default_value(60.)
             }),
             copied: false,
+            copied_reset: None,
             _observe: observe,
         }
     }
@@ -204,6 +210,22 @@ impl HomeView {
             });
             cx.notify();
         });
+    }
+
+    /// Copy the install line and say so for [`COPIED_FOR`]. The reset is one
+    /// timer, not a frame loop: once it fires, nothing here draws again.
+    fn copy_install(&mut self, cx: &mut Context<Self>) {
+        cx.write_to_clipboard(ClipboardItem::new_string(INSTALL.to_string()));
+        self.copied = true;
+        self.copied_reset = Some(cx.spawn(async move |this, cx| {
+            cx.background_executor().timer(COPIED_FOR).await;
+            let _ = this.update(cx, |this, cx| {
+                this.copied = false;
+                this.copied_reset = None;
+                cx.notify();
+            });
+        }));
+        cx.notify();
     }
 
     fn render_hero(&self, width: f32, cx: &mut Context<Self>) -> Div {
@@ -647,11 +669,7 @@ impl HomeView {
                             symbol(if copied { "check" } else { "content_copy" }, 24.),
                             if copied { "Copied" } else { "Copy" },
                         )
-                        .on_click(cx.listener(|this, _, _, cx| {
-                            cx.write_to_clipboard(ClipboardItem::new_string(INSTALL.to_string()));
-                            this.copied = true;
-                            cx.notify();
-                        })),
+                        .on_click(cx.listener(|this, _, _, cx| this.copy_install(cx))),
                     ),
                 ),
         )

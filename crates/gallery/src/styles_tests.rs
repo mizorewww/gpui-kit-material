@@ -98,6 +98,51 @@ fn the_home_repaints_the_gallery_and_opens_pages(cx: &mut TestAppContext) {
         .unwrap();
 }
 
+/// Scroll the overview's first row (the home) by `offset`.
+fn scroll_home(window: &WindowHandle<Gallery>, cx: &mut VisualTestContext, offset: f32) {
+    window
+        .update(cx, |g, _, cx| {
+            g.list.scroll_to(gpui::ListOffset {
+                item_ix: 0,
+                offset_in_item: px(offset),
+            });
+            cx.notify();
+        })
+        .unwrap();
+    settle(window, cx);
+}
+
+#[gpui::test]
+fn the_copy_button_says_copied_for_a_moment(cx: &mut TestAppContext) {
+    let (window, mut cx) = open(cx);
+    settle(&window, &mut cx);
+    let lead = window.update(&mut cx, |g, _, _| g.lead.clone()).unwrap();
+    let copied = |cx: &mut VisualTestContext| {
+        cx.update(|_, cx| lead.read(cx).home.clone().unwrap().read(cx).copied)
+    };
+    scroll_home(&window, &mut cx, 600.);
+    let copy = bounds(&mut cx, "home-install-copy");
+    cx.simulate_click(copy.center(), Modifiers::none());
+    settle(&window, &mut cx);
+    assert!(copied(&mut cx));
+    assert_eq!(
+        cx.update(|_, cx| cx.read_from_clipboard().and_then(|item| item.text())),
+        Some("cargo add gpui-kit-material".to_string())
+    );
+    // A second copy restarts the moment rather than ending it early.
+    cx.executor()
+        .advance_clock(super::home::COPIED_FOR - std::time::Duration::from_millis(500));
+    cx.simulate_click(copy.center(), Modifiers::none());
+    settle(&window, &mut cx);
+    cx.executor()
+        .advance_clock(std::time::Duration::from_millis(1000));
+    settle(&window, &mut cx);
+    assert!(copied(&mut cx), "the second copy's moment is still running");
+    cx.executor().advance_clock(super::home::COPIED_FOR);
+    settle(&window, &mut cx);
+    assert!(!copied(&mut cx), "the button offers to copy again");
+}
+
 /// The home's parts that must stay inside the window.
 const HOME_PARTS: [&str; 13] = [
     "home-hero",
