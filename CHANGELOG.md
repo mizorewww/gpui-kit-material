@@ -5,8 +5,21 @@ commit messages.
 
 ## Unreleased
 
+Nothing yet.
+
+## gpui-kit-material 0.1.1 and gpui-kit-material-color 0.1.1 (2026-11-10)
+
+`gpui-kit-material` 0.1.1 still builds on `gpui-kit-material-color` 0.1.0 and `gpui-kit`
+0.9.1. `gpui-kit-material-color` 0.1.1 carries the two status-color fixes listed under
+0.1.0 below (warning and success at 4.5:1, status containers in their status color's
+hue), which were made after color 0.1.0 was published and so were not on crates.io;
+a fresh resolve of `gpui-kit-material` picks it up.
+
 ### Added
 
+- `CustomRadioGroup`: a single choice among caller-drawn options (swatches and the like),
+  Kit Base's `Radio` options in its `RadioGroup` with the library's roving focus, as
+  `MaterialRadioGroup` has.
 - `SNACKBAR_PRIORITY`, the deferred layer a `Snackbar` draws in: above GPUI Base's dialog
   host and Material's modal sheets (10 and up), below caption buttons (50), menus and
   popovers (100) and tooltips (200).
