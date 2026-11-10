@@ -75,11 +75,15 @@ pub(crate) fn init(cx: &mut App) {
             Some(DROPDOWN_CONTEXT),
         ),
     ]);
-    let keys = cx.intercept_keystrokes(open_context_menu_from_keyboard);
-    cx.set_global(ContextMenuKeys {
-        _keys: keys,
-        menus: Vec::new(),
-    });
+    // Once: a second `init` keeps the interceptor and the menus it knows.
+    if !cx.has_global::<ContextMenuKeys>() {
+        let keys = cx.intercept_keystrokes(open_context_menu_from_keyboard);
+        cx.set_global(ContextMenuKeys {
+            _keys: keys,
+            menus: Vec::new(),
+            live: 0,
+        });
+    }
 }
 
 /// The menu families of the design kit.
@@ -2008,9 +2012,28 @@ fn show_context_menu(state: &Entity<ContextMenuState>, position: Point<Pixels>, 
 struct ContextMenuKeys {
     _keys: Subscription,
     menus: Vec<WeakEntity<ContextMenuState>>,
+    /// How many were alive when the list was last pruned.
+    live: usize,
 }
 
 impl Global for ContextMenuKeys {}
+
+impl ContextMenuKeys {
+    /// Add a menu, first dropping released ones once the list has doubled
+    /// since it was last pruned, so a list whose rows come and go stays
+    /// within twice the menus alive.
+    fn register(&mut self, menu: WeakEntity<ContextMenuState>) {
+        if self.menus.len() >= 2 * self.live.max(16) {
+            self.prune();
+        }
+        self.menus.push(menu);
+    }
+
+    fn prune(&mut self) {
+        self.menus.retain(|menu| menu.upgrade().is_some());
+        self.live = self.menus.len();
+    }
+}
 
 /// Whether `keystroke` asks for a context menu: Shift+F10, or the Menu key
 /// (`menu` from Windows and X11/Wayland, `contextmenu` from the web).
@@ -2030,7 +2053,7 @@ fn open_context_menu_from_keyboard(event: &KeystrokeEvent, window: &mut Window, 
     }
     let menus = {
         let keys = cx.global_mut::<ContextMenuKeys>();
-        keys.menus.retain(|menu| menu.upgrade().is_some());
+        keys.prune();
         keys.menus.clone()
     };
     // The menu whose trigger holds focus most closely: no other holding it
@@ -2080,7 +2103,7 @@ impl RenderOnce for MaterialContextMenu {
             });
             if register {
                 let weak = state.downgrade();
-                cx.global_mut::<ContextMenuKeys>().menus.push(weak);
+                cx.global_mut::<ContextMenuKeys>().register(weak);
             }
         } else if state.read(cx).trigger.is_some() {
             state.update(cx, |state, _| state.trigger = None);

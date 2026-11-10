@@ -27,7 +27,8 @@ a fresh resolve of `gpui-kit-material` picks it up.
   returns on Escape or an activated item. A `ContextMenuHandle` given to
   `MaterialContextMenu::handle` opens it below its parent (`open`), at a point such as a
   "more" button's `ClickEvent::position` (`open_at`), or closes it. The keys need
-  `gpui_kit_material::init`, as a menu's arrows and Escape do. The right press is unchanged.
+  `gpui_kit_material::init`, as a menu's arrows and Escape do; calling it again keeps
+  them working. The right press is unchanged.
 - `SNACKBAR_PRIORITY` (99, `gpui_base::POPUP_PRIORITY - 1`), the deferred layer a
   `Snackbar` draws in: above GPUI Base's dialog host and Material's modal sheets (10 and
   up) and window caption buttons (50), below menus and popovers (100) and tooltips (200).

@@ -343,6 +343,41 @@ fn shift_f10_opens_the_context_menu_below_its_focused_trigger(cx: &mut TestAppCo
 }
 
 #[gpui::test]
+fn a_second_init_keeps_shift_f10_working(cx: &mut TestAppContext) {
+    let (view, cx) = keyboard_menu(cx);
+    let row = view.update(cx, |v, _| v.row.clone());
+    cx.update(|_, cx| crate::init(cx));
+    focus_on(cx, &row);
+    keys(cx, "shift-f10");
+    assert!(
+        cx.debug_bounds("outer-item").is_some(),
+        "the menu still opens"
+    );
+}
+
+#[gpui::test]
+fn released_context_menus_are_pruned_as_others_register(cx: &mut TestAppContext) {
+    cx.update(crate::init);
+    let kept = cx.update(|cx| cx.new(|_| ContextMenuState::default()));
+    cx.update(|cx| {
+        cx.global_mut::<ContextMenuKeys>()
+            .register(kept.downgrade())
+    });
+    // Each update releases the menu it made when it ends.
+    for _ in 0..1000 {
+        cx.update(|cx| {
+            let released = cx.new(|_| ContextMenuState::default()).downgrade();
+            cx.global_mut::<ContextMenuKeys>().register(released);
+        });
+    }
+    cx.update(|cx| {
+        let keys = cx.global::<ContextMenuKeys>();
+        assert!(keys.menus.len() <= 32, "{} registrations", keys.menus.len());
+        assert!(keys.menus.iter().any(|menu| menu.upgrade().is_some()));
+    });
+}
+
+#[gpui::test]
 fn escape_closes_a_keyboard_context_menu_and_returns_focus(cx: &mut TestAppContext) {
     let (view, cx) = keyboard_menu(cx);
     let row = view.update(cx, |v, _| v.row.clone());
