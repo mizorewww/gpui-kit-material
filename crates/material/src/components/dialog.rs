@@ -520,11 +520,18 @@ pub(crate) fn modal_focus(
     window: &mut Window,
     cx: &mut App,
 ) -> FocusHandle {
-    let state = window.use_keyed_state((id.clone(), "modal-focus"), cx, |_, cx| ModalFocus {
-        focus: cx.focus_handle(),
-        previous: None,
-        shown: false,
-        _hold: None,
+    let state = window.use_keyed_state((id.clone(), "modal-focus"), cx, |_, cx| {
+        // Leaving the tree open releases the hold as closing does.
+        cx.on_release(|state: &mut ModalFocus, cx| {
+            super::focus::ModalHold::release(state._hold.take(), cx)
+        })
+        .detach();
+        ModalFocus {
+            focus: cx.focus_handle(),
+            previous: None,
+            shown: false,
+            _hold: None,
+        }
     });
     let shown = state.read(cx).shown;
     if open && !shown {
@@ -532,7 +539,7 @@ pub(crate) fn modal_focus(
         state.update(cx, |state, _| {
             state.shown = true;
             state.previous = previous;
-            state._hold = Some(super::focus::ModalHold::new());
+            state._hold = Some(super::focus::ModalHold::new(window));
         });
         if take_focus {
             let target = state.read(cx).focus.clone();
@@ -540,11 +547,11 @@ pub(crate) fn modal_focus(
             window.defer(cx, move |window, cx| target.focus(window, cx));
         }
     } else if !open && shown {
-        let previous = state.update(cx, |state, _| {
+        let (previous, hold) = state.update(cx, |state, _| {
             state.shown = false;
-            state._hold = None;
-            state.previous.take()
+            (state.previous.take(), state._hold.take())
         });
+        super::focus::ModalHold::release(hold, cx);
         if let Some(previous) = previous {
             window.defer(cx, move |window, cx| previous.focus(window, cx));
         }

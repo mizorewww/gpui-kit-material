@@ -44,9 +44,11 @@ const EDGE: f32 = 16.;
 /// Tab reaches the snackbar's buttons after the page's last stop, as it
 /// reaches a web snackbar appended to the document. While a dialog is open
 /// its focus trap keeps Tab inside the dialog, so a snackbar with an action
-/// waits for every Material modal surface to close before its countdown
-/// runs; give its command another keyboard route too, as M3 asks of
-/// snackbar actions.
+/// waits for every Material modal surface in its window (`MaterialDialog`,
+/// modal sheets and drawers) to close before its countdown runs. Dialogs
+/// that are not Material's, such as Kit's `window.open_dialog` or a plain
+/// GPUI Base `Dialog`, do not pause it. Give its command another keyboard
+/// route too, as M3 asks of snackbar actions.
 pub const SNACKBAR_PRIORITY: usize = gpui_base::POPUP_PRIORITY - 1;
 
 type SnackbarHandler = Rc<dyn Fn(&ClickEvent, &mut Window, &mut App)>;
@@ -117,7 +119,7 @@ struct AutoDismiss {
 /// its buttons ripple and act, and focus then goes back to what had it, so a
 /// dialog it shows over keeps focus and stays open. A snackbar with an action
 /// keeps its countdown paused while a Material dialog, modal sheet or modal
-/// drawer is open.
+/// drawer is open in its window.
 ///
 /// # Example
 ///
@@ -353,7 +355,7 @@ impl RenderOnce for Snackbar {
         if preview.is_none() {
             // An action shown while a modal surface is open waits for it to
             // close: a dialog's focus trap keeps the keyboard from reaching it.
-            let held = self.action.is_some() && super::focus::modal_open();
+            let held = self.action.is_some() && super::focus::modal_open(window);
             sync_auto_dismiss(
                 &auto_dismiss,
                 self.open,
@@ -1095,6 +1097,160 @@ mod tests {
         let (view, cx) = held(cx, false);
         wait(cx, 6);
         view.read_with(cx, |v, _| assert_eq!(v.dismissals, 1));
+    }
+
+    /// A snackbar in a view of its own, drawn before a dialog in another.
+    #[cfg(feature = "dialogs")]
+    struct Bar {
+        dismissals: std::rc::Rc<std::cell::Cell<usize>>,
+    }
+
+    #[cfg(feature = "dialogs")]
+    impl Render for Bar {
+        fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+            let dismissals = self.dismissals.clone();
+            div().size_full().child(
+                Snackbar::new("copied", "Image copied")
+                    .position(SnackbarPosition::Center)
+                    .duration(SnackbarDuration::Short)
+                    .action("Undo", |_, _, _| {})
+                    .on_dismiss(move |_, _| dismissals.set(dismissals.get() + 1)),
+            )
+        }
+    }
+
+    #[cfg(feature = "dialogs")]
+    struct BarFirst {
+        dialog: bool,
+        /// Whether the dialog is in the tree at all.
+        mounted: bool,
+        bar: Entity<Bar>,
+    }
+
+    #[cfg(feature = "dialogs")]
+    impl Render for BarFirst {
+        fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+            window.set_rem_size(px(16.));
+            div()
+                .relative()
+                .size_full()
+                .child(div().absolute().inset_0().child(self.bar.clone()))
+                .when(self.mounted, |page| {
+                    page.child(
+                        crate::components::MaterialDialog::new("dialog")
+                            .headline("Screenshot")
+                            .modal(self.dialog),
+                    )
+                })
+        }
+    }
+
+    /// A platform frame: draws what changed, nothing forced.
+    #[cfg(feature = "dialogs")]
+    fn frame(cx: &mut gpui::VisualTestContext) {
+        cx.run_until_parked();
+        cx.update(|window, cx| {
+            window.draw(cx).clear(cx);
+        });
+        cx.run_until_parked();
+    }
+
+    #[cfg(feature = "dialogs")]
+    fn tick(cx: &mut gpui::VisualTestContext, seconds: u64) {
+        for _ in 0..seconds * 4 {
+            cx.executor()
+                .advance_clock(std::time::Duration::from_millis(250));
+            frame(cx);
+        }
+    }
+
+    #[cfg(feature = "dialogs")]
+    #[gpui::test]
+    fn a_snackbar_drawn_before_the_dialog_resumes_when_it_closes(cx: &mut TestAppContext) {
+        cx.update(|cx| {
+            gpui_base::init(cx);
+            cx.set_reduce_motion(true);
+        });
+        let dismissals = std::rc::Rc::new(std::cell::Cell::new(0));
+        let (view, cx) = cx.add_window_view({
+            let dismissals = dismissals.clone();
+            move |_, cx| BarFirst {
+                dialog: true,
+                mounted: true,
+                bar: cx.new(|_| Bar { dismissals }),
+            }
+        });
+        frame(cx);
+        tick(cx, 6);
+        assert_eq!(dismissals.get(), 0, "held while the dialog is open");
+        view.update(cx, |v, cx| {
+            v.dialog = false;
+            cx.notify();
+        });
+        tick(cx, 8);
+        assert_eq!(
+            dismissals.get(),
+            1,
+            "the countdown ran once the dialog closed"
+        );
+    }
+
+    #[cfg(feature = "dialogs")]
+    #[gpui::test]
+    fn an_open_dialog_leaving_the_tree_releases_the_snackbar(cx: &mut TestAppContext) {
+        cx.update(|cx| {
+            gpui_base::init(cx);
+            cx.set_reduce_motion(true);
+        });
+        let dismissals = std::rc::Rc::new(std::cell::Cell::new(0));
+        let (view, cx) = cx.add_window_view({
+            let dismissals = dismissals.clone();
+            move |_, cx| BarFirst {
+                dialog: true,
+                mounted: true,
+                bar: cx.new(|_| Bar { dismissals }),
+            }
+        });
+        frame(cx);
+        tick(cx, 6);
+        assert_eq!(dismissals.get(), 0);
+        view.update(cx, |v, cx| {
+            v.mounted = false;
+            cx.notify();
+        });
+        tick(cx, 8);
+        assert_eq!(
+            dismissals.get(),
+            1,
+            "removed while open, it no longer holds"
+        );
+    }
+
+    #[cfg(feature = "dialogs")]
+    #[gpui::test]
+    fn a_dialog_in_another_window_does_not_hold_a_snackbar(cx: &mut TestAppContext) {
+        cx.update(|cx| {
+            gpui_base::init(cx);
+            cx.set_reduce_motion(true);
+        });
+        let (_, other) = cx.add_window_view(|_, _| Held {
+            dialog: true,
+            action: false,
+            dismissals: 0,
+        });
+        frame(other);
+        let dismissals = std::rc::Rc::new(std::cell::Cell::new(0));
+        let (_, cx) = cx.add_window_view({
+            let dismissals = dismissals.clone();
+            move |_, cx| BarFirst {
+                dialog: false,
+                mounted: true,
+                bar: cx.new(|_| Bar { dismissals }),
+            }
+        });
+        frame(cx);
+        tick(cx, 6);
+        assert_eq!(dismissals.get(), 1, "only its own window's modals hold it");
     }
 
     /// Stops before and after a snackbar in the page.

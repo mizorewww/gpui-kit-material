@@ -48,9 +48,10 @@ a fresh resolve of `gpui-kit-material` picks it up.
   on a button that goes with the snackbar. With nothing focused, the button keeps focus;
   a handler that moves focus elsewhere keeps its move.
 - A snackbar with an action keeps its countdown paused while a Material dialog, modal
-  sheet or modal drawer is open, and starts it again in full once they close: the dialog's
-  focus trap keeps the keyboard from reaching the action meanwhile. A snackbar without
-  an action counts down as before.
+  sheet or modal drawer is open in its window, and starts it again in full once they
+  close (or leave the tree), wherever the snackbar is drawn: the dialog's focus trap keeps
+  the keyboard from reaching the action meanwhile. Kit's `window.open_dialog` and plain
+  GPUI Base dialogs do not pause it. A snackbar without an action counts down as before.
 
 ### Known limitations
 

@@ -562,31 +562,59 @@ mod tests {
 
 thread_local! {
     /// How many Material modal surfaces (dialogs, modal sheets and drawers)
-    /// are open on this thread, for content that waits for them to close.
-    static MODALS_OPEN: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+    /// are open in each window, for content that waits for them to close.
+    static MODALS_OPEN: std::cell::RefCell<std::collections::HashMap<WindowId, usize>> =
+        std::cell::RefCell::default();
 }
 
-/// Held while a Material modal surface is open; dropping it, as closing or
-/// leaving the tree does, releases it.
+/// Held while a Material modal surface is open in a window; dropping it, as
+/// closing or leaving the tree does, releases it. Whoever drops it refreshes
+/// the window ([`ModalHold::release`]), so content that read
+/// [`modal_open`] while it was held, in any view, draws again.
 #[cfg_attr(not(feature = "dialogs"), allow(dead_code))]
-pub(crate) struct ModalHold(());
+pub(crate) struct ModalHold(WindowId);
 
 #[cfg_attr(not(feature = "dialogs"), allow(dead_code))]
 impl ModalHold {
-    pub(crate) fn new() -> Self {
-        MODALS_OPEN.with(|open| open.set(open.get() + 1));
-        Self(())
+    pub(crate) fn new(window: &Window) -> Self {
+        let id = window.window_handle().window_id();
+        MODALS_OPEN.with(|open| *open.borrow_mut().entry(id).or_default() += 1);
+        Self(id)
+    }
+
+    /// Drop the hold and, after this frame, draw its window again.
+    pub(crate) fn release(hold: Option<Self>, cx: &mut App) {
+        let Some(hold) = hold else {
+            return;
+        };
+        let id = hold.0;
+        drop(hold);
+        let windows: Vec<_> = cx.windows();
+        if let Some(window) = windows.into_iter().find(|w| w.window_id() == id) {
+            cx.defer(move |cx| {
+                let _ = window.update(cx, |_, window, _| window.refresh());
+            });
+        }
     }
 }
 
 impl Drop for ModalHold {
     fn drop(&mut self) {
-        MODALS_OPEN.with(|open| open.set(open.get().saturating_sub(1)));
+        MODALS_OPEN.with(|open| {
+            let mut open = open.borrow_mut();
+            if let Some(count) = open.get_mut(&self.0) {
+                *count = count.saturating_sub(1);
+                if *count == 0 {
+                    open.remove(&self.0);
+                }
+            }
+        });
     }
 }
 
-/// Whether a Material modal surface is open.
+/// Whether a Material modal surface is open in `window`.
 #[cfg_attr(not(feature = "feedback"), allow(dead_code))]
-pub(crate) fn modal_open() -> bool {
-    MODALS_OPEN.with(|open| open.get() > 0)
+pub(crate) fn modal_open(window: &Window) -> bool {
+    let id = window.window_handle().window_id();
+    MODALS_OPEN.with(|open| open.borrow().contains_key(&id))
 }
