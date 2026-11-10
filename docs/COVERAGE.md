@@ -77,7 +77,7 @@ M3 roles and type. Each is opt-in: the M3 defaults do not change.
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | Checkbox | Y | Y | Y | `MaterialCheckbox` | Yes | 5 + 2 | attr | none | none found; `required` is a mark in the name, as GPUI has no required state |
 | Switch | Y | Y | Y | `MaterialSwitch` | Yes | 8 + 1 | attr | none | none found; `required` is a mark in the name, as GPUI has no required state |
-| Radio | Y | Y | Y | `MaterialRadio`, `MaterialRadioGroup` | Yes | 5 + 1 | attr | none | none found |
+| Radio | Y | Y | Y | `MaterialRadio`, `MaterialRadioGroup`, `CustomRadioGroup` | Yes | 6 + 1 | attr | none | none found |
 | Chips | Y | Y | Y | `AssistChip`, `FilterChip`, `InputChip`, `SuggestionChip`, `ChipSet` | Yes | 8 + 2 | code | none | none found |
 | Slider | Y | Y | Y | `MaterialSlider` | Yes | 17 + 1 | attr | none | No ripple by design: neither the Figma kit nor md3.io draws one on the Expressive handle |
 | Text field | Y | Y | Y | `TextField` | Yes | 9 + 1 | attr | none | Input types only mask and filter; the web build's on-screen keyboard always gets `inputmode=text`. `required` is a mark in the name |

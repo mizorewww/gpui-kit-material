@@ -76,6 +76,17 @@ impl Render for Screen {
                             .accessibility_label("Second choice"),
                     ),
             )
+            .child(
+                CustomRadioGroup::new("swatches", "Accent color")
+                    .options(["Red", "Green", "Blue"].into_iter().enumerate().map(
+                        |(index, name)| {
+                            gpui_base::Radio::new(("swatch", index))
+                                .accessibility_label(name)
+                                .size(px(20.))
+                        },
+                    ))
+                    .selected(Some(2)),
+            )
             .child(drop_target("drop", "Upload files", false).size(px(40.)))
             .child(MaterialTooltip::plain("tip", "Save a copy").trigger(div().size(px(20.))))
             .child(progress_with_label("copy", "Copy", 0.25, window, cx))
@@ -231,6 +242,16 @@ fn overlays_rows_and_items_announce_names_and_states(cx: &mut TestAppContext) {
         assert_eq!(toggled(node), chosen, "{node}");
         assert_eq!(node["position_in_set"], position, "{node}");
         assert_eq!(node["size_of_set"], 2, "{node}");
+    }
+
+    // Caller-drawn options are Base's radios in a radio group, the
+    // selection toggled, each with its place in the set.
+    labelled(&all, "radioGroup", "Accent color", &tree);
+    for (position, name) in [(1, "Red"), (2, "Green"), (3, "Blue")] {
+        let node = labelled(&all, "radioButton", name, &tree);
+        assert_eq!(toggled(node), position == 3, "{node}");
+        assert_eq!(node["position_in_set"], position, "{node}");
+        assert_eq!(node["size_of_set"], 3, "{node}");
     }
 
     // A drop target is a group named by its caller.

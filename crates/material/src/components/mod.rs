@@ -278,7 +278,7 @@ pub use progress::{
     progress_with_label, sample_circular_progress, spinner, spinner_with_playback,
 };
 #[cfg(feature = "selection")]
-pub use radio::{MaterialRadio, MaterialRadioGroup};
+pub use radio::{CustomRadioGroup, MaterialRadio, MaterialRadioGroup};
 pub use ripple::Ripple;
 #[cfg(feature = "dialogs")]
 pub use sheets::{BottomSheetDetent, MaterialBottomSheet, MaterialSideSheet, SideSheetEdge};

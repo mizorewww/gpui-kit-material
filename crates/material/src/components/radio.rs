@@ -498,6 +498,123 @@ impl RenderOnce for MaterialRadioGroup {
     }
 }
 
+/// A single-choice group whose options the caller draws, such as color
+/// swatches: each option is GPUI Base's [`gpui_base::Radio`] (its role,
+/// checked state, position in the set and activation), inside Base's
+/// [`gpui_base::RadioGroup`], with the same roving focus as
+/// [`MaterialRadioGroup`]: one tab stop, at the selection; arrow keys, Home
+/// and End move focus and select.
+///
+/// The group sets each radio's checked state, focus, tab stop, position and
+/// change handler; the caller gives it its id, accessible name, content and
+/// styles, including how the selection and keyboard focus look.
+///
+/// # Example
+///
+/// ```
+/// use gpui_kit::{prelude::*, *};
+/// use gpui_kit_material::prelude::*;
+///
+/// let selected = 1;
+/// let swatches = CustomRadioGroup::new("accent", "Accent color")
+///     .options(["Red", "Green"].into_iter().enumerate().map(|(index, name)| {
+///         gpui_base::Radio::new(("accent", index))
+///             .accessibility_label(name)
+///             .size(px(40.))
+///             .rounded_full()
+///             .when(index == selected, |radio| radio.border_2())
+///     }))
+///     .selected(Some(selected))
+///     .on_change(|index, _window, _cx| println!("Accent {index}"));
+/// # let _ = swatches;
+/// ```
+#[derive(gpui::IntoElement)]
+pub struct CustomRadioGroup {
+    id: ElementId,
+    group: gpui_base::RadioGroup,
+    options: Vec<gpui_base::Radio>,
+    selected: Option<usize>,
+    on_change: Option<GroupChange>,
+}
+
+impl CustomRadioGroup {
+    /// `label` names the group for accessibility. The options lie in a row
+    /// until [`Self::axis`] says otherwise; style the group to lay them out.
+    pub fn new(id: impl Into<ElementId>, label: impl Into<SharedString>) -> Self {
+        let id = id.into();
+        Self {
+            group: gpui_base::RadioGroup::new(id.clone())
+                .axis(Axis::Horizontal)
+                .aria_label(label.into()),
+            id,
+            options: Vec::new(),
+            selected: None,
+            on_change: None,
+        }
+    }
+    /// The axis assistive technology announces.
+    pub fn axis(mut self, axis: Axis) -> Self {
+        self.group = self.group.axis(axis);
+        self
+    }
+    /// Append an option, with its own id and accessible name.
+    pub fn option(mut self, radio: gpui_base::Radio) -> Self {
+        self.options.push(radio);
+        self
+    }
+    /// Append options in order.
+    pub fn options(mut self, radios: impl IntoIterator<Item = gpui_base::Radio>) -> Self {
+        self.options.extend(radios);
+        self
+    }
+    pub fn selected(mut self, selected: Option<usize>) -> Self {
+        self.selected = selected;
+        self
+    }
+    /// Called with the index of a newly chosen option.
+    pub fn on_change(mut self, f: impl Fn(&usize, &mut Window, &mut App) + 'static) -> Self {
+        self.on_change = Some(Rc::new(f));
+        self
+    }
+}
+
+impl Styled for CustomRadioGroup {
+    fn style(&mut self) -> &mut StyleRefinement {
+        self.group.style()
+    }
+}
+
+impl RenderOnce for CustomRadioGroup {
+    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
+        let count = self.options.len();
+        let focus = index_handles((self.id.clone(), "radio-focus"), count, window, cx);
+        let selected = self.selected.filter(|&index| index < count);
+        let on_select = self.on_change.clone().map(|on_change| {
+            Rc::new(move |index: usize, window: &mut Window, cx: &mut App| {
+                on_change(&index, window, cx)
+            }) as roving::Select
+        });
+        let roving = Roving::new(focus.clone(), Orientation::Both)
+            .selected(selected)
+            .select_on_focus(on_select);
+        let entry = roving.tab_stop(window);
+        let radios = self.options.into_iter().enumerate().map(|(index, radio)| {
+            let on_change = self.on_change.clone();
+            radio
+                .checked(selected == Some(index))
+                .track_focus(&focus[index])
+                .tab_stop(entry == Some(index))
+                .set_position(index + 1, count)
+                .on_change(move |_, _, window, cx| {
+                    if let Some(on_change) = &on_change {
+                        on_change(&index, window, cx);
+                    }
+                })
+        });
+        roving.install(self.group.children(radios))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -602,6 +719,77 @@ mod tests {
         cx.simulate_keystrokes("end");
         draw(cx);
         view.read_with(cx, |h, _| assert_eq!(h.selected, Some(2)));
+    }
+
+    struct CustomHarness {
+        selected: Option<usize>,
+        changes: Vec<usize>,
+    }
+    impl Render for CustomHarness {
+        fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+            window.set_rem_size(px(14.));
+            div().w(px(400.)).child(
+                CustomRadioGroup::new("swatches", "Swatches")
+                    .flex()
+                    .gap(px(8.))
+                    .options((0..3usize).map(|index| {
+                        gpui_base::Radio::new(("swatch", index))
+                            .accessibility_label(format!("Swatch {index}"))
+                            .debug_selector(move || format!("swatch-{index}"))
+                            .size(px(40.))
+                    }))
+                    .selected(self.selected)
+                    .on_change(cx.listener(|this, index: &usize, _, cx| {
+                        this.selected = Some(*index);
+                        this.changes.push(*index);
+                        cx.notify();
+                    })),
+            )
+        }
+    }
+
+    #[gpui::test]
+    fn a_custom_radio_group_is_one_stop_that_roves_and_selects(cx: &mut TestAppContext) {
+        cx.update(|cx| {
+            gpui_base::init(cx);
+            crate::components::init(cx);
+            cx.set_reduce_motion(true);
+        });
+        let (view, cx) = cx.add_window_view(|_, _| CustomHarness {
+            selected: Some(1),
+            changes: Vec::new(),
+        });
+        draw(cx);
+        cx.update(|window, cx| window.focus_next(cx));
+        let entry = cx.update(|window, cx| window.focused(cx));
+        assert!(entry.is_some(), "Tab enters the group");
+        cx.update(|window, cx| window.focus_next(cx));
+        assert_eq!(
+            cx.update(|window, cx| window.focused(cx)),
+            entry,
+            "the group is one tab stop"
+        );
+        cx.simulate_keystrokes("right");
+        draw(cx);
+        view.read_with(cx, |h, _| {
+            assert_eq!(h.changes, [2], "Tab entered at the selection")
+        });
+        cx.simulate_keystrokes("right");
+        draw(cx);
+        view.read_with(cx, |h, _| assert_eq!(h.changes, [2, 0], "arrows wrap"));
+        cx.simulate_keystrokes("end");
+        draw(cx);
+        view.read_with(cx, |h, _| assert_eq!(h.selected, Some(2)));
+        let first = cx.debug_bounds("swatch-0").unwrap();
+        cx.simulate_click(first.center(), Modifiers::default());
+        draw(cx);
+        view.read_with(cx, |h, _| {
+            assert_eq!(h.changes, [2, 0, 2, 0], "a click selects")
+        });
+        // Clicking the selection again changes nothing.
+        cx.simulate_click(first.center(), Modifiers::default());
+        draw(cx);
+        view.read_with(cx, |h, _| assert_eq!(h.changes.len(), 4));
     }
 
     struct DotHarness(bool);
