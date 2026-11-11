@@ -7,6 +7,38 @@ commit messages.
 
 Nothing yet.
 
+## gpui-kit-material 0.1.2 (2026-11-11)
+
+`gpui-kit-material` 0.1.2 requires `gpui-kit-material-color` 0.1.1 (unchanged, so not
+released again) and builds on `gpui-kit` 0.9.1.
+
+### Added
+
+- `ContextMenuHandle::toggle_at(&ClickEvent, cx)`, a "more" button's click handler: it
+  closes the menu when it was open as the click began and otherwise opens it at the click.
+  Checking `is_open` in the handler reopened a menu, because the press outside the menu
+  had already dismissed it by the time the click arrived.
+
+### Fixed
+
+- A `MaterialContextMenu` opened from the keyboard or `ContextMenuHandle::open` opens
+  beside its parent and never over it: below the parent's bottom edge, above its top edge
+  when it fits only there, and otherwise on the side with more room, where it scrolls to
+  stay inside the window. Without room below it flipped up from the parent's bottom edge
+  and covered it, and a tall menu could run past the window. A right press, and
+  `ContextMenuHandle::open_at`, still open at their point.
+- A `MaterialCard`'s rounding from its caller (`.rounded(px(20.))` and the per-corner
+  forms) now shapes its surface, state layers, ripple and keyboard focus ring; it reached
+  only the outer element, so the surface and ring kept 12dp corners and apps clipped the
+  card to get the look, which also cut the ring. The surface now fills a card the caller
+  sizes, and a clip asked of the card is left to it (it already clips the content), so
+  content taller than the card stays inside it and the ring outside it stays whole.
+  `CardSurface`'s focused specimen ring follows the surface's corners too.
+- A `MaterialTooltip` hides at once when its trigger is pressed, or activated with Enter
+  or Space, and stays hidden until the pointer leaves the trigger or keyboard focus comes
+  back to it. A "more" button's tooltip drew over the menu the button had just opened until
+  the pointer moved.
+
 ## gpui-kit-material 0.1.1 and gpui-kit-material-color 0.1.1 (2026-11-10)
 
 `gpui-kit-material` 0.1.1 still builds on `gpui-kit-material-color` 0.1.0 and `gpui-kit`

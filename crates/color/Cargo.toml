@@ -1,7 +1,8 @@
 [package]
 name = "gpui-kit-material-color"
 description = "Material 3 color roles, built-in palettes and scheme derivation for gpui-kit-material, without a GPUI dependency"
-version.workspace = true
+# Released on its own: unchanged since 0.1.1 while the library moved on.
+version = "0.1.1"
 edition.workspace = true
 rust-version.workspace = true
 # MIT (LICENSE), plus the Apache-2.0 port of material-color-utilities in src/dynamic

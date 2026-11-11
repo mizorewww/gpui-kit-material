@@ -1308,6 +1308,10 @@ pub struct MenuPopup {
     on_submenu_change: Option<OpenChange>,
     full_width: bool,
     on_closed: Option<OnClosed>,
+    /// Keep the asked side, fitting the menu to its room, instead of flipping
+    /// across the trigger: for a point that stands for one edge of a larger
+    /// trigger, where flipping would cover it.
+    keep_side: bool,
 }
 
 impl MenuPopup {
@@ -1325,6 +1329,7 @@ impl MenuPopup {
             on_submenu_change: None,
             full_width: false,
             on_closed: None,
+            keep_side: false,
         }
     }
     /// Fill the parent's width, with the menu as wide as the trigger.
@@ -1568,7 +1573,18 @@ impl RenderOnce for MenuPopup {
         // fits there, and otherwise scrolls on the side with more room. Base would
         // only slide it back into the window, over its own trigger.
         // A trigger that leaves less than a row on both sides keeps that clamping.
-        if !side && let Some(bounds) = trigger_bounds.get() {
+        if !side
+            && self.keep_side
+            && let Some(bounds) = trigger_bounds.get()
+        {
+            let beside = room_beside(bounds, window);
+            side_room = if opens_upward(anchor) {
+                beside.0
+            } else {
+                beside.1
+            };
+            self.menu = self.menu.fit(side_room);
+        } else if !side && let Some(bounds) = trigger_bounds.get() {
             let beside = room_beside(bounds, window);
             let asks_above = opens_upward(anchor);
             let height = self.menu.visible_height();
@@ -1850,14 +1866,18 @@ impl RenderOnce for MenuPopup {
 ///
 /// From the keyboard, Shift+F10 or the Menu key opens it, as on Windows, Linux
 /// desktops and the web, while focus is on [`Self::trigger`] or inside it (on
-/// macOS, which has no context-menu key, Shift+F10 alone). It opens below the
-/// parent's start edge, or above when there is no room, and the arrow keys
-/// move into its items. Of nested context menus, the one whose trigger holds
-/// focus most closely opens. Initialize the library ([`crate::init`]) for these
-/// keys, as for a menu's arrows and Escape.
+/// macOS, which has no context-menu key, Shift+F10 alone). It opens beside
+/// the whole parent, never over it: below its bottom edge, or above its top
+/// edge when it fits only there, else on the side with more room, where it
+/// scrolls to stay inside the window. The arrow keys move into its items.
+/// Of nested context menus, the one whose trigger holds focus most closely
+/// opens. Initialize the library ([`crate::init`]) for these keys, as for a
+/// menu's arrows and Escape.
 ///
-/// From code, a [`ContextMenuHandle`] given to [`Self::handle`] opens it below
-/// the parent or at a point, for a "more" button or a command.
+/// From code, a [`ContextMenuHandle`] given to [`Self::handle`] opens it beside
+/// the parent as the keyboard does, or at a point, for a "more" button or a
+/// command; [`ContextMenuHandle::toggle_at`] is the "more" button's click
+/// handler, which closes the menu when it was open.
 ///
 /// A control that blocks the mouse, such as a button in the row, keeps its own
 /// right press, as it does for Kit's `context_menu`.
@@ -1881,7 +1901,8 @@ impl RenderOnce for MenuPopup {
 ///         .handle(&menu),
 ///     )
 ///     .child(row_content);
-/// // Later, from a "more" button or a command: `menu.open(cx)`.
+/// // A command opens it with `menu.open(cx)`; a "more" button's click
+/// // handler calls `menu.toggle_at(event, cx)`.
 /// # let _ = row;
 /// # }
 /// ```
@@ -1933,12 +1954,12 @@ impl ContextMenuHandle {
         self.0.borrow().as_ref().and_then(WeakEntity::upgrade)
     }
 
-    /// Open below the start edge of the menu's parent, as the keyboard does.
+    /// Open beside the menu's parent, as the keyboard does: below its bottom
+    /// edge, or above its top edge when the menu fits only there.
     /// Returns whether the menu has rendered and so could open.
     pub fn open(&self, cx: &mut App) -> bool {
         self.state().is_some_and(|state| {
-            let anchor = state.read(cx).keyboard_anchor();
-            show_context_menu(&state, anchor, cx);
+            show_context_menu(&state, ContextAnchor::Parent, cx);
             true
         })
     }
@@ -1949,9 +1970,38 @@ impl ContextMenuHandle {
     pub fn open_at(&self, position: Point<Pixels>, cx: &mut App) -> bool {
         self.state().is_some_and(|state| {
             let origin = state.read(cx).bounds.origin;
-            show_context_menu(&state, position - origin, cx);
+            show_context_menu(&state, ContextAnchor::Point(position - origin), cx);
             true
         })
+    }
+
+    /// For a "more" button's click: close the menu if it was open when this
+    /// click began, and otherwise open it at the click
+    /// ([`Self::open_at`]`(event.position())`). A press outside an open
+    /// menu dismisses it before the click arrives, so checking
+    /// [`Self::is_open`] in the click handler would open it again. Returns
+    /// whether the menu is now open.
+    pub fn toggle_at(&self, event: &ClickEvent, cx: &mut App) -> bool {
+        let Some(state) = self.state() else {
+            return false;
+        };
+        let was_open = state.update(cx, |state, _| {
+            // This click's press is read once; a later click notes its own.
+            let press = state.press.take();
+            let pressed_open = match event {
+                ClickEvent::Mouse(click) => {
+                    press.is_some_and(|(at, open)| open && at == click.down.position)
+                }
+                _ => false,
+            };
+            state.open || pressed_open
+        });
+        if was_open {
+            self.close(cx);
+            false
+        } else {
+            self.open_at(event.position(), cx)
+        }
     }
 
     /// Close the menu if it is open; focus returns as on Escape.
@@ -1980,8 +2030,13 @@ pub(crate) struct ContextMenuState {
     /// state to reveal from and a trigger position to open at.
     entering: bool,
     open: bool,
-    /// Where the menu opens, from the parent's start edge.
-    position: Point<Pixels>,
+    /// Where the menu opens: at a point from the parent's start edge, or
+    /// beside the whole parent.
+    anchor: ContextAnchor,
+    /// The pointer's last press while the menu was in the tree, and whether
+    /// the menu was open then: a press that dismisses it does not reopen it
+    /// through [`ContextMenuHandle::toggle_at`].
+    press: Option<(Point<Pixels>, bool)>,
     /// The parent's bounds when it was last drawn, in window coordinates.
     bounds: Bounds<Pixels>,
     /// What holds focus for the keyboard to open it.
@@ -1990,22 +2045,39 @@ pub(crate) struct ContextMenuState {
     registered: bool,
 }
 
-impl ContextMenuState {
-    /// Below the parent's start edge.
-    fn keyboard_anchor(&self) -> Point<Pixels> {
-        point(px(0.), self.bounds.size.height)
-    }
+/// Where a context menu opens.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+enum ContextAnchor {
+    /// Beside the whole parent, below its start edge or above it, as the
+    /// keyboard and [`ContextMenuHandle::open`] open it.
+    #[default]
+    Parent,
+    /// At a point from the parent's start edge, as a press opens it.
+    Point(Point<Pixels>),
 }
 
-/// Open (or move) the menu at `position` from its parent's start edge.
-fn show_context_menu(state: &Entity<ContextMenuState>, position: Point<Pixels>, cx: &mut App) {
+/// Open (or move) the menu at `anchor`.
+fn show_context_menu(state: &Entity<ContextMenuState>, anchor: ContextAnchor, cx: &mut App) {
     state.update(cx, |state, cx| {
         state.entering = !state.mounted;
         state.mounted = true;
         state.open = true;
-        state.position = position;
+        state.anchor = anchor;
         cx.notify();
     });
+}
+
+/// Whether a menu of `height` (and `least`, its first row) opens above a
+/// trigger at `bounds` rather than below it: below when it fits there, above
+/// when it fits only there, else on the side with more room, where it
+/// scrolls. `None` when neither side has a row's room.
+fn context_menu_above(
+    bounds: Bounds<Pixels>,
+    height: f32,
+    least: f32,
+    window: &Window,
+) -> Option<bool> {
+    popup_side(false, (height, height), room_beside(bounds, window), least)
 }
 
 /// The context menus whose triggers the keyboard can open them from.
@@ -2080,8 +2152,7 @@ fn open_context_menu_from_keyboard(event: &KeystrokeEvent, window: &mut Window, 
     }
     if let Some((state, _)) = chosen {
         cx.stop_propagation();
-        let anchor = state.read(cx).keyboard_anchor();
-        show_context_menu(&state, anchor, cx);
+        show_context_menu(&state, ContextAnchor::Parent, cx);
     }
 }
 
@@ -2118,7 +2189,21 @@ impl RenderOnce for MaterialContextMenu {
             },
             {
                 let state = state.clone();
-                move |_, (bounds, hitbox): (Bounds<Pixels>, Hitbox), window, _| {
+                move |_, (bounds, hitbox): (Bounds<Pixels>, Hitbox), window, cx| {
+                    // While the menu is in the tree, and until a toggle has read
+                    // the last such press, note each press and whether the menu
+                    // was open then, before its popover dismisses it.
+                    if state.read(cx).mounted || state.read(cx).press.is_some() {
+                        let noted = state.clone();
+                        window.on_mouse_event(move |event: &MouseDownEvent, phase, _, cx| {
+                            if phase == DispatchPhase::Capture {
+                                noted.update(cx, |state, _| {
+                                    state.press = Some((event.position, state.open))
+                                });
+                            }
+                        });
+                    }
+                    let state = state.clone();
                     window.on_mouse_event(move |event: &MouseDownEvent, phase, window, cx| {
                         if phase.bubble()
                             && event.button == MouseButton::Right
@@ -2126,7 +2211,8 @@ impl RenderOnce for MaterialContextMenu {
                         {
                             // Bubbling reaches the innermost context menu first.
                             cx.stop_propagation();
-                            show_context_menu(&state, event.position - bounds.origin, cx);
+                            let at = ContextAnchor::Point(event.position - bounds.origin);
+                            show_context_menu(&state, at, cx);
                         }
                     });
                 }
@@ -2143,9 +2229,23 @@ impl RenderOnce for MaterialContextMenu {
                 window.request_animation_frame();
             }
             let open = state.read(cx).open && !entering;
-            let position = state.read(cx).position;
+            let (anchor, bounds) = (state.read(cx).anchor, state.read(cx).bounds);
+            let items = (self.menu)(window, cx);
+            // Beside the whole parent: from its bottom edge, or from its top
+            // edge when the menu goes above, so it never covers the parent.
+            let (position, above) = match anchor {
+                ContextAnchor::Point(at) => (at, None),
+                ContextAnchor::Parent => {
+                    let height = items.visible_height().min(window_room(window));
+                    let least = items.item_bottom(0).unwrap_or(height).min(height);
+                    match context_menu_above(bounds, height, least, window) {
+                        Some(true) => (point(px(0.), px(0.)), Some(true)),
+                        side => (point(px(0.), bounds.size.height), side),
+                    }
+                }
+            };
             let close = state.clone();
-            let mut menu = MenuPopup::new((self.id, "popup"), div(), (self.menu)(window, cx))
+            let mut menu = MenuPopup::new((self.id, "popup"), div(), items)
                 .open(open)
                 .on_open_change(move |next, _, cx| {
                     close.update(cx, |state, cx| {
@@ -2158,6 +2258,12 @@ impl RenderOnce for MaterialContextMenu {
             if !entering {
                 let leave = state.clone();
                 menu = menu.on_closed(move |cx| leave.update(cx, |state, _| state.mounted = false));
+            }
+            if let Some(above) = above {
+                menu.keep_side = true;
+                if above {
+                    menu = menu.anchor(Anchor::BottomLeft);
+                }
             }
             popup = Some(
                 div()

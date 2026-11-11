@@ -83,11 +83,10 @@ CI's `release-readiness` job runs both on every push, and its `package` job runs
 6. `cargo publish --dry-run -p gpui-kit-material`, then `cargo publish -p gpui-kit-material`.
 7. Tag the commit `material-v<version>` and push the tag.
 
-0.1.0 is published (`gpui-kit-material` 2026-11-09, tag `material-v0.1.0`; the color
-crate 2026-11-08, tag `color-v0.1.0`). For 0.1.1, steps 1–6's dry runs are done
-(2026-11-10, Kit 0.9.1). What remains, in order: `cargo publish -p
-gpui-kit-material-color` (0.1.1, its status-color fixes), then `cargo publish -p
-gpui-kit-material`, then the `color-v0.1.1` and `material-v0.1.1` tags. The library
-requires color `0.1.0`, so it publishes and resolves without color 0.1.1 too.
+0.1.0 and 0.1.1 are published (tags `material-v0.1.0`, `color-v0.1.0`, `material-v0.1.1`,
+`color-v0.1.1`). For `gpui-kit-material` 0.1.2, steps 1–6's dry runs are done (2026-11-11,
+Kit 0.9.1); what remains is `cargo publish -p gpui-kit-material` and the
+`material-v0.1.2` tag. `gpui-kit-material-color` is unchanged since 0.1.1, so its manifest
+keeps `version = "0.1.1"` rather than the workspace's, and it is not released again.
 
 The Gallery, gallery-web, benches and consumer-check stay `publish = false`.

@@ -459,11 +459,14 @@ fn context_region(
         )
         .child(
             div().debug_selector(|| "menu-context-more".into()).child(
-                IconButton::new("menu-context-more", symbol("more_vert", 24.), "More")
-                    // A keyboard click's position is the button's bottom-start corner.
-                    .on_click(move |event, _, cx| {
-                        more.open_at(event.position(), cx);
-                    }),
+                MaterialTooltip::plain("menu-context-more-tip", "More").trigger(
+                    IconButton::new("menu-context-more", symbol("more_vert", 24.), "More")
+                        // Opens at the click (a key's: the button's bottom-start
+                        // corner), and closes the menu when it was open.
+                        .on_click(move |event, _, cx| {
+                            more.toggle_at(event, cx);
+                        }),
+                ),
             ),
         )
 }
@@ -719,6 +722,16 @@ mod tests {
         harness.keys("down enter");
         harness.advance(1000);
         assert_eq!(drawn().4, Some(labels[0].0), "the more button opens it");
+        // Pressed again while its menu is open, it closes the menu.
+        harness.click("menu-context-more");
+        harness.advance(1000);
+        assert!(harness.bounds("material-menu").is_some());
+        harness.click("menu-context-more");
+        harness.advance(1000);
+        assert!(
+            harness.bounds("material-menu").is_none(),
+            "a second press closes it"
+        );
         // A press focuses the region; Shift+F10 then opens its menu.
         let region = harness.expect("menu-context-region");
         harness.click_at(region.origin + point(px(12.), px(12.)));
