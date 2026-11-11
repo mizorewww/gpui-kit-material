@@ -453,6 +453,100 @@ fn a_handle_opens_and_closes_the_context_menu_from_code(cx: &mut TestAppContext)
     assert!(!cx.update(|_, cx| ContextMenuHandle::default().open(cx)));
 }
 
+/// A list row at `top` in a 1280×780 window, with a context menu of `items`
+/// items that its handle opens.
+struct PlacedRow {
+    top: f32,
+    items: usize,
+    handle: ContextMenuHandle,
+}
+
+impl Render for PlacedRow {
+    fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        window.set_rem_size(px(16.));
+        let items = self.items;
+        div().size_full().child(
+            div()
+                .debug_selector(|| "placed-row".into())
+                .absolute()
+                .top(px(self.top))
+                .left(px(200.))
+                .w(px(600.))
+                .h(px(56.))
+                .child(
+                    MaterialContextMenu::new("placed", move |_, _| {
+                        MaterialMenu::new("placed-items")
+                            .items((0..items).map(|i| MaterialMenuItem::new(format!("Item {i}"))))
+                    })
+                    .handle(&self.handle),
+                ),
+        )
+    }
+}
+
+fn placed(
+    cx: &mut TestAppContext,
+    top: f32,
+    items: usize,
+) -> (Entity<PlacedRow>, &mut VisualTestContext) {
+    cx.update(|cx| {
+        gpui_kit::init(cx);
+        crate::init(cx);
+        cx.set_reduce_motion(true);
+    });
+    let (view, cx) = cx.add_window_view(move |_, _| PlacedRow {
+        top,
+        items,
+        handle: ContextMenuHandle::default(),
+    });
+    cx.simulate_resize(size(px(1280.), px(780.)));
+    settle(cx);
+    let handle = view.update(cx, |v, _| v.handle.clone());
+    assert!(cx.update(|_, cx| handle.open(cx)));
+    settle(cx);
+    (view, cx)
+}
+
+#[gpui::test]
+fn a_context_menu_without_room_below_opens_above_its_trigger(cx: &mut TestAppContext) {
+    let (_, cx) = placed(cx, 680., 4);
+    let row = cx.debug_bounds("placed-row").unwrap();
+    let menu = cx.debug_bounds("material-menu").expect("open");
+    assert!(
+        menu.bottom() <= row.top(),
+        "above the row: {menu:?} {row:?}"
+    );
+    assert!(menu.top() >= px(0.));
+    assert_eq!(menu.origin.x, row.origin.x);
+}
+
+#[gpui::test]
+fn a_context_menu_with_room_below_opens_below_its_trigger(cx: &mut TestAppContext) {
+    let (_, cx) = placed(cx, 100., 4);
+    let row = cx.debug_bounds("placed-row").unwrap();
+    let menu = cx.debug_bounds("material-menu").expect("open");
+    assert!(
+        menu.top() >= row.bottom(),
+        "below the row: {menu:?} {row:?}"
+    );
+    assert!(menu.bottom() <= px(780.));
+}
+
+#[gpui::test]
+fn a_context_menu_too_tall_for_either_side_stays_in_the_window(cx: &mut TestAppContext) {
+    let (_, cx) = placed(cx, 360., 20);
+    let row = cx.debug_bounds("placed-row").unwrap();
+    let menu = cx.debug_bounds("material-menu").expect("open");
+    assert!(
+        menu.top() >= px(0.) && menu.bottom() <= px(780.),
+        "{menu:?}"
+    );
+    assert!(
+        menu.bottom() <= row.top() || menu.top() >= row.bottom(),
+        "beside the row, not over it: {menu:?} {row:?}"
+    );
+}
+
 #[test]
 fn shift_f10_and_the_menu_key_ask_for_a_context_menu() {
     let key = |text: &'static str| Keystroke::parse(text).unwrap();

@@ -5,7 +5,14 @@ commit messages.
 
 ## Unreleased
 
-Nothing yet.
+### Fixed
+
+- A `MaterialContextMenu` opened from the keyboard or `ContextMenuHandle::open` opens
+  beside its parent and never over it: below the parent's bottom edge, above its top edge
+  when it fits only there, and otherwise on the side with more room, where it scrolls to
+  stay inside the window. Without room below it flipped up from the parent's bottom edge
+  and covered it, and a tall menu could run past the window. A right press, and
+  `ContextMenuHandle::open_at`, still open at their point.
 
 ## gpui-kit-material 0.1.1 and gpui-kit-material-color 0.1.1 (2026-11-10)
 
