@@ -782,11 +782,21 @@ impl Element for CardSurface {
             ));
         }
         if self.focus_ring {
-            // The kit's focus indicator: 3dp secondary, 2dp outside.
-            let radius = px(f32::from(RADIUS_CARD) + 5.);
+            // The kit's focus indicator: 3dp secondary, 2dp outside, around
+            // the surface's own corners.
+            let radii = style
+                .corner_radii
+                .to_pixels(window.rem_size())
+                .clamp_radii_for_quad_size(bounds.size);
+            let out = |radius: Pixels| radius + px(5.);
             window.paint_quad(quad(
                 bounds.dilate(px(5.)),
-                radius,
+                Corners {
+                    top_left: out(radii.top_left),
+                    top_right: out(radii.top_right),
+                    bottom_right: out(radii.bottom_right),
+                    bottom_left: out(radii.bottom_left),
+                },
                 transparent_black(),
                 px(3.),
                 color(SECONDARY),
@@ -827,6 +837,12 @@ const CARD_DRAG_SLOP: Pixels = px(4.);
 /// to its place on the default spatial spring, or returns at once under
 /// reduced motion). The accessible label names the action. A selectable
 /// card ([`Self::selected`]) shows and announces whether it is selected.
+///
+/// A caller's rounding (`.rounded(..)` and the per-corner forms) is the
+/// card's shape: its surface, state layers, ripple and focus ring all follow
+/// it. The surface clips the card's content to that shape, so the card
+/// needs no clip of its own; one asked of it (`.overflow_hidden()`) is left
+/// to the surface, so it cannot cut the focus ring drawn outside the card.
 ///
 /// # Example
 ///
@@ -940,8 +956,33 @@ impl ParentElement for MaterialCard {
 }
 
 impl RenderOnce for MaterialCard {
-    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
+    fn render(mut self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         use super::interaction::{ButtonFocusRing, ButtonRipple};
+        // The caller's rounding is the card's shape: the surface, its state
+        // layers, ripple and focus ring take it, not just the outer element.
+        let rounding = std::mem::take(&mut self.style.corner_radii);
+        // The surface clips its content to that shape. A clip the caller asks
+        // of the card goes no further, so it never cuts the focus ring, which
+        // is drawn outside the card.
+        self.style.overflow = Default::default();
+        let card = AbsoluteLength::from(RADIUS_CARD);
+        let mut shape = Corners {
+            top_left: card,
+            top_right: card,
+            bottom_right: card,
+            bottom_left: card,
+        };
+        for (corner, asked) in [
+            (&mut shape.top_left, rounding.top_left),
+            (&mut shape.top_right, rounding.top_right),
+            (&mut shape.bottom_right, rounding.bottom_right),
+            (&mut shape.bottom_left, rounding.bottom_left),
+        ] {
+            if let Some(asked) = asked {
+                *corner = asked;
+            }
+        }
+        let corners = shape.to_pixels(window.rem_size());
         let id = self.id;
         let drag =
             window.use_keyed_state((id.clone(), "card-drag"), cx, |_, _| CardDrag::default());
@@ -966,6 +1007,10 @@ impl RenderOnce for MaterialCard {
         let mut surface = CardSurface::new(self.variant)
             .selected(selected)
             .w_full()
+            .rounded_tl(corners.top_left)
+            .rounded_tr(corners.top_right)
+            .rounded_br(corners.bottom_right)
+            .rounded_bl(corners.bottom_left)
             .children(self.children);
         surface = match (self.preview, dragging) {
             (_, true) => surface.state(CardState::Dragged),
@@ -995,7 +1040,10 @@ impl RenderOnce for MaterialCard {
                 .track_focus(&focus)
                 .tab_stop(tab_stop)
                 .w_full()
-                .rounded(RADIUS_CARD)
+                .rounded_tl(corners.top_left)
+                .rounded_tr(corners.top_right)
+                .rounded_br(corners.bottom_right)
+                .rounded_bl(corners.bottom_left)
                 .cursor_pointer()
                 .when_some(self.label.clone(), |button, label| {
                     button.accessibility_label(label)
@@ -1028,14 +1076,13 @@ impl RenderOnce for MaterialCard {
                 (id.clone(), "card-ripple").into(),
                 true,
                 true,
-                super::ripple::ripple_corners(RADIUS_CARD),
+                shape,
                 Edges::all(px(0.).into()),
                 press_ink,
                 window,
                 cx,
             );
-            ButtonFocusRing::with_corners(ripple, focus, true, Corners::all(RADIUS_CARD))
-                .into_any_element()
+            ButtonFocusRing::with_corners(ripple, focus, true, corners).into_any_element()
         } else {
             surface.into_any_element()
         };

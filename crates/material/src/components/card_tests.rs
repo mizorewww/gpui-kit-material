@@ -484,3 +484,99 @@ fn a_card_group_is_one_tab_stop_whose_arrows_choose(cx: &mut TestAppContext) {
     super::tests::redraw(cx);
     view.read_with(cx, |h, _| assert_eq!(h.changes, [2, 1]));
 }
+
+/// An action card rounded by its caller, clipped by it or not.
+struct RoundedCard {
+    clip: bool,
+}
+impl Render for RoundedCard {
+    fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        window.set_rem_size(px(14.));
+        let card = super::MaterialCard::new("rounded-card", CardVariant::Filled)
+            .accessibility_label("Open")
+            .on_click(|_, _, _| {})
+            .w(px(100.))
+            .rounded(px(20.))
+            .child(div().h(px(60.)));
+        div().p(px(40.)).child(if self.clip {
+            card.overflow_hidden()
+        } else {
+            card
+        })
+    }
+}
+
+/// The card's fill and its keyboard focus ring in the last frame, as
+/// `(fill radius, ring bounds, ring radius, ring clipped)` in logical px.
+fn rounded_card(cx: &mut TestAppContext, clip: bool) -> (f32, gpui::Bounds<f32>, f32, bool) {
+    cx.update(gpui_base::init);
+    let (_, cx) = cx.add_window_view(move |_, _| RoundedCard { clip });
+    cx.run_until_parked();
+    cx.update(|window, cx| window.focus_next(cx));
+    // A key press puts the window in keyboard modality.
+    let keystroke =
+        cx.update(|_, cx| gpui::Keystroke::parse_with_os("a", cx.platform_info().os).unwrap());
+    cx.simulate_event(gpui::KeyDownEvent {
+        keystroke,
+        is_held: false,
+        prefer_character_input: false,
+    });
+    super::tests::redraw(cx);
+    cx.update(|window, _| {
+        let scale = window.scale_factor();
+        let quads = window.painted_quads();
+        let fill = quads
+            .iter()
+            .find(|q| q.bounds.size.width.0 == 100. * scale && !q.background.is_transparent())
+            .expect("the card's fill");
+        let ring = quads
+            .iter()
+            .find(|q| q.border_widths.top.0 == 3. * scale)
+            .expect("the focus ring");
+        // The ring may be painted in pieces, each under its own mask: it is
+        // clipped when their masks together do not cover it.
+        let covered = quads
+            .iter()
+            .filter(|q| q.border_widths.top.0 == 3. * scale && q.bounds == ring.bounds)
+            .map(|q| q.content_mask.bounds)
+            .reduce(|a, b| a.union(&b))
+            .expect("the ring's masks");
+        let clipped = covered.intersect(&ring.bounds) != ring.bounds;
+        let bounds = gpui::Bounds {
+            origin: gpui::point(
+                ring.bounds.origin.x.0 / scale,
+                ring.bounds.origin.y.0 / scale,
+            ),
+            size: gpui::size(
+                ring.bounds.size.width.0 / scale,
+                ring.bounds.size.height.0 / scale,
+            ),
+        };
+        (
+            fill.corner_radii.top_left.0 / scale,
+            bounds,
+            ring.corner_radii.top_left.0 / scale,
+            clipped,
+        )
+    })
+}
+
+#[gpui::test]
+fn a_cards_surface_and_ring_follow_its_rounding(cx: &mut TestAppContext) {
+    let (fill, ring, ring_radius, clipped) = rounded_card(cx, false);
+    assert_eq!(fill, 20., "the surface takes the caller's radius");
+    assert_eq!(ring_radius, 25., "the ring follows it, 5px out");
+    assert_eq!(
+        ring.size.width, 110.,
+        "the ring stays 2dp outside, 3dp wide"
+    );
+    assert!(!clipped, "nothing clips the ring");
+}
+
+#[gpui::test]
+fn a_callers_clip_on_the_card_leaves_its_ring_whole(cx: &mut TestAppContext) {
+    let (fill, _, ring_radius, clipped) = rounded_card(cx, true);
+    assert_eq!(fill, 20.);
+    assert_eq!(ring_radius, 25.);
+    assert!(!clipped, "the card's own clip does not cut its ring");
+}
