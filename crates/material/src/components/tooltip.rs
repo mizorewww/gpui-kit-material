@@ -18,7 +18,10 @@
 //!
 //! The tooltip shows after the show delay on hover, at once on keyboard
 //! focus, and hides after the grace period once neither the trigger nor (for
-//! a rich tooltip) the tooltip is hovered or focused; Escape hides it. It
+//! a rich tooltip) the tooltip is hovered or focused; Escape hides it. A
+//! press on the trigger, or Enter or Space in it, hides it at once and keeps
+//! it hidden until the pointer leaves the trigger or keyboard focus comes
+//! back to it, so it never covers a menu or popup the trigger opened. It
 //! fades on the fast effects spring and moves 4dp toward its trigger on the
 //! fast spatial spring (GPUI has no element scale transform, so the M3 scale
 //! is carried by that movement); reduced motion keeps only the fade. The
@@ -298,6 +301,9 @@ struct TipState {
     timing: TipTiming,
     /// Whether the pointer is over the trigger, shown or not.
     pointer_over: bool,
+    /// Activating the trigger hid the tooltip; it stays hidden until the
+    /// pointer leaves the trigger or keyboard focus returns to it.
+    suppressed: bool,
     bounds: Option<Bounds<Pixels>>,
     focus: Option<FocusHandle>,
     seen_focus: Option<FocusHandle>,
@@ -308,7 +314,7 @@ struct TipState {
 
 impl TipState {
     fn wanted(&self) -> bool {
-        self.trigger_hovered || self.tip_hovered || self.keyboard_focus
+        !self.suppressed && (self.trigger_hovered || self.tip_hovered || self.keyboard_focus)
     }
 }
 
@@ -340,6 +346,21 @@ fn escape_tip(state: &Entity<TipState>, event: &KeyDownEvent, window: &mut Windo
             tip.trigger_hovered = false;
             tip.epoch += 1;
         });
+        window.refresh();
+    }
+}
+
+/// Activating the trigger hides the tooltip at once, and keeps it hidden.
+fn suppress_tip(state: &Entity<TipState>, window: &mut Window, cx: &mut App) {
+    if state.read(cx).suppressed {
+        return;
+    }
+    let was_visible = state.update(cx, |tip, _| {
+        tip.suppressed = true;
+        tip.epoch += 1;
+        std::mem::replace(&mut tip.visible, false)
+    });
+    if was_visible {
         window.refresh();
     }
 }
@@ -399,7 +420,7 @@ fn update_tip(
 fn hover_layer(
     id: impl Into<ElementId>,
     changed: impl Fn(bool, &mut Window, &mut App) + 'static,
-) -> impl IntoElement {
+) -> Stateful<Div> {
     div()
         .id(id.into())
         .absolute()
@@ -467,7 +488,14 @@ impl RenderOnce for MaterialTooltip {
                 let keyboard = timing.on_focus && inside && window.last_input_was_keyboard();
                 observed.update(cx, |tip, _| tip.seen_focus = focused);
                 if keyboard != observed.read(cx).keyboard_focus {
-                    update_tip(&observed, window, cx, |tip| tip.keyboard_focus = keyboard);
+                    update_tip(&observed, window, cx, |tip| {
+                        // Focus coming back, as when a menu it opened closes,
+                        // ends the suppression its activation began.
+                        if keyboard {
+                            tip.suppressed = false;
+                        }
+                        tip.keyboard_focus = keyboard;
+                    });
                 }
             });
         }
@@ -491,6 +519,8 @@ impl RenderOnce for MaterialTooltip {
         let bounds = state.read(cx).bounds;
 
         let hover_state = state.clone();
+        let press_state = state.clone();
+        let key_state = state.clone();
         let escape_state = state.clone();
         let measure = state.clone();
         let wrapper = div()
@@ -503,16 +533,31 @@ impl RenderOnce for MaterialTooltip {
                 wrapper.role(Role::Group).aria_description(description)
             })
             .on_key_down(move |event, window, cx| escape_tip(&escape_state, event, window, cx))
+            // Before the trigger acts on the key, which may open a menu.
+            .capture_key_down(move |event, window, cx| {
+                if matches!(event.keystroke.key.as_str(), "enter" | "space") {
+                    suppress_tip(&key_state, window, cx);
+                }
+            })
             .child(trigger)
-            .child(hover_layer(
-                (id.clone(), "tooltip-trigger-hover"),
-                move |hovered, window, cx| {
-                    update_tip(&hover_state, window, cx, |tip| {
-                        tip.pointer_over = hovered;
-                        tip.trigger_hovered = hovered && tip.timing.on_hover;
-                    });
-                },
-            ))
+            .child(
+                hover_layer(
+                    (id.clone(), "tooltip-trigger-hover"),
+                    move |hovered, window, cx| {
+                        update_tip(&hover_state, window, cx, |tip| {
+                            tip.pointer_over = hovered;
+                            tip.trigger_hovered = hovered && tip.timing.on_hover;
+                            // Leaving the trigger ends a suppression.
+                            if !hovered {
+                                tip.suppressed = false;
+                            }
+                        });
+                    },
+                )
+                .capture_any_mouse_down(move |_, window, cx| {
+                    suppress_tip(&press_state, window, cx)
+                }),
+            )
             .child(
                 canvas(
                     move |bounds, window, cx| {
@@ -628,6 +673,47 @@ mod tests {
         assert_eq!(tip_change(true, false, false), TipChange::HideAfterGrace);
         assert_eq!(tip_change(true, true, false), TipChange::Keep);
         assert_eq!(tip_change(false, false, false), TipChange::Keep);
+    }
+
+    #[gpui::test]
+    fn a_press_on_the_trigger_hides_the_tooltip_until_the_pointer_leaves(cx: &mut TestAppContext) {
+        cx.update(|cx| {
+            gpui_base::init(cx);
+            cx.set_reduce_motion(true);
+            gpui_base::TooltipDefaults::new()
+                .with_show_delay(Duration::from_millis(100))
+                .with_grace_period(Duration::from_millis(300))
+                .install(cx);
+        });
+        let (_, cx) = cx.add_window_view(|_, _| Harness);
+        draw(cx);
+        let trigger = cx.debug_bounds("trigger").unwrap();
+        cx.simulate_mouse_move(trigger.center(), None, Modifiers::default());
+        cx.executor().advance_clock(Duration::from_millis(100));
+        draw(cx);
+        draw(cx);
+        assert!(tooltip_shown(cx), "shown on hover");
+        cx.simulate_mouse_down(trigger.center(), MouseButton::Left, Modifiers::default());
+        cx.simulate_mouse_up(trigger.center(), MouseButton::Left, Modifiers::default());
+        draw(cx);
+        draw(cx);
+        assert!(!tooltip_shown(cx), "a press hides it at once");
+        // The pointer resting on the trigger does not bring it back.
+        cx.executor().advance_clock(Duration::from_secs(2));
+        draw(cx);
+        assert!(!tooltip_shown(cx), "kept hidden while the pointer stays");
+        // Leaving and coming back shows it again.
+        cx.simulate_mouse_move(
+            trigger.center() + point(px(200.), px(200.)),
+            None,
+            Modifiers::default(),
+        );
+        draw(cx);
+        cx.simulate_mouse_move(trigger.center(), None, Modifiers::default());
+        cx.executor().advance_clock(Duration::from_millis(100));
+        draw(cx);
+        draw(cx);
+        assert!(tooltip_shown(cx), "a new hover shows it");
     }
 
     struct Harness;

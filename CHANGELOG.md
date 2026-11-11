@@ -13,6 +13,10 @@ commit messages.
   stay inside the window. Without room below it flipped up from the parent's bottom edge
   and covered it, and a tall menu could run past the window. A right press, and
   `ContextMenuHandle::open_at`, still open at their point.
+- A `MaterialTooltip` hides at once when its trigger is pressed, or activated with Enter
+  or Space, and stays hidden until the pointer leaves the trigger or keyboard focus comes
+  back to it. A "more" button's tooltip drew over the menu the button had just opened until
+  the pointer moved.
 
 ## gpui-kit-material 0.1.1 and gpui-kit-material-color 0.1.1 (2026-11-10)
 
