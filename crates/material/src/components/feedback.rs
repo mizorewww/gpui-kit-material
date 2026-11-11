@@ -840,8 +840,8 @@ const CARD_DRAG_SLOP: Pixels = px(4.);
 ///
 /// A caller's rounding (`.rounded(..)` and the per-corner forms) is the
 /// card's shape: its surface, state layers, ripple and focus ring all follow
-/// it. The surface clips the card's content to that shape, so the card
-/// needs no clip of its own; one asked of it (`.overflow_hidden()`) is left
+/// it. The surface fills the card, even one the caller sizes, and clips its
+/// content to that shape, so the card needs no clip of its own; one asked of it (`.overflow_hidden()`) is left
 /// to the surface, so it cannot cut the focus ring drawn outside the card.
 ///
 /// # Example
@@ -1004,9 +1004,13 @@ impl RenderOnce for MaterialCard {
         let press_ink = color(card_layer_content(selected, CardState::Pressed));
         let group: SharedString = format!("material-card-{id:?}").into();
 
+        // The surface fills the card, so a card the caller sizes is the
+        // surface's size, and the surface's clip keeps taller content in it.
         let mut surface = CardSurface::new(self.variant)
             .selected(selected)
             .w_full()
+            .flex_grow_1()
+            .min_h_0()
             .rounded_tl(corners.top_left)
             .rounded_tr(corners.top_right)
             .rounded_br(corners.bottom_right)
@@ -1040,6 +1044,10 @@ impl RenderOnce for MaterialCard {
                 .track_focus(&focus)
                 .tab_stop(tab_stop)
                 .w_full()
+                .flex()
+                .flex_col()
+                .flex_grow_1()
+                .min_h_0()
                 .rounded_tl(corners.top_left)
                 .rounded_tr(corners.top_right)
                 .rounded_br(corners.bottom_right)

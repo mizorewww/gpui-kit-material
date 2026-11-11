@@ -30,8 +30,9 @@ released again) and builds on `gpui-kit` 0.9.1.
 - A `MaterialCard`'s rounding from its caller (`.rounded(px(20.))` and the per-corner
   forms) now shapes its surface, state layers, ripple and keyboard focus ring; it reached
   only the outer element, so the surface and ring kept 12dp corners and apps clipped the
-  card to get the look, which also cut the ring. A clip asked of the card is left to its
-  surface, which already clips the content, so the ring outside it stays whole.
+  card to get the look, which also cut the ring. The surface now fills a card the caller
+  sizes, and a clip asked of the card is left to it (it already clips the content), so
+  content taller than the card stays inside it and the ring outside it stays whole.
   `CardSurface`'s focused specimen ring follows the surface's corners too.
 - A `MaterialTooltip` hides at once when its trigger is pressed, or activated with Enter
   or Space, and stays hidden until the pointer leaves the trigger or keyboard focus comes

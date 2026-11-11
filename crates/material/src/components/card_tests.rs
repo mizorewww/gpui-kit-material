@@ -580,3 +580,80 @@ fn a_callers_clip_on_the_card_leaves_its_ring_whole(cx: &mut TestAppContext) {
     assert_eq!(ring_radius, 25.);
     assert!(!clipped, "the card's own clip does not cut its ring");
 }
+
+/// A fixed-height action card, clipped by its caller, whose content is
+/// taller than it.
+struct FixedCard(bool);
+impl Render for FixedCard {
+    fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        window.set_rem_size(px(14.));
+        let card =
+            super::MaterialCard::new("fixed-card", CardVariant::Filled).accessibility_label("Open");
+        let card = if self.0 {
+            card.on_click(|_, _, _| {})
+        } else {
+            card
+        };
+        div().p(px(40.)).child(
+            card.w(px(100.))
+                .h(px(80.))
+                .rounded(px(20.))
+                .overflow_hidden()
+                .child(div().h(px(300.)).debug_selector(|| "tall-child".into())),
+        )
+    }
+}
+
+#[gpui::test]
+fn a_fixed_height_static_card_keeps_its_content_to_its_height(cx: &mut TestAppContext) {
+    let (_, cx) = cx.add_window_view(|_, _| FixedCard(false));
+    cx.run_until_parked();
+    cx.update(|window, _| {
+        let scale = window.scale_factor();
+        let fill = window
+            .painted_quads()
+            .iter()
+            .find(|q| q.bounds.size.width.0 == 100. * scale && !q.background.is_transparent())
+            .map(|q| q.bounds.size.height.0)
+            .expect("the card's fill");
+        assert_eq!(fill, 80. * scale);
+    });
+}
+
+#[gpui::test]
+fn a_fixed_height_cards_surface_clips_its_content_to_the_card(cx: &mut TestAppContext) {
+    cx.update(gpui_base::init);
+    let (_, cx) = cx.add_window_view(|_, _| FixedCard(true));
+    cx.run_until_parked();
+    cx.update(|window, cx| window.focus_next(cx));
+    let keystroke =
+        cx.update(|_, cx| gpui::Keystroke::parse_with_os("a", cx.platform_info().os).unwrap());
+    cx.simulate_event(gpui::KeyDownEvent {
+        keystroke,
+        is_held: false,
+        prefer_character_input: false,
+    });
+    super::tests::redraw(cx);
+    cx.update(|window, _| {
+        let scale = window.scale_factor();
+        let quads = window.painted_quads();
+        let fill = quads
+            .iter()
+            .find(|q| q.bounds.size.width.0 == 100. * scale && !q.background.is_transparent())
+            .expect("the card's fill");
+        assert_eq!(
+            fill.bounds.size.height.0,
+            80. * scale,
+            "the surface, which clips the content, is the card's height"
+        );
+        let ring = quads
+            .iter()
+            .find(|q| q.border_widths.top.0 == 3. * scale)
+            .expect("the focus ring is drawn");
+        assert_eq!(
+            ring.bounds.size.height.0,
+            90. * scale,
+            "around the 80px card"
+        );
+    });
+}
