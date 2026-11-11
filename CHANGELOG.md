@@ -5,6 +5,13 @@ commit messages.
 
 ## Unreleased
 
+### Added
+
+- `ContextMenuHandle::toggle_at(&ClickEvent, cx)`, a "more" button's click handler: it
+  closes the menu when it was open as the click began and otherwise opens it at the click.
+  Checking `is_open` in the handler reopened a menu, because the press outside the menu
+  had already dismissed it by the time the click arrived.
+
 ### Fixed
 
 - A `MaterialContextMenu` opened from the keyboard or `ContextMenuHandle::open` opens

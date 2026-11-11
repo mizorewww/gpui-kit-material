@@ -547,6 +547,129 @@ fn a_context_menu_too_tall_for_either_side_stays_in_the_window(cx: &mut TestAppC
     );
 }
 
+/// A row whose "more" button, with a tooltip, toggles its context menu.
+#[cfg(all(feature = "buttons", feature = "feedback"))]
+struct MoreRow {
+    handle: ContextMenuHandle,
+}
+
+#[cfg(all(feature = "buttons", feature = "feedback"))]
+impl Render for MoreRow {
+    fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        window.set_rem_size(px(16.));
+        let handle = self.handle.clone();
+        div().size_full().p(px(40.)).child(
+            div()
+                .relative()
+                .w(px(400.))
+                .h(px(56.))
+                .child(
+                    MaterialContextMenu::new("more-menu", |_, _| {
+                        MaterialMenu::new("more-items").item(MaterialMenuItem::new("Rename"))
+                    })
+                    .handle(&self.handle),
+                )
+                .child(
+                    div()
+                        .absolute()
+                        .top_0()
+                        .right_0()
+                        .debug_selector(|| "more".into())
+                        .child(
+                            crate::components::MaterialTooltip::plain("more-tip", "More").trigger(
+                                crate::components::IconButton::new(
+                                    "more",
+                                    crate::icons::IconName::Close,
+                                    "More",
+                                )
+                                .on_click(move |event, _, cx| {
+                                    handle.toggle_at(event, cx);
+                                }),
+                            ),
+                        ),
+                ),
+        )
+    }
+}
+
+#[cfg(all(feature = "buttons", feature = "feedback"))]
+fn more_row(cx: &mut TestAppContext) -> (Entity<MoreRow>, &mut VisualTestContext) {
+    cx.update(|cx| {
+        gpui_kit::init(cx);
+        crate::init(cx);
+        cx.set_reduce_motion(true);
+        gpui_base::TooltipDefaults::new()
+            .with_show_delay(std::time::Duration::from_millis(100))
+            .install(cx);
+    });
+    let (view, cx) = cx.add_window_view(|_, _| MoreRow {
+        handle: ContextMenuHandle::default(),
+    });
+    settle(cx);
+    (view, cx)
+}
+
+#[cfg(all(feature = "buttons", feature = "feedback"))]
+#[gpui::test]
+fn a_more_buttons_click_toggles_its_context_menu(cx: &mut TestAppContext) {
+    let (view, cx) = more_row(cx);
+    let handle = view.update(cx, |v, _| v.handle.clone());
+    let more = cx.debug_bounds("more").unwrap().center();
+    cx.simulate_click(more, Modifiers::default());
+    settle(cx);
+    assert!(
+        cx.update(|_, cx| handle.is_open(cx)),
+        "the first click opens it"
+    );
+    assert!(cx.debug_bounds("material-menu").is_some());
+    cx.simulate_click(more, Modifiers::default());
+    settle(cx);
+    assert!(
+        !cx.update(|_, cx| handle.is_open(cx)),
+        "the second closes it"
+    );
+    assert!(
+        cx.debug_bounds("material-menu").is_none(),
+        "and it stays closed"
+    );
+    cx.simulate_click(more, Modifiers::default());
+    settle(cx);
+    assert!(
+        cx.update(|_, cx| handle.is_open(cx)),
+        "the third opens it again"
+    );
+    // Dismissed by a press elsewhere, the next click on the button opens it.
+    cx.simulate_click(more - point(px(300.), px(0.)), Modifiers::default());
+    settle(cx);
+    assert!(!cx.update(|_, cx| handle.is_open(cx)));
+    cx.simulate_click(more, Modifiers::default());
+    settle(cx);
+    assert!(
+        cx.update(|_, cx| handle.is_open(cx)),
+        "after a dismissal elsewhere"
+    );
+}
+
+#[cfg(all(feature = "buttons", feature = "feedback"))]
+#[gpui::test]
+fn the_more_buttons_tooltip_stays_off_the_menu_it_opened(cx: &mut TestAppContext) {
+    let (_, cx) = more_row(cx);
+    let more = cx.debug_bounds("more").unwrap().center();
+    cx.simulate_mouse_move(more, None, Modifiers::default());
+    settle(cx);
+    assert!(
+        cx.debug_bounds("tooltip-popup").is_some(),
+        "hovering shows the tooltip"
+    );
+    cx.simulate_click(more, Modifiers::default());
+    settle(cx);
+    assert!(cx.debug_bounds("material-menu").is_some());
+    assert!(
+        cx.debug_bounds("tooltip-popup").is_none(),
+        "the tooltip is hidden while its menu is open"
+    );
+}
+
 #[test]
 fn shift_f10_and_the_menu_key_ask_for_a_context_menu() {
     let key = |text: &'static str| Keystroke::parse(text).unwrap();

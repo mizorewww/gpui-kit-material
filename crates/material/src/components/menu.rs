@@ -1876,7 +1876,8 @@ impl RenderOnce for MenuPopup {
 ///
 /// From code, a [`ContextMenuHandle`] given to [`Self::handle`] opens it beside
 /// the parent as the keyboard does, or at a point, for a "more" button or a
-/// command.
+/// command; [`ContextMenuHandle::toggle_at`] is the "more" button's click
+/// handler, which closes the menu when it was open.
 ///
 /// A control that blocks the mouse, such as a button in the row, keeps its own
 /// right press, as it does for Kit's `context_menu`.
@@ -1900,7 +1901,8 @@ impl RenderOnce for MenuPopup {
 ///         .handle(&menu),
 ///     )
 ///     .child(row_content);
-/// // Later, from a "more" button or a command: `menu.open(cx)`.
+/// // A command opens it with `menu.open(cx)`; a "more" button's click
+/// // handler calls `menu.toggle_at(event, cx)`.
 /// # let _ = row;
 /// # }
 /// ```
@@ -1973,6 +1975,35 @@ impl ContextMenuHandle {
         })
     }
 
+    /// For a "more" button's click: close the menu if it was open when this
+    /// click began, and otherwise open it at the click
+    /// ([`Self::open_at`]`(event.position())`). A press outside an open
+    /// menu dismisses it before the click arrives, so checking
+    /// [`Self::is_open`] in the click handler would open it again. Returns
+    /// whether the menu is now open.
+    pub fn toggle_at(&self, event: &ClickEvent, cx: &mut App) -> bool {
+        let Some(state) = self.state() else {
+            return false;
+        };
+        let was_open = state.update(cx, |state, _| {
+            // This click's press is read once; a later click notes its own.
+            let press = state.press.take();
+            let pressed_open = match event {
+                ClickEvent::Mouse(click) => {
+                    press.is_some_and(|(at, open)| open && at == click.down.position)
+                }
+                _ => false,
+            };
+            state.open || pressed_open
+        });
+        if was_open {
+            self.close(cx);
+            false
+        } else {
+            self.open_at(event.position(), cx)
+        }
+    }
+
     /// Close the menu if it is open; focus returns as on Escape.
     pub fn close(&self, cx: &mut App) {
         if let Some(state) = self.state() {
@@ -2002,6 +2033,10 @@ pub(crate) struct ContextMenuState {
     /// Where the menu opens: at a point from the parent's start edge, or
     /// beside the whole parent.
     anchor: ContextAnchor,
+    /// The pointer's last press while the menu was in the tree, and whether
+    /// the menu was open then: a press that dismisses it does not reopen it
+    /// through [`ContextMenuHandle::toggle_at`].
+    press: Option<(Point<Pixels>, bool)>,
     /// The parent's bounds when it was last drawn, in window coordinates.
     bounds: Bounds<Pixels>,
     /// What holds focus for the keyboard to open it.
@@ -2154,7 +2189,21 @@ impl RenderOnce for MaterialContextMenu {
             },
             {
                 let state = state.clone();
-                move |_, (bounds, hitbox): (Bounds<Pixels>, Hitbox), window, _| {
+                move |_, (bounds, hitbox): (Bounds<Pixels>, Hitbox), window, cx| {
+                    // While the menu is in the tree, and until a toggle has read
+                    // the last such press, note each press and whether the menu
+                    // was open then, before its popover dismisses it.
+                    if state.read(cx).mounted || state.read(cx).press.is_some() {
+                        let noted = state.clone();
+                        window.on_mouse_event(move |event: &MouseDownEvent, phase, _, cx| {
+                            if phase == DispatchPhase::Capture {
+                                noted.update(cx, |state, _| {
+                                    state.press = Some((event.position, state.open))
+                                });
+                            }
+                        });
+                    }
+                    let state = state.clone();
                     window.on_mouse_event(move |event: &MouseDownEvent, phase, window, cx| {
                         if phase.bubble()
                             && event.button == MouseButton::Right
