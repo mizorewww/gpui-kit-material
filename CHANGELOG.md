@@ -5,6 +5,13 @@ commit messages.
 
 ## Unreleased
 
+Nothing yet.
+
+## gpui-kit-material 0.1.2 (2026-11-11)
+
+`gpui-kit-material` 0.1.2 requires `gpui-kit-material-color` 0.1.1 (unchanged, so not
+released again) and builds on `gpui-kit` 0.9.1.
+
 ### Added
 
 - `ContextMenuHandle::toggle_at(&ClickEvent, cx)`, a "more" button's click handler: it

@@ -163,18 +163,18 @@ one revision:
 ```toml
 [dependencies]
 gpui-kit = "0.9.1"
-gpui-kit-material = { git = "https://github.com/mizorewww/gpui-kit-material", rev = "46124b555381edf1874807f33a3ab82045d06766" }
+gpui-kit-material = { git = "https://github.com/mizorewww/gpui-kit-material", rev = "5253fec830a185579e36a7a79ad0ddb92fb2331d" }
 
 [patch.crates-io]
-gpui-kit = { git = "https://github.com/mizorewww/gpui-kit-material", rev = "46124b555381edf1874807f33a3ab82045d06766" }
-gpui-pre = { git = "https://github.com/mizorewww/gpui-kit-material", rev = "46124b555381edf1874807f33a3ab82045d06766" }
-gpui-pre-apple = { git = "https://github.com/mizorewww/gpui-kit-material", rev = "46124b555381edf1874807f33a3ab82045d06766" }
-gpui-pre-web = { git = "https://github.com/mizorewww/gpui-kit-material", rev = "46124b555381edf1874807f33a3ab82045d06766" }
-gpui-fast = { git = "https://github.com/mizorewww/gpui-kit-material", rev = "46124b555381edf1874807f33a3ab82045d06766" }
+gpui-kit = { git = "https://github.com/mizorewww/gpui-kit-material", rev = "5253fec830a185579e36a7a79ad0ddb92fb2331d" }
+gpui-pre = { git = "https://github.com/mizorewww/gpui-kit-material", rev = "5253fec830a185579e36a7a79ad0ddb92fb2331d" }
+gpui-pre-apple = { git = "https://github.com/mizorewww/gpui-kit-material", rev = "5253fec830a185579e36a7a79ad0ddb92fb2331d" }
+gpui-pre-web = { git = "https://github.com/mizorewww/gpui-kit-material", rev = "5253fec830a185579e36a7a79ad0ddb92fb2331d" }
+gpui-fast = { git = "https://github.com/mizorewww/gpui-kit-material", rev = "5253fec830a185579e36a7a79ad0ddb92fb2331d" }
 ```
 
 `[patch]` is read only from the top-level manifest, so it goes in your workspace root.
-The revision shown is `gpui-kit-material` 0.1.1's source; the engine patches in it are
+The revision shown is `gpui-kit-material` 0.1.2's source; the engine patches in it are
 unchanged since they moved to Kit 0.9.1 (`98c72b8`). CI does not build that revision
 again, and `scripts/check-package.sh` checks that this block differs from the template CI
 builds (`scripts/git-consumer/Cargo.toml.in`) only in its revision.

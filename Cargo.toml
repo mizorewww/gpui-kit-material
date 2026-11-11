@@ -4,7 +4,7 @@ members = ["crates/color", "crates/material", "crates/gallery", "crates/gallery-
 exclude = ["vendor/gpui-kit", "vendor/gpui-pre", "vendor/gpui-pre-web", "vendor/gpui-pre-apple", "vendor/gpui-fast", "vendor/gpui-fast-apple"]
 
 [workspace.package]
-version = "0.1.1"
+version = "0.1.2"
 edition = "2024"
 license = "MIT"
 rust-version = "1.98"
@@ -12,7 +12,7 @@ repository = "https://github.com/mizorewww/gpui-kit-material"
 authors = ["mizorewww"]
 
 [workspace.dependencies]
-gpui-kit-material-color = { path = "crates/color", version = "0.1.0", default-features = false }
+gpui-kit-material-color = { path = "crates/color", version = "0.1.1", default-features = false }
 
 # Kit owns application initialization and the Component layer; GPUI and Base must be
 # shared, so Base is the same release.
