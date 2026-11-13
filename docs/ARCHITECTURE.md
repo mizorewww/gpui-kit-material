@@ -163,19 +163,20 @@ one revision:
 ```toml
 [dependencies]
 gpui-kit = "0.9.1"
-gpui-kit-material = { git = "https://github.com/mizorewww/gpui-kit-material", rev = "e8bb5ee18cb0520622a656a9d232d039d4211a5b" }
+gpui-kit-material = { git = "https://github.com/mizorewww/gpui-kit-material", rev = "f4c0127e6767f75986180ddb640c4ece3f6a7beb" }
 
 [patch.crates-io]
-gpui-kit = { git = "https://github.com/mizorewww/gpui-kit-material", rev = "e8bb5ee18cb0520622a656a9d232d039d4211a5b" }
-gpui-pre = { git = "https://github.com/mizorewww/gpui-kit-material", rev = "e8bb5ee18cb0520622a656a9d232d039d4211a5b" }
-gpui-pre-apple = { git = "https://github.com/mizorewww/gpui-kit-material", rev = "e8bb5ee18cb0520622a656a9d232d039d4211a5b" }
-gpui-pre-web = { git = "https://github.com/mizorewww/gpui-kit-material", rev = "e8bb5ee18cb0520622a656a9d232d039d4211a5b" }
-gpui-fast = { git = "https://github.com/mizorewww/gpui-kit-material", rev = "e8bb5ee18cb0520622a656a9d232d039d4211a5b" }
+gpui-kit = { git = "https://github.com/mizorewww/gpui-kit-material", rev = "f4c0127e6767f75986180ddb640c4ece3f6a7beb" }
+gpui-pre = { git = "https://github.com/mizorewww/gpui-kit-material", rev = "f4c0127e6767f75986180ddb640c4ece3f6a7beb" }
+gpui-pre-apple = { git = "https://github.com/mizorewww/gpui-kit-material", rev = "f4c0127e6767f75986180ddb640c4ece3f6a7beb" }
+gpui-pre-web = { git = "https://github.com/mizorewww/gpui-kit-material", rev = "f4c0127e6767f75986180ddb640c4ece3f6a7beb" }
+gpui-fast = { git = "https://github.com/mizorewww/gpui-kit-material", rev = "f4c0127e6767f75986180ddb640c4ece3f6a7beb" }
 ```
 
 `[patch]` is read only from the top-level manifest, so it goes in your workspace root.
-The revision shown is `gpui-kit-material` 0.1.2's source; the engine patches in it are
-unchanged since they moved to Kit 0.9.1 (`98c72b8`). CI does not build that revision
+The revision shown is `gpui-kit-material` 0.1.3's source; its engine patches add, to
+those that moved to Kit 0.9.1 (`98c72b8`), the nested scroll containers' wheel on
+`gpui-fast`. CI does not build that revision
 again, and `scripts/check-package.sh` checks that this block differs from the template CI
 builds (`scripts/git-consumer/Cargo.toml.in`) only in its revision.
 
