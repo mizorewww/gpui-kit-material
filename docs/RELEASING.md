@@ -34,14 +34,14 @@ consumer patch set ([ARCHITECTURE.md](ARCHITECTURE.md#consumer-patch-set)).
 | Vendored | On | Why it is still vendored |
 | --- | --- | --- |
 | `gpui-kit` | crates.io 0.9.1 source, unchanged | Its manifest keeps WASM single-threaded by default; published Kit enables the Web platforms' `multithreaded` default. |
-| `gpui-fast` | crates.io 0.1.14 | Hanging overflow spaces (`src/text_system/line_layout.rs`, `line_wrapper.rs`), waiting on zed-industries/zed#66644; a `measure_all` list's measurement after a width change (`src/elements/list.rs`, `vendor/gpui-pre/list-width-remeasure-patch.md`), offered as longbridge/gpui-fast#129; a wheel over nested scroll containers scrolls only the innermost one it moves, for the gesture (`src/fast/layers/wheel_latch.rs`); test-harness repairs and `try_update` for the deprecated `fetch_update`. |
-| `gpui-fast-apple` | crates.io 0.1.14 | Its `font_fallback` regression test with the Gallery's fonts, and a warning fix; no runtime change. |
-| `gpui-pre` | crates.io 0.3.12 | The two `gpui-fast` behavior patches above, and the lazy tab-stop index and `em` metrics that gpui-fast has upstream, for the upstream backend, which has no PR channel of its own; test-harness repairs; `try_update`. |
+| `gpui-fast` | crates.io 0.1.15 | Hanging overflow spaces (`src/text_system/line_layout.rs`, `line_wrapper.rs`), waiting on zed-industries/zed#66644; a wheel over nested scroll containers scrolls only the innermost one it moves, for the gesture (`src/fast/layers/wheel_latch.rs`); test-harness repairs and `try_update` for the deprecated `fetch_update`. |
+| `gpui-fast-apple` | crates.io 0.1.15 | Its `font_fallback` regression test with the Gallery's fonts, and a warning fix; no runtime change. |
+| `gpui-pre` | crates.io 0.3.12 | Hanging overflow spaces and a `measure_all` list's measurement after a width change (`vendor/gpui-pre/list-width-remeasure-patch.md`, released in gpui-fast 0.1.15 as #129), and the lazy tab-stop index and `em` metrics that gpui-fast has upstream, for the upstream backend, which has no PR channel of its own; test-harness repairs; `try_update`. |
 | `gpui-pre-apple`, `gpui-pre-web` | crates.io 0.3.12 | Fallback and `sbix` fonts, and the browser IME, for the upstream backend; gpui-fast 0.1.14 has them upstream. |
 
-Every Material gpui-fast PR (#104–#106, #108–#115, #119) is in gpui-fast 0.1.14, so
+Every Material gpui-fast PR (#104–#106, #108–#115, #119, #129) is in gpui-fast 0.1.15, so
 `gpui-fast-macos`, `-linux`, `-windows`, `-wgpu` and `-web` are no longer vendored: they
-come from crates.io 0.1.14 (`-wgpu`'s test-harness repairs only mattered to its own tests,
+come from crates.io 0.1.15 (`-wgpu`'s test-harness repairs only mattered to its own tests,
 which this workspace does not run). `scripts/vendor-gpui-fast.py --published <version>`
 records the vendored gpui-fast crates against a release's archives; `--rev` still
 packages an unreleased commit with upstream's release step.

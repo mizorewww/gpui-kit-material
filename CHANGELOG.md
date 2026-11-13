@@ -11,7 +11,10 @@ Nothing yet.
 
 `gpui-kit-material` 0.1.3 requires `gpui-kit-material-color` 0.1.1 (unchanged, so not
 released again) and builds on `gpui-kit` 0.9.1. The library's code is unchanged; the
-release carries the consumer patch set's new engine behavior below.
+release carries the consumer patch set's new engine behavior below. The consumer patch
+set's `gpui-fast` moves to 0.1.15 (crates.io's latest, which a fresh resolve picks; the
+0.1.14 patch no longer applied to it), whose `measure_all` list remeasurement is the
+patch the set carried before.
 
 ### Fixed
 

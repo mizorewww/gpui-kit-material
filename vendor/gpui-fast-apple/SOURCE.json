@@ -1,15 +1,15 @@
 {
   "package": "gpui-fast-apple",
-  "version": "0.1.14",
+  "version": "0.1.15",
   "repository": "https://github.com/longbridge/gpui-fast",
-  "archive_url": "https://static.crates.io/crates/gpui-fast-apple/gpui-fast-apple-0.1.14.crate",
-  "archive_sha256": "7d1934376409ef93257473cfd1cba16bbc825a3a3afc437410de73208cfd8364",
-  "source": "the published crates.io 0.1.14 archive, its checksum checked against the index, by scripts/vendor-gpui-fast.py",
+  "archive_url": "https://static.crates.io/crates/gpui-fast-apple/gpui-fast-apple-0.1.15.crate",
+  "archive_sha256": "94395e1c8cc1e0795d3bac933d8701582eb3e6b274db09919dca24eab379d801",
+  "source": "the published crates.io 0.1.15 archive, its checksum checked against the index, by scripts/vendor-gpui-fast.py",
   "upstream_files_sha256": {
-    "Cargo.toml": "e5d4442c4a5dfd6c52edae85af5c7b69fc70e294bf133f79ccdcf65053344faa",
-    "Cargo.toml.orig": "a2dfd35c8202cab2acfcfd1c42433cbbe1ef6caa0499f5f6dce13924d91895d6",
+    "Cargo.toml": "1259e4cd3f25d1f260ff67f782ba88cc3c294d672812131df686e6ae840ee3c5",
+    "Cargo.toml.orig": "6288bd73dc0522ebb5e14f1abf05ee9aa2cdcda1ac3dba52159c35ff379164f2",
     "LICENSE": "5f78a733701db49b73da93addad8cb74f816f3789ef30c3c0e959e943ecd99b4",
-    "README.md": "118a9817d5a41aebb675e83da70d87d28930cdef6c6ec0cc8b19fd87a201cbe2",
+    "README.md": "39632d8c2644dcfc284b7391b38dc3a11ec23aac8f251b92f003a18f72c70972",
     "build.rs": "cc05fa1dd22c2115da3385c7ec9a0d06cdae73cf4eaad630b193ac06731c292a",
     "src/dispatcher.rs": "21ec54613d48cd3c419f2f694f75460d1019491c2406a7ed4dfa3374c84824cf",
     "src/display_link.rs": "1a1776d9a8d5a0083ec07faced6ba16a9a0fa833c256ae2888d4cc784f7e356f",
@@ -22,7 +22,7 @@
     "src/fast/layers/raster.rs": "73624582017003289a7f20b0dc8d0f11ac3a1c748db3fb4fddc02c85a9a8ab48",
     "src/fast/layers/tests.rs": "19253d11c3ed809e96919d6af4e2bf6e1710ffae67ce641a9f8cccdf18f13249",
     "src/fast/layers/tile_cache.rs": "66f539be39587a9b7f61fe976945dde5d2b0958535c0e9b15ad90c5ae9b20c1c",
-    "src/fast/mod.rs": "746bd6fdfffcd94882c3b98697bf1582b745ee4272bb60b37174a196a7355343",
+    "src/fast/mod.rs": "b67523b9ec735f13207dda07e420cc84eba164787a0e9ed875a2f1827cd21d13",
     "src/fast/paths.rs": "f9971cf7eb296c443e4e7e959719f276d2b0e9c688a8c7af607f69dfbbee9ac2",
     "src/fast/release_gpui/src/color.rs": "4292aa1a2bbc56b653aaef0702726325f8efb93f16226320519e257c3ba8a839",
     "src/fast/release_gpui/src/geometry.rs": "965ae8f6c1d4bd2e7dcb43e253a99dd4363252b1ef6dc19c3031ea50c5192408",
@@ -49,6 +49,7 @@
     "src/fast/rounded_clip.rs": "cd4550aa62fc91cd73794e074b6daf2931868215b2cf757a9f0f62809484c184",
     "src/fast/rounded_clip_shader.rs": "e48e86dee268738339c89589279be7fcf9a44d8ad62c43a56c6cf5d722e216b1",
     "src/fast/text_system.rs": "98fd94a56c558e95d777501066cc61fd8f8ab80e1bc1de752d43c0a3b7f2c493",
+    "src/fast/truncation_tests.rs": "261fcf806a9caccaceb39de3487bb4ac0fe1eab8295ffec3d051aa6630a9e1cb",
     "src/gpui_apple.rs": "f0929fc38bde7f580fe03e8e641834a9079e0e56dc9fc96eab4f33aed17e8c7f",
     "src/keychain.rs": "636ce5b08fe6e939dfef73fafc3be719b21b35da356a7d7053afe4dbf4d6f71c",
     "src/metal_atlas.rs": "0889f2ff0ec3091bc0749ea629b4c87eab2c6253f84cb459693895a48dcb1e73",
@@ -60,8 +61,8 @@
   },
   "modified_files": {
     "Cargo.toml": {
-      "upstream_sha256": "e5d4442c4a5dfd6c52edae85af5c7b69fc70e294bf133f79ccdcf65053344faa",
-      "local_sha256": "73db26af627adf9b540357c8cfa492c721199edaab31d1a09aa583812fba7486"
+      "upstream_sha256": "1259e4cd3f25d1f260ff67f782ba88cc3c294d672812131df686e6ae840ee3c5",
+      "local_sha256": "82bf47ace4d1cda6edef86ee8bbb014fe8ef61cb7143175341160934a33c0ec7"
     },
     "src/fast/rounded_clip_shader.rs": {
       "upstream_sha256": "e48e86dee268738339c89589279be7fcf9a44d8ad62c43a56c6cf5d722e216b1",

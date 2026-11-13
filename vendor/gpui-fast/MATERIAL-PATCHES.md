@@ -1,11 +1,14 @@
 # gpui-fast source
 
-`gpui-fast` 0.1.14 as published on crates.io, with the local changes below, recorded by
-`scripts/vendor-gpui-fast.py --published 0.1.14`. `SOURCE.json` records the archive's
+`gpui-fast` 0.1.15 as published on crates.io, with the local changes below, recorded by
+`scripts/vendor-gpui-fast.py --published 0.1.15`. `SOURCE.json` records the archive's
 SHA-256, every upstream file hash and the original and patched hash of each changed
 file. The package-level `Cargo.lock` is not vendored. The other gpui-fast crates
 (`-macos`, `-linux`, `-windows`, `-wgpu`, `-web`, `-platform`, `-macros`) come from
-crates.io 0.1.14 unchanged.
+crates.io 0.1.15 unchanged.
+
+Released in 0.1.15 and no longer patched here: a `measure_all` list measured over later
+frames after a width change (#129, upstream's `src/fast/list_measure.rs`).
 
 Released in 0.1.14 and no longer patched here (each was a Material PR):
 wheel at its scroll limit (#104), released entities in a spliced view (#106),
@@ -26,11 +29,6 @@ slow views rather than the last one: a later frame can replay them without the w
 Behavior, not yet released upstream: `src/text_system/line_layout.rs`,
 `src/text_system/line_wrapper.rs` hang a space that overflows after content
 instead of starting the next wrapped row with it (`vendor/gpui-pre/hanging-space-patch.md`; zed-industries/zed#66644).
-`src/elements/list.rs`: after a width change (since 0.1.14, a change of the width
-inside the list's padding and border), a `measure_all` list lays out only the items it
-shows in that frame, keeping the others' heights as estimates scaled by how
-those items reflowed, and measures the rest over later frames, 4 ms per frame
-(`vendor/gpui-pre/list-width-remeasure-patch.md`; offered as longbridge/gpui-fast#129).
 `src/fast/layers/wheel_latch.rs` (new), `src/elements/div.rs`, `src/elements/list.rs`,
 `src/fast/layers/input.rs`, `src/fast/layers/mod.rs`: nested scroll containers. Every
 container under the pointer moved by the same wheel, so a list inside a scrolling page

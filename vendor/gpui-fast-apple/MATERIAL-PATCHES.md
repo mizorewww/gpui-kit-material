@@ -1,7 +1,7 @@
 # gpui-fast-apple source
 
-gpui-fast-apple 0.1.14 as published on crates.io, with the local changes below, recorded by
-`scripts/vendor-gpui-fast.py --published 0.1.14`. `SOURCE.json` records the archive's
+gpui-fast-apple 0.1.15 as published on crates.io, with the local changes below, recorded by
+`scripts/vendor-gpui-fast.py --published 0.1.15`. `SOURCE.json` records the archive's
 SHA-256, every upstream file hash and the original and patched hash of each changed
 file. The package-level `Cargo.lock` is not vendored. Vendored for its regression
 test only; it changes no runtime behavior.
