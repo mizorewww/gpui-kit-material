@@ -5,7 +5,16 @@ commit messages.
 
 ## Unreleased
 
-Nothing yet.
+### Fixed
+
+- With the consumer patch set on the `gpui-fast` backend, a wheel or trackpad swipe over
+  nested scroll containers (a list inside a scrolling page, a dialog's list) scrolls only
+  the innermost one it moves; the page around it no longer moves with it. The container
+  keeps the gesture: at its end it holds the rest of the swipe and its momentum, and a
+  page scrolling under a still pointer is not taken over by a list that comes under it.
+  The next gesture, or a moved pointer, scrolls the page. Other wheel listeners, a
+  container's own `on_scroll` among them, still hear every event. A mainly vertical wheel
+  over a container that scrolls only horizontally still moves it and the page, as before.
 
 ## gpui-kit-material 0.1.2 (2026-11-11)
 

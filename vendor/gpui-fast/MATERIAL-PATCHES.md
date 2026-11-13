@@ -31,3 +31,20 @@ inside the list's padding and border), a `measure_all` list lays out only the it
 shows in that frame, keeping the others' heights as estimates scaled by how
 those items reflowed, and measures the rest over later frames, 4 ms per frame
 (`vendor/gpui-pre/list-width-remeasure-patch.md`; offered as longbridge/gpui-fast#129).
+`src/fast/layers/wheel_latch.rs` (new), `src/elements/div.rs`, `src/elements/list.rs`,
+`src/fast/layers/input.rs`, `src/fast/layers/mod.rs`: nested scroll containers. Every
+container under the pointer moved by the same wheel, so a list inside a scrolling page
+moved with the page. The innermost container the wheel moves now takes the event, and
+the scroll containers around it leave it alone (the event still propagates, so other
+wheel listeners, a container's own `on_scroll` among them, hear it); it keeps
+the gesture at the same pointer position while a trackpad's fingers are down, and after
+they lift, or for a mouse wheel, while events keep coming less than 250 ms apart (by the
+executor's clock), until a new touch: at its end it holds the rest of the swipe and its
+momentum instead of handing them to the page, and a page scrolling under a still pointer
+is not taken over by a list that comes under it. The containers under the pointer note
+themselves in the capture phase, so a container knows whether the one keeping the
+gesture is among them. A container scrolling on one axis takes only a wheel going mainly
+along it; one going mainly across it (a vertical swipe over a horizontal strip, even with
+a little sideways movement) moves it as before without taking the event, so the page
+scrolls too. Tests: `src/fast/tests/wheel_latch.rs`. The upstream backend (`gpui-pre`) keeps
+upstream's wheel behavior.

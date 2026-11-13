@@ -165,6 +165,7 @@ pub(crate) fn decide(window: &mut Window, id: &GlobalElementId, decision: Decisi
 pub(crate) fn before_dispatch(window: &mut Window, cx: &mut App, event: &PlatformInput) {
     if let PlatformInput::Scroll(event) = event {
         crate::fast::layers::hover_freeze::note_wheel(window, cx, event);
+        crate::fast::layers::wheel_latch::begin_dispatch(window, cx, event);
     }
     crate::fast::layers::wheel::begin_dispatch(window, cx, event);
     if !COMPILED || window.fast_layers.layers.is_empty() {

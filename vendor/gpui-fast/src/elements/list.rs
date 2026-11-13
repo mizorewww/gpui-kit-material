@@ -911,6 +911,23 @@ impl StateInner {
         scroll_top.item_ix..cursor.start().count + 1
     }
 
+    /// How far the list's content scrolls in a viewport `height` tall.
+    fn scroll_max(&self, height: Pixels) -> Pixels {
+        let padding = self.last_padding.unwrap_or_default();
+        (self.items.summary().height + padding.top + padding.bottom - height).max(px(0.))
+    }
+
+    /// Where the list's content is scrolled to in a viewport `height` tall,
+    /// for a wheel listener to tell whether it moved it.
+    fn shown_scroll_top(&self, height: Pixels) -> Option<Pixels> {
+        let following = matches!(self.follow_state, FollowState::Tail { is_following: true });
+        (!following).then(|| {
+            self.scroll_top(&self.logical_scroll_top())
+                .max(px(0.))
+                .min(self.scroll_max(height))
+        })
+    }
+
     fn scroll(
         &mut self,
         scroll_top: &ListOffset,
@@ -926,9 +943,7 @@ impl StateInner {
             return;
         }
 
-        let padding = self.last_padding.unwrap_or_default();
-        let scroll_max =
-            (self.items.summary().height + padding.top + padding.bottom - height).max(px(0.));
+        let scroll_max = self.scroll_max(height);
         let new_scroll_top = (self.scroll_top(scroll_top) - delta.y)
             .max(px(0.))
             .min(scroll_max);
@@ -2027,10 +2042,26 @@ impl Element for List {
         let scroll_top = prepaint.layout.scroll_top;
         let hitbox_id = prepaint.hitbox.id;
         let mut accumulated_scroll_delta = ScrollDelta::default();
+        let container = Rc::as_ptr(&list_state.0) as usize;
         window.on_mouse_event(move |event: &ScrollEvent, phase, window, cx| {
+            if phase == DispatchPhase::Capture && hitbox_id.should_handle_scroll(window) {
+                crate::fast::layers::wheel_latch::note_under_pointer(window, container);
+            }
             if phase == DispatchPhase::Bubble && hitbox_id.should_handle_scroll(window) {
+                // As a div's scroll container: the innermost container the
+                // wheel moves takes it, and keeps the gesture
+                // (`crate::fast::layers::wheel_latch`).
+                let owner = crate::fast::layers::wheel_latch::owner(window, container);
+                if matches!(
+                    owner,
+                    crate::fast::layers::wheel_latch::Owner::Taken
+                        | crate::fast::layers::wheel_latch::Owner::Other
+                ) {
+                    return;
+                }
                 accumulated_scroll_delta = accumulated_scroll_delta.coalesce(event.delta);
                 let pixel_delta = accumulated_scroll_delta.pixel_delta(px(20.));
+                let before = list_state.0.borrow().shown_scroll_top(height);
                 list_state.0.borrow_mut().scroll(
                     &scroll_top,
                     height,
@@ -2038,7 +2069,11 @@ impl Element for List {
                     current_view,
                     window,
                     cx,
-                )
+                );
+                let moved = list_state.0.borrow().shown_scroll_top(height) != before;
+                if owner == crate::fast::layers::wheel_latch::Owner::This || moved {
+                    crate::fast::layers::wheel_latch::hold(window, cx, container, event);
+                }
             }
         });
 
