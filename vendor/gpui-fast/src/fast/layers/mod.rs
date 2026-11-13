@@ -22,6 +22,7 @@ pub(crate) mod tiles;
 #[cfg(any(test, feature = "test-support"))]
 pub(crate) mod verify;
 pub(crate) mod wheel;
+pub(crate) mod wheel_latch;
 pub(crate) mod work;
 
 use crate::{App, GlobalElementId, Window};
@@ -64,6 +65,8 @@ pub(crate) struct WindowLayers {
     pub(crate) wheel: wheel::WheelDispatch,
     /// When the last wheel event came, for hover to be held still a while.
     pub(crate) hover_freeze: hover_freeze::HoverFreeze,
+    /// Which scroll container the wheel gesture under way scrolls.
+    pub(crate) wheel_latch: wheel_latch::WheelLatch,
 }
 
 impl Default for WindowLayers {
@@ -81,6 +84,7 @@ impl Default for WindowLayers {
             window_size: None,
             wheel: wheel::WheelDispatch::default(),
             hover_freeze: hover_freeze::HoverFreeze::default(),
+            wheel_latch: wheel_latch::WheelLatch::default(),
         }
     }
 }

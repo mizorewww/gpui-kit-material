@@ -7,6 +7,26 @@ commit messages.
 
 Nothing yet.
 
+## gpui-kit-material 0.1.3 (2026-11-13)
+
+`gpui-kit-material` 0.1.3 requires `gpui-kit-material-color` 0.1.1 (unchanged, so not
+released again) and builds on `gpui-kit` 0.9.1. The library's code is unchanged; the
+release carries the consumer patch set's new engine behavior below. The consumer patch
+set's `gpui-fast` moves to 0.1.15 (crates.io's latest, which a fresh resolve picks; the
+0.1.14 patch no longer applied to it), whose `measure_all` list remeasurement is the
+patch the set carried before.
+
+### Fixed
+
+- With the consumer patch set on the `gpui-fast` backend, a wheel or trackpad swipe over
+  nested scroll containers (a list inside a scrolling page, a dialog's list) scrolls only
+  the innermost one it moves; the page around it no longer moves with it. The container
+  keeps the gesture: at its end it holds the rest of the swipe and its momentum, and a
+  page scrolling under a still pointer is not taken over by a list that comes under it.
+  The next gesture, or a moved pointer, scrolls the page. Other wheel listeners, a
+  container's own `on_scroll` among them, still hear every event. A mainly vertical wheel
+  over a container that scrolls only horizontally still moves it and the page, as before.
+
 ## gpui-kit-material 0.1.2 (2026-11-11)
 
 `gpui-kit-material` 0.1.2 requires `gpui-kit-material-color` 0.1.1 (unchanged, so not

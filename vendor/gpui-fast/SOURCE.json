@@ -1,15 +1,15 @@
 {
   "package": "gpui-fast",
-  "version": "0.1.14",
+  "version": "0.1.15",
   "repository": "https://github.com/longbridge/gpui-fast",
-  "archive_url": "https://static.crates.io/crates/gpui-fast/gpui-fast-0.1.14.crate",
-  "archive_sha256": "f8c3a7e25e5a4789656da980b0316857acbdb72347b5d890d7d0c549bb9fee72",
-  "source": "the published crates.io 0.1.14 archive, its checksum checked against the index, by scripts/vendor-gpui-fast.py",
+  "archive_url": "https://static.crates.io/crates/gpui-fast/gpui-fast-0.1.15.crate",
+  "archive_sha256": "a069272b90d908d15152711b38153edabcf67a5dcc490123197af7fd9ad78d9d",
+  "source": "the published crates.io 0.1.15 archive, its checksum checked against the index, by scripts/vendor-gpui-fast.py",
   "upstream_files_sha256": {
-    "Cargo.toml": "26bca40a7e3bb2c68a06bc6cc00fecc88505af7a408ef322ede48f31a550b365",
-    "Cargo.toml.orig": "ccd9604b199cbfd47941e65ac14e00b8700338e40d6a6abf62909640a0562cb9",
+    "Cargo.toml": "9f6ee0b329953d97596705aa29ab11147153e826f1c06ae6830482d60d43b868",
+    "Cargo.toml.orig": "80fdb9d420c4db85a5e36cb15d9260f6fb185bd5d6528fa942b76c62cb0748d4",
     "LICENSE": "5f78a733701db49b73da93addad8cb74f816f3789ef30c3c0e959e943ecd99b4",
-    "README.md": "8f95eb732a7b705fe332543acb540229b751fed1a50825fdc59715694af4f71d",
+    "README.md": "50fae0d425da3bbe399bdc032fc5175e37acc5b5483865dffa8af56172fbf8e1",
     "build.rs": "2ce34ab434e1bc9e111e5e6cc52d7aa43a4a2e4e2f2648ed19e5f48888873dd6",
     "resources/windows/gpui.manifest.xml": "00bce21693c57d15d1a15f1d8814206d9dd80389bbf63ce5a8f3b364891232b6",
     "resources/windows/gpui.rc": "eb3efc3b6af498552a0dd67f69d58e1a53e49155dfe90e4649478ec64dbd6af6",
@@ -42,7 +42,7 @@
     "src/elements/div.rs": "727f26f84edc1c724b31931264ee7d967bede63a40df54271c613cedec0a65b5",
     "src/elements/image_cache.rs": "7d3586c6e4d5b52a03e1a205daf740e802888f489f805656b0c2d0063086d801",
     "src/elements/img.rs": "1e53a2531f87ff6763ab8c4ce4324a4291e85cb2389b23d573c768f171b87a6c",
-    "src/elements/list.rs": "9b156ac1988ffef9d0ef8351318f1fd6457af43dc66a771f6edbdecf24136e72",
+    "src/elements/list.rs": "3760f8367652365051097714df082b254325044763fa2bf598668bee80217425",
     "src/elements/mod.rs": "28dffa24bfff0fd1feaf79645e13a62216efcb62ac6ae2c457ad6ae4a781db9a",
     "src/elements/surface.rs": "f2ec6f75528c2e9116255303fc7bb7c79cefc3fcae52f5bb64bc13e171cbb2fb",
     "src/elements/svg.rs": "ab5412945c36fd0087e95a1544d610cf9308e906b3059835b4c49f98f4b9279e",
@@ -68,7 +68,7 @@
     "src/fast/layers/mod.rs": "0e3437497f6eb5ba8d4df09464302a3ed616a9bfc037cda88c4d1d5ee968381c",
     "src/fast/layers/overlay.rs": "b56764a7c1be0758de2e4a08ec56f4fe9beb6a948aef531da98d8afade035acc",
     "src/fast/layers/paint.rs": "33b8a1050f93327a9f6171f66f826d53de456bc0b83471ab8ee63a8910dc6916",
-    "src/fast/layers/policy.rs": "42e6d9ee48316ca0bd99854bcbffb0f51bdd79805b0096366e530c5a03020fe5",
+    "src/fast/layers/policy.rs": "fe8a2700478de63a978c570ed15c2468c34ffe7ba55a628317f3a830d30383df",
     "src/fast/layers/record.rs": "79ac7c837daf73544ce8ac7ea0b3f266ea3cfe9e3eac0ae2894f5eee93ad4be9",
     "src/fast/layers/reuse.rs": "73145d100f11d2a2f9d66fd35dca90803babffcb0e2c10b65cd77868e0f556bf",
     "src/fast/layers/scene.rs": "72ffe6268d28606a26151dda28bb260d8d4ce0c27bcf7686619f04ea5bc32acf",
@@ -81,10 +81,11 @@
     "src/fast/layout_bounds.rs": "b9d5bc8950bd339eb96423864cf680255b2ceb7db47523ab5127b2d5a62674b4",
     "src/fast/layout_key.rs": "7cf3e633429536a2c322a28d42c3bd68be8c4eef10ce25afba6faef9499d7c5d",
     "src/fast/line_break.rs": "94e8252f8086d6ce3f02f733cc6b06a07eeb55491c87c5b119ae32c5811556fa",
+    "src/fast/list_measure.rs": "8aa90870959e309b56ea2c7db1f152c76298d059bafd6717f3fd6a92c0fab28a",
     "src/fast/misc/mod.rs": "07f7e3431c8e6474ba5fcf898187266c62cf0c3a28af6e757fd0c26ecc725073",
     "src/fast/misc/system_power.rs": "cf7ec626c65579abf4c43b237de6904fefe31874c2eda029c23d0f444c8eb8cf",
     "src/fast/misc/touch_fling.rs": "0bc60cd91cd4d18969dcd85498f8f428e5f1beb26e1560588e03813f28dd869a",
-    "src/fast/mod.rs": "3309d02b904b47ca98945fe11f75ba1ceaa3964142186132d90eefcdf47c60f9",
+    "src/fast/mod.rs": "dc775e33092018436032c371c6ffd18624995e910bf990ab0b7d93c3a3b70e37",
     "src/fast/number_shaping.rs": "9b61e343e7a706d3aafbbf4e96f5d019e13f805e6f75f951a64aede73cc6d8c3",
     "src/fast/path_cache.rs": "b7e988864c8e687685b93d0bf73acc12d41900498913ad528313ef09ce103c1e",
     "src/fast/retained.rs": "b8ccfee21ed8d6091a318e26051e00d67e7da37b31caa82b624b597fea919096",
@@ -103,14 +104,15 @@
     "src/fast/tests/em_metrics.rs": "ee715b45a547ecd49b3c8573d1bf90c192e40f3880495d712afee408a5d667d1",
     "src/fast/tests/global_id.rs": "d734a0982c17f27d72c64704cb780fcb3961fcccde515357c1435bd3b89aa33e",
     "src/fast/tests/interactive_text.rs": "78a0b5f7b21a77ebb19c40eb38a145027ae365dab7f242226ec0602ca283dcb5",
-    "src/fast/tests/layers.rs": "5f2fa1ab72f6ead52df54eb35a8d4d1abbb4dd35d20e9dc53ab52e41911b4b03",
+    "src/fast/tests/layers.rs": "6855b94f51c2acd28de7a79a85ecf2f00196be0f2a5321976b0d5bf12cce81fd",
     "src/fast/tests/layers_lists.rs": "bf5a4d1031166e2d97aa549083f38d08fbe8223efe4867683e1c2879f01a7baa",
     "src/fast/tests/layers_oracle.rs": "ff28ee326fccca43f6d3a04bf7f3d76693ee0d09e6096c3101fabdc1177f35e6",
     "src/fast/tests/layout.rs": "59c264ee686a82e423f9bfdf13f0237212257f5763b84940cb666be0a5b32406",
+    "src/fast/tests/list_measure.rs": "0c1481df46af09de7beca57c9cad9ba0a7e9994b51765d8e7abe92be96f3f6bd",
     "src/fast/tests/misc/mod.rs": "fab764d2251093b6d0c37340341e49bd6683cff2813cb0bf7f778069687291a0",
     "src/fast/tests/misc/system_power.rs": "9fab23d3a8f9cb88212dcbb0fd60773693e29bd8229a25ac6e06697b8d6f3643",
     "src/fast/tests/misc/touch_fling.rs": "53ba3448532f902887915df918b4bb075f6f3bbd83339d1701ac0f88ca0bac08",
-    "src/fast/tests/mod.rs": "4c85497560345357513aa676977dd3eb2456a77353b93aaaafbf6eb1512d3865",
+    "src/fast/tests/mod.rs": "dd60a178df8fc1b415e491594b323e2c89663b809bdf633116aba90d9d419241",
     "src/fast/tests/number_shaping.rs": "36a705b368b098ab90abe852daf9b105bf40a297a1d3a10b38c53f082d7055ff",
     "src/fast/tests/oracle.rs": "4e2c4f8ec0241e53964176b2ea394a5d5c178fe2e95e5068d26f48667bc12804",
     "src/fast/tests/path_cache.rs": "25339c06e4f2749ad9e44b1655bd6e5eaabf77fe1651d366576a8a24d8268cb9",
@@ -125,10 +127,12 @@
     "src/fast/tests/text.rs": "6f8b25f9870fa336bdd153673258e12324a827fc273ff743f781a89474d3e25d",
     "src/fast/tests/text_shaping.rs": "4ec2e056ad1f8b7883c862ea92dde98fec5cabc561714f59c92e9bf9ea94233a",
     "src/fast/tests/tracked_entities.rs": "0699a7fb946827fae4a4488664bd7b82f3322062f177cb93a3ab96aa2c4080fe",
+    "src/fast/tests/truncation.rs": "0204e40964e2c00d1103e397983c8a1e9a29bfb0c1b25a0fb664d0f559fa22a3",
     "src/fast/tests/wheel_notifies.rs": "a41e607fe922ddd80e5a726a4784e307118fa56f5f831ed155cee70276a79ec7",
-    "src/fast/text.rs": "3505d68e4a644b286521770bd26009667d21a4fa2e33c9bf06e87215dd61f3ea",
+    "src/fast/text.rs": "7d622e4c471f8ba4a70b8a379f9fbb682f7e3cabfbae4a902f7ac5627dda2253",
     "src/fast/text_style.rs": "375be6d8c8c8d0b54ec4552bcecd51e9517ad32f6fa3a94ba9abe076cc9cc639",
     "src/fast/tracked_entities.rs": "16171f48408a7cc224333e641a1b96a3502f9ae53c74811555f417e63f1fe469",
+    "src/fast/truncation.rs": "d28ea5338433916c80bbd1ce1b4312123647e23db9c889aa88fb311620c777cc",
     "src/fast/windows_manifest.rs": "e3dc55ca61b752ae8435dc67b3efebcf7c0a10312b61c675e8b18ab94724cf0d",
     "src/geometry.rs": "965ae8f6c1d4bd2e7dcb43e253a99dd4363252b1ef6dc19c3031ea50c5192408",
     "src/gestures.rs": "9b0ee581f2e709719219ce94224e977b5d880dec6cd94cc9adc0143a1ded0eef",
@@ -182,7 +186,7 @@
     "src/text_system/font_features.rs": "85f901df313e3b8379e65b70a0e69e5dfc7d8280a761e568d1f4293edc4c4834",
     "src/text_system/line.rs": "08da0ee49c4cc95c7e9c71e5b3fda7717352e3bcf70f6b62b0e6e242cca826b0",
     "src/text_system/line_layout.rs": "b89f78643cf253656f4d990c90c84ca1175cb0747dd827c13650fccc6702795e",
-    "src/text_system/line_wrapper.rs": "8912c5d16dc00bbcc1f19f56c2f2f4e3b826aa244b4f7c04c62a3934b22f7c4f",
+    "src/text_system/line_wrapper.rs": "b2665a85485b04378d9ae0026eee10671ab2566dbc8e26acde0377e7f2375a38",
     "src/text_system.rs": "32cb536dfb33a2a74fd6f0b24482e6a5259ff762669dfd407c39282aa82f2de9",
     "src/util.rs": "04397f667bf5d890cce690b96441cd5b8f5eb0a5dd2942ce27b0314be38fa636",
     "src/view.rs": "468c95349c919875cd693e2e5b39df8c8131377c90cf74ba10bc9ccf0802e9d2",
@@ -192,9 +196,25 @@
     "src/window.rs": "cb34d06d7ad329aa59bbc64396f25b0777b9b0b1e26084afe4f2159ff87f862f"
   },
   "modified_files": {
+    "src/elements/div.rs": {
+      "upstream_sha256": "727f26f84edc1c724b31931264ee7d967bede63a40df54271c613cedec0a65b5",
+      "local_sha256": "c3fa4dfdf4d3097cdd05dad9228a692e4f785ebff17decaad141aba10b2ae274"
+    },
     "src/elements/list.rs": {
-      "upstream_sha256": "9b156ac1988ffef9d0ef8351318f1fd6457af43dc66a771f6edbdecf24136e72",
-      "local_sha256": "fd5d836516c265e34ada3d4c18053dd05391ab558d0eb3931bf03d14fdd2d25a"
+      "upstream_sha256": "3760f8367652365051097714df082b254325044763fa2bf598668bee80217425",
+      "local_sha256": "d07b4f1e1655c351edb24b0601c56f5329af182c02fe01f04dd806eaf42bd0d2"
+    },
+    "src/fast/layers/input.rs": {
+      "upstream_sha256": "a3b8bb6f880e2193592c7aeff62a3bbdf3f7a536f5d27414c6e2967956a34cf1",
+      "local_sha256": "5c382c1aaf27ccc83f34554ad3c02d592b0f5c6241f81f95e9259e51a5d6cd7b"
+    },
+    "src/fast/layers/mod.rs": {
+      "upstream_sha256": "0e3437497f6eb5ba8d4df09464302a3ed616a9bfc037cda88c4d1d5ee968381c",
+      "local_sha256": "463778a8b559296011ecda1fbdbdd38f1d1e6c3b93a1f111b2d27fb3894bfbb4"
+    },
+    "src/fast/tests/mod.rs": {
+      "upstream_sha256": "dd60a178df8fc1b415e491594b323e2c89663b809bdf633116aba90d9d419241",
+      "local_sha256": "49feca498293f4ed2694b64f0afb7edde42c477e7056553e9fc2f388c9fe1ac4"
     },
     "src/profiler/hang.rs": {
       "upstream_sha256": "1d32f5e43c0b61ddbd8083662ad3a129f67f66c9c607dd555c98c9cefa041c7e",
@@ -221,12 +241,14 @@
       "local_sha256": "a6154102dccdd88dc55416ec8a7466f5a6459690a12ca1ee13d89fb651b70d97"
     },
     "src/text_system/line_wrapper.rs": {
-      "upstream_sha256": "8912c5d16dc00bbcc1f19f56c2f2f4e3b826aa244b4f7c04c62a3934b22f7c4f",
-      "local_sha256": "fb5698fdef112a5daf981103ad2af0eb60ca854e134a03f297901cf28f6bc952"
+      "upstream_sha256": "b2665a85485b04378d9ae0026eee10671ab2566dbc8e26acde0377e7f2375a38",
+      "local_sha256": "f18d131c394b9d7c8cfd230a4611c72dee8bf7ab17e1af8e1b2276f44f5e250d"
     }
   },
   "added_files": {
     "examples/image/exif-orientation-rotate-180.jpg": "cb6c28e3e6065d62790ba38662d14f3f1510180375cacba18547720e8b48d9d5",
+    "src/fast/layers/wheel_latch.rs": "061a39e1c1a0b7a211980f92a87bf35ca2e8c66e7c61b91ce423806d05dd151d",
+    "src/fast/tests/wheel_latch.rs": "b1dd5443df61f9bd7ee78a6d22a03fccd1087fc8ae831449c7ea0da7fcc61f3a",
     "tests/fonts/README.md": "675824dd97a1d09a1a105d186a7b96a05016009d5d14621d6f5298612b3fbc6d",
     "tests/fonts/ibm-plex-sans/IBMPlexSans-Regular.ttf": "975dcda37d80f038dcd143c22e33ca2d97a0cc5a929aace1c749153b0fe1afa5",
     "tests/fonts/ibm-plex-sans/license.txt": "91c25c350d3cac39da2736d74f7ba37ef648f5237a4e330a240615bc8d8c4360",

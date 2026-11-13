@@ -3448,8 +3448,16 @@ impl Interactivity {
             let current_view = window.current_view();
             let subtrees = crate::fast::retained::enclosing_retained_subtrees(window);
             let fast_container = crate::fast::layers::invalidate::painted_container(window, self);
+            let container = Rc::as_ptr(&scroll_offset) as usize;
             window.on_mouse_event(move |event: &ScrollEvent, phase, window, cx| {
+                if phase == DispatchPhase::Capture && hitbox.should_handle_scroll(window) {
+                    crate::fast::layers::wheel_latch::note_under_pointer(window, container);
+                }
                 if phase == DispatchPhase::Bubble && hitbox.should_handle_scroll(window) {
+                    let owner = crate::fast::layers::wheel_latch::owner(window, container);
+                    if owner == crate::fast::layers::wheel_latch::Owner::Taken {
+                        return;
+                    }
                     let mut scroll_offset = scroll_offset.borrow_mut();
                     let old_scroll_offset = *scroll_offset;
                     let mut delta = event.delta.pixel_delta(line_height);
@@ -3463,6 +3471,15 @@ impl Interactivity {
                             .filter(&mut delta, event.touch_phase);
                     }
 
+                    // A container scrolling on one axis takes only a wheel going
+                    // mainly along it; one going mainly across it moves it
+                    // without taking it, as it moves the containers around it.
+                    let across = match (overflow.x, overflow.y) {
+                        (Overflow::Scroll, Overflow::Scroll) => false,
+                        (Overflow::Scroll, _) => delta.x.abs() <= delta.y.abs(),
+                        (_, Overflow::Scroll) => delta.y.abs() < delta.x.abs(),
+                        _ => false,
+                    };
                     let mut delta_x = match overflow.x {
                         Overflow::Scroll if !delta.x.is_zero() => delta.x,
                         Overflow::Scroll
@@ -3481,6 +3498,9 @@ impl Interactivity {
                         }
                         _ => Pixels::ZERO,
                     };
+                    if owner == crate::fast::layers::wheel_latch::Owner::Other && !across {
+                        return;
+                    }
                     if !allow_concurrent_scroll && !delta_x.is_zero() && !delta_y.is_zero() {
                         if delta_x.abs() > delta_y.abs() {
                             delta_y = Pixels::ZERO;
@@ -3488,11 +3508,18 @@ impl Interactivity {
                             delta_x = Pixels::ZERO;
                         }
                     }
-                    if !crate::fast::layers::wheel::moves(
+                    let moves = crate::fast::layers::wheel::moves(
                         old_scroll_offset,
                         point(delta_x, delta_y),
                         fast_scroll_max,
-                    ) {
+                    );
+                    // The gesture's container keeps the event at its end too,
+                    // so that nothing around it moves by it.
+                    if owner == crate::fast::layers::wheel_latch::Owner::This || (moves && !across)
+                    {
+                        crate::fast::layers::wheel_latch::hold(window, cx, container, event);
+                    }
+                    if !moves {
                         return;
                     }
                     scroll_offset.y += delta_y;
