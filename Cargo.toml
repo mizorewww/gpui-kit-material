@@ -4,7 +4,7 @@ members = ["crates/color", "crates/material", "crates/gallery", "crates/gallery-
 exclude = ["vendor/gpui-kit", "vendor/gpui-pre", "vendor/gpui-pre-web", "vendor/gpui-pre-apple", "vendor/gpui-fast", "vendor/gpui-fast-apple"]
 
 [workspace.package]
-version = "0.1.3"
+version = "0.1.4"
 edition = "2024"
 license = "MIT"
 rust-version = "1.98"
