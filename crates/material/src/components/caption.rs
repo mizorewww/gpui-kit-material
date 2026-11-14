@@ -358,9 +358,18 @@ impl RenderOnce for CaptionButtons {
 /// Makes a control inside a title bar take the press itself. The whole bar
 /// is a drag area: on Windows a press there arrives as a caption press, and
 /// one no element stops goes on to the system's move-window loop (and
-/// maximizes on a double click). Empty bar space still moves the window.
+/// maximizes on a double click), which swallows the release, so the control
+/// never sees a click. Empty bar space still moves the window.
+///
+/// The element occludes the bar behind it, so Windows hit-tests its area as
+/// the window's client area and the press never becomes a caption press. A
+/// stopped press alone is not enough: it stops only where the element itself
+/// is hovered, and a control inside it (a button wrapped in a tooltip) blocks
+/// the hover of everything behind it, the wrapper included.
 pub fn title_bar_control<E: gpui::InteractiveElement>(element: E) -> E {
-    element.on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+    element
+        .occlude()
+        .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
 }
 
 /// The straight strokes of a glyph in a `glyph` px box, relative to the box.
