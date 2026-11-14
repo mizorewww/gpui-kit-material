@@ -366,6 +366,10 @@ impl RenderOnce for CaptionButtons {
 /// stopped press alone is not enough: it stops only where the element itself
 /// is hovered, and a control inside it (a button wrapped in a tooltip) blocks
 /// the hover of everything behind it, the wrapper included.
+///
+/// Occluding also keeps the wheel from what is behind the element, so it
+/// belongs in a bar that does not scroll with content: a sample bar inside a
+/// scrolling page does not pass the wheel over its controls to the page.
 pub fn title_bar_control<E: gpui::InteractiveElement>(element: E) -> E {
     element
         .occlude()
