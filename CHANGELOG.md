@@ -7,6 +7,21 @@ commit messages.
 
 Nothing yet.
 
+## gpui-kit-material 0.1.4 (2026-11-14)
+
+`gpui-kit-material` 0.1.4 requires `gpui-kit-material-color` 0.1.1 (unchanged, so not
+released again) and builds on `gpui-kit` 0.9.1. The consumer patch set is unchanged
+since 0.1.3.
+
+### Fixed
+
+- On Windows, a control that `title_bar_control` wraps together with something around
+  it, such as an `IconButton` inside a `MaterialTooltip`, takes its clicks. The press
+  reached the system's move-window loop instead, which swallowed the release: the button
+  showed pressed and never clicked. `title_bar_control` now occludes the bar's drag area
+  behind it, so Windows hit-tests the control's area as the client area. Controls wrapped
+  directly, and empty bar space, behave as before.
+
 ## gpui-kit-material 0.1.3 (2026-11-13)
 
 `gpui-kit-material` 0.1.3 requires `gpui-kit-material-color` 0.1.1 (unchanged, so not

@@ -83,14 +83,10 @@ pub(crate) fn set_dark(shared: &Entity<GalleryShared>, dark: bool, cx: &mut App)
 }
 
 /// Makes a control in the title bar its own: [`title_bar_control`] takes its
-/// left presses, and this also takes its right presses, which the bar would
-/// answer with the system's window menu, and occludes the bar beneath it. The
-/// bar is a drag area, which Windows hit-tests as the caption wherever the
-/// pointer reaches it: a field there could not be drag-selected.
+/// left presses and occludes the bar beneath it, and this also takes its right
+/// presses, which the bar would answer with the system's window menu.
 pub(crate) fn bar_control<E: InteractiveElement>(element: E) -> E {
-    title_bar_control(element)
-        .occlude()
-        .on_mouse_down(MouseButton::Right, |_, _, cx| cx.stop_propagation())
+    title_bar_control(element).on_mouse_down(MouseButton::Right, |_, _, cx| cx.stop_propagation())
 }
 
 pub(crate) struct TopBar {

@@ -259,7 +259,7 @@ mod tests {
     use crate::components::caption::tests::test_labels;
     use crate::components::{ButtonVariant, material_button, title_bar_control};
     use gpui::{Context, Modifiers, Render, TestAppContext, size};
-    use std::cell::Cell;
+    use std::{cell::Cell, rc::Rc};
 
     thread_local! {
         /// Window moves the bar started on this test's thread.
@@ -378,6 +378,84 @@ mod tests {
         cx.simulate_mouse_down(empty, MouseButton::Left, Modifiers::default());
         cx.simulate_mouse_move(empty + point(px(8.), px(0.)), left, Modifiers::default());
         assert_eq!(moves(), usize::from(!cfg!(target_os = "windows")));
+    }
+
+    /// A control nested in what `title_bar_control` wraps, a button in a
+    /// tooltip, with a hitbox behind the bar's content standing in for its drag
+    /// area: Windows asks whether the drag area is anywhere under the pointer
+    /// (`should_handle_scroll`'s test), and finds it only on empty bar space.
+    struct Nested {
+        drag_area_under: Rc<Cell<Option<bool>>>,
+        clicks: usize,
+    }
+
+    impl Render for Nested {
+        fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+            let seen = self.drag_area_under.clone();
+            let behind = gpui::canvas(
+                |bounds, window, _| window.insert_hitbox(bounds, gpui::HitboxBehavior::Normal),
+                move |_, hitbox, window, _| {
+                    let seen = seen.clone();
+                    window.on_mouse_event(move |_: &gpui::MouseDownEvent, phase, window, _| {
+                        if phase == gpui::DispatchPhase::Capture {
+                            seen.set(Some(hitbox.should_handle_scroll(window)));
+                        }
+                    });
+                },
+            )
+            .absolute()
+            .top_0()
+            .left_0()
+            .size_full();
+            div().size_full().child(
+                TitleBar::new("bar", px(48.), test_labels())
+                    .w_full()
+                    .relative()
+                    .child(behind)
+                    .child(title_bar_control(
+                        div()
+                            .flex_shrink_0()
+                            .debug_selector(|| "nested".into())
+                            .child(
+                                crate::components::MaterialTooltip::plain("tip", "Back").trigger(
+                                    crate::components::IconButton::new(
+                                        "nested",
+                                        crate::icons::Symbol::ARROW_BACK.icon(),
+                                        "Back",
+                                    )
+                                    .on_click(cx.listener(|this, _, _, _| this.clicks += 1)),
+                                ),
+                            ),
+                    ))
+                    .child(div().flex_1()),
+            )
+        }
+    }
+
+    #[gpui::test]
+    fn a_nested_control_keeps_the_drag_area_out_from_under_it(cx: &mut TestAppContext) {
+        let seen = Rc::new(Cell::new(None));
+        let (view, cx) = cx.add_window_view({
+            let seen = seen.clone();
+            move |_, _| Nested {
+                drag_area_under: seen,
+                clicks: 0,
+            }
+        });
+        cx.run_until_parked();
+        let button = cx
+            .debug_bounds("nested")
+            .expect("the nested button")
+            .center();
+        cx.simulate_click(button, Modifiers::default());
+        assert_eq!(
+            seen.get(),
+            Some(false),
+            "the drag area is not under the control"
+        );
+        view.read_with(cx, |v, _| assert_eq!(v.clicks, 1));
+        cx.simulate_click(point(px(400.), px(24.)), Modifiers::default());
+        assert_eq!(seen.get(), Some(true), "empty bar space is the drag area");
     }
 
     #[gpui::test]
