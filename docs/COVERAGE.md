@@ -42,6 +42,7 @@ M3 roles and type. Each is opt-in: the M3 defaults do not change.
 | `TextFieldShape::Rounded` | Medium corners on a filled or outlined field |
 | `ButtonTone::Neutral`, `Accent` | Other roles for a button's enabled, unselected colors. Disabled and selected keep M3's |
 | `SearchFieldStyle::Surface`, `Tonal` | A search bar on the surface with an edge, or on surface-container-highest |
+| `SearchFieldDensity::Compact`, `Dense` | A 48dp or 40dp search bar with 40dp icon targets, for toolbars of 40dp controls. `Dense` uses Body medium and drops the 4dp chrome inset |
 | `CardVariant::Surface` | A flat card on the surface with no edge |
 | `MaterialDialog::container` | Another role for a dialog's container |
 | `NoticeKind::Warning`, `status_fact_chip` | Status surfaces on the kit's own warning and success roles |

@@ -7,6 +7,7 @@ struct BarHarness {
     expanded: bool,
     layout: SearchViewLayout,
     style: SearchViewStyle,
+    density: SearchFieldDensity,
     disabled: bool,
     rows: usize,
     picked: Rc<Cell<Option<usize>>>,
@@ -20,6 +21,7 @@ impl Render for BarHarness {
             SearchView::new(
                 "view",
                 SearchField::new(&self.state)
+                    .density(self.density)
                     .leading(div().size(px(24.)))
                     .disabled(self.disabled),
             )
@@ -56,6 +58,7 @@ fn setup(
         expanded: false,
         layout,
         style: SearchViewStyle::Contained,
+        density: SearchFieldDensity::Default,
         disabled: false,
         rows: 3,
         picked: Rc::default(),
@@ -281,4 +284,44 @@ fn search_field_styles_paint_their_containers() {
         SearchFieldStyle::Tonal.container(),
         ColorRole::SURFACE_CONTAINER_HIGHEST
     );
+}
+
+#[test]
+fn search_field_density_follows_m3_steps() {
+    assert_eq!(SearchFieldDensity::default(), SearchFieldDensity::Default);
+    assert_eq!(SearchFieldDensity::Default.height(), 56.);
+    assert_eq!(SearchFieldDensity::Compact.height(), 48.);
+    assert_eq!(SearchFieldDensity::Dense.height(), 40.);
+    assert_eq!(
+        rem(SearchFieldDensity::Dense.height()),
+        crate::tokens::layout::CONTROL_HEIGHT
+    );
+    for density in SearchFieldDensity::ALL {
+        assert!(
+            density.target_size() <= density.height(),
+            "{density:?} target exceeds bar height"
+        );
+        assert_eq!(density.chrome_inset() + density.text_inset(), 16.);
+    }
+}
+
+#[gpui::test]
+fn dense_and_compact_bars_size_their_bar_and_icon_targets(cx: &mut TestAppContext) {
+    let (view, cx) = setup(cx, SearchViewLayout::Docked);
+    for (density, expected_bar, expected_target) in [
+        (SearchFieldDensity::Default, 56., 48.),
+        (SearchFieldDensity::Compact, 48., 40.),
+        (SearchFieldDensity::Dense, 40., 40.),
+    ] {
+        view.update(cx, |v, cx| {
+            v.density = density;
+            cx.notify();
+        });
+        draw(cx);
+        let bar = cx.debug_bounds("search-bar").unwrap();
+        let target = cx.debug_bounds("search-bar-target").unwrap();
+        assert_eq!(bar.size, size(px(360.), px(expected_bar)));
+        assert_eq!(target.size, size(px(expected_target), px(expected_target)));
+        assert!(target.top() >= bar.top() && target.bottom() <= bar.bottom());
+    }
 }

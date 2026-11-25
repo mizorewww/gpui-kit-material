@@ -56,6 +56,69 @@ impl SearchFieldStyle {
     }
 }
 
+/// Vertical density of a [`SearchField`], following Material's density scale
+/// (4dp steps from the 56dp M3 search bar baseline).
+///
+/// The Figma Material 3 Design Kit draws the bar at density 0 (56dp). Denser
+/// levels shrink the bar and its icon targets proportionally so it aligns with
+/// toolbar controls at [`crate::tokens::layout::CONTROL_HEIGHT`] (40dp).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum SearchFieldDensity {
+    /// M3 search bar baseline (density 0): 56dp tall with 48dp icon targets.
+    #[default]
+    Default,
+    /// Density −2: 48dp tall with 40dp icon targets.
+    Compact,
+    /// Density −4: 40dp tall (`CONTROL_HEIGHT`) with 40dp icon targets.
+    Dense,
+}
+
+impl SearchFieldDensity {
+    pub const ALL: [Self; 3] = [Self::Default, Self::Compact, Self::Dense];
+    pub const fn name(self) -> &'static str {
+        match self {
+            Self::Default => "Default",
+            Self::Compact => "Compact",
+            Self::Dense => "Dense",
+        }
+    }
+    /// The bar's container height in dp.
+    pub const fn height(self) -> f32 {
+        match self {
+            Self::Default => SEARCH_BAR_HEIGHT,
+            Self::Compact => SEARCH_BAR_HEIGHT - 8.,
+            Self::Dense => SEARCH_BAR_HEIGHT - 16.,
+        }
+    }
+    /// Side length of each leading or trailing icon slot in dp.
+    const fn target_size(self) -> f32 {
+        match self {
+            Self::Default => TARGET,
+            Self::Compact | Self::Dense => 40.,
+        }
+    }
+    /// Outer horizontal padding and inter-slot gap of the bar in dp.
+    const fn chrome_inset(self) -> f32 {
+        match self {
+            Self::Default | Self::Compact => 4.,
+            Self::Dense => 0.,
+        }
+    }
+    /// Text inset on a side without an icon slot, added to
+    /// [`Self::chrome_inset`] to keep a 16dp text margin.
+    const fn text_inset(self) -> f32 {
+        16. - self.chrome_inset()
+    }
+    /// Query and placeholder type role.
+    const fn type_role(self) -> TypeRole {
+        match self {
+            Self::Default | Self::Compact => TypeRole::BodyLarge,
+            Self::Dense => TypeRole::BodyMedium,
+        }
+    }
+}
+
 /// The search bar container: surface-container-high (not the highest).
 pub(crate) const SEARCH_CONTAINER: ColorRole = ColorRole::SURFACE_CONTAINER_HIGH;
 /// Search bar height.
@@ -115,6 +178,7 @@ pub struct SearchField {
     trailing: Vec<AnyElement>,
     disabled: bool,
     field_style: SearchFieldStyle,
+    density: SearchFieldDensity,
     preview: Option<InteractionPreview>,
     style: StyleRefinement,
 }
@@ -146,6 +210,7 @@ impl SearchField {
             trailing: Vec::new(),
             disabled: false,
             field_style: SearchFieldStyle::Standard,
+            density: SearchFieldDensity::Default,
             preview: None,
             style: StyleRefinement::default(),
         }
@@ -154,6 +219,12 @@ impl SearchField {
     /// How the bar sits on the screen. See [`SearchFieldStyle`].
     pub fn field_style(mut self, style: SearchFieldStyle) -> Self {
         self.field_style = style;
+        self
+    }
+
+    /// Vertical density of the bar. See [`SearchFieldDensity`].
+    pub fn density(mut self, density: SearchFieldDensity) -> Self {
+        self.density = density;
         self
     }
 
@@ -197,14 +268,15 @@ fn alpha(mut c: Rgba, a: f32) -> Rgba {
     c
 }
 
-/// A 48dp target holding one 24dp slot.
-fn target(child: AnyElement, ink: Rgba) -> Div {
+/// An icon slot sized for the bar's density.
+fn target(child: AnyElement, size: f32, ink: Rgba) -> Div {
     div()
+        .debug_selector(|| "search-bar-target".into())
         .flex()
         .flex_shrink_0()
         .items_center()
         .justify_center()
-        .size(rem(TARGET))
+        .size(rem(size))
         .text_color(ink)
         .child(child)
 }
@@ -214,6 +286,12 @@ impl RenderOnce for SearchField {
         let on_surface = color(ColorRole::ON_SURFACE);
         let container = color(self.field_style.container());
         let edged = self.field_style == SearchFieldStyle::Surface;
+        let density = self.density;
+        let role = density.type_role();
+        let scale = role.scale();
+        let target_size = density.target_size();
+        let chrome_inset = density.chrome_inset();
+        let text_inset = density.text_inset();
         let disabled = self.disabled || self.preview.is_some_and(InteractionPreview::is_disabled);
         let preview = self.preview.filter(|_| !disabled);
         let live = preview.is_none() && !disabled;
@@ -238,9 +316,9 @@ impl RenderOnce for SearchField {
                     .disabled(disabled)
                     .with_size(Size::XSmall)
                     .p_0()
-                    .h(rem(24.))
-                    .text_size(TypeRole::BodyLarge.scale().font_size)
-                    .line_height(TypeRole::BodyLarge.scale().line_height)
+                    .h(scale.line_height)
+                    .text_size(scale.font_size)
+                    .line_height(scale.line_height)
                     .into_any_element(),
                 state,
             )
@@ -262,62 +340,60 @@ impl RenderOnce for SearchField {
         };
         let has_leading = self.leading.is_some();
         let trailing_count = self.trailing.len();
-        let mut bar = div()
-            .id(self.id.clone())
-            .debug_selector(|| "search-bar".into())
-            .group(group.clone())
-            .relative()
-            .flex()
-            .items_center()
-            .w_full()
-            .min_w_0()
-            .h(rem(SEARCH_BAR_HEIGHT))
-            .px(rem(4.))
-            .gap(rem(4.))
-            .rounded_full()
-            .bg(container)
-            .when(edged, |this| {
-                this.border(px(1.))
-                    .border_color(color(ColorRole::OUTLINE_VARIANT))
-            })
-            .text_color(on_surface)
-            .map(|this| type_style(this, TypeRole::BodyLarge))
-            .when(live, |this| this.cursor_text())
-            // The state layer, under the content.
-            .child(
-                div()
-                    .absolute()
-                    .inset_0()
-                    .rounded_full()
-                    .bg(alpha(on_surface, layer))
-                    .when(live, |this| {
-                        this.group_hover(group.clone(), move |s| {
-                            s.bg(alpha(on_surface, state::HOVER))
-                        })
-                    }),
-            )
-            .when(live, |this| {
-                this.active(move |s| s.bg(state::pressed(container, on_surface)))
-            })
-            .children(
-                self.leading
-                    .map(|icon| target(icon, color(ColorRole::ON_SURFACE)).opacity(fade)),
-            )
-            .child(
-                div()
-                    .relative()
-                    .flex_1()
-                    .min_w_0()
-                    .opacity(fade)
-                    .when(!has_leading, |this| this.pl(rem(12.)))
-                    .when(trailing_count == 0, |this| this.pr(rem(12.)))
-                    .child(content),
-            )
-            .children(
-                self.trailing
-                    .into_iter()
-                    .map(|icon| target(icon, color(ColorRole::ON_SURFACE_VARIANT)).opacity(fade)),
-            );
+        let mut bar =
+            div()
+                .id(self.id.clone())
+                .debug_selector(|| "search-bar".into())
+                .group(group.clone())
+                .relative()
+                .flex()
+                .items_center()
+                .w_full()
+                .min_w_0()
+                .h(rem(density.height()))
+                .px(rem(chrome_inset))
+                .gap(rem(chrome_inset))
+                .rounded_full()
+                .bg(container)
+                .when(edged, |this| {
+                    this.border(px(1.))
+                        .border_color(color(ColorRole::OUTLINE_VARIANT))
+                })
+                .text_color(on_surface)
+                .map(|this| type_style(this, role))
+                .when(live, |this| this.cursor_text())
+                // The state layer, under the content.
+                .child(
+                    div()
+                        .absolute()
+                        .inset_0()
+                        .rounded_full()
+                        .bg(alpha(on_surface, layer))
+                        .when(live, |this| {
+                            this.group_hover(group.clone(), move |s| {
+                                s.bg(alpha(on_surface, state::HOVER))
+                            })
+                        }),
+                )
+                .when(live, |this| {
+                    this.active(move |s| s.bg(state::pressed(container, on_surface)))
+                })
+                .children(self.leading.map(|icon| {
+                    target(icon, target_size, color(ColorRole::ON_SURFACE)).opacity(fade)
+                }))
+                .child(
+                    div()
+                        .relative()
+                        .flex_1()
+                        .min_w_0()
+                        .opacity(fade)
+                        .when(!has_leading, |this| this.pl(rem(text_inset)))
+                        .when(trailing_count == 0, |this| this.pr(rem(text_inset)))
+                        .child(content),
+                )
+                .children(self.trailing.into_iter().map(|icon| {
+                    target(icon, target_size, color(ColorRole::ON_SURFACE_VARIANT)).opacity(fade)
+                }));
         if let Some(focus) = focus.filter(|_| live) {
             bar = bar.on_mouse_down(MouseButton::Left, move |_, window, cx| {
                 focus.focus(window, cx);
@@ -646,6 +722,7 @@ impl RenderOnce for SearchView {
         let mut root = match self.layout {
             SearchViewLayout::Docked if divided => {
                 let height = results_height(rows, self.max_visible, expand);
+                let radius = self.bar.density.height() / 2.;
                 let open = visible && rows > 0;
                 div()
                     .id(id.clone())
@@ -654,7 +731,7 @@ impl RenderOnce for SearchView {
                     .flex_col()
                     .w_full()
                     .max_w(rem(360.))
-                    .rounded(rem(SEARCH_BAR_HEIGHT / 2.))
+                    .rounded(rem(radius))
                     .overflow_hidden()
                     .when(open, |this| this.bg(color(SEARCH_CONTAINER)))
                     .child(self.bar)

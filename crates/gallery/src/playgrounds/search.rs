@@ -51,6 +51,12 @@ pub static PLAYGROUND: Playground = Playground {
                     default: 0,
                 },
                 Control::Segmented {
+                    id: "density",
+                    label: "Density",
+                    options: &["default", "compact", "dense"],
+                    default: 0,
+                },
+                Control::Segmented {
                     id: "state",
                     label: "State",
                     options: &["bar", "view"],
@@ -170,6 +176,7 @@ fn preview(
     let mut bar = SearchField::new(&input)
         .id("playground-search-bar")
         .field_style(SearchFieldStyle::ALL[config.choice("field")])
+        .density(SearchFieldDensity::ALL[config.choice("density")])
         .leading(leading)
         .disabled(disabled);
     if config.bool("clear") && !query.is_empty() {
@@ -302,6 +309,7 @@ fn code(config: &Config) -> String {
         )
     });
     let field = config.choice("field");
+    let density = config.choice("density");
     let bar = chain(
         "SearchField::new(&self.query)",
         [
@@ -309,6 +317,12 @@ fn code(config: &Config) -> String {
                 format!(
                     "field_style(SearchFieldStyle::{:?})",
                     SearchFieldStyle::ALL[field]
+                )
+            }),
+            (density != 0).then(|| {
+                format!(
+                    "density(SearchFieldDensity::{:?})",
+                    SearchFieldDensity::ALL[density]
                 )
             }),
             Some(format!("leading({leading})")),
