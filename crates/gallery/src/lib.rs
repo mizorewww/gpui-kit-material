@@ -45,25 +45,42 @@ use std::{
     rc::Rc,
 };
 
-gpui::actions!(gallery, [FocusNext, FocusPrevious, Quit, CloseWindow]);
+gpui::actions!(
+    gallery,
+    [
+        FocusNext,
+        FocusPrevious,
+        Quit,
+        CloseWindow,
+        ToggleFullScreen
+    ]
+);
 
-/// The application's own commands: Quit and Close Window, bound where the
-/// platform's convention has the application handle them (macOS's Command-Q
-/// and Command-W, and its application menu). Windows and Linux close and quit
-/// a single-window application from the window manager (Alt-F4).
+/// The application's own commands, bound where the platform's convention has
+/// the application handle them: Quit and Close Window on macOS (Command-Q and
+/// Command-W, and its application menu), where the system owns full screen
+/// (Control-Command-F); Full Screen on Windows and Linux (F11, as GNOME and
+/// Windows applications bind it), where the window manager closes and quits
+/// a single-window application (Alt-F4).
 fn install_app_commands(cx: &mut App) {
     cx.on_action(|_: &Quit, cx| cx.quit());
-    cx.on_action(|_: &CloseWindow, cx| {
-        // The key's window is being updated while it dispatches the action.
-        if let Some(window) = cx.active_window() {
-            cx.defer(move |cx| {
-                let _ = window.update(cx, |_, window, _| window.remove_window());
-            });
-        }
+    cx.on_action(|_: &CloseWindow, cx| on_active_window(cx, |window| window.remove_window()));
+    cx.on_action(|_: &ToggleFullScreen, cx| {
+        on_active_window(cx, |window| window.toggle_fullscreen())
     });
     cx.bind_keys(app_command_bindings());
     #[cfg(target_os = "macos")]
     cx.set_menus([Menu::new("gpui-kit-material").items([MenuItem::action("Quit", Quit)])]);
+}
+
+/// Acts on the key's window once it has finished dispatching the action: the
+/// window is being updated while it does.
+fn on_active_window(cx: &mut App, act: impl FnOnce(&mut Window) + 'static) {
+    if let Some(window) = cx.active_window() {
+        cx.defer(move |cx| {
+            let _ = window.update(cx, |_, window, _| act(window));
+        });
+    }
 }
 
 fn app_command_bindings() -> Vec<KeyBinding> {
@@ -73,7 +90,7 @@ fn app_command_bindings() -> Vec<KeyBinding> {
             KeyBinding::new("cmd-w", CloseWindow, None),
         ]
     } else {
-        Vec::new()
+        vec![KeyBinding::new("f11", ToggleFullScreen, None)]
     }
 }
 
