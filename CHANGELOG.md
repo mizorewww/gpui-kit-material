@@ -5,7 +5,13 @@ commit messages.
 
 ## Unreleased
 
-Nothing yet.
+### Changed
+
+- `gpui-fast` is no longer a default feature of `gpui-kit-material`. A library choosing
+  the engine chose it for the whole application: Kit's features unify, so the default
+  moved every crate on that Kit, and any `[patch]` of `gpui-pre`, onto GPUI Fast. The
+  library now draws on whichever backend the application's Kit uses. To keep Fast, turn
+  on `gpui-kit-material/gpui-fast` (or Kit's `gpui-fast`) yourself. No API changes.
 
 ## gpui-kit-material 0.3.0 (2026-11-24)
 

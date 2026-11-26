@@ -51,10 +51,12 @@ resolve to one implementation. No `[patch]` is needed.
 To compile only the parts you use, turn off the defaults and name the component groups:
 
 ```toml
-gpui-kit-material = { version = "0.3", default-features = false, features = ["buttons", "selection", "gpui-fast", "embedded-symbols"] }
+gpui-kit-material = { version = "0.3", default-features = false, features = ["buttons", "selection", "embedded-symbols"] }
 ```
 
-The [crate README](crates/material/README.md#features) lists every feature.
+The library draws on upstream GPUI (`gpui-pre`) unless you turn on its `gpui-fast` feature
+or Kit's, so a `[patch]` of `gpui-pre` in your workspace applies to it too. The
+[crate README](crates/material/README.md#features) lists every feature.
 
 **WebAssembly:** published Kit 0.11.0 builds its web platform with threads, which needs
 the nightly toolchain named in Kit's

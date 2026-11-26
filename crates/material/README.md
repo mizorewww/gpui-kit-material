@@ -50,8 +50,9 @@ names always come from the caller. The rustdoc describes each component's contra
 
 ## Features
 
-`default` enables every component group, the GPUI Fast backend, embedded symbols
-and `serde`. `full` is every group, without the backend, symbols or `serde`. To drop
+`default` enables every component group, embedded symbols and `serde`, on whichever
+GPUI backend your Kit uses (upstream unless something enables Kit's `gpui-fast`).
+`full` is every group, without symbols or `serde`. To drop
 code, disable the defaults and name what you use; a group brings what it needs.
 
 | Feature | Contents |
@@ -71,7 +72,7 @@ code, disable the defaults and name what you use; a group brings what it needs.
 | `window-chrome` | `TitleBar`, `CaptionButtons` |
 | `shapes` | `MaterialShape`, `Morph` |
 | `dynamic-color` | `color::dynamic`: HCT and seed schemes |
-| `gpui-fast` | Kit's GPUI Fast backend; off selects upstream GPUI |
+| `gpui-fast` | Kit's GPUI Fast backend (off by default); off selects upstream GPUI unless your application turns on Kit's own `gpui-fast` |
 | `embedded-symbols` | Material Symbols fonts and SVGs compiled into the binary |
 | `serde` | Serializable theme preferences |
 
