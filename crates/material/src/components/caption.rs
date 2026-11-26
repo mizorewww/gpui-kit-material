@@ -29,7 +29,7 @@ use crate::color::ColorRole::{self, *};
 use crate::theme::color;
 use crate::tokens::state;
 use gpui::{
-    AnyElement, App, Bounds, Decorations, ElementId, InteractiveElement as _, IntoElement,
+    AnyElement, App, Bounds, Decorations, Edges, ElementId, InteractiveElement as _, IntoElement,
     MouseButton, ParentElement as _, PathBuilder, Pixels, RenderOnce, Rgba, SharedString,
     StatefulInteractiveElement as _, Styled, Window, WindowControlArea, canvas, div, fill, point,
     prelude::FluentBuilder as _, px, size,
@@ -465,9 +465,48 @@ fn glyph(button: CaptionButton, glyph: f32, stroke: f32) -> impl IntoElement {
     )
 }
 
-/// The row at the window's top-right corner, after every dialog layer.
+/// The width of the border Kit's window frame draws on each edge that is not
+/// tiled against the screen (gpui-component `window_border.rs`,
+/// `BORDER_SIZE`).
+const FRAME_BORDER: f32 = 1.;
+
+/// How far the window's visible frame sits inside the viewport, per side.
+///
+/// Under Linux client-side decorations Kit's `Root` wraps the window in
+/// gpui-component's `window_border`, which sets the client inset and pads the
+/// content by it for a shadow, inside a 1px border, on every edge that is not
+/// tiled against the screen. The viewport includes that shadow, which is
+/// outside the window's geometry: the compositor neither shows the window
+/// there as its body nor passes presses through. Without a client inset no
+/// frame is drawn and the frame is the viewport.
+fn frame_insets(window: &Window) -> Edges<Pixels> {
+    frame_insets_for(window.window_decorations(), window.client_inset())
+}
+
+fn frame_insets_for(decorations: Decorations, client_inset: Option<Pixels>) -> Edges<Pixels> {
+    let (Decorations::Client { tiling }, Some(shadow)) = (decorations, client_inset) else {
+        return Edges::default();
+    };
+    let side = |tiled: bool| {
+        if tiled {
+            px(0.)
+        } else {
+            shadow + px(FRAME_BORDER)
+        }
+    };
+    Edges {
+        top: side(tiling.top),
+        right: side(tiling.right),
+        bottom: side(tiling.bottom),
+        left: side(tiling.left),
+    }
+}
+
+/// The row at the top-right corner of the window's visible frame, after
+/// every dialog layer.
 fn caption_layer(row: impl IntoElement, window: &Window) -> AnyElement {
-    let trailing = gpui::point(window.viewport_size().width, px(0.));
+    let frame = frame_insets(window);
+    let trailing = gpui::point(window.viewport_size().width - frame.right, frame.top);
     gpui::deferred(
         gpui::anchored()
             .anchor(gpui::Anchor::TopRight)
@@ -867,6 +906,57 @@ pub(crate) mod tests {
         let (_, cx) = cx.add_window_view(|_, _| BarHarness(Caption::Windows, px(28.)));
         cx.run_until_parked();
         assert_centered(cx, (46., 28.), 10., false);
+    }
+
+    #[test]
+    fn the_buttons_sit_inside_the_client_decorated_frame() {
+        use gpui::Tiling;
+        let shadow = Some(px(20.));
+        // Floating: inside the shadow and the border on every side.
+        let floating = frame_insets_for(
+            Decorations::Client {
+                tiling: Tiling::default(),
+            },
+            shadow,
+        );
+        assert_eq!(floating, Edges::all(px(21.)));
+        // Snapped to the right half: flush with the screen's right edge only.
+        let snapped = frame_insets_for(
+            Decorations::Client {
+                tiling: Tiling {
+                    top: true,
+                    bottom: true,
+                    right: true,
+                    left: false,
+                },
+            },
+            shadow,
+        );
+        assert_eq!(
+            (snapped.top, snapped.right, snapped.left),
+            (px(0.), px(0.), px(21.))
+        );
+        // Maximized or fullscreen: the frame is the viewport.
+        let tiled = frame_insets_for(
+            Decorations::Client {
+                tiling: Tiling::tiled(),
+            },
+            shadow,
+        );
+        assert_eq!(tiled, Edges::default());
+        // No frame is drawn without a client inset or under the system's
+        // own decorations.
+        for (decorations, inset) in [
+            (
+                Decorations::Client {
+                    tiling: Tiling::default(),
+                },
+                None,
+            ),
+            (Decorations::Server, shadow),
+        ] {
+            assert_eq!(frame_insets_for(decorations, inset), Edges::default());
+        }
     }
 
     #[test]
