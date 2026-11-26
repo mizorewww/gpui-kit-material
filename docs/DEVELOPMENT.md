@@ -6,7 +6,9 @@ its own.
 
 ## Backends
 
-Material, the Gallery, gallery-web and the benches default to Kit's **GPUI Fast** backend.
+The Gallery, gallery-web and the benches default to Kit's **GPUI Fast** backend; the
+library alone draws on upstream GPUI unless its `gpui-fast` feature is on (in this
+workspace the Gallery's default turns it on for every package).
 For comparison, run the upstream backend:
 
 ```sh

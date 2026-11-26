@@ -242,10 +242,14 @@ Query results include gpui-kit#3612, which no Material widget reaches
 (`crates/material/tests/tab_stops.rs`).
 
 **Backend selection.** Material, the Gallery, gallery-web and the benches expose
-`gpui-fast`, forwarding to Kit's backend feature; it is on by default. Material's `gpui` alias points to
+`gpui-fast`, forwarding to Kit's backend feature. The Gallery, gallery-web and the
+benches turn it on by default; the library does not, because features unify: a library
+that selects Fast moves its consumer's whole Kit, and any `gpui-pre` patch the consumer
+carries, onto the other engine. No library code depends on the backend; only tests that
+observe Fast's retained views are gated on it. Material's `gpui` alias points to
 Kit, so upstream and Fast types cannot mix. Cargo still compiles upstream
-packages additively; they do not define the facade's public types. Disable
-default features to compare against upstream.
+packages additively; they do not define the facade's public types. Disable the
+Gallery's default features to compare against upstream.
 
 ## Rows built from an entity
 

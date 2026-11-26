@@ -19,9 +19,12 @@ categories = ["gui"]
 targets = ["x86_64-unknown-linux-gnu"]
 
 [features]
-default = ["full", "serde", "embedded-symbols", "gpui-fast"]
+default = ["full", "serde", "embedded-symbols"]
 embedded-symbols = ["gpui-material-symbols/embed-assets"]
 serde = ["gpui-kit-material-color/serde"]
+# Kit's GPUI Fast backend. Off by default: the backend is the application's choice, and a
+# library turning it on would move every crate on that Kit, and any `gpui-pre` patch the
+# application carries, off upstream GPUI. The Gallery and benches turn it on.
 gpui-fast = ["gpui-kit/gpui-fast", "dep:gpui-fast"]
 
 # Every group below. Backend, symbols and serde stay separate choices.
