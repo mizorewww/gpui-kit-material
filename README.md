@@ -42,7 +42,7 @@ Minimum Rust: **1.98**.
 ```toml
 [dependencies]
 gpui-kit = "0.11.0"
-gpui-kit-material = "0.3"
+gpui-kit-material = "0.4"
 ```
 
 Use the `gpui-kit` version the library depends on, so that Kit, GPUI and the icons
@@ -51,7 +51,7 @@ resolve to one implementation. No `[patch]` is needed.
 To compile only the parts you use, turn off the defaults and name the component groups:
 
 ```toml
-gpui-kit-material = { version = "0.3", default-features = false, features = ["buttons", "selection", "embedded-symbols"] }
+gpui-kit-material = { version = "0.4", default-features = false, features = ["buttons", "selection", "embedded-symbols"] }
 ```
 
 The library draws on upstream GPUI (`gpui-pre`) unless you turn on its `gpui-fast` feature

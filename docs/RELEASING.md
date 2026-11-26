@@ -15,6 +15,7 @@ How the crates reach crates.io. What a release must meet is in
    `gpui-material-symbols` 0.2.0 on it: `gpui-kit-material` 0.2.0.
 6. `gpui-kit` 0.11.0 (2026-11-23, tag `v0.11.0`, `gpui-fast` 0.1.19, `gpui-pre` 0.3.14) and
    `gpui-material-symbols` 0.3.0 on it: `gpui-kit-material` 0.3.0.
+7. `gpui-kit-material` 0.4.0 on the same Kit: `gpui-fast` leaves the default features.
 
 ## What the library needs from Kit
 
@@ -103,7 +104,8 @@ makes a GitHub release. Performance targets are not measured on that path.
 
 0.1.0 through 0.1.4 and 0.2.0 are published (tags `material-v0.1.0`, `color-v0.1.0`,
 `material-v0.1.1`, `color-v0.1.1`, `material-v0.1.2`, `material-v0.1.3`,
-`material-v0.1.4`, `material-v0.2.0`); 0.1.5 has a changelog entry but no tag and no
+`material-v0.1.4`, `material-v0.2.0`, `material-v0.3.0`, and `material-v0.4.0` by hand
+on 2026-11-26); 0.1.5 has a changelog entry but no tag and no
 crates.io release. `gpui-kit-material` 0.3.0 follows Kit 0.11.0: steps 1–5 are done by
 the automated port (2026-11-24; the WASM registry check runs in CI); the merge,
 `material-v0.3.0` tag and publish follow from the automation. `gpui-kit-material-color`

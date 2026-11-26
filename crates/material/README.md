@@ -19,7 +19,7 @@ color from [gpui-kit-material-color](https://crates.io/crates/gpui-kit-material-
 ```toml
 [dependencies]
 gpui-kit = "0.11.0"
-gpui-kit-material = "0.3"
+gpui-kit-material = "0.4"
 ```
 
 Use the `gpui-kit` release this crate depends on (0.11.0 or a later 0.11), so that Kit,

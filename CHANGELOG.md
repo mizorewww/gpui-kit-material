@@ -5,6 +5,15 @@ commit messages.
 
 ## Unreleased
 
+Nothing yet.
+
+## gpui-kit-material 0.4.0 (2026-11-26)
+
+`gpui-kit-material` 0.4.0 builds on `gpui-kit` 0.11.0 and requires
+`gpui-kit-material-color` 0.1.1 (unchanged, so not released again). The default
+features change, so this is a minor release. The consumer patch set is unchanged since
+0.3.0.
+
 ### Changed
 
 - `gpui-fast` is no longer a default feature of `gpui-kit-material`. A library choosing
@@ -12,6 +21,22 @@ commit messages.
   moved every crate on that Kit, and any `[patch]` of `gpui-pre`, onto GPUI Fast. The
   library now draws on whichever backend the application's Kit uses. To keep Fast, turn
   on `gpui-kit-material/gpui-fast` (or Kit's `gpui-fast`) yourself. No API changes.
+
+### Added
+
+- `SearchField::density` takes a `SearchFieldDensity`: `Default` (56dp, the Material 3
+  baseline), `Compact` (48dp, with 40dp icon targets) or `Dense` (40dp, `CONTROL_HEIGHT`,
+  `BodyMedium` text and no chrome inset), so a desktop toolbar can line a search bar up
+  with its 40dp controls. A divided docked `SearchView` takes its corner radius from the
+  bar's height. Density is opt-in and outside the Material references.
+
+### Fixed
+
+- On Linux under client-side decorations (GNOME on Wayland), the caption buttons of a
+  window that is not maximized, tiled or fullscreen sit inside the window again (#51).
+  Kit's `Root` frames such a window with a shadow inset and a 1px border, and the
+  buttons were anchored to the viewport's corner in that shadow: outside the window,
+  where presses never reached them. They now anchor to the visible frame's corner.
 
 ## gpui-kit-material 0.3.0 (2026-11-24)
 
